@@ -38,12 +38,35 @@ jobs:
           echo "OK — sintaksa e pastër."
 
       - name: Përgatit çelësin SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+          SERVER: ${{ secrets.SERVER_SSH }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+
+          # OpenSSH e refuzon nje celes qe nuk mbaron me newline ("error in
+          # libcrypto", exit 255), dhe GitHub Secrets e heq shpesh ate te fundit.
+          # printf '%s\n' e rivendos pa shtuar nje te dyte kur ekziston.
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          echo "${{ secrets.SERVER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+
+          # Deshto ketu, me nje mesazh te qarte, ne vend qe te dale nje 255 i zhveshur
+          # nga hapi tjeter.
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY nuk eshte celes i vlefshem. Kopjoje te plote, perfshi rreshtat BEGIN/END."
+            exit 1
+          fi
+          if [ -z "$SERVER" ]; then
+            echo "::error::Mungon secret-i SERVER_SSH (pritet 'root@139.162.169.104')."
+            exit 1
+          fi
+
+          # Provo lidhjen njehere, qe nje problem i qasjes te duket ketu.
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+              -i ~/.ssh/id_ed25519 "$SERVER" 'echo "SSH OK: $(hostname)"'
 
       - name: Sinkronizo kodin
         env:
@@ -53,23 +76,24 @@ jobs:
           EXCL="--exclude=.git --exclude=.github --exclude=.venv \
                 --exclude=__pycache__ --exclude=*.pyc --exclude=.env \
                 --exclude=.DS_Store --exclude=data"
+          SSH_OPTS='-o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519'
           for app in rhg-finance-local rhg-purchasing-local rhg-identity; do
             echo "==> $app"
-            rsync -az --delete $EXCL "$app/" "$SERVER:/opt/rhg/$app/"
+            rsync -az --delete -e "ssh $SSH_OPTS" $EXCL "$app/" "$SERVER:/opt/rhg/$app/"
           done
 
           echo "==> deploy files"
-          ssh "$SERVER" 'mkdir -p /opt/rhg/deploy/nginx/html /opt/rhg/deploy/npm'
+          ssh $SSH_OPTS "$SERVER" 'mkdir -p /opt/rhg/deploy/nginx/html /opt/rhg/deploy/npm'
           # certs/ përjashtohet: certifikatat janë të serverit, jo të repo-s.
-          rsync -az --delete --exclude=certs --exclude=.env \
+          rsync -az --delete -e "ssh $SSH_OPTS" --exclude=certs --exclude=.env \
                 deploy/ "$SERVER:/opt/rhg/deploy/"
-          ssh "$SERVER" 'chmod +x /opt/rhg/deploy/*.sh'
+          ssh $SSH_OPTS "$SERVER" 'chmod +x /opt/rhg/deploy/*.sh'
 
       - name: Rindërto dhe rinis
         env:
           SERVER: ${{ secrets.SERVER_SSH }}
         run: |
-          ssh "$SERVER" 'set -e
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 "$SERVER" 'set -e
             cd /opt/rhg/deploy
             docker compose build
             docker compose up -d --force-recreate finance purchasing identity
@@ -79,7 +103,7 @@ jobs:
         env:
           SERVER: ${{ secrets.SERVER_SSH }}
         run: |
-          ssh "$SERVER" 'cd /opt/rhg/deploy
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 "$SERVER" 'cd /opt/rhg/deploy
             for i in $(seq 1 30); do
               s=$(docker compose ps --format "{{.Service}}:{{.Status}}")
               echo "$s" | grep -q "starting" || break
