@@ -23,6 +23,10 @@ rsync -az "$HERE/deploy/docker-compose.yml" "$HERE/deploy/deploy.sh" \
           "$HERE/deploy/server-setup.sh" "$HERE/deploy/backup.sh" "$HERE/deploy/README-DEPLOY.md" \
           "$SERVER:$REMOTE/deploy/"
 rsync -az "$HERE/deploy/nginx/default.conf" "$SERVER:$REMOTE/deploy/nginx/"
+# NPM-ja e humb http_top.conf kur volumi rikrijohet, dhe pa te nje kerkese me IP
+# te zhveshur refuzohet me "unrecognized name". Prandaj sinkronizohet gjithmone.
+ssh "$SERVER" "mkdir -p $REMOTE/deploy/npm"
+rsync -az "$HERE/deploy/npm/http_top.conf" "$SERVER:$REMOTE/deploy/npm/"
 rsync -az --delete "$HERE/deploy/nginx/html/" "$SERVER:$REMOTE/deploy/nginx/html/"
 ssh "$SERVER" "chmod +x $REMOTE/deploy/*.sh"
 echo "==> Pushed to $SERVER:$REMOTE"

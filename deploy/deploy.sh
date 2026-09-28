@@ -21,6 +21,19 @@ fi
 
 docker compose build
 docker compose up -d
+
+# NPM mban certifikaten dhe catch-all-in ne volumin e vet. Nese volumi rikrijohet
+# ato humbin dhe TLS-i bie me "unrecognized name", ndaj rivendosen sa here nevojitet.
+if ! docker compose exec -T npm test -f /data/nginx/custom/http_top.conf 2>/dev/null \
+   || ! docker compose exec -T npm test -f /data/custom_ssl/npm-1/fullchain.pem 2>/dev/null; then
+  echo "==> Rivendos konfigurimin TLS te NPM-se"
+  docker compose exec -T npm mkdir -p /data/custom_ssl/npm-1 /data/nginx/custom
+  docker compose cp certs/server.crt npm:/data/custom_ssl/npm-1/fullchain.pem
+  docker compose cp certs/server.key npm:/data/custom_ssl/npm-1/privkey.pem
+  docker compose cp npm/http_top.conf npm:/data/nginx/custom/http_top.conf
+  docker compose exec -T npm chmod 600 /data/custom_ssl/npm-1/privkey.pem
+  docker compose exec -T npm nginx -t && docker compose exec -T npm nginx -s reload
+fi
 echo
 docker compose ps
 echo

@@ -1,0 +1,104 @@
+name: Deploy
+
+# Çdo push në main shkon drejt e në server. Deploy-i mund të nisë edhe me dorë
+# nga skeda Actions (workflow_dispatch), p.sh. për të ribërë një deploy të dështuar.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Dy deploy-e njëkohësisht do të përplaseshin mbi të njëjtin docker compose.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kontroll — asnjë .env në commit
+        run: |
+          # Roje: nëse një .env rihyn ndonjëherë në repo, deploy-i ndalet këtu
+          # në vend që t'i shpërndajë kredencialet.
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::Një .env është i gjurmuar në git. Hiqe para deploy-it."
+            exit 1
+          fi
+          echo "OK — asnjë .env i gjurmuar."
+
+      - name: Kontroll sintakse Python
+        run: |
+          for app in rhg-finance-local rhg-purchasing-local rhg-identity; do
+            python3 -m compileall -q "$app" || exit 1
+          done
+          echo "OK — sintaksa e pastër."
+
+      - name: Përgatit çelësin SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SERVER_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sinkronizo kodin
+        env:
+          SERVER: ${{ secrets.SERVER_SSH }}
+        run: |
+          # .env, data/ dhe certs/ rrijnë vetëm në server dhe nuk preken kurrë.
+          EXCL="--exclude=.git --exclude=.github --exclude=.venv \
+                --exclude=__pycache__ --exclude=*.pyc --exclude=.env \
+                --exclude=.DS_Store --exclude=data"
+          for app in rhg-finance-local rhg-purchasing-local rhg-identity; do
+            echo "==> $app"
+            rsync -az --delete $EXCL "$app/" "$SERVER:/opt/rhg/$app/"
+          done
+
+          echo "==> deploy files"
+          ssh "$SERVER" 'mkdir -p /opt/rhg/deploy/nginx/html /opt/rhg/deploy/npm'
+          # certs/ përjashtohet: certifikatat janë të serverit, jo të repo-s.
+          rsync -az --delete --exclude=certs --exclude=.env \
+                deploy/ "$SERVER:/opt/rhg/deploy/"
+          ssh "$SERVER" 'chmod +x /opt/rhg/deploy/*.sh'
+
+      - name: Rindërto dhe rinis
+        env:
+          SERVER: ${{ secrets.SERVER_SSH }}
+        run: |
+          ssh "$SERVER" 'set -e
+            cd /opt/rhg/deploy
+            docker compose build
+            docker compose up -d --force-recreate finance purchasing identity
+            docker image prune -f >/dev/null 2>&1 || true'
+
+      - name: Prit health-check-et
+        env:
+          SERVER: ${{ secrets.SERVER_SSH }}
+        run: |
+          ssh "$SERVER" 'cd /opt/rhg/deploy
+            for i in $(seq 1 30); do
+              s=$(docker compose ps --format "{{.Service}}:{{.Status}}")
+              echo "$s" | grep -q "starting" || break
+              sleep 5
+            done
+            docker compose ps --format "{{.Service}}: {{.Status}}"
+            # Çdo shërbim me health-check duhet të jetë healthy.
+            for svc in finance purchasing identity; do
+              docker compose ps --format "{{.Service}}:{{.Status}}" \
+                | grep -q "^$svc:Up.*healthy" || {
+                  echo "::error::$svc nuk eshte healthy"
+                  docker compose logs --tail=40 "$svc"
+                  exit 1
+                }
+            done'
+
+      - name: Verifiko që faqja përgjigjet
+        run: |
+          code=$(curl -sk -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 \
+                 https://${{ secrets.SERVER_HOST }}/)
+          echo "Rrënja ktheu $code"
+          [ "$code" = "200" ] || { echo "::error::Pritej 200, erdhi $code"; exit 1; }

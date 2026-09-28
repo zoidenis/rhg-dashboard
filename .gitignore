@@ -1,0 +1,33 @@
+# Kredencialet reale: rrijne VETEM ne server, kurre ne git.
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Te dhenat e aplikacionit (volume Docker ne server)
+data/
+*.sqlite
+*.db
+
+# Certifikata dhe celesa
+*.key
+*.pem
+*.crt
+deploy/certs/
+
+# Backup-e
+backups/
+*.tar.gz
+
+# macOS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
