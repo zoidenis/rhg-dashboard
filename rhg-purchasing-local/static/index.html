@@ -180,7 +180,7 @@ td.num,th.num{text-align:right}
 <body>
 <div class="app">
 <aside>
-  <div class="brand"><div class="logo" id="logo">R</div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
+  <div class="brand"><div class="logo" id="logo" role="img" aria-label="RHG"></div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
   <nav id="nav">
     <button class="on" data-view="overview">Overview</button>
     <button data-view="live">Live operations</button>
@@ -2234,15 +2234,6 @@ setInterval(() => {
 
 (async () => {
   await loadSession();
-  // use static/logo.svg or logo.png as the brand mark when one is present
-  for (const f of ["/logo.svg", "/logo.png"]) {
-    try {
-      const r = await fetch(f, {cache:"no-store"});
-      // r.url carries the prefix nginx serves this tower under; f does not, because
-      // nginx rewrites the literal above but not a template built at runtime.
-      if (r.ok) { document.documentElement.style.setProperty("--brand-logo", `url('${r.url}')`); $("logo").classList.add("has-image"); break; }
-    } catch(e) {}
-  }
   $("week").value = snapDate(mondayOf(new Date()));
   try {
     const r = await fetch("/api/companies"); const j = await r.json();

@@ -11,7 +11,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .wrap{min-height:100%;display:grid;place-items:center;padding:24px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px;width:100%;max-width:400px}
 .brand{display:flex;gap:11px;align-items:center;margin-bottom:22px}
-.logo{width:40px;height:40px;border-radius:11px;background:var(--sky);color:var(--accent);font-weight:800;display:grid;place-items:center;font-size:17px}
+.logo{width:40px;height:40px;border-radius:11px;background:var(--sky);color:var(--accent);display:grid;place-items:center;font-size:0}
+/* Same mark as the rest of the app, inlined so the page needs no extra request. */
+.logo::after{content:"";width:56%;height:56%;background-color:currentColor;
+  -webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>') center/contain no-repeat;
+          mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>') center/contain no-repeat}
 h1{font-size:17px;margin:0}
 small{color:var(--sub)}
 label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:14px 0 5px}
@@ -24,7 +28,7 @@ button:disabled{opacity:.6;cursor:default}
 </head>
 <body>
 <div class="wrap"><div class="card">
-  <div class="brand"><div class="logo">R</div><div><h1>RHG Finance</h1><small>Control Tower</small></div></div>
+  <div class="brand"><div class="logo" role="img" aria-label="RHG"></div><div><h1>RHG Finance</h1><small>Control Tower</small></div></div>
   <div id="loginForm">
     <label for="u">Username</label><input id="u" autocomplete="username" autofocus>
     <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
