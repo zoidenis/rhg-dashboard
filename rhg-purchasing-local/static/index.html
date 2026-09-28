@@ -24,17 +24,25 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .app{display:flex;min-height:100%}
-aside{width:228px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh}
+aside{width:228px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;min-height:0}
 .brand{display:flex;gap:11px;align-items:center;padding:0 6px}
 .logo{width:36px;height:36px;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;display:grid;place-items:center}
 .brand b{display:block;color:#fff;font-size:15px}
 .brand small{color:#8a909c;font-size:12px}
-nav{display:flex;flex-direction:column;gap:2px}
+nav{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+nav::-webkit-scrollbar{width:6px}
+nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+/* Section labels: the list is long enough that scanning it needs anchors. The
+   first one sits flush, the rest open a gap above so the groups read apart. */
+nav .grp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:#6b7280;padding:0 12px 4px;margin-top:16px;user-select:none}
+nav .grp:first-child{margin-top:0}
 nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center}
 nav button:hover{background:rgba(255,255,255,.05)}
 nav button.on{background:rgba(255,255,255,.09);color:#fff;font-weight:700}
 nav .count{background:#5c1d1a;color:#ffb4ae;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
-.side-foot{margin-top:auto;font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
+.side-foot{flex:none;font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 28px 60px}
 header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:16px}
 h1{font-size:23px;margin:0;font-weight:800;letter-spacing:-.01em}
@@ -182,26 +190,39 @@ td.num,th.num{text-align:right}
 <aside>
   <div class="brand"><div class="logo" id="logo" role="img" aria-label="RHG"></div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
   <nav id="nav">
+    <div class="grp">Overview</div>
     <button class="on" data-view="overview">Overview</button>
     <button data-view="live">Live operations</button>
+
+    <div class="grp">Buying</div>
     <button data-view="reqs">Requisitions <span class="count" id="reqCount">0</span></button>
-    <button data-view="compare">Comparisons</button>
-    <button data-view="streams">Purchase types</button>
-    <button data-view="services">Services &amp; CAPEX</button>
-    <button data-view="contracts">Contract prices</button>
-    <button data-view="compliance">Invoices without PO</button>
-    <button data-view="stock">Stock &amp; working capital</button>
-    <button data-view="prices">Price changes</button>
     <button data-view="po">Purchase orders <span class="count" id="poCount">0</span></button>
     <button data-view="invoices">Invoices</button>
-    <button data-view="users">User performance</button>
-    <button data-view="suppliers">Supplier performance</button>
+    <button data-view="streams">Purchase types</button>
+    <button data-view="services">Services &amp; CAPEX</button>
+
+    <div class="grp">Prices &amp; contracts</div>
+    <button data-view="compare">Comparisons</button>
+    <button data-view="contracts">Contract prices</button>
+    <button data-view="prices">Price changes</button>
     <button data-view="locations">Location prices</button>
-    <button data-view="exceptions">Exceptions <span class="count" id="exCount">0</span></button>
+
+    <div class="grp">Stock</div>
+    <button data-view="stock">Stock &amp; working capital</button>
+
+    <div class="grp">Control</div>
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
+    <button data-view="exceptions">Exceptions <span class="count" id="exCount">0</span></button>
+    <button data-view="compliance">Invoices without PO</button>
     <button data-view="feed">Posting follow-up</button>
-    <button data-view="quality">Data quality <span class="count" id="qCount">0</span></button>
+
+    <div class="grp">Performance</div>
+    <button data-view="suppliers">Supplier performance</button>
+    <button data-view="users">User performance</button>
     <button data-view="reports">Reports</button>
+
+    <div class="grp">System</div>
+    <button data-view="quality">Data quality <span class="count" id="qCount">0</span></button>
     <button data-view="gaps">Data availability</button>
     <button data-view="settings">Settings</button>
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>

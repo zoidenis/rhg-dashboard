@@ -18,6 +18,11 @@ aside{width:236px;flex-shrink:0;background:var(--side);color:var(--side-ink);pad
 .logo{width:36px;height:36px;border-radius:10px;background:var(--prev);color:var(--accent);font-weight:800;display:grid;place-items:center}
 .brand b{display:block;color:#fff;font-size:14.5px}.brand small{color:#8fb3c1;font-size:11.5px}
 nav{display:flex;flex-direction:column;gap:2px}
+/* Section labels: the list is long enough that scanning it needs anchors. The
+   first one sits flush, the rest open a gap above so the groups read apart. */
+nav .grp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:#5f8394;padding:0 12px 4px;margin-top:15px;user-select:none}
+nav .grp:first-child{margin-top:0}
 nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center;font-size:13.5px}
 nav button:hover{background:rgba(160,216,234,.09)}
 nav button.on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
@@ -105,21 +110,32 @@ td.num,th.num{text-align:right}
 <aside>
   <div class="brand"><div class="logo" id="logo" role="img" aria-label="RHG"></div><div><b>Finance Control Tower</b><small>Business Central, read-only</small></div></div>
   <nav id="nav">
+    <div class="grp">Overview</div>
     <button class="on" data-view="overview">Executive overview</button>
+    <button data-view="group">Group view</button>
+
+    <div class="grp">Statements</div>
     <button data-view="pl">Profit &amp; loss</button>
     <button data-view="bs">Balance sheet</button>
+    <button data-view="gl">G/L entries</button>
+
+    <div class="grp">Working capital</div>
     <button data-view="cash">Cash &amp; bank</button>
     <button data-view="ap">Accounts payable</button>
     <button data-view="ar">Accounts receivable</button>
-    <button data-view="gl">G/L entries</button>
     <button data-view="inventory">Inventory</button>
-    <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
+
+    <div class="grp">Planning</div>
     <button data-view="treasury">Cash flow &amp; treasury</button>
-    <button data-view="assets">Fixed assets</button>
     <button data-view="budget">Budget &amp; forecast</button>
-    <button data-view="group">Group view</button>
-    <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
+    <button data-view="assets">Fixed assets</button>
+
+    <div class="grp">Control</div>
+    <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
+    <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
+
+    <div class="grp">System</div>
     <button data-view="gaps">Data availability</button>
     <button data-view="settings">Settings</button>
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
