@@ -29,11 +29,15 @@ self.addEventListener("fetch", e => {
   const name = url.pathname.split("/").pop();
   if (!SHELL.includes(name)) return;
 
-  e.respondWith(caches.match(e.request).then(hit => {
-    const net = fetch(e.request).then(res => {
+  // The network decides, the cache is only the offline fallback. Serving the
+  // cached copy first would show the previous deploy's shell on the first load
+  // after every release, and the server sends no-store on these files - it
+  // expects them to be re-read. The cache is still filled on each success, so a
+  // dropped connection opens the last known-good shell.
+  e.respondWith(
+    fetch(e.request).then(res => {
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
       return res;
-    }).catch(() => hit);
-    return hit || net;
-  }));
+    }).catch(() => caches.match(e.request).then(hit => hit || Response.error()))
+  );
 });
