@@ -63,10 +63,42 @@ jobs:
             echo "::error::Mungon secret-i SERVER_SSH (pritet 'root@139.162.169.104')."
             exit 1
           fi
+          case "$SERVER" in
+            *@*) : ;;
+            *) echo "::error::SERVER_SSH duhet te jete 'user@host', jo '$SERVER'."; exit 1 ;;
+          esac
 
-          # Provo lidhjen njehere, qe nje problem i qasjes te duket ketu.
-          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
-              -i ~/.ssh/id_ed25519 "$SERVER" 'echo "SSH OK: $(hostname)"'
+          host="${SERVER#*@}"
+
+          # Nje known_hosts bosh ose per host tjeter e ndal lidhjen me nje 255 te
+          # heshtur, prandaj kontrollohet para se te provohet.
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "::error::SERVER_KNOWN_HOSTS eshte bosh. Vendose rreshtin qe jep: ssh-keyscan $host"
+            exit 1
+          fi
+          if ! grep -q "$host" ~/.ssh/known_hosts; then
+            echo "::error::SERVER_KNOWN_HOSTS nuk permban '$host'. Vendos daljen e: ssh-keyscan $host"
+            sed -e 's/AAAA[A-Za-z0-9+/=]*/<celesi>/g' ~/.ssh/known_hosts
+            exit 1
+          fi
+
+          # Provo lidhjen njehere, qe nje problem i qasjes te duket ketu dhe jo dy
+          # hapa me vone si nje 255 pa shpjegim.
+          if ! ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+                   -i ~/.ssh/id_ed25519 "$SERVER" 'echo "SSH OK: $(hostname)"'; then
+            echo "::error::Lidhja SSH deshtoi. Diagnostikimi me poshte."
+            echo "--- a arrihet porta 22?"
+            timeout 10 bash -c "cat < /dev/null > /dev/tcp/$host/22" \
+              && echo "porta 22: e hapur" || echo "porta 22: e paarritshme"
+            echo "--- cfare thote ssh me -v (pa sekrete)"
+            ssh -vv -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+                -i ~/.ssh/id_ed25519 "$SERVER" true 2>&1 \
+              | grep -iE 'debug1|host key|permission|denied|authenticat|no matching|refused|timed out' \
+              | head -25
+            echo "--- a e pranon serveri kete celes publik?"
+            ssh-keygen -y -f ~/.ssh/id_ed25519 | awk '{print $1, substr($2,1,24) "..."}'
+            exit 1
+          fi
 
       - name: Sinkronizo kodin
         env:
