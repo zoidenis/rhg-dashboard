@@ -28,8 +28,13 @@ from bc_client import BCClient, BCError
 
 STATIC = config.BASE_DIR / "static"
 STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+xml", "logo.png": "image/png",
+                "icon.svg": "image/svg+xml",
+                "manifest.webmanifest": "application/manifest+json",
+                "sw.js": "application/javascript; charset=utf-8",
+                "select.js": "application/javascript; charset=utf-8",
+                "select.css": "text/css; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}
-PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png"}
+PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
                      "/api/users": "users", "/api/password": "view"}
 client = BCClient()
@@ -708,7 +713,15 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-    def _cookie(self, name="session"):
+    def _redirect(self, to):
+        self.send_response(302)
+        self.send_header("Location", to)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
+    def _cookie(self, name=None):
+        name = name or auth.cookie_name()
         raw = self.headers.get("Cookie") or ""
         for part in raw.split(";"):
             if "=" in part:
@@ -744,14 +757,21 @@ class Handler(BaseHTTPRequestHandler):
         user = self._user()
         try:
             if url.path in ("/login", "/login.html"):
-                self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
+                # Sign-in is central now.
+                self._redirect("/")
             elif url.path == "/api/session":
                 self._send(200, {"user": user, "roles": auth.ROLES})
             elif not user and url.path not in PUBLIC_PATHS:
                 if url.path.startswith("/api/"):
                     self._send(401, {"error": "Not signed in."})
                 else:
-                    self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
+                    self._redirect("/")
+            elif url.path not in PUBLIC_PATHS and not auth.can(user, "view"):
+                # Signed in, but this role is not allowed into this tower.
+                if url.path.startswith("/api/"):
+                    self._send(403, {"error": "Your role does not have access to this application."})
+                else:
+                    self._redirect("/")
             elif url.path == "/api/users":
                 if not auth.can(user, "users"):
                     self._send(403, {"error": "Your role cannot manage accounts."})
@@ -833,24 +853,13 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
         user = self._user()
         if url.path == "/api/login":
-            token, public, err = auth.authenticate(body.get("username"), body.get("password"))
-            if err:
-                store.audit("login failed", (body.get("username") or "")[:60],
-                            (body.get("username") or "unknown")[:60], {}, {}, err)
-                self._send(401, {"error": err})
-                return
-            payload = json.dumps({"user": public}).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Set-Cookie", f"session={token}; Path=/; HttpOnly; SameSite=Strict; "
-                                           f"Max-Age={auth.SESSION_HOURS * 3600}")
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
-            store.audit("login", public["username"], public["username"], {}, {"role": public["role"]}, "")
+            self._send(410, {"error": "Sign in at the site root; this tower no longer holds accounts."})
             return
         if not user:
             self._send(401, {"error": "Not signed in."})
+            return
+        if not auth.can(user, "view"):
+            self._send(403, {"error": "Your role does not have access to this application."})
             return
         if url.path == "/api/password":
             ok, err = auth.change_own_password(user["username"], body.get("current"), body.get("new"))

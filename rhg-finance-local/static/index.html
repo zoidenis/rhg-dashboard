@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RHG Finance Control Tower</title>
+<meta name="theme-color" content="#0c475e">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="select.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <style>
 :root{--bg:#ecebeb;--card:#fff;--ink:#0e2733;--sub:#5c7482;--line:#d9dcdd;--side:#08303f;--side-ink:#b9d4de;
@@ -12,16 +17,45 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;font-size:14px}
 button,select,input{font:inherit;color:inherit}
 .app{display:flex;min-height:100%}
-aside{width:236px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:24px;position:sticky;top:0;height:100vh;overflow:auto}
+aside{width:236px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px 14px;
+  display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100dvh;overflow:hidden}
 .brand{display:flex;gap:11px;align-items:center;padding:0 6px}
-.logo{width:36px;height:36px;border-radius:10px;background:var(--prev);color:var(--accent);font-weight:800;display:grid;place-items:center}
+/* The mark is drawn by brand.css as a mask in currentColor. --prev and --accent
+   both shift in dark mode and left the mark low-contrast, so pin the tile to
+   the brand pair: sky fill, deep blue ink. */
+.logo{width:36px;height:36px;border-radius:10px;background:var(--revo-sky,#a0d8ea);
+  color:var(--revo-blue,#0c475e);display:grid;place-items:center;font-size:0}
 .brand b{display:block;color:#fff;font-size:14.5px}.brand small{color:#8fb3c1;font-size:11.5px}
-nav{display:flex;flex-direction:column;gap:2px}
+nav{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;
+  overscroll-behavior:contain;scrollbar-width:thin;
+  scrollbar-color:rgba(160,216,234,.30) transparent;margin:0 -6px;padding:0 6px}
+nav::-webkit-scrollbar{width:8px}
+nav::-webkit-scrollbar-thumb{background:rgba(160,216,234,.26);border-radius:99px}
+nav::-webkit-scrollbar-thumb:hover{background:rgba(160,216,234,.42)}
+nav::-webkit-scrollbar-track{background:transparent}
 nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center;font-size:13.5px}
 nav button:hover{background:rgba(160,216,234,.09)}
 nav button.on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
+/* Back to the platform's app chooser. It sits above the brand so it reads as
+   leaving this tower, not as another view inside it. */
+.back{display:inline-flex;align-items:center;gap:7px;padding:7px 8px;margin:-4px 0 -8px;
+  border-radius:8px;color:#8fb3c1;font-size:12.5px;font-weight:600;text-decoration:none}
+.back:hover{background:rgba(160,216,234,.09);color:#fff}
+.back svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+/* The Administration entry is a link, not a nav button, so it needs the same
+   shape as its neighbours rather than the browser's default anchor styling. */
+nav a#usersNav{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;
+  justify-content:space-between;align-items:center;font-size:13.5px;margin-top:6px;
+  border-top:1px solid rgba(160,216,234,.14);padding-top:13px}
+nav a#usersNav:hover{background:rgba(160,216,234,.09);color:#fff}
+/* Section headings. They are plain text, not buttons, so the click handler that
+   binds "#nav button" is untouched. */
+nav .group{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  color:#6f8f9d;padding:14px 12px 5px;pointer-events:none}
+nav .group:first-child{padding-top:0}
 nav .count{background:rgba(160,216,234,.2);color:var(--prev);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
-.side-foot{margin-top:auto;font-size:11.5px;color:#7e9daa;line-height:1.5;padding:0 6px}
+.side-foot{flex:none;padding-top:12px;border-top:1px solid rgba(160,216,234,.12);font-size:11.5px;color:#7e9daa;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 26px 60px}
 header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px}
 h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
@@ -45,7 +79,54 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
 .up{color:var(--up)}.down{color:var(--down)}
 .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:15px;margin-bottom:15px}
 @media(max-width:1000px){.grid{grid-template-columns:1fr}}
-@media(max-width:760px){aside{display:none}main{padding:16px}}
+/* ---------------------------------------------------------------- mobile
+   The sidebar used to be display:none below 760px, which left the application
+   with no navigation at all on a phone. It becomes a drawer instead: the same
+   markup, slid off-canvas and brought back by the header button. Nothing about
+   the desktop layout changes. */
+.navbtn{display:none}
+.scrim{position:fixed;inset:0;background:rgba(8,34,45,.55);opacity:0;visibility:hidden;
+  transition:opacity .2s;z-index:44}
+.scrim.on{opacity:1;visibility:visible}
+
+@media(max-width:860px){
+  .app{display:block}
+  aside{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:86vw;height:100dvh;
+    z-index:45;transform:translateX(-100%);transition:transform .22s ease;
+    box-shadow:0 0 44px rgba(0,0,0,.42);padding-top:16px}
+  aside.open{transform:none}
+  main{padding:14px 14px 56px;min-width:0}
+
+  /* A header bar that holds the menu button and stays reachable while scrolling. */
+  .navbtn{display:inline-grid;place-items:center;width:42px;height:42px;flex:none;
+    border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);
+    cursor:pointer;padding:0}
+  .navbtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;
+    stroke-linecap:round}
+  header{position:sticky;top:0;z-index:20;background:var(--bg);
+    padding:10px 0 12px;margin:-14px 0 12px;align-items:center}
+  h1{font-size:18px}
+  .period{font-size:12.5px}
+
+  /* Controls become full width so they are tappable, not cramped. */
+  .filters{gap:9px}
+  .filters > label,.filters > .field{flex:1 1 100%;min-width:0}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .money{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+
+  /* Wide tables scroll sideways rather than squashing the numbers. */
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;
+    margin:0 -14px;padding:0 14px}
+  table{min-width:560px}
+  .card{padding:14px}
+  .modal{padding:16px;border-radius:12px}
+}
+@media(max-width:420px){
+  h1{font-size:17px}
+  .kpis{grid-template-columns:1fr 1fr}
+}
+/* Someone using a phone should not have to fight the animation. */
+@media (prefers-reduced-motion:reduce){ aside,.scrim{transition:none} }
 h2{font-size:15px;margin:0;font-weight:700}
 .hint{color:var(--sub);font-size:12.5px;margin:3px 0 12px}
 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -57,6 +138,10 @@ tr:last-child td{border-bottom:none}
 td.num,th.num{text-align:right}
 .name{font-weight:700;white-space:normal;min-width:170px}
 .meta{color:var(--sub);font-size:12px;font-weight:500}
+/* Account links had no rule, so they fell back to the browser default blue,
+   which is unreadable on the dark surface. Use the theme accent. */
+.acc{color:var(--accent);font-weight:600;text-decoration:none}
+.acc:hover{text-decoration:underline}
 .chip{display:inline-block;font-weight:700;font-size:12px;border-radius:999px;padding:3px 9px;background:#e4f3f9;color:var(--accent)}
 .chip.up{background:var(--up-bg);color:var(--up)}.chip.down{background:var(--down-bg);color:var(--down)}
 .total td{font-weight:800;background:#f6f8f9}
@@ -100,33 +185,43 @@ td.num,th.num{text-align:right}
 </head>
 <body>
 <div class="app">
-<aside>
-  <div class="brand"><div class="logo" id="logo">R</div><div><b>Finance Control Tower</b><small>Business Central, read-only</small></div></div>
+<div class="scrim" id="scrim"></div>
+<aside id="sideNav">
+  <a class="back" href="/" title="Back to the control towers"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>All applications</a>
+  <div class="brand"><div class="logo" id="logo"></div><div><b>Finance Control Tower</b><small>Business Central, read-only</small></div></div>
   <nav id="nav">
+    <div class="group">Overview</div>
     <button class="on" data-view="overview">Executive overview</button>
+    <div class="group">Financial statements</div>
     <button data-view="pl">Profit &amp; loss</button>
     <button data-view="bs">Balance sheet</button>
     <button data-view="cash">Cash &amp; bank</button>
+    <div class="group">Working capital</div>
     <button data-view="ap">Accounts payable</button>
     <button data-view="ar">Accounts receivable</button>
+    <div class="group">Ledger &amp; stock</div>
     <button data-view="gl">G/L entries</button>
     <button data-view="inventory">Inventory</button>
+    <div class="group">Period &amp; planning</div>
     <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
     <button data-view="treasury">Cash flow &amp; treasury</button>
     <button data-view="assets">Fixed assets</button>
     <button data-view="budget">Budget &amp; forecast</button>
     <button data-view="group">Group view</button>
+    <div class="group">Follow-up</div>
     <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
+    <div class="group">System</div>
     <button data-view="gaps">Data availability</button>
     <button data-view="settings">Settings</button>
-    <button data-view="accounts" id="usersNav" style="display:none">Users</button>
+    <a id="usersNav" href="/admin" style="display:none">Administration</a>
   </nav>
-  <div class="side-foot">Reads Business Central directly, on this PC. BC stays read-only; actions and thresholds live here.</div>
+  <div class="side-foot">Business Central stays read-only. Actions, thresholds and the closing checklist live in this application.</div>
 </aside>
 
 <main>
   <header>
+    <button class="navbtn" id="navBtn" aria-label="Menu" aria-expanded="false" aria-controls="sideNav"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div><h1 id="title">Executive overview</h1><div class="period" id="period">Loading…</div></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
@@ -381,7 +476,7 @@ async function load(){
   if(busy) return; busy = true; setPill("load","Reading Business Central…");
   try{
     const r = await fetch("/api/dashboard?"+params());
-    if (r.status === 401) { location.href = "/login"; return; }
+    if (r.status === 401) { location.href = "/"; return; }
     const j = await r.json();
     if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
     data = j; $("banner").style.display="none"; render();
@@ -730,15 +825,14 @@ async function loadSession(){
   try{
     const j = await (await fetch("/api/session")).json();
     me = j.user;
-    if(!me){ location.href = "/login"; return false; }
+    if(!me){ location.href = "/"; return false; }
     $("whoami").innerHTML = `<span class="dot"></span>${esc(me.name||me.username)} · ${esc(me.role)}`;
     $("usersNav").style.display = can("users") ? "" : "none";
     const save = $("saveSettings"); if(save && !can("settings")){ save.disabled = true; save.title = "Your role cannot change thresholds."; }
-    if(can("users")) loadUsers();
     return true;
-  }catch(e){ location.href = "/login"; return false; }
+  }catch(e){ location.href = "/"; return false; }
 }
-$("logoutBtn").onclick = async () => { await fetch("/api/logout"); location.href = "/login"; };
+$("logoutBtn").onclick = async () => { await fetch("/api/logout", {method:"POST"}).catch(()=>{}); location.href = "/"; };
 async function loadUsers(){
   try{
     const j = await (await fetch("/api/users")).json();
@@ -1045,5 +1139,31 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
   load();
 })();
 </script>
+<script src="select.js"></script>
+<script>
+/* ---- mobile drawer ------------------------------------------------------
+   The sidebar is off-canvas below 860px. It closes on a nav choice, on the
+   scrim, on Escape and when the viewport grows back to desktop, so it can
+   never be left open over the content. */
+(function(){
+  const side = document.getElementById("sideNav"),
+        scrim = document.getElementById("scrim"),
+        btn = document.getElementById("navBtn");
+  if(!side || !btn) return;
+  const isMobile = () => window.matchMedia("(max-width:860px)").matches;
+  function set(open){
+    side.classList.toggle("open", open);
+    scrim.classList.toggle("on", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    document.body.style.overflow = open && isMobile() ? "hidden" : "";
+  }
+  btn.onclick = () => set(!side.classList.contains("open"));
+  scrim.onclick = () => set(false);
+  document.addEventListener("keydown", e => { if(e.key === "Escape") set(false); });
+  side.addEventListener("click", e => { if(e.target.closest("button[data-view], a")) set(false); });
+  window.addEventListener("resize", () => { if(!isMobile()) set(false); });
+})();
+</script>
+<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
 </body>
 </html>

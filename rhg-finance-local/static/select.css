@@ -1,0 +1,39 @@
+/* Custom dropdown. The native <select> is kept in the DOM and driven by this
+   control, so existing .value reads and change handlers are unaffected. */
+.rsel{position:relative;display:block}
+.rsel > select{position:absolute;opacity:0;pointer-events:none;width:100%;height:100%;
+  top:0;left:0;margin:0;border:0}
+.rsel-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+  background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:9px;
+  padding:7px 9px;font:inherit;text-align:left;cursor:pointer;min-height:36px}
+.rsel-btn:hover:not(:disabled){border-color:var(--accent)}
+.rsel-btn:disabled{opacity:.55;cursor:default}
+.rsel.open .rsel-btn{border-color:var(--accent)}
+.rsel-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rsel-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsel-caret{flex:none;display:grid;place-items:center;color:var(--sub)}
+.rsel-caret svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.rsel.open .rsel-caret svg{transform:rotate(180deg)}
+
+.rsel-list{position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:100%;
+  max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--line);
+  border-radius:10px;padding:4px;
+  box-shadow:0 8px 28px rgba(8,34,45,.18), 0 2px 6px rgba(8,34,45,.10)}
+.rsel.up .rsel-list{top:auto;bottom:calc(100% + 4px)}
+.rsel-opt{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13.5px;
+  white-space:nowrap;color:var(--ink)}
+/* A translucent tint rather than a named fill: it darkens over a dark panel and
+   lightens over a light one, so the label keeps its contrast in both themes.
+   The selected row keeps --ink, because the accent turns pale sky in dark mode
+   and would wash out against its own highlight. */
+.rsel-opt:hover{background:rgba(120,170,190,.16)}
+.rsel-opt.on{background:rgba(120,170,190,.20);font-weight:700;color:var(--ink)}
+.rsel-opt.on::after{content:"";float:right;width:6px;height:6px;margin:6px 1px 0 8px;
+  border-radius:50%;background:var(--accent)}
+.rsel-opt.off{opacity:.45;cursor:default}
+.rsel-opt.off:hover{background:none}
+
+/* Inside the filter bar the control should match the other fields. */
+.field .rsel-btn{padding:7px 9px}
+@media (prefers-reduced-motion:reduce){ .rsel-caret svg{transition:none} }

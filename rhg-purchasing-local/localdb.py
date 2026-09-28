@@ -9,6 +9,7 @@ The file is a cache, not a source of truth: it can be deleted at any time and th
 app will simply read everything again from BC.
 """
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -66,6 +67,32 @@ def max_entry(kind, company, date_from=None, date_to=None):
     return int(value) if value is not None else None
 
 
+# The server this runs on is small, so the cache is bounded. Periods are dropped
+# whole, least recently used first: a half-loaded period would read as complete and
+# quietly under-report, so it is never left partially present.
+MAX_ROWS = int(os.environ.get("CACHE_MAX_ROWS", "300000"))
+
+
+def _evict_if_needed(conn):
+    total = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+    if total <= MAX_ROWS:
+        return 0
+    dropped = 0
+    for kind, company, dfrom, dto in conn.execute(
+            "SELECT kind, company, date_from, date_to FROM periods ORDER BY loaded_at ASC").fetchall():
+        cur = conn.execute(
+            "DELETE FROM entries WHERE kind=? AND company=? AND posting_date >= ? AND posting_date <= ?",
+            (kind, company, dfrom, dto))
+        conn.execute("DELETE FROM periods WHERE kind=? AND company=? AND date_from=? AND date_to=?",
+                     (kind, company, dfrom, dto))
+        dropped += cur.rowcount
+        total -= cur.rowcount
+        if total <= MAX_ROWS * 0.9:
+            break
+    conn.commit()
+    return dropped
+
+
 def store(kind, company, rows_in):
     """Writes rows, ignoring ones already held. Returns how many were new."""
     if not rows_in:
@@ -85,7 +112,9 @@ def store(kind, company, rows_in):
         conn.executemany("INSERT OR IGNORE INTO entries (kind, company, entry_no, posting_date, payload) "
                          "VALUES (?,?,?,?,?)", payload)
         conn.commit()
-        return conn.total_changes - before
+        written = conn.total_changes - before      # count before eviction's deletes
+        _evict_if_needed(conn)
+        return written
 
 
 def period_loaded(kind, company, date_from, date_to):

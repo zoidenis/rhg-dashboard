@@ -8,10 +8,11 @@
    --------------------------------------------------------------- */
 @import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Archivo:wght@500;600;700;800&display=swap");
 
-/* Aktifo B is a licensed typeface, so it is not fetched from the web.
-   Drop the licensed files into static/fonts/ and they are used automatically;
-   until then the app falls back to Figtree and Archivo, which share the same
-   geometric, low-contrast character. */
+/* Aktifo B is a licensed typeface and is not shipped with the app, so the
+   @font-face rules below stay commented out: a browser would otherwise request
+   four .woff2 files that are not there and log a 404 for each one.
+   To enable it, drop the licensed files into static/fonts/ and uncomment. */
+/*
 @font-face{ font-family:"Aktifo B"; font-weight:400; font-display:swap;
   src:url("/fonts/AktifoB-Regular.woff2") format("woff2"); }
 @font-face{ font-family:"Aktifo B"; font-weight:500; font-display:swap;
@@ -20,8 +21,14 @@
   src:url("/fonts/AktifoB-Bold.woff2") format("woff2"); }
 @font-face{ font-family:"Aktifo B"; font-weight:300; font-display:swap;
   src:url("/fonts/AktifoB-Light.woff2") format("woff2"); }
+*/
 
 :root{
+  /* Paint the browser's own controls - select menus, date pickers,
+     scrollbars - in the matching theme. Without this they stay white on a
+     dark page, which is what made the filter fields look pasted on. */
+  color-scheme: light dark;
+
   /* --- brand palette --- */
   --revo-blue:        #0c475e;
   --revo-blue-deep:   #08303f;   /* darker step for the navigation panel */
@@ -51,6 +58,7 @@
   --brand-font-display: "Aktifo B", "Archivo", var(--brand-font);
   --brand-radius: 12px;
   --brand-logo-size: 36px;
+  --revo-mark: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>');
 }
 
 /* --- map the brand onto the application variables --- */
@@ -96,8 +104,18 @@ th{ color: var(--brand-muted); }
   width: var(--brand-logo-size); height: var(--brand-logo-size);
   background-color: var(--revo-sky);
   color: var(--revo-blue);
-  background-image: var(--brand-logo, none);
-  background-size: contain; background-repeat: no-repeat; background-position: center;
+  border-radius: 11px;
+  display: grid; place-items: center;
+  font-size: 0;            /* hides the "R" fallback once the mark is drawn */
+}
+/* The Revo mark, drawn as a mask so it inherits the tile's colour and stays
+   correct in both themes rather than being baked in as a fixed fill. */
+.logo::after{
+  content: "";
+  width: 56%; height: 56%;
+  background-color: currentColor;
+  -webkit-mask: var(--revo-mark) center / contain no-repeat;
+          mask: var(--revo-mark) center / contain no-repeat;
 }
 .logo.has-image{ background-color: transparent; color: transparent; }
 
@@ -107,10 +125,17 @@ th{ color: var(--brand-muted); }
     --bg:#08222d; --card:#0e2f3d; --ink:#e8f2f6; --sub:#93b2bf; --line:#194354;
     --side:#061a23; --side-ink:#b9d4de;
     --accent: var(--revo-sky);
+    /* The soft sky fill is a near-white tint, which stays white on a dark
+       surface and leaves pale text unreadable on it. Tint the dark card instead. */
+    --revo-sky-soft: rgba(160,216,234,.14);
     --prev:#2b5a6c;
     --up:#ef6a5c; --up-bg:#3a1d1a; --down:#3fc08c; --down-bg:#0d2e24; --warn:#e0a44a; --warn-bg:#32270f;
   }
   .btn.dark, .mini.dark{ background: var(--revo-sky); color: var(--revo-blue-deep); border-color: var(--revo-sky); }
   .chip:not(.up):not(.down){ background: rgba(160,216,234,.14); color: var(--revo-sky); }
   .status-ok{ background: rgba(160,216,234,.14); color: var(--revo-sky); }
+  /* Subtotal rows (gross profit, EBITDA, net result) carry a hardcoded near-white
+     fill from the light theme, which left light text on a light band - unreadable.
+     Tint the card colour instead, so the row still reads as a total. */
+  .total td{ background: rgba(160,216,234,.10); color: var(--ink); }
 }

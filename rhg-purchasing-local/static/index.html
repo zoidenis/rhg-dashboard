@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RHG Purchasing</title>
+<meta name="theme-color" content="#0c475e">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="select.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -14,8 +19,10 @@
   --prev:#c9ced8;
 }
 @media (prefers-color-scheme: dark){
-  :root{--bg:#0e1117;--card:#171b23;--ink:#eef0f3;--sub:#9aa1ad;--line:#262b35;--side:#090b10;
-        --up-bg:#3b1715;--down-bg:#0d2a1c;--warn-bg:#2d220f;--prev:#3a404c;}
+  /* The Revo dark palette, matching Finance and brand.css. This used to be a
+     neutral grey set, which read as a different product next to the other tower. */
+  :root{--bg:#08222d;--card:#0e2f3d;--ink:#e8f2f6;--sub:#93b2bf;--line:#194354;--side:#061a23;
+        --up-bg:#3a1d1a;--down-bg:#0d2e24;--warn-bg:#32270f;--prev:#2b5a6c;}
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
@@ -23,17 +30,45 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .app{display:flex;min-height:100%}
-aside{width:228px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh}
+aside{width:228px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px 14px;
+  display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100dvh;overflow:hidden}
 .brand{display:flex;gap:11px;align-items:center;padding:0 6px}
-.logo{width:36px;height:36px;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;display:grid;place-items:center}
+/* The mark is drawn by brand.css as a mask in currentColor, so the tile must
+   carry the sky fill and the deep blue ink - white on sky is invisible. */
+.logo{width:36px;height:36px;border-radius:10px;background:var(--revo-sky,#a0d8ea);
+  color:var(--revo-blue,#0c475e);display:grid;place-items:center;font-size:0}
 .brand b{display:block;color:#fff;font-size:15px}
 .brand small{color:#8a909c;font-size:12px}
-nav{display:flex;flex-direction:column;gap:2px}
+nav{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;
+  overscroll-behavior:contain;scrollbar-width:thin;
+  scrollbar-color:rgba(160,216,234,.30) transparent;margin:0 -6px;padding:0 6px}
+nav::-webkit-scrollbar{width:8px}
+nav::-webkit-scrollbar-thumb{background:rgba(160,216,234,.26);border-radius:99px}
+nav::-webkit-scrollbar-thumb:hover{background:rgba(160,216,234,.42)}
+nav::-webkit-scrollbar-track{background:transparent}
 nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center}
 nav button:hover{background:rgba(255,255,255,.05)}
 nav button.on{background:rgba(255,255,255,.09);color:#fff;font-weight:700}
-nav .count{background:#5c1d1a;color:#ffb4ae;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
-.side-foot{margin-top:auto;font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
+/* Back to the platform's app chooser. It sits above the brand so it reads as
+   leaving this tower, not as another view inside it. */
+.back{display:inline-flex;align-items:center;gap:7px;padding:7px 8px;margin:-4px 0 -8px;
+  border-radius:8px;color:#8fb3c1;font-size:12.5px;font-weight:600;text-decoration:none}
+.back:hover{background:rgba(160,216,234,.09);color:#fff}
+.back svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+/* The Administration entry is a link, not a nav button, so it needs the same
+   shape as its neighbours rather than the browser's default anchor styling. */
+nav a#usersNav{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;
+  justify-content:space-between;align-items:center;font-size:13.5px;margin-top:6px;
+  border-top:1px solid rgba(160,216,234,.14);padding-top:13px}
+nav a#usersNav:hover{background:rgba(160,216,234,.09);color:#fff}
+/* Section headings. They are plain text, not buttons, so the click handler that
+   binds "#nav button" is untouched. */
+nav .group{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  color:#6f8f9d;padding:14px 12px 5px;pointer-events:none}
+nav .group:first-child{padding-top:0}
+nav .count{background:rgba(160,216,234,.2);color:var(--revo-sky,#a0d8ea);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.side-foot{flex:none;padding-top:12px;border-top:1px solid rgba(160,216,234,.12);font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 28px 60px}
 header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:16px}
 h1{font-size:23px;margin:0;font-weight:800;letter-spacing:-.01em}
@@ -56,7 +91,54 @@ h1{font-size:23px;margin:0;font-weight:800;letter-spacing:-.01em}
 .up{color:var(--up)} .down{color:var(--down)}
 .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
 @media(max-width:1000px){.grid{grid-template-columns:1fr}}
-@media(max-width:760px){aside{display:none} main{padding:16px}}
+/* ---------------------------------------------------------------- mobile
+   The sidebar used to be display:none below 760px, which left the application
+   with no navigation at all on a phone. It becomes a drawer instead: the same
+   markup, slid off-canvas and brought back by the header button. Nothing about
+   the desktop layout changes. */
+.navbtn{display:none}
+.scrim{position:fixed;inset:0;background:rgba(8,34,45,.55);opacity:0;visibility:hidden;
+  transition:opacity .2s;z-index:44}
+.scrim.on{opacity:1;visibility:visible}
+
+@media(max-width:860px){
+  .app{display:block}
+  aside{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:86vw;height:100dvh;
+    z-index:45;transform:translateX(-100%);transition:transform .22s ease;
+    box-shadow:0 0 44px rgba(0,0,0,.42);padding-top:16px}
+  aside.open{transform:none}
+  main{padding:14px 14px 56px;min-width:0}
+
+  /* A header bar that holds the menu button and stays reachable while scrolling. */
+  .navbtn{display:inline-grid;place-items:center;width:42px;height:42px;flex:none;
+    border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);
+    cursor:pointer;padding:0}
+  .navbtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;
+    stroke-linecap:round}
+  header{position:sticky;top:0;z-index:20;background:var(--bg);
+    padding:10px 0 12px;margin:-14px 0 12px;align-items:center}
+  h1{font-size:18px}
+  .period{font-size:12.5px}
+
+  /* Controls become full width so they are tappable, not cramped. */
+  .filters{gap:9px}
+  .filters > label,.filters > .field{flex:1 1 100%;min-width:0}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .money{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+
+  /* Wide tables scroll sideways rather than squashing the numbers. */
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;
+    margin:0 -14px;padding:0 14px}
+  table{min-width:560px}
+  .card{padding:14px}
+  .modal{padding:16px;border-radius:12px}
+}
+@media(max-width:420px){
+  h1{font-size:17px}
+  .kpis{grid-template-columns:1fr 1fr}
+}
+/* Someone using a phone should not have to fight the animation. */
+@media (prefers-reduced-motion:reduce){ aside,.scrim{transition:none} }
 h2{font-size:15.5px;margin:0;font-weight:700}
 .hint{color:var(--sub);font-size:12.5px;margin:3px 0 14px}
 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -68,6 +150,10 @@ tr:last-child td{border-bottom:none}
 td.num,th.num{text-align:right}
 .name{font-weight:700;white-space:normal;min-width:180px}
 .meta{color:var(--sub);font-size:12px;font-weight:500}
+/* Account links had no rule, so they fell back to the browser default blue,
+   which is unreadable on the dark surface. Use the theme accent. */
+.acc{color:var(--accent);font-weight:600;text-decoration:none}
+.acc:hover{text-decoration:underline}
 .chip{display:inline-block;font-weight:700;font-size:12px;border-radius:999px;padding:3px 9px}
 .chip.up{background:var(--up-bg)} .chip.down{background:var(--down-bg)}
 .bars .row{display:grid;grid-template-columns:minmax(120px,190px) 1fr 100px;gap:10px;align-items:center;padding:6px 0}
@@ -178,38 +264,48 @@ td.num,th.num{text-align:right}
 </head>
 <body>
 <div class="app">
-<aside>
-  <div class="brand"><div class="logo" id="logo">R</div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
+<div class="scrim" id="scrim"></div>
+<aside id="sideNav">
+  <a class="back" href="/" title="Back to the control towers"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>All applications</a>
+  <div class="brand"><div class="logo" id="logo"></div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
   <nav id="nav">
+    <div class="group">Overview</div>
     <button class="on" data-view="overview">Overview</button>
     <button data-view="live">Live operations</button>
     <button data-view="reqs">Requisitions <span class="count" id="reqCount">0</span></button>
+    <div class="group">Analysis</div>
     <button data-view="compare">Comparisons</button>
     <button data-view="streams">Purchase types</button>
     <button data-view="services">Services &amp; CAPEX</button>
+    <button data-view="prices">Price changes</button>
+    <button data-view="stock">Stock &amp; working capital</button>
+    <div class="group">Contracts &amp; compliance</div>
     <button data-view="contracts">Contract prices</button>
     <button data-view="compliance">Invoices without PO</button>
-    <button data-view="stock">Stock &amp; working capital</button>
-    <button data-view="prices">Price changes</button>
+    <div class="group">Orders &amp; invoices</div>
     <button data-view="po">Purchase orders <span class="count" id="poCount">0</span></button>
     <button data-view="invoices">Invoices</button>
+    <div class="group">Performance</div>
     <button data-view="users">User performance</button>
     <button data-view="suppliers">Supplier performance</button>
     <button data-view="locations">Location prices</button>
+    <div class="group">Follow-up</div>
     <button data-view="exceptions">Exceptions <span class="count" id="exCount">0</span></button>
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
     <button data-view="feed">Posting follow-up</button>
     <button data-view="quality">Data quality <span class="count" id="qCount">0</span></button>
     <button data-view="reports">Reports</button>
+    <div class="group">System</div>
     <button data-view="gaps">Data availability</button>
     <button data-view="settings">Settings</button>
-    <button data-view="accounts" id="usersNav" style="display:none">Users</button>
+    <a id="usersNav" href="/admin" style="display:none">Administration</a>
   </nav>
-  <div class="side-foot">Runs on this PC. Data comes straight from Business Central and refreshes on its own.</div>
+  <div class="side-foot">Data comes straight from Business Central and refreshes on its own. Actions and thresholds live in this application.</div>
 </aside>
 
 <main>
   <header>
+    <button class="navbtn" id="navBtn" aria-label="Menu" aria-expanded="false" aria-controls="sideNav"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div>
       <h1 id="title">Purchasing overview</h1>
       <div class="period" id="period">Loading…</div>
@@ -693,7 +789,7 @@ async function load(manual){
   showLoading(true);
   try{
     const r = await fetch("/api/dashboard?" + params());
-    if (r.status === 401) { location.href = "/login"; return; }
+    if (r.status === 401) { location.href = "/"; return; }
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
     data = j; refreshSec = j.meta.refresh_seconds || 30;
@@ -1433,15 +1529,14 @@ async function loadSession(){
   try{
     const j = await (await fetch("/api/session")).json();
     me = j.user; roles = j.roles || {};
-    if(!me){ location.href = "/login"; return; }
+    if(!me){ location.href = "/"; return; }
     $("whoami").innerHTML = `<span class="dot"></span>${esc(me.name||me.username)} · ${esc(me.role)}`;
     $("usersNav").style.display = can("users") ? "" : "none";
     document.querySelectorAll("#saveSettings").forEach(b => { b.disabled = !can("settings");
       if(!can("settings")) b.title = "Your role cannot change thresholds."; });
-    if(can("users")) loadUsers();
-  }catch(e){ location.href = "/login"; }
+  }catch(e){ location.href = "/"; }
 }
-$("logoutBtn").onclick = async () => { await fetch("/api/logout"); location.href = "/login"; };
+$("logoutBtn").onclick = async () => { await fetch("/api/logout", {method:"POST"}).catch(()=>{}); location.href = "/"; };
 
 async function loadUsers(){
   try{
@@ -1717,22 +1812,9 @@ function renderStock(){
   const change = t.closing_value - t.opening_value;
   const maxMeasurable = t.maximum_coverage.measurable;
   const excess = d.categories.reduce((a,c)=>a+(c.excess_value||0),0);
-  const nm = t.no_movement_breakdown || {};
   $("stkKpis").innerHTML = [
-    stockCard("Stock at the start of the month", all(t.opening_value),
-      [`${fmt(t.opening_items)} items with a balance at ${d.opening_date}`,
-       "Balance BC reports the day before the month began"]),
-    stockCard("Entered the location", all(t.inflow_cost),
-      [`${fmt(t.inflow_items)} items · ${fmt(t.purchases_items)} of them purchased`,
-       t.sales_return_cost ? `Returned by customers ${all(t.sales_return_cost)} · ${fmt(t.sales_return_items)} items`
-                           : "Purchased, transferred in or added by a count",
-       "Recipe output is not counted: it is internal"]),
-    stockCard("Left the location", all(t.outflow_cost),
-      [`Sold or used ${all(t.consumed_cost)}`,
-       `Transferred out ${all(t.transfers_out_cost)} · ${fmt(t.transfer_items)} items`,
-       "Transfers are how stock reaches the restaurants"]),
-    stockCard("Stock at the end of the month", all(t.closing_value),
-      [`${sign(change)} ${CUR} against the start`,
+    stockCard("Stock value at month end", all(t.closing_value),
+      [`${sign(change)} ${CUR} against the month before`,
        `${fmt(t.value_coverage.priced)} of ${fmt(t.value_coverage.items)} items priced`,
        "Card cost, a management valuation"]),
     stockCard("Estimated excess", maxMeasurable ? all(t.above_maximum_value) : all(excess),
@@ -1742,18 +1824,14 @@ function renderStock(){
        maxMeasurable ? "Against the limit set in BC"
         : `Cannot use the SKU maximum: ${fmt(t.maximum_coverage.with_maximum)} of ${fmt(t.maximum_coverage.cards)} cards carry one`,
        "Not cash that can be recovered at once"]),
-    stockCard("Added by count", all(t.positive_adjustment_cost),
-      [`${fmt(t.positive_adjustment_items)} items adjusted upwards`,
-       "Stock found that the books did not have",
-       `Net of both sides: ${sign(t.adjustment_cost)} ${CUR}`]),
-    stockCard("Written off by count", all(t.negative_adjustment_cost),
-      [`${fmt(t.negative_adjustment_items)} items adjusted downwards`,
-       "Stock the books had and the shelf did not",
-       "Counted as stock that left the location"]),
     stockCard("Stock that did not move", all(t.no_movement_value),
-      [`${fmt(t.no_movement_items)} items: nothing sold, used, transferred out or written off`,
-       `${fmt(nm.no_entries_at_all || 0)} with no posting at all (${all(nm.value_no_entries || 0)})`,
-       `${fmt(nm.received_only || 0)} that only received stock (${all(nm.value_received_only || 0)})`]),
+      [`${fmt(t.no_movement_items)} items with a balance and no consumption`, "Confirmed by the posted records"]),
+    stockCard("Consumed in the month", all(t.consumed_cost),
+      ["Cost of sales plus net adjustments", "Assembly pairs net out, so nothing is counted twice"]),
+    stockCard("Count adjustments", sign(t.adjustment_cost) + " " + CUR,
+      [`${fmt(t.adjustment_items)} items adjusted`, "Neither purchase nor consumption: a correction"]),
+    stockCard("Negative balances", fmt(t.negative_stock),
+      [t.negative_stock ? `${all(t.negative_value)} at stake` : "None", "Consumption posted against stock never received"]),
   ].join("");
 
   const st = t.status;
@@ -1763,8 +1841,8 @@ function renderStock(){
       <div>Movement classification<b>${esc(st.classification.state)}</b></div></div>
     <p class="hint" style="margin:6px 0 0">${esc(st.quantity.detail)} ${esc(st.valuation.detail)} ${esc(st.classification.detail)}</p>`;
 
-  $("stkCatNote").textContent = `Cover is calculated per category against everything that left it — sold, used, transferred out or written off — not as one average for the whole location. ${d.categories.length} categories.`;
-  $("stkCat").innerHTML = `<tr><th>Category</th><th class="num">Value</th><th class="num">Left (cost)</th>
+  $("stkCatNote").textContent = `Cover is calculated per category against its own cost of sales, not as one average for the whole location. ${d.categories.length} categories.`;
+  $("stkCat").innerHTML = `<tr><th>Category</th><th class="num">Value</th><th class="num">Used (cost)</th>
       <th class="num">Days cover</th><th class="num">Target</th><th class="num">Excess</th><th class="num">Not moving</th></tr>` +
     d.categories.slice(0,14).map(c=>`<tr class="${(c.excess_value||0)>0?"warnrow":""}">
       <td class="name">${esc(c.category)}<div class="meta">${fmt(c.items)} items${c.negative?` · ${c.negative} negative`:""}</div></td>
@@ -1789,7 +1867,7 @@ function renderStock(){
 
   $("stkTable").innerHTML = `<tr><th>Item</th><th class="num">Opening</th><th class="num">Receipts</th><th class="num">Returns</th>
       <th class="num">Transf. in</th><th class="num">Transf. out</th><th class="num">Asm. output</th><th class="num">Asm. used</th>
-      <th class="num">Sales</th><th class="num">Sales ret.</th><th class="num">Adj. +</th><th class="num">Adj. −</th>
+      <th class="num">Sales/other</th><th class="num">Adj. +</th><th class="num">Adj. −</th>
       <th class="num">Calculated</th><th class="num">BC</th><th class="num">Diff</th>
       <th class="num">Reorder pt</th><th class="num">Max</th><th class="num">Days cover</th><th class="num">Value</th></tr>` +
     d.rows.slice(0,150).map(r=>`<tr class="${r.reconciled?"":"warnrow"}">
@@ -1797,7 +1875,7 @@ function renderStock(){
       <td class="num">${fmt(r.opening,2)}</td><td class="num">${fmt(r.receipts,2)}</td><td class="num">${fmt(r.returns,2)}</td>
       <td class="num">${fmt(r.transfer_in,2)}</td><td class="num">${fmt(r.transfer_out,2)}</td>
       <td class="num">${fmt(r.assembly_output,2)}</td><td class="num">${fmt(r.assembly_consumption,2)}</td>
-      <td class="num">${fmt(r.sales,2)}</td><td class="num">${fmt(r.sales_return,2)}</td><td class="num">${fmt(r.positive_adjustment,2)}</td><td class="num">${fmt(r.negative_adjustment,2)}</td>
+      <td class="num">${fmt(r.sales,2)}</td><td class="num">${fmt(r.positive_adjustment,2)}</td><td class="num">${fmt(r.negative_adjustment,2)}</td>
       <td class="num">${fmt(r.calculated_closing,2)}</td><td class="num"><b>${fmt(r.bc_closing,2)}</b></td>
       <td class="num ${Math.abs(r.difference)>0.001?"up":""}">${fmt(r.difference,2)}</td>
       <td class="num meta">${r.reorder_point?fmt(r.reorder_point,2):"–"}</td>
@@ -2233,13 +2311,9 @@ setInterval(() => {
 
 (async () => {
   await loadSession();
-  // use static/logo.svg or logo.png as the brand mark when one is present
-  for (const f of ["/logo.svg", "/logo.png"]) {
-    try {
-      const r = await fetch(f, {cache:"no-store"});
-      if (r.ok) { document.documentElement.style.setProperty("--brand-logo", `url('${f}')`); $("logo").classList.add("has-image"); break; }
-    } catch(e) {}
-  }
+  // The brand mark is drawn by brand.css as a mask in the tile's own colour,
+  // so it is already correct in both themes. The old probe for logo.svg set
+  // .has-image, which made the tile transparent and left nothing to draw.
   $("week").value = snapDate(mondayOf(new Date()));
   try {
     const r = await fetch("/api/companies"); const j = await r.json();
@@ -2249,5 +2323,31 @@ setInterval(() => {
   load(true);
 })();
 </script>
+<script src="select.js"></script>
+<script>
+/* ---- mobile drawer ------------------------------------------------------
+   The sidebar is off-canvas below 860px. It closes on a nav choice, on the
+   scrim, on Escape and when the viewport grows back to desktop, so it can
+   never be left open over the content. */
+(function(){
+  const side = document.getElementById("sideNav"),
+        scrim = document.getElementById("scrim"),
+        btn = document.getElementById("navBtn");
+  if(!side || !btn) return;
+  const isMobile = () => window.matchMedia("(max-width:860px)").matches;
+  function set(open){
+    side.classList.toggle("open", open);
+    scrim.classList.toggle("on", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    document.body.style.overflow = open && isMobile() ? "hidden" : "";
+  }
+  btn.onclick = () => set(!side.classList.contains("open"));
+  scrim.onclick = () => set(false);
+  document.addEventListener("keydown", e => { if(e.key === "Escape") set(false); });
+  side.addEventListener("click", e => { if(e.target.closest("button[data-view], a")) set(false); });
+  window.addEventListener("resize", () => { if(!isMobile()) set(false); });
+})();
+</script>
+<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
 </body>
 </html>

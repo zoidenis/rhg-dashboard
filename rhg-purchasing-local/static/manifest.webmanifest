@@ -1,0 +1,25 @@
+{
+  "name": "RHG Purchasing",
+  "short_name": "Purchasing",
+  "description": "Spend, suppliers, price movements and requisitions from Business Central.",
+  "start_url": "/purchasing/",
+  "scope": "/purchasing/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ecebeb",
+  "theme_color": "#0c475e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
