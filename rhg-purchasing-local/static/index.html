@@ -2237,7 +2237,9 @@ setInterval(() => {
   for (const f of ["/logo.svg", "/logo.png"]) {
     try {
       const r = await fetch(f, {cache:"no-store"});
-      if (r.ok) { document.documentElement.style.setProperty("--brand-logo", `url('${f}')`); $("logo").classList.add("has-image"); break; }
+      // r.url carries the prefix nginx serves this tower under; f does not, because
+      // nginx rewrites the literal above but not a template built at runtime.
+      if (r.ok) { document.documentElement.style.setProperty("--brand-logo", `url('${r.url}')`); $("logo").classList.add("has-image"); break; }
     } catch(e) {}
   }
   $("week").value = snapDate(mondayOf(new Date()));
