@@ -42,6 +42,11 @@ from bc_client import BCClient, BCError, PeriodCache
 STATIC = config.BASE_DIR / "static"
 STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+xml",
                 "logo.png": "image/png", "favicon.ico": "image/x-icon",
+                "icon.svg": "image/svg+xml",
+                "manifest.webmanifest": "application/manifest+json",
+                "sw.js": "application/javascript; charset=utf-8",
+                "select.js": "application/javascript; charset=utf-8",
+                "select.css": "text/css; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}
 client = BCClient()
 cache = PeriodCache(client)
