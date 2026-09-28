@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c475e">
+<title>RHG Control Towers · Sign in</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/select.css">
+<style>
+.wrap{min-height:100dvh;display:grid;place-items:center;padding:24px 16px}
+.panel{width:100%;max-width:400px}
+.brand{display:flex;gap:11px;align-items:center;margin-bottom:22px}
+.brand h1{font-size:17px}
+.box{padding:28px 24px}
+.apps{margin-top:18px;display:grid;gap:10px}
+a.tower{display:flex;align-items:center;gap:13px;padding:15px 16px;border:1px solid var(--line);
+  border-radius:var(--radius);text-decoration:none;color:inherit;background:var(--card);
+  transition:border-color .15s,transform .15s}
+a.tower:hover{border-color:var(--accent);transform:translateY(-1px)}
+.mark{width:36px;height:36px;flex:none;border-radius:10px;background:var(--revo-sky-soft);
+  color:var(--accent);display:grid;place-items:center}
+.mark svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round}
+.t-name{font-weight:700}
+.t-desc{color:var(--sub);font-size:12.5px;margin-top:1px}
+.foot{margin-top:18px;font-size:12px;color:var(--sub);line-height:1.5}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+@media(max-width:380px){ .box{padding:22px 18px} }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="panel">
+  <div class="brand"><div class="logo"></div>
+    <div><h1>RHG Control Towers</h1><small class="muted">Revo Hospitality Group</small></div></div>
+
+  <div class="card box">
+    <!-- sign in -->
+    <div id="signin">
+      <label for="u">Username</label>
+      <input id="u" autocomplete="username" autocapitalize="none" autofocus>
+      <label for="p">Password</label>
+      <input id="p" type="password" autocomplete="current-password">
+      <button class="btn primary" id="go" style="width:100%;margin-top:18px">Sign in</button>
+    </div>
+
+    <!-- forced password change -->
+    <div id="change" hidden>
+      <p class="muted" style="margin:0">Choose a new password before you continue.</p>
+      <label for="n1">New password</label>
+      <input id="n1" type="password" autocomplete="new-password">
+      <label for="n2">Repeat new password</label>
+      <input id="n2" type="password" autocomplete="new-password">
+      <p class="muted" style="font-size:12px;margin:10px 0 0">
+        At least 12 characters, with upper case, lower case and a digit.</p>
+      <button class="btn primary" id="save" style="width:100%;margin-top:14px">Save and continue</button>
+    </div>
+
+    <!-- app chooser, once signed in -->
+    <div id="chooser" hidden>
+      <div class="row"><div><b id="who"></b><div class="muted" id="role" style="font-size:12.5px"></div></div>
+        <button class="btn sm" id="out">Sign out</button></div>
+      <div class="apps" id="apps"></div>
+      <div id="adminLink"></div>
+    </div>
+
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="foot">Business Central is read-only. Sessions last 12 hours and end after
+    60 minutes idle. Five wrong attempts lock the account for 15 minutes.</div>
+</div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let CSRF = null, pending = null;
+
+const TOWERS = [
+  {key:"finance", href:"/finance/", perm:"finance.view", name:"Finance & Inventory",
+   desc:"P&L, balance sheet, AP/AR, cash, treasury and stock",
+   icon:'<path d="M3 20h18M6 20V10M12 20V4M18 20v-7"/>'},
+  {key:"purchasing", href:"/purchasing/", perm:"purchasing.view", name:"Purchasing",
+   desc:"Spend, suppliers, price movements and requisitions",
+   icon:'<path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="18" cy="20" r="1.2"/>'}
+];
+
+function say(text, kind){ const m = $("msg"); m.textContent = text || ""; m.className = "msg " + (kind||""); }
+
+async function api(path, body, method){
+  const h = {"Content-Type":"application/json"};
+  if(CSRF) h["X-CSRF-Token"] = CSRF;
+  const r = await fetch(path, {method: method || (body ? "POST" : "GET"),
+    headers: h, body: body ? JSON.stringify(body) : undefined});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+function show(which){
+  for(const id of ["signin","change","chooser"]) $(id).hidden = (id !== which);
+}
+
+function renderChooser(user){
+  $("who").textContent = user.name || user.username;
+  $("role").textContent = user.role;
+  const allowed = TOWERS.filter(t => user.permissions.includes(t.perm));
+  $("apps").innerHTML = allowed.length ? allowed.map(t => `
+    <a class="tower" href="${t.href}">
+      <div class="mark"><svg viewBox="0 0 24 24">${t.icon}</svg></div>
+      <div><div class="t-name">${t.name}</div><div class="t-desc">${t.desc}</div></div>
+    </a>`).join("")
+    : `<p class="muted" style="margin:0">Your role has no applications assigned yet.
+       Ask an administrator.</p>`;
+  $("adminLink").innerHTML = user.permissions.includes("admin.users.manage")
+    ? `<a class="tower" style="margin-top:10px" href="/admin">
+         <div class="mark"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg></div>
+         <div><div class="t-name">Administration</div>
+              <div class="t-desc">Accounts, roles, sessions and the audit trail</div></div></a>`
+    : "";
+  show("chooser");
+}
+
+async function boot(){
+  try{
+    const j = await api("/api/session");
+    if(j.user){
+      CSRF = j.user.csrf;
+      if(j.user.must_change){ show("change"); $("n1").focus(); }
+      else renderChooser(j.user);
+    } else show("signin");
+  }catch(e){ show("signin"); }
+}
+
+$("go").onclick = async () => {
+  say(""); $("go").disabled = true;
+  try{
+    const j = await api("/api/login", {username:$("u").value.trim(), password:$("p").value});
+    CSRF = j.csrf;
+    pending = $("p").value;   // needed as "current" on a forced change
+    $("p").value = "";
+    if(j.user.must_change){ show("change"); $("n1").focus(); }
+    else renderChooser(j.user);
+  }catch(e){ say(e.message, "err"); }
+  finally{ $("go").disabled = false; }
+};
+
+$("save").onclick = async () => {
+  say("");
+  if($("n1").value !== $("n2").value){ say("The two passwords do not match.", "err"); return; }
+  $("save").disabled = true;
+  try{
+    await api("/api/password", {current:pending, new:$("n1").value});
+    const j = await api("/api/session");
+    CSRF = j.user.csrf;
+    say("Password saved.", "ok");
+    renderChooser(j.user);
+  }catch(e){ say(e.message, "err"); }
+  finally{ $("save").disabled = false; }
+};
+
+$("out").onclick = async () => {
+  try{ await api("/api/logout", {}); }catch(e){}
+  CSRF = null; location.reload();
+};
+
+document.addEventListener("keydown", e => {
+  if(e.key !== "Enter") return;
+  if(!$("signin").hidden) $("go").click();
+  else if(!$("change").hidden) $("save").click();
+});
+
+boot();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+</script>
+<script src="/select.js"></script>
+</body>
+</html>

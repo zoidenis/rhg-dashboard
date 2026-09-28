@@ -1,0 +1,384 @@
+[
+ {
+  "id": "711608032a",
+  "title": "Purchase order open too long: 33 cases, 790,247 ALL involved",
+  "description": "Largest case: PO 291750 \u00b7 SHAKAJ 2019: open 9 working days. Order value 144,850 ALL, still Open (threshold 7 days).\nRecommended: Release, amend or close the order.",
+  "source_exception": "group-Purchase order open too -2026-09-21",
+  "bc_document": "",
+  "document_type": "Purchase Order",
+  "company": "SALT",
+  "location": "",
+  "supplier": "",
+  "impact": 790246.7069999999,
+  "priority": "High",
+  "owner": "",
+  "created_at": "2026-09-22T21:15:15",
+  "created_by": "director",
+  "due_date": "2026-09-27",
+  "status": "Overdue",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "291750",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "293294",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "291487",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "290899",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "290906",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "291745",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "291915",
+    "period": "2026-09-21 to 2026-09-22"
+   },
+   {
+    "entity": "Business Central",
+    "key": "291631",
+    "period": "2026-09-21 to 2026-09-22"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-22T21:15:15",
+    "actor": "director",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ },
+ {
+  "id": "4e579e796a",
+  "title": "Domate: price up +40.3%",
+  "description": "Average unit cost 79.98 \u2192 112.23 ALL on 1,162.49 units, cost impact +37,488 ALL.\nRecommended: Confirm the new price with the supplier or revert to the agreed price.",
+  "source_exception": "price-A3062-2026-09-14",
+  "bc_document": "A3062",
+  "document_type": "Item",
+  "company": "SALT",
+  "location": "CENTRAL, LIFT, OPA 9KAT, OPA QTU, OPA TEG, OPA TIA, OPA1, OPA3, SALT, VESPER",
+  "supplier": "",
+  "impact": 37487.83239639403,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-22T21:29:39",
+  "created_by": "director",
+  "due_date": "2026-09-25",
+  "status": "Overdue",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "A3062",
+    "period": "2026-09-14..2026-09-20"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-22T21:29:39",
+    "actor": "director",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ },
+ {
+  "id": "c1500a65e1",
+  "title": "PO 289859 \u00b7 TradeRoute Logistics & Global Transport: goods received, no invoice",
+  "description": "5,002,232 ALL received but not invoiced, order open 4 working days (threshold 48h).\nRecommended: Chase the vendor invoice or post it; the cost is accrued but unconfirmed.",
+  "source_exception": "po-invoice-289859",
+  "bc_document": "289859",
+  "document_type": "Purchase Order",
+  "company": "SALT",
+  "location": "MAGAZINE",
+  "supplier": "TradeRoute Logistics & Global Transport",
+  "impact": 5002231.63,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-24T18:02:17",
+  "created_by": "admin",
+  "due_date": "2026-09-27",
+  "status": "Overdue",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "289859",
+    "period": "2026-08-01..2026-08-31"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-24T18:02:17",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ },
+ {
+  "id": "d5dd4d1363",
+  "title": "PO 289859 \u00b7 TradeRoute Logistics & Global Transport: goods received, no invoice",
+  "description": "5,002,232 ALL received but not invoiced, order open 4 working days (threshold 48h).\nRecommended: Chase the vendor invoice or post it; the cost is accrued but unconfirmed.",
+  "source_exception": "po-invoice-289859",
+  "bc_document": "289859",
+  "document_type": "Purchase Order",
+  "company": "SALT",
+  "location": "MAGAZINE",
+  "supplier": "TradeRoute Logistics & Global Transport",
+  "impact": 5002231.63,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-24T18:02:19",
+  "created_by": "admin",
+  "due_date": "2026-09-27",
+  "status": "Dismissed",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "289859",
+    "period": "2026-08-01..2026-08-31"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-24T18:02:19",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   },
+   {
+    "ts": "2026-09-24T18:08:23",
+    "actor": "admin",
+    "from": "New",
+    "to": "Dismissed",
+    "comment": ""
+   }
+  ]
+ },
+ {
+  "id": "548e5677e7",
+  "title": "PO 289859 \u00b7 TradeRoute Logistics & Global Transport: goods received, no invoice",
+  "description": "5,002,232 ALL received but not invoiced, order open 4 working days (threshold 48h).\nRecommended: Chase the vendor invoice or post it; the cost is accrued but unconfirmed.",
+  "source_exception": "po-invoice-289859",
+  "bc_document": "289859",
+  "document_type": "Purchase Order",
+  "company": "SALT",
+  "location": "MAGAZINE",
+  "supplier": "TradeRoute Logistics & Global Transport",
+  "impact": 5002231.63,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-24T18:02:30",
+  "created_by": "admin",
+  "due_date": "2026-09-27",
+  "status": "Dismissed",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "289859",
+    "period": "2026-08-01..2026-08-31"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-24T18:02:30",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   },
+   {
+    "ts": "2026-09-24T18:08:36",
+    "actor": "admin",
+    "from": "New",
+    "to": "Dismissed",
+    "comment": ""
+   }
+  ]
+ },
+ {
+  "id": "f5ec9f5f19",
+  "title": "Requisition Djathe PARMIGIANO REGGIANO: open 51h",
+  "description": "30.40 KG for SALT, supplier Conad Albania SHPK, waiting since 2026-09-22T21:36:48 (warning 24h, critical 48h).\nRecommended: Convert it into a purchase order or clear the line.",
+  "source_exception": "req-0/43840000/A406",
+  "bc_document": "A406",
+  "document_type": "Requisition",
+  "company": "SALT",
+  "location": "SALT",
+  "supplier": "Conad Albania SHPK",
+  "impact": 31032.236095999997,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-25T00:39:32",
+  "created_by": "admin",
+  "due_date": "2026-09-28",
+  "status": "New",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "A406",
+    "period": "2026-09-21..2026-09-25"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-25T00:39:32",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ },
+ {
+  "id": "6d30846b70",
+  "title": "Requisition Sallate bebi ROMANA: open 51h",
+  "description": "75.00 KG for SALT, supplier Jani Fruta Perime PF, waiting since 2026-09-22T21:36:48 (warning 24h, critical 48h).\nRecommended: Convert it into a purchase order or clear the line.",
+  "source_exception": "req-0/43670000/A3797",
+  "bc_document": "A3797",
+  "document_type": "Requisition",
+  "company": "SALT",
+  "location": "SALT",
+  "supplier": "Jani Fruta Perime PF",
+  "impact": 28749.74775,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-25T00:39:41",
+  "created_by": "admin",
+  "due_date": "2026-09-28",
+  "status": "New",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "A3797",
+    "period": "2026-09-21..2026-09-25"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-25T00:39:41",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ },
+ {
+  "id": "b47a2adc39",
+  "title": "Requisition Djathe PARMIGIANO REGGIANO: open 51h",
+  "description": "7.98 KG for SALT, supplier Conad Albania SHPK, waiting since 2026-09-22T21:36:48 (warning 24h, critical 48h).\nRecommended: Convert it into a purchase order or clear the line.",
+  "source_exception": "req-0/43790000/A406",
+  "bc_document": "A406",
+  "document_type": "Requisition",
+  "company": "SALT",
+  "location": "SALT",
+  "supplier": "Conad Albania SHPK",
+  "impact": 8144.287867726401,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-25T00:39:44",
+  "created_by": "admin",
+  "due_date": "2026-09-28",
+  "status": "New",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "A406",
+    "period": "2026-09-21..2026-09-25"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-25T00:39:44",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ },
+ {
+  "id": "84099b85ad",
+  "title": "Frozen FILLET Beef E.E +3.5 (Fileto Vici): price up +16.7%",
+  "description": "Average unit cost 2,000.00 \u2192 2,333.33 ALL on 38.32 units, cost impact +12,773 ALL.\nRecommended: Confirm the new price with the supplier or revert to the agreed price.",
+  "source_exception": "price-A491-2026-09-21",
+  "bc_document": "A491",
+  "document_type": "Item",
+  "company": "SALT",
+  "location": "SALT",
+  "supplier": "",
+  "impact": 12773.330000000002,
+  "priority": "Critical",
+  "owner": "",
+  "created_at": "2026-09-25T00:39:53",
+  "created_by": "admin",
+  "due_date": "2026-09-28",
+  "status": "New",
+  "management_comment": "",
+  "resolution_comment": "",
+  "evidence": [
+   {
+    "entity": "Business Central",
+    "key": "A491",
+    "period": "2026-09-21..2026-09-25"
+   }
+  ],
+  "confidence": "high",
+  "history": [
+   {
+    "ts": "2026-09-25T00:39:53",
+    "actor": "admin",
+    "from": "",
+    "to": "New",
+    "comment": "Created"
+   }
+  ]
+ }
+]

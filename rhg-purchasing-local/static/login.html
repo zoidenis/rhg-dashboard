@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RHG Purchasing Control Tower · Sign in</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ecebeb;--card:#fff;--ink:#0e2733;--sub:#5c7482;--line:#d9dcdd;--accent:#0c475e;--sky:#a0d8ea;--up:#c0392b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-size:14px}
+.wrap{min-height:100%;display:grid;place-items:center;padding:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px;width:100%;max-width:400px}
+.brand{display:flex;gap:11px;align-items:center;margin-bottom:22px}
+.logo{width:40px;height:40px;border-radius:11px;background:var(--sky);color:var(--accent);font-weight:800;display:grid;place-items:center;font-size:17px}
+h1{font-size:17px;margin:0}
+small{color:var(--sub)}
+label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:14px 0 5px}
+input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--bg)}
+button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+.msg{margin-top:14px;font-size:13px;font-weight:600;color:var(--up);min-height:18px}
+.note{margin-top:20px;font-size:12px;color:var(--sub);line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <div class="brand"><div class="logo">R</div><div><h1>RHG Purchasing</h1><small>Control Tower</small></div></div>
+  <div id="loginForm">
+    <label for="u">Username</label><input id="u" autocomplete="username" autofocus>
+    <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+    <button id="go">Sign in</button>
+  </div>
+  <div id="changeForm" style="display:none">
+    <p style="margin:0;color:var(--sub)">Choose a new password before you continue.</p>
+    <label for="c">Current password</label><input id="c" type="password" autocomplete="current-password">
+    <label for="n1">New password</label><input id="n1" type="password" autocomplete="new-password">
+    <label for="n2">Repeat new password</label><input id="n2" type="password" autocomplete="new-password">
+    <button id="save">Save and continue</button>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="note">Sessions last 12 hours. Five wrong attempts lock the account for 15 minutes.
+    This application runs on this PC over plain HTTP; do not publish it to the network without HTTPS in front of it.</div>
+</div></div>
+<script>
+const $ = id => document.getElementById(id);
+let pending = null;
+async function post(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+$("go").onclick = async () => {
+  $("msg").textContent = ""; $("go").disabled = true;
+  try{
+    const j = await post("/api/login", {username:$("u").value.trim(), password:$("p").value});
+    if(j.user.must_change){
+      pending = $("p").value;
+      $("loginForm").style.display = "none"; $("changeForm").style.display = "block";
+      $("c").value = pending; $("n1").focus();
+    } else { location.href = "/"; }
+  }catch(e){ $("msg").textContent = e.message; }
+  finally{ $("go").disabled = false; }
+};
+$("save").onclick = async () => {
+  $("msg").textContent = "";
+  if($("n1").value !== $("n2").value){ $("msg").textContent = "The two new passwords do not match."; return; }
+  $("save").disabled = true;
+  try{
+    await post("/api/password", {current:$("c").value, new:$("n1").value});
+    location.href = "/";
+  }catch(e){ $("msg").textContent = e.message; }
+  finally{ $("save").disabled = false; }
+};
+document.addEventListener("keydown", e => { if(e.key === "Enter"){
+  ($("changeForm").style.display === "block" ? $("save") : $("go")).click(); }});
+</script>
+</body>
+</html>

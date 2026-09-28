@@ -1,0 +1,43 @@
+{
+ "thresholds": {
+  "materiality": 50000.0,
+  "pl_variance_pct": 5.0,
+  "bs_movement_pct": 10.0,
+  "manual_journal": 100000.0,
+  "prior_period_days": 30.0,
+  "ap_critical_days": 60.0,
+  "ar_warning_days": 30.0,
+  "ar_critical_days": 60.0,
+  "concentration_pct": 35.0,
+  "cash_warning": 1000000.0,
+  "stock_monitor_days": 30.0,
+  "stock_slow_days": 60.0,
+  "stock_dead_days": 90.0,
+  "stock_value_floor": 10000.0,
+  "inventory_difference": 100000.0
+ },
+ "owners": {
+  "default": "",
+  "accounting": "",
+  "treasury": "",
+  "receivables": "",
+  "payables": "",
+  "inventory": ""
+ },
+ "budget": {
+  "name": ""
+ },
+ "inventory": {
+  "accounts": "311,312,3123,3124,3126,327,351,35801,372,3723",
+  "locations": ""
+ },
+ "group": {
+  "reporting_currency": "ALL",
+  "currencies": "SALT=ALL, TBM=ALL, RKS Revo Hospitality Group=EUR, Zoi Greece=EUR",
+  "rates": "EUR=100",
+  "rate_note": ""
+ },
+ "period_closed_before": "",
+ "exclude_weekends": true,
+ "updated_at": "2026-09-23T11:48:35"
+}

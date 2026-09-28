@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RHG Purchasing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f4f6; --card:#fff; --ink:#15181f; --sub:#687080; --line:#e5e7eb;
+  --side:#121620; --side-ink:#c9cdd6; --accent:#e23b33;
+  --up:#d6342c; --up-bg:#fdeceb; --down:#0e9a57; --down-bg:#e7f7ee; --warn:#b26a00; --warn-bg:#fff4e0;
+  --prev:#c9ced8;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0e1117;--card:#171b23;--ink:#eef0f3;--sub:#9aa1ad;--line:#262b35;--side:#090b10;
+        --up-bg:#3b1715;--down-bg:#0d2a1c;--warn-bg:#2d220f;--prev:#3a404c;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:flex;min-height:100%}
+aside{width:228px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:11px;align-items:center;padding:0 6px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;display:grid;place-items:center}
+.brand b{display:block;color:#fff;font-size:15px}
+.brand small{color:#8a909c;font-size:12px}
+nav{display:flex;flex-direction:column;gap:2px}
+nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center}
+nav button:hover{background:rgba(255,255,255,.05)}
+nav button.on{background:rgba(255,255,255,.09);color:#fff;font-weight:700}
+nav .count{background:#5c1d1a;color:#ffb4ae;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.side-foot{margin-top:auto;font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
+main{flex:1;min-width:0;padding:22px 28px 60px}
+header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:16px}
+h1{font-size:23px;margin:0;font-weight:800;letter-spacing:-.01em}
+.period{color:var(--sub);margin-top:4px}
+.status{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;font-weight:600;font-size:12.5px;background:var(--card);border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--down)}
+.pill.err .dot{background:var(--up)} .pill.load .dot{background:var(--warn)}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-weight:600;cursor:pointer}
+.btn.dark{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);font-weight:600}
+.filters select,.filters input{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:170px}
+.banner{background:var(--up-bg);color:var(--up);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-weight:600;display:none}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.kpi .l{color:var(--sub);font-weight:600;font-size:13px}
+.kpi .v{font-size:27px;font-weight:800;margin:8px 0 6px;letter-spacing:-.02em}
+.kpi .s{font-size:12.5px;color:var(--sub)}
+.up{color:var(--up)} .down{color:var(--down)}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+@media(max-width:760px){aside{display:none} main{padding:16px}}
+h2{font-size:15.5px;margin:0;font-weight:700}
+.hint{color:var(--sub);font-size:12.5px;margin:3px 0 14px}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;color:var(--sub);text-align:left;font-weight:700;padding:0 10px 9px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+td{padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right}
+.name{font-weight:700;white-space:normal;min-width:180px}
+.meta{color:var(--sub);font-size:12px;font-weight:500}
+.chip{display:inline-block;font-weight:700;font-size:12px;border-radius:999px;padding:3px 9px}
+.chip.up{background:var(--up-bg)} .chip.down{background:var(--down-bg)}
+.bars .row{display:grid;grid-template-columns:minmax(120px,190px) 1fr 100px;gap:10px;align-items:center;padding:6px 0}
+.bars .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:13px}
+.track{height:10px;background:var(--line);border-radius:6px;overflow:hidden;position:relative}
+.fill{height:100%;background:var(--accent);border-radius:6px}
+.fill.prev{position:absolute;top:0;left:0;background:transparent;border-right:2px solid var(--ink);border-radius:0;opacity:.55}
+.amt{text-align:right;font-weight:700;font-size:12.5px}
+.ex{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:11px 13px;margin-bottom:9px}
+.ex.price{border-left-color:var(--up)} .ex.new{border-left-color:var(--accent)} .ex.credit,.ex.nocost{border-left-color:var(--sub)}
+.ex b{display:block;margin-bottom:3px}
+.ex span{color:var(--sub);font-size:12.8px;line-height:1.45}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--sub);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.empty{color:var(--sub);padding:18px 0}
+.view{display:none} .view.on{display:block}
+.search{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:240px}
+.new-row td{animation:flash 2.5s ease-out}
+@keyframes flash{from{background:var(--warn-bg)}to{background:transparent}}
+@media (prefers-reduced-motion:reduce){.new-row td{animation:none}}
+.kpis.five{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.setup{border:1px dashed var(--line);border-radius:12px;padding:16px 18px;line-height:1.6}
+.setup ol{margin:8px 0 0 18px;padding:0}
+.setup code{background:var(--bg);padding:1px 6px;border-radius:5px}
+.warnrow td{background:var(--warn-bg)}
+.hours{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:6px}
+.hours div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:1px;position:relative}
+.hours-lbl{display:flex;gap:3px;font-size:10px;color:var(--sub);margin-top:4px}
+.hours-lbl span{flex:1;text-align:center}
+.brief{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-bottom:18px}
+.brief .head{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.status-pill{font-weight:800;font-size:13px;padding:7px 14px;border-radius:999px}
+.status-ok{background:var(--down-bg);color:var(--down)} .status-warn{background:var(--warn-bg);color:var(--warn)} .status-crit{background:var(--up-bg);color:var(--up)}
+.brief h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:16px 0 8px}
+.brief ul{margin:0;padding-left:18px} .brief li{margin-bottom:7px;line-height:1.55}
+.tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;border-radius:4px;padding:1px 5px;margin-right:6px;background:var(--bg);color:var(--sub);border:1px solid var(--line)}
+.tag.inference{color:var(--warn)} .tag.rec{color:var(--accent)}
+.money{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:6px 0}
+.money div{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--sub);font-weight:600}
+.money b{display:block;font-size:18px;margin-top:4px;color:var(--ink)}
+.brief .money{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
+.brief .money div{background:var(--bg);border-radius:10px;padding:10px 12px}
+.brief .money b{display:block;font-size:17px;margin-top:3px}
+.act{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.act .row1{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.act h4{margin:0;font-size:14px}
+.prio{font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px}
+.prio.Critical{background:var(--up-bg);color:var(--up)} .prio.High{background:var(--warn-bg);color:var(--warn)}
+.prio.Medium{background:var(--bg);color:var(--sub)} .prio.Low{background:var(--bg);color:var(--sub)}
+.sev{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px}
+.sev.critical{background:var(--up)} .sev.warning{background:var(--warn)} .sev.info{background:var(--sub)}
+.clickable{cursor:pointer;transition:border-color .15s}
+.clickable:hover{border-color:var(--accent)}
+.drill-hint{font-size:11px;color:var(--sub);margin-top:8px}
+.modal-bg{position:fixed;inset:0;background:rgba(10,12,16,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 20px;z-index:50;overflow:auto}
+.modal-bg.on{display:flex}
+.modal{background:var(--card);border-radius:16px;max-width:1100px;width:100%;padding:20px 22px;border:1px solid var(--line)}
+.modal .mhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.mini{font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:600}
+.mini.dark{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);font-weight:600}
+.field input,.field select,.field textarea{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 9px;color:var(--ink);font:inherit}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px}
+.gap{border-left:3px solid var(--warn);padding:10px 14px;margin-bottom:10px;background:var(--bg);border-radius:0 10px 10px 0}
+.gap b{display:block;margin-bottom:3px}
+.gap span{color:var(--sub);font-size:12.5px;line-height:1.5}
+.qcheck{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.qcheck .row1{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.qcheck h4{margin:0;font-size:14px}
+.rep h3{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:20px 0 8px}
+.rep table{margin-bottom:6px}
+.rep ul{margin:0;padding-left:18px} .rep li{margin-bottom:6px;line-height:1.5}
+#printHead, #printFoot{display:none}
+@media print{
+  /* keep the screen colours: without this Chrome drops backgrounds and the chips go grey */
+  *{-webkit-print-color-adjust:exact !important; print-color-adjust:exact !important}
+  body.printing aside, body.printing header, body.printing .filters, body.printing .banner,
+  body.printing .mini, body.printing .btn, body.printing .search, body.printing .foot,
+  body.printing #modalBg, body.printing select, body.printing input{display:none !important}
+  body.printing .view:not(.on){display:none !important}
+  body.printing main{padding:0}
+  body.printing, body.printing main, body.printing .app{background:#fff}
+  body.printing .card{border:none;padding:0 0 10px;break-inside:auto}
+  body.printing .card-head{display:block;margin-bottom:6px}
+  body.printing .scroll{overflow:visible}
+  body.printing #printHead, body.printing #printFoot{display:block}
+  body.printing #printHead h1{font-size:17px;margin:0 0 3px}
+  body.printing #printHead p{font-size:10.5px;color:var(--sub);margin:0 0 12px}
+  body.printing #printFoot{font-size:10.5px;color:var(--sub);margin-top:14px;line-height:1.5}
+  body.printing table{font-size:10.5px}
+  body.printing th{position:static}
+  body.printing tr{break-inside:avoid}
+  body.printing thead{display:table-header-group}
+  body.printing .grid{display:block}
+  body.printing .kpis{display:grid !important;grid-template-columns:repeat(4,1fr)}
+  body.printing .kpi .v{font-size:17px}
+  body.printing .act, body.printing .qcheck, body.printing .brief{break-inside:avoid}
+  /* the report screen prints only the report itself */
+  body.printing.print-report .view:not(#v-reports){display:none !important}
+  body.printing.print-report #v-reports .card-head{display:none}
+  @page{size:A4 landscape;margin:12mm}
+}
+
+.foot{color:var(--sub);font-size:12px;line-height:1.6;margin-top:22px}
+</style>
+<!-- brand layer last, so the Revo tokens override the built-in defaults -->
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" id="logo">R</div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
+  <nav id="nav">
+    <button class="on" data-view="overview">Overview</button>
+    <button data-view="live">Live operations</button>
+    <button data-view="reqs">Requisitions <span class="count" id="reqCount">0</span></button>
+    <button data-view="compare">Comparisons</button>
+    <button data-view="streams">Purchase types</button>
+    <button data-view="services">Services &amp; CAPEX</button>
+    <button data-view="contracts">Contract prices</button>
+    <button data-view="compliance">Invoices without PO</button>
+    <button data-view="stock">Stock &amp; working capital</button>
+    <button data-view="prices">Price changes</button>
+    <button data-view="po">Purchase orders <span class="count" id="poCount">0</span></button>
+    <button data-view="invoices">Invoices</button>
+    <button data-view="users">User performance</button>
+    <button data-view="suppliers">Supplier performance</button>
+    <button data-view="locations">Location prices</button>
+    <button data-view="exceptions">Exceptions <span class="count" id="exCount">0</span></button>
+    <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
+    <button data-view="feed">Posting follow-up</button>
+    <button data-view="quality">Data quality <span class="count" id="qCount">0</span></button>
+    <button data-view="reports">Reports</button>
+    <button data-view="gaps">Data availability</button>
+    <button data-view="settings">Settings</button>
+    <button data-view="accounts" id="usersNav" style="display:none">Users</button>
+  </nav>
+  <div class="side-foot">Runs on this PC. Data comes straight from Business Central and refreshes on its own.</div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <h1 id="title">Purchasing overview</h1>
+      <div class="period" id="period">Loading…</div>
+    </div>
+    <div class="status">
+      <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
+      <button class="btn" id="exportBtn">Export CSV</button>
+      <button class="btn" id="pdfBtn">Export PDF</button>
+      <button class="btn dark" id="refreshBtn">Refresh now</button>
+      <span class="pill" id="whoami" title="Signed in"></span>
+      <button class="btn" id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label>Company <select id="company"></select></label>
+    <label>Location <select id="location"><option value="">All locations</option></select></label>
+    <label>Period <select id="mode">
+      <option value="week">Week</option><option value="month">Month</option><option value="ytd">Year to date</option>
+    </select></label>
+    <label id="anchorLabel">Week starting <input type="date" id="week"></label>
+  </div>
+
+  <div class="banner" id="banner"></div>
+  <div id="printHead"></div>
+
+  <section class="view on" id="v-overview">
+    <div class="brief" id="brief"></div>
+    <div class="kpis">
+      <div class="card kpi clickable" data-drill="purchases"><div class="l">Purchases</div><div class="v" id="kTotal">–</div><div class="s" id="kTotalS"></div></div>
+      <div class="card kpi clickable" data-drill="increases"><div class="l">Price increases</div><div class="v" id="kInc">–</div><div class="s" id="kIncS"></div></div>
+      <div class="card kpi clickable" data-drill="decreases"><div class="l">Price decreases</div><div class="v" id="kDec">–</div><div class="s" id="kDecS"></div></div>
+      <div class="card kpi clickable" data-drill="movers"><div class="l">Net price impact</div><div class="v" id="kNet">–</div><div class="s" id="kNetS"></div></div>
+      <div class="card kpi clickable" data-drill="po_pending"><div class="l">Received, not invoiced (this period)</div><div class="v" id="kPend">–</div><div class="s" id="kPendS"></div></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h2>Spend by day</h2><p class="hint">This period against the same weekdays of the comparison period</p>
+        <div class="legend"><span><i style="background:var(--accent)"></i>This period</span><span><i style="background:var(--prev)"></i>Comparison</span></div>
+        <div id="daily"></div>
+      </div>
+      <div class="card">
+        <h2>Biggest price movers</h2><p class="hint">Ranked by money impact</p>
+        <div id="moversMini"></div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Top spend items</h2><p class="hint">Marker shows the comparison period</p><div class="bars" id="topSpend"></div></div>
+      <div class="card"><h2>Spend by location</h2><p class="hint">Marker shows the comparison period</p><div class="bars" id="byLoc"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-compare">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Equivalent period comparisons</h2>
+        <p class="hint" id="cmpHint">Every comparison uses the same weekdays, so trading days match. Loaded on demand and cached for 15 minutes.</p></div>
+        <button class="mini dark" id="cmpReload">Reload</button></div>
+      <div class="scroll"><table id="cmpTable"></table></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><h2>Budget benchmark</h2>
+      <p class="hint" id="budHint"></p>
+      <div id="budBody"></div>
+    </div>
+    <div class="card"><h2>Contracted price</h2>
+      <p class="hint">Average price paid against the agreed purchase price, where a price list is published in BC.</p>
+      <div class="scroll"><table id="contractTable"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-streams">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Procurement by purchase type</h2><p class="hint" id="strNote"></p></div>
+        <button class="mini dark" id="strLoad">Read</button></div>
+      <div class="kpis" id="strKpis"></div>
+      <div class="scroll"><table id="strTable"></table></div>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="card-head"><div><h2>Unclassified purchases</h2><p class="hint" id="strUncNote"></p></div>
+        <button class="mini" data-drill="unclassified">Open</button></div>
+        <div class="scroll"><table id="strUnc"></table></div></div>
+      <div class="card"><h2>Data source and validation</h2><p class="hint">What was read, and what cannot be tested with the published data</p>
+        <div id="strProv"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-services">
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Services and other non-item spend</h2><p class="hint" id="svcNote"></p></div>
+      <button class="mini" data-drill="services">Open postings</button></div>
+      <div class="scroll"><table id="svcTable"></table></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>CAPEX postings</h2><p class="hint" id="capNote"></p></div>
+      <button class="mini" data-drill="capex">Open postings</button></div>
+      <div class="scroll"><table id="capTable"></table></div></div>
+    <div class="card"><h2>Goods accounts, excluded from services</h2><p class="hint" id="goodsNote"></p>
+      <div class="money" id="goodsTotals"></div>
+      <div class="scroll"><table id="goodsTable"></table></div></div>
+  </section>
+
+  <section class="view" id="v-contracts">
+    <div class="kpis" id="ctKpis"></div>
+    <div class="card" style="margin-bottom:16px"><p class="hint" id="ctDefs"></p></div>
+    <div class="grid">
+      <div class="card"><h2>By supplier</h2><p class="hint">Ranked by what was bought from them in this period. Coverage is the share of that spend with an agreed price behind it.</p>
+        <div class="scroll"><table id="ctSup"></table></div></div>
+      <div class="card"><h2>By category</h2><p class="hint">Where the agreed prices reach, and where buying happens without one.</p>
+        <div class="scroll"><table id="ctCat"></table></div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Largest spend with no agreed price</h2><p class="hint" id="ctUncNote"></p>
+        <div class="scroll"><table id="ctUnc"></table></div></div>
+      <div class="card"><h2>Largest gaps against the agreed price</h2>
+        <p class="hint">Summary only. The item-by-item comparison lives on the Comparisons screen.</p>
+        <div class="scroll"><table id="ctGap"></table></div>
+        <button class="mini" style="margin-top:10px" data-goto2="Comparisons">Open Comparisons</button></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-compliance">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Invoices posted without a purchase order</h2><p class="hint" id="cplNote">Choose a month and read. The rule is one approved order before every purchase.</p></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="month" id="cplMonth"><button class="mini dark" id="cplLoad">Read</button></div></div>
+      <div class="kpis" id="cplKpis"></div>
+      <div class="hint" id="cplDefs"></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Where it happens</h2><p class="hint" id="cplWhereNote"></p>
+        <div class="scroll"><table id="cplUnits"></table></div>
+        <h2 style="margin-top:18px">Suppliers</h2>
+        <div class="scroll"><table id="cplVendors"></table></div></div>
+      <div class="card"><h2>Why, and who owns it</h2><p class="hint">Grouped by cause. The person who posted the invoice is usually the inputter, not the person who decided to buy, so responsibility is set by unit and category.</p>
+        <div id="cplReasons"></div>
+        <h2 style="margin-top:18px">Compliance by month</h2>
+        <div class="scroll"><table id="cplTrend"></table></div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><h2>Decisions that need action</h2>
+      <p class="hint" id="cplDecNote"></p>
+      <div class="scroll"><table id="cplDec"></table></div></div>
+    <div class="card">
+      <div class="card-head"><div><h2>The invoices behind the figures</h2><p class="hint" id="cplListNote"></p></div>
+        <button class="mini" id="cplListToggle">Show the invoices</button></div>
+      <div class="scroll" id="cplListBox" style="display:none"><table id="cplList"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-stock">
+    <div class="banner" id="stkMismatch" style="display:none"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Stock and working capital</h2><p class="hint" id="stkNote">Choose a location and a completed month, then read.</p></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="stkLoc"></select>
+          <input type="month" id="stkMonth">
+          <button class="mini dark" id="stkLoad">Read</button></div></div>
+      <div class="kpis" id="stkKpis"></div>
+      <div id="stkRecon"></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Where the capital is tied up</h2><p class="hint" id="stkCatNote"></p>
+        <div class="scroll"><table id="stkCat"></table></div>
+        <h2 style="margin-top:18px">Stock value by location</h2>
+        <p class="hint" id="stkOvNote">Load the month for every location.</p>
+        <button class="mini" id="stkOvLoad">Load all locations</button>
+        <div class="scroll" style="margin-top:10px"><table id="stkOv"></table></div></div>
+      <div class="card"><h2>Why it is happening</h2><p class="hint">Each cause says whether it is confirmed by the records, a possible risk, or something the published data cannot answer.</p>
+        <div id="stkCauses"></div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><h2>Decisions this week</h2>
+      <p class="hint" id="stkDecNote"></p>
+      <div class="scroll"><table id="stkDec"></table></div></div>
+    <div class="card">
+      <div class="card-head"><div><h2>Audit and reconciliation</h2><p class="hint" id="stkAuditNote">The full movement bridge, for checking a figure. Business Central remains the place for transaction detail.</p></div>
+        <button class="mini" id="stkAuditToggle">Show the bridge</button></div>
+      <div id="stkAuditBox" style="display:none">
+        <div id="stkQuality" class="hint"></div>
+        <div class="scroll"><table id="stkTable"></table></div>
+        <h2 style="margin-top:18px">Risks and recommendations</h2><p class="hint" id="stkExcNote"></p>
+        <div id="stkExc"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-prices">
+    <div class="card" id="pricesCard">
+      <div class="card-head"><div><h2>Price changes</h2><p class="hint" id="pricesHint">Average unit cost per item, this period vs comparison. Click a column to sort.</p></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="search" id="search" placeholder="Search item or location">
+          <button class="mini" id="pricesCsv">Export CSV</button></div></div>
+      <div class="scroll"><table id="moversTable"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-invoices">
+    <div class="kpis five">
+      <div class="card kpi"><div class="l">Invoices posted</div><div class="v" id="iInv">–</div><div class="s" id="iInvS"></div></div>
+      <div class="card kpi"><div class="l">Credit memos</div><div class="v" id="iCm">–</div><div class="s" id="iCmS"></div></div>
+      <div class="card kpi"><div class="l">Lines per invoice</div><div class="v" id="iLines">–</div><div class="s" id="iLinesS"></div></div>
+      <div class="card kpi"><div class="l">Posting delay</div><div class="v" id="iLag">–</div><div class="s" id="iLagS"></div></div>
+      <div class="card kpi"><div class="l">Invoices to check</div><div class="v" id="iSus">–</div><div class="s">Negative or zero-cost item lines</div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Invoices posted per day</h2><p class="hint">All vendor invoices, items and services. Grey is credit memos.</p><div id="invDaily"></div></div>
+      <div class="card"><h2>Invoice size</h2><p class="hint">Item invoices by number of lines</p><div class="bars" id="invBuckets"></div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Invoices to check</h2><p class="hint">Negative lines on an invoice usually mean a return that should have been a credit memo. Zero-cost lines mean a missing price.</p><div class="scroll"><table id="susTable"></table></div></div>
+      <div class="card"><h2>Late postings</h2><p class="hint" id="lateHint"></p><div class="scroll"><table id="lateTable"></table></div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Vendors by invoice count</h2><p class="hint">Average delay between the vendor's invoice date and posting in BC</p><div class="scroll"><table id="vendTable"></table></div></div>
+      <div class="card"><h2>Largest invoices by lines</h2><p class="hint">Item lines per posted invoice</p><div class="scroll"><table id="bigTable"></table></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-users">
+    <div id="usersSetup"></div>
+    <div id="usersBody">
+      <div class="card" style="margin-bottom:16px">
+        <h2>Performance by user</h2><p class="hint">Documents each BC user posted in this period. Click a column to sort. Highlighted rows have negative invoice lines or backdated postings to look at.</p>
+        <div class="scroll"><table id="userTable"></table></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>Invoices per user</h2><p class="hint">Share of all invoices posted</p><div class="bars" id="userBars"></div></div>
+        <div class="card"><h2>When invoices get posted</h2><p class="hint">Invoices and credit memos by hour of posting</p><div class="hours" id="hours"></div><div class="hours-lbl" id="hoursLbl"></div></div>
+      </div>
+      <div class="card"><h2>How these are measured</h2>
+        <p class="hint" style="margin:0;line-height:1.7">Invoices, lines and value count item invoices each user posted. Invoices/day divides by the days the user posted anything. Delay is vendor invoice date to posting date. Backdated means the posting date is more than the late threshold before the day it was actually posted. Negative lines on invoices and credit memo share point to the document-type mistakes the team is working to remove.</p></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-live">
+    <div class="kpis five">
+      <div class="card kpi clickable" data-drill="documents"><div class="l">Documents posted</div><div class="v" id="lDocs">–</div><div class="s" id="lDocsS">Invoices, receipts and credit notes that carry item lines</div></div>
+      <div class="card kpi clickable" data-drill="po"><div class="l">Open purchase orders</div><div class="v" id="lPo">–</div><div class="s" id="lPoS"></div></div>
+      <div class="card kpi clickable" data-drill="po_pending"><div class="l">Awaiting invoice</div><div class="v" id="lPend">–</div><div class="s">Goods received, invoice not posted</div></div>
+      <div class="card kpi clickable" data-drill="sla"><div class="l">Open exceptions</div><div class="v" id="lExc">–</div><div class="s" id="lExcS"></div></div>
+      <div class="card kpi"><div class="l">Data updated at</div><div class="v" id="lTime" style="font-size:20px">–</div><div class="s" id="lTimeS"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Activity feed</h2><p class="hint" id="liveHint"></p></div>
+        <input class="search" id="liveSearch" placeholder="Search document, supplier, user"></div>
+      <div class="scroll"><table id="liveTable"></table></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Events Business Central does not record here</h2>
+      <p class="hint">Requisitions, approval steps, document modifications and reopened documents need the web services listed under Data availability. They are not estimated.</p>
+      <div id="liveGaps"></div></div>
+  </section>
+
+  <section class="view" id="v-reqs">
+    <div id="reqSetup"></div>
+    <div id="reqBody">
+      <div class="kpis five" id="reqKpis"></div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>By location</h2><p class="hint" id="reqLocNote"></p></div>
+          <button class="mini" data-drill="requisitions">Export lines (CSV)</button></div>
+        <div class="scroll"><table id="reqLocTable"></table></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>What is holding them up</h2>
+          <p class="hint" id="reqExcNote">Grouped by cause. Open a group to see the lines behind it.</p>
+          <div id="reqExc"></div></div>
+        <div class="card"><h2>From request to order</h2>
+          <p class="hint" id="reqFunnelNote"></p>
+          <div class="scroll"><table id="reqFunnel"></table></div>
+          <h2 style="margin-top:18px">Data quality</h2>
+          <p class="hint" id="reqQuality"></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-po">
+    <div class="card">
+      <div class="card-head"><div><h2>Open purchase orders</h2><p class="hint">Live from PurchaseOrderList. "Received not invoiced" is cost already accrued at order price.</p></div>
+        <input class="search" id="poSearch" placeholder="Search order or supplier"></div>
+      <div class="scroll"><table id="poTable"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-suppliers">
+    <div class="card">
+      <h2>Supplier performance</h2>
+      <p class="hint">Supplier comes from the vendor ledger entry matched to each posted document number. Delivery performance is not shown because expected receipt dates are empty in BC.</p>
+      <div class="scroll"><table id="supTable"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-actions">
+    <div class="card" style="margin-bottom:16px" id="untrackedCard">
+      <div class="card-head"><div><h2>Not yet tracked</h2><p class="hint" id="untrackedNote"></p></div>
+        <button class="mini dark" id="trackCritical">Track all critical</button></div>
+      <div class="scroll"><table id="untrackedTable"></table></div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Action center</h2><p class="hint">Actions live in this app only. Business Central stays read-only.</p></div>
+        <div style="display:flex;gap:8px"><button class="mini" id="actFilter">Show overdue only</button><button class="mini dark" id="actNew">New action</button></div></div>
+      <div id="actionList"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-quality">
+    <div class="kpis five">
+      <div class="card kpi"><div class="l">Findings</div><div class="v" id="qAll">–</div><div class="s">Records that need correcting in BC</div></div>
+      <div class="card kpi"><div class="l">Critical</div><div class="v up" id="qCrit">–</div><div class="s">Wrong cost or a possible duplicate</div></div>
+      <div class="card kpi"><div class="l">Warning</div><div class="v" id="qWarn">–</div><div class="s">Missing or incomplete information</div></div>
+      <div class="card kpi"><div class="l">Information</div><div class="v" id="qInfo">–</div><div class="s">Master data worth tidying</div></div>
+    </div>
+    <div class="card"><h2>Data quality checks</h2>
+      <p class="hint">Run over the records of the selected period. Where BC does not show who caused an error, the finding says so instead of assigning blame.</p>
+      <div id="qualityList"></div></div>
+  </section>
+
+  <section class="view" id="v-reports">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Reports</h2><p class="hint">Generated from the same records as the screens. Print to save as PDF.</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="mini" id="repDaily">Daily brief</button>
+          <button class="mini" id="repWeekly">Weekly report</button>
+          <button class="mini" id="repMonthly">Monthly report</button>
+          <button class="mini" id="repYtd">Year to date</button>
+          <button class="mini" id="repCsv">Export CSV</button>
+          <button class="mini dark" id="repPrint">Print / save as PDF</button></div></div>
+      <div id="reportArea"><div class="empty">Choose the daily brief or the weekly report.</div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-gaps">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Speed and local cache</h2><p class="hint" id="cacheNote"></p></div>
+        <button class="mini" id="cacheLoad">Check</button></div>
+      <div class="scroll"><table id="cacheTable"></table></div>
+    </div>
+    <div class="card"><h2>Data availability</h2>
+      <p class="hint">KPIs requested by management that the published Business Central web services cannot supply. Nothing here is estimated; each line is a technical requirement for Onetech.</p>
+      <div id="gapList"></div></div>
+  </section>
+
+  <section class="view" id="v-accounts">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Accounts</h2><p class="hint" id="usersNote"></p></div></div>
+      <div class="scroll"><table id="usersTable"></table></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Add a colleague</h2><p class="hint">They choose their own password at first sign-in; the one you set here is temporary.</p>
+        <div class="formgrid">
+          <label class="field">Username<input id="nu-user" placeholder="e.g. ana"></label>
+          <label class="field">Name<input id="nu-name" placeholder="Ana K."></label>
+          <label class="field">Role<select id="nu-role"></select></label>
+          <label class="field">Temporary password<input id="nu-pass" type="text" placeholder="at least 8 characters"></label>
+        </div>
+        <button class="btn dark" id="nu-add">Create account</button> <span class="meta" id="nu-msg"></span>
+        <div id="roleHelp" class="hint" style="margin-top:14px"></div>
+      </div>
+      <div class="card"><h2>Open sessions</h2><p class="hint">Sessions last 12 hours and end when a password or role changes.</p>
+        <div class="scroll"><table id="sessTable"></table></div>
+        <h2 style="margin-top:18px">My password</h2>
+        <div class="formgrid">
+          <label class="field">Current<input id="pw-cur" type="password"></label>
+          <label class="field">New<input id="pw-new" type="password"></label>
+        </div>
+        <button class="btn" id="pw-save">Change my password</button> <span class="meta" id="pw-msg"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-settings">
+    <div class="card" style="margin-bottom:16px">
+      <h2>Service-level thresholds</h2><p class="hint">Applied to every exception, brief and SLA calculation on the next refresh.</p>
+      <div class="formgrid" id="thresholdForm"></div>
+      <div class="formgrid" id="ownerForm"></div>
+      <div class="formgrid" id="budgetForm"></div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:12px">
+        <input type="checkbox" id="setWeekends" style="width:auto"> Count working days only (exclude weekends)</label>
+      <button class="btn dark" id="saveSettings">Save thresholds</button>
+      <span class="meta" id="settingsSaved" style="margin-left:10px"></span>
+    </div>
+    <div class="card"><h2>Audit history</h2><p class="hint">Every action assignment, status change, comment and threshold change made in this app.</p>
+      <div class="scroll"><table id="auditTable"></table></div></div>
+  </section>
+
+  <section class="view" id="v-locations">
+    <div class="card">
+      <h2>Same item, different price by location</h2>
+      <p class="hint">Items bought at two or more locations this period where the dearest average cost is well above the cheapest. "Extra paid" prices the dearest location's quantity at the cheapest location's cost.</p>
+      <div class="scroll"><table id="spreadTable"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-exceptions">
+    <div class="card" style="margin-bottom:16px"><h2>Service-level exceptions</h2>
+      <p class="hint">Rules applied to live BC records, using the thresholds in Settings. Each exception can be turned into a tracked action.</p>
+      <div id="slaList"></div></div>
+    <div class="card"><h2>Price and stock signals</h2><p class="hint">Movements worth a look that are not threshold breaches</p><div id="exList"></div></div>
+  </section>
+
+  <section class="view" id="v-feed">
+    <div class="kpis" id="pfKpis"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Invoiced at a different price than received</h2><p class="hint" id="pfGapNote"></p></div>
+        <button class="mini" id="pfGapAll">Show all cases</button></div>
+      <div class="scroll"><table id="pfGap"></table></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Returns and credit notes</h2><p class="hint" id="pfRetNote"></p>
+        <div class="scroll"><table id="pfRet"></table></div></div>
+      <div class="card"><h2>Covered in another section</h2>
+        <p class="hint">These controls belong to the screens that already prove them; repeating the figure here would risk two answers to one question.</p>
+        <div id="pfElsewhere"></div>
+        <h2 style="margin-top:18px">What the postings of this period were</h2>
+        <div class="scroll"><table id="pfKinds"></table></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Audit: the latest entries</h2><p class="hint">The newest purchase value entries, with the document type that created each one. A negative quantity is a credit note or a return, not an error.</p></div>
+        <button class="mini" id="pfFeedToggle">Show entries</button></div>
+      <div class="scroll" id="pfFeedBox" style="display:none"><table id="feedTable"></table></div>
+    </div>
+  </section>
+
+  <div id="printFoot"></div>
+  <div class="foot" id="foot"></div>
+</main>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="mhead"><div><h2 id="modalTitle">Records</h2><p class="hint" id="modalHint" style="margin:0"></p></div>
+      <div style="display:flex;gap:8px"><button class="mini" id="modalCsv">Export CSV</button><button class="mini dark" id="modalClose">Close</button></div></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n, d=0) => n == null || isNaN(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+let CUR = "ALL";
+const all = n => fmt(n) + " " + CUR;
+const sign = n => (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dayName = iso => new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{weekday:"short", day:"numeric", month:"short"});
+
+let data = null, refreshSec = 30, countdown = 30, timer = null, busy = false, seenEntries = new Set(), sortKey = "impact", sortDir = -1;
+
+const MODE_LABEL = {week:"Week starting", month:"Month starting", ytd:"Year"};
+function modeValue(){ return $("mode").value || "week"; }
+function snapDate(v){
+  if (!v) return v;
+  const m = modeValue();
+  if (m === "week") return mondayOf(v);
+  const d = new Date(v + "T00:00:00");
+  const iso = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
+  return m === "month" ? iso(new Date(d.getFullYear(), d.getMonth(), 1)) : iso(new Date(d.getFullYear(), 0, 1));
+}
+function mondayOf(d){
+  const x = typeof d === "string" ? new Date(d + "T00:00:00") : new Date(d);
+  x.setDate(x.getDate() - (x.getDay()+6)%7);
+  return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
+}
+
+function params(){
+  const p = new URLSearchParams();
+  if ($("company").value) p.set("company", $("company").value);
+  if ($("location").value) p.set("location", $("location").value);
+  if ($("week").value) p.set("week", $("week").value);
+  p.set("mode", modeValue());
+  return p.toString();
+}
+
+function setPill(state, text){ $("pill").className = "pill " + state; $("pillText").textContent = text; }
+
+let loadTimer = null;
+function showLoading(on){
+  clearInterval(loadTimer);
+  if (!on) return;
+  const started = Date.now();
+  const tick = () => {
+    const secs = Math.round((Date.now() - started) / 1000);
+    setPill("load", secs < 4 ? "Reading Business Central…"
+      : `Reading Business Central… ${secs}s · a period opened for the first time is read once, then cached`);
+  };
+  tick(); loadTimer = setInterval(tick, 1000);
+}
+
+async function load(manual){
+  if (busy) return; busy = true;
+  showLoading(true);
+  try{
+    const r = await fetch("/api/dashboard?" + params());
+    if (r.status === 401) { location.href = "/login"; return; }
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+    data = j; refreshSec = j.meta.refresh_seconds || 30;
+    $("banner").style.display = "none";
+    render();
+  }catch(e){
+    $("banner").textContent = "Couldn't refresh from Business Central: " + e.message + " The last good numbers stay on screen; retrying automatically.";
+    $("banner").style.display = "block";
+    setPill("err", "Connection problem");
+  }finally{ busy = false; countdown = refreshSec; showLoading(false); }
+}
+
+function render(){
+  CUR = (data.meta && data.meta.currency) || "ALL";
+  const m = data.meta, k = data.kpis;
+  const lfl = m.like_for_like ? " (like for like, period to date)" : "";
+  $("period").textContent = `${m.period_label ? m.period_label + " · " : ""}${dayName(m.current[0])} – ${dayName(m.current[1])} vs ${dayName(m.prior[0])} – ${dayName(m.prior[1])}${lfl}`;
+  if (m.mode !== "week" && $("banner").textContent.startsWith("Loading a longer period")) $("banner").style.display = "none";
+  $("title").textContent = "Purchasing overview · " + m.company + (m.location ? " · " + m.location : "");
+
+  const locSel = $("location"), cur = locSel.value;
+  locSel.innerHTML = '<option value="">All locations</option>' + data.all_locations.map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
+
+  $("kTotal").textContent = all(k.total_cur);
+  $("kTotalS").innerHTML = k.total_pct == null ? "No comparison data" :
+     `<span class="${k.total_pct>0?"up":"down"}">${k.total_pct>0?"▲":"▼"} ${fmt(Math.abs(k.total_pct),1)}%</span> vs ${all(k.total_prev)} · ${fmt(k.lines)} lines, ${fmt(k.items)} items`;
+  $("kInc").textContent = fmt(k.increases);
+  $("kIncS").innerHTML = `<span class="up">+${all(k.increase_impact)}</span> extra cost`;
+  $("kDec").textContent = fmt(k.decreases);
+  $("kDecS").innerHTML = `<span class="down">${all(k.saving)}</span> saved`;
+  $("kNet").textContent = sign(k.net_price_impact) + " " + CUR;
+  $("kNet").className = "v " + (k.net_price_impact > 0 ? "up" : "down");
+  $("kNetS").textContent = `${fmt(k.exceptions)} price signals to review`;
+  const ops = data.operations || {};
+  const periodUninvoiced = k.uninvoiced_in_period || 0;
+  $("kPend").textContent = all(periodUninvoiced);
+  $("kPendS").innerHTML = `${fmt(k.uninvoiced_receipts || 0)} receipts in this period still without an invoice`
+    + `<div class="meta">Open orders today: ${all(ops.pending_invoice_value || 0)} · a current position, not the period's</div>`;
+  $("exCount").textContent = k.exceptions;
+
+  renderDaily(); renderMini(); renderBars("topSpend", data.top_spend.slice(0,10).map(t => ({l:t.desc||t.item_no, v:t.cost, p:t.prev_cost})));
+  renderBars("byLoc", data.locations.slice(0,12).map(t => ({l:t.code, v:t.cur, p:t.prev})));
+  renderMovers(); renderSpreads(); renderExceptions(); renderPostings(); renderContracts(); renderInvoices(); renderUsers();
+  renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
+
+  const t = new Date(m.checked_at);
+  setPill(m.serving ? "load" : "", m.serving
+    ? `Showing figures from ${t.toLocaleTimeString("en-GB")} · reading the new ones now`
+    : `Live · updated ${t.toLocaleTimeString("en-GB")} · next in ${refreshSec}s`);
+  $("foot").textContent = `Source: Business Central, company ${m.company}, purchase value entries. Costs ex-VAT${m.expected_cost_included ? ", including goods received but not yet invoiced at expected cost" : ", invoiced cost only"}. Last check took ${m.query_ms} ms and found ${m.new_since_last} new entries.`;
+}
+
+function renderDaily(){
+  const cur = Object.entries(data.daily_cur), prev = Object.entries(data.daily_prev);
+  const n = Math.max(cur.length, prev.length, 1);
+  const max = Math.max(1, ...cur.map(x=>x[1]), ...prev.map(x=>x[1]));
+  const W = 640, H = 220, pad = 28, gw = (W - pad) / n, bw = Math.min(26, gw/3);
+  let svg = `<svg viewBox="0 0 ${W} ${H+30}" width="100%" role="img" aria-label="Daily spend chart">`;
+  for (let i=0;i<n;i++){
+    const x = pad + i*gw + gw/2;
+    const pv = prev[i]?.[1] || 0, cv = cur[i]?.[1] || 0;
+    const ph = pv/max*H, ch = cv/max*H;
+    svg += `<rect x="${x-bw-2}" y="${H-ph}" width="${bw}" height="${ph}" rx="4" fill="var(--prev)"><title>${prev[i]?dayName(prev[i][0]):""}: ${all(pv)}</title></rect>`;
+    svg += `<rect x="${x+2}" y="${H-ch}" width="${bw}" height="${ch}" rx="4" fill="var(--accent)"><title>${cur[i]?dayName(cur[i][0]):""}: ${all(cv)}</title></rect>`;
+    const lbl = cur[i] ? dayName(cur[i][0]) : (prev[i] ? new Date(prev[i][0]+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short"}) : "");
+    svg += `<text x="${x}" y="${H+18}" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(lbl)}</text>`;
+  }
+  svg += `<text x="0" y="12" font-size="10.5" fill="var(--sub)">${fmt(max/1000)}k</text><line x1="${pad}" y1="${H}" x2="${W}" y2="${H}" stroke="var(--line)"/></svg>`;
+  $("daily").innerHTML = cur.length || prev.length ? svg : '<div class="empty">No purchases posted in this period yet.</div>';
+}
+
+function renderMini(){
+  const rows = data.movers.slice(0,7);
+  $("moversMini").innerHTML = rows.length ? `<table>${rows.map(m => `<tr><td class="name">${esc(m.desc||m.item_no)}<div class="meta">${fmt(m.prev_avg,2)} → ${fmt(m.cur_avg,2)} ${CUR}</div></td>
+    <td class="num"><span class="chip ${m.pct>0?"up":"down"}">${m.pct>0?"+":""}${fmt(m.pct,1)}%</span></td>
+    <td class="num ${m.impact>0?"up":"down"}"><b>${sign(m.impact)}</b></td></tr>`).join("")}</table>` : '<div class="empty">No meaningful price changes yet in this period.</div>';
+}
+
+function renderBars(id, rows){
+  const max = Math.max(1, ...rows.map(r => Math.max(r.v, r.p||0)));
+  $(id).innerHTML = rows.length ? rows.map(r => `<div class="row"><div class="lbl" title="${esc(r.l)}">${esc(r.l)}</div>
+    <div class="track"><div class="fill" style="width:${Math.max(0,r.v)/max*100}%"></div><div class="fill prev" style="width:${Math.max(0,r.p||0)/max*100}%"></div></div>
+    <div class="amt">${fmt(r.v)}</div></div>`).join("") : '<div class="empty">Nothing to show yet.</div>';
+}
+
+function renderMovers(){
+  const q = $("search").value.trim().toLowerCase();
+  let rows = data.movers.filter(m => !q || (m.desc||"").toLowerCase().includes(q) || m.item_no.toLowerCase().includes(q) || m.locations.join(" ").toLowerCase().includes(q));
+  rows.sort((a,b) => { const A = a[sortKey], B = b[sortKey]; return (typeof A === "string" ? A.localeCompare(B) : ((sortKey==="impact"||sortKey==="pct") ? Math.abs(A)-Math.abs(B) : A-B)) * sortDir; });
+  const cols = [["desc","Item"],["prev_avg","Previous","num"],["cur_avg","Current","num"],["pct","Change","num"],["cur_qty","Qty","num"],["impact",`Impact (${CUR})`,"num"]];
+  $("moversTable").innerHTML = `<tr>${cols.map(c => `<th class="${c[2]||""}" data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir<0?" ↓":" ↑"):""}</th>`).join("")}</tr>` +
+    (rows.length ? rows.map(m => `<tr><td class="name">${esc(m.desc||m.item_no)}<div class="meta">${esc(m.item_no)} · ${esc(m.locations.join(", "))}</div></td>
+      <td class="num">${fmt(m.prev_avg,2)}</td><td class="num"><b>${fmt(m.cur_avg,2)}</b></td>
+      <td class="num"><span class="chip ${m.pct>0?"up":"down"}">${m.pct>0?"+":""}${fmt(m.pct,1)}%</span></td>
+      <td class="num">${fmt(m.cur_qty,2)}</td><td class="num ${m.impact>0?"up":"down"}"><b>${sign(m.impact)}</b></td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">No price changes match.</td></tr>`);
+  document.querySelectorAll("#moversTable th").forEach(th => th.onclick = () => { const k = th.dataset.k; sortDir = sortKey===k ? -sortDir : -1; sortKey = k; renderMovers(); });
+}
+
+function renderSpreads(){
+  const rows = data.spreads;
+  $("spreadTable").innerHTML = `<tr><th>Item</th><th>Cheapest</th><th class="num">Cost</th><th>Dearest</th><th class="num">Cost</th><th class="num">Spread</th><th class="num">Extra paid (${CUR})</th></tr>` +
+    (rows.length ? rows.map(s => `<tr><td class="name">${esc(s.desc||s.item_no)}<div class="meta">${esc(s.item_no)}</div></td>
+      <td>${esc(s.low_loc)}</td><td class="num">${fmt(s.low,2)}</td><td>${esc(s.high_loc)}</td><td class="num">${fmt(s.high,2)}</td>
+      <td class="num"><span class="chip up">+${fmt(s.spread,0)}%</span></td><td class="num up"><b>${fmt(s.overpay)}</b></td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">No big price gaps between locations this period.</td></tr>`);
+}
+
+function renderExceptions(){
+  const rows = data.exceptions;
+  $("exList").innerHTML = rows.length ? rows.map(e => `<div class="ex ${e.type}"><b>${esc(e.title)}</b><span>${esc(e.detail)}</span></div>`).join("")
+    : '<div class="empty">Nothing needs attention right now.</div>';
+}
+
+function renderPostings(){
+  const p = data.postings; if (!p) return;
+  const g = p.price_gap, r = p.returns;
+  $("pfKpis").innerHTML = [
+    stockCard("Invoiced above what was received", sign(g.difference) + " " + CUR,
+      [`${fmt(g.pct,1)}% against ${all(g.received_cost)} received`,
+       `${fmt(g.cases)} entries past the ${fmt(g.tolerance,0)}% tolerance`,
+       "Order price at receipt against the supplier's invoice"]),
+    stockCard("Cases worth reviewing", fmt(g.cases),
+      [`${all(g.case_value)} at stake`, `Owner: ${g.owner}`]),
+    stockCard("Returns and credit notes", fmt(r.documents),
+      [`${all(Math.abs(r.value))} credited back`, `Owner: ${r.owner}`]),
+  ].join("");
+  $("pfGapNote").innerHTML = `${esc(g.method)} <b>Do:</b> ${esc(g.action)} · <b>Owner:</b> ${esc(g.owner)}`;
+  const gapRows = (pfShowAll ? g.all : g.top);
+  $("pfGap").innerHTML = `<tr><th>Item</th><th>Location</th><th class="num">Received at</th><th class="num">Invoiced at</th>
+      <th class="num">Difference</th><th class="num">%</th><th>In BC</th></tr>` +
+    (gapRows.length ? gapRows.map(x=>`<tr class="${x.difference>0?"warnrow":""}">
+      <td class="name">${esc(x.description||x.item)}<div class="meta">${esc(x.item)}</div></td>
+      <td>${esc(x.location||"–")}</td><td class="num">${fmt(x.received_cost)}</td>
+      <td class="num">${fmt(x.invoiced_cost)}</td>
+      <td class="num ${x.difference>0?"up":"down"}"><b>${sign(x.difference)}</b></td>
+      <td class="num ${x.difference>0?"up":"down"}">${fmt(x.pct,1)}%</td>
+      <td class="meta">${esc(x.reference)}</td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">No entry was invoiced outside the tolerance in this period.</td></tr>`);
+  $("pfGapAll").textContent = pfShowAll ? `Show the top ${g.top.length}` : `Show all ${fmt(g.all.length)} cases`;
+  $("pfRetNote").innerHTML = `${esc(r.method)} <b>Do:</b> ${esc(r.action)}`;
+  $("pfRet").innerHTML = `<tr><th>Document</th><th>Date</th><th class="num">Items</th><th>Locations</th><th class="num">Value</th></tr>` +
+    (r.all.length ? r.all.slice(0,12).map(x=>`<tr><td class="name">${esc(x.document)}</td><td class="meta">${esc(x.date||"")}</td>
+      <td class="num">${fmt(x.items)}</td><td class="meta">${esc(x.locations.join(", "))}</td>
+      <td class="num"><b>${fmt(x.value)}</b></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No returns or credit notes in this period.</td></tr>`);
+  $("pfElsewhere").innerHTML = p.covered_elsewhere.map(c=>`<div class="act">
+      <div class="row1"><h4>${esc(c.control)}</h4>
+        <button class="mini" data-goto="${esc(c.where)}">Open ${esc(c.where)}</button></div>
+      <p class="hint" style="margin:6px 0 0">${esc(c.why)}</p></div>`).join("");
+  document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => {
+    const target = Array.from(document.querySelectorAll("#nav button"))
+      .find(n => n.textContent.trim().toLowerCase().startsWith(b.dataset.goto.toLowerCase().slice(0,10)));
+    if (target) target.click();
+  });
+  $("pfKinds").innerHTML = `<tr><th>Document type</th><th class="num">Entries</th><th class="num">Documents</th><th class="num">Cost</th></tr>` +
+    p.kinds.map(k=>`<tr><td class="name">${esc(k.type)}</td><td class="num">${fmt(k.rows)}</td>
+      <td class="num">${fmt(k.documents)}</td><td class="num">${fmt(k.value)}</td></tr>`).join("");
+  renderFeed();
+}
+let pfShowAll = false;
+$("pfGapAll").onclick = () => { pfShowAll = !pfShowAll; renderPostings(); };
+$("pfFeedToggle").onclick = () => {
+  const box = $("pfFeedBox"), open = box.style.display === "block";
+  box.style.display = open ? "none" : "block";
+  $("pfFeedToggle").textContent = open ? "Show entries" : "Hide entries";
+};
+function renderFeed(){
+  const first = seenEntries.size === 0;
+  const rows = data.latest;
+  $("feedTable").innerHTML = `<tr><th>Date</th><th>Item</th><th>Location</th><th>Document</th><th>Type</th><th class="num">Qty</th><th class="num">Cost (${CUR})</th></tr>` +
+    (rows.length ? rows.map(r => { const isNew = !first && !seenEntries.has(r.entry); return `<tr class="${isNew?"new-row":""}"><td>${esc(r.date)}</td><td class="name">${esc(r.item)}</td><td>${esc(r.location)}</td><td>${esc(r.doc)}</td><td class="meta">${esc(r.type||"")}</td><td class="num">${fmt(r.qty,2)}</td><td class="num">${fmt(r.cost,2)}</td></tr>`; }).join("")
+      : `<tr><td colspan="7" class="empty">No postings yet in this period.</td></tr>`);
+  rows.forEach(r => seenEntries.add(r.entry));
+}
+
+const delta = (cur, prev, goodDown) => {
+  if (prev == null || prev === 0 || cur == null) return "";
+  const p = (cur - prev) / prev * 100, bad = goodDown ? p > 0 : p < 0;
+  const cls = goodDown === undefined ? "" : (bad ? "up" : "down");
+  return `<span class="${cls}">${p > 0 ? "▲" : "▼"} ${fmt(Math.abs(p),1)}%</span> vs ${fmt(prev, prev % 1 ? 1 : 0)}`;
+};
+
+function renderInvoices(){
+  const I = data.invoices, k = I.kpis;
+  $("iInv").textContent = fmt(k.invoices);
+  $("iInvS").innerHTML = `${delta(k.invoices, k.invoices_prev)} · ${all(k.value)}, ${fmt(k.vendors)} vendors`;
+  $("iCm").textContent = fmt(k.credit_memos);
+  $("iCmS").innerHTML = `${fmt(k.credit_ratio,1)}% of invoices · last period ${fmt(k.credit_memos_prev)}`;
+  $("iLines").textContent = fmt(k.avg_lines,1);
+  $("iLinesS").innerHTML = `${fmt(k.item_lines)} lines on ${fmt(k.item_invoices)} item invoices · max ${fmt(k.max_lines)}`;
+  $("iLag").textContent = k.avg_lag == null ? "–" : fmt(k.avg_lag,1) + " days";
+  $("iLagS").innerHTML = `${delta(k.avg_lag, k.avg_lag_prev, true)}${k.same_day_pct==null?"":` · ${fmt(k.same_day_pct,0)}% within a day`} · ${fmt(k.late)} late`;
+  $("iSus").textContent = fmt(k.suspicious);
+  $("iSus").className = "v" + (k.suspicious ? " up" : "");
+
+  const days = Object.entries(I.daily), max = Math.max(1, ...days.map(d => d[1].invoices + d[1].credit_memos));
+  $("invDaily").innerHTML = days.length ? `<div class="hours" style="height:170px">${days.map(([d,v]) =>
+     `<div title="${dayName(d)}: ${v.invoices} invoices, ${v.credit_memos} credit memos" style="height:${(v.invoices+v.credit_memos)/max*100}%;background:linear-gradient(to top, var(--prev) ${v.credit_memos/(v.invoices+v.credit_memos||1)*100}%, var(--accent) 0)"></div>`).join("")}</div>
+     <div class="hours-lbl">${days.map(([d,v]) => `<span>${dayName(d).split(",")[0]}<br><b>${v.invoices}</b></span>`).join("")}</div>` : '<div class="empty">No invoices posted yet in this period.</div>';
+
+  renderBars("invBuckets", I.buckets.map(b => ({l:b.label, v:b.count, p:0})));
+  $("susTable").innerHTML = `<tr><th>Invoice</th><th>User</th><th class="num">Lines</th><th class="num">Negative</th><th class="num">Zero cost</th><th class="num">Value</th></tr>` +
+    (I.suspicious.length ? I.suspicious.map(x => `<tr><td class="name">${esc(x.doc)}<div class="meta">${esc(x.locations.join(", "))}</div></td><td>${esc(x.user||"–")}</td>
+      <td class="num">${x.lines}</td><td class="num ${x.neg_lines?"up":""}"><b>${x.neg_lines}</b></td><td class="num">${x.zero_lines}</td><td class="num">${fmt(x.value)}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">No problem invoices this period.</td></tr>`);
+  $("lateHint").textContent = `Posted more than ${data.meta.late_days} days after the vendor's invoice date`;
+  $("lateTable").innerHTML = `<tr><th>Invoice</th><th>Vendor</th><th>Invoice date</th><th>Posted</th><th class="num">Days</th><th class="num">Value</th></tr>` +
+    (I.late.length ? I.late.map(x => `<tr><td>${esc(x.doc)}</td><td class="name">${esc(x.vendor)}</td><td>${esc(x.document_date)}</td><td>${esc(x.posting_date)}</td><td class="num up"><b>${x.lag}</b></td><td class="num">${fmt(x.value)}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">Everything was posted on time.</td></tr>`);
+  $("vendTable").innerHTML = `<tr><th>Vendor</th><th class="num">Invoices</th><th class="num">Value</th><th class="num">Avg delay</th></tr>` +
+    (I.vendors.length ? I.vendors.map(v => `<tr><td class="name">${esc(v.name)}<div class="meta">${esc(v.no)}</div></td><td class="num">${v.invoices}</td><td class="num">${fmt(v.value)}</td><td class="num ${v.avg_lag>data.meta.late_days?"up":""}">${v.avg_lag==null?"–":fmt(v.avg_lag,1)+" d"}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">No invoices yet.</td></tr>`);
+  $("bigTable").innerHTML = `<tr><th>Invoice</th><th>User</th><th class="num">Lines</th><th class="num">Value</th></tr>` +
+    (I.biggest.length ? I.biggest.map(x => `<tr><td class="name">${esc(x.doc)}<div class="meta">${esc(x.locations.join(", "))}</div></td><td>${esc(x.user||"–")}</td><td class="num"><b>${x.lines}</b></td><td class="num">${fmt(x.value)}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">No item invoices yet.</td></tr>`);
+}
+
+let uSort = "invoices", uDir = -1;
+function renderUsers(){
+  const I = data.invoices, st = I.user_status;
+  if (!st.available){
+    $("usersBody").style.display = "none";
+    $("usersSetup").innerHTML = `<div class="card"><h2>Turn on user tracking</h2><div class="setup">
+      Business Central doesn't yet share who posted each document. Publish the standard <b>Item Registers</b> page as a web service and this screen fills in on the next refresh:
+      <ol><li>In BC search for <b>Web Services</b>, click <b>New</b>.</li>
+      <li>Object Type <code>Page</code>, Object ID <code>117</code>, Service Name <code>ItemRegisters</code>, tick <b>Published</b>.</li>
+      <li>Make sure the BC user in <code>.env</code> can read it. Nothing else to change here.</li></ol>
+      ${st.reason ? `<p class="meta" style="margin-top:10px">Details from BC: ${esc(st.reason).slice(0,300)}</p>` : ""}
+      <p class="meta">Invoice counts, lines per invoice, delays and problem invoices on the Invoices screen already work without this.</p></div></div>`;
+    return;
+  }
+  $("usersSetup").innerHTML = ""; $("usersBody").style.display = "block";
+  const cols = [["user","User"],["invoices","Invoices","num"],["share","Share","num"],["lines","Lines","num"],["avg_lines","Lines/inv","num"],
+    ["per_day","Inv/day","num"],["value",`Value (${CUR})`,"num"],["receipts","Receipts","num"],["credit_memos","Credit memos","num"],
+    ["neg_lines","Neg. lines","num"],["zero_lines","Zero cost","num"],["avg_lag","Delay (d)","num"],["late","Late","num"],["backdated","Backdated","num"],
+    ["peak_hour","Peak hour","num"],["last","Last posting"]];
+  const rows = [...I.users].sort((a,b) => { const A=a[uSort], B=b[uSort]; if (A==null) return 1; if (B==null) return -1; return (typeof A==="string"?A.localeCompare(B):A-B)*uDir; });
+  $("userTable").innerHTML = `<tr>${cols.map(c => `<th class="${c[2]||""}" data-k="${c[0]}">${c[1]}${uSort===c[0]?(uDir<0?" ↓":" ↑"):""}</th>`).join("")}</tr>` +
+    (rows.length ? rows.map(u => `<tr class="${(u.neg_lines||u.backdated)?"warnrow":""}"><td class="name">${esc(u.user)}<div class="meta">${u.active_days} active days</div></td>
+      <td class="num"><b>${fmt(u.invoices)}</b></td><td class="num">${fmt(u.share,0)}%</td><td class="num">${fmt(u.lines)}</td><td class="num">${fmt(u.avg_lines,1)}</td>
+      <td class="num">${u.per_day==null?"–":fmt(u.per_day,1)}</td><td class="num">${fmt(u.value)}</td><td class="num">${fmt(u.receipts)}</td>
+      <td class="num">${fmt(u.credit_memos)}</td><td class="num ${u.neg_lines?"up":""}">${fmt(u.neg_lines)}</td><td class="num">${fmt(u.zero_lines)}</td>
+      <td class="num">${u.avg_lag==null?"–":fmt(u.avg_lag,1)}</td><td class="num ${u.late?"up":""}">${fmt(u.late)}</td><td class="num ${u.backdated?"up":""}">${fmt(u.backdated)}</td>
+      <td class="num">${u.peak_hour==null?"–":String(u.peak_hour).padStart(2,"0")+":00"}</td><td>${esc(u.last||"–")}</td></tr>`).join("")
+      : `<tr><td colspan="${cols.length}" class="empty">No postings in this period yet.</td></tr>`);
+  document.querySelectorAll("#userTable th").forEach(th => th.onclick = () => { const k = th.dataset.k; uDir = uSort===k ? -uDir : -1; uSort = k; renderUsers(); });
+  renderBars("userBars", I.users.filter(u => u.invoices).map(u => ({l:u.user, v:u.invoices, p:0})));
+  const hmax = Math.max(1, ...I.hours), from = Math.max(0, I.hours.findIndex(h => h>0) - 1), toIdx = 23 - Math.max(0, [...I.hours].reverse().findIndex(h => h>0) - 1);
+  const hrs = I.hours.slice(from, toIdx + 1);
+  $("hours").innerHTML = hrs.map((h,i) => `<div title="${String(from+i).padStart(2,"0")}:00 – ${h} documents" style="height:${h/hmax*100}%"></div>`).join("");
+  $("hoursLbl").innerHTML = hrs.map((h,i) => `<span>${String(from+i).padStart(2,"0")}</span>`).join("");
+}
+
+// ---------- drill-down ----------
+let modalRows = [], modalCols = [], modalName = "records";
+async function openDrill(kind, key, context){
+  const bg = $("modalBg");
+  $("modalTitle").textContent = "Loading…"; $("modalBody").innerHTML = ""; $("modalHint").textContent = "";
+  bg.classList.add("on");
+  try{
+    const r = await fetch(`/api/drill?kind=${encodeURIComponent(kind)}&key=${encodeURIComponent(key||"")}`);
+    const j = await r.json();
+    modalRows = j.rows; modalCols = j.columns; modalName = j.kind;
+    $("modalTitle").textContent = j.title;
+    $("modalHint").textContent = `${j.count} record${j.count===1?"":"s"} · ${data.meta.company} · ${data.meta.current[0]} to ${data.meta.current[1]}`
+      + (context ? ` · ${context}` : "");
+    $("modalBody").innerHTML = j.rows.length
+      ? `<div class="scroll"><table><tr>${j.columns.map(c=>`<th class="${typeof j.rows[0][c]==="number"?"num":""}">${esc(c)}</th>`).join("")}</tr>` +
+        j.rows.map(row=>`<tr>${j.columns.map(c=>`<td class="${typeof row[c]==="number"?"num":""}">${row[c]==null?"":(typeof row[c]==="number"?fmt(row[c], Math.abs(row[c])<1000&&row[c]%1?2:0):esc(row[c]))}</td>`).join("")}</tr>`).join("") + "</table></div>"
+      : '<div class="empty">No underlying records for this selection.</div>';
+  }catch(e){ $("modalTitle").textContent = "Could not load records"; $("modalBody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$("modalClose").onclick = () => $("modalBg").classList.remove("on");
+$("modalBg").onclick = e => { if (e.target === $("modalBg")) $("modalBg").classList.remove("on"); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("modalBg").classList.remove("on"); });
+$("modalCsv").onclick = () => {
+  if (!modalRows.length) return;
+  const lines = [modalCols].concat(modalRows.map(r => modalCols.map(c => r[c] ?? "")));
+  const csv = lines.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv"}));
+  a.download = `${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
+};
+document.querySelectorAll("[data-drill]").forEach(el => el.onclick = () => openDrill(el.dataset.drill, ""));
+
+// ---------- executive brief ----------
+const STATUS_CLASS = {"Under control":"status-ok","Attention required":"status-warn","Critical intervention required":"status-crit"};
+function tagOf(kind){ return `<span class="tag ${kind==="inference"?"inference":kind==="recommendation"?"rec":""}">${kind}</span>`; }
+function renderBrief(){
+  const b = data.brief;
+  if (!b){ $("brief").innerHTML = '<div class="empty">The brief needs the vendor ledger and purchase orders; that data did not load on this refresh.</div>'; return; }
+  const f = b.finance;
+  $("brief").innerHTML = `
+    <div class="head"><div><h2>Executive purchasing brief</h2>
+      <p class="hint" style="margin:3px 0 0">${esc(b.period)} vs ${esc(b.comparison)} · ${esc(b.methodology)} · ${esc(b.filters.company)} · ${esc(b.filters.location)}</p></div>
+      <span class="status-pill ${STATUS_CLASS[b.status]||""}">${esc(b.status)}</span></div>
+    <p class="hint" style="margin:6px 0 0">${esc(b.status_note)} Every line below is read from Business Central records; click any item to open them.</p>
+    <h3>Main developments</h3>
+    <ul>${b.developments.map(d => `<li>${tagOf(d.kind)}<b>${esc(d.label)}.</b> ${esc(d.text)}${d.drill?` <a href="#" class="brief-drill" data-kind="${d.drill.kind}" data-key="${esc(d.drill.key||"")}">records</a>`:""}</li>`).join("")}</ul>
+    <h3>Financial impact</h3>
+    <div class="money">
+      <div>Extra cost from price rises<b class="up">${all(f.extra_cost)}</b></div>
+      <div>Savings from price falls<b class="down">${all(f.savings)}</b></div>
+      <div>Net price effect<b class="${f.net>0?"up":"down"}">${sign(f.net)} ${CUR}</b></div>
+      <div>Avoidable cost above threshold<b class="up">${all(f.avoidable)}</b></div>
+      <div>Location price gaps<b>${all(f.location_spread)}</b></div>
+      <div>Received, not yet invoiced<b>${all(f.unconfirmed_exposure)}</b></div>
+    </div>
+    <h3>Operational risks</h3>
+    <ul>${b.risks.length ? b.risks.map(r => `<li>${tagOf(r.kind)}${esc(r.text)}${r.drill?` <a href="#" class="brief-drill" data-kind="${r.drill.kind}" data-key="">records</a>`:""}</li>`).join("") : "<li>No operational risk passed the thresholds.</li>"}</ul>
+    <h3>Management actions</h3>
+    ${b.actions.length ? b.actions.map((a,i) => `<div class="act">
+      <div class="row1"><h4>${tagOf("recommendation")}${esc(a.title)}</h4><span class="prio ${a.priority}">${a.priority}</span></div>
+      <p class="hint" style="margin:6px 0">${esc(a.detail)}</p>
+      <p class="hint" style="margin:0"><b>Do:</b> ${esc(a.recommendation)} · <b>Owner:</b> ${esc(a.owner||"unassigned")} · <b>By:</b> ${esc(a.due_date)} · <b>At stake:</b> ${esc(a.expected_impact)} · <b>Confidence:</b> ${esc(a.confidence)}</p>
+      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+        ${a.bc_document?`<button class="mini" data-evidence="${esc(a.document_type==="Item"?"item":a.document_type==="Purchase Order"?"po":"document")}" data-key="${esc(a.bc_document)}">Supporting records</button>`:""}
+        <button class="mini dark" data-brief-action="${i}" ${data.action_keys.includes(a.source_exception)?"disabled":""}>${data.action_keys.includes(a.source_exception)?"Already tracked":"Track as action"}</button>
+      </div></div>`).join("") : '<div class="empty">No management action required from this period\u2019s records.</div>'}
+    <p class="drill-hint">Generated ${esc(b.generated_at)} from ${esc(b.counts.total)} evaluated exceptions (${esc(b.counts.critical)} critical, ${esc(b.counts.warning)} warning). Figures are ex-VAT in ${CUR}.</p>`;
+  document.querySelectorAll(".brief-drill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill(a.dataset.kind, a.dataset.key); });
+  document.querySelectorAll("[data-evidence]").forEach(btn => btn.onclick = () => openDrill(btn.dataset.evidence, btn.dataset.key, "supporting records"));
+  document.querySelectorAll("[data-brief-action]").forEach(btn => btn.onclick = () => {
+    const a = data.brief.actions[+btn.dataset.briefAction];
+    createAction({title:a.title, description:`${a.detail}\nRecommended: ${a.recommendation}`, source_exception:a.source_exception,
+      bc_document:a.bc_document, document_type:a.document_type, company:data.meta.company, location:a.location,
+      supplier:a.supplier, impact:a.impact, priority:a.priority, owner:a.owner, due_date:a.due_date,
+      confidence:a.confidence, evidence:a.evidence});
+  });
+}
+
+// ---------- live operations ----------
+function renderLive(){
+  const ops = data.operations || {}, inv = data.invoices && !data.invoices.error ? data.invoices : {};
+  const sla = ops.sla || [];
+  const docTotal = ops.documents_total ?? (ops.documents||[]).length;
+  $("lDocs").textContent = fmt(docTotal);
+  $("lDocsS").textContent = docTotal > (ops.documents||[]).length
+    ? `Item documents in the period; the table below lists the ${fmt((ops.documents||[]).length)} most recent`
+    : "Invoices, receipts and credit notes that carry item lines";
+  $("lPo").textContent = fmt(ops.open_orders||0);
+  const po = ops.po_summary || {};
+  $("lPoS").textContent = ops.po_error ? "PurchaseOrderList unavailable"
+    : `${fmt(po.released || 0)} released · ${fmt(po.open_status || 0)} open · every order BC holds today, not only this month's`;
+  $("lPend").textContent = all(ops.pending_invoice_value||0);
+  $("lExc").textContent = fmt(sla.length);
+  $("lExcS").textContent = `${sla.filter(e=>e.severity==="critical").length} critical · ${sla.filter(e=>e.severity==="warning").length} warning`;
+  $("poCount").textContent = fmt((ops.purchase_orders||[]).filter(p=>p.flag).length);
+  const t = new Date(data.meta.checked_at);
+  $("lTime").textContent = t.toLocaleTimeString("en-GB");
+  $("lTimeS").textContent = `Refreshes every ${data.meta.refresh_seconds}s · BC is polled, so events appear at the next poll`;
+  $("liveHint").textContent = "Posted documents and open orders, newest first. Time in status is counted from the document date.";
+  const q = ($("liveSearch").value||"").toLowerCase();
+  const rows = (ops.events||[]).filter(e => !q || [e.document,e.supplier,e.user,e.location,e.kind].join(" ").toLowerCase().includes(q));
+  $("liveTable").innerHTML = `<tr><th>When</th><th>Event</th><th>Document</th><th>Supplier</th><th>Location</th><th>User</th><th class="num">Value (${CUR})</th><th>Status</th><th>Next action</th></tr>` +
+    (rows.length ? rows.map(e => `<tr><td>${esc(e.date||"")}</td><td class="name">${esc(e.kind)}</td>
+      <td><a href="#" class="ev" data-kind="${e.document_type==="Purchase Order"?"po":"document"}" data-key="${esc(e.document)}">${esc(e.document)}</a></td>
+      <td>${esc(e.supplier||"–")}</td><td>${esc(e.location||"–")}</td><td>${esc(e.user||"–")}</td>
+      <td class="num">${fmt(e.amount)}</td><td>${esc(e.status)}${e.age_days!=null?` · ${e.age_days}d`:""}</td>
+      <td class="meta">${esc(e.next_action||"")}</td></tr>`).join("")
+      : `<tr><td colspan="9" class="empty">No activity in this period.</td></tr>`);
+  document.querySelectorAll("#liveTable .ev").forEach(a => a.onclick = e => { e.preventDefault(); openDrill(a.dataset.kind, a.dataset.key); });
+  $("liveGaps").innerHTML = (data.gaps||[]).slice(0,4).map(g => `<div class="gap"><b>${esc(g.kpi)}</b><span>${esc(g.missing)}</span></div>`).join("");
+}
+
+// ---------- requisitions ----------
+function renderReqs(){
+  const r = data.requisitions || {};
+  const st = (data.operations || {}).requisition_status || {};
+  $("reqCount").textContent = (r.kpis && r.kpis.at_risk) || 0;
+  if (r.unavailable || !st.available){
+    $("reqSetup").innerHTML = `<div class="card" style="margin-bottom:16px"><h2>Requisition worksheet not available</h2>
+      <p class="hint">${esc((r.unavailable && (r.unavailable.reason || r.unavailable.error)) || st.reason || "The service is not published.")}</p></div>`;
+    $("reqBody").style.display = "none"; return;
+  }
+  $("reqSetup").innerHTML = ""; $("reqBody").style.display = "";
+  const k = r.kpis;
+  $("reqKpis").innerHTML = [
+    ["Locations needing action", fmt(k.locations), `${fmt(k.batches)} worksheet batch(es) open`],
+    ["Open lines", fmt(k.open_lines), `${fmt(k.converted)} already carried into orders`],
+    ["At supply risk", fmt(k.at_risk), "Past the required date or due within two days"],
+    ["Oldest waiting", k.oldest_days == null ? "–" : fmt(k.oldest_days) + " days", "Measured from the line's order date in BC"],
+    ["Value awaiting order", k.value == null ? "Unavailable" : all(k.value), k.value_note],
+  ].map(([l,v,s2])=>`<div class="card kpi"><div class="l">${esc(l)}</div><div class="v">${v}</div><div class="s">${esc(s2)}</div></div>`).join("");
+
+  $("reqLocNote").textContent = `${fmt(r.locations.length)} location(s) with lines in a worksheet. ${r.age_basis}`;
+  $("reqLocTable").innerHTML = `<tr><th>Location</th><th class="num">Open</th><th class="num">Lines</th>
+      <th class="num">At risk</th><th class="num">Data issues</th><th class="num">Oldest</th>
+      <th class="num">Value</th><th>Main reason</th><th>Next action</th><th>Batches</th></tr>` +
+    (r.locations.length ? r.locations.map(l=>`<tr class="${l.risk?"warnrow":""}">
+      <td class="name">${esc(l.location)}</td><td class="num"><b>${fmt(l.open)}</b></td>
+      <td class="num meta">${fmt(l.lines)}</td>
+      <td class="num ${l.risk?"up":""}">${fmt(l.risk)}</td><td class="num">${fmt(l.issues)}</td>
+      <td class="num">${l.oldest_days==null?"–":fmt(l.oldest_days)+"d"}</td>
+      <td class="num">${fmt(l.value)}</td><td class="meta">${esc(l.main_reason||"–")}</td>
+      <td class="meta">${esc(l.next_action)}</td><td class="meta">${esc(l.batches.join(", ")||"–")}</td></tr>`).join("")
+      : `<tr><td colspan="10" class="empty">No worksheet lines are open.</td></tr>`);
+
+  $("reqExcNote").textContent = `${fmt(r.exceptions.length)} cause(s) behind ${fmt(r.kpis.open_lines)} open lines. Each group names the owner and the next action; the lines behind it open on click.`;
+  $("reqExc").innerHTML = r.exceptions.length ? r.exceptions.map((e,i)=>`<div class="act">
+      <div class="row1"><h4><span class="sev ${esc(e.severity)}"></span>${esc(e.cause)} · ${fmt(e.count)} line(s)</h4>
+        <button class="mini" data-reqg="${i}">Show lines</button></div>
+      <p class="hint" style="margin:4px 0"><b>Where:</b> ${esc(e.locations.join(", "))}
+        ${e.oldest_days!=null?` · <b>Oldest:</b> ${fmt(e.oldest_days)} days`:""}
+        ${e.value?` · <b>Value:</b> ${all(e.value)}`:""}</p>
+      <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.action)} · <b>Owner:</b> ${esc(e.owner)}</p>
+      <div class="scroll" id="reqg${i}" style="display:none;margin-top:8px"></div></div>`).join("")
+    : `<p class="empty">Nothing is waiting.</p>`;
+  document.querySelectorAll("[data-reqg]").forEach(b => b.onclick = () => {
+    const i = +b.dataset.reqg, box = $("reqg"+i);
+    if (box.style.display === "block"){ box.style.display = "none"; b.textContent = "Show lines"; return; }
+    box.style.display = "block"; b.textContent = "Hide";
+    box.innerHTML = `<table><tr><th>Item</th><th>Location</th><th class="num">Qty</th><th>Required</th>
+      <th class="num">Age</th><th>Supplier</th><th>In BC</th></tr>` +
+      r.exceptions[i].lines.map(l=>`<tr><td class="name">${esc(l.description||l.item)}<div class="meta">${esc(l.item)}</div></td>
+        <td>${esc(l.location||"–")}</td><td class="num">${fmt(l.quantity,2)} ${esc(l.uom)}</td>
+        <td class="${l.days_to_due!=null&&l.days_to_due<0?"up":""}">${esc(l.due||"not set")}</td>
+        <td class="num">${l.age_days==null?"–":fmt(l.age_days)+"d"}</td>
+        <td class="meta">${esc(l.vendor||"–")}</td>
+        <td class="meta">${esc(l.reference)}${l.order_no?` · order ${esc(l.order_no)}`:""}</td></tr>`).join("") + `</table>`;
+  });
+
+  $("reqFunnelNote").textContent = "Only stages Business Central actually records. A line counts as carried into an order when BC holds the order number on it.";
+  $("reqFunnel").innerHTML = `<tr><th>Stage</th><th class="num">Lines</th><th>What it means</th></tr>` +
+    r.funnel.map(f=>`<tr><td class="name">${esc(f.stage)}</td><td class="num"><b>${fmt(f.count)}</b></td>
+      <td class="meta">${esc(f.note)}</td></tr>`).join("");
+  const q = r.data_quality;
+  $("reqQuality").innerHTML = `${esc(q.note)}<br>`
+    + `Within the real worksheet lines: ${fmt(q.zero_quantity)} with no quantity, ${fmt(q.no_supplier)} with no supplier, `
+    + `${fmt(q.no_due_date)} with no required date, ${fmt(q.suspect_cost)} with a unit cost that looks unset.`;
+}
+
+// ---------- purchase orders ----------
+function renderPOs(){
+  const ops = data.operations || {};
+  const q = ($("poSearch").value||"").toLowerCase();
+  const rows = (ops.purchase_orders||[]).filter(p => !q || [p.no,p.supplier,p.location].join(" ").toLowerCase().includes(q));
+  $("poTable").innerHTML = `<tr><th>Order</th><th>Supplier</th><th>Location</th><th>Status</th><th>Document date</th><th class="num">Age (wd)</th><th class="num">Order amount</th><th class="num">Received not invoiced</th><th>Flag</th></tr>` +
+    (rows.length ? rows.map(p => `<tr class="${p.flag==="invoice_due"?"warnrow":""}"><td><a href="#" class="podrill" data-key="${esc(p.no)}">${esc(p.no)}</a></td>
+      <td class="name">${esc(p.supplier||"–")}</td><td>${esc(p.location||"–")}</td><td>${esc(p.status)}</td><td>${esc(p.document_date||"")}</td>
+      <td class="num">${p.age_days==null?"–":p.age_days}${p.hours_in_status!=null?`<div class="meta">${fmt(p.hours_in_status,0)}h in ${esc(p.status)}</div>`:""}</td><td class="num">${fmt(p.amount)}</td>
+      <td class="num ${p.received_not_invoiced>0?"up":""}"><b>${fmt(p.received_not_invoiced)}</b></td>
+      <td class="meta">${p.flag==="invoice_due"?"Invoice missing":p.flag==="stale"?"Open too long":""}</td></tr>`).join("")
+      : `<tr><td colspan="9" class="empty">${ops.po_error?esc(ops.po_error):"No open purchase orders."}</td></tr>`);
+  document.querySelectorAll(".podrill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("po", a.dataset.key); });
+}
+
+// ---------- suppliers ----------
+function renderSuppliers(){
+  const rows = (data.operations||{}).suppliers || [];
+  $("supTable").innerHTML = `<tr><th>Supplier</th><th class="num">Spend (${CUR})</th><th class="num">Share</th><th class="num">Invoices</th><th class="num">Avg invoice</th><th class="num">Credit notes</th><th class="num">Items</th><th>Locations</th><th>Assessment</th></tr>` +
+    (rows.length ? rows.map(s => {
+      const conc = s.share >= (data.settings.thresholds.supplier_concentration_pct||35);
+      const note = conc ? "Concentration risk: test a second source" : s.credit_notes ? "Credit notes issued: check quality or pricing" :
+        s.issues ? "Documents with data problems" : "Normal";
+      return `<tr><td class="name"><a href="#" class="supdrill" data-key="${esc(s.supplier)}">${esc(s.supplier)}</a><div class="meta">${s.lines} lines</div></td>
+      <td class="num"><b>${fmt(s.spend)}</b></td><td class="num ${conc?"up":""}">${fmt(s.share,1)}%</td><td class="num">${s.invoices}</td>
+      <td class="num">${fmt(s.avg_invoice)}</td><td class="num">${s.credit_notes}</td><td class="num">${s.items}</td>
+      <td class="meta">${esc(s.locations.join(", "))}</td><td class="meta">${esc(note)}</td></tr>`;}).join("")
+      : `<tr><td colspan="9" class="empty">Supplier names come from the vendor ledger; nothing matched in this period.</td></tr>`);
+  document.querySelectorAll(".supdrill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("suppliers", ""); });
+}
+
+// ---------- SLA exceptions ----------
+function renderSla(){
+  const sla = (data.operations||{}).sla || [];
+  const tracked = data.action_keys || [];
+  $("exCount").textContent = sla.length;
+  $("slaList").innerHTML = sla.length ? sla.map((e,i) => `<div class="act">
+      <div class="row1"><h4><span class="sev ${e.severity}"></span>${esc(e.title)}</h4><span class="meta">${esc(e.rule)}</span></div>
+      <p class="hint" style="margin:6px 0">${esc(e.detail)}</p>
+      <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action||"")}${e.owner?` · <b>Owner:</b> ${esc(e.owner)}`:""}${e.impact?` · <b>Impact:</b> ${sign(e.impact)} ${CUR}`:""}</p>
+      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+        ${e.document?`<button class="mini" data-sladrill="${i}">Supporting records</button>`:""}
+        <button class="mini dark" data-slaaction="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
+      </div></div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
+  document.querySelectorAll("[data-sladrill]").forEach(b => b.onclick = () => {
+    const e = sla[+b.dataset.sladrill];
+    const kind = e.drill ? e.drill.kind : (e.document_type==="Purchase Order" ? "po" : "document");
+    openDrill(kind, e.drill ? e.drill.key : e.document, e.rule);
+  });
+  document.querySelectorAll("[data-slaaction]").forEach(b => b.onclick = () => {
+    const e = sla[+b.dataset.slaaction];
+    createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
+      bc_document:e.document||"", document_type:e.document_type||"", company:data.meta.company, location:e.location||"",
+      supplier:e.supplier||"", impact:e.impact||0, priority:e.severity==="critical"?"Critical":e.severity==="warning"?"High":"Medium",
+      owner:e.owner||"", confidence:"high",
+      evidence:[{entity:"Business Central", key:e.document||"", period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});
+  });
+}
+
+// ---------- action center ----------
+let actions = [], overdueOnly = false;
+async function createAction(payload){
+  try{
+    const r = await fetch("/api/actions", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+    if (!r.ok) throw new Error((await r.json()).error || "save failed");
+    await load(true);
+    document.querySelector('#nav button[data-view="actions"]').click();
+  }catch(e){ alert("Could not save the action: " + e.message); }
+}
+async function patchAction(id, patch){
+  try{
+    const r = await fetch(`/api/actions/${id}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(patch)});
+    if (!r.ok) throw new Error("update failed");
+    const updated = await r.json();
+    actions = actions.map(a => a.id === id ? updated : a);
+    data.actions = actions; renderActions(); renderUntracked();
+  }catch(e){ alert("Could not update the action: " + e.message); }
+}
+function renderUntracked(){
+  const u = data.untracked || {counts:{critical:0,warning:0,impact:0}, critical:[], warning:[], note:""};
+  const rows = (u.critical||[]).concat(u.warning||[]);
+  $("untrackedNote").textContent =
+    `${fmt(u.counts.critical)} critical and ${fmt(u.counts.warning)} warning exceptions in this period have no owner`
+    + ` · ${all(u.counts.impact)} at stake. ${u.note || ""}`;
+  $("trackCritical").disabled = !u.counts.critical || !can("actions");
+  $("untrackedTable").innerHTML = rows.length
+    ? `<tr><th>Exception</th><th>Rule</th><th class="num">At stake</th><th></th></tr>` +
+      rows.slice(0,25).map((e,i) => `<tr><td class="name"><span class="sev ${e.severity}"></span>${esc(e.title)}
+        <div class="meta">${esc(e.detail || "")}</div></td>
+        <td class="meta">${esc(e.rule)}</td><td class="num"><b>${fmt(Math.abs(e.impact||0))}</b></td>
+        <td><button class="mini" data-ut="${i}" ${can("actions")?"":"disabled"}>Track</button></td></tr>`).join("")
+    : `<tr><td class="empty">Every exception in this period has an action against it.</td></tr>`;
+  document.querySelectorAll("[data-ut]").forEach(b => b.onclick = () => trackException(rows[+b.dataset.ut]));
+}
+function exceptionPayload(e){
+  return {title: e.title, description: `${e.detail}\nRecommended: ${e.next_action || ""}`,
+          source_exception: e.code, bc_document: e.document || "", document_type: e.document_type || "",
+          company: data.meta.company, location: e.location || "", supplier: e.supplier || "",
+          impact: Math.abs(e.impact || 0),
+          priority: e.severity === "critical" ? "Critical" : e.severity === "warning" ? "High" : "Medium",
+          owner: e.owner || "", confidence: "high",
+          evidence: [{entity: "Business Central", key: e.document || "",
+                      period: `${data.meta.current[0]}..${data.meta.current[1]}`}]};
+}
+async function trackException(e){ if (e) await createAction(exceptionPayload(e)); }
+$("trackCritical").onclick = async () => {
+  const list = (data.untracked || {}).critical || [];
+  if (!list.length) return;
+  if (!confirm(`Create ${list.length} action(s) from the critical exceptions of this period?`)) return;
+  $("trackCritical").disabled = true;
+  for (const e of list) {
+    try {
+      await fetch("/api/actions", {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(exceptionPayload(e))});
+    } catch (err) { /* keep going; the load below shows what landed */ }
+  }
+  await load(true);
+  document.querySelector('#nav button[data-view="actions"]').click();
+};
+
+function renderActions(){
+  actions = data.actions || [];
+  const open = actions.filter(a => !["Resolved","Dismissed"].includes(a.status));
+  $("actCount").textContent = open.length;
+  const rows = overdueOnly ? actions.filter(a => a.status === "Overdue") : actions;
+  const statuses = ["New","Acknowledged","In progress","Waiting for approval","Waiting for supplier","Resolved","Dismissed"];
+  $("actionList").innerHTML = rows.length ? rows.map(a => `<div class="act">
+    <div class="row1"><h4>${esc(a.title)}</h4>
+      <div style="display:flex;gap:8px;align-items:center"><span class="prio ${a.priority}">${a.priority}</span>
+      <span class="chip ${a.status==="Overdue"?"up":a.status==="Resolved"?"down":""}">${esc(a.status)}</span></div></div>
+    <p class="hint" style="margin:6px 0;white-space:pre-wrap">${esc(a.description)}</p>
+    <p class="hint" style="margin:0">${a.bc_document?`<b>BC document:</b> ${esc(a.bc_document)} (${esc(a.document_type)}) · `:""}${a.supplier?`<b>Supplier:</b> ${esc(a.supplier)} · `:""}${a.location?`<b>Location:</b> ${esc(a.location)} · `:""}<b>Impact:</b> ${fmt(a.impact)} ${CUR} · <b>Created:</b> ${esc(a.created_at)} · <b>Confidence:</b> ${esc(a.confidence)}</p>
+    <div class="formgrid" style="margin-top:10px">
+      <label class="field">Owner<input value="${esc(a.owner)}" data-f="owner" data-id="${a.id}"></label>
+      <label class="field">Due date<input type="date" value="${esc(a.due_date)}" data-f="due_date" data-id="${a.id}"></label>
+      <label class="field">Status<select data-f="status" data-id="${a.id}">${statuses.map(s=>`<option ${s===a.status?"selected":""}>${s}</option>`).join("")}</select></label>
+      <label class="field">Comment<input placeholder="Add a comment" data-f="comment" data-id="${a.id}"></label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${a.bc_document?`<button class="mini" data-actdrill="${a.id}">Open BC records</button>`:""}
+      <button class="mini" data-history="${a.id}">History (${a.history.length})</button></div>
+    <div id="hist-${a.id}" style="display:none;margin-top:10px">${a.history.map(h=>`<div class="meta">${esc(h.ts)} · ${esc(h.actor)} · ${esc(h.from||"—")} → ${esc(h.to)}${h.comment?` · ${esc(h.comment)}`:""}</div>`).join("")}</div>
+  </div>`).join("") : '<div class="empty">No actions yet. Create them from the brief or from any exception.</div>';
+  document.querySelectorAll("#actionList [data-f]").forEach(el => el.onchange = () => {
+    const patch = {}; patch[el.dataset.f] = el.value;
+    if (el.dataset.f === "comment"){ patch.comment = el.value; delete patch.status; el.value = ""; }
+    patchAction(el.dataset.id, patch);
+  });
+  document.querySelectorAll("[data-actdrill]").forEach(b => b.onclick = () => {
+    const a = actions.find(x => x.id === b.dataset.actdrill);
+    openDrill(a.document_type === "Item" ? "item" : a.document_type === "Purchase Order" ? "po" : "document", a.bc_document, a.title);
+  });
+  document.querySelectorAll("[data-history]").forEach(b => b.onclick = () => {
+    const el = $("hist-" + b.dataset.history); el.style.display = el.style.display === "none" ? "block" : "none";
+  });
+}
+$("actFilter").onclick = () => { overdueOnly = !overdueOnly; $("actFilter").textContent = overdueOnly ? "Show all" : "Show overdue only"; renderActions(); };
+$("actNew").onclick = () => {
+  const title = prompt("Action title");
+  if (title) createAction({title, description:"Created manually by the Purchasing Director.", company:data.meta.company, priority:"Medium"});
+};
+
+// ---------- data gaps ----------
+function renderGaps(){
+  $("gapList").innerHTML = (data.gaps||[]).map(g => `<div class="gap"><b>${esc(g.kpi)}</b><span>${esc(g.missing)}<br><b>Requirement:</b> ${esc(g.requirement)}</span></div>`).join("");
+}
+
+// ---------- settings ----------
+const THRESHOLD_LABELS = {
+  receipt_to_invoice_hours:"Goods received, invoice not posted (hours)",
+  po_open_days:"Purchase order open too long (working days)",
+  invoice_posting_late_days:"Invoice posted late (days after invoice date)",
+  price_review_pct:"Price increase review (%)",
+  price_critical_pct:"Price increase critical (%)",
+  price_critical_impact:"Price increase critical impact (amount)",
+  exception_spend:"Large exception value (amount)",
+  min_spend_for_mover:"Minimum spend to count a price move (amount)",
+  location_spread_pct:"Location price gap (%)",
+  supplier_concentration_pct:"Supplier concentration warning (%)",
+  price_above_contract_pct:"Paid above contracted price, tolerance (%)",
+  requisition_warning_hours:"Requisition open, warning (hours)",
+  requisition_critical_hours:"Requisition open, critical (hours)"
+};
+const OWNER_LABELS = {default:"Default owner", price:"Price exceptions owner", invoices:"Invoice exceptions owner", data_quality:"Data quality owner", requisitions:"Requisitions owner"};
+let settingsRendered = false;
+function renderSettings(){
+  if (settingsRendered) return;
+  const s = data.settings;
+  $("thresholdForm").innerHTML = Object.entries(THRESHOLD_LABELS).map(([k,label]) =>
+    `<label class="field">${label}<input type="number" step="any" id="th-${k}" value="${s.thresholds[k]}"></label>`).join("");
+  $("ownerForm").innerHTML = Object.entries(OWNER_LABELS).map(([k,label]) =>
+    `<label class="field">${label}<input id="ow-${k}" value="${esc(s.owners[k]||"")}" placeholder="name"></label>`).join("");
+  $("budgetForm").innerHTML = `<label class="field">Budget name in BC<input id="bg-name" value="${esc(s.budget.name||"")}" placeholder="e.g. BUDGET2026"></label>
+    <label class="field">Cost-of-goods accounts (comma separated)<input id="bg-cogs" value="${esc(s.budget.cogs_accounts||"")}"></label>
+    <label class="field" style="grid-column:1/-1">Item Category Group 3 to purchase type (tried first)<input id="cl-g3" value="${esc((s.classification||{}).group3||"")}" placeholder="USHQIME=Food &amp; Beverage, PIJE=Food &amp; Beverage, JO USHQIMORE=Non-Food Inventory"></label>
+    <label class="field" style="grid-column:1/-1">Item Category Group 2 to purchase type (fallback)<input id="cl-g2" value="${esc((s.classification||{}).group2||"")}" placeholder="LP=Food &amp; Beverage, II=Non-Food Inventory, PRODUKT PASTRIMI=Operating Supplies"></label>
+    <label class="field" style="grid-column:1/-1">Item Category Code to purchase type (last fallback)<input id="cl-items" value="${esc((s.classification||{}).item_categories||"")}" placeholder="AMBALAZH=Non-Food Inventory"></label>
+    <label class="field" style="grid-column:1/-1">Delivery rhythm per location (lead / cycle / safety, in days)<input id="st-cad" value="${esc((s.stock||{}).cadence||"")}" placeholder="*=2/3/2, MAGAZINE=45/30/10"></label>
+    <label class="field" style="grid-column:1/-1">Company currencies (label only, nothing is converted)<input id="cu-map" value="${esc((s.currencies||{}).map||"")}" placeholder="SALT=ALL, RKS Revo Hospitality Group=EUR"></label>
+    <label class="field" style="grid-column:1/-1">CAPEX accounts<input id="cl-capex" value="${esc((s.classification||{}).capex_accounts||"")}" placeholder="203,208,213,2131,2134,2135,215,2181,2182,21822,2188"></label>
+    <label class="field">Expense account prefix (services)<input id="cl-pref" value="${esc((s.classification||{}).service_prefix||"")}" placeholder="6"></label>
+    <label class="field">Prepayment account prefix<input id="cl-prep" value="${esc((s.classification||{}).prepayment_prefix||"")}" placeholder="4"></label>
+    <label class="field" style="grid-column:1/-1">Goods accounts to exclude from services (already counted as items)<input id="cl-goods" value="${esc((s.classification||{}).goods_prefixes||"")}" placeholder="60,605,6051,65801,65802,65803"></label>
+    <label class="field" style="grid-column:1/-1">Single G/L account to purchase type<input id="cl-svc" value="${esc((s.classification||{}).service_accounts||"")}" placeholder="636=Recurring Contracts, 6271=Services"></label>`;
+  $("setWeekends").checked = !!s.exclude_weekends;
+  settingsRendered = true;
+  loadAudit();
+}
+$("saveSettings").onclick = async () => {
+  const thresholds = {}, owners = {};
+  Object.keys(THRESHOLD_LABELS).forEach(k => thresholds[k] = $("th-"+k).value);
+  Object.keys(OWNER_LABELS).forEach(k => owners[k] = $("ow-"+k).value);
+  try{
+    const r = await fetch("/api/settings", {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({thresholds, owners, exclude_weekends: $("setWeekends").checked,
+        budget:{name: $("bg-name").value, cogs_accounts: $("bg-cogs").value},
+        currencies:{map: $("cu-map").value},
+        stock:{cadence: $("st-cad").value},
+        classification:{group3: $("cl-g3").value, group2: $("cl-g2").value,
+          item_categories: $("cl-items").value, service_accounts: $("cl-svc").value,
+          capex_accounts: $("cl-capex").value, service_prefix: $("cl-pref").value,
+          prepayment_prefix: $("cl-prep").value, goods_prefixes: $("cl-goods").value}})});
+    if (!r.ok) throw new Error("save failed");
+    cmp = null; streams = null;
+    $("settingsSaved").textContent = "Saved. Applied on the next refresh.";
+    await load(true); loadAudit();
+  }catch(e){ $("settingsSaved").textContent = "Could not save: " + e.message; }
+};
+async function loadAudit(){
+  try{
+    const r = await fetch("/api/audit"); const j = await r.json();
+    $("auditTable").innerHTML = `<tr><th>When</th><th>What</th><th>Target</th><th>By</th><th>Change</th></tr>` +
+      (j.audit.length ? j.audit.slice(0,60).map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.kind)}</td><td>${esc(a.target)}</td><td>${esc(a.actor)}</td>
+        <td class="meta">${esc(JSON.stringify(a.after)).slice(0,160)}${a.comment?` · ${esc(a.comment)}`:""}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="empty">Nothing recorded yet.</td></tr>`);
+  }catch(e){}
+}
+// ---------- comparisons, budget, contracted price ----------
+let cmp = null, cmpLoading = false;
+async function loadComparisons(force){
+  if (cmpLoading || (cmp && !force)) { renderCompare(); return; }
+  cmpLoading = true; $("cmpTable").innerHTML = '<tr><td class="empty">Loading equivalent periods from Business Central…</td></tr>';
+  try{
+    const r = await fetch("/api/comparisons?" + params());
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "failed");
+    cmp = j; renderCompare();
+  }catch(e){ $("cmpTable").innerHTML = `<tr><td class="empty">Could not load comparisons: ${esc(e.message)}</td></tr>`; }
+  finally { cmpLoading = false; }
+}
+function renderCompare(){
+  if (!cmp) return;
+  const cur = cmp.current;
+  $("cmpHint").textContent = `${cur.period_label ? cur.period_label + " · " : ""}${cur.from} to ${cur.to} · ${all(cur.total)} purchased${cur.location?` · ${cur.location}`:""} · every comparison uses the same weekdays · generated ${cmp.generated_at}`;
+  $("cmpTable").innerHTML = `<tr><th>Comparison</th><th>Period</th><th class="num">Purchases (${CUR})</th><th class="num">Difference</th><th class="num">Change</th><th>How it is measured</th></tr>` +
+    cmp.rows.map(r => `<tr><td class="name">${esc(r.label)}</td><td>${r.from?`${esc(r.from)} → ${esc(r.to)}`:"–"}</td>
+      <td class="num">${fmt(r.total)}</td><td class="num ${r.difference>0?"up":"down"}">${sign(r.difference)}</td>
+      <td class="num">${r.pct==null?"–":`<span class="chip ${r.pct>0?"up":"down"}">${r.pct>0?"+":""}${fmt(r.pct,1)}%</span>`}</td>
+      <td class="meta">${esc(r.method)}</td></tr>`).join("");
+  const b = cmp.budget || {};
+  if (!b.available){
+    $("budHint").textContent = "";
+    $("budBody").innerHTML = `<div class="setup">No budget comparison yet. ${esc(b.reason||"")}
+      <ol><li>In BC, the budget lives in <b>G/L Budget Entries</b> per account and month.</li>
+      <li>In Settings, set the budget name (e.g. BUDGET2026) and the cost-of-goods accounts to compare against.</li></ol></div>`;
+    return;
+  }
+  $("budHint").textContent = b.note;
+  const varClass = b.variance > 0 ? "up" : "down";
+  $("budBody").innerHTML = `<div class="money">
+      <div>Budget for these ${fmt(b.days)} days<b>${all(b.amount)}</b></div>
+      <div>Actual cost of goods (G/L)<b>${all(b.actual_cogs)}</b></div>
+      <div>Variance<b class="${varClass}">${sign(b.variance)} ALL${b.variance_pct==null?"":` (${fmt(b.variance_pct,1)}%)`}</b></div>
+      <div>Purchases in the same period<b>${all(b.purchases)}</b></div>
+    </div>
+    <p class="drill-hint">Budget ${esc(b.budget_name||"")} · accounts ${esc((b.accounts||[]).join(", "))} · monthly budget rows pro-rated by days.
+    ${(b.budget_names||[]).length>1?`Other budgets in BC: ${esc(b.budget_names.join(", "))}.`:""}</p>`;
+}
+function renderContract(){
+  const ops = data.operations || {}, rows = ops.contract_prices || [], st = ops.price_status || {};
+  const cNote = document.querySelector("#v-compare .card:last-child .hint");
+  if (cNote) cNote.innerHTML = st.available
+    ? `${fmt(st.count||0)} items have a price valid today, read from ${fmt(st.rows_read||0)} lines of ${esc(st.entity||"the price service")}.`
+      + (st.skipped && st.skipped.not_purchase ? ` ${fmt(st.skipped.not_purchase)} sales lines and ${fmt(st.skipped.not_active||0)} draft lines were left out.` : "")
+      + (st.multi_price_items ? ` ${fmt(st.multi_price_items)} of them have more than one valid price; the lowest-minimum local-currency row is used.` : "")
+      + (st.skipped ? ` Skipped: ${fmt(st.skipped.expired||0)} expired, ${fmt(st.skipped.not_started||0)} not yet started, ${fmt(st.skipped.no_price||0)} without a price.` : "")
+      + " Prices are compared per unit; BC does not publish the unit of measure on value entries, so a price agreed per case against buying per kilo will look wrong."
+    : `<span class="up">${esc(st.reason || "No price list is published.")}</span>`;
+  $("contractTable").innerHTML = st.available
+    ? `<tr><th>Item</th><th class="num">Contracted</th><th class="num">Paid (avg)</th><th class="num">Difference</th><th class="num">Quantity</th><th class="num">Over/under paid (${CUR})</th><th>Supplier</th></tr>` +
+      (rows.length ? rows.map(r => `<tr class="${r.pct>data.settings.thresholds.price_above_contract_pct?"warnrow":""}">
+        <td class="name">${esc(r.desc||r.item_no)}<div class="meta">${esc(r.item_no)}</div></td>
+        <td class="num">${fmt(r.contract,2)}</td><td class="num"><b>${fmt(r.paid,2)}</b></td>
+        <td class="num"><span class="chip ${r.pct>0?"up":"down"}">${r.pct>0?"+":""}${fmt(r.pct,1)}%</span></td>
+        <td class="num">${fmt(r.qty,2)}</td><td class="num ${r.overpaid>0?"up":"down"}"><b>${sign(r.overpaid)}</b></td>
+        <td>${esc(r.vendor||"–")}</td></tr>`).join("")
+        : `<tr><td colspan="7" class="empty">No purchased item matched the published price list this period.</td></tr>`)
+    : `<tr><td class="empty">No contracted price list published. In BC: Web Services → New → Page → <b>Purchase Prices</b> (or <b>Price List Lines</b> on newer versions) → Service Name <code>PurchasePrices</code> → Published.${st.reason?`<div class="meta" style="margin-top:6px">${esc(st.reason).slice(0,220)}</div>`:""}</td></tr>`;
+}
+// ---------- accounts and permissions ----------
+let me = null, roles = {};
+function can(p){ return !!me && (me.can||[]).includes(p); }
+async function loadSession(){
+  try{
+    const j = await (await fetch("/api/session")).json();
+    me = j.user; roles = j.roles || {};
+    if(!me){ location.href = "/login"; return; }
+    $("whoami").innerHTML = `<span class="dot"></span>${esc(me.name||me.username)} · ${esc(me.role)}`;
+    $("usersNav").style.display = can("users") ? "" : "none";
+    document.querySelectorAll("#saveSettings").forEach(b => { b.disabled = !can("settings");
+      if(!can("settings")) b.title = "Your role cannot change thresholds."; });
+    if(can("users")) loadUsers();
+  }catch(e){ location.href = "/login"; }
+}
+$("logoutBtn").onclick = async () => { await fetch("/api/logout"); location.href = "/login"; };
+
+async function loadUsers(){
+  try{
+    const j = await (await fetch("/api/users")).json();
+    if(j.error) throw new Error(j.error);
+    $("usersNote").textContent = `${j.users.length} account(s). Disabling an account ends its sessions at once; every change here is written to the audit trail.`;
+    $("nu-role").innerHTML = Object.keys(j.roles).map(r=>`<option>${esc(r)}</option>`).join("");
+    $("roleHelp").innerHTML = Object.entries(j.roles).map(([r,v])=>`<b>${esc(r)}:</b> ${esc(v.description)}`).join("<br>");
+    $("usersTable").innerHTML = `<tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>Created</th><th></th></tr>` +
+      j.users.map(u=>`<tr class="${u.active?"":"warnrow"}">
+        <td class="name">${esc(u.name||u.username)}<div class="meta">${esc(u.username)}${u.must_change?" · must change password":""}</div></td>
+        <td><select data-uf="role" data-u="${esc(u.username)}">${Object.keys(j.roles).map(r=>`<option ${r===u.role?"selected":""}>${esc(r)}</option>`).join("")}</select></td>
+        <td>${u.active?'<span class="chip down">active</span>':'<span class="chip up">disabled</span>'}${u.locked_until?' <span class="chip up">locked</span>':""}</td>
+        <td class="meta">${esc((u.last_login||"never").replace("T"," "))}</td>
+        <td class="meta">${esc((u.created_at||"").slice(0,10))} · ${esc(u.created_by||"")}</td>
+        <td><button class="mini" data-ua="toggle" data-u="${esc(u.username)}">${u.active?"Disable":"Enable"}</button>
+            <button class="mini" data-ua="reset" data-u="${esc(u.username)}">Reset password</button>
+            ${u.locked_until?`<button class="mini" data-ua="unlock" data-u="${esc(u.username)}">Unlock</button>`:""}</td></tr>`).join("");
+    $("sessTable").innerHTML = `<tr><th>User</th><th>Role</th><th>Signed in</th><th>Last seen</th></tr>` +
+      (j.sessions.length ? j.sessions.map(sx=>`<tr><td class="name">${esc(sx.username)}</td><td>${esc(sx.role)}</td>
+        <td class="meta">${esc(sx.since.replace("T"," "))}</td><td class="meta">${esc(sx.last_seen.replace("T"," "))}</td></tr>`).join("")
+        : `<tr><td colspan="4" class="empty">No one else is signed in.</td></tr>`);
+    document.querySelectorAll("[data-uf=role]").forEach(el=>el.onchange=()=>patchUser(el.dataset.u,{role:el.value}));
+    document.querySelectorAll("[data-ua]").forEach(b=>b.onclick=()=>{
+      const u = b.dataset.u;
+      if(b.dataset.ua==="toggle") patchUser(u,{active: b.textContent==="Enable"});
+      if(b.dataset.ua==="unlock") patchUser(u,{unlock:true});
+      if(b.dataset.ua==="reset"){
+        const pw = prompt(`Temporary password for ${u} (at least 8 characters)`);
+        if(pw) patchUser(u,{password:pw});
+      }});
+  }catch(e){ $("usersNote").textContent = "Could not load the accounts: " + e.message; }
+}
+async function patchUser(username, patch){
+  try{
+    const r = await fetch("/api/users/"+encodeURIComponent(username), {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(patch)});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    loadUsers();
+  }catch(e){ alert("Could not update the account: " + e.message); }
+}
+$("nu-add").onclick = async () => {
+  $("nu-msg").textContent = "";
+  try{
+    const r = await fetch("/api/users", {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:$("nu-user").value.trim(), name:$("nu-name").value,
+                           role:$("nu-role").value, password:$("nu-pass").value})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    $("nu-msg").textContent = "Created. Give them the temporary password; they must change it at first sign-in.";
+    $("nu-user").value = $("nu-name").value = $("nu-pass").value = "";
+    loadUsers();
+  }catch(e){ $("nu-msg").textContent = e.message; }
+};
+$("pw-save").onclick = async () => {
+  $("pw-msg").textContent = "";
+  try{
+    const r = await fetch("/api/password", {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({current:$("pw-cur").value, new:$("pw-new").value})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    $("pw-msg").textContent = "Changed."; $("pw-cur").value = $("pw-new").value = "";
+  }catch(e){ $("pw-msg").textContent = e.message; }
+};
+
+// ---------- local cache ----------
+$("cacheLoad").onclick = async () => {
+  $("cacheNote").textContent = "Checking…";
+  try{
+    const j = await (await fetch("/api/cache")).json();
+    const f = j.local_file;
+    $("cacheNote").textContent = `${j.memory_mb == null ? "" : "Using " + j.memory_mb + " MB of memory. "}`
+      + `${fmt(f.rows)} ledger rows held on disk in ${f.file_mb} MB across ${fmt(f.periods)} periods `
+      + `· warm-up runs at ${j.warm_at || "never"} · ${j.memory_note || ""} ${j.note}`;
+    $("cacheTable").innerHTML = `<tr><th>What</th><th>Company</th><th class="num">Rows</th><th>From</th><th>To</th></tr>`
+      + (f.detail||[]).map(d=>`<tr><td class="name">${esc(d.kind)}</td><td>${esc(d.company)}</td>
+          <td class="num"><b>${fmt(d.rows)}</b></td><td class="meta">${esc(d.from||"")}</td><td class="meta">${esc(d.to||"")}</td></tr>`).join("")
+      + (j.screens_held||[]).map(h=>`<tr><td class="name">screen held</td><td>${esc(h.company)}</td>
+          <td class="num meta" colspan="3">${esc(h.period)} · ${esc(h.mode)} · ${esc(h.location)} · ${fmt(h.age_seconds)}s old</td></tr>`).join("");
+  }catch(e){ $("cacheNote").textContent = "Could not read: " + e.message; }
+};
+
+// ---------- contract prices ----------
+function renderContracts(){
+  const c = data.contracts; if (!c) return;
+  if (!c.available){
+    $("ctKpis").innerHTML = "";
+    $("ctDefs").innerHTML = `<span class="up">No agreed prices could be read.</span> ${esc(c.reason||"")}`;
+    return;
+  }
+  const k = c.kpis;
+  $("ctKpis").innerHTML = [
+    stockCard("Spend under an agreed price", fmt(k.coverage_pct,1) + "%",
+      [`${all(k.covered_cost)} of ${all(k.total_cost)} bought`,
+       `${fmt(k.items_covered)} of ${fmt(k.items_bought)} items bought carry a price`,
+       `${fmt(k.agreed_items)} items priced in the list`]),
+    stockCard("Bought with no agreed price", all(k.uncovered_cost),
+      [`${fmt(100 - k.coverage_pct,1)}% of the period`, "Nothing to compare these purchases against"]),
+    stockCard("Paid above the agreed price", all(k.above_value),
+      [`${fmt(k.above_pct,1)}% of the covered spend`, `Outside a ${fmt(k.tolerance,0)}% tolerance`,
+       "Measured on the period's average unit cost"]),
+    stockCard("Paid below the agreed price", all(Math.abs(k.below_value)),
+      ["Usually a discount or a price that has fallen", "Worth updating the list to the real price"]),
+  ].join("");
+  $("ctDefs").innerHTML = `<b>Coverage:</b> ${esc(c.definitions.coverage)}<br>`
+    + `<b>Adherence:</b> ${esc(c.definitions.adherence)}<br><b>Limits:</b> ${esc(c.definitions.limits)}`;
+  $("ctSup").innerHTML = `<tr><th>Supplier</th><th class="num">Under contract</th><th class="num">No contract</th><th class="num">Coverage</th><th class="num">Above agreed</th></tr>` +
+    c.suppliers.map(s=>`<tr class="${s.share<50?"warnrow":""}"><td class="name">${esc(s.supplier)}</td>
+      <td class="num">${fmt(s.covered)}</td><td class="num">${fmt(s.uncovered)}</td>
+      <td class="num ${s.share<50?"up":"down"}">${fmt(s.share,0)}%</td>
+      <td class="num ${s.above>0?"up":""}">${fmt(s.above)}</td></tr>`).join("");
+  $("ctCat").innerHTML = `<tr><th>Category</th><th class="num">Under contract</th><th class="num">No contract</th><th class="num">Coverage</th><th class="num">Above agreed</th></tr>` +
+    c.categories.map(s=>`<tr class="${s.share<50?"warnrow":""}"><td class="name">${esc(s.category)}</td>
+      <td class="num">${fmt(s.covered)}</td><td class="num">${fmt(s.uncovered)}</td>
+      <td class="num ${s.share<50?"up":"down"}">${fmt(s.share,0)}%</td>
+      <td class="num ${s.above>0?"up":""}">${fmt(s.above)}</td></tr>`).join("");
+  $("ctUncNote").textContent = "The items worth adding to the price list first, by what was spent on them.";
+  $("ctUnc").innerHTML = `<tr><th>Item</th><th>Supplier</th><th>Category</th><th class="num">Spend</th></tr>` +
+    (c.biggest_uncovered.length ? c.biggest_uncovered.map(u=>`<tr><td class="name">${esc(u.description||u.item)}<div class="meta">${esc(u.item)}</div></td>
+      <td class="meta">${esc(u.vendor||"–")}</td><td class="meta">${esc(u.category||"–")}</td>
+      <td class="num"><b>${fmt(u.cost)}</b></td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">Everything bought this period had an agreed price.</td></tr>`);
+  $("ctGap").innerHTML = `<tr><th>Item</th><th class="num">Agreed</th><th class="num">Paid</th><th class="num">%</th><th class="num">Value</th></tr>` +
+    (c.biggest_gaps.length ? c.biggest_gaps.map(g=>`<tr><td class="name">${esc(g.description||g.item)}<div class="meta">${esc(g.vendor||"")}</div></td>
+      <td class="num">${fmt(g.agreed,2)}</td><td class="num">${fmt(g.paid_unit,2)}</td>
+      <td class="num up">${fmt(g.pct,1)}%</td><td class="num"><b>${fmt(g.gap_value)}</b></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">Nothing was paid above the agreed price beyond the tolerance.</td></tr>`);
+  document.querySelectorAll("[data-goto2]").forEach(b => b.onclick = () => {
+    const t = Array.from(document.querySelectorAll("#nav button")).find(n => n.textContent.trim() === b.dataset.goto2);
+    if (t) t.click();
+  });
+}
+
+// ---------- invoices without a purchase order ----------
+let cplData = null;
+async function loadCompliance(){
+  if (!$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
+  $("cplNote").textContent = "Reading the posted invoices…";
+  try{
+    const r = await fetch(`/api/compliance?month=${encodeURIComponent($("cplMonth").value)}&company=${encodeURIComponent($("company").value)}`);
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "failed");
+    cplData = j; renderCompliance();
+  }catch(e){ $("cplNote").textContent = "Could not read: " + e.message; }
+}
+$("cplLoad").onclick = loadCompliance;
+function renderCompliance(){
+  const d = cplData; if(!d) return;
+  if(!d.available){
+    $("cplNote").innerHTML = `<span class="up">${esc(d.error||"Unavailable")}</span> ${esc(d.reason||"")}`;
+    $("cplKpis").innerHTML = ""; return;
+  }
+  const k = d.kpis;
+  $("cplNote").textContent = `${d.period} · ${fmt(k.invoices)} posted invoices examined · ${d.lines_note}`;
+  $("cplKpis").innerHTML = [
+    stockCard("Invoices with no order", fmt(k.no_order + k.partial),
+      [`${fmt(k.rate,1)}% of ${fmt(k.invoices)} invoices`, k.partial ? `${fmt(k.partial)} partly linked` : "None partly linked",
+       "The target is zero, whatever the amount"]),
+    stockCard("Value with no order", all(k.value_breach),
+      [`${fmt(k.value_rate,1)}% of ${all(k.value_total)} bought`, "Excluding VAT", "Only the unlinked lines on mixed invoices"]),
+    stockCard("Order raised late", "Unverifiable",
+      ["BC publishes the order date only while the order is open", "Cannot be proved for closed orders"]),
+    stockCard("Order number present", fmt(k.with_order),
+      ["Counted as compliant on the order number", "The date the order was raised stays unverified"]),
+    stockCard("Corrections excluded", fmt(k.corrections),
+      ["Cancelled or corrective documents", "Not new purchases, so out of the denominator"]),
+  ].join("");
+  $("cplDefs").innerHTML = `<b>Denominator:</b> ${esc(d.definitions.denominator)}<br>`
+    + `<b>What counts as a breach:</b> ${esc(d.definitions.breach)}<br>`
+    + `<b>Value:</b> ${esc(d.definitions.value)}<br><b>Unverifiable:</b> ${esc(d.definitions.unverifiable)}`;
+
+  $("cplWhereNote").textContent = "By unit and category, ranked by value. Open a row to see the invoices behind it.";
+  $("cplUnits").innerHTML = `<tr><th>Unit</th><th class="num">Invoices</th><th class="num">Value</th><th>Categories</th></tr>` +
+    (d.by_unit.length ? d.by_unit.map(u=>`<tr><td class="name">${esc(u.name)}</td>
+      <td class="num">${fmt(u.invoices)}</td><td class="num"><b>${fmt(u.value)}</b></td>
+      <td class="meta">${esc(u.top_categories.join(", "))}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">Every invoice this month came from an order.</td></tr>`);
+  $("cplVendors").innerHTML = `<tr><th>Supplier</th><th class="num">Invoices</th><th class="num">Value</th><th>Units</th></tr>` +
+    d.vendors.map(v=>`<tr class="${v.repeat?"warnrow":""}"><td class="name">${esc(v.vendor)}${v.repeat?' <span class="chip up">repeat</span>':""}</td>
+      <td class="num">${fmt(v.invoices)}</td><td class="num"><b>${fmt(v.value)}</b></td>
+      <td class="meta">${esc(v.units.join(", "))}</td></tr>`).join("");
+
+  $("cplReasons").innerHTML = d.reasons.length ? d.reasons.map(r=>`<div class="act">
+      <div class="row1"><h4>${esc(r.reason)}</h4><span class="chip ${r.confidence==="confirmed"?"up":""}">${esc(r.confidence)}</span></div>
+      <p class="hint" style="margin:6px 0 0">${esc(r.detail)} <b>${fmt(r.invoices)} invoices · ${all(r.value)}</b>
+        ${r.units.length?` · ${esc(r.units.slice(0,4).join(", "))}`:""} · <b>Owner:</b> ${esc(r.owner)}</p></div>`).join("")
+    : `<p class="empty">Nothing to explain: no breaches this month.</p>`;
+
+  $("cplTrend").innerHTML = `<tr><th>Month</th><th class="num">Invoices</th><th class="num">Without an order</th><th class="num">Rate</th><th class="num">Value</th></tr>` +
+    d.trend.map(t=>`<tr><td class="name">${esc(t.month)}</td>
+      <td class="num">${t.invoices==null?"–":fmt(t.invoices)}</td>
+      <td class="num">${t.breaches==null?"–":fmt(t.breaches)}</td>
+      <td class="num ${t.rate!=null&&t.rate>2?"up":""}">${t.rate==null?"not read":fmt(t.rate,1)+"%"}</td>
+      <td class="num">${t.value==null?"–":fmt(t.value)}</td></tr>`).join("");
+
+  $("cplDecNote").textContent = `${fmt(d.decisions.length)} case(s), ranked by value. Nothing is changed in Business Central.`;
+  $("cplDec").innerHTML = `<tr><th>Case</th><th>Evidence</th><th>Action</th><th class="num">Value</th><th>Owner</th><th>By when</th><th>Status</th></tr>` +
+    (d.decisions.length ? d.decisions.map(x=>`<tr><td class="name">${esc(x.case)}</td><td class="meta">${esc(x.evidence)}</td>
+      <td class="meta">${esc(x.action)}</td><td class="num"><b>${fmt(x.value)}</b></td><td>${esc(x.owner)}</td>
+      <td class="meta">${esc(x.due)}</td><td><span class="chip">${esc(x.status)}</span></td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">Nothing to act on this month.</td></tr>`);
+
+  $("cplListNote").textContent = `${fmt(d.invoices.length)} invoice(s) with no order, with the reference to find each one in BC.`;
+  $("cplList").innerHTML = `<tr><th>Invoice</th><th>Supplier</th><th>Posted</th><th>Unit</th><th>Category</th><th>Lines</th><th class="num">Value</th></tr>` +
+    d.invoices.map(i=>`<tr><td class="name">${esc(i.invoice)}<div class="meta">${esc(i.reference)}${i.vendor_invoice?` · supplier ref ${esc(i.vendor_invoice)}`:""}</div></td>
+      <td>${esc(i.vendor)}</td><td class="meta">${esc(i.posted)}</td><td>${esc(i.unit)}</td>
+      <td class="meta">${esc(i.category)}</td><td class="meta">${esc(i.line_types.join(", ")||i.state)}</td>
+      <td class="num"><b>${fmt(i.unlinked_value)}</b></td></tr>`).join("");
+}
+$("cplListToggle").onclick = () => {
+  const box = $("cplListBox"), open = box.style.display === "block";
+  box.style.display = open ? "none" : "block";
+  $("cplListToggle").textContent = open ? "Show the invoices" : "Hide the invoices";
+};
+
+// ---------- stock and working capital ----------
+let stockData = null;
+function stockMonthDefault(){
+  const d = new Date(); d.setDate(0);            // last day of the previous month
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+let stockLocations = null;
+async function fillStockControls(){
+  if (!$("stkMonth").value) $("stkMonth").value = stockMonthDefault();
+  if (!stockLocations) {
+    // the location list comes from Business Central, not from the period on screen:
+    // a restaurant with no movements this week still has stock to review
+    try{
+      const j = await (await fetch(`/api/locations?company=${encodeURIComponent($("company").value)}`)).json();
+      stockLocations = (j.locations || []).map(l => l.code);
+    }catch(e){ stockLocations = []; }
+    if (!stockLocations.length) stockLocations = (data && data.all_locations) || [];
+  }
+  const chosen = $("stkLoc").value;
+  $("stkLoc").innerHTML = stockLocations.length
+    ? stockLocations.map(l => `<option ${l===chosen?"selected":""}>${esc(l)}</option>`).join("")
+    : `<option value="">(no locations)</option>`;
+}
+async function loadStock(){
+  await fillStockControls();
+  if (!$("stkLoc").value) { $("stkNote").textContent = "No locations could be read from Business Central."; return; }
+  const loc = $("stkLoc").value, month = $("stkMonth").value;
+  $("stkNote").textContent = `Reading ${loc} for ${month}… a month of movements is tens of thousands of entries, so the first read takes a while.`;
+  try{
+    const r = await fetch(`/api/stock?location=${encodeURIComponent(loc)}&month=${encodeURIComponent(month)}`
+      + `&company=${encodeURIComponent($("company").value)}&header=${encodeURIComponent(data ? data.meta.current[0] : "")}`);
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "failed");
+    stockData = j; renderStock();
+  }catch(e){ $("stkNote").textContent = "Could not read: " + e.message; }
+}
+$("stkLoad").onclick = loadStock;
+function stockCard(label, value, lines){
+  return `<div class="card kpi"><div class="l">${esc(label)}</div><div class="v">${value}</div>
+    <div class="s">${lines.filter(Boolean).map(esc).join("<br>")}</div></div>`;
+}
+function renderStock(){
+  const d = stockData; if(!d) return;
+  if(!d.available){
+    $("stkNote").innerHTML = `<span class="up">Data unavailable or not verified in Business Central.</span> `
+      + (d.sources||[]).filter(s=>s.status!=="verified").map(s=>esc(s.source+": "+(s.reason||""))).join(" · ");
+    $("stkKpis").innerHTML = ""; return;
+  }
+  const t = d.totals, p = d.policy, m = d.completeness;
+  $("stkMismatch").style.display = d.period_mismatch ? "block" : "none";
+  if (d.period_mismatch) $("stkMismatch").textContent =
+    `The filter at the top of the page shows ${data.meta.current[0]} to ${data.meta.current[1]}, while this screen shows ${d.month}. The figures below are for ${d.month}.`;
+  $("stkNote").innerHTML = `${esc(d.location)} · ${esc(d.month)} · opening at ${esc(d.opening_date)}, closing at ${esc(d.period[1])}`
+    + ` · ${fmt(m.ile_rows_read)} movements read${m.ile_rows_expected!=null?` of ${fmt(m.ile_rows_expected)} BC counts`:""}`
+    + ` · ${esc(p.label)}`;
+
+  const change = t.closing_value - t.opening_value;
+  const maxMeasurable = t.maximum_coverage.measurable;
+  const excess = d.categories.reduce((a,c)=>a+(c.excess_value||0),0);
+  const nm = t.no_movement_breakdown || {};
+  $("stkKpis").innerHTML = [
+    stockCard("Stock at the start of the month", all(t.opening_value),
+      [`${fmt(t.opening_items)} items with a balance at ${d.opening_date}`,
+       "Balance BC reports the day before the month began"]),
+    stockCard("Entered the location", all(t.inflow_cost),
+      [`${fmt(t.inflow_items)} items · ${fmt(t.purchases_items)} of them purchased`,
+       t.sales_return_cost ? `Returned by customers ${all(t.sales_return_cost)} · ${fmt(t.sales_return_items)} items`
+                           : "Purchased, transferred in or added by a count",
+       "Recipe output is not counted: it is internal"]),
+    stockCard("Left the location", all(t.outflow_cost),
+      [`Sold or used ${all(t.consumed_cost)}`,
+       `Transferred out ${all(t.transfers_out_cost)} · ${fmt(t.transfer_items)} items`,
+       "Transfers are how stock reaches the restaurants"]),
+    stockCard("Stock at the end of the month", all(t.closing_value),
+      [`${sign(change)} ${CUR} against the start`,
+       `${fmt(t.value_coverage.priced)} of ${fmt(t.value_coverage.items)} items priced`,
+       "Card cost, a management valuation"]),
+    stockCard("Estimated excess", maxMeasurable ? all(t.above_maximum_value) : all(excess),
+      [maxMeasurable
+        ? `${fmt(t.above_maximum_items)} of ${fmt(t.with_maximum)} items above their SKU maximum`
+        : `Measured against this location's own rhythm: ${fmt(p.max_days,0)} days of cover`,
+       maxMeasurable ? "Against the limit set in BC"
+        : `Cannot use the SKU maximum: ${fmt(t.maximum_coverage.with_maximum)} of ${fmt(t.maximum_coverage.cards)} cards carry one`,
+       "Not cash that can be recovered at once"]),
+    stockCard("Added by count", all(t.positive_adjustment_cost),
+      [`${fmt(t.positive_adjustment_items)} items adjusted upwards`,
+       "Stock found that the books did not have",
+       `Net of both sides: ${sign(t.adjustment_cost)} ${CUR}`]),
+    stockCard("Written off by count", all(t.negative_adjustment_cost),
+      [`${fmt(t.negative_adjustment_items)} items adjusted downwards`,
+       "Stock the books had and the shelf did not",
+       "Counted as stock that left the location"]),
+    stockCard("Stock that did not move", all(t.no_movement_value),
+      [`${fmt(t.no_movement_items)} items: nothing sold, used, transferred out or written off`,
+       `${fmt(nm.no_entries_at_all || 0)} with no posting at all (${all(nm.value_no_entries || 0)})`,
+       `${fmt(nm.received_only || 0)} that only received stock (${all(nm.value_received_only || 0)})`]),
+  ].join("");
+
+  const st = t.status;
+  $("stkRecon").innerHTML = `<div class="money">
+      <div>Quantity bridge<b class="${st.quantity.state==="reconciled"?"down":"up"}">${esc(st.quantity.state)}</b></div>
+      <div>Valuation<b>${esc(st.valuation.state)}</b></div>
+      <div>Movement classification<b>${esc(st.classification.state)}</b></div></div>
+    <p class="hint" style="margin:6px 0 0">${esc(st.quantity.detail)} ${esc(st.valuation.detail)} ${esc(st.classification.detail)}</p>`;
+
+  $("stkCatNote").textContent = `Cover is calculated per category against everything that left it — sold, used, transferred out or written off — not as one average for the whole location. ${d.categories.length} categories.`;
+  $("stkCat").innerHTML = `<tr><th>Category</th><th class="num">Value</th><th class="num">Left (cost)</th>
+      <th class="num">Days cover</th><th class="num">Target</th><th class="num">Excess</th><th class="num">Not moving</th></tr>` +
+    d.categories.slice(0,14).map(c=>`<tr class="${(c.excess_value||0)>0?"warnrow":""}">
+      <td class="name">${esc(c.category)}<div class="meta">${fmt(c.items)} items${c.negative?` · ${c.negative} negative`:""}</div></td>
+      <td class="num"><b>${fmt(c.value)}</b></td><td class="num">${fmt(c.consumption_cost)}</td>
+      <td class="num">${c.days_cover==null?"–":fmt(c.days_cover,0)}</td>
+      <td class="num meta">${fmt(c.target_days,0)}</td>
+      <td class="num ${(c.excess_value||0)>0?"up":""}">${c.excess_value==null?"–":fmt(c.excess_value)}</td>
+      <td class="num">${fmt(c.no_movement_value)}</td></tr>`).join("");
+
+  $("stkCauses").innerHTML = d.causes.length ? d.causes.map(c=>`<div class="act">
+      <div class="row1"><h4>${esc(c.cause)}</h4><span class="chip ${c.confidence==="confirmed"?"up":""}">${esc(c.confidence)}</span></div>
+      <p class="hint" style="margin:6px 0 0">${esc(c.detail)}${c.value?` <b>${all(c.value)}</b>`:""}</p></div>`).join("")
+    : `<p class="empty">Nothing stands out in this month.</p>`;
+
+  $("stkDecNote").textContent = `${fmt(d.decisions.length)} call(s) to make, ranked by the money they move. Nothing is changed in Business Central: these are proposals for the named owner.`;
+  $("stkDec").innerHTML = `<tr><th>Problem</th><th>Evidence</th><th>Action</th><th class="num">Value</th><th>Owner</th><th>By when</th><th>Confidence</th></tr>` +
+    (d.decisions.length ? d.decisions.map(x=>`<tr><td class="name">${esc(x.problem)}<div class="meta">${esc(x.unit)}${x.category?" · "+esc(x.category):""} · ${esc(x.item)}</div></td>
+      <td class="meta">${esc(x.evidence)}</td><td class="meta">${esc(x.action)}</td>
+      <td class="num"><b>${fmt(x.value)}</b></td><td>${esc(x.owner)}</td><td class="meta">${esc(x.urgency)}</td>
+      <td><span class="chip ${x.confidence==="confirmed"?"up":""}">${esc(x.confidence)}</span></td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">Nothing above the thresholds this month.</td></tr>`);
+
+  $("stkTable").innerHTML = `<tr><th>Item</th><th class="num">Opening</th><th class="num">Receipts</th><th class="num">Returns</th>
+      <th class="num">Transf. in</th><th class="num">Transf. out</th><th class="num">Asm. output</th><th class="num">Asm. used</th>
+      <th class="num">Sales</th><th class="num">Sales ret.</th><th class="num">Adj. +</th><th class="num">Adj. −</th>
+      <th class="num">Calculated</th><th class="num">BC</th><th class="num">Diff</th>
+      <th class="num">Reorder pt</th><th class="num">Max</th><th class="num">Days cover</th><th class="num">Value</th></tr>` +
+    d.rows.slice(0,150).map(r=>`<tr class="${r.reconciled?"":"warnrow"}">
+      <td class="name">${esc(r.description||r.item)}<div class="meta">${esc(r.item)}${r.uom?" · "+esc(r.uom):""}</div></td>
+      <td class="num">${fmt(r.opening,2)}</td><td class="num">${fmt(r.receipts,2)}</td><td class="num">${fmt(r.returns,2)}</td>
+      <td class="num">${fmt(r.transfer_in,2)}</td><td class="num">${fmt(r.transfer_out,2)}</td>
+      <td class="num">${fmt(r.assembly_output,2)}</td><td class="num">${fmt(r.assembly_consumption,2)}</td>
+      <td class="num">${fmt(r.sales,2)}</td><td class="num">${fmt(r.sales_return,2)}</td><td class="num">${fmt(r.positive_adjustment,2)}</td><td class="num">${fmt(r.negative_adjustment,2)}</td>
+      <td class="num">${fmt(r.calculated_closing,2)}</td><td class="num"><b>${fmt(r.bc_closing,2)}</b></td>
+      <td class="num ${Math.abs(r.difference)>0.001?"up":""}">${fmt(r.difference,2)}</td>
+      <td class="num meta">${r.reorder_point?fmt(r.reorder_point,2):"–"}</td>
+      <td class="num meta">${r.maximum?fmt(r.maximum,2):"–"}</td>
+      <td class="num">${r.days_cover==null?"–":fmt(r.days_cover,0)}</td>
+      <td class="num"><b>${fmt(r.closing_value)}</b></td></tr>`).join("");
+  const exc = d.exceptions || [];
+  $("stkExcNote").textContent = `${fmt(exc.length)} finding(s) behind the decisions above.`;
+  $("stkExc").innerHTML = exc.length ? exc.slice(0,20).map(e=>`<div class="act">
+      <div class="row1"><h4><span class="sev ${esc(e.severity)}"></span>${esc(e.title)}</h4></div>
+      <p class="hint" style="margin:4px 0">${esc(e.detail)}</p>
+      <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action)} · <b>Owner:</b> ${esc(e.owner_role)} · <b>At stake:</b> ${all(e.impact)}</p></div>`).join("")
+    : `<p class="empty">Nothing above the thresholds.</p>`;
+  const sk = d.sku_status || {}, prop = d.proposed || [], pv = d.provenance;
+  $("stkQuality").innerHTML = (sk.available
+    ? `<b>Planning parameters:</b> ${fmt(sk.with_maximum)} of ${fmt(sk.cards)} stockkeeping unit cards at this location carry a maximum inventory and ${fmt(sk.with_reorder_point)} a reorder point.`
+      + (prop.length ? ` <b>Proposal for the rest:</b> reorder at ${fmt(p.reorder_days,0)} days of use, maximum ${fmt(p.max_days,0)} days — for the unit managers to review, not a BC figure.` : "")
+    : `<b class="up">Planning parameters unavailable.</b>`)
+    + `<br><b>Method:</b> ${esc(pv.method)}<br><b>Valuation:</b> ${esc(pv.valuation)}`
+    + `<br><b>Consumption:</b> ${esc(t.consumption_method)}`
+    + `<br><b>Not available:</b> ${pv.unavailable.map(esc).join(" · ")}`;
+}
+$("stkAuditToggle").onclick = () => {
+  const box = $("stkAuditBox"), open = box.style.display === "block";
+  box.style.display = open ? "none" : "block";
+  $("stkAuditToggle").textContent = open ? "Show the bridge" : "Hide the bridge";
+};
+$("stkOvLoad").onclick = async () => {
+  await fillStockControls();
+  $("stkOvNote").textContent = "Reading every location…";
+  try{
+    const r = await fetch(`/api/stock-overview?month=${encodeURIComponent($("stkMonth").value)}&company=${encodeURIComponent($("company").value)}`);
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "failed");
+    $("stkOvNote").textContent = `${j.month} · total ${all(j.total)} against ${all(j.previous)} a month earlier. ${j.note}`
+      + (j.unavailable.length ? ` Not read: ${j.unavailable.join(", ")}.` : "");
+    $("stkOv").innerHTML = `<tr><th>Location</th><th class="num">Items</th><th class="num">Value</th><th class="num">Change</th><th class="num">Negative</th></tr>`
+      + j.rows.map(r=>`<tr><td class="name">${esc(r.location)}</td><td class="num">${fmt(r.items)}</td>
+        <td class="num"><b>${fmt(r.value)}</b></td>
+        <td class="num ${r.change>0?"up":"down"}">${sign(r.change)}</td>
+        <td class="num ${r.negative_items?"up":""}">${fmt(r.negative_items)}</td></tr>`).join("")
+      + `<tr class="total"><td>Total</td><td class="num">–</td><td class="num">${fmt(j.total)}</td><td class="num">${sign(j.total-j.previous)}</td><td class="num">–</td></tr>`;
+  }catch(e){ $("stkOvNote").textContent = "Could not read: " + e.message; }
+};
+
+// ---------- purchase types ----------
+let streams = null;
+async function loadStreams(force){
+  if (streams && !force) { renderStreams(); return; }
+  $("strNote").textContent = "Reading Business Central…";
+  try{
+    const r = await fetch("/api/streams?" + params());
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "failed");
+    streams = j; renderStreams();
+  }catch(e){ $("strNote").textContent = "Could not read: " + e.message; }
+}
+$("strLoad").onclick = () => loadStreams(true);
+const STATUS_TEXT = {verified:"Verified live", partial:"Partial data", unavailable:"Unavailable"};
+function renderStreams(){
+  const st = streams; if(!st) return;
+  const bad = (st.sources||[]).filter(x=>x.status!=="verified");
+  $("strNote").innerHTML = `${esc(st.label)} · ${st.period[0]} to ${st.period[1]} · ${esc(st.company)}${st.location?" · "+esc(st.location):""}
+    · <span class="chip ${st.status==="verified"?"down":"up"}">${STATUS_TEXT[st.status]||st.status}</span>`
+    + (bad.length ? ` · not read: ${bad.map(b=>esc(b.source)).join(", ")}` : "");
+  const total = st.summary.reduce((a,s)=>a+s.value,0);
+  $("strKpis").innerHTML = st.summary.map(s=>`<div class="card kpi clickable" data-stream="${esc(s.type)}">
+      <div class="l">${esc(s.type)}</div><div class="v">${all(s.value)}</div>
+      <div class="s">${fmt(s.share,1)}% of ${all(total)} · ${fmt(s.documents)} documents</div></div>`).join("");
+  document.querySelectorAll("[data-stream]").forEach(el=>el.onclick=()=>{
+    const t = el.dataset.stream;
+    openDrill(t==="Services"||t==="Recurring Contracts" ? "services" : t==="CAPEX" ? "capex" :
+              t==="Unclassified" ? "unclassified" : "stream_items", t==="Unclassified"?"":t, t);
+  });
+  $("strTable").innerHTML = `<tr><th>Purchase type</th><th class="num">Value (${CUR})</th><th class="num">Share</th><th class="num">Lines</th><th class="num">Documents</th><th>Largest categories or accounts</th></tr>` +
+    st.summary.map(s=>`<tr><td class="name">${esc(s.type)}</td><td class="num"><b>${fmt(s.value)}</b></td>
+      <td class="num">${fmt(s.share,1)}%</td><td class="num">${fmt(s.lines)}</td><td class="num">${fmt(s.documents)}</td>
+      <td class="meta">${s.top.slice(0,4).map(t=>`${esc(t.label)} ${fmt(t.value)}`).join(" · ")}</td></tr>`).join("");
+  $("strUncNote").innerHTML = `${all(st.unclassified_value)} could not be classified. Classified by: `
+    + (st.classified_by||[]).map(c=>`${esc(c.field)} ${all(c.value)}`).join(" · ");
+  $("strUnc").innerHTML = `<tr><th>Item</th><th>On the card</th><th>Why</th><th class="num">Value</th></tr>` +
+    (st.unclassified.length ? st.unclassified.slice(0,15).map(u=>`<tr><td class="name">${esc(u.desc||u.item)}<div class="meta">${esc(u.item)}</div></td>
+      <td class="meta">${esc(u.category||"(empty)")}</td><td class="meta">${esc(u.reason||"")}</td>
+      <td class="num"><b>${fmt(u.value)}</b></td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">Everything in this period is classified.</td></tr>`);
+  const p = st.provenance;
+  $("strProv").innerHTML = `<div class="money">
+      <div>Value entries read<b>${fmt(p.records.value_entries)}</b></div>
+      <div>Purchase G/L entries<b>${fmt(p.records.gl_purchase_entries)}</b></div>
+      <div>Item cards<b>${fmt(p.records.item_cards)}</b></div>
+      <div>Accounts<b>${fmt(p.records.accounts)}</b></div></div>
+    <p class="hint" style="margin:8px 0 4px"><b>Datasets:</b> ${p.datasets.map(esc).join(" · ")}</p>
+    <p class="hint" style="margin:0 0 4px"><b>Date field:</b> ${esc(p.date_field)} · ${esc(p.date_range)} · ${esc(p.filters)}</p>
+    <p class="hint" style="margin:0 0 4px"><b>Method:</b> ${esc(p.method)}</p>
+    <p class="hint" style="margin:0 0 4px"><b>VAT:</b> ${esc(p.vat)} <b>Credit notes:</b> ${esc(p.credit_notes)} <b>UOM:</b> ${esc(p.uom)}</p>
+    <p class="hint" style="margin:0"><b>Cannot be tested with the published data:</b></p>
+    <ul class="hint" style="margin:4px 0 0;padding-left:18px">${p.limitations.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>`;
+  renderServices();
+}
+function renderServices(){
+  const st = streams; if(!st) return;
+  const svcTotal = st.services.reduce((a,r)=>a+r.value,0);
+  const capTotal = st.capex.reduce((a,r)=>a+r.value,0);
+  if (st.gl_status !== "verified") {
+    $("svcNote").innerHTML = `<span class="up">The purchase postings could not be read from Business Central, so this screen is empty.</span> ${esc(st.gl_reason||"")}`;
+    $("capNote").textContent = "";
+    $("svcTable").innerHTML = `<tr><td class="empty">Data unavailable or not verified in Business Central.</td></tr>`;
+    $("capTable").innerHTML = `<tr><td class="empty">Data unavailable or not verified in Business Central.</td></tr>`;
+    return;
+  }
+  $("svcNote").innerHTML = `${all(svcTotal)} posted on ${fmt(new Set(st.services.map(r=>r.document)).size)} documents, from ${fmt(st.gl_rows_read)} purchase postings read.
+    Goods accounts (${esc(st.rules.goods_prefixes)}) are excluded: those purchases already count as items.
+    Other expense accounts starting with ${esc(st.rules.service_prefix)} count as services; class ${esc(st.rules.prepayment_prefix)} asset accounts are shown as prepayments, not as spend; supplier balances and VAT are excluded.
+    Contracts and purchase-order links are not published by BC, so neither is tested.`
+    + ((st.unknown_accounts||[]).length ? `<br><b>Accounts no rule covers:</b> ${st.unknown_accounts.slice(0,6).map(u=>esc(u.account)+" "+fmt(u.value)).join(" · ")}` : "");
+  const byAcc = {};
+  st.services.forEach(r=>{ const k = r.account+" "+r.account_name; byAcc[k] = byAcc[k] || {value:0, docs:new Set(), supplier:{}};
+    byAcc[k].value += r.value; byAcc[k].docs.add(r.document); byAcc[k].supplier[r.supplier||"(not matched)"] = (byAcc[k].supplier[r.supplier||"(not matched)"]||0)+r.value; });
+  const accRows = Object.entries(byAcc).sort((a,b)=>b[1].value-a[1].value).slice(0,25);
+  $("svcTable").innerHTML = `<tr><th>Account</th><th class="num">Value (${CUR})</th><th class="num">Documents</th><th>Largest supplier</th></tr>` +
+    (accRows.length ? accRows.map(([k,v])=>{
+      const top = Object.entries(v.supplier).sort((a,b)=>b[1]-a[1])[0];
+      return `<tr><td class="name">${esc(k)}</td><td class="num"><b>${fmt(v.value)}</b></td><td class="num">${v.docs.size}</td>
+        <td>${esc(top[0])} <span class="meta">${fmt(top[1])}</span></td></tr>`;}).join("")
+      : `<tr><td colspan="4" class="empty">No non-item purchase postings in this period.</td></tr>`);
+  const g = st.goods_mirror || {accounts:[], total:0, item_stream:0, difference:0, note:""};
+  $("goodsNote").textContent = g.note;
+  $("goodsTotals").innerHTML = `<div>Goods accounts in the G/L<b>${all(g.total)}</b></div>
+    <div>Item purchases (value entries)<b>${all(g.item_stream)}</b></div>
+    <div>Difference<b class="${Math.abs(g.difference) > g.item_stream*0.05 ? "up" : ""}">${sign(g.difference)}</b></div>`;
+  $("goodsTable").innerHTML = `<tr><th>Account</th><th class="num">Amount (${CUR})</th></tr>` +
+    (g.accounts.length ? g.accounts.map(a=>`<tr><td class="name">${esc(a.account)}</td><td class="num"><b>${fmt(a.value)}</b></td></tr>`).join("")
+      : `<tr><td colspan="2" class="empty">No goods accounts were posted in this period.</td></tr>`);
+  $("capNote").textContent = `${all(capTotal)} posted to the CAPEX accounts set in Settings: ${st.rules.capex_accounts.join(", ")}. `
+    + "Only these accounts count as CAPEX, because prepayments, related-party balances and inventory also sit on asset accounts.";
+  $("capTable").innerHTML = `<tr><th>Document</th><th>Posted</th><th>Supplier</th><th>Account</th><th class="num">Amount</th></tr>` +
+    (st.capex.length ? st.capex.slice(0,30).map(r=>`<tr><td>${esc(r.document)}</td><td>${esc(r.posting)}</td>
+      <td class="name">${esc(r.supplier||"–")}</td><td class="meta">${esc(r.account)} ${esc(r.account_name)}</td>
+      <td class="num"><b>${fmt(r.value)}</b></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No CAPEX postings in this period.</td></tr>`);
+}
+
+// ---------- data quality ----------
+function renderQuality(){
+  const q = data.quality || {}, t = q.totals || {};
+  $("qCount").textContent = fmt(t.critical || 0);
+  $("qAll").textContent = fmt(t.findings || 0);
+  $("qCrit").textContent = fmt(t.critical || 0);
+  $("qWarn").textContent = fmt(t.warning || 0);
+  $("qInfo").textContent = fmt(t.info || 0);
+  const checks = q.checks || [];
+  $("qualityList").innerHTML = checks.length ? checks.map((c,i) => `<div class="qcheck">
+    <div class="row1"><h4><span class="sev ${c.severity}"></span>${esc(c.title)}</h4>
+      <span class="chip ${c.severity==="critical"?"up":c.severity==="warning"?"":"down"}">${fmt(c.count)} record${c.count===1?"":"s"}</span></div>
+    <p class="hint" style="margin:6px 0">${esc(c.why)}</p>
+    <p class="hint" style="margin:0"><b>Fix:</b> ${esc(c.fix)}</p>
+    <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="mini" data-qdrill="${esc(c.code)}">Open records</button>
+      <button class="mini dark" data-qaction="${i}" ${(data.action_keys||[]).includes("dq-"+c.code)?"disabled":""}>${(data.action_keys||[]).includes("dq-"+c.code)?"Already tracked":"Create action"}</button>
+    </div></div>`).join("")
+    : `<div class="empty">${q.error ? esc(q.error) : "No data quality problem found in this period."}</div>`;
+  document.querySelectorAll("[data-qdrill]").forEach(b => b.onclick = () => openDrill("quality:" + b.dataset.qdrill, "", "data quality"));
+  document.querySelectorAll("[data-qaction]").forEach(b => b.onclick = () => {
+    const c = checks[+b.dataset.qaction];
+    createAction({title:`Data quality: ${c.title} (${c.count})`, description:`${c.why}\nFix: ${c.fix}`,
+      source_exception:"dq-"+c.code, company:data.meta.company,
+      priority:c.severity==="critical"?"Critical":c.severity==="warning"?"High":"Medium",
+      owner:data.settings.owners.data_quality||"", confidence:"high",
+      evidence:[{entity:"ValueEntries / VendorLedgerEntries", key:c.code, period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});
+  });
+}
+
+// ---------- reports ----------
+let report = null;
+async function loadReport(kind, modeOverride){
+  $("reportArea").innerHTML = modeOverride && modeOverride !== "week"
+    ? '<div class="empty">Building the report. A month or a year is read from Business Central month by month, so the first run takes a while…</div>'
+    : '<div class="empty">Building the report from Business Central…</div>';
+  try{
+    const q = new URLSearchParams(params());
+    if (modeOverride) q.set("mode", modeOverride);
+    const r = await fetch(`/api/report?type=${kind}&` + q.toString());
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "failed");
+    report = j; renderReport();
+  }catch(e){ $("reportArea").innerHTML = `<div class="empty">Could not build the report: ${esc(e.message)}</div>`; }
+}
+const tbl = (cols, rows) => rows.length
+  ? `<div class="scroll"><table><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr>` +
+    rows.map(r=>`<tr>${r.map(v=>`<td>${typeof v==="number"?fmt(v, Math.abs(v)<100&&v%1?2:0):esc(v??"")}</td>`).join("")}</tr>`).join("") + "</table></div>"
+  : '<div class="empty">Nothing to report here.</div>';
+function renderReport(){
+  const r = report;
+  if (!r) return;
+  let html = `<div class="rep"><h2>${esc(r.title)}</h2>
+    <p class="hint">${esc(r.company)} · ${esc(r.location)} · data as at ${esc(r.generated_at)}</p>`;
+  if (r.type === "daily"){
+    const a = r.activity;
+    html += `<h3>Yesterday</h3><div class="money">
+      <div>Purchases<b>${all(a.spend)}</b></div><div>Documents<b>${fmt(a.documents)}</b></div>
+      <div>Lines<b>${fmt(a.lines)}</b></div><div>Items<b>${fmt(a.items)}</b></div></div>
+      <h3>Today's priorities</h3>` +
+      (r.priorities.length ? r.priorities.map(p => `<div class="act"><div class="row1"><h4><span class="sev ${p.severity}"></span>${esc(p.title)}</h4>
+        <span class="meta">${p.impact?`${sign(p.impact)} ALL`:""}</span></div>
+        <p class="hint" style="margin:6px 0 0">${esc(p.detail)}</p>
+        <p class="hint" style="margin:4px 0 0"><b>Do:</b> ${esc(p.action)}${p.owner?` · <b>Owner:</b> ${esc(p.owner)}`:""}</p></div>`).join("")
+        : '<div class="empty">Nothing above the thresholds.</div>') +
+      `<h3>Goods received, invoice not posted</h3>` +
+      tbl(["Order","Supplier","Location",`Value (${CUR})`,"Age (working days)"],
+          r.overdue_documents.map(d => [d.order, d.supplier, d.location, d.value, d.age_days])) +
+      `<h3>Price moves above 5%</h3>` +
+      tbl(["Item","Change %",`Impact (${CUR})`], r.price_moves.map(p => [p.item, Math.round(p.pct*10)/10, Math.round(p.impact)])) +
+      (r.requisitions_waiting.length ? `<h3>Requisitions waiting</h3>` +
+        tbl(["Item","Hours waiting","Location","Requested by"], r.requisitions_waiting.map(x => [x.item, x.hours, x.location, x.user])) : "") +
+      `<h3>Supplier issues</h3>` +
+      tbl(["Supplier","Credit notes","Documents with problems",`Spend (${CUR})`],
+          r.supplier_issues.map(s => [s.supplier, s.credit_notes, s.issues, Math.round(s.spend)])) +
+      `<h3>Actions by owner</h3>` +
+      tbl(["Owner","Action","Priority","Due","Status"],
+          Object.entries(r.actions_by_owner).flatMap(([o, list]) => list.map(a => [o, a.title, a.priority, a.due, a.status]))) +
+      `<h3>Data quality</h3>` +
+      tbl(["Finding","Records","Severity"], (r.quality.top||[]).map(c => [c.title, c.count, c.severity]));
+  } else {
+    const s = r.spend, p = r.price, av = r.avoidable, b = r.budget || {};
+    html += `<h3>Executive summary</h3>
+      <p><span class="status-pill ${STATUS_CLASS[r.status]||""}">${esc(r.status)}</span> ${esc(r.status_note)}</p>
+      <ul>${(r.summary||[]).map(d => `<li><b>${esc(d.label)}.</b> ${esc(d.text)}</li>`).join("")}</ul>
+      <h3>Spend and volume</h3><div class="money">
+        <div>Purchases<b>${all(s.current)}</b></div>
+        <div>Comparison period<b>${all(s.previous)}</b></div>
+        <div>Change<b class="${s.pct>0?"up":"down"}">${s.pct==null?"–":`${s.pct>0?"+":""}${fmt(s.pct,1)}%`}</b></div>
+        <div>Lines / items<b>${fmt(s.lines)} / ${fmt(s.items)}</b></div></div>
+      <h3>Comparisons</h3>` +
+      tbl(["Comparison","Period",`Purchases (${CUR})`,"Difference","Change %"],
+          (r.comparisons||[]).map(c => [c.label, c.from?`${c.from} → ${c.to}`:"–", Math.round(c.total),
+                                        Math.round(c.difference), c.pct==null?"–":Math.round(c.pct*10)/10])) +
+      (b.available ? `<h3>Budget</h3><div class="money">
+        <div>Budget for the period<b>${all(b.amount)}</b></div>
+        <div>Actual cost of goods<b>${all(b.actual_cogs)}</b></div>
+        <div>Variance<b class="${b.variance>0?"up":"down"}">${sign(b.variance)} ${CUR}</b></div></div>` : "") +
+      `<h3>Price impact</h3><div class="money">
+        <div>Extra cost<b class="up">${all(p.extra_cost)}</b></div>
+        <div>Savings<b class="down">${all(p.savings)}</b></div>
+        <div>Net<b class="${p.net>0?"up":"down"}">${sign(p.net)} ${CUR}</b></div>
+        <div>Items up / down<b>${fmt(p.increases)} / ${fmt(p.decreases)}</b></div></div>` +
+      tbl(["Item","Previous","Current","Change %",`Impact (${CUR})`],
+          p.top_movers.map(m => [m.item, Math.round(m.prev*100)/100, Math.round(m.cur*100)/100,
+                                 Math.round(m.pct*10)/10, Math.round(m.impact)])) +
+      `<h3>Avoidable cost</h3><div class="money">
+        <div>Location price gaps<b>${all(av.location_spread)}</b></div>
+        <div>Paid above contract<b>${all(av.above_contract)}</b></div></div>` +
+      tbl(["Item","Cheapest","Dearest","Spread %",`Extra paid (${CUR})`],
+          av.spreads.map(x => [x.item, x.low_loc, x.high_loc, Math.round(x.spread), Math.round(x.overpay)])) +
+      `<h3>Suppliers</h3>` +
+      tbl(["Supplier",`Spend (${CUR})`,"Share %","Invoices","Credit notes","Documents with problems"],
+          r.suppliers.map(x => [x.supplier, Math.round(x.spend), Math.round(x.share*10)/10, x.invoices, x.credit_notes, x.issues])) +
+      `<h3>Locations</h3>` +
+      tbl(["Location","This period","Comparison","Change %"],
+          r.locations.map(l => [l.location, Math.round(l.current), Math.round(l.previous),
+                                l.pct==null?"–":Math.round(l.pct*10)/10])) +
+      `<h3>Team workload</h3>` +
+      (r.team.available ? tbl(["User","Invoices","Lines","Lines per invoice","Late","Negative lines","Avg delay (days)"],
+          r.team.users.map(u => [u.user, u.invoices, u.lines, Math.round(u.avg_lines*10)/10, u.late, u.neg_lines,
+                                 u.avg_lag==null?"–":Math.round(u.avg_lag*10)/10]))
+        : '<div class="empty">Posting user is not published by BC, so workload per colleague is not measured.</div>') +
+      `<h3>Service levels and backlog</h3><div class="money">
+        <div>Critical exceptions<b class="up">${fmt(r.sla.critical)}</b></div>
+        <div>Warnings<b>${fmt(r.sla.warning)}</b></div>
+        <div>Open orders<b>${fmt(r.backlog.open_orders)}</b></div>
+        <div>Received, not invoiced<b>${all(r.backlog.pending_invoice_value)}</b></div>
+        <div>Open requisitions<b>${fmt(r.backlog.open_requisitions)}</b></div>
+        <div>Invoice posting delay<b>${r.backlog.invoice_posting_delay==null?"–":fmt(r.backlog.invoice_posting_delay,1)+" days"}</b></div></div>` +
+      tbl(["Rule","Cases"], Object.entries(r.sla.by_rule||{}).map(([k,v]) => [k, v])) +
+      `<h3>Actions</h3><div class="money">
+        <div>Open<b>${fmt(r.actions.open)}</b></div><div>Resolved<b class="down">${fmt(r.actions.resolved)}</b></div>
+        <div>Overdue<b class="up">${fmt(r.actions.overdue)}</b></div>
+        <div>Data quality findings<b>${fmt((r.quality||{}).findings||0)}</b></div></div>` +
+      `<h3>Priorities for next week</h3>` +
+      tbl(["Action","Priority","Owner","Due","At stake"],
+          (r.recommended||[]).map(a => [a.title, a.priority, a.owner||"unassigned", a.due_date, a.expected_impact]));
+  }
+  html += `<h3>Notes</h3><ul>${(r.notes||[]).map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>`;
+  $("reportArea").innerHTML = html;
+}
+$("repDaily").onclick = () => loadReport("daily");
+$("repWeekly").onclick = () => loadReport("weekly", "week");
+$("repMonthly").onclick = () => loadReport("weekly", "month");
+$("repYtd").onclick = () => loadReport("weekly", "ytd");
+$("repPrint").onclick = () => exportPdf();
+$("repCsv").onclick = () => {
+  if (!report) return;
+  const lines = [["Report", report.title], ["Company", report.company], ["Location", report.location], []];
+  const push = (name, cols, rows) => { lines.push([name]); lines.push(cols); rows.forEach(r => lines.push(r)); lines.push([]); };
+  if (report.type === "daily"){
+    push("Activity", ["Purchases","Documents","Lines","Items"],
+      [[report.activity.spend, report.activity.documents, report.activity.lines, report.activity.items]]);
+    push("Priorities", ["Severity","Title","Impact","Action","Owner"],
+      report.priorities.map(p => [p.severity, p.title, Math.round(p.impact||0), p.action, p.owner]));
+    push("Goods received not invoiced", ["Order","Supplier","Location","Value","Age"],
+      report.overdue_documents.map(d => [d.order, d.supplier, d.location, Math.round(d.value), d.age_days]));
+  } else {
+    push("Comparisons", ["Comparison","From","To","Total","Difference","Change %"],
+      (report.comparisons||[]).map(c => [c.label, c.from||"", c.to||"", Math.round(c.total), Math.round(c.difference), c.pct==null?"":c.pct.toFixed(1)]));
+    push("Price movers", ["Item","Previous","Current","Change %","Impact"],
+      report.price.top_movers.map(m => [m.item, m.prev.toFixed(2), m.cur.toFixed(2), m.pct.toFixed(1), Math.round(m.impact)]));
+    push("Suppliers", ["Supplier","Spend","Share %","Invoices","Credit notes","Issues"],
+      report.suppliers.map(s => [s.supplier, Math.round(s.spend), s.share.toFixed(1), s.invoices, s.credit_notes, s.issues]));
+    push("Locations", ["Location","This period","Comparison","Change %"],
+      report.locations.map(l => [l.location, Math.round(l.current), Math.round(l.previous), l.pct==null?"":l.pct.toFixed(1)]));
+  }
+  const csv = lines.map(r => (r||[]).map(v => `"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv"}));
+  a.download = `${report.type}-report-${report.company}-${data.meta.current[0]}.csv`; a.click();
+};
+
+$("cmpReload").onclick = () => loadComparisons(true);
+$("liveSearch").oninput = () => data && renderLive();
+$("poSearch").oninput = () => data && renderPOs();
+
+function exportCsv(){
+  if (!data) return;
+  const view = document.querySelector("#nav button.on").dataset.view;
+  let lines, name;
+  const invx = data.invoices && !data.invoices.error ? data.invoices : null;
+  if (view === "users" && invx && invx.user_status.available){
+    name = "user-performance";
+    lines = [["User","Invoices","Share %","Lines","Lines per invoice","Invoices per day","Value ALL","Receipts","Credit memos","Negative lines","Zero-cost lines","Avg delay days","Late","Backdated","Active days","First posting","Last posting"]];
+    data.invoices.users.forEach(u => lines.push([u.user,u.invoices,u.share.toFixed(1),u.lines,u.avg_lines.toFixed(1),u.per_day==null?"":u.per_day.toFixed(1),u.value.toFixed(0),u.receipts,u.credit_memos,u.neg_lines,u.zero_lines,u.avg_lag==null?"":u.avg_lag.toFixed(1),u.late,u.backdated,u.active_days,u.first||"",u.last||""]));
+  } else if (view === "invoices" && invx){
+    name = "invoices-to-check";
+    lines = [["Invoice","User","Lines","Negative lines","Zero-cost lines","Value ALL","Locations"]];
+    data.invoices.suspicious.forEach(x => lines.push([x.doc,x.user||"",x.lines,x.neg_lines,x.zero_lines,x.value.toFixed(0),x.locations.join(" ")]));
+    lines.push([]); lines.push(["Late invoice","Vendor","Invoice date","Posted","Days","Value ALL"]);
+    data.invoices.late.forEach(x => lines.push([x.doc,x.vendor,x.document_date,x.posting_date,x.lag,x.value.toFixed(0)]));
+  } else {
+    name = "price-changes";
+    lines = [["Item No","Item","Locations","Previous avg","Current avg","Change %","Qty","Impact ALL"]];
+    data.movers.forEach(m => lines.push([m.item_no, m.desc, m.locations.join(" "), m.prev_avg.toFixed(2), m.cur_avg.toFixed(2), m.pct.toFixed(1), m.cur_qty.toFixed(2), m.impact.toFixed(0)]));
+  }
+  const csv = lines.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv"}));
+  a.download = `${name}-${data.meta.company}-${data.meta.current[0]}.csv`;
+  a.click();
+}
+
+document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x===b));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.view));
+  if (b.dataset.view === "compare") loadComparisons(false);
+  if ((b.dataset.view === "streams" || b.dataset.view === "services") && data) loadStreams(false);
+  if (b.dataset.view === "stock") fillStockControls();
+  if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
+});
+$("refreshBtn").onclick = () => load(true);
+$("exportBtn").onclick = exportCsv;
+$("search").oninput = () => data && renderMovers();
+
+// ---------- printing any screen to PDF ----------
+const SCREEN_NOTE = {
+  prices: "Average unit cost is the period's cost divided by the period's quantity, so a change in pack size or unit of measure reads as a price change.",
+  streams: "Item purchases are classified from the item card's category groups; non-item purchases by the G/L account. The mapping is an application setting, not Business Central data.",
+  services: "Service spend is read from the purchase postings in the general ledger. Goods accounts are excluded because those purchases already count as items.",
+  invoices: "Counts come from the vendor ledger; item lines from the value entries. A supplier invoice without items appears in the count but not in the lines.",
+  po: "Open purchase orders as Business Central holds them now, not a historical position.",
+  live: "Events are the postings Business Central records; requisition timings are measured by this application.",
+  compare: "Every comparison uses the same weekdays, so trading days match.",
+  exceptions: "Rules and thresholds come from Settings; each line names the records behind it.",
+  quality: "Findings are records that need correcting in Business Central.",
+  gaps: "Figures the published web services cannot supply. Nothing here is estimated.",
+};
+function currentView(){
+  const btn = document.querySelector("#nav button.on");
+  return {id: (btn && btn.dataset.view) || "overview",
+          label: (btn ? btn.textContent : "Overview").replace(/\s*\d+$/, "").trim()};
+}
+function printContext(){
+  const m = data.meta;
+  return `${m.period_label} · ${dayName(m.current[0])} – ${dayName(m.current[1])} vs ${dayName(m.prior[0])} – ${dayName(m.prior[1])}`
+    + ` · ${m.company}${m.location ? " · " + m.location : " · all locations"} · amounts in ${CUR}`;
+}
+const pricesContext = printContext;
+function exportPdf(){
+  if (!data) return;
+  const view = currentView();
+  const search = ($("search").value || "").trim();
+  $("printHead").innerHTML = `<h1>${esc(view.label)} · ${esc(data.meta.company)}</h1>
+    <p>${esc(printContext())}${view.id === "prices" && search ? " · filtered by “" + esc(search) + "”" : ""}</p>`;
+  $("printFoot").innerHTML = `Source: Business Central, read-only. Costs are ex-VAT.`
+    + (SCREEN_NOTE[view.id] ? " " + esc(SCREEN_NOTE[view.id]) : "")
+    + ` Data as at ${esc(data.meta.checked_at.replace("T", " "))} · printed ${new Date().toLocaleString("en-GB")}.`;
+  document.body.classList.add("printing");
+  if (view.id === "reports") document.body.classList.add("print-report");
+  window.print();
+}
+window.addEventListener("afterprint", () => document.body.classList.remove("printing", "print-report"));
+$("pdfBtn").onclick = exportPdf;
+$("pricesCsv").onclick = () => {
+  const q = ($("search").value || "").trim().toLowerCase();
+  const movers = (data.movers || []).filter(m => !q || (m.desc||"").toLowerCase().includes(q)
+    || m.item_no.toLowerCase().includes(q) || m.locations.join(" ").toLowerCase().includes(q));
+  const head = ["Item No","Item","Locations","Previous avg","Current avg","Change %","Quantity",`Impact ${CUR}`];
+  const lines = [[`Price changes · ${data.meta.company}`], [printContext()], [], head].concat(
+    movers.map(m => [m.item_no, m.desc, (m.locations||[]).join(" "), m.prev_avg.toFixed(2),
+                     m.cur_avg.toFixed(2), m.pct.toFixed(1), m.cur_qty.toFixed(2), Math.round(m.impact)]));
+  const csv = lines.map(r => (r||[]).map(v => `"${String(v ?? "").replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], {type:"text/csv"}));
+  a.download = `price-changes-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
+};
+["company","location"].forEach(id => $(id).onchange = () => { seenEntries.clear(); cmp = null; streams = null; stockLocations = null; stockData = null; load(true); });
+$("week").onchange = () => { if ($("week").value) $("week").value = snapDate($("week").value); seenEntries.clear(); cmp = null; streams = null; load(true); };
+$("mode").onchange = () => {
+  const m = modeValue();
+  $("anchorLabel").firstChild.textContent = MODE_LABEL[m] + " ";
+  if ($("week").value) $("week").value = snapDate($("week").value);
+  seenEntries.clear(); cmp = null; report = null; streams = null;
+  if (m !== "week") $("banner").textContent = "Loading a longer period from Business Central. The first load reads month by month and can take a while; after that it is cached.";
+  $("banner").style.display = m === "week" ? "none" : "block";
+  load(true);
+};
+
+setInterval(() => {
+  if (!data || busy) return;
+  countdown--;
+  if (countdown <= 0) { if (!document.hidden) load(false); else countdown = refreshSec; }
+  else if (!$("pill").classList.contains("err")) {
+    const t = new Date(data.meta.checked_at).toLocaleTimeString("en-GB");
+    $("pillText").textContent = `Live · updated ${t} · next in ${countdown}s`;
+  }
+}, 1000);
+
+(async () => {
+  await loadSession();
+  // use static/logo.svg or logo.png as the brand mark when one is present
+  for (const f of ["/logo.svg", "/logo.png"]) {
+    try {
+      const r = await fetch(f, {cache:"no-store"});
+      if (r.ok) { document.documentElement.style.setProperty("--brand-logo", `url('${f}')`); $("logo").classList.add("has-image"); break; }
+    } catch(e) {}
+  }
+  $("week").value = snapDate(mondayOf(new Date()));
+  try {
+    const r = await fetch("/api/companies"); const j = await r.json();
+    if (r.ok) $("company").innerHTML = j.companies.map(c => `<option ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
+    else throw new Error(j.error);
+  } catch(e) { $("company").innerHTML = `<option>SALT</option>`; }
+  load(true);
+})();
+</script>
+</body>
+</html>

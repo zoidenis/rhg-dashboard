@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c475e">
+<title>RHG Administration</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/select.css">
+<style>
+.shell{display:flex;min-height:100dvh}
+aside{width:232px;flex:none;background:var(--side);color:var(--side-ink);
+  padding:18px 12px;display:flex;flex-direction:column;gap:20px;
+  position:sticky;top:0;height:100dvh;overflow:auto}
+.abrand{display:flex;gap:10px;align-items:center;padding:0 6px}
+.abrand b{color:#fff;font-size:14px;line-height:1.2}
+.abrand small{color:#8fb3c1;font-size:11.5px}
+nav{display:flex;flex-direction:column;gap:2px}
+nav button{appearance:none;background:none;border:0;color:inherit;font:inherit;
+  text-align:left;padding:10px 12px;border-radius:9px;cursor:pointer;min-height:42px}
+nav button:hover{background:rgba(160,216,234,.09)}
+nav button.on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
+.side-foot{margin-top:auto;padding:0 6px;font-size:11.5px;color:#7e9daa;line-height:1.5}
+main{flex:1;min-width:0;padding:22px 24px 60px}
+header.top{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+header.top h2{font-size:19px;flex:1}
+.burger{display:none}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--sub);font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.grid{display:grid;gap:14px}
+.pad{padding:18px}
+.perms{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;margin-top:10px}
+.perm{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid var(--line);
+  border-radius:8px;font-size:12.5px}
+.perm input{width:auto;min-height:auto;margin:2px 0 0}
+.modal{position:fixed;inset:0;background:rgba(8,34,45,.55);display:grid;place-items:center;
+  padding:16px;z-index:40}
+.modal .card{width:100%;max-width:460px;max-height:90dvh;overflow:auto;padding:22px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.cardlist{display:none}
+@media(max-width:860px){
+  aside{position:fixed;inset:0 auto 0 0;z-index:30;transform:translateX(-100%);
+    transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  aside.open{transform:none}
+  .burger{display:inline-grid;place-items:center;width:42px;height:42px;
+    border:1px solid var(--line);border-radius:9px;background:var(--card);cursor:pointer}
+  main{padding:16px 14px 50px}
+  /* Tables become cards: a 7-column grid is unreadable on a phone. */
+  .tablewrap{display:none}
+  .cardlist{display:grid;gap:10px}
+  .urow{padding:14px;display:grid;gap:8px}
+  .urow .line{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+  .urow .line span:first-child{color:var(--sub)}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside id="side">
+    <div class="abrand"><div class="logo sm"></div>
+      <div><b>Administration</b><br><small>RHG Control Towers</small></div></div>
+    <nav id="nav">
+      <button data-tab="users" class="on">Accounts</button>
+      <button data-tab="roles">Roles &amp; permissions</button>
+      <button data-tab="sessions">Active sessions</button>
+      <button data-tab="audit">Audit trail</button>
+    </nav>
+    <div class="side-foot">
+      <a href="/" style="color:var(--revo-sky)">← Back to the towers</a>
+      <div style="margin-top:10px" id="me"></div>
+    </div>
+  </aside>
+
+  <main>
+    <header class="top">
+      <button class="burger" id="burger" aria-label="Menu">☰</button>
+      <h2 id="title">Accounts</h2>
+      <button class="btn primary" id="newUser">New account</button>
+    </header>
+    <div id="view" class="grid"></div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </main>
+</div>
+<div id="modalHost"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let CSRF = null, ME = null, PERMS = {}, ROLES = [], TAB = "users";
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function say(t, kind){ const m=$("msg"); m.textContent=t||""; m.className="msg "+(kind||""); }
+
+async function api(path, body, method){
+  const h = {"Content-Type":"application/json"};
+  if(CSRF) h["X-CSRF-Token"] = CSRF;
+  const r = await fetch(path, {method: method || (body ? "POST":"GET"), headers:h,
+    body: body ? JSON.stringify(body) : undefined});
+  if(r.status === 401){ location.href = "/"; throw new Error("Signed out"); }
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || ("HTTP "+r.status));
+  return j;
+}
+
+/* ---------------------------------------------------------- accounts */
+async function renderUsers(){
+  const j = await api("/api/users");
+  ROLES = j.roles; PERMS = j.permissions;
+  const rows = j.users;
+  $("view").innerHTML = `
+    <div class="card">
+      <div class="tablewrap"><table>
+        <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+        <tbody>${rows.map(u => `
+          <tr>
+            <td><b>${esc(u.name)}</b><div class="muted" style="font-size:12px">${esc(u.username)}</div></td>
+            <td>${esc(u.role)}</td>
+            <td>${u.active ? '<span class="pill">Active</span>' : '<span class="pill off">Disabled</span>'}
+                ${u.must_change ? '<span class="pill off">Must change</span>' : ''}</td>
+            <td class="muted">${u.last_login ? esc(u.last_login).replace("T"," ") : "never"}</td>
+            <td><div class="actions">
+              <button class="btn sm" data-edit="${esc(u.username)}">Edit</button>
+              <button class="btn sm" data-reset="${esc(u.username)}">Reset password</button>
+            </div></td>
+          </tr>`).join("")}</tbody>
+      </table></div>
+      <div class="cardlist" style="padding:12px">${rows.map(u => `
+        <div class="card urow">
+          <div><b>${esc(u.name)}</b><div class="muted" style="font-size:12px">${esc(u.username)}</div></div>
+          <div class="line"><span>Role</span><span>${esc(u.role)}</span></div>
+          <div class="line"><span>Status</span><span>${u.active ? "Active":"Disabled"}</span></div>
+          <div class="line"><span>Last sign-in</span><span>${u.last_login ? esc(u.last_login).replace("T"," ") : "never"}</span></div>
+          <div class="actions">
+            <button class="btn sm" data-edit="${esc(u.username)}">Edit</button>
+            <button class="btn sm" data-reset="${esc(u.username)}">Reset password</button>
+          </div>
+        </div>`).join("")}</div>
+    </div>`;
+  $("view").querySelectorAll("[data-edit]").forEach(b =>
+    b.onclick = () => userModal(rows.find(x => x.username === b.dataset.edit)));
+  $("view").querySelectorAll("[data-reset]").forEach(b =>
+    b.onclick = () => resetModal(b.dataset.reset));
+}
+
+function roleOptions(sel){
+  return ROLES.map(r => `<option value="${esc(r.name)}"${r.name===sel?" selected":""}>${esc(r.name)}</option>`).join("");
+}
+
+function modal(html){
+  $("modalHost").innerHTML = `<div class="modal" id="mod"><div class="card">${html}</div></div>`;
+  $("mod").onclick = e => { if(e.target.id === "mod") close(); };
+}
+function close(){ $("modalHost").innerHTML = ""; }
+
+function userModal(u){
+  const isNew = !u;
+  modal(`
+    <h3 style="margin-bottom:6px">${isNew ? "New account" : esc(u.username)}</h3>
+    ${isNew ? '<label for="mu">Username</label><input id="mu" autocapitalize="none">' : ""}
+    <label for="mn">Full name</label><input id="mn" value="${isNew?"":esc(u.name)}">
+    <label for="me2">Email</label><input id="me2" type="email" value="${isNew?"":esc(u.email||"")}">
+    <label for="mr">Role</label><select id="mr">${roleOptions(isNew?"Viewer":u.role)}</select>
+    ${isNew ? '<label for="mp">Initial password</label><input id="mp" type="password" autocomplete="new-password">' : ""}
+    ${isNew ? "" : `<label for="ma">Status</label><select id="ma">
+        <option value="1"${u.active?" selected":""}>Active</option>
+        <option value="0"${u.active?"":" selected"}>Disabled</option></select>`}
+    <div class="msg err" id="mmsg"></div>
+    <div class="actions" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="close()">Cancel</button>
+      <button class="btn primary" id="msave">${isNew ? "Create" : "Save"}</button>
+    </div>`);
+  $("msave").onclick = async () => {
+    $("msave").disabled = true;
+    try{
+      if(isNew){
+        await api("/api/users", {username:$("mu").value.trim(), name:$("mn").value.trim(),
+          email:$("me2").value.trim(), role:$("mr").value, password:$("mp").value});
+      }else{
+        await api("/api/users/"+encodeURIComponent(u.username), {name:$("mn").value.trim(),
+          email:$("me2").value.trim(), role:$("mr").value, active:$("ma").value === "1"});
+      }
+      close(); say(isNew ? "Account created." : "Account saved.", "ok"); renderUsers();
+    }catch(e){ $("mmsg").textContent = e.message; $("msave").disabled = false; }
+  };
+}
+
+function resetModal(username){
+  modal(`
+    <h3 style="margin-bottom:6px">Reset password</h3>
+    <p class="muted" style="margin:0">${esc(username)} will be asked to choose a new one at the next sign-in,
+      and any open session ends immediately.</p>
+    <label for="rp">New password</label><input id="rp" type="password" autocomplete="new-password">
+    <div class="msg err" id="mmsg"></div>
+    <div class="actions" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="close()">Cancel</button>
+      <button class="btn primary" id="rsave">Reset</button></div>`);
+  $("rsave").onclick = async () => {
+    $("rsave").disabled = true;
+    try{
+      await api("/api/users/"+encodeURIComponent(username), {password:$("rp").value});
+      close(); say("Password reset.", "ok"); renderUsers();
+    }catch(e){ $("mmsg").textContent = e.message; $("rsave").disabled = false; }
+  };
+}
+
+/* ---------------------------------------------------------- roles */
+async function renderRoles(){
+  const j = await api("/api/roles");
+  PERMS = j.permissions;
+  $("view").innerHTML = j.roles.map(r => `
+    <div class="card pad">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <div><b>${esc(r.name)}</b>${r.system?' <span class="pill">system</span>':""}
+          <div class="muted" style="font-size:12.5px">${esc(r.description||"")}</div></div>
+        <div class="muted" style="font-size:12.5px">${r.permissions.length} of ${Object.keys(PERMS).length} permissions</div>
+      </div>
+      <div class="perms">${Object.entries(PERMS).map(([p,label]) => `
+        <label class="perm"><input type="checkbox" data-role="${esc(r.name)}" value="${esc(p)}"
+          ${r.permissions.includes(p)?"checked":""} ${r.system?"disabled":""}>
+          <span><b style="font-weight:600">${esc(label)}</b>
+            <div class="muted" style="font-size:11px">${esc(p)}</div></span></label>`).join("")}</div>
+      ${r.system ? '<p class="muted" style="font-size:12px;margin:12px 0 0">The Administrator role always holds every permission.</p>'
+        : `<div class="actions" style="margin-top:14px;justify-content:flex-end">
+             <button class="btn primary sm" data-save="${esc(r.name)}"
+               data-desc="${esc(r.description||"")}">Save ${esc(r.name)}</button></div>`}
+    </div>`).join("");
+  $("view").querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
+    const name = b.dataset.save;
+    const perms = [...$("view").querySelectorAll(`input[data-role="${CSS.escape(name)}"]:checked`)].map(i=>i.value);
+    b.disabled = true;
+    try{ await api("/api/roles", {name, description:b.dataset.desc, permissions:perms});
+      say(`${name} saved.`, "ok"); }
+    catch(e){ say(e.message, "err"); }
+    finally{ b.disabled = false; }
+  });
+}
+
+/* ---------------------------------------------------------- sessions */
+async function renderSessions(){
+  const j = await api("/api/sessions");
+  const fmt = t => new Date(t*1000).toLocaleString();
+  $("view").innerHTML = `<div class="card"><div class="tablewrap"><table>
+    <thead><tr><th>User</th><th>Signed in</th><th>Last seen</th><th>Address</th><th></th></tr></thead>
+    <tbody>${j.sessions.map(s => `<tr>
+      <td><b>${esc(s.username)}</b>${s.current?' <span class="pill">this device</span>':""}</td>
+      <td class="muted">${fmt(s.created)}</td><td class="muted">${fmt(s.last_seen)}</td>
+      <td class="muted">${esc(s.ip||"")}</td>
+      <td><button class="btn sm danger" data-rev="${esc(s.username)}">Revoke</button></td></tr>`).join("")
+      || '<tr><td colspan="5" class="muted">No active sessions.</td></tr>'}</tbody></table></div>
+    <div class="cardlist" style="padding:12px">${j.sessions.map(s => `<div class="card urow">
+      <div><b>${esc(s.username)}</b>${s.current?' <span class="pill">this device</span>':""}</div>
+      <div class="line"><span>Last seen</span><span>${fmt(s.last_seen)}</span></div>
+      <div class="line"><span>Address</span><span>${esc(s.ip||"")}</span></div>
+      <button class="btn sm danger" data-rev="${esc(s.username)}">Revoke</button></div>`).join("")}</div></div>`;
+  $("view").querySelectorAll("[data-rev]").forEach(b => b.onclick = async () => {
+    if(!confirm(`Sign ${b.dataset.rev} out of every device?`)) return;
+    try{ await api("/api/sessions/revoke", {username:b.dataset.rev});
+      say("Sessions revoked.", "ok"); renderSessions(); }
+    catch(e){ say(e.message, "err"); }
+  });
+}
+
+/* ---------------------------------------------------------- audit */
+async function renderAudit(){
+  const j = await api("/api/audit?limit=300");
+  $("view").innerHTML = `<div class="card"><div class="tablewrap"><table>
+    <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Subject</th><th>Address</th></tr></thead>
+    <tbody>${j.entries.map(e => `<tr>
+      <td class="muted" style="white-space:nowrap">${esc(e.at).replace("T"," ")}</td>
+      <td>${esc(e.actor)}</td><td>${esc(e.action)}</td>
+      <td class="muted">${esc(e.subject)}</td><td class="muted">${esc(e.ip||"")}</td></tr>`).join("")
+      || '<tr><td colspan="5" class="muted">Nothing recorded yet.</td></tr>'}</tbody></table></div>
+    <div class="cardlist" style="padding:12px">${j.entries.slice(0,80).map(e => `<div class="card urow">
+      <div class="line"><span>${esc(e.at).replace("T"," ")}</span><span><b>${esc(e.action)}</b></span></div>
+      <div class="line"><span>Actor</span><span>${esc(e.actor)}</span></div>
+      <div class="line"><span>Subject</span><span>${esc(e.subject)}</span></div></div>`).join("")}</div></div>`;
+}
+
+const TABS = {users:["Accounts",renderUsers], roles:["Roles & permissions",renderRoles],
+              sessions:["Active sessions",renderSessions], audit:["Audit trail",renderAudit]};
+
+async function go(tab){
+  TAB = tab;
+  $("title").textContent = TABS[tab][0];
+  $("newUser").hidden = tab !== "users";
+  $("nav").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  $("side").classList.remove("open");
+  say("");
+  $("view").innerHTML = '<p class="muted">Loading…</p>';
+  try{ await TABS[tab][1](); }catch(e){ say(e.message, "err"); $("view").innerHTML = ""; }
+}
+
+$("nav").onclick = e => { const b = e.target.closest("button[data-tab]"); if(b) go(b.dataset.tab); };
+$("burger").onclick = () => $("side").classList.toggle("open");
+$("newUser").onclick = () => userModal(null);
+window.close = close;
+
+(async function boot(){
+  const j = await api("/api/session");
+  if(!j.user){ location.href = "/"; return; }
+  ME = j.user; CSRF = j.user.csrf;
+  if(!ME.permissions.includes("admin.users.manage")){ location.href = "/"; return; }
+  $("me").textContent = `${ME.name} · ${ME.role}`;
+  go("users");
+})();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+</script>
+<script src="/select.js"></script>
+</body>
+</html>

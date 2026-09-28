@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RHG Finance Control Tower</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+:root{--bg:#ecebeb;--card:#fff;--ink:#0e2733;--sub:#5c7482;--line:#d9dcdd;--side:#08303f;--side-ink:#b9d4de;
+  --accent:#0c475e;--prev:#a0d8ea;--up:#c0392b;--up-bg:#fbecea;--down:#0e8a57;--down-bg:#e6f6ef;--warn:#b26a00;--warn-bg:#fdf3e2;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;font-size:14px}
+button,select,input{font:inherit;color:inherit}
+.app{display:flex;min-height:100%}
+aside{width:236px;flex-shrink:0;background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:24px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;gap:11px;align-items:center;padding:0 6px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--prev);color:var(--accent);font-weight:800;display:grid;place-items:center}
+.brand b{display:block;color:#fff;font-size:14.5px}.brand small{color:#8fb3c1;font-size:11.5px}
+nav{display:flex;flex-direction:column;gap:2px}
+nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center;font-size:13.5px}
+nav button:hover{background:rgba(160,216,234,.09)}
+nav button.on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
+nav .count{background:rgba(160,216,234,.2);color:var(--prev);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.side-foot{margin-top:auto;font-size:11.5px;color:#7e9daa;line-height:1.5;padding:0 6px}
+main{flex:1;min-width:0;padding:22px 26px 60px}
+header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px}
+h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
+.period{color:var(--sub);margin-top:4px}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;font-weight:600;font-size:12.5px;background:var(--card);border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--down)}.pill.err .dot{background:var(--up)}.pill.load .dot{background:var(--warn)}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-weight:600;cursor:pointer}
+.btn.dark{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mini{font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:600}
+.mini.dark{background:var(--accent);color:#fff;border-color:var(--accent)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);font-weight:600}
+.filters select,.filters input{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:160px}
+.banner{background:var(--up-bg);color:var(--up);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-weight:600;display:none}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:17px}
+.clickable{cursor:pointer}.clickable:hover{border-color:var(--accent)}
+.kpi .l{color:var(--sub);font-weight:600;font-size:12.5px}
+.kpi .v{font-size:24px;font-weight:800;margin:7px 0 5px;letter-spacing:-.02em}
+.kpi .s{font-size:12px;color:var(--sub)}
+.up{color:var(--up)}.down{color:var(--down)}
+.grid{display:grid;grid-template-columns:1.3fr 1fr;gap:15px;margin-bottom:15px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+@media(max-width:760px){aside{display:none}main{padding:16px}}
+h2{font-size:15px;margin:0;font-weight:700}
+.hint{color:var(--sub);font-size:12.5px;margin:3px 0 12px}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;color:var(--sub);text-align:left;font-weight:700;padding:0 10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right}
+.name{font-weight:700;white-space:normal;min-width:170px}
+.meta{color:var(--sub);font-size:12px;font-weight:500}
+.chip{display:inline-block;font-weight:700;font-size:12px;border-radius:999px;padding:3px 9px;background:#e4f3f9;color:var(--accent)}
+.chip.up{background:var(--up-bg);color:var(--up)}.chip.down{background:var(--down-bg);color:var(--down)}
+.total td{font-weight:800;background:#f6f8f9}
+.brief{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:19px 21px;margin-bottom:16px}
+.brief h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:15px 0 7px}
+.brief ul{margin:0;padding-left:18px}.brief li{margin-bottom:6px;line-height:1.55}
+.status-pill{font-weight:800;font-size:12.5px;padding:6px 13px;border-radius:999px}
+.status-ok{background:#e4f3f9;color:var(--accent)}.status-warn{background:var(--warn-bg);color:var(--warn)}.status-crit{background:var(--up-bg);color:var(--up)}
+.tag{font-size:10px;font-weight:800;text-transform:uppercase;border-radius:4px;padding:1px 5px;margin-right:6px;background:var(--bg);color:var(--sub);border:1px solid var(--line)}
+.tag.inference{color:var(--warn)}.tag.rec{color:var(--accent)}
+.act{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px}
+.act .row1{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.act h4{margin:0;font-size:13.5px}
+.prio{font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px}
+.prio.Critical{background:var(--up-bg);color:var(--up)}.prio.High{background:var(--warn-bg);color:var(--warn)}
+.prio.Medium,.prio.Low{background:var(--bg);color:var(--sub)}
+.sev{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px}
+.sev.critical{background:var(--up)}.sev.warning{background:var(--warn)}.sev.info{background:var(--sub)}
+.money{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin:6px 0}
+.money div{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--sub);font-weight:600}
+.money b{display:block;font-size:17px;margin-top:4px;color:var(--ink)}
+.gap{border-left:3px solid var(--warn);padding:10px 14px;margin-bottom:9px;background:var(--bg);border-radius:0 10px 10px 0}
+.gap b{display:block;margin-bottom:3px}.gap span{color:var(--sub);font-size:12.5px;line-height:1.5}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);font-weight:600}
+.field input,.field select{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+.empty{color:var(--sub);padding:16px 0}
+.view{display:none}.view.on{display:block}
+.modal-bg{position:fixed;inset:0;background:rgba(8,30,40,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 20px;z-index:50;overflow:auto}
+.modal-bg.on{display:flex}
+.modal{background:var(--card);border-radius:14px;max-width:1150px;width:100%;padding:20px 22px;border:1px solid var(--line)}
+.mhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.bar{display:grid;grid-template-columns:minmax(110px,150px) 1fr 110px;gap:10px;align-items:center;padding:6px 0}
+.track{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+.fill{height:100%;background:var(--accent);border-radius:6px}
+.foot{color:var(--sub);font-size:12px;line-height:1.6;margin-top:20px}
+@media print{aside,.filters,.mini,.btn,header .pill{display:none!important}body *{visibility:hidden}
+  #reportArea,#reportArea *{visibility:visible}#reportArea{position:absolute;left:0;top:0;width:100%}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" id="logo">R</div><div><b>Finance Control Tower</b><small>Business Central, read-only</small></div></div>
+  <nav id="nav">
+    <button class="on" data-view="overview">Executive overview</button>
+    <button data-view="pl">Profit &amp; loss</button>
+    <button data-view="bs">Balance sheet</button>
+    <button data-view="cash">Cash &amp; bank</button>
+    <button data-view="ap">Accounts payable</button>
+    <button data-view="ar">Accounts receivable</button>
+    <button data-view="gl">G/L entries</button>
+    <button data-view="inventory">Inventory</button>
+    <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
+    <button data-view="treasury">Cash flow &amp; treasury</button>
+    <button data-view="assets">Fixed assets</button>
+    <button data-view="budget">Budget &amp; forecast</button>
+    <button data-view="group">Group view</button>
+    <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
+    <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
+    <button data-view="gaps">Data availability</button>
+    <button data-view="settings">Settings</button>
+    <button data-view="accounts" id="usersNav" style="display:none">Users</button>
+  </nav>
+  <div class="side-foot">Reads Business Central directly, on this PC. BC stays read-only; actions and thresholds live here.</div>
+</aside>
+
+<main>
+  <header>
+    <div><h1 id="title">Executive overview</h1><div class="period" id="period">Loading…</div></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
+      <button class="btn dark" id="refreshBtn">Refresh</button>
+      <span class="pill" id="whoami"></span>
+      <button class="btn" id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label>Company <select id="company"></select></label>
+    <label>Period <select id="mode">
+      <option value="month">Month</option><option value="quarter">Quarter</option><option value="ytd">Year to date</option>
+    </select></label>
+    <label id="anchorLabel">Month starting <input type="date" id="anchor"></label>
+    <label>Department <select id="dimension"><option value="">All departments</option></select></label>
+  </div>
+
+  <div class="banner" id="banner"></div>
+  <div class="banner" id="sourceBanner" style="background:var(--warn-bg);color:var(--warn)"></div>
+
+  <section class="view on" id="v-overview">
+    <div class="banner" id="validation" style="display:none"></div>
+    <div class="card" style="margin-bottom:15px" id="compareCard">
+      <div class="card-head"><div><h2>Comparison</h2><p class="hint" id="cmpNote"></p></div>
+        <select id="cmpMode">
+          <option value="prior">Against the period before</option>
+          <option value="last_year">Against the same dates last year</option>
+        </select></div>
+    </div>
+    <div class="brief" id="brief"></div>
+    <div class="kpis">
+      <div class="card kpi clickable" data-drill="pl"><div class="l">Revenue</div><div class="v" id="kRev">–</div><div class="s" id="kRevS"></div></div>
+      <div class="card kpi clickable" data-drill="pl"><div class="l">Gross profit</div><div class="v" id="kGross">–</div><div class="s" id="kGrossS"></div></div>
+      <div class="card kpi clickable" data-drill="pl"><div class="l">EBITDA</div><div class="v" id="kEbitda">–</div><div class="s" id="kEbitdaS"></div></div>
+      <div class="card kpi clickable" data-drill="cash"><div class="l">Cash and bank</div><div class="v" id="kCash">–</div><div class="s" id="kCashS"></div></div>
+      <div class="card kpi clickable" data-drill="ar"><div class="l">Receivables</div><div class="v" id="kAr">–</div><div class="s" id="kArS"></div></div>
+      <div class="card kpi clickable" data-drill="ap"><div class="l">Payables</div><div class="v" id="kAp">–</div><div class="s" id="kApS"></div></div>
+      <div class="card kpi clickable" data-drill="ap"><div class="l">Working capital</div><div class="v" id="kWc">–</div><div class="s">Cash plus receivables less payables</div></div>
+      <div class="card kpi clickable" data-drill="exceptions"><div class="l">Exceptions</div><div class="v" id="kExc">–</div><div class="s" id="kExcS"></div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plHint"></p></div>
+        <button class="mini" data-drill="pl">Open accounts</button></div>
+        <div class="scroll"><table id="plMini"></table></div></div>
+      <div class="card"><h2>Aging</h2><p class="hint">Open payables and receivables by due date</p><div id="agingMini"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-pl">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plNote"></p></div>
+      <button class="mini" data-drill="pl">Open by account</button></div>
+      <div class="scroll"><table id="plTable"></table></div></div>
+    <div class="card"><h2>Largest accounts</h2><p class="hint">Click an account to open its ledger entries for the period</p>
+      <div class="scroll"><table id="plAccounts"></table></div></div>
+  </section>
+
+  <section class="view" id="v-bs">
+    <div class="card" style="margin-bottom:15px"><h2>Balance sheet</h2><p class="hint" id="bsNote"></p>
+      <div class="money" id="bsTotals"></div></div>
+    <div class="card"><div class="card-head"><div><h2>Accounts</h2><p class="hint">Balance at the end of the period, with the movement against the comparison period</p></div>
+      <button class="mini" data-drill="bs">Open all</button></div>
+      <div class="scroll"><table id="bsTable"></table></div></div>
+  </section>
+
+  <section class="view" id="v-cash">
+    <div class="card" style="margin-bottom:15px"><h2>Cash and bank</h2><p class="hint" id="cashNote"></p>
+      <div class="scroll"><table id="cashTable"></table></div></div>
+    <div class="card"><h2>Bank movements in the period</h2><p class="hint">From the bank ledger entries</p>
+      <div class="scroll"><table id="bankTable"></table></div></div>
+  </section>
+
+  <section class="view" id="v-ap"><div class="card"><div class="card-head"><div><h2>Accounts payable</h2><p class="hint" id="apHint"></p></div>
+    <button class="mini" data-drill="ap">Open entries</button></div>
+    <div class="money" id="apTotals"></div><div id="apBuckets"></div>
+    <div class="scroll" style="margin-top:12px"><table id="apTable"></table></div></div></section>
+
+  <section class="view" id="v-ar"><div class="card"><div class="card-head"><div><h2>Accounts receivable</h2><p class="hint" id="arHint"></p></div>
+    <button class="mini" data-drill="ar">Open entries</button></div>
+    <div class="money" id="arTotals"></div><div id="arBuckets"></div>
+    <div class="scroll" style="margin-top:12px"><table id="arTable"></table></div></div></section>
+
+  <section class="view" id="v-gl"><div class="card"><div class="card-head"><div><h2>Material general ledger entries</h2><p class="hint" id="glNote"></p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <label class="field">Window (days)<input type="number" id="glDays" value="7" min="1" max="31" style="width:90px"></label>
+      <label class="field">From amount<input type="number" id="glTh" value="100000" step="10000" style="width:130px"></label>
+      <button class="mini dark" id="glLoad">Read entries</button>
+      <button class="mini" data-drill="gl">Open all</button></div></div>
+    <div class="scroll"><table id="glTable"></table></div></div></section>
+
+  <section class="view" id="v-inventory">
+    <div class="kpis five" id="invKpis"></div>
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Inventory</h2><p class="hint" id="invNote"></p></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label class="field">Location<select id="invLoc"><option value="">All locations</option></select></label>
+        <button class="mini dark" id="invLoad">Read inventory</button></div></div>
+      <div class="scroll"><table id="invClasses"></table></div></div>
+    <div class="grid">
+      <div class="card"><div class="card-head"><div><h2>By category</h2><p class="hint">Value at item unit cost</p></div>
+        <button class="mini" data-drill="inventory_top">Open items</button></div><div id="invCats"></div></div>
+      <div class="card"><div class="card-head"><div><h2>Negative and zero-cost stock</h2><p class="hint">Items that make the valuation unreliable</p></div>
+        <button class="mini" data-drill="inventory_negative">Open</button></div>
+        <div class="scroll"><table id="invProblems"></table></div></div>
+    </div>
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Slow and non-moving stock</h2><p class="hint" id="invRiskNote"></p></div>
+      <button class="mini" data-drill="inventory_risk">Open all</button></div>
+      <div class="scroll"><table id="invRisk"></table></div></div>
+    <div class="card"><h2>Reconciliation against the general ledger</h2><p class="hint" id="invRecNote"></p>
+      <div class="money" id="invRec"></div></div>
+  </section>
+
+  <section class="view" id="v-closing">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Month-end close</h2><p class="hint" id="closeNote"></p></div>
+      <button class="mini dark" id="closeLoad">Refresh checks</button></div>
+      <div class="money" id="closeProgress"></div>
+      <div class="scroll"><table id="closeChecks"></table></div></div>
+    <div class="card"><h2>Checklist</h2><p class="hint">Owner, status and comments are stored by this application.</p>
+      <div class="scroll"><table id="closeTable"></table></div></div>
+  </section>
+
+  <section class="view" id="v-treasury">
+    <div class="money" id="trsKpis"></div>
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Cash flow, indirect</h2><p class="hint" id="trsNote"></p></div>
+      <button class="mini dark" id="trsLoad">Read</button></div>
+      <div class="scroll"><table id="trsFlow"></table></div></div>
+    <div class="grid">
+      <div class="card"><div class="card-head"><div><h2>Due in the next seven days</h2><p class="hint" id="trsDueNote"></p></div>
+        <button class="mini" data-drill="payments">Open</button></div>
+        <div class="scroll"><table id="trsDue"></table></div></div>
+      <div class="card"><div class="card-head"><div><h2>Bank activity in the period</h2><p class="hint">From the bank ledger</p></div>
+        <button class="mini" data-drill="cashflow">Cash flow detail</button></div>
+        <div class="scroll"><table id="trsBank"></table></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-assets">
+    <div class="money" id="faKpis"></div>
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Fixed assets and CAPEX</h2><p class="hint" id="faNote"></p></div>
+      <div style="display:flex;gap:8px"><button class="mini dark" id="faLoad">Read</button>
+      <button class="mini" data-drill="assets">Open entries</button></div></div>
+      <div class="scroll"><table id="faTypes"></table></div></div>
+    <div class="card"><h2>Assets touched in the period</h2><p class="hint">Acquisitions and depreciation per asset</p>
+      <div class="scroll"><table id="faAssets"></table></div></div>
+  </section>
+
+  <section class="view" id="v-budget">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Budget and forecast</h2><p class="hint" id="bgNote"></p></div>
+      <button class="mini dark" id="bgLoad">Read</button></div>
+      <div class="scroll"><table id="bgStatement"></table></div></div>
+    <div class="card"><h2>By account, year to date</h2><p class="hint">Actual against budget, with a straight run-rate year end</p>
+      <div class="scroll"><table id="bgLines"></table></div></div>
+  </section>
+
+  <section class="view" id="v-group">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Group view</h2><p class="hint" id="grpNote"></p></div>
+      <button class="mini dark" id="grpLoad">Read all companies</button></div>
+      <div class="scroll"><table id="grpTable"></table></div></div>
+    <div class="card"><h2>How to read this</h2><p class="hint" id="grpWarn"></p></div>
+  </section>
+
+  <section class="view" id="v-exceptions"><div class="card"><h2>Exceptions</h2>
+    <p class="hint">Rules applied to live BC records using the thresholds in Settings. Each one can become a tracked action.</p>
+    <div id="excList"></div></div></section>
+
+  <section class="view" id="v-actions"><div class="card">
+    <div class="card-head"><div><h2>Action center</h2><p class="hint">Actions live in this application only; Business Central stays read-only.</p></div>
+      <button class="mini dark" id="actNew">New action</button></div>
+    <div id="actionList"></div></div></section>
+
+  <section class="view" id="v-gaps">
+    <div class="card" style="margin-bottom:15px">
+      <div class="card-head"><div><h2>Speed and local cache</h2><p class="hint" id="cacheNote"></p></div>
+        <button class="mini" id="cacheLoad">Check</button></div>
+      <div class="scroll"><table id="cacheTable"></table></div></div><div class="card"><h2>Data availability</h2>
+    <p class="hint">Figures the brief asks for that the published web services cannot supply. Nothing here is estimated.</p>
+    <div id="gapList"></div></div></section>
+
+  <section class="view" id="v-accounts">
+    <div class="card" style="margin-bottom:15px">
+      <div class="card-head"><div><h2>Accounts</h2><p class="hint" id="usersNote"></p></div></div>
+      <div class="scroll"><table id="usersTable"></table></div></div>
+    <div class="grid">
+      <div class="card"><h2>Add a colleague</h2><p class="hint">The password you set is temporary; they choose their own at first sign-in.</p>
+        <div class="formgrid">
+          <label class="field">Username<input id="nu-user" placeholder="e.g. ana"></label>
+          <label class="field">Name<input id="nu-name" placeholder="Ana K."></label>
+          <label class="field">Role<select id="nu-role"></select></label>
+          <label class="field">Temporary password<input id="nu-pass" type="text" placeholder="at least 8 characters"></label>
+        </div>
+        <button class="btn dark" id="nu-add">Create account</button> <span class="meta" id="nu-msg"></span>
+        <div id="roleHelp" class="hint" style="margin-top:14px"></div></div>
+      <div class="card"><h2>Open sessions</h2><p class="hint">Sessions last 12 hours and end when a password or role changes.</p>
+        <div class="scroll"><table id="sessTable"></table></div>
+        <h2 style="margin-top:18px">My password</h2>
+        <div class="formgrid">
+          <label class="field">Current<input id="pw-cur" type="password"></label>
+          <label class="field">New<input id="pw-new" type="password"></label></div>
+        <button class="btn" id="pw-save">Change my password</button> <span class="meta" id="pw-msg"></span></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-settings">
+    <div class="card" style="margin-bottom:15px"><h2>Materiality and alert rules</h2>
+      <p class="hint">Applied to every exception and to the brief on the next refresh.</p>
+      <div class="formgrid" id="thresholdForm"></div>
+      <div class="formgrid" id="ownerForm"></div>
+      <div class="formgrid" id="extraForm"></div>
+      <button class="btn dark" id="saveSettings">Save</button> <span class="meta" id="saved"></span></div>
+    <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
+      <div class="scroll"><table id="auditTable"></table></div></div>
+  </section>
+
+  <div class="foot" id="foot"></div>
+</main>
+</div>
+
+<div class="modal-bg" id="modalBg"><div class="modal">
+  <div class="mhead"><div><h2 id="modalTitle">Records</h2><p class="hint" id="modalHint" style="margin:0"></p></div>
+    <div style="display:flex;gap:8px"><button class="mini" id="modalCsv">Export CSV</button><button class="mini dark" id="modalClose">Close</button></div></div>
+  <div id="modalBody"></div></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n,d=0) => n==null||isNaN(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cur = n => fmt(n) + " " + (data?.meta?.currency || "ALL");
+const sign = n => (n>0?"+":n<0?"−":"") + fmt(Math.abs(n));
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pctChip = p => p==null ? "–" : `<span class="chip ${p>0?"up":"down"}">${p>0?"+":""}${fmt(p,1)}%</span>`;
+let data = null, busy = false;
+
+const MODE_LABEL = {month:"Month starting", quarter:"Quarter starting", ytd:"Year"};
+function snap(v){
+  if(!v) return v;
+  const d = new Date(v+"T00:00:00"), m = $("mode").value;
+  const iso = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
+  if(m==="ytd") return iso(new Date(d.getFullYear(),0,1));
+  if(m==="quarter") return iso(new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1));
+  return iso(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+function params(){
+  const p = new URLSearchParams();
+  if($("company").value) p.set("company",$("company").value);
+  if($("anchor").value) p.set("period",$("anchor").value);
+  if($("dimension").value) p.set("dimension",$("dimension").value);
+  p.set("mode",$("mode").value);
+  p.set("compare",$("cmpMode").value);
+  return p.toString();
+}
+function setPill(state,text){ $("pill").className="pill "+state; $("pillText").textContent=text; }
+
+async function load(){
+  if(busy) return; busy = true; setPill("load","Reading Business Central…");
+  try{
+    const r = await fetch("/api/dashboard?"+params());
+    if (r.status === 401) { location.href = "/login"; return; }
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+    data = j; $("banner").style.display="none"; render();
+    setPill("", `Data as at ${new Date(j.meta.checked_at).toLocaleTimeString("en-GB")} · ${j.meta.query_ms} ms`);
+  }catch(e){
+    $("banner").textContent = "Could not read Business Central: "+e.message+" The last good figures stay on screen.";
+    $("banner").style.display="block"; setPill("err","Connection problem");
+  }finally{ busy=false; }
+}
+
+function render(){
+  const m = data.meta, k = data.kpis;
+  $("cmpNote").textContent = `${m.current[0]} to ${m.current[1]} against ${m.compare_range[0]} to ${m.compare_range[1]}, ${m.compare_label}. ${m.compare_rule}`;
+  const base = m.compare === "last_year" ? "ly" : "prev";
+  $("period").textContent = `${m.period_label} · ${m.current[0]} to ${m.current[1]} vs ${m.compare_range[0]} to ${m.compare_range[1]} · ${m.company}${m.dimension?" · "+m.dimension:""} · amounts in ${m.currency}`;
+  $("kRev").textContent = cur(k.revenue);
+  const revBase = base === "ly" ? k.revenue_ly : k.revenue_prev;
+  $("kRevS").innerHTML = revBase
+    ? `${pctChip((k.revenue-revBase)/Math.abs(revBase)*100)} against ${cur(revBase)} ${esc(m.compare_label)}`
+    : "N/A — the comparison base is zero or was not read";
+  const v = (data.pl && data.pl.validation) || [];
+  const suppressed = new Set(v.flatMap(x => x.suppressed || []));
+  $("validation").style.display = v.length ? "block" : "none";
+  $("validation").innerHTML = v.map(x =>
+    `<b>${esc(x.figure)}: ${esc(x.state)}.</b> ${esc(x.reason)} <b>Owner:</b> ${esc(x.owner)}.`
+    + (x.suppressed && x.suppressed.length ? ` Not shown until this is resolved: ${x.suppressed.map(esc).join(", ")}.` : "")
+  ).join("<br>");
+  $("kGross").textContent = suppressed.has("Gross profit") ? "Under validation" : cur(k.gross);
+  $("kGrossS").textContent = suppressed.has("Gross margin")
+    ? "Margin withheld: the cost of sales for this period is a credit"
+    : (k.gross_margin==null ? "" : `Margin ${fmt(k.gross_margin,1)}%`);
+  $("kEbitda").textContent = k.ebitda==null ? "Under validation" : cur(k.ebitda);
+  $("kEbitdaS").textContent = suppressed.has("EBITDA margin")
+    ? "Margin withheld until the cost of sales is validated"
+    : (k.ebitda_margin==null ? "" : `Margin ${fmt(k.ebitda_margin,1)}% · EBIT ${cur(k.ebit)}`);
+  $("kCash").textContent = cur(k.cash);
+  $("kCashS").textContent = "Balance-sheet cash and bank accounts";
+  $("kAr").textContent = cur(k.receivables);
+  $("kArS").innerHTML = `<span class="up">${cur(k.receivables_overdue)}</span> overdue`;
+  $("kAp").textContent = cur(k.payables);
+  $("kApS").innerHTML = `<span class="up">${cur(k.payables_overdue)}</span> overdue`;
+  $("kWc").textContent = cur(k.working_capital);
+  $("kExc").textContent = fmt(k.exceptions);
+  $("kExcS").innerHTML = `<span class="up">${k.critical}</span> critical`;
+  $("excCount").textContent = k.critical;
+  renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
+  renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
+  if($("invLoc").options.length<=1){
+    $("invLoc").innerHTML = '<option value="">All locations</option>' +
+      Array.from($("dimension").options).slice(1).map(o=>`<option value="${esc(o.value)}">${esc(o.text)}</option>`).join("");
+  }
+  if (m.serving) $("pillText").textContent = "Showing held figures · reading the new ones now";
+  $("foot").textContent = `Source: Business Central company ${m.company}, read-only. ${m.currency_note||""} Period figures come from the chart-of-accounts flow fields calculated by BC; ledger entries are read only where the volume allows. Amounts in ${m.currency}.`;
+}
+
+function renderSources(){
+  const bad = (data.sources||[]).filter(s=>s.status!=="ok");
+  const el = $("sourceBanner");
+  if(!bad.length){ el.style.display="none"; return; }
+  el.style.display="block";
+  el.innerHTML = "Some Business Central sources did not answer, so the figures that depend on them are incomplete: "
+    + bad.map(b=>`<b>${esc(b.source)}</b>`).join(", ")
+    + `. <span class="meta">${esc(bad[0].reason||"")}</span>`;
+}
+
+function tagOf(k){ return `<span class="tag ${k==="inference"?"inference":k==="recommendation"?"rec":""}">${k}</span>`; }
+const STATUS_CLASS = {"Financial position under control":"status-ok","Attention required":"status-warn","Critical management intervention required":"status-crit"};
+function bullets(list){ return `<ul>${list.map(x=>`<li>${tagOf(x.kind)}${esc(x.text)}${x.drill?` <a href="#" class="bd" data-kind="${x.drill.kind}" data-key="${esc(x.drill.key||"")}">records</a>`:""}</li>`).join("")}</ul>`; }
+function renderBrief(){
+  const b = data.brief;
+  $("brief").innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center">
+      <div><h2>Executive finance brief</h2><p class="hint" style="margin:3px 0 0">${esc(b.period)} vs ${esc(b.comparison)} · ${esc(b.methodology)} · ${esc(b.filters.company)} · ${esc(b.filters.dimension)}</p></div>
+      <span class="status-pill ${STATUS_CLASS[b.status]||""}">${esc(b.status)}</span></div>
+    <p class="hint" style="margin:6px 0 0">${esc(b.status_note)} Every line is read from Business Central records; click any item to open them.</p>
+    <h3>Financial performance</h3>${bullets(b.performance)}
+    <h3>Balance-sheet position</h3>${bullets(b.position)}
+    <h3>Cash and liquidity</h3>${bullets(b.liquidity)}
+    <h3>Accounting risks</h3>${b.accounting.length?bullets(b.accounting):"<p class='hint'>Nothing above the thresholds.</p>"}
+    <h3>Management actions</h3>
+    ${b.actions.length ? b.actions.map((a,i)=>`<div class="act"><div class="row1"><h4>${tagOf("recommendation")}${esc(a.title)}</h4><span class="prio ${a.priority}">${a.priority}</span></div>
+      <p class="hint" style="margin:6px 0">${esc(a.detail)}</p>
+      <p class="hint" style="margin:0"><b>Do:</b> ${esc(a.recommendation)} · <b>Area:</b> ${esc(a.area||"—")} · <b>Owner:</b> ${esc(a.owner||"unassigned")} · <b>By:</b> ${esc(a.due_date)} · <b>At stake:</b> ${cur(a.impact)} · <b>Confidence:</b> ${esc(a.confidence)}</p>
+      <div style="margin-top:9px"><button class="mini dark" data-brief="${i}" ${(data.action_keys||[]).includes(a.source_exception)?"disabled":""}>${(data.action_keys||[]).includes(a.source_exception)?"Already tracked":"Track as action"}</button></div></div>`).join("")
+      : '<div class="empty">No management action required from this period\u2019s records.</div>'}
+    <p class="hint" style="margin-top:10px">Generated ${esc(b.generated_at)} from ${b.counts.total} evaluated exceptions (${b.counts.critical} critical, ${b.counts.warning} warning).</p>`;
+  document.querySelectorAll(".bd").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill(a.dataset.kind,a.dataset.key);});
+  document.querySelectorAll("[data-brief]").forEach(b2=>b2.onclick=()=>{
+    const a = data.brief.actions[+b2.dataset.brief];
+    createAction({title:a.title, description:`${a.detail}\nRecommended: ${a.recommendation}`, source_exception:a.source_exception,
+      bc_document:a.document, document_type:a.area, company:data.meta.company, impact:a.impact,
+      priority:a.priority, owner:a.owner, due_date:a.due_date, confidence:a.confidence, evidence:a.evidence});
+  });
+}
+
+function statementRows(lines){
+  return lines.map(l=>`<tr class="${["Gross profit","EBITDA","EBIT"].includes(l.label)?"total":""}">
+    <td class="name">${esc(l.label)}</td><td class="num">${fmt(l.current)}</td>
+    <td class="num">${l.previous==null?"–":fmt(l.previous)}</td><td class="num">${pctChip(l.vs_previous_pct)}</td>
+    <td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td><td class="num">${pctChip(l.vs_last_year_pct)}</td>
+    <td class="num">${l.budget?fmt(l.budget):"–"}</td><td class="num">${l.vs_budget==null?"–":sign(l.vs_budget)}</td>
+    <td class="num">${l.of_revenue==null?"–":fmt(l.of_revenue,1)+"%"}</td></tr>`).join("");
+}
+function renderPL(){
+  const pl = data.pl;
+  const head = `<tr><th>Line</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Change</th>
+    <th class="num">Last year</th><th class="num">Change</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">% of revenue</th></tr>`;
+  $("plTable").innerHTML = head + statementRows(pl.statement);
+  $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th><th class="num">vs comparison</th></tr>` +
+    pl.statement.map(l=>`<tr class="${["Gross profit","EBITDA"].includes(l.label)?"total":""}"><td class="name">${esc(l.label)}</td>
+      <td class="num">${fmt(l.current)}</td><td class="num">${pctChip(l.vs_previous_pct)}</td></tr>`).join("");
+  $("plHint").textContent = `${data.meta.period_label} · ${data.meta.currency}, excluding VAT`;
+  const by = pl.classified_by || {};
+  const fallbackCount = Object.entries(by).filter(([k])=>k!=="Account Category").reduce((a,[,v])=>a+v,0);
+  $("plNote").textContent = pl.note + (fallbackCount
+    ? ` ${fmt(fallbackCount)} of these accounts have no Account Category in BC, so the account number classified them (${Object.entries(by).map(([k,v])=>`${k}: ${v}`).join(", ")}).`
+    : "");
+  $("plAccounts").innerHTML = `<tr><th>Account</th><th>Name</th><th>Category</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Last year</th><th class="num">Budget</th></tr>` +
+    pl.lines.slice(0,60).map(l=>`<tr><td><a href="#" class="acc" data-acc="${esc(l.account)}">${esc(l.account)}</a></td>
+      <td class="name">${esc(l.name)}</td><td class="meta">${esc(l.category)}</td><td class="num">${fmt(l.current)}</td>
+      <td class="num">${l.previous==null?"–":fmt(l.previous)}</td><td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td>
+      <td class="num">${l.budget?fmt(l.budget):"–"}</td></tr>`).join("");
+  document.querySelectorAll(".acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
+}
+
+function renderBS(){
+  const bs = data.balance_sheet, t = bs.totals;
+  const bsBy = bs.classified_by || {};
+  const bsFallback = Object.entries(bsBy).filter(([k])=>k!=="Account Category").reduce((a,[,v])=>a+v,0);
+  $("bsNote").textContent = bs.note + (bsFallback
+    ? ` ${fmt(bsFallback)} accounts have no Account Category in BC (${Object.entries(bsBy).map(([k,v])=>`${k}: ${v}`).join(", ")}); those placed by balance sign are an inference, not a classification.`
+    : "");
+  $("bsTotals").innerHTML = `<div>Assets<b>${cur(t.assets)}</b></div><div>Liabilities<b>${cur(t.liabilities)}</b></div>
+    <div>Equity<b>${cur(t.equity)}</b></div><div>Assets less liabilities and equity<b class="${Math.abs(t.difference)>1?"up":""}">${sign(t.difference)}</b></div>`;
+  const rows = [];
+  ["Assets","Liabilities","Equity"].forEach(cat=>{
+    const g = bs.groups[cat]; if(!g) return;
+    rows.push(`<tr class="total"><td class="name">${cat}</td><td class="num">${fmt(g.current)}</td><td class="num">${fmt(g.previous)}</td><td class="num">${sign(g.current-g.previous)}</td><td></td></tr>`);
+    g.lines.slice(0,25).forEach(l=>rows.push(`<tr><td class="name" style="padding-left:22px"><a href="#" class="acc" data-acc="${esc(l.account)}">${esc(l.account)}</a> ${esc(l.name)}</td>
+      <td class="num">${fmt(l.current)}</td><td class="num">${fmt(l.previous)}</td><td class="num">${sign(l.movement)}</td>
+      <td class="num">${pctChip(l.movement_pct)}</td></tr>`));
+  });
+  $("bsTable").innerHTML = `<tr><th>Account</th><th class="num">Balance</th><th class="num">Comparison</th><th class="num">Movement</th><th class="num">%</th></tr>` + rows.join("");
+  document.querySelectorAll("#bsTable .acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
+}
+
+function renderCash(){
+  const c = data.cash;
+  $("cashNote").textContent = c.note;
+  $("cashTable").innerHTML = `<tr><th>Account</th><th>Name</th><th class="num">Balance</th><th class="num">Movement in period</th></tr>` +
+    (c.accounts.length ? c.accounts.map(a=>`<tr><td><a href="#" class="acc" data-acc="${esc(a.account)}">${esc(a.account)}</a></td>
+      <td class="name">${esc(a.name)}</td><td class="num"><b>${fmt(a.balance)}</b></td><td class="num">${sign(a.movement)}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">No account is identified as cash or bank. Name the accounts, or map them in Settings.</td></tr>`);
+  $("bankTable").innerHTML = `<tr><th>Bank account</th><th>Currency</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th></tr>` +
+    (c.bank_movements.length ? c.bank_movements.map(b=>`<tr><td class="name">${esc(b.bank)}</td><td>${esc(b.currency||"–")}</td>
+      <td class="num down">${fmt(b.in)}</td><td class="num up">${fmt(b.out)}</td><td class="num"><b>${sign(b.net)}</b></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No bank movement in this period.</td></tr>`);
+  document.querySelectorAll("#cashTable .acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
+}
+
+function renderLedger(kind){
+  const d = kind==="ap" ? data.payables : data.receivables;
+  const label = kind==="ap" ? "payable" : "receivable";
+  $(kind+"Hint").textContent = `Open entries at ${data.meta.checked_at.slice(0,10)} · concentration on the largest ${kind==="ap"?"supplier":"customer"}: ${d.concentration==null?"–":fmt(d.concentration,1)+"%"}`;
+  $(kind+"Totals").innerHTML = `<div>Total ${label}s<b>${cur(d.total)}</b></div><div>Not yet due<b>${cur(d.current)}</b></div>
+    <div>Overdue<b class="up">${cur(d.overdue)}</b></div>`;
+  const max = Math.max(1, ...d.buckets.map(b=>Math.abs(b.value)));
+  $(kind+"Buckets").innerHTML = d.buckets.map(b=>`<div class="bar"><div>${esc(b.label)}</div>
+    <div class="track"><div class="fill" style="width:${Math.abs(b.value)/max*100}%"></div></div>
+    <div class="num" style="text-align:right;font-weight:700">${fmt(b.value)}</div></div>`).join("");
+  $(kind+"Table").innerHTML = `<tr><th>${kind==="ap"?"Supplier":"Customer"}</th><th class="num">Total</th><th class="num">Overdue</th><th class="num">Oldest (days)</th><th class="num">Entries</th></tr>` +
+    (d.parties.length ? d.parties.map(p=>`<tr><td class="name">${esc(p.party)}</td><td class="num"><b>${fmt(p.total)}</b></td>
+      <td class="num ${p.overdue?"up":""}">${fmt(p.overdue)}</td><td class="num">${p.oldest_days??"–"}</td><td class="num">${p.entries}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No open entries.</td></tr>`);
+}
+
+async function loadGL(){
+  $("glNote").textContent = "Reading the ledger…";
+  $("glTable").innerHTML = '<tr><td class="empty">Reading the ledger from Business Central…</td></tr>';
+  try{
+    const p = new URLSearchParams(params());
+    p.set("days", $("glDays").value); p.set("threshold", $("glTh").value);
+    const r = await fetch("/api/gl?"+p.toString());
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    data.gl = j; renderGL();
+  }catch(e){
+    $("glNote").textContent = "";
+    $("glTable").innerHTML = `<tr><td class="empty">Could not read the ledger: ${esc(e.message)}. Try a shorter window or a higher amount.</td></tr>`;
+  }
+}
+$("glLoad").onclick = () => loadGL();
+function renderGL(){
+  const g = data.gl;
+  if(!g.loaded){
+    $("glNote").textContent = g.note;
+    $("glTable").innerHTML = `<tr><td class="empty">Choose a window and an amount, then press "Read entries". The ledger is not read automatically because it grows by tens of thousands of entries a day.</td></tr>`;
+    return;
+  }
+  $("glNote").textContent = `${g.window[0]} to ${g.window[1]} · entries of ${fmt(g.threshold)} or more · `
+    + (g.capped ? `capped at ${g.entries.length} rows, narrow the window or raise the amount to see the rest. ` : "")
+    + g.note;
+  $("glTable").innerHTML = `<tr><th>Posted</th><th>Document</th><th>Account</th><th>Source</th><th class="num">Amount</th><th>Flag</th></tr>` +
+    (g.entries.length ? g.entries.slice(0,80).map(e=>`<tr><td>${esc(e.posting)}</td><td>${esc(e.document)}</td>
+      <td class="name"><a href="#" class="acc" data-acc="${esc(e.account)}">${esc(e.account)}</a> ${esc(e.account_name||"")}</td>
+      <td>${esc(e.source||"–")}</td><td class="num"><b>${fmt(e.amount)}</b></td>
+      <td class="meta">${e.manual?"manual journal":""}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">No entry reached the materiality threshold in this period.</td></tr>`);
+  document.querySelectorAll("#glTable .acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
+}
+
+function renderExceptions(){
+  const list = data.exceptions, tracked = data.action_keys||[];
+  $("excList").innerHTML = list.length ? list.map((e,i)=>`<div class="act">
+    <div class="row1"><h4><span class="sev ${e.severity}"></span>${esc(e.title)}</h4><span class="meta">${esc(e.area||"")} · ${esc(e.rule)}</span></div>
+    <p class="hint" style="margin:6px 0">${esc(e.detail)}</p>
+    <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action||"")}${e.impact?` · <b>Impact:</b> ${cur(Math.abs(e.impact))}`:""}</p>
+    <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+      ${e.drill?`<button class="mini" data-ed="${i}">Supporting records</button>`:""}
+      <button class="mini dark" data-ea="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
+    </div></div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
+  document.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{const e=list[+b.dataset.ed]; openDrill(e.drill.kind, e.drill.key||"", e.rule);});
+  document.querySelectorAll("[data-ea]").forEach(b=>b.onclick=()=>{const e=list[+b.dataset.ea];
+    createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
+      bc_document:e.document||"", document_type:e.area||"", company:data.meta.company, impact:Math.abs(e.impact||0),
+      priority:e.severity==="critical"?"Critical":e.severity==="warning"?"High":"Medium", confidence:"high",
+      evidence:[{entity:"Business Central", key:e.document||"", period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});});
+}
+
+let actions=[];
+async function createAction(payload){
+  try{
+    const r = await fetch("/api/actions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    if(!r.ok) throw new Error("save failed");
+    await load(); document.querySelector('#nav button[data-view="actions"]').click();
+  }catch(e){ alert("Could not save the action: "+e.message); }
+}
+async function patchAction(id,patch){
+  try{
+    const r = await fetch(`/api/actions/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
+    if(!r.ok) throw new Error("update failed");
+    const u = await r.json(); actions = actions.map(a=>a.id===id?u:a); data.actions=actions; renderActions();
+  }catch(e){ alert("Could not update the action: "+e.message); }
+}
+function renderActions(){
+  actions = data.actions||[];
+  const open = actions.filter(a=>!["Resolved","Dismissed"].includes(a.status));
+  $("actCount").textContent = open.length;
+  const statuses = ["New","Acknowledged","In progress","Waiting for information","Waiting for approval","Resolved","Dismissed"];
+  $("actionList").innerHTML = actions.length ? actions.map(a=>`<div class="act">
+    <div class="row1"><h4>${esc(a.title)}</h4><div style="display:flex;gap:8px;align-items:center">
+      <span class="prio ${a.priority}">${a.priority}</span><span class="chip ${a.status==="Overdue"?"up":a.status==="Resolved"?"down":""}">${esc(a.status)}</span></div></div>
+    <p class="hint" style="margin:6px 0;white-space:pre-wrap">${esc(a.description)}</p>
+    <p class="hint" style="margin:0">${a.bc_document?`<b>Document:</b> ${esc(a.bc_document)} · `:""}<b>Impact:</b> ${cur(a.impact)} · <b>Created:</b> ${esc(a.created_at)}</p>
+    <div class="formgrid" style="margin-top:10px">
+      <label class="field">Owner<input value="${esc(a.owner)}" data-f="owner" data-id="${a.id}"></label>
+      <label class="field">Due date<input type="date" value="${esc(a.due_date)}" data-f="due_date" data-id="${a.id}"></label>
+      <label class="field">Status<select data-f="status" data-id="${a.id}">${statuses.map(s=>`<option ${s===a.status?"selected":""}>${s}</option>`).join("")}</select></label>
+      <label class="field">Comment<input placeholder="Add a comment" data-f="comment" data-id="${a.id}"></label></div>
+    <div class="meta">${a.history.map(h=>`${esc(h.ts)} · ${esc(h.actor)} · ${esc(h.from||"—")} → ${esc(h.to)}${h.comment?" · "+esc(h.comment):""}`).join("<br>")}</div>
+  </div>`).join("") : '<div class="empty">No actions yet. Create them from the brief or from any exception.</div>';
+  document.querySelectorAll("#actionList [data-f]").forEach(el=>el.onchange=()=>{
+    const patch={}; patch[el.dataset.f]=el.value;
+    if(el.dataset.f==="comment"){ patch.comment=el.value; delete patch.status; el.value=""; }
+    patchAction(el.dataset.id,patch);});
+}
+$("actNew").onclick = ()=>{ const t = prompt("Action title"); if(t) createAction({title:t, description:"Created manually.", company:data.meta.company, priority:"Medium"}); };
+
+function renderGaps(){
+  $("gapList").innerHTML = (data.gaps||[]).map(g=>`<div class="gap"><b>${esc(g.kpi)}</b><span>${esc(g.missing)}<br><b>Requirement:</b> ${esc(g.requirement)}</span></div>`).join("");
+}
+
+const TH_LABEL = {materiality:"Materiality (ALL)", stock_monitor_days:"Stock unchanged, monitor (days)",
+  stock_slow_days:"Stock unchanged, slow-moving (days)", stock_dead_days:"Stock unchanged, non-moving (days)",
+  stock_value_floor:"Ignore stock below (ALL)", inventory_difference:"Inventory vs G/L difference (ALL)", pl_variance_pct:"P&L variance (%)", bs_movement_pct:"Balance-sheet movement (%)",
+  manual_journal:"Manual journal review (ALL)", prior_period_days:"Posting after document date (days)",
+  ap_critical_days:"Payable overdue, critical (days)", ar_warning_days:"Receivable overdue, warning (days)",
+  ar_critical_days:"Receivable overdue, critical (days)", concentration_pct:"Concentration warning (%)",
+  cash_warning:"Cash warning level (ALL)"};
+const OW_LABEL = {default:"Default owner", accounting:"Accounting", treasury:"Treasury", receivables:"Receivables", payables:"Payables", inventory:"Inventory"};
+let settingsDone = false;
+function renderSettings(){
+  if(settingsDone) return;
+  const s = data.settings;
+  $("thresholdForm").innerHTML = Object.entries(TH_LABEL).map(([k,l])=>`<label class="field">${l}<input type="number" step="any" id="th-${k}" value="${s.thresholds[k]}"></label>`).join("");
+  $("ownerForm").innerHTML = Object.entries(OW_LABEL).map(([k,l])=>`<label class="field">${l}<input id="ow-${k}" value="${esc(s.owners[k]||"")}" placeholder="name"></label>`).join("");
+  $("extraForm").innerHTML = `<label class="field">Budget name in BC<input id="bg-name" value="${esc(s.budget.name||"")}" placeholder="e.g. BUDGET2026"></label>
+    <label class="field">Periods closed before<input type="date" id="closed" value="${esc(s.period_closed_before||"")}"></label>
+    <label class="field">Inventory accounts (comma separated)<input id="inv-acc" value="${esc((s.inventory||{}).accounts||"")}" placeholder="e.g. 3121,3126"></label>
+    <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
+    <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
+    <label class="field">Exchange rates<input id="gr-rates" value="${esc((s.group||{}).rates||"")}" placeholder="EUR=100"></label>
+    <label class="field">Rate source note<input id="gr-note" value="${esc((s.group||{}).rate_note||"")}" placeholder="e.g. BoA rate, 30 Sept"></label>
+    <label class="field">Income account prefixes<input id="ac-inc" value="${esc((s.accounts||{}).income_prefixes||"")}" placeholder="7"></label>
+    <label class="field">Cost-of-goods prefixes<input id="ac-cogs" value="${esc((s.accounts||{}).cogs_prefixes||"")}" placeholder="60"></label>
+    <label class="field">Expense prefixes<input id="ac-exp" value="${esc((s.accounts||{}).expense_prefixes||"")}" placeholder="6"></label>
+    <label class="field">Equity prefixes<input id="ac-eq" value="${esc((s.accounts||{}).equity_prefixes||"")}" placeholder="1"></label>`;
+  settingsDone = true; loadAudit();
+}
+$("saveSettings").onclick = async ()=>{
+  const thresholds={}, owners={};
+  Object.keys(TH_LABEL).forEach(k=>thresholds[k]=$("th-"+k).value);
+  Object.keys(OW_LABEL).forEach(k=>owners[k]=$("ow-"+k).value);
+  try{
+    const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({thresholds,owners,budget:{name:$("bg-name").value},period_closed_before:$("closed").value,
+        inventory:{accounts:$("inv-acc").value},
+        group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
+               rates:$("gr-rates").value, rate_note:$("gr-note").value},
+        accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
+                  expense_prefixes:$("ac-exp").value, equity_prefixes:$("ac-eq").value}})});
+    if(!r.ok) throw new Error("save failed");
+    $("saved").textContent="Saved. Applied on the next refresh."; await load(); loadAudit();
+  }catch(e){ $("saved").textContent="Could not save: "+e.message; }
+};
+async function loadAudit(){
+  try{
+    const j = await (await fetch("/api/audit")).json();
+    $("auditTable").innerHTML = `<tr><th>When</th><th>What</th><th>Target</th><th>By</th><th>Change</th></tr>` +
+      (j.audit.length ? j.audit.slice(0,50).map(a=>`<tr><td>${esc(a.ts)}</td><td>${esc(a.kind)}</td><td>${esc(a.target)}</td><td>${esc(a.actor)}</td><td class="meta">${esc(JSON.stringify(a.after)).slice(0,140)}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="empty">Nothing recorded yet.</td></tr>`);
+  }catch(e){}
+}
+
+// ---------- local cache ----------
+$("cacheLoad").onclick = async () => {
+  $("cacheNote").textContent = "Checking…";
+  try{
+    const j = await (await fetch("/api/cache")).json();
+    const f = j.local_file;
+    $("cacheNote").textContent = `${j.memory_mb == null ? "" : "Using " + j.memory_mb + " MB of memory. "}`
+      + `${fmt(f.rows)} immutable rows held on disk in ${f.file_mb} MB across ${fmt(f.periods)} periods · `
+      + `warm-up at ${j.warm_at || "never"} · ${j.note}`;
+    $("cacheTable").innerHTML = `<tr><th>What</th><th>Company</th><th class="num">Rows</th><th>From</th><th>To</th></tr>`
+      + (f.detail||[]).map(d=>`<tr><td class="name">${esc(d.kind)}</td><td>${esc(d.company)}</td>
+         <td class="num"><b>${fmt(d.rows)}</b></td><td class="meta">${esc(d.from||"")}</td><td class="meta">${esc(d.to||"")}</td></tr>`).join("")
+      + (j.screens_held||[]).map(h=>`<tr><td class="name">screen held</td><td>${esc(h.company)}</td>
+         <td class="num meta" colspan="3">${esc(h.period)} · ${esc(h.mode)} · ${fmt(h.age_seconds)}s old</td></tr>`).join("");
+  }catch(e){ $("cacheNote").textContent = "Could not read: " + e.message; }
+};
+
+// ---------- accounts and permissions ----------
+let me = null;
+function can(p){ return !!me && (me.can||[]).includes(p); }
+async function loadSession(){
+  try{
+    const j = await (await fetch("/api/session")).json();
+    me = j.user;
+    if(!me){ location.href = "/login"; return false; }
+    $("whoami").innerHTML = `<span class="dot"></span>${esc(me.name||me.username)} · ${esc(me.role)}`;
+    $("usersNav").style.display = can("users") ? "" : "none";
+    const save = $("saveSettings"); if(save && !can("settings")){ save.disabled = true; save.title = "Your role cannot change thresholds."; }
+    if(can("users")) loadUsers();
+    return true;
+  }catch(e){ location.href = "/login"; return false; }
+}
+$("logoutBtn").onclick = async () => { await fetch("/api/logout"); location.href = "/login"; };
+async function loadUsers(){
+  try{
+    const j = await (await fetch("/api/users")).json();
+    if(j.error) throw new Error(j.error);
+    $("usersNote").textContent = `${j.users.length} account(s). Disabling an account ends its sessions at once; every change is written to the audit trail.`;
+    $("nu-role").innerHTML = Object.keys(j.roles).map(r=>`<option>${esc(r)}</option>`).join("");
+    $("roleHelp").innerHTML = Object.entries(j.roles).map(([r,v])=>`<b>${esc(r)}:</b> ${esc(v.description)}`).join("<br>");
+    $("usersTable").innerHTML = `<tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>Created</th><th></th></tr>` +
+      j.users.map(u=>`<tr><td class="name">${esc(u.name||u.username)}<div class="meta">${esc(u.username)}${u.must_change?" · must change password":""}</div></td>
+        <td><select data-uf="role" data-u="${esc(u.username)}">${Object.keys(j.roles).map(r=>`<option ${r===u.role?"selected":""}>${esc(r)}</option>`).join("")}</select></td>
+        <td>${u.active?'<span class="chip down">active</span>':'<span class="chip up">disabled</span>'}${u.locked_until?' <span class="chip up">locked</span>':""}</td>
+        <td class="meta">${esc((u.last_login||"never").replace("T"," "))}</td>
+        <td class="meta">${esc((u.created_at||"").slice(0,10))} · ${esc(u.created_by||"")}</td>
+        <td><button class="mini" data-ua="toggle" data-u="${esc(u.username)}">${u.active?"Disable":"Enable"}</button>
+            <button class="mini" data-ua="reset" data-u="${esc(u.username)}">Reset password</button>
+            ${u.locked_until?`<button class="mini" data-ua="unlock" data-u="${esc(u.username)}">Unlock</button>`:""}</td></tr>`).join("");
+    $("sessTable").innerHTML = `<tr><th>User</th><th>Role</th><th>Signed in</th><th>Last seen</th></tr>` +
+      (j.sessions.length ? j.sessions.map(sx=>`<tr><td class="name">${esc(sx.username)}</td><td>${esc(sx.role)}</td>
+        <td class="meta">${esc(sx.since.replace("T"," "))}</td><td class="meta">${esc(sx.last_seen.replace("T"," "))}</td></tr>`).join("")
+        : `<tr><td colspan="4" class="empty">No one else is signed in.</td></tr>`);
+    document.querySelectorAll("[data-uf=role]").forEach(el=>el.onchange=()=>patchUser(el.dataset.u,{role:el.value}));
+    document.querySelectorAll("[data-ua]").forEach(b=>b.onclick=()=>{
+      const u = b.dataset.u;
+      if(b.dataset.ua==="toggle") patchUser(u,{active: b.textContent==="Enable"});
+      if(b.dataset.ua==="unlock") patchUser(u,{unlock:true});
+      if(b.dataset.ua==="reset"){ const pw = prompt(`Temporary password for ${u} (at least 8 characters)`); if(pw) patchUser(u,{password:pw}); }});
+  }catch(e){ $("usersNote").textContent = "Could not load the accounts: " + e.message; }
+}
+async function patchUser(username, patch){
+  try{
+    const r = await fetch("/api/users/"+encodeURIComponent(username), {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(patch)});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    loadUsers();
+  }catch(e){ alert("Could not update the account: " + e.message); }
+}
+$("nu-add").onclick = async () => {
+  $("nu-msg").textContent = "";
+  try{
+    const r = await fetch("/api/users", {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:$("nu-user").value.trim(), name:$("nu-name").value,
+                           role:$("nu-role").value, password:$("nu-pass").value})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    $("nu-msg").textContent = "Created. Give them the temporary password; they must change it at first sign-in.";
+    $("nu-user").value = $("nu-name").value = $("nu-pass").value = ""; loadUsers();
+  }catch(e){ $("nu-msg").textContent = e.message; }
+};
+$("pw-save").onclick = async () => {
+  $("pw-msg").textContent = "";
+  try{
+    const r = await fetch("/api/password", {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({current:$("pw-cur").value, new:$("pw-new").value})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    $("pw-msg").textContent = "Changed."; $("pw-cur").value = $("pw-new").value = "";
+  }catch(e){ $("pw-msg").textContent = e.message; }
+};
+
+// ---------- inventory ----------
+async function loadInventory(){
+  $("invNote").textContent = "Reading the item cards…";
+  try{
+    const p = new URLSearchParams(params());
+    if($("invLoc").value) p.set("location",$("invLoc").value);
+    const r = await fetch("/api/inventory?"+p.toString());
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    data.inventory = j; renderInventory();
+  }catch(e){ $("invNote").textContent = "Could not read the inventory: "+e.message; }
+}
+$("invLoad").onclick = ()=>loadInventory();
+function renderInventory(){
+  const inv = data.inventory||{};
+  if(!inv.loaded){
+    $("invNote").textContent = inv.note||"";
+    $("invKpis").innerHTML = "";
+    $("invClasses").innerHTML = `<tr><td class="empty">Choose a location if you want one, then press "Read inventory".</td></tr>`;
+    return;
+  }
+  const t = inv.totals;
+  $("invNote").textContent = `${inv.location} · on hand at ${inv.as_of} · ${inv.note}`;
+  $("invKpis").innerHTML = `
+    <div class="card kpi clickable" data-drill="inventory_top"><div class="l">Inventory value</div><div class="v">${cur(t.value)}</div><div class="s">${fmt(t.items)} items with stock</div></div>
+    <div class="card kpi clickable" data-drill="inventory_risk"><div class="l">Slow and non-moving</div><div class="v">${cur(t.at_risk_value)}</div><div class="s">Above the value floor in Settings</div></div>
+    <div class="card kpi clickable" data-drill="inventory_negative"><div class="l">Negative items</div><div class="v ${t.negative_items?"up":""}">${fmt(t.negative_items)}</div><div class="s">${cur(t.negative_value)} at cost</div></div>
+    <div class="card kpi"><div class="l">Moved in 30 days</div><div class="v">${cur(t.moved_value_30)}</div><div class="s">Net change between snapshots</div></div>`;
+  document.querySelectorAll("#invKpis [data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
+  $("invClasses").innerHTML = `<tr><th>Class</th><th class="num">Items</th><th class="num">Value</th></tr>` +
+    inv.classes.map(c=>`<tr><td class="name">${esc(c.class)}</td><td class="num">${fmt(c.items)}</td><td class="num"><b>${fmt(c.value)}</b></td></tr>`).join("");
+  const max = Math.max(1, ...inv.categories.map(c=>c.value));
+  $("invCats").innerHTML = inv.categories.slice(0,12).map(c=>`<div class="bar"><div>${esc(c.category)}</div>
+    <div class="track"><div class="fill" style="width:${c.value/max*100}%"></div></div>
+    <div style="text-align:right;font-weight:700">${fmt(c.value)}</div></div>`).join("");
+  const problems = inv.negative.slice(0,12).concat(inv.zero_cost.slice(0,8));
+  $("invProblems").innerHTML = `<tr><th>Item</th><th class="num">Quantity</th><th class="num">Unit cost</th><th>Issue</th></tr>` +
+    (problems.length ? problems.map(i=>`<tr><td class="name">${esc(i.description||i.item)}<div class="meta">${esc(i.item)}</div></td>
+      <td class="num ${i.quantity<0?"up":""}">${fmt(i.quantity,2)}</td><td class="num">${fmt(i.unit_cost,2)}</td>
+      <td class="meta">${i.quantity<0?"negative stock":"zero cost"}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">Nothing negative and no zero-cost stock.</td></tr>`);
+  const th = data.settings.thresholds;
+  $("invRiskNote").textContent = `Unchanged quantity for ${fmt(th.stock_monitor_days)} days: monitor · ${fmt(th.stock_slow_days)} days: slow-moving · ${fmt(th.stock_dead_days)} days: non-moving. Items below ${fmt(th.stock_value_floor)} in value are left out.`;
+  $("invRisk").innerHTML = `<tr><th>Item</th><th>Category</th><th class="num">Quantity</th><th class="num">Value</th><th>Class</th><th class="num">Unchanged (days)</th></tr>` +
+    (inv.risk.length ? inv.risk.slice(0,40).map(r=>`<tr><td class="name">${esc(r.description||r.item)}<div class="meta">${esc(r.item)}</div></td>
+      <td class="meta">${esc(r.category||"–")}</td><td class="num">${fmt(r.quantity,2)}</td><td class="num"><b>${fmt(r.value)}</b></td>
+      <td>${esc(r.class)}</td><td class="num">${r.still_days??"–"}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">Nothing above the value floor has stood still.</td></tr>`);
+  const rec = inv.reconciliation;
+  $("invRecNote").textContent = rec ? rec.method + " " + (inv.gl_note||"") : (inv.gl_note||"");
+  $("invRec").innerHTML = rec ? `<div>Inventory at item cost<b>${cur(rec.inventory_value)}</b></div>
+    <div>Inventory accounts in the G/L<b>${cur(rec.gl_balance)}</b></div>
+    <div>Difference<b class="${Math.abs(rec.difference)>=data.settings.thresholds.inventory_difference?"up":""}">${sign(rec.difference)}</b></div>`
+    : `<div>Set the inventory account numbers in Settings to see this comparison.<b>Not configured</b></div>`;
+}
+
+// ---------- month-end close ----------
+async function loadClosing(){
+  try{
+    const r = await fetch("/api/closing?"+params());
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    data.closing = j; renderClosing();
+  }catch(e){ $("closeNote").textContent = "Could not load the checklist: "+e.message; }
+}
+$("closeLoad").onclick = ()=>loadClosing();
+function renderClosing(){
+  const c = data.closing; if(!c) return;
+  $("closeCount").textContent = c.progress.open;
+  $("closeNote").textContent = `${c.company} · period ${c.period} · ${c.note}`;
+  $("closeProgress").innerHTML = `<div>Completed<b>${c.progress.done} of ${c.progress.total}</b></div>
+    <div>Progress<b>${fmt(c.progress.pct,0)}%</b></div><div>Still open<b class="${c.progress.open?"up":""}">${c.progress.open}</b></div>`;
+  $("closeChecks").innerHTML = `<tr><th>Automatic check</th><th>Value</th><th>Status</th><th>What it means</th></tr>` +
+    c.checks.map(x=>`<tr><td class="name">${esc(x.check)}</td><td class="num">${esc(x.value)}</td>
+      <td><span class="sev ${x.status==="critical"?"critical":x.status==="warning"?"warning":"info"}"></span>${esc(x.status)}</td>
+      <td class="meta">${esc(x.detail)}</td></tr>`).join("");
+  $("closeTable").innerHTML = `<tr><th>Task</th><th>Area</th><th>Owner</th><th>Status</th><th>Comment</th><th>Completed</th></tr>` +
+    c.tasks.map(t=>`<tr><td class="name">${esc(t.task)}</td><td class="meta">${esc(t.area)}</td>
+      <td><input value="${esc(t.owner)}" data-ct="owner" data-id="${t.id}" style="width:120px"></td>
+      <td><select data-ct="status" data-id="${t.id}">${c.statuses.map(s=>`<option ${s===t.status?"selected":""}>${s}</option>`).join("")}</select></td>
+      <td><input value="${esc(t.comment)}" data-ct="comment" data-id="${t.id}" placeholder="comment" style="width:180px"></td>
+      <td class="meta">${esc(t.completed_at||"")}</td></tr>`).join("");
+  document.querySelectorAll("[data-ct]").forEach(el=>el.onchange=async()=>{
+    const patch={company:data.meta.company, period:c.period, id:el.dataset.id};
+    patch[el.dataset.ct]=el.value;
+    try{
+      const r = await fetch("/api/closing",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
+      if(!r.ok) throw new Error("update failed");
+      loadClosing();
+    }catch(e){ alert("Could not update the task: "+e.message); }
+  });
+}
+
+// ---------- treasury, assets, budget, group ----------
+async function loadPane(path, key, render, note){
+  if(note) $(note).textContent = "Reading Business Central…";
+  try{
+    const r = await fetch(path+"?"+params());
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    data[key] = j; render();
+  }catch(e){ if(note) $(note).textContent = "Could not read: "+e.message; }
+}
+$("trsLoad").onclick = ()=>loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
+$("faLoad").onclick = ()=>loadPane("/api/assets","assets",renderAssets,"faNote");
+$("bgLoad").onclick = ()=>loadPane("/api/budget","budget",renderBudget,"bgNote");
+$("grpLoad").onclick = ()=>loadPane("/api/consolidation","group",renderGroup,"grpNote");
+
+function renderTreasury(){
+  const t = data.treasury; if(!t||!t.loaded) return;
+  const o = t.obligations;
+  $("trsNote").textContent = t.flow.note;
+  $("trsKpis").innerHTML = `<div>Cash and bank<b>${cur(o.cash)}</b></div>
+    <div>Due in 7 days<b class="up">${cur(o.due_7)}</b></div>
+    <div>Expected in 7 days<b class="down">${cur(o.expected_7)}</b></div>
+    <div>Net after 7 days<b class="${o.net_7<0?"up":"down"}">${cur(o.net_7)}</b></div>
+    <div>Net after 30 days<b class="${o.net_30<0?"up":"down"}">${cur(o.net_30)}</b></div>
+    <div>Operating cash flow<b>${cur(t.flow.operating)}</b></div>
+    ${o.unapplied_ap ? `<div>Unapplied supplier payments<b class="warn">${cur(o.unapplied_ap)}</b></div>` : ""}`;
+  $("trsFlow").innerHTML = `<tr><th>Line</th><th class="num">Amount</th><th>How it is measured</th></tr>` +
+    t.flow.lines.map(l=>`<tr class="${l.label.startsWith("Operating")||l.label.startsWith("Movement")?"total":""}">
+      <td class="name">${esc(l.label)}</td><td class="num"><b>${sign(l.value)}</b></td><td class="meta">${esc(l.note)}</td></tr>`).join("");
+  $("trsDueNote").textContent = o.note;
+  $("trsDue").innerHTML = `<tr><th>Supplier</th><th>Document</th><th>Due</th><th class="num">Amount</th></tr>` +
+    (o.payments.length ? o.payments.slice(0,20).map(p=>`<tr><td class="name">${esc(p.party)}</td><td>${esc(p.document)}</td>
+      <td>${esc(p.due)}${p.days>0?` <span class="chip up">${p.days}d late</span>`:""}</td><td class="num"><b>${fmt(p.amount)}</b></td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">Nothing falls due in the next seven days.</td></tr>`);
+  $("trsBank").innerHTML = `<tr><th>Bank account</th><th>Currency</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th></tr>` +
+    (t.activity.accounts.length ? t.activity.accounts.map(a=>`<tr><td class="name">${esc(a.name)}</td><td>${esc(a.currency||"–")}</td>
+      <td class="num down">${fmt(a.in)}</td><td class="num up">${fmt(a.out)}</td><td class="num"><b>${sign(a.net)}</b></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No bank movement in this period.</td></tr>`);
+}
+
+function renderAssets(){
+  const a = data.assets; if(!a||!a.loaded) return;
+  $("faNote").textContent = a.note;
+  $("faKpis").innerHTML = `<div>Additions<b>${cur(a.totals.additions)}</b></div>
+    <div>Depreciation<b>${cur(a.totals.depreciation)}</b></div>
+    <div>Other movements<b>${cur(a.totals.other)}</b></div>
+    <div>Assets touched<b>${fmt(a.totals.assets_touched)}</b></div>`;
+  $("faTypes").innerHTML = `<tr><th>Posting type</th><th class="num">Amount</th></tr>` +
+    (a.by_type.length ? a.by_type.map(t=>`<tr><td class="name">${esc(t.type)}</td><td class="num"><b>${fmt(t.amount)}</b></td></tr>`).join("")
+      : `<tr><td colspan="2" class="empty">No fixed-asset movement in this period.</td></tr>`);
+  $("faAssets").innerHTML = `<tr><th>Asset</th><th>Class</th><th>Location</th><th class="num">Additions</th><th class="num">Depreciation</th><th class="num">Entries</th></tr>` +
+    (a.assets.length ? a.assets.slice(0,30).map(x=>`<tr><td class="name">${esc(x.description||x.asset)}<div class="meta">${esc(x.asset)}</div></td>
+      <td class="meta">${esc(x.class||"–")}</td><td class="meta">${esc(x.location||"–")}</td>
+      <td class="num">${fmt(x.acquisition)}</td><td class="num">${fmt(x.depreciation)}</td><td class="num">${x.entries}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">Nothing to show.</td></tr>`);
+}
+
+function renderBudget(){
+  const b = data.budget; if(!b||!b.loaded) return;
+  $("bgNote").textContent = `Budget ${b.budget_name} · period ${b.period[0]} to ${b.period[1]} · year to date ${b.ytd[0]} to ${b.ytd[1]} (${b.days_done} days). ${b.note}`;
+  $("bgStatement").innerHTML = `<tr><th>Line</th><th class="num">Period actual</th><th class="num">Period budget</th><th class="num">Variance</th><th class="num">Year to date</th><th class="num">YTD budget</th><th class="num">Variance</th></tr>` +
+    b.period_statement.map((l,i)=>{ const y=b.ytd_statement[i]||{};
+      return `<tr class="${["Gross profit","EBITDA","EBIT"].includes(l.label)?"total":""}"><td class="name">${esc(l.label)}</td>
+      <td class="num">${fmt(l.current)}</td><td class="num">${l.budget?fmt(l.budget):"–"}</td><td class="num">${l.vs_budget==null?"–":sign(l.vs_budget)}</td>
+      <td class="num">${fmt(y.current||0)}</td><td class="num">${y.budget?fmt(y.budget):"–"}</td><td class="num">${y.vs_budget==null?"–":sign(y.vs_budget)}</td></tr>`;}).join("");
+  $("bgLines").innerHTML = `<tr><th>Account</th><th>Name</th><th class="num">Actual YTD</th><th class="num">Budget</th><th class="num">Variance %</th><th class="num">Remaining</th><th class="num">Run-rate year end</th></tr>` +
+    (b.lines.length ? b.lines.slice(0,50).map(l=>`<tr><td><a href="#" class="acc" data-acc="${esc(l.account)}">${esc(l.account)}</a></td>
+      <td class="name">${esc(l.name)}</td><td class="num">${fmt(l.current)}</td><td class="num">${l.budget?fmt(l.budget):"–"}</td>
+      <td class="num">${pctChip(l.vs_budget_pct)}</td><td class="num">${l.remaining==null?"–":fmt(l.remaining)}</td>
+      <td class="num">${fmt(l.forecast_year)}</td></tr>`).join("")
+      : `<tr><td colspan="7" class="empty">No budget rows for this year. Set the budget name in Settings.</td></tr>`);
+  document.querySelectorAll("#bgLines .acc").forEach(el=>el.onclick=e=>{e.preventDefault();openDrill("account",el.dataset.acc);});
+}
+
+function renderGroup(){
+  const g = data.group; if(!g||!g.loaded) return;
+  if(g.error){ $("grpNote").textContent = g.error; return; }
+  $("grpNote").textContent = `${g.period[0]} to ${g.period[1]} · ${g.totals.companies} companies in the group total · reporting currency ${g.reporting_currency} · rates: ${g.rates}`;
+  $("grpWarn").textContent = g.note + (g.rate_note ? ` Rate source: ${g.rate_note}.` : "");
+  const rc = g.reporting_currency;
+  $("grpTable").innerHTML = `<tr><th>Company</th><th>Currency</th><th class="num">Rate</th>
+      <th class="num">Revenue</th><th class="num">Gross profit</th><th class="num">Margin</th><th class="num">EBITDA</th>
+      <th class="num">Revenue in ${esc(rc)}</th><th class="num">EBITDA in ${esc(rc)}</th><th class="num">Assets in ${esc(rc)}</th></tr>` +
+    g.rows.map(r=>{
+      if(!r.available) return `<tr><td class="name">${esc(r.company)}</td><td>${esc(r.currency||"–")}</td><td colspan="8" class="meta">not available with this login</td></tr>`;
+      const c = r.converted||{};
+      return `<tr class="${r.in_total?"":"warnrow"}"><td class="name">${esc(r.company)}</td><td>${esc(r.currency)}</td>
+      <td class="num">${r.rate==null?'<span class="chip up">no rate</span>':fmt(r.rate,2)}</td>
+      <td class="num">${fmt(r.revenue)}</td><td class="num">${fmt(r.gross)}</td>
+      <td class="num">${r.gross_margin==null?"–":fmt(r.gross_margin,1)+"%"}</td><td class="num">${fmt(r.ebitda)}</td>
+      <td class="num"><b>${c.revenue==null?"–":fmt(c.revenue)}</b></td><td class="num">${c.ebitda==null?"–":fmt(c.ebitda)}</td>
+      <td class="num">${c.assets==null?"–":fmt(c.assets)}</td></tr>`;}).join("") +
+    `<tr class="total"><td>Group, in ${esc(rc)}</td><td colspan="5"></td><td class="num">–</td>
+      <td class="num">${fmt(g.totals.revenue)}</td><td class="num">${fmt(g.totals.ebitda)}</td><td class="num">${fmt(g.totals.assets)}</td></tr>`;
+}
+
+let modalRows=[], modalCols=[], modalName="records";
+async function openDrill(kind,key,context){
+  $("modalBg").classList.add("on"); $("modalTitle").textContent="Loading…"; $("modalBody").innerHTML=""; $("modalHint").textContent="";
+  try{
+    const j = await (await fetch(`/api/drill?kind=${encodeURIComponent(kind)}&key=${encodeURIComponent(key||"")}`)).json();
+    modalRows=j.rows; modalCols=j.columns; modalName=j.kind;
+    $("modalTitle").textContent=j.title;
+    $("modalHint").textContent=`${j.count} record${j.count===1?"":"s"} · ${data.meta.company} · ${data.meta.current[0]} to ${data.meta.current[1]}${context?" · "+context:""}`;
+    $("modalBody").innerHTML = j.rows.length ? `<div class="scroll"><table><tr>${j.columns.map(c=>`<th class="${typeof j.rows[0][c]==="number"?"num":""}">${esc(c)}</th>`).join("")}</tr>`+
+      j.rows.map(r=>`<tr>${j.columns.map(c=>`<td class="${typeof r[c]==="number"?"num":""}">${r[c]==null?"":(typeof r[c]==="number"?fmt(r[c]):esc(r[c]))}</td>`).join("")}</tr>`).join("")+"</table></div>"
+      : '<div class="empty">No underlying records for this selection.</div>';
+  }catch(e){ $("modalTitle").textContent="Could not load records"; $("modalBody").innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
+}
+$("modalClose").onclick=()=>$("modalBg").classList.remove("on");
+$("modalBg").onclick=e=>{ if(e.target===$("modalBg")) $("modalBg").classList.remove("on"); };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("modalBg").classList.remove("on"); });
+$("modalCsv").onclick=()=>{
+  if(!modalRows.length) return;
+  const lines=[modalCols].concat(modalRows.map(r=>modalCols.map(c=>r[c]??"")));
+  const csv=lines.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
+  a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
+};
+document.querySelectorAll("[data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
+  if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
+  if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
+  if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
+  if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
+  if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");
+  if(b.dataset.view==="budget" && data && !(data.budget||{}).loaded) loadPane("/api/budget","budget",renderBudget,"bgNote");
+  if(b.dataset.view==="group" && data && !(data.group||{}).loaded) loadPane("/api/consolidation","group",renderGroup,"grpNote");
+  $("title").textContent = b.textContent.trim().replace(/\s*\d+$/,"");
+});
+$("refreshBtn").onclick=()=>load();
+["company","dimension"].forEach(id=>$(id).onchange=()=>load());
+$("cmpMode").onchange=()=>load();
+$("anchor").onchange=()=>{ if($("anchor").value) $("anchor").value=snap($("anchor").value); load(); };
+$("mode").onchange=()=>{ $("anchorLabel").firstChild.textContent=MODE_LABEL[$("mode").value]+" ";
+  if($("anchor").value) $("anchor").value=snap($("anchor").value); load(); };
+setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRESH||180)*1000);
+
+(async ()=>{
+  if(!await loadSession()) return;
+  const today=new Date();
+  $("anchor").value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-01`;
+  try{
+    const j = await (await fetch("/api/companies")).json();
+    $("company").innerHTML = (j.companies||[]).map(c=>`<option ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
+    $("dimension").innerHTML = '<option value="">All departments</option>' +
+      (j.dimensions||[]).map(([code,name])=>`<option value="${esc(code)}">${esc(code)} — ${esc(name)}</option>`).join("");
+  }catch(e){ $("company").innerHTML = `<option>SALT</option>`; }
+  load();
+})();
+</script>
+</body>
+</html>

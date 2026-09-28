@@ -1,0 +1,121 @@
+# RHG Control Towers. nginx terminates TLS and is the only container with published
+# ports; the two apps are reachable only on the internal network.
+services:
+  # Central sign-in, accounts and permissions. The towers hold no accounts:
+  # they ask this service who the caller is on every request.
+  identity:
+    build:
+      context: ../rhg-identity
+    image: rhg-identity:latest
+    restart: unless-stopped
+    env_file: ../rhg-identity/.env
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8767"
+      TZ: Europe/Tirane
+    volumes:
+      - identity-data:/app/data
+    networks: [rhg]
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8767/api/session',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  purchasing:
+    depends_on: [identity]
+    build:
+      context: ../rhg-purchasing-local
+    image: rhg-purchasing:latest
+    restart: unless-stopped
+    env_file: ../rhg-purchasing-local/.env
+    environment:
+      # Must be 0.0.0.0 so nginx can reach it across the container boundary.
+      # Not a public exposure: this container publishes no ports to the host.
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8765"
+      TZ: Europe/Tirane
+      # This tower holds no accounts: it asks identity who the caller is.
+      RHG_APP: "purchasing"
+      IDENTITY_URL: "http://identity:8767"
+      SERVICE_TOKEN: "${SERVICE_TOKEN}"
+      COOKIE_NAME: "rhg_session"
+    volumes:
+      - purchasing-data:/app/data
+    networks: [rhg]
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/api/session',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  finance:
+    depends_on: [identity]
+    build:
+      context: ../rhg-finance-local
+    image: rhg-finance:latest
+    restart: unless-stopped
+    env_file: ../rhg-finance-local/.env
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8766"
+      TZ: Europe/Tirane
+      # This tower holds no accounts: it asks identity who the caller is.
+      RHG_APP: "finance"
+      IDENTITY_URL: "http://identity:8767"
+      SERVICE_TOKEN: "${SERVICE_TOKEN}"
+      COOKIE_NAME: "rhg_session"
+    volumes:
+      - finance-data:/app/data
+    networks: [rhg]
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8766/api/session',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  # Internal router: keeps the /finance and /purchasing path rewriting
+  # (sub_filter + cookie scoping) that NPM's GUI cannot express.
+  # NPM publishes 80/443 and forwards to this on port 80.
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on: [purchasing, finance]
+    networks: [rhg]
+
+  # Nginx Proxy Manager: the GUI that owns 80/443 and, later, Let's Encrypt.
+  npm:
+    image: jc21/nginx-proxy-manager:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"     # admin GUI
+    environment:
+      DISABLE_IPV6: "true"
+      TZ: Europe/Tirane
+    volumes:
+      - npm-data:/data
+      - npm-letsencrypt:/etc/letsencrypt
+    depends_on: [nginx]
+    networks: [rhg]
+
+volumes:
+  purchasing-data:
+  finance-data:
+  identity-data:
+  npm-data:
+  npm-letsencrypt:
+
+networks:
+  rhg:

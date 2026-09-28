@@ -1,0 +1,116 @@
+/* ---------------------------------------------------------------
+   Revo / RHG brand layer.
+   Palette and typeface from the Revo Brand Guide:
+     #0C475E deep blue · #A0D8EA light blue · #ECEBEB light grey
+     Primary typeface: Aktifo B
+   Everything the app's look depends on lives here, so the whole
+   application can be re-skinned from this one file.
+   --------------------------------------------------------------- */
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Archivo:wght@500;600;700;800&display=swap");
+
+/* Aktifo B is a licensed typeface, so it is not fetched from the web.
+   Drop the licensed files into static/fonts/ and they are used automatically;
+   until then the app falls back to Figtree and Archivo, which share the same
+   geometric, low-contrast character. */
+@font-face{ font-family:"Aktifo B"; font-weight:400; font-display:swap;
+  src:url("/fonts/AktifoB-Regular.woff2") format("woff2"); }
+@font-face{ font-family:"Aktifo B"; font-weight:500; font-display:swap;
+  src:url("/fonts/AktifoB-Medium.woff2") format("woff2"); }
+@font-face{ font-family:"Aktifo B"; font-weight:700; font-display:swap;
+  src:url("/fonts/AktifoB-Bold.woff2") format("woff2"); }
+@font-face{ font-family:"Aktifo B"; font-weight:300; font-display:swap;
+  src:url("/fonts/AktifoB-Light.woff2") format("woff2"); }
+
+:root{
+  /* --- brand palette --- */
+  --revo-blue:        #0c475e;
+  --revo-blue-deep:   #08303f;   /* darker step for the navigation panel */
+  --revo-sky:         #a0d8ea;
+  --revo-sky-soft:    #e4f3f9;   /* sky at low opacity, for fills        */
+  --revo-grey:        #ecebeb;
+  --revo-white:       #ffffff;
+
+  /* --- roles --- */
+  --brand-ink:      #0e2733;
+  --brand-accent:   var(--revo-blue);
+  --brand-second:   var(--revo-sky);
+  --brand-sidebar:  var(--revo-blue-deep);
+  --brand-surface:  var(--revo-white);
+  --brand-page:     var(--revo-grey);
+  --brand-line:     #d9dcdd;
+  --brand-muted:    #5c7482;
+
+  /* --- signal colours: these carry meaning, so they stay distinct
+         from the brand blues and keep their contrast --- */
+  --brand-negative: #c0392b;   /* extra cost, critical  */
+  --brand-positive: #0e8a57;   /* savings, resolved     */
+  --brand-warning:  #b26a00;   /* warning               */
+
+  /* --- typography --- */
+  --brand-font:         "Aktifo B", "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --brand-font-display: "Aktifo B", "Archivo", var(--brand-font);
+  --brand-radius: 12px;
+  --brand-logo-size: 36px;
+}
+
+/* --- map the brand onto the application variables --- */
+:root{
+  --bg: var(--brand-page);
+  --card: var(--brand-surface);
+  --ink: var(--brand-ink);
+  --sub: var(--brand-muted);
+  --line: var(--brand-line);
+  --side: var(--brand-sidebar);
+  --side-ink: #b9d4de;
+  --accent: var(--brand-accent);
+  --prev: var(--revo-sky);              /* comparison bars in the brand's second colour */
+  --up: var(--brand-negative);   --up-bg:   #fbecea;
+  --down: var(--brand-positive); --down-bg: #e6f6ef;
+  --warn: var(--brand-warning);  --warn-bg: #fdf3e2;
+}
+
+html, body{ font-family: var(--brand-font); letter-spacing: -0.005em; }
+h1, h2, h3, h4, .brand b, .kpi .v, .status-pill{ font-family: var(--brand-font-display); }
+h1{ letter-spacing: -0.02em; }
+.card, .brief, .act, .qcheck, .modal{ border-radius: var(--brand-radius); }
+
+/* --- navigation --- */
+nav button.on{ background: rgba(160,216,234,.16); color: #fff; }
+nav button:hover{ background: rgba(160,216,234,.09); }
+nav .count{ background: rgba(160,216,234,.2); color: var(--revo-sky); }
+.brand small{ color: #8fb3c1; }
+.side-foot{ color: #7e9daa; }
+
+/* --- accents that should read as brand, not as alarm --- */
+.btn.dark{ background: var(--revo-blue); color: #fff; border-color: var(--revo-blue); }
+.mini.dark{ background: var(--revo-blue); color: #fff; border-color: var(--revo-blue); }
+.chip:not(.up):not(.down){ background: var(--revo-sky-soft); color: var(--revo-blue); }
+.tag.rec{ color: var(--revo-blue); }
+.kpi .v{ letter-spacing: -0.02em; }
+.status-ok{ background: var(--revo-sky-soft); color: var(--revo-blue); }
+th{ color: var(--brand-muted); }
+:focus-visible{ outline-color: var(--revo-blue); }
+
+/* --- logo: drop static/logo.svg or logo.png and it replaces the letter mark --- */
+.logo{
+  width: var(--brand-logo-size); height: var(--brand-logo-size);
+  background-color: var(--revo-sky);
+  color: var(--revo-blue);
+  background-image: var(--brand-logo, none);
+  background-size: contain; background-repeat: no-repeat; background-position: center;
+}
+.logo.has-image{ background-color: transparent; color: transparent; }
+
+/* --- dark mode: the deep blue becomes the surface, the sky becomes the accent --- */
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#08222d; --card:#0e2f3d; --ink:#e8f2f6; --sub:#93b2bf; --line:#194354;
+    --side:#061a23; --side-ink:#b9d4de;
+    --accent: var(--revo-sky);
+    --prev:#2b5a6c;
+    --up:#ef6a5c; --up-bg:#3a1d1a; --down:#3fc08c; --down-bg:#0d2e24; --warn:#e0a44a; --warn-bg:#32270f;
+  }
+  .btn.dark, .mini.dark{ background: var(--revo-sky); color: var(--revo-blue-deep); border-color: var(--revo-sky); }
+  .chip:not(.up):not(.down){ background: rgba(160,216,234,.14); color: var(--revo-sky); }
+  .status-ok{ background: rgba(160,216,234,.14); color: var(--revo-sky); }
+}

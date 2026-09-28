@@ -1,0 +1,30 @@
+{
+ "thresholds": {
+  "receipt_to_invoice_hours": 48.0,
+  "po_open_days": 7.0,
+  "invoice_posting_late_days": 7.0,
+  "price_review_pct": 5.0,
+  "price_critical_pct": 10.0,
+  "price_critical_impact": 20000.0,
+  "exception_spend": 100000.0,
+  "min_spend_for_mover": 5000.0,
+  "location_spread_pct": 20.0,
+  "supplier_concentration_pct": 35.0,
+  "price_above_contract_pct": 2.0,
+  "requisition_warning_hours": 24.0,
+  "requisition_critical_hours": 48.0
+ },
+ "owners": {
+  "default": "",
+  "price": "",
+  "invoices": "",
+  "data_quality": "",
+  "requisitions": ""
+ },
+ "exclude_weekends": true,
+ "updated_at": "2026-09-23T10:13:08",
+ "budget": {
+  "name": "",
+  "cogs_accounts": "6051,60111"
+ }
+}

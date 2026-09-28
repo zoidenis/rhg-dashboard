@@ -1,0 +1,15 @@
+{
+  "name": "RHG Control Towers",
+  "short_name": "RHG",
+  "description": "Finance, inventory and purchasing control towers for Revo Hospitality Group.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ecebeb",
+  "theme_color": "#0c475e",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,176 @@
+[
+ {
+  "ts": "2026-09-23T00:07:09",
+  "kind": "action",
+  "target": "b83ce57eb6",
+  "actor": "finance",
+  "before": null,
+  "after": {
+   "status": "New",
+   "title": "Overdue balance beyond the critical limit: 1126 cases, 328,613,708 ALL involved"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-23T11:48:35",
+  "kind": "settings",
+  "target": "thresholds",
+  "actor": "finance",
+  "before": {
+   "materiality": 50000,
+   "pl_variance_pct": 5,
+   "bs_movement_pct": 10,
+   "manual_journal": 100000,
+   "prior_period_days": 30,
+   "ap_critical_days": 60,
+   "ar_warning_days": 30,
+   "ar_critical_days": 60,
+   "concentration_pct": 35,
+   "cash_warning": 1000000,
+   "stock_monitor_days": 30,
+   "stock_slow_days": 60,
+   "stock_dead_days": 90,
+   "stock_value_floor": 10000,
+   "inventory_difference": 100000
+  },
+  "after": {
+   "materiality": 50000.0,
+   "pl_variance_pct": 5.0,
+   "bs_movement_pct": 10.0,
+   "manual_journal": 100000.0,
+   "prior_period_days": 30.0,
+   "ap_critical_days": 60.0,
+   "ar_warning_days": 30.0,
+   "ar_critical_days": 60.0,
+   "concentration_pct": 35.0,
+   "cash_warning": 1000000.0,
+   "stock_monitor_days": 30.0,
+   "stock_slow_days": 60.0,
+   "stock_dead_days": 90.0,
+   "stock_value_floor": 10000.0,
+   "inventory_difference": 100000.0
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-23T18:15:08",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-23T18:15:22",
+  "kind": "password change",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "ok": true
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-24T09:15:55",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-24T12:45:15",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-25T00:29:26",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-25T01:12:35",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-26T12:15:22",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-26T12:29:05",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-26T12:35:36",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-26T19:09:47",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ },
+ {
+  "ts": "2026-09-28T14:08:03",
+  "kind": "login",
+  "target": "admin",
+  "actor": "admin",
+  "before": {},
+  "after": {
+   "role": "Administrator"
+  },
+  "comment": ""
+ }
+]
