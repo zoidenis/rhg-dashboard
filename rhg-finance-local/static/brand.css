@@ -8,18 +8,15 @@
    --------------------------------------------------------------- */
 @import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Archivo:wght@500;600;700;800&display=swap");
 
-/* Aktifo B is a licensed typeface, so it is not fetched from the web.
-   Drop the licensed files into static/fonts/ and they are used automatically;
-   until then the app falls back to Figtree and Archivo, which share the same
-   geometric, low-contrast character. */
-@font-face{ font-family:"Aktifo B"; font-weight:400; font-display:swap;
-  src:url("/fonts/AktifoB-Regular.woff2") format("woff2"); }
-@font-face{ font-family:"Aktifo B"; font-weight:500; font-display:swap;
-  src:url("/fonts/AktifoB-Medium.woff2") format("woff2"); }
-@font-face{ font-family:"Aktifo B"; font-weight:700; font-display:swap;
-  src:url("/fonts/AktifoB-Bold.woff2") format("woff2"); }
-@font-face{ font-family:"Aktifo B"; font-weight:300; font-display:swap;
-  src:url("/fonts/AktifoB-Light.woff2") format("woff2"); }
+/* Aktifo B is a licensed typeface and we do not hold the files, so nothing is
+   declared for it here: an @font-face pointing at fonts we do not have only
+   costs four 404s on every load. The stack below falls back to Figtree and
+   Archivo, which share the same geometric, low-contrast character.
+
+   If the licensed files ever arrive, drop AktifoB-{Light,Regular,Medium,Bold}
+   .woff2 into static/fonts/ and restore the four @font-face rules here; the
+   server already serves that folder and the font stack already asks for the
+   family first. */
 
 :root{
   /* --- brand palette --- */
