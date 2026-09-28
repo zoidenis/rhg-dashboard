@@ -153,8 +153,25 @@ jobs:
             done'
 
       - name: Verifiko që faqja përgjigjet
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER: ${{ secrets.SERVER_SSH }}
         run: |
+          # Nje SERVER_HOST bosh e ben url-ne "https:///", te cilen curl e refuzon
+          # me exit 3 - nje deshtim qe duket si i deploy-it edhe pse deploy-i ka
+          # mbaruar. Kur mungon, host-i merret nga SERVER_SSH.
+          host="${SERVER_HOST:-${SERVER#*@}}"
+          host="${host#http://}"; host="${host#https://}"; host="${host%%/*}"
+          if [ -z "$host" ]; then
+            echo "::warning::As SERVER_HOST as SERVER_SSH nuk japin nje host; verifikimi u kapercye."
+            exit 0
+          fi
+
+          echo "Po verifikoj https://$host/"
           code=$(curl -sk -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 \
-                 https://${{ secrets.SERVER_HOST }}/)
+                 "https://$host/") || {
+            echo "::error::curl deshtoi per https://$host/ (kontrollo secret-in SERVER_HOST)"
+            exit 1
+          }
           echo "Rrënja ktheu $code"
           [ "$code" = "200" ] || { echo "::error::Pritej 200, erdhi $code"; exit 1; }
