@@ -210,51 +210,14 @@ class BCClient:
 
     def material_gl_entries(self, company, date_from, date_to, threshold, limit=400, max_age=300):
         """Only entries at or above the materiality threshold: the ledger itself is far too
-        large to read in full (tens of thousands of entries a day).
-
-        A posted G/L entry never changes, so the result is kept in the local file as well
-        as in memory. The threshold is part of the cache kind, because a set read at one
-        threshold is not the answer for a lower one - reusing it would quietly drop rows.
-        """
-        kind = f"gl@{int(threshold)}"
-
-        def go(after=None):
+        large to read in full (tens of thousands of entries a day)."""
+        def go():
             flt = (f"Posting_Date ge {date_from} and Posting_Date le {date_to} "
                    f"and (Amount ge {threshold} or Amount le -{threshold})")
-            if after:
-                flt += f" and Entry_No gt {after}"
             return self._get_all(self._url(company, config.E_GL),
                                  {"$filter": flt, "$select": ",".join(GL_FIELDS), "$top": str(limit)},
                                  limit=limit)
-
-        key = (kind, company, date_from, date_to)
-        with self._lock:
-            hit = self._cache.get(key)
-            if hit and time.time() - hit[0] < max_age:
-                return hit[1]
-
-        stored = localdb.rows(kind, company, date_from, date_to)
-        if stored and localdb.period_loaded(kind, company, date_from, date_to):
-            highest = max((r.get("Entry_No") or 0 for r in stored), default=0)
-            try:                                  # backdated postings still arrive
-                newer = [r for r in go(highest) if (r.get("Entry_No") or 0) > highest]
-            except BCError:
-                newer = []
-            if newer:
-                localdb.store(kind, company, newer)
-                stored.extend(newer)
-            rows = stored
-        else:
-            rows = go(None)
-            # A read capped by $top is not the whole period. Storing it would mark the
-            # period complete and hide the rest for good, so only a complete read is kept.
-            if len(rows) < limit:
-                localdb.store(kind, company, rows)
-                localdb.mark_period(kind, company, date_from, date_to, len(rows))
-
-        with self._lock:
-            self._cache[key] = (time.time(), rows)
-        return rows
+        return self._cached(("gl", company, date_from, date_to, threshold), max_age, go)
 
     def gl_for_account(self, company, account, date_from, date_to, limit=300):
         flt = (f"G_L_Account_No eq '{account}' and Posting_Date ge {date_from} "
@@ -267,6 +230,20 @@ class BCClient:
                  "FA_Posting_Type", "FA_Posting_Date", "FA_Location_Code", "Location_Code",
                  "Depreciation_Book_Code", "Posting_Date", "Document_No", "Document_Type",
                  "Source_Code", "Amount_LCY"]
+
+    def item_ledger(self, company, date_from, date_to):
+        """Posted stock movements of a period. Entries never change once posted, so they
+        are kept in the local file and only newer entry numbers are fetched."""
+        def go(after=None):
+            flt = f"Posting_Date ge {date_from} and Posting_Date le {date_to}"
+            if after:
+                flt += f" and Entry_No gt {after}"
+            return self._get_all(self._url(company, config.E_ILE),
+                                 {"$filter": flt,
+                                  "$select": "Entry_No,Entry_Type,Item_No,Location_Code,Posting_Date,"
+                                             "Quantity,Cost_Amount_Actual,Item_Category_Code,"
+                                             "Unit_of_Measure_Code"})
+        return self._cached_immutable("ile", company, date_from, date_to, go)
 
     def fa_entries(self, company, date_from, date_to, max_age=900):
         """Fixed-asset movements of the period only: the FA ledger holds hundreds of

@@ -19,8 +19,10 @@ RECEIPT, RETURN = "receipts", "returns"
 TRANSFER_IN, TRANSFER_OUT = "transfer_in", "transfer_out"
 ASM_OUT, ASM_USE = "assembly_output", "assembly_consumption"
 SALES, POS_ADJ, NEG_ADJ, OTHER = "sales", "positive_adjustment", "negative_adjustment", "other"
+SALES_RETURN = "sales_return"          # a customer returning goods: stock coming back in
 
-COLUMNS = [RECEIPT, RETURN, TRANSFER_IN, TRANSFER_OUT, ASM_OUT, ASM_USE, SALES, POS_ADJ, NEG_ADJ, OTHER]
+COLUMNS = [RECEIPT, RETURN, TRANSFER_IN, TRANSFER_OUT, ASM_OUT, ASM_USE, SALES, SALES_RETURN,
+           POS_ADJ, NEG_ADJ, OTHER]
 
 
 # Replenishment reality at RHG: the restaurants are delivered two or three times a week,
@@ -80,7 +82,10 @@ def classify(entry_type, qty):
     if entry_type == "Assembly Consumption":
         return ASM_USE
     if entry_type == "Sale":
-        return SALES
+        # A sales return receipt is posted as a Sale with a positive quantity: the goods
+        # are coming back onto the shelf, so it belongs with what entered the location,
+        # not with what left it.
+        return SALES if qty < 0 else SALES_RETURN
     if entry_type == "Positive Adjmt.":
         return POS_ADJ
     if entry_type == "Negative Adjmt.":
@@ -118,10 +123,16 @@ def build(ile_rows, opening, closing, cards, skus=None, location="", tolerance=0
         open_qty = _f(opening.get(item))
         bc_close = _f(closing.get(item))
         calculated = (open_qty + m[RECEIPT] + m[RETURN] + m[TRANSFER_IN] + m[TRANSFER_OUT]
-                      + m[ASM_OUT] + m[ASM_USE] + m[SALES] + m[POS_ADJ] + m[NEG_ADJ] + m[OTHER])
+                      + m[ASM_OUT] + m[ASM_USE] + m[SALES] + m[SALES_RETURN]
+                      + m[POS_ADJ] + m[NEG_ADJ] + m[OTHER])
         difference = calculated - bc_close
         unit_cost = _f(card.get("unit_cost"))
-        consumption = -(m[ASM_USE] + m[SALES])          # quantity that left the shelf
+        # What left this location, whatever door it went out of. Transfers are how this
+        # group actually moves stock — MAGAZINE supplies the restaurants that way — so a
+        # warehouse item shipped out every week was being reported as never moving.
+        consumption = -(m[ASM_USE] + m[SALES] + m[NEG_ADJ] + m[TRANSFER_OUT])
+        sales_only = -(m[ASM_USE] + m[SALES])
+        inflow = m[RECEIPT] + m[POS_ADJ] + m[ASM_OUT] + m[TRANSFER_IN] + m[SALES_RETURN]
         posted = cost_by_column.get(item, {})
         # Cost of what actually left this location. Assembly consumption and assembly
         # output are the two halves of one transformation and cancel out, so counting
@@ -129,6 +140,19 @@ def build(ile_rows, opening, closing, cards, skus=None, location="", tolerance=0
         # is the sale, plus the net of the inventory adjustments.
         consumed_cost = -(posted.get(SALES, 0.0) + posted.get(ASM_USE, 0.0) + posted.get(ASM_OUT, 0.0))
         adjustment_cost = posted.get(POS_ADJ, 0.0) + posted.get(NEG_ADJ, 0.0)
+        # the two count adjustments kept apart: one adds stock, the other writes it off,
+        # and netting them hides both
+        positive_adjustment_cost = posted.get(POS_ADJ, 0.0)
+        negative_adjustment_cost = -posted.get(NEG_ADJ, 0.0)
+        transfer_out_cost = -posted.get(TRANSFER_OUT, 0.0)
+        transfer_in_cost = posted.get(TRANSFER_IN, 0.0)
+        # What arrived at this location, at the cost BC posted. Assembly output is left
+        # out on purpose: it is the other half of assembly consumption, which is left out
+        # of the outflow for the same reason. Counting either would count one
+        # transformation twice.
+        sales_return_cost = posted.get(SALES_RETURN, 0.0)
+        inflow_cost = (posted.get(RECEIPT, 0.0) + posted.get(RETURN, 0.0)
+                       + transfer_in_cost + posted.get(POS_ADJ, 0.0) + sales_return_cost)
         sku = (skus or {}).get((item, location)) or {}
         maximum = sku.get("maximum") or 0
         rows.append({
@@ -149,8 +173,18 @@ def build(ile_rows, opening, closing, cards, skus=None, location="", tolerance=0
             "movement_cost": cost.get(item, 0.0),
             "consumption": consumption,
             "days_cover": (bc_close / (consumption / 30.0)) if consumption > 0 else None,
+            "moved": consumption > 0 or inflow > 0,
             "turns": (consumption / ((open_qty + bc_close) / 2)) if (open_qty + bc_close) > 0 else None,
             "consumed_cost": consumed_cost, "adjustment_cost": adjustment_cost,
+            "transfer_out_cost": transfer_out_cost, "transfer_in_cost": transfer_in_cost,
+            "sales_return_cost": sales_return_cost,
+            "positive_adjustment_cost": positive_adjustment_cost,
+            "negative_adjustment_cost": negative_adjustment_cost,
+            # everything that left: sold or used, shipped out, or written off by a count
+            "outflow_cost": consumed_cost + transfer_out_cost + negative_adjustment_cost,
+            "inflow_cost": inflow_cost,
+            "entries": len([1 for c in COLUMNS if m[c]]),
+            "sales_only": sales_only, "inflow": inflow,
             "purchase_cost": posted.get(RECEIPT, 0.0) + posted.get(RETURN, 0.0),
             "transfer_cost": posted.get(TRANSFER_IN, 0.0) + posted.get(TRANSFER_OUT, 0.0),
             "is_assembled": abs(posted.get(ASM_OUT, 0.0)) > 0,
@@ -185,18 +219,66 @@ def summary(rows, sku_status=None, location="", month=""):
                            "confidence": "medium" if len(with_cost) < len(rows) else "high"},
         "purchases_cost": sum(r["purchase_cost"] for r in rows),
         "consumed_cost": sum(r["consumed_cost"] for r in rows),
-        "consumption_method": "Cost of the sales posted at this location, plus the net of the inventory "
+        "consumption_method": "Cost of what was sold or used in a recipe at this location, plus the net "
+                              "of the inventory adjustments. Stock shipped to another location is not "
+                              "consumption and is reported separately as transfers out. Older: cost of "
+                              "the sales posted at this location, plus the net of the inventory "
                               "adjustments. Assembly output and assembly consumption are the two halves of "
                               "one transformation and cancel out, so the ingredient and the finished good "
                               "are not both counted.",
         "adjustment_cost": sum(r["adjustment_cost"] for r in rows),
         "adjustment_items": sum(1 for r in rows if abs(r["adjustment_cost"]) > 0),
+        "positive_adjustment_cost": sum(r["positive_adjustment_cost"] for r in rows),
+        "positive_adjustment_items": sum(1 for r in rows if r["positive_adjustment_cost"] > 0),
+        "negative_adjustment_cost": sum(r["negative_adjustment_cost"] for r in rows),
+        "negative_adjustment_items": sum(1 for r in rows if r["negative_adjustment_cost"] > 0),
+        "adjustment_method": "Count adjustments are kept apart because they mean opposite things. A "
+                             "positive adjustment adds stock the books did not know about; a negative one "
+                             "writes off stock the books thought was there. Netting them to one figure "
+                             "hides both, and a location with large amounts on each side has a counting "
+                             "or posting problem even when the net is near zero.",
         "transfer_cost": sum(r["transfer_cost"] for r in rows),
         "negative_stock": sum(1 for r in rows if r["bc_closing"] < 0),
         "negative_value": sum(abs(r["closing_value"]) for r in rows if r["bc_closing"] < 0),
         "no_movement_value": sum(r["closing_value"] for r in rows
                                  if r["consumption"] <= 0 and r["bc_closing"] > 0),
         "no_movement_items": sum(1 for r in rows if r["consumption"] <= 0 and r["bc_closing"] > 0),
+        # the same set, split by why nothing left, so the figure can be checked
+        "no_movement_breakdown": {
+            "no_entries_at_all": sum(1 for r in rows if r["consumption"] <= 0 and r["bc_closing"] > 0
+                                     and r["entries"] == 0),
+            "received_only": sum(1 for r in rows if r["consumption"] <= 0 and r["bc_closing"] > 0
+                                 and r["inflow"] > 0),
+            "value_no_entries": sum(r["closing_value"] for r in rows if r["consumption"] <= 0
+                                    and r["bc_closing"] > 0 and r["entries"] == 0),
+            "value_received_only": sum(r["closing_value"] for r in rows if r["consumption"] <= 0
+                                       and r["bc_closing"] > 0 and r["inflow"] > 0),
+            "method": "An item counts here when nothing left the location all month: no sale, no recipe "
+                      "use, no transfer out, no write-off. The split shows how many had no posting at all "
+                      "against how many only received stock, which is a different problem: one is stock "
+                      "nobody touched, the other is stock that arrived and has not been used yet.",
+        },
+        "opening_items": sum(1 for r in rows if r["opening"] != 0),
+        "inflow_cost": sum(r["inflow_cost"] for r in rows),
+        "inflow_items": sum(1 for r in rows if r["inflow"] > 0),
+        "sales_return_cost": sum(r["sales_return_cost"] for r in rows),
+        "sales_return_items": sum(1 for r in rows if r["sales_return_cost"] > 0),
+        "purchases_items": sum(1 for r in rows if r[RECEIPT] > 0),
+        "inflow_method": "Everything that arrived at the location at the cost BC posted: purchased, "
+                         "transferred in, returned by a customer, or added by a count. A sales return "
+                         "receipt is posted as a sale with a positive quantity, so it is read by its sign "
+                         "and counted here rather than as stock leaving. Assembly output is not counted, "
+                         "because it is the other half of the recipe consumption that the outflow also "
+                         "leaves out.",
+        "transfers_out_cost": sum(r["transfer_out_cost"] for r in rows),
+        "transfers_in_cost": sum(r["transfer_in_cost"] for r in rows),
+        "transfer_items": sum(1 for r in rows if r["transfer_out_cost"] > 0),
+        "outflow_cost": sum(r["outflow_cost"] for r in rows),
+        "outflow_method": "Everything that left the location at the cost BC posted: sold or used in a "
+                          "recipe, shipped to another location, or written off. Transfers out are part of "
+                          "this because that is how stock reaches the restaurants from MAGAZINE and moves "
+                          "between restaurants; an item shipped out weekly has moved, whatever the "
+                          "consumption figure says.",
         "with_maximum": len(with_max),
         "above_maximum_value": sum(r["above_maximum_value"] or 0 for r in rows),
         "above_maximum_items": sum(1 for r in rows if (r.get("above_maximum") or 0) > 0),
@@ -273,9 +355,10 @@ def exceptions(rows, settings, location, policy=None):
                         "owner_role": "Purchasing Coordinator"})
         if r["consumption"] <= 0 and r["bc_closing"] > 0 and value >= floor:
             out.append({"code": f"stock-dead-{location}-{r['item']}", "severity": "warning",
-                        "rule": "No consumption in the month",
+                        "rule": "Nothing left this location in the month",
                         "title": f"{r['description'] or r['item']}: {value:,.0f} {currency.code()} sitting unused",
-                        "detail": f"Closing {r['bc_closing']:,.2f} {r['uom']} with nothing consumed this month"
+                        "detail": f"Closing {r['bc_closing']:,.2f} {r['uom']} with nothing sold, used, "
+                                  f"transferred out or written off this month"
                                   + (f", and {r[RECEIPT]:,.2f} still received." if r[RECEIPT] > 0 else "."),
                         "impact": value, "item": r["item"], "location": location, "confidence": "high",
                         "next_action": "Check condition and expiry, then move it or stop buying it.",
@@ -380,7 +463,7 @@ def category_view(rows, policy):
         key = r.get("category") or r.get("sub_category") or "(no category on the card)"
         g = groups[key]
         g["value"] += r["closing_value"]
-        g["consumption_cost"] += r["consumed_cost"]
+        g["consumption_cost"] += r["outflow_cost"]
         g["items"] += 1
         if r["consumption"] <= 0 and r["bc_closing"] > 0:
             g["no_movement"] += r["closing_value"]
@@ -399,7 +482,8 @@ def category_view(rows, policy):
                     "kind": "fresh" if fresh else "drinks" if any(h in name.upper() for h in DRINK_HINTS)
                             else "other",
                     "basis": ("Cover is this category's closing value divided by its own daily cost of "
-                              "sales; fresh categories are held to half the location's normal cover."
+                              "outflow, which includes stock shipped to other locations; fresh "
+                              "categories are held to half the location's normal cover."
                               if daily > 0 else "No consumption posted, so cover cannot be calculated.")})
     out.sort(key=lambda c: -(c["excess_value"] or 0))
     return out
@@ -408,17 +492,19 @@ def category_view(rows, policy):
 def causes(rows, totals, categories, policy, sku_status):
     """Why the capital is sitting there, stated as confirmed, possible, or not knowable."""
     out = []
-    purchases, consumed = totals["purchases_cost"], totals["consumed_cost"]
+    purchases, consumed = totals["purchases_cost"], totals["outflow_cost"]
     if purchases > consumed * 1.15 and consumed > 0:
         out.append({"cause": "Bought more than was used", "confidence": "confirmed",
                     "value": purchases - consumed,
-                    "detail": f"Purchases cost {purchases:,.0f} against {consumed:,.0f} consumed, so "
-                              f"{purchases - consumed:,.0f} stayed on the shelf this month."})
+                    "detail": f"Purchases cost {purchases:,.0f} against {consumed:,.0f} that left the "
+                              f"location, transfers out included, so {purchases - consumed:,.0f} stayed "
+                              f"on the shelf this month."})
     if totals["no_movement_value"] > 0:
         out.append({"cause": "Stock that did not move at all", "confidence": "confirmed",
                     "value": totals["no_movement_value"],
-                    "detail": f"{totals['no_movement_items']} items with a balance and no consumption "
-                              f"posted in the month."})
+                    "detail": f"{totals['no_movement_items']} items with a balance and nothing leaving the "
+                              f"location in the month: no sale, no recipe use, no transfer out and no "
+                              f"write-off."})
     fresh_excess = sum(c["excess_value"] or 0 for c in categories if c["kind"] == "fresh")
     if fresh_excess > 0:
         out.append({"cause": "Fresh categories above the cover they should hold", "confidence": "possible",
@@ -470,7 +556,8 @@ def decisions(rows, categories, policy, location, settings, limit=10):
         elif r["consumption"] <= 0 and r["closing_value"] >= floor:
             out.append({"unit": location, "category": r["category"], "item": r["item"],
                         "problem": f"{r['description'] or r['item']} did not move at all this month.",
-                        "evidence": f"{r['bc_closing']:,.2f} {r['uom']} on hand"
+                        "evidence": f"Nothing sold, used, transferred out or written off. "
+                                    f"{r['bc_closing']:,.2f} {r['uom']} on hand"
                                     + (f", and {r['receipts']:,.2f} still received." if r["receipts"] > 0
                                        else "."),
                         "action": "Check condition and expiry, then move it to a unit that uses it or stop "

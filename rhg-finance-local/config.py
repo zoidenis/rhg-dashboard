@@ -44,6 +44,9 @@ E_FA = get("E_FA", "FALedgerEntries")
 E_DIMSET = get("E_DIMSET", "DimensionSetEntries")
 E_FINREPORT = get("E_FINREPORT", "pbfinance")
 E_ITEMS = get("E_ITEMS", "PbItems")
+# Posted stock movements. The snapshots say what the balance was; only the ledger says
+# whether anything actually moved.
+E_ILE = get("E_ILE", "ItemLedgerEntries")
 E_REGISTERS = get("E_REGISTERS", "ItemRegisters")
 
 # Background warm-up and instant serving, as in the purchasing tower.

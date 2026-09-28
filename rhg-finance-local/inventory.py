@@ -10,6 +10,7 @@ the posted inventory value: the posted value lives in the value entries and in
 the G/L, and the difference between the two is shown rather than hidden.
 """
 from collections import defaultdict
+from datetime import date
 
 
 def _f(v):
@@ -45,8 +46,52 @@ def snapshot(rows):
     return out
 
 
-def overview(cur, history, settings, gl_inventory=None, location=""):
-    """cur: snapshot now. history: {days: snapshot} for the trailing windows."""
+# The same rule the purchasing tower uses, so both towers answer the question the same
+# way: stock has moved if anything left the location or arrived at it, whatever door it
+# used. Transfers are how this group moves stock between MAGAZINE and the restaurants,
+# and a sales return receipt is posted as a sale with a positive quantity, so it is read
+# by its sign and counted as stock coming back in.
+OUT_TYPES = ("Assembly Consumption", "Negative Adjmt.")
+IN_TYPES = ("Purchase", "Positive Adjmt.", "Assembly Output")
+
+
+def movement_summary(entries):
+    """{item: last outflow date, quantities and cost by direction} from posted entries."""
+    out = {}
+    for e in entries or []:
+        item = str(e.get("Item_No") or "")
+        if not item:
+            continue
+        qty = _f(e.get("Quantity"))
+        kind = (e.get("Entry_Type") or "").strip()
+        cost = _f(e.get("Cost_Amount_Actual"))
+        date_text = str(e.get("Posting_Date") or "")[:10]
+        rec = out.setdefault(item, {"out_qty": 0.0, "in_qty": 0.0, "out_cost": 0.0, "in_cost": 0.0,
+                                    "last_out": "", "last_in": "", "entries": 0})
+        rec["entries"] += 1
+        leaving = (kind in OUT_TYPES or (kind == "Sale" and qty < 0)
+                   or (kind == "Transfer" and qty < 0) or (kind == "Purchase" and qty < 0))
+        if kind == "Assembly Output" or (kind == "Sale" and qty > 0):
+            leaving = False
+        if leaving:
+            rec["out_qty"] += abs(qty)
+            rec["out_cost"] += abs(cost)
+            rec["last_out"] = max(rec["last_out"], date_text)
+        else:
+            rec["in_qty"] += abs(qty)
+            rec["in_cost"] += abs(cost)
+            rec["last_in"] = max(rec["last_in"], date_text)
+    return out
+
+
+def overview(cur, history, settings, gl_inventory=None, location="", movements=None, as_of=None):
+    """cur: snapshot now. history: {days: snapshot} for the trailing windows.
+
+    movements: the posted ledger movements, when they could be read. They decide whether
+    an item has moved; the snapshots can only show a net change, so an item that was
+    shipped out and replaced looks untouched and an item nobody used looks the same as
+    one used every day.
+    """
     th = settings["thresholds"]
     items = list(cur.values())
     total_value = sum(i["value"] for i in items)
@@ -78,6 +123,22 @@ def overview(cur, history, settings, gl_inventory=None, location=""):
             if not changed:
                 entry["still_days"] = days          # unchanged at least this long
         aged.append({**i, **entry})
+
+    today = as_of or date.today()
+    if movements is not None:
+        for row in aged:
+            m = movements.get(row["item"])
+            row["last_out"] = (m or {}).get("last_out") or ""
+            row["out_qty"] = (m or {}).get("out_qty") or 0.0
+            row["in_qty"] = (m or {}).get("in_qty") or 0.0
+            if row["last_out"]:
+                try:
+                    row["still_days"] = (today - date.fromisoformat(row["last_out"])).days
+                except ValueError:
+                    pass
+            else:
+                row["still_days"] = th["stock_dead_days"]      # nothing left it in the window
+            row["movement_basis"] = "posted ledger movements"
 
     def classify(row):
         d = row["still_days"]

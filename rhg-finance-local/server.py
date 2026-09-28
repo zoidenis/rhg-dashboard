@@ -28,13 +28,8 @@ from bc_client import BCClient, BCError
 
 STATIC = config.BASE_DIR / "static"
 STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+xml", "logo.png": "image/png",
-                "icon.svg": "image/svg+xml",
-                "manifest.webmanifest": "application/manifest+json",
-                "sw.js": "application/javascript; charset=utf-8",
-                "select.js": "application/javascript; charset=utf-8",
-                "select.css": "text/css; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}
-PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
+PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
                      "/api/users": "users", "/api/password": "view"}
 client = BCClient()
@@ -311,7 +306,28 @@ def inventory_screen(company, anchor, mode, dimension, location=None):
         gl_balance, gl_note = _inventory_gl_balance(company, c_to, dimension, settings)
     except BCError as exc:
         sources.append({"source": "Inventory accounts in the G/L", "status": "unavailable", "reason": str(exc)[:200]})
-    inv = inventory.overview(cur, history, settings, gl_balance, location or "")
+    # the posted movements behind the snapshots: a balance that has not changed does not
+    # mean nothing moved, and the ledger is the only place that says which it is
+    window_days = max(int(settings["thresholds"].get("stock_dead_days") or 90), 90)
+    movements = None
+    try:
+        entries = client.item_ledger(company, (c_to - timedelta(days=window_days)).isoformat(),
+                                     c_to.isoformat())
+        if location:
+            entries = [e for e in entries if e.get("Location_Code") == location]
+        movements = inventory.movement_summary(entries)
+        sources.append({"source": f"Posted stock movements, last {window_days} days",
+                        "status": "verified", "rows": len(entries)})
+    except BCError as exc:
+        sources.append({"source": "Posted stock movements", "status": "unavailable",
+                        "reason": str(exc)[:200]})
+    inv = inventory.overview(cur, history, settings, gl_balance, location or "", movements, c_to)
+    inv["movement_basis"] = ("Posted ledger movements: an item counts as moving when something left it "
+                             "or arrived, transfers included. A sales return receipt is a sale with a "
+                             "positive quantity and counts as stock coming back in."
+                             if movements is not None else
+                             "Snapshot differences only: the ledger could not be read, so an item that "
+                             "was shipped out and replaced looks untouched.")
     inv["gl_note"] = gl_note
     inv["as_of"] = c_to.isoformat()
     inv["sources"] = sources
@@ -713,15 +729,7 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-    def _redirect(self, to):
-        self.send_response(302)
-        self.send_header("Location", to)
-        self.send_header("Content-Length", "0")
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-
-    def _cookie(self, name=None):
-        name = name or auth.cookie_name()
+    def _cookie(self, name="session"):
         raw = self.headers.get("Cookie") or ""
         for part in raw.split(";"):
             if "=" in part:
@@ -757,21 +765,14 @@ class Handler(BaseHTTPRequestHandler):
         user = self._user()
         try:
             if url.path in ("/login", "/login.html"):
-                # Sign-in is central now.
-                self._redirect("/")
+                self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
             elif url.path == "/api/session":
                 self._send(200, {"user": user, "roles": auth.ROLES})
             elif not user and url.path not in PUBLIC_PATHS:
                 if url.path.startswith("/api/"):
                     self._send(401, {"error": "Not signed in."})
                 else:
-                    self._redirect("/")
-            elif url.path not in PUBLIC_PATHS and not auth.can(user, "view"):
-                # Signed in, but this role is not allowed into this tower.
-                if url.path.startswith("/api/"):
-                    self._send(403, {"error": "Your role does not have access to this application."})
-                else:
-                    self._redirect("/")
+                    self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
             elif url.path == "/api/users":
                 if not auth.can(user, "users"):
                     self._send(403, {"error": "Your role cannot manage accounts."})
@@ -853,13 +854,24 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
         user = self._user()
         if url.path == "/api/login":
-            self._send(410, {"error": "Sign in at the site root; this tower no longer holds accounts."})
+            token, public, err = auth.authenticate(body.get("username"), body.get("password"))
+            if err:
+                store.audit("login failed", (body.get("username") or "")[:60],
+                            (body.get("username") or "unknown")[:60], {}, {}, err)
+                self._send(401, {"error": err})
+                return
+            payload = json.dumps({"user": public}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Set-Cookie", f"session={token}; Path=/; HttpOnly; SameSite=Strict; "
+                                           f"Max-Age={auth.SESSION_HOURS * 3600}")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            store.audit("login", public["username"], public["username"], {}, {"role": public["role"]}, "")
             return
         if not user:
             self._send(401, {"error": "Not signed in."})
-            return
-        if not auth.can(user, "view"):
-            self._send(403, {"error": "Your role does not have access to this application."})
             return
         if url.path == "/api/password":
             ok, err = auth.change_own_password(user["username"], body.get("current"), body.get("new"))

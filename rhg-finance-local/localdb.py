@@ -4,11 +4,6 @@ Only immutable entries are kept here: general ledger entries, fixed-asset entrie
 bank account entries. Once posted, those rows are fixed, so a period can be read once
 and re-used.
 
-A closed period is read from BC exactly once and then answered from this file, which
-is what makes the month and year views cheap. The file is capped (see MAX_ROWS) and
-the least recently used periods are dropped first, so it cannot grow without bound on
-a small server.
-
 What is deliberately NOT kept: supplier and customer ledger entries, and the balances
 read from the chart of accounts. A supplier entry carries an Open flag and a remaining
 amount that change the day the invoice is paid or applied, and the account balances are
@@ -19,7 +14,6 @@ The file is a cache, not a source of truth: it can be deleted at any time and th
 app will simply read everything again from BC.
 """
 import json
-import os
 import sqlite3
 import threading
 import time
@@ -96,9 +90,7 @@ def store(kind, company, rows_in):
         conn.executemany("INSERT OR IGNORE INTO entries (kind, company, entry_no, posting_date, payload) "
                          "VALUES (?,?,?,?,?)", payload)
         conn.commit()
-        written = conn.total_changes - before
-        _evict_if_needed(conn)
-        return written
+        return conn.total_changes - before
 
 
 def period_loaded(kind, company, date_from, date_to):
@@ -118,36 +110,6 @@ def mark_period(kind, company, date_from, date_to, row_count):
         conn.commit()
 
 
-# The server this runs on is small, so the cache is bounded. At roughly 400 bytes a
-# row this is about 120 MB of payload in the worst case, and far less in practice.
-MAX_ROWS = int(os.environ.get("CACHE_MAX_ROWS", "300000"))
-
-
-def _evict_if_needed(conn):
-    """Drops whole periods, least recently used first, until the row cap is met.
-
-    Periods are the unit because a half-loaded period would be read as complete and
-    would quietly under-report; dropping it whole forces a clean re-read from BC.
-    """
-    total = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
-    if total <= MAX_ROWS:
-        return 0
-    dropped = 0
-    for kind, company, dfrom, dto in conn.execute(
-            "SELECT kind, company, date_from, date_to FROM periods ORDER BY loaded_at ASC").fetchall():
-        cur = conn.execute(
-            "DELETE FROM entries WHERE kind=? AND company=? AND posting_date >= ? AND posting_date <= ?",
-            (kind, company, dfrom, dto))
-        conn.execute("DELETE FROM periods WHERE kind=? AND company=? AND date_from=? AND date_to=?",
-                     (kind, company, dfrom, dto))
-        dropped += cur.rowcount
-        total -= cur.rowcount
-        if total <= MAX_ROWS * 0.9:      # leave headroom so this runs rarely
-            break
-    conn.commit()
-    return dropped
-
-
 def stats():
     with _lock:
         conn = _connect()
@@ -157,8 +119,8 @@ def stats():
             "FROM entries GROUP BY kind, company").fetchall()
         periods = conn.execute("SELECT COUNT(*) FROM periods").fetchone()[0]
     size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
-    return {"rows": total, "max_rows": MAX_ROWS, "periods": periods,
-            "file_mb": round(size / 1048576, 1), "path": str(DB_PATH),
+    return {"rows": total, "periods": periods, "file_mb": round(size / 1048576, 1),
+            "path": str(DB_PATH),
             "detail": [{"kind": k, "company": c, "rows": n, "from": a, "to": b}
                        for k, c, n, a, b in by_kind]}
 
