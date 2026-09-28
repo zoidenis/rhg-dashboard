@@ -42,6 +42,7 @@ def snapshot(rows):
             "category": r.get("Item_Category_Code") or "", "uom": r.get("Base_Unit_of_Measure") or "",
             "costing": r.get("Costing_Method") or "", "blocked": bool(r.get("Blocked")),
             "last_cost": _f(r.get("Last_Direct_Cost")), "vendor": r.get("Vendor_No") or "",
+            "posting_group": (r.get("Inventory_Posting_Group") or "").strip(),
         }
     return out
 
@@ -162,6 +163,8 @@ def overview(cur, history, settings, gl_inventory=None, location="", movements=N
         t["value"] += r["value"]
         t["items"] += 1
 
+    provision = provision_proposal(class_totals, settings)
+
     reconciliation = None
     if gl_inventory is not None:
         diff = total_value - gl_inventory
@@ -187,6 +190,7 @@ def overview(cur, history, settings, gl_inventory=None, location="", movements=N
         "risk": risk[:120],
         "classes": [{"class": k, **v} for k, v in sorted(class_totals.items(), key=lambda kv: -kv[1]["value"])],
         "reconciliation": reconciliation,
+        "provision": provision,
         "note": "Quantities come from the item card's Inventory flow field, calculated by BC for the "
                 "selected location and date. Movement is the change between snapshots, so an item that "
                 "moved out and back in on equal quantities reads as unchanged.",
@@ -235,3 +239,148 @@ def exceptions(inv, settings):
                     "next_action": "Run the cost adjustment, then investigate what remains.",
                     "drill": {"kind": "inventory_top", "key": ""}})
     return out
+
+
+# ------------------------------------------------------------------ finance summary
+def _codes(text):
+    return [c.strip() for c in (text or "").split(",") if c.strip()]
+
+
+def parse_rates(text):
+    """'Slow-moving=25, Non-moving=50' -> {'Slow-moving': 25.0, 'Non-moving': 50.0}."""
+    out = {}
+    for part in (text or "").split(","):
+        key, _, value = part.partition("=")
+        try:
+            out[key.strip()] = max(0.0, min(100.0, float(value)))
+        except ValueError:
+            continue
+    return out
+
+
+def provision_proposal(class_totals, settings):
+    """A write-down proposal per stock class, at the rates set in Settings.
+
+    It is a proposal for the accountant, not a figure BC holds: nothing is posted, and the
+    rates are the group's own policy, entered in Settings."""
+    rates = parse_rates((settings.get("inventory") or {}).get("provision_rates"))
+    lines = []
+    for cls, rate in rates.items():
+        t = class_totals.get(cls) or {"value": 0.0, "items": 0}
+        lines.append({"class": cls, "rate": rate, "value": t["value"], "items": t["items"],
+                      "provision": t["value"] * rate / 100})
+    return {"lines": lines, "total": sum(l["provision"] for l in lines),
+            "basis": "Value at item cost of each stock class, times the rate set in Settings. "
+                     "A proposal for review: nothing is posted to Business Central."}
+
+
+def finance_summary(cards, loc_close, loc_open, accounts, cogs_accounts, settings,
+                    as_of, opening_date, cogs_days):
+    """The stock position in accounting terms.
+
+    cards:         snapshot() of every item at as_of, all locations: quantity, unit cost
+                   and inventory posting group.
+    loc_close/open:{location: {item: quantity}} at as_of and at opening_date.
+    accounts:      chart of accounts for the period (Balance_at_Date = closing balance,
+                   Net_Change = movement of the period).
+    cogs_accounts: chart of accounts for the trailing cogs_days, for days of inventory.
+    """
+    inv = settings.get("inventory") or {}
+    th = settings["thresholds"]
+    wanted = _codes(inv.get("accounts"))
+    excluded = set(_codes(inv.get("dio_exclude")))
+    cost = {k: v["unit_cost"] for k, v in cards.items()}
+
+    # --- by location: opening and closing at the same unit cost, so the change is quantity
+    locations = []
+    for loc in sorted(set(loc_close) | set(loc_open)):
+        close_q, open_q = loc_close.get(loc) or {}, loc_open.get(loc) or {}
+        close_v = sum(q * cost.get(i, 0.0) for i, q in close_q.items())
+        open_v = sum(q * cost.get(i, 0.0) for i, q in open_q.items())
+        neg = [(i, q) for i, q in close_q.items() if q < 0]
+        if not close_q and not open_q:
+            continue
+        locations.append({"location": loc, "opening": open_v, "closing": close_v,
+                          "change": close_v - open_v,
+                          "change_pct": ((close_v - open_v) / open_v * 100) if open_v else None,
+                          "items": sum(1 for q in close_q.values() if q > 0),
+                          "negative_items": len(neg),
+                          "negative_value": sum(q * cost.get(i, 0.0) for i, q in neg),
+                          "no_cost_items": sum(1 for i, q in close_q.items() if q > 0 and not cost.get(i))})
+    locations.sort(key=lambda r: -r["closing"])
+    loc_total_close = sum(r["closing"] for r in locations)
+    for r in locations:
+        r["share_pct"] = (r["closing"] / loc_total_close * 100) if loc_total_close else 0.0
+
+    # --- G/L by inventory account, against the item value posted to the same account
+    by_group = defaultdict(lambda: {"value": 0.0, "items": 0})
+    for c in cards.values():
+        g = by_group[c.get("posting_group") or ""]
+        g["value"] += c["value"]
+        g["items"] += 1
+    acc = {str(r.get("No")): r for r in accounts or []}
+    rows = []
+    for no in wanted:
+        r = acc.get(no)
+        closing = _f((r or {}).get("Balance_at_Date"))
+        change = _f((r or {}).get("Net_Change"))
+        item_value = by_group.get(no, {}).get("value", 0.0)
+        rows.append({"account": no, "name": ((r or {}).get("Name") or "").strip(),
+                     "found": r is not None, "opening": closing - change, "closing": closing,
+                     "change": change, "debit": _f((r or {}).get("Debit_Amount")),
+                     "credit": _f((r or {}).get("Credit_Amount")),
+                     "item_value": item_value, "items": by_group.get(no, {}).get("items", 0),
+                     "difference": item_value - closing,
+                     "flag": abs(item_value - closing) >= th["inventory_difference"],
+                     "in_dio": no not in excluded})
+    unmapped = sorted(({"posting_group": g or "(none)", **v} for g, v in by_group.items()
+                       if g not in wanted and abs(v["value"]) > 0.5), key=lambda x: -abs(x["value"]))
+    gl_close = sum(r["closing"] for r in rows)
+    gl_open = sum(r["opening"] for r in rows)
+    item_total = sum(c["value"] for c in cards.values())
+
+    # --- days of inventory, from BC's own cost-of-goods-sold category
+    cogs_rows = [r for r in cogs_accounts or []
+                 if (r.get("Account_Category") or "") == "Cost of Goods Sold"
+                 and (r.get("Account_Type") or "Posting") == "Posting"]
+    cogs = sum(_f(r.get("Net_Change")) for r in cogs_rows)
+    consumable = sum(r["closing"] for r in rows if r["in_dio"])
+    dio, dio_state = None, "ok"
+    if not wanted:
+        dio_state = "not_configured"
+    elif cogs <= 0:
+        dio_state = "under_validation"
+    else:
+        dio = consumable / (cogs / cogs_days)
+
+    top_cogs = sorted(({"account": str(r.get("No")), "name": (r.get("Name") or "").strip(),
+                        "amount": _f(r.get("Net_Change"))} for r in cogs_rows if _f(r.get("Net_Change"))),
+                      key=lambda x: -abs(x["amount"]))
+
+    return {
+        "as_of": as_of, "opening_date": opening_date,
+        "totals": {"gl_closing": gl_close, "gl_opening": gl_open, "gl_change": gl_close - gl_open,
+                   "item_value": item_total, "difference": item_total - gl_close,
+                   "difference_pct": ((item_total - gl_close) / gl_close * 100) if gl_close else None,
+                   "location_value": loc_total_close,
+                   "location_opening": sum(r["opening"] for r in locations),
+                   "negative_locations": sum(1 for r in locations if r["negative_items"]),
+                   "negative_value": sum(r["negative_value"] for r in locations)},
+        "locations": locations,
+        "accounts": rows,
+        "unmapped": unmapped,
+        "dio": {"days": dio, "state": dio_state, "consumable_stock": consumable,
+                "cogs": cogs, "cogs_days": cogs_days, "daily_cogs": (cogs / cogs_days) if cogs_days else 0,
+                "excluded": sorted(excluded), "accounts": top_cogs[:12],
+                "method": f"Closing balance of the inventory accounts, less {', '.join(sorted(excluded)) or 'none'}, "
+                          f"divided by the average daily cost of goods sold over the last {cogs_days} days. "
+                          f"Cost of goods sold is every posting account Business Central itself files under "
+                          f"the category 'Cost of Goods Sold'."},
+        "notes": [
+            "Location values are quantity on hand times today's unit cost on the item card, at both "
+            "dates. The change therefore shows quantity, not revaluation.",
+            "The G/L column is the posted balance of each inventory account. The item value beside it "
+            "is every item whose inventory posting group carries the same code.",
+            "Items in transit sit on the TRANSIT location and are counted there.",
+        ],
+    }

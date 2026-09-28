@@ -48,6 +48,7 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
 @media(max-width:760px){aside{display:none}main{padding:16px}}
 h2{font-size:15px;margin:0;font-weight:700}
 .hint{color:var(--sub);font-size:12.5px;margin:3px 0 12px}
+.sub-h{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:4px 0 8px}
 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
@@ -218,6 +219,18 @@ td.num,th.num{text-align:right}
     <div class="scroll"><table id="glTable"></table></div></div></section>
 
   <section class="view" id="v-inventory">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Stock position</h2>
+      <p class="hint" id="ssNote">Company-wide, at the end of the selected period.</p></div>
+      <button class="mini" id="ssLoad">Refresh</button></div>
+      <div class="kpis" id="ssKpis"></div>
+      <div class="grid" style="margin-bottom:0">
+        <div><h3 class="sub-h">By location</h3><div class="scroll"><table id="ssLoc"></table></div></div>
+        <div><h3 class="sub-h">Inventory accounts against the items posted to them</h3>
+          <div class="scroll"><table id="ssAcc"></table></div><p class="hint" id="ssUnmapped"></p></div>
+      </div>
+      <details style="margin-top:10px"><summary class="meta" style="cursor:pointer">How these figures are built</summary>
+        <div class="hint" id="ssMethod"></div></details>
+    </div>
     <div class="kpis five" id="invKpis"></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Inventory</h2><p class="hint" id="invNote"></p></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -429,6 +442,7 @@ function render(){
   $("excCount").textContent = k.critical;
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
+  if($("v-inventory").classList.contains("on")) loadStockSummary();
   if($("invLoc").options.length<=1){
     $("invLoc").innerHTML = '<option value="">All locations</option>' +
       Array.from($("dimension").options).slice(1).map(o=>`<option value="${esc(o.value)}">${esc(o.text)}</option>`).join("");
@@ -671,6 +685,8 @@ function renderSettings(){
   $("extraForm").innerHTML = `<label class="field">Budget name in BC<input id="bg-name" value="${esc(s.budget.name||"")}" placeholder="e.g. BUDGET2026"></label>
     <label class="field">Periods closed before<input type="date" id="closed" value="${esc(s.period_closed_before||"")}"></label>
     <label class="field">Inventory accounts (comma separated)<input id="inv-acc" value="${esc((s.inventory||{}).accounts||"")}" placeholder="e.g. 3121,3126"></label>
+    <label class="field">Provision rates by stock class (%)<input id="inv-prov" value="${esc((s.inventory||{}).provision_rates||"")}" placeholder="Slow-moving=25, Non-moving=50"></label>
+    <label class="field">Accounts left out of days of inventory<input id="inv-dio" value="${esc((s.inventory||{}).dio_exclude||"")}" placeholder="327, 372"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
     <label class="field">Exchange rates<input id="gr-rates" value="${esc((s.group||{}).rates||"")}" placeholder="EUR=100"></label>
@@ -688,7 +704,7 @@ $("saveSettings").onclick = async ()=>{
   try{
     const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({thresholds,owners,budget:{name:$("bg-name").value},period_closed_before:$("closed").value,
-        inventory:{accounts:$("inv-acc").value},
+        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -808,7 +824,7 @@ async function loadInventory(){
     const r = await fetch("/api/inventory?"+p.toString());
     const j = await r.json();
     if(!r.ok) throw new Error(j.error||"failed");
-    data.inventory = j; renderInventory();
+    data.inventory = j; renderInventory(); renderStockSummary();
   }catch(e){ $("invNote").textContent = "Could not read the inventory: "+e.message; }
 }
 $("invLoad").onclick = ()=>loadInventory();
@@ -853,6 +869,74 @@ function renderInventory(){
     <div>Inventory accounts in the G/L<b>${cur(rec.gl_balance)}</b></div>
     <div>Difference<b class="${Math.abs(rec.difference)>=data.settings.thresholds.inventory_difference?"up":""}">${sign(rec.difference)}</b></div>`
     : `<div>Set the inventory account numbers in Settings to see this comparison.<b>Not configured</b></div>`;
+}
+
+// ---------- stock position (finance summary) ----------
+async function loadStockSummary(){
+  $("ssNote").textContent = "Reading stock by location and the inventory accounts… the first read of a period takes a minute or two.";
+  try{
+    const r = await fetch("/api/stock-summary?"+params());
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||"failed");
+    data.stockSummary = j; renderStockSummary();
+  }catch(e){ $("ssNote").textContent = "Could not read the stock position: "+e.message; }
+}
+$("ssLoad").onclick = ()=>loadStockSummary();
+function renderStockSummary(){
+  const ss = data && data.stockSummary; if(!ss) return;
+  if(!ss.available){
+    $("ssNote").textContent = ss.error || "Data unavailable or not verified in Business Central.";
+    $("ssKpis").innerHTML = ""; $("ssLoc").innerHTML = ""; $("ssAcc").innerHTML = ""; return;
+  }
+  const t = ss.totals, d = ss.dio, th = data.settings.thresholds;
+  const inv = data.inventory||{}, prov = inv.loaded ? inv.provision : null;
+  const risk = inv.loaded ? inv.classes.filter(c=>c.class==="Slow-moving"||c.class==="Non-moving") : [];
+  const riskVal = risk.reduce((a,c)=>a+c.value,0);
+  const dioTxt = d.state==="ok" ? `${fmt(d.days)} days`
+    : d.state==="under_validation" ? "Under validation" : "Not configured";
+  const dioSub = d.state==="ok" ? `${cur(d.daily_cogs)} cost of sales a day, last ${d.cogs_days} days`
+    : d.state==="under_validation" ? `Cost of goods sold nets to ${cur(d.cogs)} over ${d.cogs_days} days, so the ratio would mislead`
+    : "Set the inventory accounts in Settings";
+  const diffBad = Math.abs(t.difference) >= th.inventory_difference;
+  $("ssNote").textContent = `${data.meta.company} · opening ${ss.opening_date} → closing ${ss.as_of}${ss.settled?"":" (period still open)"} · all locations and departments` +
+    (ss.missing_locations.length ? ` · not read: ${ss.missing_locations.join(", ")}` : "");
+  $("ssKpis").innerHTML = `
+    <div class="card kpi"><div class="l">Inventory in the G/L</div><div class="v">${cur(t.gl_closing)}</div>
+      <div class="s">${sign(t.gl_change)} since ${ss.opening_date}</div></div>
+    <div class="card kpi"><div class="l">Item value against the G/L</div><div class="v ${diffBad?"up":""}">${sign(t.difference)}</div>
+      <div class="s">${cur(t.item_value)} at item cost${t.difference_pct!=null?` · ${fmt(t.difference_pct,1)}%`:""}</div></div>
+    <div class="card kpi"><div class="l">Days of inventory</div><div class="v ${d.state==="ok"?"":"up"}">${dioTxt}</div>
+      <div class="s">${esc(dioSub)}</div></div>
+    <div class="card kpi"><div class="l">Slow and non-moving</div><div class="v">${inv.loaded?cur(riskVal):"–"}</div>
+      <div class="s">${inv.loaded?`${fmt(risk.reduce((a,c)=>a+c.items,0))} items`:"Shown once the inventory below is read"}</div></div>
+    <div class="card kpi"><div class="l">Proposed provision</div><div class="v">${prov?cur(prov.total):"–"}</div>
+      <div class="s">${prov?prov.lines.map(l=>`${esc(l.class)} ${fmt(l.rate)}%`).join(" · ")+" · not posted":"Rates in Settings"}</div></div>
+    <div class="card kpi"><div class="l">Negative stock</div><div class="v ${t.negative_locations?"up":""}">${fmt(t.negative_locations)}</div>
+      <div class="s">locations with negative items, ${cur(t.negative_value)}</div></div>`;
+  $("ssLoc").innerHTML = `<tr><th>Location</th><th class="num">Opening</th><th class="num">Closing</th><th class="num">Change</th><th class="num">Share</th><th class="num">Negative</th></tr>` +
+    ss.locations.map(r=>`<tr><td class="name">${esc(r.location)}<div class="meta">${fmt(r.items)} items${r.no_cost_items?` · ${fmt(r.no_cost_items)} at zero cost`:""}</div></td>
+      <td class="num">${fmt(r.opening)}</td><td class="num"><b>${fmt(r.closing)}</b></td>
+      <td class="num">${sign(r.change)}<div>${pctChip(r.change_pct)}</div></td>
+      <td class="num">${fmt(r.share_pct,1)}%</td>
+      <td class="num ${r.negative_items?"up":""}">${r.negative_items?fmt(r.negative_items):"–"}</td></tr>`).join("") +
+    `<tr><td class="name"><b>Total</b></td><td class="num"><b>${fmt(t.location_opening)}</b></td><td class="num"><b>${fmt(t.location_value)}</b></td>
+      <td class="num"><b>${sign(t.location_value-t.location_opening)}</b></td><td></td><td></td></tr>`;
+  $("ssAcc").innerHTML = `<tr><th>Account</th><th class="num">G/L opening</th><th class="num">G/L closing</th><th class="num">Item value</th><th class="num">Difference</th></tr>` +
+    ss.accounts.map(a=>`<tr><td class="name">${esc(a.account)} ${esc(a.name)}<div class="meta">${a.found?`${fmt(a.items)} items${a.in_dio?"":" · left out of days of inventory"}`:"not found in the chart of accounts"}</div></td>
+      <td class="num">${fmt(a.opening)}</td><td class="num"><b>${fmt(a.closing)}</b></td>
+      <td class="num">${fmt(a.item_value)}</td><td class="num ${a.flag?"up":""}">${sign(a.difference)}</td></tr>`).join("") +
+    `<tr><td class="name"><b>Total</b></td><td class="num"><b>${fmt(t.gl_opening)}</b></td><td class="num"><b>${fmt(t.gl_closing)}</b></td>
+      <td class="num"><b>${fmt(ss.accounts.reduce((a,r)=>a+r.item_value,0))}</b></td>
+      <td class="num ${diffBad?"up":""}"><b>${sign(ss.accounts.reduce((a,r)=>a+r.difference,0))}</b></td></tr>`;
+  $("ssUnmapped").textContent = ss.unmapped.length
+    ? "Items whose posting group is not among the inventory accounts in Settings: " +
+      ss.unmapped.map(u=>`${u.posting_group} ${fmt(u.value)} (${fmt(u.items)} items)`).join(" · ")
+    : "Every item with stock posts to one of the inventory accounts in Settings.";
+  $("ssMethod").innerHTML = `<p>${esc(d.method)}</p>` +
+    (d.accounts.length ? `<p>Cost of goods sold, last ${d.cogs_days} days: ` + d.accounts.map(a=>`${esc(a.account)} ${esc(a.name)} ${fmt(a.amount)}`).join(" · ") + `</p>` : "") +
+    ss.notes.map(n=>`<p>${esc(n)}</p>`).join("") +
+    (prov ? `<p>${esc(prov.basis)}</p>` : "") +
+    `<p>Sources: ${ss.sources.map(x=>`${esc(x.source)} (${esc(x.status)}${x.reason?": "+esc(x.reason):""})`).join(" · ")}. Read in ${fmt(ss.ms/1000,1)} s.</p>`;
 }
 
 // ---------- month-end close ----------
@@ -1016,6 +1100,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
+  if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");

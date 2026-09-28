@@ -24,6 +24,8 @@ import finance
 import inventory
 import store
 import treasury
+from concurrent.futures import ThreadPoolExecutor
+
 from bc_client import BCClient, BCError
 
 STATIC = config.BASE_DIR / "static"
@@ -340,6 +342,81 @@ def inventory_screen(company, anchor, mode, dimension, location=None):
             existing = {e["code"] for e in d["exceptions"]}
             d["exceptions"] = d["exceptions"] + [e for e in inv["exceptions"] if e["code"] not in existing]
     return inv
+
+
+_summary_cache = {}
+_summary_lock = threading.Lock()
+COGS_DAYS = 90
+
+
+def stock_summary(company, anchor, mode):
+    """The stock position for finance: value by location, the inventory accounts against
+    the items posted to them, and days of inventory. Company-wide, whatever location or
+    department is selected elsewhere, because the accounts are company-wide."""
+    settings = store.get_settings()
+    c_from, c_to, *_ = periods(anchor, mode)
+    opening = c_from - timedelta(days=1)
+    settled = c_to < date.today()
+    key = (company, c_from.isoformat(), c_to.isoformat(),
+           json.dumps(settings.get("inventory"), sort_keys=True))
+    with _summary_lock:
+        hit = _summary_cache.get(key)
+        if hit and time.time() - hit[0] < (3600 if settled else 600):
+            return hit[1]
+    t0, sources = time.time(), []
+    age = 86400 if settled else 900
+
+    locations = _safe(sources, "Locations", lambda: client.locations(company), [])
+    jobs = {
+        "cards": ("Item cards at the period end, all locations",
+                  lambda: client.item_snapshot(company, c_to.isoformat(), None, age)),
+        "accounts": ("Inventory accounts for the period",
+                     lambda: client.accounts(company, c_from.isoformat(), c_to.isoformat(), None, age)),
+        "cogs": (f"Cost of goods sold, last {COGS_DAYS} days",
+                 lambda: client.accounts(company, (c_to - timedelta(days=COGS_DAYS - 1)).isoformat(),
+                                         c_to.isoformat(), None, age)),
+    }
+    for loc in locations:
+        jobs[f"close::{loc}"] = (None, lambda l=loc: client.stock_by_location(company, l, c_to.isoformat(), age))
+        jobs[f"open::{loc}"] = (None, lambda l=loc: client.stock_by_location(company, l, opening.isoformat(), 86400))
+    got, failed = {}, []
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {name: pool.submit(call) for name, (_, call) in jobs.items()}
+        for name, fut in futures.items():
+            label = jobs[name][0]
+            t = time.time()
+            try:
+                got[name] = fut.result()
+                if label:
+                    sources.append({"source": label, "status": "ok", "ms": int((time.time() - t) * 1000)})
+            except BCError as exc:
+                got[name] = None
+                if label:
+                    sources.append({"source": label, "status": "unavailable", "reason": str(exc)[:300]})
+                else:
+                    failed.append(name.split("::", 1)[1])
+    if locations:
+        sources.append({"source": f"Stock by location, {len(locations)} locations at two dates",
+                        "status": "unavailable" if failed else "ok",
+                        "reason": ("Not read: " + ", ".join(sorted(set(failed)))) if failed else ""})
+    if got.get("cards") is None or got.get("accounts") is None:
+        return {"available": False, "sources": sources,
+                "error": "Data unavailable or not verified in Business Central."}
+
+    cards = inventory.snapshot(got["cards"])
+    loc_close = {l: got[f"close::{l}"] for l in locations if got.get(f"close::{l}") is not None}
+    loc_open = {l: got[f"open::{l}"] for l in locations if got.get(f"open::{l}") is not None}
+    out = inventory.finance_summary(cards, loc_close, loc_open, got["accounts"], got.get("cogs") or [],
+                                    settings, c_to.isoformat(), opening.isoformat(), COGS_DAYS)
+    out.update({"available": True, "company": company, "period": [c_from.isoformat(), c_to.isoformat()],
+                "settled": settled, "sources": sources, "missing_locations": sorted(set(failed)),
+                "ms": int((time.time() - t0) * 1000)})
+    with _summary_lock:
+        _summary_cache[key] = (time.time(), out)
+        if len(_summary_cache) > 6:
+            for k, _ in sorted(_summary_cache.items(), key=lambda kv: kv[1][0])[:2]:
+                _summary_cache.pop(k, None)
+    return out
 
 
 def closing_screen(company, anchor, mode):
@@ -798,6 +875,9 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/inventory":
                 self._send(200, inventory_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                                  q.get("mode", "month"), q.get("dimension"), q.get("location")))
+            elif url.path == "/api/stock-summary":
+                self._send(200, stock_summary(q.get("company") or config.BC_COMPANY, q.get("period"),
+                                              q.get("mode", "month")))
             elif url.path == "/api/closing":
                 self._send(200, closing_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                                q.get("mode", "month")))

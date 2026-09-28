@@ -44,7 +44,11 @@ DEFAULT_SETTINGS = {
     "owners": {"default": "", "accounting": "", "treasury": "", "receivables": "",
                "payables": "", "inventory": ""},
     "budget": {"name": ""},
-    "inventory": {"accounts": "", "locations": ""},
+    "inventory": {"accounts": "", "locations": "",
+                  # share of the value written down per stock class; a proposal, not a posting
+                  "provision_rates": "Slow-moving=25, Non-moving=50",
+                  # inventory accounts left out of days of inventory: held, not consumed
+                  "dio_exclude": "327, 372"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses

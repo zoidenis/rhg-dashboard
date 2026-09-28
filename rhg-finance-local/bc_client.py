@@ -257,7 +257,8 @@ class BCClient:
         return self._cached_immutable("fa", company, date_from, date_to, go)
 
     ITEM_FIELDS = ["No", "Description", "InventorybyDate", "InventoryField", "Unit_Cost", "Last_Direct_Cost",
-                   "Item_Category_Code", "Base_Unit_of_Measure", "Costing_Method", "Blocked", "Vendor_No"]
+                   "Item_Category_Code", "Base_Unit_of_Measure", "Costing_Method", "Blocked", "Vendor_No",
+                   "Inventory_Posting_Group"]
 
     def item_snapshot(self, company, as_of, location=None, max_age=900):
         """Stock on hand per item at a date, calculated by BC through the item card's
@@ -269,6 +270,29 @@ class BCClient:
             return self._get_all(self._url(company, config.E_ITEMS),
                                  {"$filter": flt, "$select": ",".join(self.ITEM_FIELDS)})
         return self._cached(("items", company, as_of, location or ""), max_age, go)
+
+    def locations(self, company, max_age=3600):
+        """Location codes. The published page carries the code only, so nothing else is
+        selected: asking for a field that does not exist fails the whole request."""
+        def go():
+            rows = self._get_all(self._url(company, config.E_LOCATIONS), {"$select": "Code"})
+            return sorted(str(r.get("Code")).strip() for r in rows if r.get("Code"))
+        return self._cached(("locs", company), max_age, go)
+
+    def stock_by_location(self, company, location, as_of, max_age=900):
+        """{item: quantity} on hand at one location on one date, non-zero items only.
+
+        BC evaluates the InventorybyDate flow field for the filter, so asking only for
+        the items where it is not zero brings back about a thousand rows per location
+        instead of every one of the 15,000 item cards. Only the quantity is kept; the
+        cost comes from the one item-card read shared by every location."""
+        def go():
+            flt = (f"Date_Filter eq '..{as_of}' and Location_Filter eq '{location}' "
+                   f"and InventorybyDate ne 0")
+            rows = self._get_all(self._url(company, config.E_ITEMS),
+                                 {"$filter": flt, "$select": "No,InventorybyDate"})
+            return {str(r.get("No")): float(r.get("InventorybyDate") or 0) for r in rows}
+        return self._cached(("locqty", company, location, as_of), max_age, go)
 
     def financial_report_kpis(self, company, max_age=900):
         """pbfinance: account-schedule KPIs. Its own date filter is ignored by the service,

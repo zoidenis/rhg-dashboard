@@ -48,6 +48,7 @@ E_ITEMS = get("E_ITEMS", "PbItems")
 # whether anything actually moved.
 E_ILE = get("E_ILE", "ItemLedgerEntries")
 E_REGISTERS = get("E_REGISTERS", "ItemRegisters")
+E_LOCATIONS = get("E_LOCATIONS", "NavLocations")
 
 # Background warm-up and instant serving, as in the purchasing tower.
 WARM_AT = get("WARM_AT", "05:15")
