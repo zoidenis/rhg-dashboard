@@ -4,6 +4,7 @@ Business Central stays strictly read-only. Everything the Purchasing Director
 creates here (actions, comments, thresholds) lives in JSON files next to the app.
 """
 import json
+import re
 import threading
 import uuid
 from datetime import datetime, timedelta, date
@@ -58,6 +59,11 @@ DEFAULT_SETTINGS = {
     # that is not named. MAGAZINE holds imported goods, so it carries a long lead time.
     "stock": {"cadence": "*=2/3/2, MAGAZINE=45/30/10",
               "owners": "Stock Manager=, Unit Manager=, Purchasing Coordinator=, Cost Controller="},
+    # Daily email of invoices posted without a purchase order. Off until someone turns it on,
+    # so a new install never mails anyone by surprise. Emails are comma separated.
+    "notifications": {"enabled": False, "time": "08:00", "companies": "",
+                      "coordinator": "", "manager": "", "cost_controller": "",
+                      "lookback_days": 30, "working_days_only": False, "send_empty": False},
     "exclude_weekends": True,
     "updated_at": None,
 }
@@ -92,6 +98,7 @@ def get_settings():
     merged["classification"].update(s.get("classification", {}))
     merged["currencies"].update(s.get("currencies", {}))
     merged["stock"].update(s.get("stock", {}))
+    merged["notifications"].update(s.get("notifications", {}))
     for k in ("exclude_weekends", "updated_at"):
         if k in s:
             merged[k] = s[k]
@@ -123,11 +130,33 @@ def save_settings(patch, actor="director"):
         for k, v in (patch.get("stock") or {}).items():
             if k in DEFAULT_SETTINGS["stock"]:
                 current.setdefault("stock", {})[k] = str(v)[:600]
+        for k, v in (patch.get("notifications") or {}).items():
+            if k not in DEFAULT_SETTINGS["notifications"]:
+                continue
+            default = DEFAULT_SETTINGS["notifications"][k]
+            if isinstance(default, bool):
+                v = bool(v)
+            elif isinstance(default, int):
+                try:
+                    v = max(1, min(120, int(float(v))))
+                except (TypeError, ValueError):
+                    continue
+            elif k == "time":
+                v = str(v).strip()[:5]
+                if not re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", v):
+                    continue
+            else:
+                v = str(v)[:600]
+            current.setdefault("notifications", {})[k] = v
         if "exclude_weekends" in patch:
             current["exclude_weekends"] = bool(patch["exclude_weekends"])
         current["updated_at"] = _now()
         _write(SETTINGS_FILE, current)
-        _audit_unlocked("settings", "thresholds", actor, before.get("thresholds"), current.get("thresholds"))
+        if set(patch) - {"notifications"}:
+            _audit_unlocked("settings", "thresholds", actor, before.get("thresholds"), current.get("thresholds"))
+        if patch.get("notifications"):
+            _audit_unlocked("settings", "notifications", actor, before.get("notifications"),
+                            current.get("notifications"))
     return get_settings()
 
 

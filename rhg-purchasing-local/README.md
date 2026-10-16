@@ -84,6 +84,20 @@ Pragjet: 24 orë warning, 48 orë critical, të ndryshueshme te Settings.
   rreshta pa kod artikulli. Çdo gjetje hapet me regjistrat dhe kthehet në veprim.
 - **Reports**: Daily brief dhe Weekly report, me eksport CSV dhe printim (Ctrl+P → Save as PDF).
 
+## Njoftimet me email (Faturat pa PO)
+Çdo ditë në orën e caktuar (default 08:00, ora e Tiranës) tower-i i dërgon Purchasing Coordinator-it një email me faturat e postuara në BC pa urdhër blerjeje:
+- **Të reja që nga njoftimi i fundit**: fatura që nuk janë raportuar më parë.
+- **Më herët, ende të hapura**: fatura të ditëve të mëparshme (brenda dritares, default 30 ditë) që nuk janë mbyllur ende.
+
+Një faturë mbyllet kur veprimi i saj në Action center bëhet *Resolved* ose *Dismissed*. Butoni **Track** te "Invoices without PO" e krijon këtë veprim. BC nuk preket: gjithçka ruhet te `data/`.
+
+**Konfigurimi**
+1. Serveri i postës, një herë, te `.env` në server: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `PUBLIC_URL` (shih `.env.example`). Për Microsoft 365 përdor `smtp.office365.com`, portin 587 dhe `starttls`. Kutia që dërgon duhet të ketë **Authenticated SMTP** të aktivizuar (Microsoft 365 admin center → Users → përdoruesi → Mail → Manage email apps).
+2. Marrësit, te tower-i: **Settings → Email notifications**. Purchasing Coordinator del te *To*, kurse Purchasing Manager dhe Cost Controller te *Cc*. Aty vendosen edhe ora, kompanitë, dritarja e kujtesës dhe "vetëm ditë pune". Njoftimi është i fikur derisa të shënohet kutia dhe të ruhet.
+3. **Preview the email** tregon emailin pa dërguar asgjë. **Send a test** e dërgon vetëm te adresa e shkruar (ose te marrësit, nëse fusha është bosh) dhe nuk shënon asgjë si të raportuar.
+
+Historiku i dërgimeve shfaqet nën formular dhe te Audit history.
+
 ## Opsione
 - Të tjerët në zyrë ta hapin: `APP_HOST=0.0.0.0`, pastaj `http://IP-e-PC-së:8765` (lejo portin 8765 në Windows Firewall). Pa login — vetëm në rrjet të besuar.
 - Nisje automatike me Windows: shkurtore e `start.bat` te `shell:startup`.

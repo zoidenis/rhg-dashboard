@@ -5,6 +5,7 @@ app are stored locally under ./data and never written back to BC.
 
 Run:  python server.py     then open http://127.0.0.1:8765
 """
+import html
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -22,6 +23,7 @@ import auth
 import brief
 import classify
 import compliance
+import notify
 import contracts
 import comparisons
 import config
@@ -609,6 +611,37 @@ def compliance_screen(company, month, months_back=6):
     return out
 
 
+def nopo_window(company, date_from, date_to):
+    """Invoices without an order over any window of days, for the daily email.
+
+    The same proof as the Invoices without PO screen (compliance.build), without the
+    monthly trend, and read fresh: the email goes out once a day and must not rely on
+    a figure held from the evening before."""
+    settings = store.get_settings()
+    currency.set_current(company_currency(company, settings))
+    try:
+        headers = client.posted_invoices(company, date_from.isoformat(), date_to.isoformat(), 60)
+    except BCError as exc:
+        return {"available": False, "error": "Data unavailable or not verified in Business Central.",
+                "reason": str(exc)[:300]}
+    docs = sorted(str(h.get("No")) for h in headers if h.get("No"))
+    blank_lines = []
+    if docs:
+        try:
+            wanted = set(docs)
+            blank_lines = [l for l in client.invoice_lines_without_order(company, docs[0], docs[-1], 60)
+                           if str(l.get("Document_No")) in wanted]
+        except BCError:
+            blank_lines = []
+    out = compliance.build(headers, blank_lines, settings,
+                           f"{date_from.isoformat()} to {date_to.isoformat()}")
+    out["available"] = True
+    return out
+
+
+notifier = notify.Notifier(nopo_window, config.BC_COMPANY)
+
+
 _streams_cache = {}
 
 
@@ -990,6 +1023,7 @@ def drill(kind, key):
 
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
+                     "/api/notify/test": "settings",
                      "/api/users": "users", "/api/password": "view"}
 
 
@@ -1153,6 +1187,18 @@ class Handler(BaseHTTPRequestHandler):
                                  "priorities": store.PRIORITIES})
             elif url.path == "/api/settings":
                 self._send(200, store.get_settings())
+            elif url.path == "/api/notify/status":
+                self._send(200, {"smtp": notify.smtp_info(), "settings": store.get_settings()["notifications"],
+                                 "recipients": notifier.recipients(), "companies": notifier.companies(),
+                                 "next_run": notifier.next_run(), "runs": notify.recent_runs(),
+                                 "me": (user or {}).get("email") or ""})
+            elif url.path == "/api/notify/preview":
+                try:
+                    body = notifier.preview(q.get("company") or notifier.companies()[0])
+                except Exception as exc:                         # noqa: BLE001
+                    body = (f"<p style='font-family:sans-serif'>The preview could not be built: "
+                            f"{html.escape(str(exc)[:300])}</p>")
+                self._send(200, body.encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/api/audit":
                 self._send(200, {"audit": store.get_audit()})
             elif url.path == "/api/companies":
@@ -1218,6 +1264,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200 if updated else 404, updated or {"error": "Action not found"})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path == "/api/notify/test":
+                to, bad = notify.parse_emails(body.get("to") or "")
+                if bad:
+                    self._send(400, {"error": f"Not an email address: {', '.join(bad)[:120]}"})
+                    return
+                company = body.get("company") or notifier.companies()[0]
+                self._send(200, notifier.send(company, test=True, only_to=to or None, actor=actor))
             else:
                 self._send(404, {"error": "Not found"})
         except Exception as exc:  # noqa: BLE001
@@ -1292,6 +1345,9 @@ def main():
     print(f"Business Central: {config.BC_BASE_URL}  company: {config.BC_COMPANY}  (read-only)")
     print("Press Ctrl+C to stop.")
     threading.Thread(target=_warm_loop, daemon=True).start()
+    notifier.start()
+    print("Email notices: " + ("mail server " + config.SMTP_HOST if config.SMTP_HOST
+                               else "no mail server set (SMTP_HOST in .env)"))
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(link)).start()
     try:

@@ -632,6 +632,34 @@ td.num,th.num{text-align:right}
       <button class="btn dark" id="saveSettings">Save thresholds</button>
       <span class="meta" id="settingsSaved" style="margin-left:10px"></span>
     </div>
+    <div class="card" style="margin-bottom:16px" id="ntCard">
+      <div class="card-head"><div><h2>Email notifications</h2>
+        <p class="hint">A daily email of the invoices posted without a purchase order: the new ones since the last notice, and those reported before that nobody has closed. An invoice is closed when its action in the Action center is Resolved or Dismissed.</p></div>
+        <span class="rhg-pill" id="ntSmtp">Mail server…</span></div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:12px">
+        <input type="checkbox" id="ntEnabled" style="width:auto"> <b>Send the daily notice of invoices without a PO</b></label>
+      <div class="formgrid">
+        <label class="field">Purchasing Coordinator (To)<input id="ntCoord" placeholder="name@rhg.al, other@rhg.al"></label>
+        <label class="field">Purchasing Manager (Cc)<input id="ntMgr" placeholder="optional"></label>
+        <label class="field">Cost Controller (Cc)<input id="ntCost" placeholder="optional"></label>
+        <label class="field">Send at<input id="ntTime" type="time" value="08:00"></label>
+        <label class="field">Companies (comma separated)<input id="ntCompanies" placeholder="SALT"></label>
+        <label class="field">Keep reminding for (days)<input id="ntDays" type="number" min="1" max="120" value="30"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 6px">
+        <input type="checkbox" id="ntWorkdays" style="width:auto"> Working days only (Monday's email covers the weekend)</label>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:12px">
+        <input type="checkbox" id="ntEmpty" style="width:auto"> Send the email even when there is nothing to report</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="ntSave">Save notifications</button>
+        <button class="btn" id="ntPreview">Preview the email</button>
+        <input id="ntTestTo" placeholder="send a test to…" style="width:220px">
+        <button class="btn" id="ntTest">Send a test</button>
+        <span class="meta" id="ntMsg"></span>
+      </div>
+      <p class="meta" id="ntNext" style="margin-top:10px"></p>
+      <div class="scroll" style="margin-top:8px"><table id="ntRuns"></table></div>
+    </div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action assignment, status change, comment and threshold change made in this app.</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -1527,7 +1555,7 @@ function renderSettings(){
     <label class="field" style="grid-column:1/-1">Single G/L account to purchase type<input id="cl-svc" value="${esc((s.classification||{}).service_accounts||"")}" placeholder="636=Recurring Contracts, 6271=Services"></label>`;
   $("setWeekends").checked = !!s.exclude_weekends;
   settingsRendered = true;
-  loadAudit();
+  loadAudit(); loadNotify();
 }
 $("saveSettings").onclick = async () => {
   const thresholds = {}, owners = {};
@@ -1548,6 +1576,75 @@ $("saveSettings").onclick = async () => {
     $("settingsSaved").textContent = "Saved. Applied on the next refresh.";
     await load(true); loadAudit();
   }catch(e){ $("settingsSaved").textContent = "Could not save: " + e.message; }
+};
+// ---------- email notifications ----------
+let ntStatus = null;
+async function loadNotify(){
+  try{
+    const r = await fetch("/api/notify/status"); const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "failed");
+    ntStatus = j; renderNotify();
+  }catch(e){ $("ntMsg").textContent = "Could not read the notification settings: " + e.message; }
+}
+function renderNotify(){
+  const j = ntStatus, n = j.settings || {}, sm = j.smtp || {};
+  $("ntSmtp").className = "rhg-pill " + (sm.configured ? "ok" : "warning");
+  $("ntSmtp").textContent = sm.configured ? `Mail server · ${sm.host}:${sm.port} · from ${sm.from}` : "Mail server not set";
+  $("ntSmtp").title = sm.configured ? "" : "Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in the tower's .env on the server.";
+  $("ntEnabled").checked = !!n.enabled;
+  $("ntCoord").value = n.coordinator || ""; $("ntMgr").value = n.manager || ""; $("ntCost").value = n.cost_controller || "";
+  $("ntTime").value = n.time || "08:00"; $("ntCompanies").value = n.companies || "";
+  $("ntCompanies").placeholder = (j.companies || []).join(", ") || "SALT";
+  $("ntDays").value = n.lookback_days || 30;
+  $("ntWorkdays").checked = !!n.working_days_only; $("ntEmpty").checked = !!n.send_empty;
+  if(!$("ntTestTo").value) $("ntTestTo").value = j.me || "";
+  const rec = j.recipients || {};
+  $("ntNext").innerHTML = (n.enabled
+      ? (j.next_run ? `Next email: <b>${esc(j.next_run.replace("T"," "))}</b>` : "Next email: not scheduled")
+      : "Off: nothing is sent until the box above is ticked and saved.")
+    + (rec.to && rec.to.length ? ` · To ${esc(rec.to.join(", "))}${rec.cc.length ? ` · Cc ${esc(rec.cc.join(", "))}` : ""}` : " · No recipient set yet.")
+    + (rec.invalid && rec.invalid.length ? ` · <span class="up">Not an email address: ${esc(rec.invalid.join(", "))}</span>` : "")
+    + (sm.configured ? "" : ` · <span class="warn">The mail server is not set on the server, so nothing can be sent yet.</span>`);
+  const runs = j.runs || [];
+  $("ntRuns").innerHTML = `<tr><th>When</th><th>Company</th><th class="num">New</th><th class="num">Still open</th><th>Sent to</th><th>Result</th></tr>` +
+    (runs.length ? runs.slice(0,15).map(x => `<tr><td class="meta">${esc((x.ts||"").replace("T"," "))}${x.test?' <span class="chip">test</span>':""}</td>
+      <td>${esc(x.company)}</td><td class="num">${x.new==null?"–":fmt(x.new)}</td><td class="num">${x.still==null?"–":fmt(x.still)}</td>
+      <td class="meta">${esc((x.to||[]).concat(x.cc||[]).join(", "))}</td>
+      <td><span class="rhg-pill ${x.status==="sent"?"ok":x.status==="failed"?"critical":"info"}">${esc(x.status)}</span>
+        <div class="meta">${esc(x.detail||"")}</div></td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">No email sent yet.</td></tr>`);
+  ["ntSave","ntTest"].forEach(id => { $(id).disabled = !can("settings");
+    if(!can("settings")) $(id).title = "Your role cannot change Settings."; });
+}
+function notifyPatch(){
+  return {enabled: $("ntEnabled").checked, coordinator: $("ntCoord").value, manager: $("ntMgr").value,
+    cost_controller: $("ntCost").value, time: $("ntTime").value || "08:00", companies: $("ntCompanies").value,
+    lookback_days: $("ntDays").value || 30, working_days_only: $("ntWorkdays").checked, send_empty: $("ntEmpty").checked};
+}
+$("ntSave").onclick = async () => {
+  $("ntMsg").textContent = "Saving…";
+  try{
+    const r = await fetch("/api/settings", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({notifications: notifyPatch()})});
+    if(!r.ok) throw new Error((await r.json()).error || "save failed");
+    $("ntMsg").textContent = "Saved."; await loadNotify();
+  }catch(e){ $("ntMsg").textContent = "Could not save: " + e.message; }
+};
+$("ntPreview").onclick = () => {
+  const c = ($("ntCompanies").value.split(",")[0] || "").trim() || $("company").value;
+  window.open("/api/notify/preview?company=" + encodeURIComponent(c), "_blank");
+};
+$("ntTest").onclick = async () => {
+  $("ntMsg").textContent = "Reading Business Central and sending…";
+  try{
+    const c = ($("ntCompanies").value.split(",")[0] || "").trim() || $("company").value;
+    const r = await fetch("/api/notify/test", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({company: c, to: $("ntTestTo").value})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "failed");
+    $("ntMsg").textContent = j.status === "sent" ? `Test sent to ${(j.to||[]).join(", ")}.` : `Not sent: ${j.detail||j.status}`;
+    await loadNotify();
+  }catch(e){ $("ntMsg").textContent = "Could not send: " + e.message; }
 };
 async function loadAudit(){
   try{
@@ -1840,11 +1937,28 @@ function renderCompliance(){
       : `<tr><td colspan="7" class="empty">Nothing to act on this month.</td></tr>`);
 
   $("cplListNote").textContent = `${fmt(d.invoices.length)} invoice(s) with no order, with the reference to find each one in BC.`;
-  $("cplList").innerHTML = `<tr><th>Invoice</th><th>Supplier</th><th>Posted</th><th>Unit</th><th>Category</th><th>Lines</th><th class="num">Value</th></tr>` +
-    d.invoices.map(i=>`<tr><td class="name">${esc(i.invoice)}<div class="meta">${esc(i.reference)}${i.vendor_invoice?` · supplier ref ${esc(i.vendor_invoice)}`:""}</div></td>
+  const cplKey = i => `nopo-${d.company}-${i.invoice}`;
+  $("cplList").innerHTML = `<tr><th>Invoice</th><th>Supplier</th><th>Posted</th><th>Unit</th><th>Category</th><th>Lines</th><th class="num">Value</th><th>Follow-up</th></tr>` +
+    d.invoices.map((i,n)=>{
+      const act = ((data && data.actions) || actions || []).find(a => a.source_exception === cplKey(i));
+      const follow = act ? `<span class="chip">${esc(act.status)}</span><div class="meta">${esc(act.owner||"")}</div>`
+        : `<button class="mini" data-cpltrack="${n}" ${can("actions")?"":"disabled"}>Track</button>`;
+      return `<tr><td class="name">${esc(i.invoice)}<div class="meta">${esc(i.reference)}${i.vendor_invoice?` · supplier ref ${esc(i.vendor_invoice)}`:""}</div></td>
       <td>${esc(i.vendor)}</td><td class="meta">${esc(i.posted)}</td><td>${esc(i.unit)}</td>
       <td class="meta">${esc(i.category)}</td><td class="meta">${esc(i.line_types.join(", ")||i.state)}</td>
-      <td class="num"><b>${fmt(i.unlinked_value)}</b></td></tr>`).join("");
+      <td class="num"><b>${fmt(i.unlinked_value)}</b></td><td>${follow}</td></tr>`;}).join("");
+  document.querySelectorAll("#cplList [data-cpltrack]").forEach(b => b.onclick = () => {
+    const i = d.invoices[+b.dataset.cpltrack];
+    const big = i.unlinked_value >= ((data && data.settings && data.settings.thresholds.exception_spend) || 100000);
+    const services = /SHERBIME|INVESTIME/i.test(i.category||"") && i.state === "No order";
+    createAction({title:`Invoice ${i.invoice} without a PO: ${i.vendor}`,
+      description:`Posted ${i.posted} with no purchase order (${i.state}). ${i.unit} · ${i.category}. `
+        + `Record who approved it, then mark this Resolved; it stops appearing in the daily email.`,
+      source_exception: cplKey(i), bc_document: i.invoice, document_type: "Posted purchase invoice",
+      company: d.company, supplier: i.vendor, impact: i.unlinked_value, priority: big ? "High" : "Medium",
+      owner: (data && data.settings && (data.settings.owners.invoices || data.settings.owners.default))
+        || (services ? "Purchasing Manager" : "Purchasing Coordinator"), confidence: "high"});
+  });
 }
 $("cplListToggle").onclick = () => {
   const box = $("cplListBox"), open = box.style.display === "block";

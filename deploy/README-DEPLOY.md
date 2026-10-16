@@ -55,6 +55,8 @@ chmod 600 /opt/rhg/rhg-*/.env
 ```
 `APP_HOST` dhe `APP_PORT` **mos i ndrysho** — compose i mbishkruan vetë.
 
+Për emailet e Purchasing (Faturat pa PO), shto te `/opt/rhg/rhg-purchasing-local/.env` blloqet `SMTP_*` dhe `PUBLIC_URL` nga `.env.example`, pastaj rindiz kontejnerin: `docker compose up -d purchasing`. Pa `SMTP_HOST` tower-i punon normalisht, por emailet nuk dërgohen.
+
 ### 4. Nis
 ```bash
 cd /opt/rhg/deploy && ./deploy.sh

@@ -87,3 +87,15 @@ INCLUDE_EXPECTED_COST = get("INCLUDE_EXPECTED_COST", "true").lower() != "false"
 LOCATION_SPREAD_PCT = float(get("LOCATION_SPREAD_PCT", "20"))
 
 LATE_POSTING_DAYS = int(get("LATE_POSTING_DAYS", "7"))
+
+# ---- Email notices (Settings → Email notifications decides who gets what, and when) ----
+# Microsoft 365: SMTP_HOST=smtp.office365.com, SMTP_PORT=587, SMTP_SECURITY=starttls, and a
+# mailbox with "Authenticated SMTP" turned on. SMTP_FROM must be that mailbox (or one it may send as).
+SMTP_HOST = get("SMTP_HOST", "")
+SMTP_SECURITY = get("SMTP_SECURITY", "starttls").lower()          # starttls | ssl | none
+SMTP_PORT = int(get("SMTP_PORT", "465" if SMTP_SECURITY == "ssl" else "587"))
+SMTP_USER = get("SMTP_USER", "")
+SMTP_PASSWORD = get("SMTP_PASSWORD", "")
+SMTP_FROM = get("SMTP_FROM", SMTP_USER)
+# Address the emails link to, so a reader lands on the right screen
+PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")
