@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>RHG Control Center</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* base layout; the look itself comes from the shared design layer, brand.css */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0}
+header{display:flex;justify-content:space-between}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr)}
+.towers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.towers-grid .card{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.towers-grid h3{font-family:var(--rhg-font-display);font-size:22px;font-weight:600;margin:0;line-height:1.35}
+.towers-grid p{margin:0;font-size:13px;color:var(--sub)}
+.towers-grid .btn{text-decoration:none;display:inline-block;text-align:center}
+.towers-grid .card.off{opacity:.55}
+.foot{color:var(--sub);font-size:11px;margin-top:4px;line-height:1.5}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--down);display:inline-block}
+.pill.err .dot{background:var(--up)} .pill.load .dot{background:var(--warn)}
+.empty{color:var(--sub);padding:6px 0}
+.adminlink{margin-top:auto;padding-top:16px}
+.adminlink a{color:var(--rhg-blue);font-size:11px;text-decoration:none}
+.adminlink a:hover{text-decoration:underline}
+@media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.towers-grid{grid-template-columns:1fr}}
+@media(max-width:760px){aside{display:none}.kpis{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/" class="on" aria-current="page">Control center</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">RHG Control towers / Business Central, live</div>
+      <h1>Control center · RHG</h1>
+      <div class="period" id="today"></div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn dark" id="refreshBtn">Refresh now</button></div>
+      <div class="hdr-meta">
+        <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading the towers…</span></span>
+        <span class="sep">|</span>
+        <span id="whoami"></span>
+        <button class="linkbtn" id="logoutBtn">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label>Company <select id="company"><option>SALT</option></select></label>
+  </div>
+
+  <div class="brief" id="brief" style="margin-bottom:20px">
+    <div class="head"><h2>One group. One control room.</h2><span class="status-pill status-ok" id="status">Reading…</span></div>
+    <div class="lines" id="briefLines"><p class="hint" style="margin:0">Reading Purchasing and Finance…</p></div>
+  </div>
+
+  <div class="kpis" style="margin-bottom:20px">
+    <div class="card kpi"><div class="l" id="kSpendL">Purchase spend</div><div class="v" id="kSpend">–</div><div class="s" id="kSpendS"></div></div>
+    <div class="card kpi"><div class="l">Open purchase orders</div><div class="v" id="kPo">–</div><div class="s" id="kPoS"></div></div>
+    <div class="card kpi"><div class="l">Awaiting invoice</div><div class="v" id="kPend">–</div><div class="s" id="kPendS"></div></div>
+    <div class="card kpi"><div class="l">Control queue</div><div class="v" id="kQueue">–</div><div class="s" id="kQueueS"></div></div>
+  </div>
+
+  <div class="towers-grid">
+    <div class="card" id="cPurch"><h3>Purchasing tower</h3><p>Spend, suppliers, prices and exceptions</p>
+      <span class="rhg-pill info" id="cPurchChip">–</span><a class="btn dark" href="/purchasing/">Open tower →</a></div>
+    <div class="card" id="cFin"><h3>Finance tower</h3><p>Performance, liquidity and month-end</p>
+      <span class="rhg-pill info" id="cFinChip">–</span><a class="btn dark" href="/finance/">Open tower →</a></div>
+    <div class="card" id="cInv"><h3>Inventory control</h3><p>Stock, movement and ledger reconciliation</p>
+      <span class="rhg-pill info" id="cInvChip">–</span><a class="btn dark" href="/finance/#inventory">Open tower →</a></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px"><h2 style="font-size:18px">Priority worklist</h2>
+    <div class="rhg-list" id="worklist" style="margin-top:12px"><div class="empty">Reading…</div></div></div>
+
+  <div class="card" style="margin-bottom:20px"><h2>Reporting periods stay explicit</h2>
+    <div class="scroll" style="margin-top:12px"><table id="periods"></table></div></div>
+
+  <p class="foot" id="foot">Figures come from each tower's own reading of Business Central, which stays read-only. Each tower keeps its own period: Purchasing runs by week, Finance by month.</p>
+</main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n, d=0) => n == null || isNaN(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const day = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : "";
+let me = null, CSRF = null, busy = false;
+const can = p => !!me && (me.permissions||[]).includes(p);
+
+async function get(path){
+  const r = await fetch(path, {credentials: "same-origin"});
+  if (r.status === 401) throw new Error("signed out");
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+function shell(){
+  const t = $("towers");
+  const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],
+                 ["finance.inventory.view","/finance/#inventory","Inventory"]].filter(([p]) => can(p));
+  t.insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  if (can("admin.users.manage") || can("admin.audit.view"))
+    $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
+  if (!can("purchasing.view")) $("cPurch").classList.add("off");
+  if (!can("finance.view")) $("cFin").classList.add("off");
+  if (!can("finance.inventory.view")) $("cInv").classList.add("off");
+}
+
+const RANK = {critical:0, warning:1, info:2};
+const STATUS = s => /critical/i.test(s) ? ["Critical intervention required","status-crit",2]
+  : /attention/i.test(s) ? ["Attention required","status-warn",1] : ["Under control","status-ok",0];
+
+async function load(){
+  if (busy) return; busy = true;
+  $("pill").className = "pill load"; $("pillText").textContent = "Reading the towers…";
+  const co = encodeURIComponent($("company").value || "SALT");
+  const [p, f] = await Promise.all([
+    can("purchasing.view") ? get(`/purchasing/api/dashboard?company=${co}`).catch(e => ({error: e.message})) : null,
+    can("finance.view") ? get(`/finance/api/dashboard?company=${co}`).catch(e => ({error: e.message})) : null,
+  ]);
+  busy = false;
+  render(p, f);
+  // the stock position is a heavier read; it fills in when it arrives
+  if (can("finance.inventory.view")) get(`/finance/api/stock-summary?company=${co}`).then(ss => renderStock(ss, f)).catch(() => renderStock(null, f));
+}
+
+let lastStock = null;
+function render(p, f){
+  const pOk = p && !p.error, fOk = f && !f.error;
+  const C = (pOk && p.meta.currency) || (fOk && f.meta.currency) || "ALL";
+  const ops = pOk ? (p.operations || {}) : {}, po = ops.po_summary || {}, sla = ops.sla || [];
+  const fx = fOk ? (f.exceptions || []) : [];
+  const per = pOk ? ({week:"week to date", month:"month to date", ytd:"year to date"}[p.meta.mode] || "this period") : "";
+
+  // KPIs
+  $("kSpendL").textContent = "Purchase spend";
+  $("kSpend").textContent = pOk ? fmt(p.kpis.total_cur) : "–";
+  $("kSpendS").textContent = pOk ? `${C} · ${per}` : (p ? "Purchasing did not answer" : "No access to Purchasing");
+  $("kPo").textContent = pOk && !ops.po_error ? fmt(ops.open_orders || po.orders) : "–";
+  $("kPoS").textContent = pOk && !ops.po_error ? `${fmt(po.released||0)} released · ${fmt(po.open_status||0)} open` : "";
+  $("kPend").textContent = pOk ? fmt(ops.pending_invoice_value || 0) : "–";
+  $("kPendS").textContent = pOk ? `${C} · received, not posted` : "";
+  $("kQueue").textContent = fmt(sla.length + fx.length);
+  $("kQueueS").textContent = `${fmt(sla.length)} purchasing · ${fmt(fx.length)} finance`;
+
+  // brief
+  const sts = [pOk && p.brief && STATUS(p.brief.status), fOk && f.brief && STATUS(f.brief.status)].filter(Boolean);
+  const worst = sts.sort((a,b) => b[2]-a[2])[0] || ["Under control","status-ok",0];
+  $("status").textContent = worst[0]; $("status").className = "status-pill " + worst[1];
+  const crit = sla.filter(e => e.severity === "critical").length;
+  const lines = [];
+  lines.push(["Fact", `${fmt(sla.length)} purchasing exceptions need review; ${fmt(crit)} are critical. Finance has ${fmt(fx.length)} open exceptions.`]);
+  if (pOk && p.kpis.total_pct != null)
+    lines.push(["Inference", `Purchase spend is ${p.kpis.total_pct >= 0 ? "up" : "down"} ${fmt(Math.abs(p.kpis.total_pct),1)}% against the comparison period; validate price and volume effects before acting.`]);
+  const recs = [];
+  if (sla.some(e => /price/i.test(e.rule))) recs.push("resolve pricing exposure first");
+  if (fOk && ((f.pl||{}).validation||[]).length) recs.push("review margin validation");
+  recs.push("reconcile stock against the ledger");
+  lines.push(["Recommendation", recs.map((r,i) => i ? r : r[0].toUpperCase() + r.slice(1)).join(", then ") + "."]);
+  $("briefLines").innerHTML = lines.map(([k,t]) => `<p><span class="tag">${k}</span>${esc(t)}</p>`).join("")
+    + (p && p.error ? `<p class="hint" style="margin:0">Purchasing: ${esc(p.error)}</p>` : "")
+    + (f && f.error ? `<p class="hint" style="margin:0">Finance: ${esc(f.error)}</p>` : "");
+
+  // tower cards
+  $("cPurchChip").textContent = pOk ? `${fmt(sla.length)} exceptions · ${fmt(crit)} critical` : (p ? "Not available right now" : "No access");
+  const validation = fOk ? ((f.pl||{}).validation || []) : [];
+  const fcrit = fx.filter(e => e.severity === "critical").length;
+  $("cFinChip").textContent = !fOk ? (f ? "Not available right now" : "No access")
+    : validation.length ? "Gross margin under validation" : `${fmt(fx.length)} exceptions · ${fmt(fcrit)} critical`;
+  $("cFinChip").className = "rhg-pill " + (validation.length ? "warning" : "info");
+
+  // priority worklist: the most serious items of both towers
+  // the most serious items of each tower, taken in turn so neither crowds the other out
+  const bySev = (a,b) => (RANK[a.e.severity]??3) - (RANK[b.e.severity]??3) || Math.abs(b.e.impact||0) - Math.abs(a.e.impact||0);
+  const pq = sla.map(e => ({e, tower: "Purchasing", href: "/purchasing/#exceptions"})).sort(bySev);
+  const fq = fx.map(e => ({e, tower: "Finance", href: "/finance/#exceptions"})).sort(bySev);
+  const items = [];
+  for (let i = 0; i < Math.max(pq.length, fq.length) && items.length < 8; i++) { if (pq[i]) items.push(pq[i]); if (fq[i]) items.push(fq[i]); }
+  if (validation.length) items.splice(Math.min(1, items.length), 0, {e: {severity: "warning", title: "Validate cost of goods sold before reporting margin",
+    rule: "Under validation", owner: validation[0].owner, impact: 0, note: "Margin hidden until validation"}, tower: "Finance", href: "/finance/"});
+  $("worklist").innerHTML = items.length ? items.slice(0, 5).map(({e, tower, href}) => `<div class="rhg-row">
+      <span class="rhg-pill ${e.severity}">${e.severity === "critical" ? "Critical" : e.severity === "warning" ? "Warning" : "Info"}</span>
+      <div class="body"><b>${esc(e.title)}</b><span>${esc(tower)} · ${esc(e.owner || "Unassigned")}${e.impact ? ` · ${fmt(Math.abs(e.impact))} ${C}` : ""}${e.note ? " · " + esc(e.note) : ""}</span></div>
+      <a class="btn" href="${href}" style="text-decoration:none;text-align:center">Open detail</a></div>`).join("")
+    : '<div class="empty">Nothing in either tower needs attention right now.</div>';
+
+  window.__last = {p, f, pOk, fOk};
+  renderPeriods();
+  const t = new Date((pOk && p.meta.checked_at) || (fOk && f.meta.checked_at) || Date.now());
+  $("pill").className = "pill" + ((p && p.error) || (f && f.error) ? " err" : "");
+  $("pillText").textContent = `Live · updated ${t.toLocaleTimeString("en-GB")}`;
+}
+
+function renderStock(ss, f){
+  lastStock = ss;
+  const C = (ss && ss.available && f && !f.error && f.meta.currency) || "ALL";
+  $("cInvChip").textContent = ss && ss.available ? `${fmt(ss.totals.gl_closing)} ${C} in the G/L` : "Open to read the stock position";
+  renderPeriods();
+}
+
+function renderPeriods(){
+  const L = window.__last || {}, p = L.p, f = L.f, ss = lastStock;
+  const rows = [];
+  if (L.pOk) rows.push(["Purchasing", p.meta.period_label || "This week", `${day(p.meta.current[0])} vs ${day(p.meta.prior[0])}${p.meta.like_for_like ? " · like for like" : ""}`, p.meta.serving ? "Refreshing" : "Live"]);
+  if (L.fOk) rows.push(["Finance", f.meta.period_label, `Against ${f.meta.compare_label}`, "Read-only"]);
+  if (ss && ss.available) {
+    const flagged = (ss.accounts || []).some(a => a.flag) || (ss.unmapped || []).length;
+    rows.push(["Inventory", `${ss.opening_date} → ${ss.as_of}`, "Opening vs closing", flagged ? "Reconcile first" : "Reconciled"]);
+  }
+  $("periods").innerHTML = `<tr><th>Tower</th><th class="num">Period</th><th class="num">Comparison</th><th class="num">Status</th></tr>` +
+    (rows.length ? rows.map(r => `<tr><td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td><td class="num">${esc(r[2])}</td><td class="num">${esc(r[3])}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="empty">Reading…</td></tr>`);
+}
+
+$("refreshBtn").onclick = () => load();
+$("company").onchange = () => load();
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login";
+};
+
+(async () => {
+  $("today").textContent = new Date().toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long", year:"numeric"}) + " · Group priorities and tower access";
+  let s;
+  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  shell();
+  if (can("purchasing.view")) {
+    try {
+      const c = await get("/purchasing/api/companies");
+      if (c.companies && c.companies.length) $("company").innerHTML = c.companies.map(x => `<option ${x === c.default ? "selected" : ""}>${esc(x)}</option>`).join("");
+    } catch (e) {}
+  }
+  load();
+  setInterval(() => { if (!document.hidden) load(); }, 120000);
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

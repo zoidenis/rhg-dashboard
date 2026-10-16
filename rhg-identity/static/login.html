@@ -103,6 +103,8 @@ function show(which){
 }
 
 function renderChooser(user){
+  // Signed in: the control center at the root is the front door to every tower.
+  if (!new URLSearchParams(location.search).has("choose")) { location.replace("/"); return; }
   $("who").textContent = user.name || user.username;
   $("role").textContent = user.role;
   const allowed = TOWERS.filter(t => user.permissions.includes(t.perm));

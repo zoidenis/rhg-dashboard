@@ -100,15 +100,24 @@ td.num,th.num{text-align:right}
 .track{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
 .fill{height:100%;background:var(--accent);border-radius:6px}
 .foot{color:var(--sub);font-size:12px;line-height:1.6;margin-top:20px}
-@media print{aside,.filters,.mini,.btn,header .pill{display:none!important}body *{visibility:hidden}
-  #reportArea,#reportArea *{visibility:visible}#reportArea{position:absolute;left:0;top:0;width:100%}}
+@media print{aside,.filters,.mini,.btn,.hdr-side,.banner{display:none!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  main{padding:0} .card{break-inside:avoid} .view:not(.on){display:none!important}
+  @page{size:A4 landscape;margin:12mm}}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
 <body>
 <div class="app">
 <aside>
-  <div class="brand"><div class="logo" id="logo" role="img" aria-label="RHG"></div><div><b>Finance Control Tower</b><small>Business Central, read-only</small></div></div>
+  <div class="brand"><div class="logo" id="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/purchasing/">Purchasing</a>
+    <a href="/finance/" class="on" id="towerFinance" aria-current="page">Finance</a>
+    <a href="/finance/#inventory" id="towerInventory">Inventory</a>
+  </div>
   <nav id="nav">
     <div class="grp">Overview</div>
     <button class="on" data-view="overview">Executive overview</button>
@@ -145,12 +154,20 @@ td.num,th.num{text-align:right}
 
 <main>
   <header>
-    <div><h1 id="title">Executive overview</h1><div class="period" id="period">Loading…</div></div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
-      <button class="btn dark" id="refreshBtn">Refresh</button>
-      <span class="pill" id="whoami"></span>
-      <button class="btn" id="logoutBtn">Sign out</button>
+    <div><div class="eyebrow">RHG Finance / Business Central, read-only</div>
+      <h1 id="title">Executive overview</h1><div class="period" id="period">Loading…</div></div>
+    <div class="hdr-side">
+      <div class="hdr-btns">
+        <button class="btn" id="exportBtn">Export CSV</button>
+        <button class="btn" id="pdfBtn">Export PDF</button>
+        <button class="btn dark" id="refreshBtn">Refresh now</button>
+      </div>
+      <div class="hdr-meta">
+        <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
+        <span class="sep">|</span>
+        <span id="whoami"></span>
+        <button class="linkbtn" id="logoutBtn">Sign out</button>
+      </div>
     </div>
   </header>
 
@@ -161,37 +178,36 @@ td.num,th.num{text-align:right}
     </select></label>
     <label id="anchorLabel">Month starting <input type="date" id="anchor"></label>
     <label>Department <select id="dimension"><option value="">All departments</option></select></label>
+    <label>Compare <select id="cmpMode">
+      <option value="prior">Period before</option>
+      <option value="last_year">Same dates last year</option>
+    </select></label>
   </div>
 
   <div class="banner" id="banner"></div>
   <div class="banner" id="sourceBanner" style="background:var(--warn-bg);color:var(--warn)"></div>
 
   <section class="view on" id="v-overview">
-    <div class="banner" id="validation" style="display:none"></div>
-    <div class="card" style="margin-bottom:15px" id="compareCard">
-      <div class="card-head"><div><h2>Comparison</h2><p class="hint" id="cmpNote"></p></div>
-        <select id="cmpMode">
-          <option value="prior">Against the period before</option>
-          <option value="last_year">Against the same dates last year</option>
-        </select></div>
-    </div>
     <div class="brief" id="brief"></div>
-    <div class="kpis">
+    <div class="kpis six" id="ovKpis">
       <div class="card kpi clickable" data-drill="pl"><div class="l">Revenue</div><div class="v" id="kRev">–</div><div class="s" id="kRevS"></div></div>
       <div class="card kpi clickable" data-drill="pl"><div class="l">Gross profit</div><div class="v" id="kGross">–</div><div class="s" id="kGrossS"></div></div>
       <div class="card kpi clickable" data-drill="pl"><div class="l">EBITDA</div><div class="v" id="kEbitda">–</div><div class="s" id="kEbitdaS"></div></div>
-      <div class="card kpi clickable" data-drill="cash"><div class="l">Cash and bank</div><div class="v" id="kCash">–</div><div class="s" id="kCashS"></div></div>
-      <div class="card kpi clickable" data-drill="ar"><div class="l">Receivables</div><div class="v" id="kAr">–</div><div class="s" id="kArS"></div></div>
-      <div class="card kpi clickable" data-drill="ap"><div class="l">Payables</div><div class="v" id="kAp">–</div><div class="s" id="kApS"></div></div>
-      <div class="card kpi clickable" data-drill="ap"><div class="l">Working capital</div><div class="v" id="kWc">–</div><div class="s">Cash plus receivables less payables</div></div>
-      <div class="card kpi clickable" data-drill="exceptions"><div class="l">Exceptions</div><div class="v" id="kExc">–</div><div class="s" id="kExcS"></div></div>
+      <div class="card kpi clickable" data-drill="cash"><div class="l">Cash in bank</div><div class="v" id="kCash">–</div><div class="s" id="kCashS"></div></div>
+      <div class="card kpi clickable" data-drill="ap"><div class="l" id="kApL">AP overdue &gt;60d</div><div class="v" id="kAp">–</div><div class="s" id="kApS"></div></div>
+      <div class="card kpi clickable" data-drill="ar"><div class="l" id="kArL">AR overdue &gt;30d</div><div class="v" id="kAr">–</div><div class="s" id="kArS"></div></div>
     </div>
-    <div class="grid">
-      <div class="card"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plHint"></p></div>
-        <button class="mini" data-drill="pl">Open accounts</button></div>
-        <div class="scroll"><table id="plMini"></table></div></div>
-      <div class="card"><h2>Aging</h2><p class="hint">Open payables and receivables by due date</p><div id="agingMini"></div></div>
+    <div class="card" id="validation" style="display:none"></div>
+    <div class="card"><div class="card-head"><h2 id="plSumTitle">P&amp;L summary</h2><button class="mini" data-drill="pl">Open accounts</button></div>
+      <p class="hint" id="cmpNote"></p>
+      <div class="scroll"><table id="plMini"></table></div></div>
+    <div class="grid even">
+      <div class="card"><div class="card-head"><h2>Accounts payable ageing</h2><button class="mini" data-goto-view="ap">Open</button></div>
+        <p class="hint" id="apAgeHint">Share of the outstanding balance by due date</p><div id="apAge"></div></div>
+      <div class="card"><div class="card-head"><h2>Accounts receivable ageing</h2><button class="mini" data-goto-view="ar">Open</button></div>
+        <p class="hint" id="arAgeHint">Share of the outstanding balance by due date</p><div id="arAge"></div></div>
     </div>
+    <div class="card"><h2>Focus next</h2><p class="hint" id="focusNext" style="margin:12px 0 0;font-size:13px"></p></div>
   </section>
 
   <section class="view" id="v-pl">
@@ -236,36 +252,31 @@ td.num,th.num{text-align:right}
     <div class="scroll"><table id="glTable"></table></div></div></section>
 
   <section class="view" id="v-inventory">
-    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Stock position</h2>
-      <p class="hint" id="ssNote">Company-wide, at the end of the selected period.</p></div>
-      <button class="mini" id="ssLoad">Refresh</button></div>
-      <div class="kpis" id="ssKpis"></div>
-      <div class="grid" style="margin-bottom:0">
-        <div><h3 class="sub-h">By location</h3><div class="scroll"><table id="ssLoc"></table></div></div>
-        <div><h3 class="sub-h">Inventory accounts against the items posted to them</h3>
-          <div class="scroll"><table id="ssAcc"></table></div><p class="hint" id="ssUnmapped"></p></div>
-      </div>
-      <details style="margin-top:10px"><summary class="meta" style="cursor:pointer">How these figures are built</summary>
-        <div class="hint" id="ssMethod"></div></details>
-    </div>
-    <div class="kpis five" id="invKpis"></div>
-    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Inventory</h2><p class="hint" id="invNote"></p></div>
+    <p class="hint" id="ssNote" style="margin:0 0 12px">Company-wide, at the end of the selected period.</p>
+    <div class="kpis three" id="ssKpis"></div>
+    <div class="card" id="ssInsight" style="display:none"></div>
+    <div class="card"><div class="card-head"><h2 id="ssLocTitle">By location</h2><button class="mini" id="ssLoad">Refresh</button></div>
+      <p class="hint">Opening and closing quantity at today's item cost, so the change is quantity, not revaluation</p>
+      <div class="scroll"><table id="ssLoc"></table></div></div>
+    <div class="card"><h2 id="ssAccTitle">Inventory accounts against the items posted to them</h2>
+      <p class="hint">Posted G/L balance of each account beside every item whose inventory posting group carries the same code</p>
+      <div class="scroll"><table id="ssAcc"></table></div></div>
+    <div class="card" id="ssCaution" style="display:none"></div>
+    <div class="card"><details id="ssHow"><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" id="ssMethod" style="margin-top:12px;line-height:1.5"></div></details></div>
+    <div class="card"><div class="card-head"><div><h2>Stock classes</h2><p class="hint" id="invNote"></p></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label class="field">Location<select id="invLoc"><option value="">All locations</option></select></label>
         <button class="mini dark" id="invLoad">Read inventory</button></div></div>
       <div class="scroll"><table id="invClasses"></table></div></div>
-    <div class="grid">
-      <div class="card"><div class="card-head"><div><h2>By category</h2><p class="hint">Value at item unit cost</p></div>
-        <button class="mini" data-drill="inventory_top">Open items</button></div><div id="invCats"></div></div>
-      <div class="card"><div class="card-head"><div><h2>Negative and zero-cost stock</h2><p class="hint">Items that make the valuation unreliable</p></div>
-        <button class="mini" data-drill="inventory_negative">Open</button></div>
-        <div class="scroll"><table id="invProblems"></table></div></div>
-    </div>
-    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Slow and non-moving stock</h2><p class="hint" id="invRiskNote"></p></div>
-      <button class="mini" data-drill="inventory_risk">Open all</button></div>
+    <div class="card"><div class="card-head"><h2>Category mix · value at item cost</h2><button class="mini" data-drill="inventory_top">Open items</button></div>
+      <div id="invCats" style="margin-top:12px"></div></div>
+    <div class="card"><div class="card-head"><div><h2>Negative, zero-cost and slow stock</h2><p class="hint" id="invRiskNote"></p></div>
+      <div style="display:flex;gap:8px"><button class="mini" data-drill="inventory_negative">Negative</button><button class="mini" data-drill="inventory_risk">Slow and non-moving</button></div></div>
       <div class="scroll"><table id="invRisk"></table></div></div>
-    <div class="card"><h2>Reconciliation against the general ledger</h2><p class="hint" id="invRecNote"></p>
-      <div class="money" id="invRec"></div></div>
+    <div class="card" id="invRecCard"><h2>General ledger reconciliation</h2>
+      <p class="rhg-caution" id="invRecLine" style="margin:12px 0 0;font-size:13px"></p>
+      <p class="hint" id="invRecNote" style="margin:12px 0 0"></p></div>
   </section>
 
   <section class="view" id="v-closing">
@@ -414,7 +425,11 @@ async function load(){
     if (r.status === 401) { location.href = "/login"; return; }
     const j = await r.json();
     if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
-    data = j; $("banner").style.display="none"; render();
+    // the inventory reads are heavy and on demand: keep them across refreshes of the same scope
+    const prev = data, same = prev && ["company","dimension","mode"].every(k => prev.meta[k] === j.meta[k]) && prev.meta.current[0] === j.meta.current[0];
+    data = j;
+    if (same) { if ((prev.inventory||{}).loaded) data.inventory = prev.inventory; if (prev.stockSummary) data.stockSummary = prev.stockSummary; }
+    $("banner").style.display="none"; render();
     setPill("", `Data as at ${new Date(j.meta.checked_at).toLocaleTimeString("en-GB")} · ${j.meta.query_ms} ms`);
   }catch(e){
     $("banner").textContent = "Could not read Business Central: "+e.message+" The last good figures stay on screen.";
@@ -422,44 +437,68 @@ async function load(){
   }finally{ busy=false; }
 }
 
+function bucketFrom(label){
+  // "Not due" -> 0, "1-30 days" -> 1, "31-60 days" -> 31, "Over 90 days" -> 91
+  const t = String(label||"").toLowerCase();
+  if (t.startsWith("not")) return 0;
+  const over = t.match(/over\s*(\d+)/); if (over) return +over[1] + 1;
+  const n = t.match(/(\d+)/); return n ? +n[1] : 0;
+}
+const AGE_COLORS = ["var(--rhg-primary)","var(--rhg-blue)","var(--rhg-sky)","var(--rhg-amberbg)","var(--rhg-redbg)"];
+function renderAgeing(kind){
+  const d = kind==="ap" ? data.payables : data.receivables;
+  const b = d.buckets || [], tot = b.reduce((a,x)=>a+Math.max(0,+x.value||0),0);
+  const pct = x => tot ? Math.max(0,+x.value||0)/tot*100 : 0;
+  $(kind+"AgeHint").textContent = `${cur(d.total)} outstanding · share by due date`;
+  $(kind+"Age").innerHTML = tot ? `<div class="rhg-stack-bar">${b.map((x,i)=>`<span title="${esc(x.label)}: ${fmt(x.value)}" style="width:${pct(x)}%;background:${AGE_COLORS[i%5]}"></span>`).join("")}</div>
+    <div class="rhg-buckets">${b.map(x=>`<div>${esc(x.label.replace(/ days$/,"").replace("Over ","").replace(/^(\d+)$/,"$1+"))}<b>${fmt(pct(x))}%</b></div>`).join("")}</div>`
+    : '<div class="empty">No open entries.</div>';
+}
 function render(){
   const m = data.meta, k = data.kpis;
   $("cmpNote").textContent = `${m.current[0]} to ${m.current[1]} against ${m.compare_range[0]} to ${m.compare_range[1]}, ${m.compare_label}. ${m.compare_rule}`;
   const base = m.compare === "last_year" ? "ly" : "prev";
-  $("period").textContent = `${m.period_label} · ${m.current[0]} to ${m.current[1]} vs ${m.compare_range[0]} to ${m.compare_range[1]} · ${m.company}${m.dimension?" · "+m.dimension:""} · amounts in ${m.currency}`;
-  $("kRev").textContent = cur(k.revenue);
+  setHeader();
+  const C = m.currency || "ALL";
+  $("kRev").textContent = fmt(k.revenue);
   const revBase = base === "ly" ? k.revenue_ly : k.revenue_prev;
   $("kRevS").innerHTML = revBase
-    ? `${pctChip((k.revenue-revBase)/Math.abs(revBase)*100)} against ${cur(revBase)} ${esc(m.compare_label)}`
-    : "N/A — the comparison base is zero or was not read";
+    ? `${C} · ${pctChip((k.revenue-revBase)/Math.abs(revBase)*100)} vs ${esc(m.compare === "last_year" ? "last year" : "period before")}`
+    : `${C} · no comparison base`;
   const v = (data.pl && data.pl.validation) || [];
   const suppressed = new Set(v.flatMap(x => x.suppressed || []));
+  const grossHidden = suppressed.has("Gross profit") || suppressed.has("Gross margin");
+  $("kGross").textContent = suppressed.has("Gross profit") ? "Validation" : fmt(k.gross);
+  $("kGross").className = "v" + (suppressed.has("Gross profit") ? " warn" : "");
+  $("kGrossS").textContent = grossHidden ? "Margin hidden" : (k.gross_margin==null ? C : `${C} · margin ${fmt(k.gross_margin,1)}%`);
+  $("kEbitda").textContent = k.ebitda==null ? "Review pending" : fmt(k.ebitda);
+  $("kEbitdaS").textContent = k.ebitda==null || suppressed.has("EBITDA margin") ? "Depends on COGS"
+    : (k.ebitda_margin==null ? C : `${C} · margin ${fmt(k.ebitda_margin,1)}%`);
+  $("kCash").textContent = fmt(k.cash);
+  $("kCashS").textContent = `${C} · cash and bank accounts`;
+  const th = data.settings.thresholds;
+  const over = (d, days) => (d.buckets||[]).filter(b => bucketFrom(b.label) > days).reduce((a,b)=>a+(+b.value||0),0);
+  $("kApL").textContent = `AP overdue >${fmt(th.ap_critical_days)}d`;
+  $("kAp").textContent = fmt(over(data.payables, th.ap_critical_days));
+  $("kApS").textContent = `${C} · of ${fmt(data.payables.overdue)} overdue`;
+  $("kArL").textContent = `AR overdue >${fmt(th.ar_warning_days)}d`;
+  $("kAr").textContent = fmt(over(data.receivables, th.ar_warning_days));
+  $("kArS").textContent = `${C} · of ${fmt(data.receivables.overdue)} overdue`;
   $("validation").style.display = v.length ? "block" : "none";
-  $("validation").innerHTML = v.map(x =>
-    `<b>${esc(x.figure)}: ${esc(x.state)}.</b> ${esc(x.reason)} <b>Owner:</b> ${esc(x.owner)}.`
-    + (x.suppressed && x.suppressed.length ? ` Not shown until this is resolved: ${x.suppressed.map(esc).join(", ")}.` : "")
-  ).join("<br>");
-  $("kGross").textContent = suppressed.has("Gross profit") ? "Under validation" : cur(k.gross);
-  $("kGrossS").textContent = suppressed.has("Gross margin")
-    ? "Margin withheld: the cost of sales for this period is a credit"
-    : (k.gross_margin==null ? "" : `Margin ${fmt(k.gross_margin,1)}%`);
-  $("kEbitda").textContent = k.ebitda==null ? "Under validation" : cur(k.ebitda);
-  $("kEbitdaS").textContent = suppressed.has("EBITDA margin")
-    ? "Margin withheld until the cost of sales is validated"
-    : (k.ebitda_margin==null ? "" : `Margin ${fmt(k.ebitda_margin,1)}% · EBIT ${cur(k.ebit)}`);
-  $("kCash").textContent = cur(k.cash);
-  $("kCashS").textContent = "Balance-sheet cash and bank accounts";
-  $("kAr").textContent = cur(k.receivables);
-  $("kArS").innerHTML = `<span class="up">${cur(k.receivables_overdue)}</span> overdue`;
-  $("kAp").textContent = cur(k.payables);
-  $("kApS").innerHTML = `<span class="up">${cur(k.payables_overdue)}</span> overdue`;
-  $("kWc").textContent = cur(k.working_capital);
-  $("kExc").textContent = fmt(k.exceptions);
-  $("kExcS").innerHTML = `<span class="up">${k.critical}</span> critical`;
+  $("validation").innerHTML = v.map(x => `<span class="rhg-pill warning">${esc(x.state)}</span>
+    <p class="rhg-caution" style="margin:12px 0 0;font-size:14px">${esc(x.figure)}: ${esc(x.reason)}</p>
+    <p class="hint" style="margin:12px 0 0">Owner: ${esc(x.owner)}${x.suppressed && x.suppressed.length ? ` · Not shown until this is resolved: ${x.suppressed.map(esc).join(", ")}` : ""}</p>`).join('<div style="height:16px"></div>');
+  renderAgeing("ap"); renderAgeing("ar");
+  const closeOpen = data.closing && data.closing.progress ? data.closing.progress.open : null;
+  $("focusNext").textContent = `${closeOpen==null ? "Month-end close: open the checklist to see the tasks" : `Month-end close: ${fmt(closeOpen)} tasks open`} · Exceptions: ${fmt(k.exceptions)} (${fmt(k.critical)} critical)`
+    + (v.length ? " · Resolve validation before distributing the pack." : " · Figures are ready to distribute once the exceptions are reviewed.");
   $("excCount").textContent = k.critical;
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
-  if($("v-inventory").classList.contains("on")) loadStockSummary();
+  if($("v-inventory").classList.contains("on")){
+    if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
+    if (!(data.inventory||{}).loaded) loadInventory();
+  }
   if($("invLoc").options.length<=1){
     $("invLoc").innerHTML = '<option value="">All locations</option>' +
       Array.from($("dimension").options).slice(1).map(o=>`<option value="${esc(o.value)}">${esc(o.text)}</option>`).join("");
@@ -483,11 +522,15 @@ const STATUS_CLASS = {"Financial position under control":"status-ok","Attention 
 function bullets(list){ return `<ul>${list.map(x=>`<li>${tagOf(x.kind)}${esc(x.text)}${x.drill?` <a href="#" class="bd" data-kind="${x.drill.kind}" data-key="${esc(x.drill.key||"")}">records</a>`:""}</li>`).join("")}</ul>`; }
 function renderBrief(){
   const b = data.brief;
+  const all = [].concat(b.performance||[], b.position||[], b.liquidity||[], b.accounting||[]);
+  const lead = all.filter(x => x.kind === "fact").slice(0, 1).concat(all.filter(x => x.kind === "inference").slice(0, 1))
+    .concat((b.actions||[]).slice(0, 2).map(a => ({kind: "recommendation", text: `${a.title} · ${a.owner || "unassigned"} by ${a.due_date}`})));
   $("brief").innerHTML = `
-    <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center">
-      <div><h2>Executive finance brief</h2><p class="hint" style="margin:3px 0 0">${esc(b.period)} vs ${esc(b.comparison)} · ${esc(b.methodology)} · ${esc(b.filters.company)} · ${esc(b.filters.dimension)}</p></div>
+    <div class="head"><h2>Executive finance brief</h2>
       <span class="status-pill ${STATUS_CLASS[b.status]||""}">${esc(b.status)}</span></div>
-    <p class="hint" style="margin:6px 0 0">${esc(b.status_note)} Every line is read from Business Central records; click any item to open them.</p>
+    <div class="lines">${lead.map(l => `<p>${tagOf(l.kind)}${esc(l.text)}</p>`).join("")}</div>
+    <details><summary>Full brief · ${b.counts.total} exceptions evaluated · ${esc(b.period)} vs ${esc(b.comparison)}</summary>
+    <p class="hint" style="margin:10px 0 0">${esc(b.methodology)} · ${esc(b.filters.company)} · ${esc(b.filters.dimension)}. ${esc(b.status_note)} Every line is read from Business Central records; click any item to open them.</p>
     <h3>Financial performance</h3>${bullets(b.performance)}
     <h3>Balance-sheet position</h3>${bullets(b.position)}
     <h3>Cash and liquidity</h3>${bullets(b.liquidity)}
@@ -498,7 +541,7 @@ function renderBrief(){
       <p class="hint" style="margin:0"><b>Do:</b> ${esc(a.recommendation)} · <b>Area:</b> ${esc(a.area||"—")} · <b>Owner:</b> ${esc(a.owner||"unassigned")} · <b>By:</b> ${esc(a.due_date)} · <b>At stake:</b> ${cur(a.impact)} · <b>Confidence:</b> ${esc(a.confidence)}</p>
       <div style="margin-top:9px"><button class="mini dark" data-brief="${i}" ${(data.action_keys||[]).includes(a.source_exception)?"disabled":""}>${(data.action_keys||[]).includes(a.source_exception)?"Already tracked":"Track as action"}</button></div></div>`).join("")
       : '<div class="empty">No management action required from this period\u2019s records.</div>'}
-    <p class="hint" style="margin-top:10px">Generated ${esc(b.generated_at)} from ${b.counts.total} evaluated exceptions (${b.counts.critical} critical, ${b.counts.warning} warning).</p>`;
+    <p class="hint" style="margin-top:10px">Generated ${esc(b.generated_at)} from ${b.counts.total} evaluated exceptions (${b.counts.critical} critical, ${b.counts.warning} warning).</p></details>`;
   document.querySelectorAll(".bd").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill(a.dataset.kind,a.dataset.key);});
   document.querySelectorAll("[data-brief]").forEach(b2=>b2.onclick=()=>{
     const a = data.brief.actions[+b2.dataset.brief];
@@ -521,10 +564,19 @@ function renderPL(){
   const head = `<tr><th>Line</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Change</th>
     <th class="num">Last year</th><th class="num">Change</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">% of revenue</th></tr>`;
   $("plTable").innerHTML = head + statementRows(pl.statement);
-  $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th><th class="num">vs comparison</th></tr>` +
-    pl.statement.map(l=>`<tr class="${["Gross profit","EBITDA"].includes(l.label)?"total":""}"><td class="name">${esc(l.label)}</td>
-      <td class="num">${fmt(l.current)}</td><td class="num">${pctChip(l.vs_previous_pct)}</td></tr>`).join("");
-  $("plHint").textContent = `${data.meta.period_label} · ${data.meta.currency}, excluding VAT`;
+  const hidden = new Set((pl.validation||[]).flatMap(x => x.suppressed || []));
+  const credit = (pl.validation||[]).some(x => x.figure === "Cost of goods sold");
+  const anyBudget = pl.statement.some(l => l.budget);
+  const varOf = l => anyBudget ? l.vs_budget_pct : (data.meta.compare === "last_year" ? l.vs_last_year_pct : l.vs_previous_pct);
+  const pending = l => (l.label === "EBITDA" || l.label === "EBIT") && data.kpis.ebitda == null;
+  const curCell = l => l.label === "Cost of goods sold" && credit ? "Credit · review"
+    : hidden.has(l.label) ? (l.label === "Gross profit" ? "Hidden" : "Review pending") : pending(l) ? "Review pending" : fmt(l.current);
+  $("plSumTitle").textContent = `P&L summary · ${data.meta.currency}`;
+  $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th><th class="num">${data.meta.compare === "last_year" ? "Comparison" : "Prior"}</th><th class="num">Last year</th><th class="num">Budget</th><th class="num">Variance %${anyBudget?" vs budget":""}</th></tr>` +
+    pl.statement.map(l=>`<tr class="${l.label==="EBIT"?"total":""}"><td class="name">${esc(l.label)}</td>
+      <td class="num">${curCell(l)}</td><td class="num">${l.previous==null?"–":fmt(l.previous)}</td>
+      <td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td><td class="num">${l.budget?fmt(l.budget):"–"}</td>
+      <td class="num">${hidden.has(l.label)||pending(l)||varOf(l)==null||(l.label==="Cost of goods sold"&&credit)?"—":(varOf(l)>0?"+":varOf(l)<0?"−":"")+fmt(Math.abs(varOf(l)),1)+"%"}</td></tr>`).join("");
   const by = pl.classified_by || {};
   const fallbackCount = Object.entries(by).filter(([k])=>k!=="Account Category").reduce((a,[,v])=>a+v,0);
   $("plNote").textContent = pl.note + (fallbackCount
@@ -764,7 +816,7 @@ async function loadSession(){
     const j = await (await fetch("/api/session")).json();
     me = j.user;
     if(!me){ location.href = "/login"; return false; }
-    $("whoami").innerHTML = `<span class="dot"></span>${esc(me.name||me.username)} · ${esc(me.role)}`;
+    $("whoami").textContent = `${me.name||me.username} · ${me.role}`;
     $("usersNav").style.display = can("users") ? "" : "none";
     const save = $("saveSettings"); if(save && !can("settings")){ save.disabled = true; save.title = "Your role cannot change thresholds."; }
     if(can("users")) loadUsers();
@@ -846,50 +898,51 @@ async function loadInventory(){
 }
 $("invLoad").onclick = ()=>loadInventory();
 function renderInventory(){
-  const inv = data.inventory||{};
+  const inv = data.inventory||{}, th = data.settings.thresholds;
   if(!inv.loaded){
     $("invNote").textContent = inv.note||"";
-    $("invKpis").innerHTML = "";
     $("invClasses").innerHTML = `<tr><td class="empty">Choose a location if you want one, then press "Read inventory".</td></tr>`;
+    $("invCats").innerHTML = ""; $("invRisk").innerHTML = ""; $("invRecLine").textContent = ""; $("invRecNote").textContent = "";
     return;
   }
   const t = inv.totals;
-  $("invNote").textContent = `${inv.location} · on hand at ${inv.as_of} · ${inv.note}`;
-  $("invKpis").innerHTML = `
-    <div class="card kpi clickable" data-drill="inventory_top"><div class="l">Inventory value</div><div class="v">${cur(t.value)}</div><div class="s">${fmt(t.items)} items with stock</div></div>
-    <div class="card kpi clickable" data-drill="inventory_risk"><div class="l">Slow and non-moving</div><div class="v">${cur(t.at_risk_value)}</div><div class="s">Above the value floor in Settings</div></div>
-    <div class="card kpi clickable" data-drill="inventory_negative"><div class="l">Negative items</div><div class="v ${t.negative_items?"up":""}">${fmt(t.negative_items)}</div><div class="s">${cur(t.negative_value)} at cost</div></div>
-    <div class="card kpi"><div class="l">Moved in 30 days</div><div class="v">${cur(t.moved_value_30)}</div><div class="s">Net change between snapshots</div></div>`;
-  document.querySelectorAll("#invKpis [data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
-  $("invClasses").innerHTML = `<tr><th>Class</th><th class="num">Items</th><th class="num">Value</th></tr>` +
-    inv.classes.map(c=>`<tr><td class="name">${esc(c.class)}</td><td class="num">${fmt(c.items)}</td><td class="num"><b>${fmt(c.value)}</b></td></tr>`).join("");
+  $("invNote").textContent = `${inv.location} · on hand at ${inv.as_of} · ${fmt(t.items)} items with stock, ${cur(t.value)} at item cost`;
+  const DEF = {"Active": `Movement ≤${fmt(th.stock_monitor_days)}d`, "Monitor": `${fmt(th.stock_monitor_days+1)}–${fmt(th.stock_slow_days)}d`,
+               "Slow-moving": `${fmt(th.stock_slow_days+1)}–${fmt(th.stock_dead_days)}d`, "Non-moving": `>${fmt(th.stock_dead_days)}d`};
+  const ORDER = ["Active","Monitor","Slow-moving","Non-moving"];
+  const prov = inv.provision || {lines: [], total: 0};
+  const rateOf = c => (prov.lines.find(l => l.class === c) || {}).rate || 0;
+  const classes = ORDER.map(c => inv.classes.find(x => x.class === c) || {class: c, value: 0, items: 0})
+    .concat(inv.classes.filter(x => !ORDER.includes(x.class)));
+  $("invClasses").innerHTML = `<tr><th>Class</th><th class="num">Definition</th><th class="num">Items</th><th class="num">Stock ${data.meta.currency}</th><th class="num">Provision rate</th><th class="num">Proposed ${data.meta.currency}</th></tr>` +
+    classes.map(c => `<tr><td class="name">${esc(c.class)}</td><td class="num">${esc(DEF[c.class]||"")}</td><td class="num">${fmt(c.items)}</td>
+      <td class="num">${fmt(c.value)}</td><td class="num">${fmt(rateOf(c.class))}%</td><td class="num">${fmt(c.value*rateOf(c.class)/100)}</td></tr>`).join("") +
+    `<tr class="total"><td>Total</td><td></td><td class="num">${fmt(classes.reduce((a,c)=>a+c.items,0))}</td><td class="num">${fmt(classes.reduce((a,c)=>a+c.value,0))}</td><td></td><td class="num">${fmt(prov.total)}</td></tr>`;
   const max = Math.max(1, ...inv.categories.map(c=>c.value));
-  $("invCats").innerHTML = inv.categories.slice(0,12).map(c=>`<div class="bar"><div>${esc(c.category)}</div>
-    <div class="track"><div class="fill" style="width:${c.value/max*100}%"></div></div>
-    <div style="text-align:right;font-weight:700">${fmt(c.value)}</div></div>`).join("");
-  const problems = inv.negative.slice(0,12).concat(inv.zero_cost.slice(0,8));
-  $("invProblems").innerHTML = `<tr><th>Item</th><th class="num">Quantity</th><th class="num">Unit cost</th><th>Issue</th></tr>` +
-    (problems.length ? problems.map(i=>`<tr><td class="name">${esc(i.description||i.item)}<div class="meta">${esc(i.item)}</div></td>
-      <td class="num ${i.quantity<0?"up":""}">${fmt(i.quantity,2)}</td><td class="num">${fmt(i.unit_cost,2)}</td>
-      <td class="meta">${i.quantity<0?"negative stock":"zero cost"}</td></tr>`).join("")
-      : `<tr><td colspan="4" class="empty">Nothing negative and no zero-cost stock.</td></tr>`);
-  const th = data.settings.thresholds;
-  $("invRiskNote").textContent = `Unchanged quantity for ${fmt(th.stock_monitor_days)} days: monitor · ${fmt(th.stock_slow_days)} days: slow-moving · ${fmt(th.stock_dead_days)} days: non-moving. Items below ${fmt(th.stock_value_floor)} in value are left out.`;
-  $("invRisk").innerHTML = `<tr><th>Item</th><th>Category</th><th class="num">Quantity</th><th class="num">Value</th><th>Class</th><th class="num">Unchanged (days)</th></tr>` +
-    (inv.risk.length ? inv.risk.slice(0,40).map(r=>`<tr><td class="name">${esc(r.description||r.item)}<div class="meta">${esc(r.item)}</div></td>
-      <td class="meta">${esc(r.category||"–")}</td><td class="num">${fmt(r.quantity,2)}</td><td class="num"><b>${fmt(r.value)}</b></td>
-      <td>${esc(r.class)}</td><td class="num">${r.still_days??"–"}</td></tr>`).join("")
-      : `<tr><td colspan="6" class="empty">Nothing above the value floor has stood still.</td></tr>`);
-  const rec = inv.reconciliation;
+  $("invCats").innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${inv.categories.slice(0,10).map(c=>`<div>
+    <div class="hint" style="margin:0 0 6px">${esc(c.category)} · ${fmt(c.value)}</div>
+    <div style="height:10px;background:var(--rhg-primary);width:${Math.max(0.5,c.value/max*100)}%"></div></div>`).join("")}</div>`;
+  $("invRiskNote").textContent = `Items that make the valuation unreliable, then stock that has not moved: ${fmt(th.stock_slow_days)} days slow-moving, ${fmt(th.stock_dead_days)} days non-moving. Items below ${fmt(th.stock_value_floor)} are left out of the slow list.`;
+  const NEXT = {neg: "Post the missing receipt or check transfers", zero: "Validate the unit cost", "Non-moving": "Provision review", "Slow-moving": "Rebalance or use first", "Monitor": "Watch"};
+  const rows = inv.negative.slice(0,10).map(i => ({i, issue: "Negative stock", next: NEXT.neg, cls: "up"}))
+    .concat(inv.zero_cost.slice(0,6).map(i => ({i, issue: "Zero cost", next: NEXT.zero})))
+    .concat(inv.risk.slice(0,30).map(i => ({i, issue: `${i.class}${i.still_days!=null?` · ${i.still_days}d`:""}`, next: NEXT[i.class]||""})));
+  $("invRisk").innerHTML = `<tr><th>Item</th><th class="num">Issue</th><th class="num">Quantity</th><th class="num">Value ${data.meta.currency}</th><th class="num">Next step</th></tr>` +
+    (rows.length ? rows.map(r=>`<tr><td class="name">${esc(r.i.description||r.i.item)} <span class="meta">${esc(r.i.item)}${r.i.category?" · "+esc(r.i.category):""}</span></td>
+      <td class="num">${esc(r.issue)}</td><td class="num ${r.cls||""}">${fmt(r.i.quantity, r.i.quantity%1?2:0)}</td>
+      <td class="num">${fmt(r.i.value)}</td><td class="num">${esc(r.next)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">Nothing negative, nothing at zero cost and nothing above the value floor has stood still.</td></tr>`);
+  const rec = inv.reconciliation, owner = (data.settings.owners||{}).inventory || "Inventory accountant";
+  $("invRecLine").className = rec && Math.abs(rec.difference) >= th.inventory_difference ? "rhg-caution up" : "rhg-caution";
+  $("invRecLine").textContent = rec
+    ? `Item vs ledger difference: ${sign(rec.difference)} ${data.meta.currency} (${cur(rec.inventory_value)} at item cost against ${cur(rec.gl_balance)} in the G/L) · Owner: ${owner}`
+    : "Set the inventory account numbers in Settings to see this comparison.";
   $("invRecNote").textContent = rec ? rec.method + " " + (inv.gl_note||"") : (inv.gl_note||"");
-  $("invRec").innerHTML = rec ? `<div>Inventory at item cost<b>${cur(rec.inventory_value)}</b></div>
-    <div>Inventory accounts in the G/L<b>${cur(rec.gl_balance)}</b></div>
-    <div>Difference<b class="${Math.abs(rec.difference)>=data.settings.thresholds.inventory_difference?"up":""}">${sign(rec.difference)}</b></div>`
-    : `<div>Set the inventory account numbers in Settings to see this comparison.<b>Not configured</b></div>`;
 }
 
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
+  $("ssNote").style.display = "";
   $("ssNote").textContent = "Reading stock by location and the inventory accounts… the first read of a period takes a minute or two.";
   try{
     const r = await fetch("/api/stock-summary?"+params());
@@ -901,59 +954,65 @@ async function loadStockSummary(){
 $("ssLoad").onclick = ()=>loadStockSummary();
 function renderStockSummary(){
   const ss = data && data.stockSummary; if(!ss) return;
+  const C = data.meta.currency;
+  setHeader();
   if(!ss.available){
     $("ssNote").textContent = ss.error || "Data unavailable or not verified in Business Central.";
-    $("ssKpis").innerHTML = ""; $("ssLoc").innerHTML = ""; $("ssAcc").innerHTML = ""; return;
+    ["ssKpis","ssLoc","ssAcc"].forEach(id => $(id).innerHTML = ""); return;
   }
   const t = ss.totals, d = ss.dio, th = data.settings.thresholds;
   const inv = data.inventory||{}, prov = inv.loaded ? inv.provision : null;
   const risk = inv.loaded ? inv.classes.filter(c=>c.class==="Slow-moving"||c.class==="Non-moving") : [];
   const riskVal = risk.reduce((a,c)=>a+c.value,0);
-  const dioTxt = d.state==="ok" ? `${fmt(d.days)} days`
-    : d.state==="under_validation" ? "Under validation" : "Not configured";
-  const dioSub = d.state==="ok" ? `${cur(d.daily_cogs)} cost of sales a day, last ${d.cogs_days} days`
-    : d.state==="under_validation" ? `Cost of goods sold nets to ${cur(d.cogs)} over ${d.cogs_days} days, so the ratio would mislead`
-    : "Set the inventory accounts in Settings";
+  const worst = ss.accounts.filter(a => a.found).sort((a,b) => Math.abs(b.difference)-Math.abs(a.difference))[0];
   const diffBad = Math.abs(t.difference) >= th.inventory_difference;
-  $("ssNote").textContent = `${data.meta.company} · opening ${ss.opening_date} → closing ${ss.as_of}${ss.settled?"":" (period still open)"} · all locations and departments` +
-    (ss.missing_locations.length ? ` · not read: ${ss.missing_locations.join(", ")}` : "");
-  $("ssKpis").innerHTML = `
-    <div class="card kpi"><div class="l">Inventory in the G/L</div><div class="v">${cur(t.gl_closing)}</div>
-      <div class="s">${sign(t.gl_change)} since ${ss.opening_date}</div></div>
-    <div class="card kpi"><div class="l">Item value against the G/L</div><div class="v ${diffBad?"up":""}">${sign(t.difference)}</div>
-      <div class="s">${cur(t.item_value)} at item cost${t.difference_pct!=null?` · ${fmt(t.difference_pct,1)}%`:""}</div></div>
-    <div class="card kpi"><div class="l">Days of inventory</div><div class="v ${d.state==="ok"?"":"up"}">${dioTxt}</div>
-      <div class="s">${esc(dioSub)}</div></div>
-    <div class="card kpi"><div class="l">Slow and non-moving</div><div class="v">${inv.loaded?cur(riskVal):"–"}</div>
-      <div class="s">${inv.loaded?`${fmt(risk.reduce((a,c)=>a+c.items,0))} items`:"Shown once the inventory below is read"}</div></div>
-    <div class="card kpi"><div class="l">Proposed provision</div><div class="v">${prov?cur(prov.total):"–"}</div>
-      <div class="s">${prov?prov.lines.map(l=>`${esc(l.class)} ${fmt(l.rate)}%`).join(" · ")+" · not posted":"Rates in Settings"}</div></div>
-    <div class="card kpi"><div class="l">Negative stock</div><div class="v ${t.negative_locations?"up":""}">${fmt(t.negative_locations)}</div>
-      <div class="s">locations with negative items, ${cur(t.negative_value)}</div></div>`;
-  $("ssLoc").innerHTML = `<tr><th>Location</th><th class="num">Opening</th><th class="num">Closing</th><th class="num">Change</th><th class="num">Share</th><th class="num">Negative</th></tr>` +
-    ss.locations.map(r=>`<tr><td class="name">${esc(r.location)}<div class="meta">${fmt(r.items)} items${r.no_cost_items?` · ${fmt(r.no_cost_items)} at zero cost`:""}</div></td>
-      <td class="num">${fmt(r.opening)}</td><td class="num"><b>${fmt(r.closing)}</b></td>
-      <td class="num">${sign(r.change)}<div>${pctChip(r.change_pct)}</div></td>
-      <td class="num">${fmt(r.share_pct,1)}%</td>
-      <td class="num ${r.negative_items?"up":""}">${r.negative_items?fmt(r.negative_items):"–"}</td></tr>`).join("") +
-    `<tr><td class="name"><b>Total</b></td><td class="num"><b>${fmt(t.location_opening)}</b></td><td class="num"><b>${fmt(t.location_value)}</b></td>
-      <td class="num"><b>${sign(t.location_value-t.location_opening)}</b></td><td></td><td></td></tr>`;
+  const kpi = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls||""}">${v}</div><div class="s">${sub}</div></div>`;
+  $("ssNote").textContent = ss.missing_locations.length ? `Not read on this pass: ${ss.missing_locations.join(", ")}` : (ss.settled ? "" : "The period is still open; the closing figures move until it ends.");
+  $("ssNote").style.display = $("ssNote").textContent ? "" : "none";
+  $("ssKpis").innerHTML = [
+    kpi("Inventory in the G/L", fmt(t.gl_closing), `${C} · ${sign(t.gl_change)} since ${ss.opening_date}`),
+    kpi("Item vs G/L", sign(t.difference), worst && Math.abs(worst.difference) >= 1 ? `${C} · largest on account ${esc(worst.account)} (${sign(worst.difference)})` : `${C} · ${fmt(t.item_value)} at item cost`, diffBad ? "up" : ""),
+    kpi("Days of inventory", d.state==="ok" ? `${fmt(d.days,1)} days` : d.state==="under_validation" ? "Validation" : "Not configured",
+        d.state==="ok" ? `${fmt(d.daily_cogs)} ${C} COGS / day` : d.state==="under_validation" ? `COGS nets to ${fmt(d.cogs)} over ${d.cogs_days} days` : "Set the inventory accounts in Settings",
+        d.state==="ok" ? "" : "warn"),
+    kpi("Slow / non-moving", inv.loaded ? fmt(riskVal) : "Review list", inv.loaded ? `${C} · ${fmt(risk.reduce((a,c)=>a+c.items,0))} items` : "Classification below"),
+    kpi("Proposed provision", prov ? fmt(prov.total) : "Not posted", prov ? `${C} · ${prov.lines.map(l=>`${esc(l.class.replace("-moving",""))} ${fmt(l.rate)}%`).join(" · ")} · not posted` : "Rates in Settings"),
+    kpi("Negative stock", `${fmt(t.negative_locations)} location${t.negative_locations===1?"":"s"}`, `${fmt(ss.locations.reduce((a,r)=>a+r.negative_items,0))} items · ${fmt(t.negative_value)} ${C}`, t.negative_locations ? "up" : ""),
+  ].join("");
+  // the loss line, when Business Central files one under cost of goods sold
+  const loss = (d.accounts||[]).find(a => /loss|shrink|humbj|fir[eë]/i.test(a.name));
+  $("ssInsight").style.display = loss && d.cogs > 0 ? "" : "none";
+  if (loss && d.cogs > 0) $("ssInsight").innerHTML = `<div class="rhg-insight">${esc(loss.name.replace(/\s*\(.*\)\s*$/,""))} (${esc(loss.account)}) is ${fmt(loss.amount/1e6,1)} M in ${d.cogs_days} days</div>
+    <p class="hint" style="margin:12px 0 0;font-size:13px">${fmt(loss.amount/d.cogs*100,1)}% of cost of goods sold · Review movement and wastage by location.</p>`;
+  $("ssLocTitle").textContent = `By location · ${C}`;
+  $("ssLoc").innerHTML = `<tr><th>Location</th><th class="num">Opening</th><th class="num">Closing</th><th class="num">Change / %</th><th class="num">Share</th><th class="num">Negative items</th></tr>` +
+    ss.locations.map(r=>`<tr><td class="name">${esc(r.location)}${r.no_cost_items?` <span class="meta">${fmt(r.no_cost_items)} at zero cost</span>`:""}</td>
+      <td class="num">${fmt(r.opening)}</td><td class="num">${fmt(r.closing)}</td>
+      <td class="num">${sign(r.change)}${r.change_pct==null?"":` / ${fmt(r.change_pct,1)}%`}</td>
+      <td class="num">${fmt(r.share_pct,1)}%</td><td class="num ${r.negative_items?"up":""}">${fmt(r.negative_items)}</td></tr>`).join("") +
+    `<tr class="total"><td>Total</td><td class="num">${fmt(t.location_opening)}</td><td class="num">${fmt(t.location_value)}</td>
+      <td class="num">${sign(t.location_value-t.location_opening)}${t.location_opening?` / ${fmt((t.location_value-t.location_opening)/t.location_opening*100,1)}%`:""}</td>
+      <td class="num">100%</td><td class="num">${fmt(ss.locations.reduce((a,r)=>a+r.negative_items,0))}</td></tr>`;
+  $("ssAccTitle").textContent = `Inventory accounts against the items posted to them · ${C}`;
+  const sumItem = ss.accounts.reduce((a,r)=>a+r.item_value,0), sumDiff = ss.accounts.reduce((a,r)=>a+r.difference,0);
   $("ssAcc").innerHTML = `<tr><th>Account</th><th class="num">G/L opening</th><th class="num">G/L closing</th><th class="num">Item value</th><th class="num">Difference</th></tr>` +
-    ss.accounts.map(a=>`<tr><td class="name">${esc(a.account)} ${esc(a.name)}<div class="meta">${a.found?`${fmt(a.items)} items${a.in_dio?"":" · left out of days of inventory"}`:"not found in the chart of accounts"}</div></td>
-      <td class="num">${fmt(a.opening)}</td><td class="num"><b>${fmt(a.closing)}</b></td>
+    ss.accounts.map(a=>`<tr><td class="name">${esc(a.account)} · ${esc(a.name)}${a.found?(a.in_dio?"":' <span class="meta">left out of days of inventory</span>'):' <span class="meta">not in the chart of accounts</span>'}</td>
+      <td class="num">${fmt(a.opening)}</td><td class="num">${fmt(a.closing)}</td>
       <td class="num">${fmt(a.item_value)}</td><td class="num ${a.flag?"up":""}">${sign(a.difference)}</td></tr>`).join("") +
-    `<tr><td class="name"><b>Total</b></td><td class="num"><b>${fmt(t.gl_opening)}</b></td><td class="num"><b>${fmt(t.gl_closing)}</b></td>
-      <td class="num"><b>${fmt(ss.accounts.reduce((a,r)=>a+r.item_value,0))}</b></td>
-      <td class="num ${diffBad?"up":""}"><b>${sign(ss.accounts.reduce((a,r)=>a+r.difference,0))}</b></td></tr>`;
-  $("ssUnmapped").textContent = ss.unmapped.length
-    ? "Items whose posting group is not among the inventory accounts in Settings: " +
-      ss.unmapped.map(u=>`${u.posting_group} ${fmt(u.value)} (${fmt(u.items)} items)`).join(" · ")
-    : "Every item with stock posts to one of the inventory accounts in Settings.";
-  $("ssMethod").innerHTML = `<p>${esc(d.method)}</p>` +
-    (d.accounts.length ? `<p>Cost of goods sold, last ${d.cogs_days} days: ` + d.accounts.map(a=>`${esc(a.account)} ${esc(a.name)} ${fmt(a.amount)}`).join(" · ") + `</p>` : "") +
-    ss.notes.map(n=>`<p>${esc(n)}</p>`).join("") +
-    (prov ? `<p>${esc(prov.basis)}</p>` : "") +
-    `<p>Sources: ${ss.sources.map(x=>`${esc(x.source)} (${esc(x.status)}${x.reason?": "+esc(x.reason):""})`).join(" · ")}. Read in ${fmt(ss.ms/1000,1)} s.</p>`;
+    `<tr class="total"><td>Total</td><td class="num">${fmt(t.gl_opening)}</td><td class="num">${fmt(t.gl_closing)}</td>
+      <td class="num">${fmt(sumItem)}</td><td class="num ${diffBad?"up":""}">${sign(sumDiff)}</td></tr>`;
+  const unm = ss.unmapped || [];
+  $("ssCaution").style.display = unm.length || diffBad ? "" : "none";
+  $("ssCaution").innerHTML = `<span class="rhg-pill warning">Attention required</span>
+    <p class="rhg-caution" style="margin:12px 0 0;font-size:13px">${unm.length
+      ? `${fmt(unm.reduce((a,u)=>a+u.value,0))} ${C} of stock posts to groups that are not among the inventory accounts in Settings: ${unm.map(u=>`${esc(u.posting_group)} ${fmt(u.value)} (${fmt(u.items)} items)`).join(" · ")}.`
+      : `Item value differs from the G/L by ${sign(t.difference)} ${C}, above the ${fmt(th.inventory_difference)} threshold.`}</p>
+    <p class="hint" style="margin:12px 0 0">Confirm the account scope in Settings, or run the cost adjustment, before accepting the company-wide reconciliation.</p>`;
+  $("ssMethod").innerHTML = `<p style="margin:0 0 6px">${esc(d.method)}</p>` +
+    (d.accounts.length ? `<p style="margin:0 0 6px">Cost of goods sold, last ${d.cogs_days} days: ${d.accounts.map(a=>`${esc(a.account)} ${esc(a.name)} ${fmt(a.amount)}`).join(" · ")}</p>` : "") +
+    ss.notes.map(n=>`<p style="margin:0 0 6px">${esc(n)}</p>`).join("") +
+    (prov ? `<p style="margin:0 0 6px">${esc(prov.basis)}</p>` : "") +
+    `<p style="margin:0">Sources: ${ss.sources.map(x=>`${esc(x.source)} (${esc(x.status)}${x.reason?": "+esc(x.reason):""})`).join(" · ")}. Read in ${fmt(ss.ms/1000,1)} s.</p>`;
 }
 
 // ---------- month-end close ----------
@@ -1124,8 +1183,57 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");
   if(b.dataset.view==="budget" && data && !(data.budget||{}).loaded) loadPane("/api/budget","budget",renderBudget,"bgNote");
   if(b.dataset.view==="group" && data && !(data.group||{}).loaded) loadPane("/api/consolidation","group",renderGroup,"grpNote");
-  $("title").textContent = b.textContent.trim().replace(/\s*\d+$/,"");
+  // the open screen is part of the address, so the control center can link straight to it
+  if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
+  setHeader();
 });
+function currentView(){
+  const b = document.querySelector("#nav button.on");
+  return {id: (b && b.dataset.view) || "overview", label: (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"")};
+}
+function setHeader(){
+  const v = currentView();
+  const inv = v.id === "inventory";
+  $("towerFinance").classList.toggle("on", !inv); $("towerInventory").classList.toggle("on", inv);
+  $("towerFinance").toggleAttribute("aria-current", !inv); $("towerInventory").toggleAttribute("aria-current", inv);
+  if (!data) { $("title").textContent = v.label; return; }
+  const m = data.meta;
+  $("title").textContent = `${v.label} · ${m.company}${m.dimension ? " · " + m.dimension : ""}`;
+  const ss = data.stockSummary;
+  $("period").textContent = inv && ss && ss.available
+    ? `Stock position · company-wide · Opening ${ss.opening_date} → closing ${ss.as_of}`
+    : `${m.period_label} · against ${m.compare_label}${m.dimension ? " · " + m.dimension : ""} · ${m.currency}`;
+}
+function openFromHash(){
+  const v = (location.hash || "").slice(1);
+  const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
+  if (b && !b.classList.contains("on")) b.click();
+}
+window.addEventListener("hashchange", openFromHash);
+function bindGotoViews(root){
+  (root || document).querySelectorAll("[data-goto-view]").forEach(el => el.onclick = ev => {
+    ev.preventDefault();
+    const b = document.querySelector(`#nav button[data-view="${el.dataset.gotoView}"]`); if (b) b.click();
+  });
+}
+bindGotoViews(document);
+// Export CSV: the tables of the open screen, one block each; Export PDF: the open screen
+$("exportBtn").onclick = () => {
+  const view = document.querySelector(".view.on"); if (!view || !data) return;
+  const cell = t => `"${String(t).replace(/\s+/g," ").trim().replace(/"/g,'""')}"`;
+  const blocks = Array.from(view.querySelectorAll("table")).filter(t => t.rows.length > 1).map(t => {
+    const card = t.closest(".card"), h = card && card.querySelector("h2");
+    return [[cell(h ? h.textContent : "")]].concat(Array.from(t.rows).map(r => Array.from(r.cells).map(c => cell(c.textContent))));
+  });
+  if (!blocks.length) return;
+  const head = [[cell(`${currentView().label} · ${data.meta.company}`)], [cell($("period").textContent)], []];
+  const csv = head.concat(...blocks.map(b => b.concat([[]]))).map(r => r.join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], {type: "text/csv"}));
+  a.download = `${currentView().id}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
+};
+$("pdfBtn").onclick = () => { document.body.classList.add("printing"); window.print(); };
+window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
 $("refreshBtn").onclick=()=>load();
 ["company","dimension"].forEach(id=>$(id).onchange=()=>load());
 $("cmpMode").onchange=()=>load();
@@ -1144,6 +1252,7 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
     $("dimension").innerHTML = '<option value="">All departments</option>' +
       (j.dimensions||[]).map(([code,name])=>`<option value="${esc(code)}">${esc(code)} — ${esc(name)}</option>`).join("");
   }catch(e){ $("company").innerHTML = `<option>SALT</option>`; }
+  openFromHash();
   load();
 })();
 </script>

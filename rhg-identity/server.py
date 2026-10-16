@@ -108,7 +108,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         try:
-            if url.path in ("/", "/login", "/login.html"):
+            if url.path == "/":
+                # Signed in: the control center. Otherwise, or while a new password is
+                # still owed, the sign-in page.
+                u = self._user()
+                page = "control.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
+            if url.path in ("/login", "/login.html"):
                 self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
                 return
             if url.path in ("/admin", "/admin.html"):

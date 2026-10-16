@@ -1,124 +1,287 @@
 /* ---------------------------------------------------------------
-   Revo / RHG brand layer (Finance & Inventory Control Tower).
-   Palette and typeface from the Revo Brand Guide:
-     #0C475E deep blue · #A0D8EA light blue · #ECEBEB light grey
-     Primary typeface: Aktifo B
-   Everything the app's look depends on lives here, so the whole
-   application can be re-skinned from this one file.
+   Revo / RHG brand layer — RHG Control Towers design system.
+   Source: Figma "RHG Control Towers" (screens 01–05, components
+   RHG/KPI, RHG/Button primary, RHG/Button secondary) and the Revo
+   Brand Guide: #0C475E deep blue · #A0D8EA light blue · #ECEBEB grey.
+
+   This file is identical in both towers and loads after each page's
+   own styles, so the whole look of the platform lives here. The
+   --rhg-* names are the Figma variable names, one to one.
    --------------------------------------------------------------- */
 @import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Archivo:wght@500;600;700;800&display=swap");
 
-/* Aktifo B is a licensed typeface and we do not hold the files, so nothing is
-   declared for it here: an @font-face pointing at fonts we do not have only
-   costs four 404s on every load. The stack below falls back to Figtree and
-   Archivo, which share the same geometric, low-contrast character.
-
-   If the licensed files ever arrive, drop AktifoB-{Light,Regular,Medium,Bold}
-   .woff2 into static/fonts/ and restore the four @font-face rules here; the
-   server already serves that folder and the font stack already asks for the
-   family first. */
+/* Aktifo B is licensed and we do not hold the files, so nothing is declared
+   for it: Figtree (text) and Archivo (headings, figures) carry the same
+   geometric, low-contrast character. If the files arrive, add the
+   @font-face rules here; the stacks below already ask for it first. */
 
 :root{
-  /* --- brand palette --- */
-  --revo-blue:        #0c475e;
-  --revo-blue-deep:   #08303f;   /* darker step for the navigation panel */
-  --revo-sky:         #a0d8ea;
-  --revo-sky-soft:    #e4f3f9;   /* sky at low opacity, for fills        */
-  --revo-grey:        #ecebeb;
-  --revo-white:       #ffffff;
+  /* --- Figma variables --- */
+  --rhg-bg:       #ecebeb;
+  --rhg-nav:      #08303f;
+  --rhg-primary:  #0c475e;
+  --rhg-blue:     #a0d8ea;
+  --rhg-sky:      #e4f3f9;
+  --rhg-white:    #ffffff;
+  --rhg-ink:      #0e2733;
+  --rhg-muted:    #5c7482;
+  --rhg-line:     #d9dcdd;
+  --rhg-red:      #c0392b;  --rhg-redbg:   #fbecea;
+  --rhg-amber:    #b26a00;  --rhg-amberbg: #fdf3e2;
+  --rhg-green:    #0e8a57;  --rhg-greenbg: #e6f6ef;   /* savings; not in the Figma file yet */
+  --rhg-space-6: 6px; --rhg-space-8: 8px; --rhg-space-12: 12px; --rhg-space-16: 16px; --rhg-space-20: 20px;
+  --rhg-radius:   12px;
+  --rhg-font:         "Aktifo B", "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --rhg-font-display: "Aktifo B", "Archivo", var(--rhg-font);
+  --rhg-mark: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>');
 
-  /* --- roles --- */
-  --brand-ink:      #0e2733;
-  --brand-accent:   var(--revo-blue);
-  --brand-second:   var(--revo-sky);
-  --brand-sidebar:  var(--revo-blue-deep);
-  --brand-surface:  var(--revo-white);
-  --brand-page:     var(--revo-grey);
-  --brand-line:     #d9dcdd;
-  --brand-muted:    #5c7482;
-
-  /* --- signal colours: these carry meaning, so they stay distinct
-         from the brand blues and keep their contrast --- */
-  --brand-negative: #c0392b;   /* extra cost, critical  */
-  --brand-positive: #0e8a57;   /* savings, resolved     */
-  --brand-warning:  #b26a00;   /* warning               */
-
-  /* --- typography --- */
-  --brand-font:         "Aktifo B", "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --brand-font-display: "Aktifo B", "Archivo", var(--brand-font);
-  --brand-radius: 12px;
-  --brand-logo-size: 36px;
-  --brand-mark: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>');
+  /* --- the application's own variable names, mapped onto the system --- */
+  --bg: var(--rhg-bg);  --card: var(--rhg-white);  --ink: var(--rhg-ink);  --sub: var(--rhg-muted);
+  --line: var(--rhg-line);  --side: var(--rhg-nav);  --side-ink: var(--rhg-blue);
+  --accent: var(--rhg-primary);  --prev: var(--rhg-blue);
+  --up: var(--rhg-red);    --up-bg: var(--rhg-redbg);
+  --down: var(--rhg-green); --down-bg: var(--rhg-greenbg);
+  --warn: var(--rhg-amber); --warn-bg: var(--rhg-amberbg);
+  /* older names some screens still use */
+  --revo-blue: var(--rhg-primary); --revo-blue-deep: var(--rhg-nav); --revo-sky: var(--rhg-blue);
+  --revo-sky-soft: var(--rhg-sky); --brand-muted: var(--rhg-muted); --brand-radius: var(--rhg-radius);
 }
 
-/* --- map the brand onto the application variables --- */
-:root{
-  --bg: var(--brand-page);
-  --card: var(--brand-surface);
-  --ink: var(--brand-ink);
-  --sub: var(--brand-muted);
-  --line: var(--brand-line);
-  --side: var(--brand-sidebar);
-  --side-ink: #b9d4de;
-  --accent: var(--brand-accent);
-  --prev: var(--revo-sky);              /* comparison bars in the brand's second colour */
-  --up: var(--brand-negative);   --up-bg:   #fbecea;
-  --down: var(--brand-positive); --down-bg: #e6f6ef;
-  --warn: var(--brand-warning);  --warn-bg: #fdf3e2;
+/* ---------------------------------------------------------------- base */
+html, body{ font-family: var(--rhg-font); font-size: 13px; letter-spacing: 0; background: var(--bg); color: var(--ink); }
+h1{ font-family: var(--rhg-font-display); font-size: 27px; font-weight: 600; line-height: 1.35; letter-spacing: 0; margin: 0; }
+h2{ font-family: var(--rhg-font); font-size: 17px; font-weight: 600; line-height: 1.35; margin: 0; }
+h3, h4{ font-family: var(--rhg-font); }
+.hint{ font-size: 12px; color: var(--sub); }
+.meta{ font-size: 11px; color: var(--sub); font-weight: 400; }
+.up{ color: var(--rhg-red); } .down{ color: var(--rhg-green); }
+:focus-visible{ outline: 2px solid var(--rhg-primary); outline-offset: 2px; }
+a{ color: var(--rhg-primary); }
+
+/* ---------------------------------------------------------- navigation */
+aside{
+  width: 240px; padding: 20px; gap: var(--rhg-space-8);
+  background: var(--rhg-nav); color: var(--rhg-blue);
 }
-
-html, body{ font-family: var(--brand-font); letter-spacing: -0.005em; }
-h1, h2, h3, h4, .brand b, .kpi .v, .status-pill{ font-family: var(--brand-font-display); }
-h1{ letter-spacing: -0.02em; }
-.card, .brief, .act, .qcheck, .modal{ border-radius: var(--brand-radius); }
-
-/* --- navigation --- */
-nav button.on{ background: rgba(160,216,234,.16); color: #fff; }
-nav button:hover{ background: rgba(160,216,234,.09); }
-nav .count{ background: rgba(160,216,234,.2); color: var(--revo-sky); }
-.brand small{ color: #8fb3c1; }
-.side-foot{ color: #7e9daa; }
-
-/* --- accents that should read as brand, not as alarm --- */
-.btn.dark{ background: var(--revo-blue); color: #fff; border-color: var(--revo-blue); }
-.mini.dark{ background: var(--revo-blue); color: #fff; border-color: var(--revo-blue); }
-.chip:not(.up):not(.down){ background: var(--revo-sky-soft); color: var(--revo-blue); }
-.tag.rec{ color: var(--revo-blue); }
-.kpi .v{ letter-spacing: -0.02em; }
-.status-ok{ background: var(--revo-sky-soft); color: var(--revo-blue); }
-th{ color: var(--brand-muted); }
-:focus-visible{ outline-color: var(--revo-blue); }
-
-/* --- logo -----------------------------------------------------------------
-   The mark is inlined as a mask rather than fetched from static/logo.svg: a
-   request would have to carry this tower's path prefix, which the page cannot
-   know, and it is the same shape the sign-in page at the root already draws.
-   Masking it with currentColor means dark mode needs nothing extra. */
+.brand{ display: flex; gap: 10px; align-items: center; padding: 0; }
+.brand b, .brand small{
+  display: block; font-family: var(--rhg-font); font-size: 12px; font-weight: 600; line-height: 1.35;
+  color: var(--rhg-white); text-transform: uppercase; letter-spacing: 0;
+}
 .logo{
-  width: var(--brand-logo-size); height: var(--brand-logo-size);
-  background-color: var(--revo-sky);
-  color: var(--revo-blue);
-  border-radius: 11px;
-  display: grid; place-items: center;
-  font-size: 0;                     /* hides the letter fallback in the markup */
+  width: 32px; height: 32px; flex: none; border-radius: 0; background: transparent;
+  color: var(--rhg-white); display: grid; place-items: center; font-size: 0;
 }
 .logo::after{
-  content: ""; width: 56%; height: 56%;
-  background-color: currentColor;
-  -webkit-mask: var(--brand-mark) center/contain no-repeat;
-          mask: var(--brand-mark) center/contain no-repeat;
+  content: ""; width: 100%; height: 100%; background-color: currentColor;
+  -webkit-mask: var(--rhg-mark) center/contain no-repeat; mask: var(--rhg-mark) center/contain no-repeat;
 }
+/* the platform switcher: which tower you are in */
+.towers{ display: flex; flex-direction: column; gap: var(--rhg-space-8); margin-top: 4px; }
+.towers .lbl{ font-size: 10px; font-weight: 600; line-height: 1.35; color: var(--rhg-blue); text-transform: uppercase; }
+.towers a{
+  display: block; padding: 10px; font-size: 14px; line-height: 1.35; color: var(--rhg-blue);
+  text-decoration: none; border-radius: 0;
+}
+.towers a:hover{ background: rgba(160,216,234,.08); }
+.towers a.on{ background: var(--rhg-primary); color: var(--rhg-white); font-weight: 600; }
+nav{ gap: var(--rhg-space-8); margin-top: 4px; }
+nav .grp{
+  font-size: 9px; font-weight: 600; line-height: 1.35; letter-spacing: 0; text-transform: uppercase;
+  color: var(--rhg-blue); padding: 0; margin: 0;
+}
+nav button{
+  all: unset; cursor: pointer; font-size: 11px; line-height: 1.35; color: var(--rhg-white);
+  display: flex; justify-content: flex-start; align-items: baseline; gap: 6px;
+  padding: 2px 6px; margin: -2px -6px; border-radius: 4px;
+}
+nav button:hover{ background: rgba(160,216,234,.09); }
+nav button.on{ background: rgba(160,216,234,.16); color: var(--rhg-white); font-weight: 600; }
+nav .count{ background: none; color: inherit; font-size: 11px; font-weight: inherit; padding: 0; border-radius: 0; }
+.side-foot{ font-size: 10px; color: rgba(160,216,234,.6); padding: 0; margin-top: auto; }
 
-/* --- dark mode: the deep blue becomes the surface, the sky becomes the accent --- */
+/* --------------------------------------------------------------- page */
+main{ padding: 24px; }
+header{ gap: 18px; margin-bottom: var(--rhg-space-20); align-items: flex-start; flex-wrap: nowrap; }
+header > div:first-child{ flex: 1; min-width: 0; }
+.eyebrow{ font-size: 10px; font-weight: 600; line-height: 1.35; color: var(--sub); text-transform: uppercase; margin-bottom: 6px; }
+.period{ font-size: 13px; color: var(--sub); margin-top: 6px; line-height: 1.35; }
+.hdr-side{ display: flex; flex-direction: column; gap: var(--rhg-space-8); align-items: flex-end; }
+.hdr-btns{ display: flex; gap: var(--rhg-space-8); flex-wrap: wrap; justify-content: flex-end; }
+.hdr-meta{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
+  font-size: 11px; line-height: 1.35; color: var(--sub); }
+.hdr-meta .sep{ opacity: .6; }
+.hdr-meta .pill{ all: unset; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sub); }
+.hdr-meta .pill .dot{ width: 6px; height: 6px; }
+.linkbtn{ all: unset; cursor: pointer; font-size: 11px; color: var(--sub); }
+.linkbtn:hover{ color: var(--rhg-primary); text-decoration: underline; }
+
+/* ------------------------------------------------------------ buttons */
+.btn{
+  min-width: 138px; padding: 10px 16px; border-radius: var(--rhg-radius); border: 1px solid transparent;
+  background: var(--rhg-white); color: var(--rhg-primary); font-size: 12px; font-weight: 600; line-height: normal; cursor: pointer;
+}
+.btn:hover{ border-color: var(--rhg-line); }
+.btn.dark, .btn.primary{ background: var(--rhg-primary); color: var(--rhg-white); border-color: var(--rhg-primary); }
+.btn.dark:hover, .btn.primary:hover{ background: #0a3d51; }
+.card .btn:not(.dark):not(.primary), .brief .btn:not(.dark):not(.primary){ background: transparent; }
+.card .btn:not(.dark):not(.primary):hover{ background: var(--rhg-sky); border-color: transparent; }
+.mini{
+  font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--rhg-line); background: var(--rhg-white); color: var(--rhg-primary);
+}
+.mini:hover{ border-color: var(--rhg-primary); }
+.mini.dark{ background: var(--rhg-primary); color: var(--rhg-white); border-color: var(--rhg-primary); }
+.mini[disabled]{ opacity: .55; cursor: default; }
+
+/* ------------------------------------------------------------ filters */
+.filters{ display: flex; gap: var(--rhg-space-12); flex-wrap: wrap; margin-bottom: var(--rhg-space-20); }
+.filters label{
+  flex: 1 1 150px; flex-direction: row; align-items: center; gap: 8px;
+  background: var(--rhg-white); border: 1px solid var(--rhg-line); border-radius: var(--rhg-radius);
+  padding: 0 14px 0 20px; min-height: 38px; font-size: 12px; font-weight: 400; color: var(--ink); white-space: nowrap;
+}
+.filters select, .filters input{
+  flex: 1; min-width: 0; border: 0; background: transparent; padding: 9px 0; font-size: 12px; color: var(--ink);
+  border-radius: 0; outline: none;
+}
+.filters label:focus-within{ border-color: var(--rhg-primary); }
+
+/* ------------------------------------------------------------- surfaces */
+.card, .brief{
+  background: var(--rhg-white); border: 1px solid var(--rhg-line); border-radius: var(--rhg-radius); padding: 20px;
+}
+.card h2{ margin-bottom: 0; }
+.card .hint{ margin: 4px 0 12px; }
+.view > .card, .view > .grid, .view > .kpis, .view > .brief, .view > .rhg-stack{ margin-bottom: var(--rhg-space-20) !important; }
+.grid{ gap: var(--rhg-space-16); }
+.grid > .card{ margin-bottom: 0 !important; }
+.grid > *{ min-width: 0; }
+.kpis.five{ grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.kpis.six{ grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.kpis.three{ grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 760px){ .kpis.three{ grid-template-columns: 1fr; } }
+.grid.even{ grid-template-columns: 1fr 1fr; }
+@media (max-width: 1000px){ .grid.even{ grid-template-columns: 1fr; } }
+.clickable{ cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+.clickable:hover{ border-color: var(--rhg-primary); }
+
+/* RHG/KPI — white, borderless, 126 px tall */
+.kpis{ gap: var(--rhg-space-12); }
+.card.kpi{
+  border: 0; border-radius: var(--rhg-radius); padding: 12px 16px; min-height: 126px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.card.kpi.clickable:hover{ box-shadow: 0 0 0 1px var(--rhg-primary); }
+.kpi .l{ font-size: 12px; font-weight: 600; color: var(--ink); line-height: normal; }
+.kpi .v{ font-family: var(--rhg-font-display); font-size: 24px; font-weight: 600; line-height: normal; letter-spacing: 0; margin: 0; color: var(--ink); }
+.kpi .v.up{ color: var(--rhg-red); } .kpi .v.down{ color: var(--rhg-green); } .kpi .v.warn{ color: var(--rhg-amber); }
+.kpi .s{ font-size: 11px; font-weight: 600; color: var(--sub); line-height: 1.35; }
+.kpi .s .meta{ font-weight: 400; }
+
+/* ---------------------------------------------------------------- tables */
+table{ width: 100%; border-collapse: collapse; }
+th{ text-align: left; white-space: nowrap; }
+td.num, th.num{ text-align: right; }
+th{
+  background: var(--rhg-sky); color: var(--sub); font-size: 12px; font-weight: 600; line-height: 1.35;
+  padding: 10px 7px; border-bottom: 0; text-transform: none; letter-spacing: 0;
+}
+th:first-child, td:first-child{ padding-left: 8px; }
+th:last-child, td:last-child{ padding-right: 8px; }
+td{ font-size: 12px; line-height: 1.35; padding: 9px 7px; border-bottom: 1px solid #f0f1f2; color: var(--ink); }
+tr:last-child td{ border-bottom: 0; }
+.name{ font-weight: 400; }
+td.name b, .name b{ font-weight: 600; }
+tr.total td, .total td{ font-weight: 600; background: transparent; }
+
+/* --------------------------------------------------------------- pills */
+.chip, .prio, .status-pill, .rhg-pill{
+  display: inline-block; font-family: var(--rhg-font); font-size: 11px; font-weight: 600; line-height: 1.35;
+  padding: 3px 6px; border-radius: 6px; background: var(--rhg-sky); color: var(--rhg-primary);
+}
+.chip.up, .prio.Critical, .status-crit, .rhg-pill.critical{ background: var(--rhg-redbg); color: var(--rhg-red); }
+.chip.down, .rhg-pill.ok{ background: var(--rhg-greenbg); color: var(--rhg-green); }
+.prio.High, .status-warn, .rhg-pill.warning{ background: var(--rhg-amberbg); color: var(--rhg-amber); }
+.status-ok, .rhg-pill.info{ background: var(--rhg-sky); color: var(--rhg-primary); }
+.prio.Medium, .prio.Low{ background: var(--rhg-bg); color: var(--sub); }
+.rhg-pill{ padding: 6px; }
+
+/* FACT / INFERENCE / RECOMMENDATION read as a prefix, not a badge */
+.tag{ all: unset; font-size: inherit; font-weight: 400; text-transform: uppercase; color: var(--ink); margin-right: 0; }
+.tag::after{ content: " · "; }
+.tag.inference, .tag.rec{ color: var(--ink); }
+
+/* -------------------------------------------------- brief and worklists */
+.brief .head{ display: flex; gap: var(--rhg-space-16); align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 0; }
+.brief h2{ font-size: 18px; }
+.brief .lines{ display: flex; flex-direction: column; gap: var(--rhg-space-12); margin-top: var(--rhg-space-12); }
+.brief .lines p{ margin: 0; font-size: 13px; line-height: 1.35; }
+.brief h3{ font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--sub); letter-spacing: 0; margin: 16px 0 8px; }
+.brief details{ margin-top: var(--rhg-space-12); }
+.brief details > summary{ cursor: pointer; font-size: 12px; color: var(--rhg-primary); font-weight: 600; }
+.money div{ background: var(--rhg-bg); border-radius: 8px; font-size: 11px; }
+.money b{ font-family: var(--rhg-font-display); font-weight: 600; }
+
+/* a worklist row: severity · title + owner line · action */
+.rhg-list{ display: flex; flex-direction: column; gap: var(--rhg-space-12); }
+.rhg-row{ display: flex; gap: var(--rhg-space-16); align-items: flex-start; }
+.rhg-row .rhg-pill{ flex: none; min-width: 62px; text-align: center; }
+.rhg-row .body{ flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rhg-row .body b{ font-size: 13px; font-weight: 600; line-height: 1.35; }
+.rhg-row .body span{ font-size: 11px; color: var(--sub); line-height: 1.35; }
+.rhg-row .btn{ flex: none; }
+.act{ border: 1px solid var(--rhg-line); border-radius: var(--rhg-radius); }
+
+/* comparison bars: this period (primary) over the comparison (light blue) */
+.rhg-bars{ display: flex; flex-direction: column; gap: var(--rhg-space-12); }
+.rhg-bars .row{ display: grid; grid-template-columns: 100px 1fr auto; gap: var(--rhg-space-12); align-items: center; }
+.rhg-bars .lbl{ font-size: 11px; font-weight: 600; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rhg-bars .pair{ display: flex; flex-direction: column; gap: 4px; }
+.rhg-bars .pair i{ display: block; height: 7px; background: var(--rhg-primary); }
+.rhg-bars .pair i + i{ background: var(--rhg-blue); }
+.rhg-bars .amt{ font-size: 11px; color: var(--sub); text-align: right; min-width: 80px; }
+.rhg-legend{ font-size: 11px; color: var(--sub); }
+.rhg-legend i{ display: inline-block; width: 14px; height: 7px; background: var(--rhg-primary); margin: 0 4px 0 2px; vertical-align: 1px; }
+.rhg-legend i.prev{ background: var(--rhg-blue); }
+
+/* stacked ageing bar */
+.rhg-stack-bar{ display: flex; height: 24px; overflow: hidden; }
+.rhg-stack-bar span{ display: block; height: 100%; }
+.rhg-buckets{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: var(--rhg-space-12); font-size: 11px; color: var(--sub); }
+.rhg-buckets b{ display: block; font-size: 12px; color: var(--ink); font-weight: 600; margin-top: 4px; }
+
+/* a one-line headline figure, e.g. the posting follow-up */
+.rhg-headline{ font-size: 18px; font-weight: 600; color: var(--rhg-primary); line-height: 1.35; display: flex; gap: 14px; flex-wrap: wrap; }
+.rhg-headline .sep{ color: var(--sub); font-weight: 400; }
+.rhg-insight{ font-size: 20px; font-weight: 600; line-height: 1.35; }
+.rhg-caution{ color: var(--rhg-amber); font-weight: 600; }
+.rhg-back{ margin-bottom: var(--rhg-space-20); }
+
+/* --- dark mode: the deep blue becomes the surface, the light blue the accent --- */
 @media (prefers-color-scheme: dark){
   :root{
     --bg:#08222d; --card:#0e2f3d; --ink:#e8f2f6; --sub:#93b2bf; --line:#194354;
-    --side:#061a23; --side-ink:#b9d4de;
-    --accent: var(--revo-sky);
-    --prev:#2b5a6c;
+    --side:#061a23; --accent: var(--rhg-blue); --prev:#2b5a6c;
     --up:#ef6a5c; --up-bg:#3a1d1a; --down:#3fc08c; --down-bg:#0d2e24; --warn:#e0a44a; --warn-bg:#32270f;
+    --rhg-white:#0e2f3d; --rhg-ink:#e8f2f6; --rhg-muted:#93b2bf; --rhg-line:#194354; --rhg-bg:#08222d;
+    --rhg-sky:#123a4a; --rhg-redbg:#3a1d1a; --rhg-amberbg:#32270f; --rhg-greenbg:#0d2e24;
+    --rhg-red:#ef6a5c; --rhg-amber:#e0a44a; --rhg-green:#3fc08c;
   }
-  .btn.dark, .mini.dark{ background: var(--revo-sky); color: var(--revo-blue-deep); border-color: var(--revo-sky); }
-  .chip:not(.up):not(.down){ background: rgba(160,216,234,.14); color: var(--revo-sky); }
-  .status-ok{ background: rgba(160,216,234,.14); color: var(--revo-sky); }
+  aside{ background: #061a23; }
+  .logo, .brand b, .brand small, nav button, .towers a.on{ color: #fff; }
+  .btn.dark, .btn.primary, .mini.dark, .towers a.on{ background: var(--rhg-blue); color: #08303f; border-color: var(--rhg-blue); }
+  .btn, .mini{ color: var(--rhg-blue); }
+  .rhg-bars .pair i{ background: var(--rhg-blue); } .rhg-bars .pair i + i{ background: #2b5a6c; }
+  .rhg-headline{ color: var(--rhg-blue); }
+  td{ border-bottom-color: #133c4b; }
+}
+
+/* --- phone: the side panel folds away, the cards stack --- */
+@media (max-width: 760px){
+  main{ padding: 16px; }
+  header{ flex-direction: column; }
+  .hdr-side{ align-items: flex-start; }
+  .hdr-btns .btn{ min-width: 0; }
+  .rhg-row{ flex-wrap: wrap; }
 }

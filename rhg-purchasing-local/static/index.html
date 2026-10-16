@@ -188,7 +188,14 @@ td.num,th.num{text-align:right}
 <body>
 <div class="app">
 <aside>
-  <div class="brand"><div class="logo" id="logo" role="img" aria-label="RHG"></div><div><b>RHG Purchasing</b><small>Business Central, live</small></div></div>
+  <div class="brand"><div class="logo" id="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/purchasing/" class="on" aria-current="page">Purchasing</a>
+    <a href="/finance/">Finance</a>
+    <a href="/finance/#inventory">Inventory</a>
+  </div>
   <nav id="nav">
     <div class="grp">Overview</div>
     <button class="on" data-view="overview">Overview</button>
@@ -233,16 +240,22 @@ td.num,th.num{text-align:right}
 <main>
   <header>
     <div>
+      <div class="eyebrow">RHG Purchasing / Business Central, live</div>
       <h1 id="title">Purchasing overview</h1>
       <div class="period" id="period">Loading…</div>
     </div>
-    <div class="status">
-      <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
-      <button class="btn" id="exportBtn">Export CSV</button>
-      <button class="btn" id="pdfBtn">Export PDF</button>
-      <button class="btn dark" id="refreshBtn">Refresh now</button>
-      <span class="pill" id="whoami" title="Signed in"></span>
-      <button class="btn" id="logoutBtn">Sign out</button>
+    <div class="hdr-side status">
+      <div class="hdr-btns">
+        <button class="btn" id="exportBtn">Export CSV</button>
+        <button class="btn" id="pdfBtn">Export PDF</button>
+        <button class="btn dark" id="refreshBtn">Refresh now</button>
+      </div>
+      <div class="hdr-meta">
+        <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Connecting to Business Central</span></span>
+        <span class="sep">|</span>
+        <span id="whoami" title="Signed in"></span>
+        <button class="linkbtn" id="logoutBtn">Sign out</button>
+      </div>
     </div>
   </header>
 
@@ -260,28 +273,43 @@ td.num,th.num{text-align:right}
 
   <section class="view on" id="v-overview">
     <div class="brief" id="brief"></div>
-    <div class="kpis">
-      <div class="card kpi clickable" data-drill="purchases"><div class="l">Purchases</div><div class="v" id="kTotal">–</div><div class="s" id="kTotalS"></div></div>
-      <div class="card kpi clickable" data-drill="increases"><div class="l">Price increases</div><div class="v" id="kInc">–</div><div class="s" id="kIncS"></div></div>
-      <div class="card kpi clickable" data-drill="decreases"><div class="l">Price decreases</div><div class="v" id="kDec">–</div><div class="s" id="kDecS"></div></div>
-      <div class="card kpi clickable" data-drill="movers"><div class="l">Net price impact</div><div class="v" id="kNet">–</div><div class="s" id="kNetS"></div></div>
-      <div class="card kpi clickable" data-drill="po_pending"><div class="l">Received, not invoiced (this period)</div><div class="v" id="kPend">–</div><div class="s" id="kPendS"></div></div>
+    <div class="kpis five">
+      <div class="card kpi clickable" data-drill="purchases"><div class="l" id="kTotalL">Purchase spend this week</div><div class="v" id="kTotal">–</div><div class="s" id="kTotalS"></div></div>
+      <div class="card kpi clickable" data-goto-view="po"><div class="l">Open purchase orders</div><div class="v" id="kPo">–</div><div class="s" id="kPoS"></div></div>
+      <div class="card kpi clickable" data-drill="po_pending"><div class="l">Awaiting invoice</div><div class="v" id="kPend">–</div><div class="s" id="kPendS"></div></div>
+      <div class="card kpi clickable" data-goto-view="exceptions"><div class="l">Open exceptions</div><div class="v" id="kExc">–</div><div class="s" id="kExcS"></div></div>
+      <div class="card kpi"><div class="l">Data updated at</div><div class="v" id="kTime">–</div><div class="s" id="kTimeS"></div></div>
     </div>
     <div class="grid">
+      <div class="card"><h2>Spend by location</h2>
+        <p class="hint rhg-legend">This period <i></i> &nbsp; Comparison <i class="prev"></i></p>
+        <div class="rhg-bars" id="byLoc"></div></div>
+      <div class="card"><div class="card-head"><h2>Biggest price changes</h2><button class="mini" data-goto-view="prices">All price changes</button></div>
+        <p class="hint">Ranked by money impact on this period's volumes</p>
+        <div class="scroll"><table id="moversMini"></table></div></div>
+    </div>
+    <div class="card"><div class="card-head"><h2 id="ovExcTitle">Exceptions</h2><button class="mini" data-goto-view="exceptions">All exceptions</button></div>
+      <div class="rhg-list" id="ovExc" style="margin-top:12px"></div></div>
+    <div class="card"><h2 id="ovPfTitle">Posting follow-up</h2>
+      <div class="rhg-headline" id="ovPf" style="margin-top:12px"></div>
+      <p class="hint" id="ovPfNote" style="margin:12px 0 0"></p></div>
+    <div class="grid">
       <div class="card">
-        <h2>Spend by day</h2><p class="hint">This period against the same weekdays of the comparison period</p>
-        <div class="legend"><span><i style="background:var(--accent)"></i>This period</span><span><i style="background:var(--prev)"></i>Comparison</span></div>
+        <h2>Spend by day</h2><p class="hint rhg-legend">This period <i></i> &nbsp; Comparison <i class="prev"></i> · same weekdays</p>
         <div id="daily"></div>
       </div>
-      <div class="card">
-        <h2>Biggest price movers</h2><p class="hint">Ranked by money impact</p>
-        <div id="moversMini"></div>
-      </div>
+      <div class="card"><h2>Top spend items</h2><p class="hint rhg-legend">This period <i></i> &nbsp; Comparison <i class="prev"></i></p><div class="rhg-bars" id="topSpend"></div></div>
     </div>
-    <div class="grid">
-      <div class="card"><h2>Top spend items</h2><p class="hint">Marker shows the comparison period</p><div class="bars" id="topSpend"></div></div>
-      <div class="card"><h2>Spend by location</h2><p class="hint">Marker shows the comparison period</p><div class="bars" id="byLoc"></div></div>
-    </div>
+  </section>
+
+  <section class="view" id="v-exdetail">
+    <button class="btn rhg-back" id="exBack">← Back</button>
+    <div class="card" id="exHead"></div>
+    <div class="kpis" id="exKpis"></div>
+    <div class="card"><div class="card-head"><h2 id="exRecTitle">Supporting records</h2><button class="mini" id="exCsv">Export CSV</button></div>
+      <p class="hint" id="exRecHint"></p><div class="scroll" id="exRecords"></div></div>
+    <div class="card" id="exReview"></div>
+    <div class="card" id="exActivity"></div>
   </section>
 
   <section class="view" id="v-compare">
@@ -728,36 +756,42 @@ async function load(manual){
   }finally{ busy = false; countdown = refreshSec; showLoading(false); }
 }
 
+function setHeader(){
+  if (!data) return;
+  const m = data.meta, lfl = m.like_for_like ? " (like for like, period to date)" : "";
+  $("period").textContent = `${m.period_label ? m.period_label + " · " : ""}${dayName(m.current[0])} – ${dayName(m.current[1])} vs ${dayName(m.prior[0])} – ${dayName(m.prior[1])}${lfl}`;
+  const v = currentView();
+  $("title").textContent = (v.id === "overview" ? "Purchasing overview" : v.label) + " · " + m.company + (m.location ? " · " + m.location : "");
+}
 function render(){
   CUR = (data.meta && data.meta.currency) || "ALL";
   const m = data.meta, k = data.kpis;
-  const lfl = m.like_for_like ? " (like for like, period to date)" : "";
-  $("period").textContent = `${m.period_label ? m.period_label + " · " : ""}${dayName(m.current[0])} – ${dayName(m.current[1])} vs ${dayName(m.prior[0])} – ${dayName(m.prior[1])}${lfl}`;
+  if (!$("v-exdetail").classList.contains("on")) setHeader();   // the detail screen keeps its own header
   if (m.mode !== "week" && $("banner").textContent.startsWith("Loading a longer period")) $("banner").style.display = "none";
-  $("title").textContent = "Purchasing overview · " + m.company + (m.location ? " · " + m.location : "");
 
   const locSel = $("location"), cur = locSel.value;
   locSel.innerHTML = '<option value="">All locations</option>' + data.all_locations.map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
 
-  $("kTotal").textContent = all(k.total_cur);
-  $("kTotalS").innerHTML = k.total_pct == null ? "No comparison data" :
-     `<span class="${k.total_pct>0?"up":"down"}">${k.total_pct>0?"▲":"▼"} ${fmt(Math.abs(k.total_pct),1)}%</span> vs ${all(k.total_prev)} · ${fmt(k.lines)} lines, ${fmt(k.items)} items`;
-  $("kInc").textContent = fmt(k.increases);
-  $("kIncS").innerHTML = `<span class="up">+${all(k.increase_impact)}</span> extra cost`;
-  $("kDec").textContent = fmt(k.decreases);
-  $("kDecS").innerHTML = `<span class="down">${all(k.saving)}</span> saved`;
-  $("kNet").textContent = sign(k.net_price_impact) + " " + CUR;
-  $("kNet").className = "v " + (k.net_price_impact > 0 ? "up" : "down");
-  $("kNetS").textContent = `${fmt(k.exceptions)} price signals to review`;
-  const ops = data.operations || {};
-  const periodUninvoiced = k.uninvoiced_in_period || 0;
-  $("kPend").textContent = all(periodUninvoiced);
-  $("kPendS").innerHTML = `${fmt(k.uninvoiced_receipts || 0)} receipts in this period still without an invoice`
-    + `<div class="meta">Open orders today: ${all(ops.pending_invoice_value || 0)} · a current position, not the period's</div>`;
+  const ops = data.operations || {}, po = ops.po_summary || {}, sla = ops.sla || [];
+  const per = {week:"this week", month:"this month", ytd:"this year"}[m.mode] || "this period";
+  const vs = {week:"last week", month:"last month", ytd:"last year"}[m.mode] || "the comparison";
+  $("kTotalL").textContent = "Purchase spend " + per;
+  $("kTotal").textContent = fmt(k.total_cur);
+  $("kTotalS").innerHTML = k.total_pct == null ? `${CUR} · no comparison data`
+    : `${CUR} · <span class="${k.total_pct>0?"up":"down"}">${k.total_pct>0?"+":"−"}${fmt(Math.abs(k.total_pct),1)}%</span> vs ${vs}`;
+  $("kPo").textContent = ops.po_error ? "–" : fmt(ops.open_orders || po.orders || 0);
+  $("kPoS").textContent = ops.po_error ? "PurchaseOrderList unavailable" : `${fmt(po.released||0)} released · ${fmt(po.open_status||0)} open`;
+  $("kPend").textContent = fmt(ops.pending_invoice_value || 0);
+  $("kPendS").textContent = `${CUR} · receipt not invoiced`;
+  $("kExc").textContent = fmt(sla.length);
+  $("kExcS").textContent = `${fmt(sla.filter(e=>e.severity==="critical").length)} critical · ${fmt(sla.filter(e=>e.severity==="warning").length)} warning`;
+  $("kTime").textContent = new Date(m.checked_at).toLocaleTimeString("en-GB");
+  $("kTimeS").textContent = `Every ${m.refresh_seconds || 30} seconds`;
   $("exCount").textContent = k.exceptions;
 
   renderDaily(); renderMini(); renderBars("topSpend", data.top_spend.slice(0,10).map(t => ({l:t.desc||t.item_no, v:t.cost, p:t.prev_cost})));
   renderBars("byLoc", data.locations.slice(0,12).map(t => ({l:t.code, v:t.cur, p:t.prev})));
+  renderOvExceptions(); renderOvPostings(); bindGotoViews($("v-overview"));
   renderMovers(); renderSpreads(); renderExceptions(); renderPostings(); renderContracts(); renderInvoices(); renderUsers();
   renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
 
@@ -788,17 +822,147 @@ function renderDaily(){
 }
 
 function renderMini(){
-  const rows = data.movers.slice(0,7);
-  $("moversMini").innerHTML = rows.length ? `<table>${rows.map(m => `<tr><td class="name">${esc(m.desc||m.item_no)}<div class="meta">${fmt(m.prev_avg,2)} → ${fmt(m.cur_avg,2)} ${CUR}</div></td>
-    <td class="num"><span class="chip ${m.pct>0?"up":"down"}">${m.pct>0?"+":""}${fmt(m.pct,1)}%</span></td>
-    <td class="num ${m.impact>0?"up":"down"}"><b>${sign(m.impact)}</b></td></tr>`).join("")}</table>` : '<div class="empty">No meaningful price changes yet in this period.</div>';
+  const rows = data.movers.slice(0,6);
+  $("moversMini").innerHTML = `<tr><th>Item / location</th><th class="num">Old</th><th class="num">New</th><th class="num">Δ %</th><th class="num">Impact ${CUR}</th></tr>` +
+    (rows.length ? rows.map(m => `<tr class="clickable" data-item="${esc(m.item_no)}">
+      <td class="name">${esc(m.desc||m.item_no)} / ${esc((m.locations||[])[0]||"–")}${(m.locations||[]).length>1?`<span class="meta"> +${m.locations.length-1}</span>`:""}</td>
+      <td class="num">${fmt(m.prev_avg, m.prev_avg<100?2:0)}</td><td class="num">${fmt(m.cur_avg, m.cur_avg<100?2:0)}</td>
+      <td class="num ${m.pct>0?"up":"down"}">${m.pct>0?"+":"−"}${fmt(Math.abs(m.pct),1)}%</td>
+      <td class="num">${sign(m.impact)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No meaningful price changes yet in this period.</td></tr>`);
+  document.querySelectorAll("#moversMini tr[data-item]").forEach(tr => tr.onclick = () => openDrill("item", tr.dataset.item));
 }
 
 function renderBars(id, rows){
   const max = Math.max(1, ...rows.map(r => Math.max(r.v, r.p||0)));
-  $(id).innerHTML = rows.length ? rows.map(r => `<div class="row"><div class="lbl" title="${esc(r.l)}">${esc(r.l)}</div>
-    <div class="track"><div class="fill" style="width:${Math.max(0,r.v)/max*100}%"></div><div class="fill prev" style="width:${Math.max(0,r.p||0)/max*100}%"></div></div>
+  $(id).innerHTML = rows.length ? rows.map(r => `<div class="row" title="${esc(r.l)}: ${fmt(r.v)} ${CUR} this period, ${fmt(r.p||0)} in the comparison">
+    <div class="lbl">${esc(r.l)}</div>
+    <div class="pair"><i style="width:${Math.max(0,r.v)/max*100}%"></i><i style="width:${Math.max(0,r.p||0)/max*100}%"></i></div>
     <div class="amt">${fmt(r.v)}</div></div>`).join("") : '<div class="empty">Nothing to show yet.</div>';
+}
+
+// ---------- overview: exceptions worklist and posting follow-up ----------
+const SEV_LABEL = {critical:"Critical", warning:"Warning", info:"Info"};
+const sevRank = e => ({critical:0, warning:1}[e.severity] ?? 2);
+function exceptionRow(e, i){
+  const who = e.owner || "Unassigned";
+  return `<div class="rhg-row"><span class="rhg-pill ${e.severity}">${SEV_LABEL[e.severity]||e.severity}</span>
+    <div class="body"><b>${esc(e.title)}</b>
+      <span>${esc(e.rule)} · ${esc(who)}${e.impact?` · ${fmt(Math.abs(e.impact))} ${CUR}`:""}${e.location?` · ${esc(e.location)}`:""}</span></div>
+    <button class="btn" data-exdetail="${i}">Open detail</button></div>`;
+}
+function renderOvExceptions(){
+  const sla = ((data.operations||{}).sla || []).map((e,i) => ({e, i})).sort((a,b) => sevRank(a.e)-sevRank(b.e) || Math.abs(b.e.impact||0)-Math.abs(a.e.impact||0));
+  $("ovExcTitle").textContent = `Exceptions · ${fmt(sla.length)} open`;
+  $("ovExc").innerHTML = sla.length ? sla.slice(0,5).map(x => exceptionRow(x.e, x.i)).join("")
+    : '<div class="empty">No rule was breached in this period.</div>';
+  document.querySelectorAll("#ovExc [data-exdetail]").forEach(b => b.onclick = () => openException(+b.dataset.exdetail));
+}
+function renderOvPostings(){
+  const p = data.postings, g = p && p.price_gap;
+  $("ovPfTitle").textContent = `Posting follow-up · ${data.meta.period_label || "this period"}`;
+  if (!g){ $("ovPf").innerHTML = '<span class="empty">The posting comparison did not load on this refresh.</span>'; $("ovPfNote").textContent = ""; return; }
+  const mn = v => fmt(v/1e6, 2) + " M " + CUR;
+  $("ovPf").innerHTML = `<span>Receipts ${mn(g.received_cost)}</span><span class="sep">/</span>
+    <span>Invoices ${mn(g.invoiced_cost)}</span><span class="sep">/</span><span>Difference ${(g.difference>0?"+":g.difference<0?"−":"")}${mn(Math.abs(g.difference))}</span>`;
+  $("ovPfNote").innerHTML = `Entries received and invoiced in this period, at the order price against the supplier's price. ${fmt(g.cases)} case${g.cases===1?"":"s"} past the ${fmt(g.tolerance,0)}% tolerance. <a href="#feed" data-goto-view="feed">Open posting follow-up</a>`;
+}
+
+// ---------- exception detail ----------
+let exCurrent = null, exRows = [], exCols = [], exReturn = "overview";
+function exDrill(e){
+  if (e.drill) return {kind: e.drill.kind, key: e.drill.key || ""};
+  if (e.document_type === "Purchase Order") return {kind: "po", key: e.document};
+  if (e.document_type === "Item") return {kind: "item", key: e.document};
+  return e.document ? {kind: "document", key: e.document} : null;
+}
+async function openException(i){
+  const e = ((data.operations||{}).sla || [])[i]; if (!e) return;
+  exCurrent = e;
+  const on = document.querySelector("#nav button.on");
+  exReturn = (on && on.dataset.view) || "overview";
+  document.querySelectorAll("#nav button").forEach(x => x.classList.remove("on"));
+  const ex = document.querySelector('#nav button[data-view="exceptions"]'); if (ex) ex.classList.add("on");
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-exdetail"));
+  $("title").textContent = "Exception detail · " + (e.document || e.rule);
+  $("period").textContent = `Purchasing / Exceptions / ${e.rule}`;
+  $("exBack").textContent = "← " + (exReturn === "exceptions" ? "Exceptions" : "Overview");
+  const tracked = (data.action_keys || []).includes(e.code);
+  const act = (actions || []).find(a => a.source_exception === e.code);
+  const mover = e.document_type === "Item" ? (data.movers||[]).find(m => m.item_no === e.document) : null;
+  const ctx = [data.meta.company, e.location, e.supplier && "Supplier: " + e.supplier, e.document && `${e.document_type || "Document"} ${e.document}`].filter(Boolean);
+  $("exHead").innerHTML = `<div class="brief" style="border:0;padding:0"><div class="head"><h2>${esc(e.title)}</h2>
+      <span class="status-pill ${e.severity==="critical"?"status-crit":"status-warn"}">${e.severity==="critical"?"Critical":"Attention required"}</span></div>
+    <div class="lines"><p>${esc(ctx.join(" · "))}</p>
+      <p><span class="tag">Fact</span>${esc(e.detail)}</p>
+      ${e.next_action?`<p><span class="tag rec">Recommendation</span>${esc(e.next_action)}</p>`:""}</div></div>`;
+  const kpi = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v ${cls||""}">${v}</div><div class="s">${esc(sub)}</div></div>`;
+  $("exKpis").innerHTML = [
+    kpi("Value at risk", fmt(Math.abs(e.impact||0)), `${CUR} · ${e.rule}`),
+    mover ? kpi("Affected quantity", fmt(mover.cur_qty, mover.cur_qty%1?1:0), `Bought in this period at ${(mover.locations||[]).length} location${(mover.locations||[]).length===1?"":"s"}`)
+          : kpi("Severity", SEV_LABEL[e.severity] || e.severity, "From the thresholds in Settings", e.severity==="critical"?"up":"warn"),
+    mover ? kpi("Previous unit cost", fmt(mover.prev_avg, 2), `${CUR} · comparison period average`)
+          : kpi("Owner", esc(act && act.owner || e.owner || "Unassigned"), tracked ? "Tracked in the Action center" : "Not tracked yet"),
+    mover ? kpi("Current unit cost", fmt(mover.cur_avg, 2), `${CUR} · ${mover.pct>0?"+":"−"}${fmt(Math.abs(mover.pct),1)}%`, mover.pct>0?"up":"down")
+          : kpi("Status", esc(act ? act.status : "Open"), act ? `Due ${act.due_date}` : "Identified on this refresh"),
+  ].join("");
+  $("exReview").innerHTML = `<h2>Review and ownership</h2>
+    <div style="margin-top:12px"><span class="rhg-pill ${e.severity}">${SEV_LABEL[e.severity]||e.severity}</span></div>
+    <p style="margin:12px 0 0;font-size:14px;font-weight:600">Owner: ${esc(act && act.owner || e.owner || "unassigned")} &nbsp;&nbsp; Due: ${esc(act ? act.due_date : "not set")} &nbsp;&nbsp; Status: ${esc(act ? act.status : "Open")}</p>
+    <p style="margin:12px 0 0;color:var(--rhg-primary)">Evidence → ${esc((exDrill(e) ? "Business Central records below" : "the rule's own figures"))} · rule “${esc(e.rule)}”</p>
+    <p class="hint" style="margin:12px 0 0">Next step: ${esc(e.next_action || "Review the records and decide.")}</p>
+    <div style="margin-top:12px;display:flex;gap:8px">${tracked
+      ? `<button class="mini" data-goto-view="actions">Open in Action center</button>`
+      : `<button class="mini dark" id="exTrack">Track as action</button>`}</div>`;
+  const hist = act && act.history || [];
+  $("exActivity").innerHTML = `<h2>Activity</h2><div class="hint" style="margin:12px 0 0;font-size:13px;line-height:1.5">${
+    [`${new Date(data.meta.checked_at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})} · Rule “${esc(e.rule)}” identified this case on the latest refresh.`]
+      .concat(hist.map(h => `${esc((h.ts||"").replace("T"," ").slice(0,16))} · ${esc(h.from?h.from+" → ":"")}${esc(h.to||"")}${h.comment?" · "+esc(h.comment):""}${h.actor?" · "+esc(h.actor):""}`))
+      .concat(tracked ? [] : ["Pending · not yet tracked as an action."]).join("<br>")}</div>`;
+  if ($("exTrack")) $("exTrack").onclick = async () => {
+    await createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
+      bc_document:e.document||"", document_type:e.document_type||"", company:data.meta.company, location:e.location||"",
+      supplier:e.supplier||"", impact:e.impact||0, priority:e.severity==="critical"?"Critical":e.severity==="warning"?"High":"Medium",
+      owner:e.owner||"", confidence:"high",
+      evidence:[{entity:"Business Central", key:e.document||"", period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});
+  };
+  bindGotoViews($("v-exdetail"));
+  window.scrollTo(0, 0);
+  const d = exDrill(e);
+  $("exRecTitle").textContent = "Supporting records";
+  $("exRecHint").textContent = d ? "Reading Business Central…" : "This rule has no record-level detail.";
+  $("exRecords").innerHTML = ""; exRows = []; exCols = [];
+  if (!d) return;
+  try{
+    const r = await fetch(`/api/drill?kind=${encodeURIComponent(d.kind)}&key=${encodeURIComponent(d.key||"")}`);
+    const j = await r.json();
+    if (exCurrent !== e) return;
+    exRows = j.rows || []; exCols = j.columns || [];
+    $("exRecTitle").textContent = j.title || "Supporting records";
+    $("exRecHint").textContent = `${fmt(j.count)} record${j.count===1?"":"s"} · ${data.meta.company} · ${data.meta.current[0]} to ${data.meta.current[1]}`;
+    const numeric = c => exRows.length && typeof exRows[0][c] === "number" && !/entry no/i.test(c);
+    const total = c => exRows.reduce((s,row) => s + (+row[c]||0), 0);
+    const sumCols = exCols.filter(c => numeric(c) && /quantity|cost|amount|value|impact/i.test(c) && !/unit/i.test(c));
+    $("exRecords").innerHTML = exRows.length ? `<table><tr>${exCols.map(c=>`<th class="${numeric(c)?"num":""}">${esc(c)}</th>`).join("")}</tr>` +
+      exRows.slice(0,200).map(row => `<tr>${exCols.map(c=>`<td class="${typeof row[c]==="number"?"num":""}">${row[c]==null?"":(typeof row[c]==="number"?fmt(row[c], Math.abs(row[c])<1000&&row[c]%1?2:0):esc(row[c]))}</td>`).join("")}</tr>`).join("") +
+      (sumCols.length && exRows.length > 1 ? `<tr class="total">${exCols.map((c,k) => `<td class="${sumCols.includes(c)?"num":""}">${k===0?"Total":sumCols.includes(c)?fmt(total(c)):""}</td>`).join("")}</tr>` : "") + "</table>"
+      : '<div class="empty">No underlying records for this selection.</div>';
+  }catch(err){ $("exRecHint").textContent = "Could not read the records: " + err.message; }
+}
+$("exBack").onclick = () => { const b = document.querySelector(`#nav button[data-view="${exReturn}"]`); if (b) b.click(); };
+$("exCsv").onclick = () => {
+  if (!exRows.length) return;
+  const lines = [exCols].concat(exRows.map(r => exCols.map(c => r[c] ?? "")));
+  const csv = lines.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff"+csv], {type:"text/csv"}));
+  a.download = `exception-${(exCurrent && exCurrent.document) || "records"}-${data.meta.current[0]}.csv`; a.click();
+};
+function bindGotoViews(root){
+  (root || document).querySelectorAll("[data-goto-view]").forEach(el => el.onclick = ev => {
+    ev.preventDefault();
+    const b = document.querySelector(`#nav button[data-view="${el.dataset.gotoView}"]`); if (b) b.click();
+  });
 }
 
 function renderMovers(){
@@ -1009,11 +1173,17 @@ function renderBrief(){
   const b = data.brief;
   if (!b){ $("brief").innerHTML = '<div class="empty">The brief needs the vendor ledger and purchase orders; that data did not load on this refresh.</div>'; return; }
   const f = b.finance;
+  const lead = [];
+  (b.developments || []).slice(0, 2).forEach(d => lead.push({kind: d.kind, text: d.text}));
+  const inf = (b.developments || []).concat(b.risks || []).find(x => x.kind === "inference");
+  if (inf) lead.push({kind: "inference", text: inf.text});
+  if ((b.actions || [])[0]) lead.push({kind: "recommendation", text: `${b.actions[0].title} · ${b.actions[0].recommendation}`});
   $("brief").innerHTML = `
-    <div class="head"><div><h2>Executive purchasing brief</h2>
-      <p class="hint" style="margin:3px 0 0">${esc(b.period)} vs ${esc(b.comparison)} · ${esc(b.methodology)} · ${esc(b.filters.company)} · ${esc(b.filters.location)}</p></div>
+    <div class="head"><h2>Executive purchasing brief</h2>
       <span class="status-pill ${STATUS_CLASS[b.status]||""}">${esc(b.status)}</span></div>
-    <p class="hint" style="margin:6px 0 0">${esc(b.status_note)} Every line below is read from Business Central records; click any item to open them.</p>
+    <div class="lines">${lead.map(l => `<p>${tagOf(l.kind)}${esc(l.text)}</p>`).join("")}</div>
+    <details><summary>Full brief · ${esc(b.counts.total)} exceptions evaluated · ${esc(b.period)} vs ${esc(b.comparison)}</summary>
+    <p class="hint" style="margin:10px 0 0">${esc(b.methodology)} · ${esc(b.filters.company)} · ${esc(b.filters.location)}. ${esc(b.status_note)} Every line below is read from Business Central records; click any item to open them.</p>
     <h3>Main developments</h3>
     <ul>${b.developments.map(d => `<li>${tagOf(d.kind)}<b>${esc(d.label)}.</b> ${esc(d.text)}${d.drill?` <a href="#" class="brief-drill" data-kind="${d.drill.kind}" data-key="${esc(d.drill.key||"")}">records</a>`:""}</li>`).join("")}</ul>
     <h3>Financial impact</h3>
@@ -1036,7 +1206,7 @@ function renderBrief(){
         ${a.bc_document?`<button class="mini" data-evidence="${esc(a.document_type==="Item"?"item":a.document_type==="Purchase Order"?"po":"document")}" data-key="${esc(a.bc_document)}">Supporting records</button>`:""}
         <button class="mini dark" data-brief-action="${i}" ${data.action_keys.includes(a.source_exception)?"disabled":""}>${data.action_keys.includes(a.source_exception)?"Already tracked":"Track as action"}</button>
       </div></div>`).join("") : '<div class="empty">No management action required from this period\u2019s records.</div>'}
-    <p class="drill-hint">Generated ${esc(b.generated_at)} from ${esc(b.counts.total)} evaluated exceptions (${esc(b.counts.critical)} critical, ${esc(b.counts.warning)} warning). Figures are ex-VAT in ${CUR}.</p>`;
+    <p class="drill-hint">Generated ${esc(b.generated_at)} from ${esc(b.counts.total)} evaluated exceptions (${esc(b.counts.critical)} critical, ${esc(b.counts.warning)} warning). Figures are ex-VAT in ${CUR}.</p></details>`;
   document.querySelectorAll(".brief-drill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill(a.dataset.kind, a.dataset.key); });
   document.querySelectorAll("[data-evidence]").forEach(btn => btn.onclick = () => openDrill(btn.dataset.evidence, btn.dataset.key, "supporting records"));
   document.querySelectorAll("[data-brief-action]").forEach(btn => btn.onclick = () => {
@@ -1190,9 +1360,11 @@ function renderSla(){
       <p class="hint" style="margin:6px 0">${esc(e.detail)}</p>
       <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action||"")}${e.owner?` · <b>Owner:</b> ${esc(e.owner)}`:""}${e.impact?` · <b>Impact:</b> ${sign(e.impact)} ${CUR}`:""}</p>
       <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="mini" data-exopen="${i}">Open detail</button>
         ${e.document?`<button class="mini" data-sladrill="${i}">Supporting records</button>`:""}
         <button class="mini dark" data-slaaction="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
       </div></div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
+  document.querySelectorAll("[data-exopen]").forEach(b => b.onclick = () => openException(+b.dataset.exopen));
   document.querySelectorAll("[data-sladrill]").forEach(b => b.onclick = () => {
     const e = sla[+b.dataset.sladrill];
     const kind = e.drill ? e.drill.kind : (e.document_type==="Purchase Order" ? "po" : "document");
@@ -1456,7 +1628,7 @@ async function loadSession(){
     const j = await (await fetch("/api/session")).json();
     me = j.user; roles = j.roles || {};
     if(!me){ location.href = "/login"; return; }
-    $("whoami").innerHTML = `<span class="dot"></span>${esc(me.name||me.username)} · ${esc(me.role)}`;
+    $("whoami").textContent = `${me.name||me.username} · ${me.role}`;
     $("usersNav").style.display = can("users") ? "" : "none";
     document.querySelectorAll("#saveSettings").forEach(b => { b.disabled = !can("settings");
       if(!can("settings")) b.title = "Your role cannot change thresholds."; });
@@ -2169,12 +2341,22 @@ function exportCsv(){
 
 document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x===b));
+  if ($("v-exdetail").classList.contains("on")) exCurrent = null;
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.view));
   if (b.dataset.view === "compare") loadComparisons(false);
   if ((b.dataset.view === "streams" || b.dataset.view === "services") && data) loadStreams(false);
   if (b.dataset.view === "stock") fillStockControls();
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
+  // the screen is part of the address, so a link from the control center can open it
+  if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
+  setHeader();
 });
+function openFromHash(){
+  const v = (location.hash || "").slice(1);
+  const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
+  if (b && !b.classList.contains("on")) b.click();
+}
+window.addEventListener("hashchange", openFromHash);
 $("refreshBtn").onclick = () => load(true);
 $("exportBtn").onclick = exportCsv;
 $("search").oninput = () => data && renderMovers();
@@ -2261,6 +2443,7 @@ setInterval(() => {
     if (r.ok) $("company").innerHTML = j.companies.map(c => `<option ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
     else throw new Error(j.error);
   } catch(e) { $("company").innerHTML = `<option>SALT</option>`; }
+  openFromHash();
   load(true);
 })();
 </script>
