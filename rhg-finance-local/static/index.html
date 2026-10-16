@@ -885,16 +885,42 @@ $("pw-save").onclick = async () => {
 };
 
 // ---------- inventory ----------
+// Reads a response that should be JSON. A proxy page (timeout, restart) is HTML, and
+// "Unexpected token <" tells nobody what happened.
+async function readJSON(r){
+  const text = await r.text();
+  try { return JSON.parse(text); }
+  catch(e){
+    if (r.status === 504) throw new Error("the server took too long to answer (HTTP 504)");
+    if (r.status === 502) throw new Error("the tower was restarting (HTTP 502), try again in a minute");
+    throw new Error(`unexpected answer from the server (HTTP ${r.status})`);
+  }
+}
+// The inventory read runs in the background on the server; this asks every few seconds
+// until it is ready. One poll at a time, whatever re-renders the screen meanwhile.
+let invPoll = null;
 async function loadInventory(){
-  $("invNote").textContent = "Reading the item cards…";
+  const p = new URLSearchParams(params());
+  if($("invLoc").value) p.set("location",$("invLoc").value);
+  const query = p.toString();
+  if (invPoll && invPoll.query === query) return;
+  const me = invPoll = {query, started: Date.now()};
+  $("invLoad").disabled = true;
   try{
-    const p = new URLSearchParams(params());
-    if($("invLoc").value) p.set("location",$("invLoc").value);
-    const r = await fetch("/api/inventory?"+p.toString());
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error||"failed");
-    data.inventory = j; renderInventory(); renderStockSummary();
-  }catch(e){ $("invNote").textContent = "Could not read the inventory: "+e.message; }
+    while (invPoll === me){
+      const r = await fetch("/api/inventory?" + query);
+      const j = await readJSON(r);
+      if(!r.ok) throw new Error(j.error||"failed");
+      if(j.error) throw new Error(j.error);
+      if(!j.pending){ data.inventory = j; renderInventory(); renderStockSummary(); break; }
+      const s = Math.round((Date.now() - me.started)/1000);
+      $("invNote").textContent = `Reading the item cards and ${fmt(Math.max(90, data.settings.thresholds.stock_dead_days||90))} days of stock movements… ${s}s. `
+        + "The first read of a period can take several minutes; later reads come from the local file.";
+      if (Date.now() - me.started > 30*60*1000) throw new Error("still not ready after 30 minutes");
+      await new Promise(res => setTimeout(res, 4000));
+    }
+  }catch(e){ if (invPoll === me) $("invNote").textContent = "Could not read the inventory: "+e.message; }
+  finally{ if (invPoll === me){ invPoll = null; $("invLoad").disabled = false; } }
 }
 $("invLoad").onclick = ()=>loadInventory();
 function renderInventory(){
@@ -946,7 +972,7 @@ async function loadStockSummary(){
   $("ssNote").textContent = "Reading stock by location and the inventory accounts… the first read of a period takes a minute or two.";
   try{
     const r = await fetch("/api/stock-summary?"+params());
-    const j = await r.json();
+    const j = await readJSON(r);
     if(!r.ok) throw new Error(j.error||"failed");
     data.stockSummary = j; renderStockSummary();
   }catch(e){ $("ssNote").textContent = "Could not read the stock position: "+e.message; }

@@ -299,35 +299,59 @@ def inventory_screen(company, anchor, mode, dimension, location=None):
     c_from, c_to, *_ = periods(anchor, mode)
     th = settings["thresholds"]
     sources = []
-    cur_rows = _safe(sources, "Item cards, stock on hand",
-                     lambda: client.item_snapshot(company, c_to.isoformat(), location), [])
-    cur = inventory.snapshot(cur_rows)
-    history = {}
-    for days in sorted({int(th["stock_monitor_days"]), int(th["stock_slow_days"]), int(th["stock_dead_days"])}):
+    window_days = max(int(th.get("stock_dead_days") or 90), 90)
+    win_from = (c_to - timedelta(days=window_days)).isoformat()
+
+    # every read is independent, so they run side by side instead of one after another
+    def ledger():
+        kind = client.hold_item_ledger(company, win_from, c_to.isoformat(), location)
+        return kind
+    jobs = {"cur": lambda: client.item_snapshot(company, c_to.isoformat(), location)}
+    day_marks = sorted({int(th["stock_monitor_days"]), int(th["stock_slow_days"]), int(th["stock_dead_days"])})
+    for days in day_marks:
         as_of = (c_to - timedelta(days=days)).isoformat()
-        rows = _safe(sources, f"Item cards, {days} days earlier",
-                     lambda a=as_of: client.item_snapshot(company, a, location, 86400), [], False)
-        history[days] = inventory.snapshot(rows)
+        jobs[f"h{days}"] = (lambda a=as_of: client.item_snapshot(company, a, location, 86400))
+    jobs["gl"] = lambda: _inventory_gl_balance(company, c_to, dimension, settings)
+    jobs["ledger"] = ledger
+    started = time.time()
+    results = {}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {k: pool.submit(fn) for k, fn in jobs.items()}
+        for k, fut in futures.items():
+            try:
+                results[k] = (fut.result(), None)
+            except BCError as exc:
+                results[k] = (None, exc)
+
+    def took():
+        return int((time.time() - started) * 1000)
+    cur_rows, err = results["cur"]
+    sources.append({"source": "Item cards, stock on hand", "status": "unavailable" if err else "ok",
+                    "required": True, **({"reason": str(err)[:300]} if err else {})})
+    cur = inventory.snapshot(cur_rows or [])
+    history = {}
+    for days in day_marks:
+        rows, err = results[f"h{days}"]
+        sources.append({"source": f"Item cards, {days} days earlier", "status": "unavailable" if err else "ok",
+                        "required": False, **({"reason": str(err)[:300]} if err else {})})
+        history[days] = inventory.snapshot(rows or [])
     gl_balance, gl_note = None, ""
-    try:
-        gl_balance, gl_note = _inventory_gl_balance(company, c_to, dimension, settings)
-    except BCError as exc:
-        sources.append({"source": "Inventory accounts in the G/L", "status": "unavailable", "reason": str(exc)[:200]})
+    gl, err = results["gl"]
+    if err:
+        sources.append({"source": "Inventory accounts in the G/L", "status": "unavailable", "reason": str(err)[:200]})
+    else:
+        gl_balance, gl_note = gl
     # the posted movements behind the snapshots: a balance that has not changed does not
-    # mean nothing moved, and the ledger is the only place that says which it is
-    window_days = max(int(settings["thresholds"].get("stock_dead_days") or 90), 90)
+    # mean nothing moved, and the ledger is the only place that says which it is. They
+    # are summed straight from the local file, a batch at a time.
     movements = None
-    try:
-        entries = client.item_ledger(company, (c_to - timedelta(days=window_days)).isoformat(),
-                                     c_to.isoformat())
-        if location:
-            entries = [e for e in entries if e.get("Location_Code") == location]
-        movements = inventory.movement_summary(entries)
-        sources.append({"source": f"Posted stock movements, last {window_days} days",
-                        "status": "verified", "rows": len(entries)})
-    except BCError as exc:
-        sources.append({"source": "Posted stock movements", "status": "unavailable",
-                        "reason": str(exc)[:200]})
+    kind, err = results["ledger"]
+    if err:
+        sources.append({"source": "Posted stock movements", "status": "unavailable", "reason": str(err)[:200]})
+    else:
+        movements = inventory.movement_summary(localdb.iter_rows(kind, company, win_from, c_to.isoformat()))
+        sources.append({"source": f"Posted stock movements, last {window_days} days", "status": "verified",
+                        "rows": sum(m["entries"] for m in movements.values())})
     inv = inventory.overview(cur, history, settings, gl_balance, location or "", movements, c_to)
     inv["movement_basis"] = ("Posted ledger movements: an item counts as moving when something left it "
                              "or arrived, transfers included. A sales return receipt is a sale with a "
@@ -340,6 +364,7 @@ def inventory_screen(company, anchor, mode, dimension, location=None):
     inv["sources"] = sources
     inv["exceptions"] = inventory.exceptions(inv, settings)
     inv["loaded"] = True
+    inv["ms"] = took()
     with _last_lock:
         d = _last.get("data")
         if d is not None:
@@ -347,6 +372,43 @@ def inventory_screen(company, anchor, mode, dimension, location=None):
             existing = {e["code"] for e in d["exceptions"]}
             d["exceptions"] = d["exceptions"] + [e for e in inv["exceptions"] if e["code"] not in existing]
     return inv
+
+
+# The inventory reads several snapshots and a quarter of stock movements, which can take
+# longer than the proxy in front of the tower waits for one answer. So the read runs in
+# the background and the screen asks again every few seconds until it is ready.
+_inv_jobs, _inv_lock = {}, threading.Lock()
+INV_KEEP_SECONDS = 1800
+
+
+def inventory_request(company, anchor, mode, dimension, location=None, refresh=False):
+    key = (company, anchor or "", mode or "month", dimension or "", location or "")
+    now = time.time()
+    with _inv_lock:
+        job = _inv_jobs.get(key)
+        if job and job["state"] == "running":
+            return {"loaded": False, "pending": True, "elapsed": int(now - job["started"])}
+        if job and job["state"] == "done" and not refresh and now - job["finished"] < INV_KEEP_SECONDS:
+            return job["result"]
+        if job and job["state"] == "failed" and not refresh:
+            _inv_jobs.pop(key, None)
+            return {"loaded": False, "error": job["error"]}
+        _inv_jobs[key] = {"state": "running", "started": now}
+        for k in [k for k, j in _inv_jobs.items() if j["state"] != "running"
+                  and now - j.get("finished", now) > INV_KEEP_SECONDS]:
+            _inv_jobs.pop(k, None)
+
+    def run():
+        try:
+            result = inventory_screen(company, anchor, mode, dimension, location)
+            state = {"state": "done", "result": result}
+        except Exception as exc:                                 # noqa: BLE001
+            traceback.print_exc()
+            state = {"state": "failed", "error": f"The inventory could not be read: {str(exc)[:300]}"}
+        with _inv_lock:
+            _inv_jobs[key] = dict(state, started=now, finished=time.time())
+    threading.Thread(target=run, daemon=True, name="inventory").start()
+    return {"loaded": False, "pending": True, "elapsed": 0}
 
 
 _summary_cache = {}
@@ -893,8 +955,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
             elif url.path == "/api/inventory":
-                self._send(200, inventory_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
-                                                 q.get("mode", "month"), q.get("dimension"), q.get("location")))
+                self._send(200, inventory_request(q.get("company") or config.BC_COMPANY, q.get("period"),
+                                                  q.get("mode", "month"), q.get("dimension"), q.get("location"),
+                                                  q.get("refresh") == "1"))
             elif url.path == "/api/stock-summary":
                 self._send(200, stock_summary(q.get("company") or config.BC_COMPANY, q.get("period"),
                                               q.get("mode", "month")))

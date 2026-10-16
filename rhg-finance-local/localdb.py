@@ -60,6 +60,23 @@ def rows(kind, company, date_from, date_to):
         return [json.loads(r[0]) for r in cur.fetchall()]
 
 
+def iter_rows(kind, company, date_from, date_to, batch=20000):
+    """Like rows(), one batch at a time, so a long ledger is never in memory as a whole
+    and the file is not locked for the length of the read."""
+    last = -1
+    while True:
+        with _lock:
+            chunk = _connect().execute(
+                "SELECT entry_no, payload FROM entries WHERE kind=? AND company=? AND entry_no > ? "
+                "AND posting_date >= ? AND posting_date <= ? ORDER BY entry_no LIMIT ?",
+                (kind, company, last, date_from, date_to, batch)).fetchall()
+        if not chunk:
+            return
+        for _, payload in chunk:
+            yield json.loads(payload)
+        last = chunk[-1][0]
+
+
 def max_entry(kind, company, date_from=None, date_to=None):
     sql = "SELECT MAX(entry_no) FROM entries WHERE kind=? AND company=?"
     args = [kind, company]

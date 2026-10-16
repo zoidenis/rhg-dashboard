@@ -10,6 +10,7 @@ journal entries above the configured threshold.
 import re
 import threading
 import time
+from datetime import date, timedelta
 from urllib.parse import quote
 
 import requests
@@ -65,7 +66,7 @@ class BCClient:
 
     MISSING_FIELD = re.compile(r"Could not find a property named '([^']+)'")
 
-    def _get_all(self, url, params=None, limit=None, _dropped=None):
+    def _get_all(self, url, params=None, limit=None, _dropped=None, on_page=None):
         """Reads every page. If a company publishes a page without one of the selected
         columns, BC answers 400 naming that column; the field is dropped and the call is
         retried, so one missing column never takes the whole screen down."""
@@ -86,11 +87,14 @@ class BCClient:
                         retry = dict(params, **{"$select": ",".join(kept)})
                         dropped = (_dropped or []) + [field]
                         print(f"Business Central does not publish '{field}' on this page; continuing without it.")
-                        return self._get_all(url, retry, limit, dropped)
+                        return self._get_all(url, retry, limit, dropped, on_page)
             if resp.status_code >= 400:
                 raise BCError(f"Business Central returned HTTP {resp.status_code}: {resp.text[:300]}")
             data = resp.json()
-            rows.extend(data.get("value", []))
+            if on_page is not None:
+                on_page(data.get("value", []))      # handed on and not kept: long ledgers
+            else:
+                rows.extend(data.get("value", []))
             if limit and len(rows) >= limit:
                 return rows[:limit]
             next_url, next_params = data.get("@odata.nextLink"), None
@@ -244,6 +248,47 @@ class BCClient:
                                              "Quantity,Cost_Amount_Actual,Item_Category_Code,"
                                              "Unit_of_Measure_Code"})
         return self._cached_immutable("ile", company, date_from, date_to, go)
+
+    ILE_SELECT = ("Entry_No,Entry_Type,Item_No,Location_Code,Posting_Date,Quantity,"
+                  "Cost_Amount_Actual,Item_Category_Code,Unit_of_Measure_Code")
+
+    def hold_item_ledger(self, company, date_from, date_to, location=None, top_up_after=600):
+        """Makes sure the local file holds every stock movement of the window, and returns
+        the store kind to read them from. Nothing is kept in memory.
+
+        The ledger is read by calendar month, so a past month is read from BC once and
+        then only topped up with newer entry numbers (backdated postings), and a window
+        that moves by one day each day no longer reads the whole 90 days again. Each page
+        goes straight to the file, so even a month of several hundred thousand entries
+        never sits in memory as a whole. A location narrows the read in BC itself."""
+        kind = f"ile@{location}" if location else "ile"
+        cursor = date.fromisoformat(date_from).replace(day=1)
+        end = date.fromisoformat(date_to)
+        while cursor <= end:
+            nxt = (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+            m_from, m_to = cursor.isoformat(), (nxt - timedelta(days=1)).isoformat()
+            flt = f"Posting_Date ge {m_from} and Posting_Date le {m_to}"
+            if location:
+                flt += f" and Location_Code eq '{location.replace(chr(39), chr(39) * 2)}'"
+            marker = localdb.period_loaded(kind, company, m_from, m_to)
+            # a month long closed only gains the odd backdated posting: check it now and then
+            wait = top_up_after if nxt > date.today() - timedelta(days=35) else max(top_up_after, 6 * 3600)
+            if marker and time.time() - marker["loaded_at"] < wait:
+                cursor = nxt
+                continue
+            if marker:
+                highest = localdb.max_entry(kind, company, m_from, m_to) or 0
+                flt += f" and Entry_No gt {highest}"
+            added = [0]
+
+            def keep(page, k=kind, c=company):
+                added[0] += localdb.store(k, c, page)
+            self._get_all(self._url(company, config.E_ILE), {"$filter": flt, "$select": self.ILE_SELECT},
+                          on_page=keep)
+            localdb.mark_period(kind, company, m_from, m_to,
+                                (marker["rows"] if marker else 0) + added[0])
+            cursor = nxt
+        return kind
 
     def fa_entries(self, company, date_from, date_to, max_age=900):
         """Fixed-asset movements of the period only: the FA ledger holds hundreds of
