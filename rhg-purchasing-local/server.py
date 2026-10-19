@@ -1023,7 +1023,7 @@ def drill(kind, key):
 
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
-                     "/api/notify/test": "settings",
+                     "/api/notify/test": "settings", "/api/notify/mail": "settings",
                      "/api/users": "users", "/api/password": "view"}
 
 
@@ -1264,6 +1264,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200 if updated else 404, updated or {"error": "Action not found"})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path == "/api/notify/mail":
+                info, err = notify.save_mail(body, actor)
+                self._send(200 if info else 400, info or {"error": err})
             elif url.path == "/api/notify/test":
                 to, bad = notify.parse_emails(body.get("to") or "")
                 if bad:
@@ -1346,8 +1349,9 @@ def main():
     print("Press Ctrl+C to stop.")
     threading.Thread(target=_warm_loop, daemon=True).start()
     notifier.start()
-    print("Email notices: " + ("mail server " + config.SMTP_HOST if config.SMTP_HOST
-                               else "no mail server set (SMTP_HOST in .env)"))
+    mail = notify.smtp_info()
+    print("Email notices: " + (f"mail server {mail['host']} ({mail['source']})" if mail["configured"]
+                               else "mail server incomplete: " + ", ".join(mail["missing"])))
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(link)).start()
     try:
