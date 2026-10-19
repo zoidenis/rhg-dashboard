@@ -43,96 +43,11 @@ MAX_ROWS = 60          # rows per table in one email; the rest are counted and l
 
 # ---------------------------------------------------------------- mail server
 
-MAIL_FILE = store.DATA_DIR / "mail.json"
-MAIL_FIELDS = ("host", "port", "security", "user", "from", "public_url")
-SECURITY_CHOICES = ("starttls", "ssl", "none")
-
-
-def _read_mail():
-    try:
-        return json.loads(MAIL_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
-def mail_config():
-    """The mail server in use: what was saved in Settings, and the .env for anything not
-    saved there. Settings win, so the server can be changed without a restart."""
-    saved = _read_mail()
-    security = (saved.get("security") or config.SMTP_SECURITY or "starttls").lower()
-    if security not in SECURITY_CHOICES:
-        security = "starttls"
-    default_port = 465 if security == "ssl" else 587
-    try:
-        port = int(saved.get("port") or 0)
-    except (TypeError, ValueError):
-        port = 0
-    if not port:
-        port = config.SMTP_PORT if not saved.get("security") else default_port
-    user = saved.get("user") if saved.get("user") is not None else config.SMTP_USER
-    return {
-        "host": (saved.get("host") or config.SMTP_HOST or "").strip(),
-        "port": port,
-        "security": security,
-        "user": (user or "").strip(),
-        "password": saved.get("password") or config.SMTP_PASSWORD or "",
-        "from": (saved.get("from") or config.SMTP_FROM or user or "").strip(),
-        "public_url": (saved.get("public_url") or config.PUBLIC_URL or "").strip(),
-        "source": "settings" if saved else ("server .env" if config.SMTP_HOST else ""),
-    }
-
-
 def smtp_info():
-    """What the screen may show. The password itself never leaves the server."""
-    m = mail_config()
-    missing = [label for key, label in (("host", "SMTP host"), ("from", "From address"))
-               if not m[key]]
-    if m["user"] and not m["password"]:
-        missing.append("App Password")
-    return {"configured": not missing, "missing": missing,
-            "host": m["host"], "port": m["port"], "security": m["security"],
-            "user": m["user"], "from": m["from"], "public_url": m["public_url"],
-            "password_set": bool(m["password"]), "source": m["source"]}
-
-
-def save_mail(patch, actor):
-    """Saves the mail server from Settings. A blank password keeps the saved one;
-    clear_password removes it. Returns (info, error)."""
-    current = _read_mail()
-    out = dict(current)
-    for key in MAIL_FIELDS:
-        if key not in patch:
-            continue
-        value = str(patch.get(key) or "").strip()[:200]
-        if key == "port":
-            if value and not value.isdigit():
-                return None, "The port must be a number (587 for STARTTLS, 465 for SSL)."
-            value = int(value) if value else ""
-        if key == "security":
-            value = value.lower()
-            if value not in SECURITY_CHOICES:
-                return None, "Security must be STARTTLS, SSL or None."
-        if key == "from" and value and not EMAIL_RE.match(value):
-            return None, f"Not an email address: {value}"
-        if key == "public_url" and value and not value.startswith(("http://", "https://")):
-            return None, "The public site URL must start with https://"
-        out[key] = value.rstrip("/") if key == "public_url" else value
-    password = str(patch.get("password") or "").replace(" ", "").strip()
-    if patch.get("clear_password"):
-        out.pop("password", None)
-    elif password:
-        out["password"] = password[:200]
-    tmp = MAIL_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(out, indent=1), encoding="utf-8")
-    try:
-        tmp.chmod(0o600)
-    except OSError:
-        pass
-    tmp.replace(MAIL_FILE)
-    store.audit("settings", "mail server", actor,
-                {k: current.get(k) for k in MAIL_FIELDS} | {"password_set": bool(current.get("password"))},
-                {k: out.get(k) for k in MAIL_FIELDS} | {"password_set": bool(out.get("password"))})
-    return smtp_info(), None
+    return {"configured": bool(config.SMTP_HOST and config.SMTP_FROM),
+            "host": config.SMTP_HOST, "port": config.SMTP_PORT,
+            "security": config.SMTP_SECURITY, "from": config.SMTP_FROM,
+            "user": config.SMTP_USER, "public_url": config.PUBLIC_URL}
 
 
 def parse_emails(text):
@@ -146,39 +61,30 @@ def parse_emails(text):
 
 
 def send_mail(to, cc, subject, html_body, text_body):
-    m = mail_config()
-    if not (m["host"] and m["from"]):
-        raise RuntimeError("The mail server is not set. Fill it in under Settings → Email notifications.")
-    if m["user"] and not m["password"]:
-        raise RuntimeError("The mail server has a username but no App Password saved.")
+    if not (config.SMTP_HOST and config.SMTP_FROM):
+        raise RuntimeError("The mail server is not set. Add SMTP_HOST and SMTP_FROM to the .env file.")
     msg = EmailMessage()
-    msg["From"] = m["from"]
+    msg["From"] = config.SMTP_FROM
     msg["To"] = ", ".join(to)
     if cc:
         msg["Cc"] = ", ".join(cc)
     msg["Subject"] = subject
     msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=(m["from"].split("@")[-1] or "rhg.al").strip(">"))
+    msg["Message-ID"] = make_msgid(domain=(config.SMTP_FROM.split("@")[-1] or "rhg.al").strip(">"))
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
     context = ssl.create_default_context()
-    if m["security"] == "ssl":
-        server = smtplib.SMTP_SSL(m["host"], m["port"], timeout=30, context=context)
+    if config.SMTP_SECURITY == "ssl":
+        server = smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, timeout=30, context=context)
     else:
-        server = smtplib.SMTP(m["host"], m["port"], timeout=30)
+        server = smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30)
     try:
         server.ehlo()
-        if m["security"] == "starttls":
+        if config.SMTP_SECURITY == "starttls":
             server.starttls(context=context)
             server.ehlo()
-        if m["user"]:
-            try:
-                server.login(m["user"], m["password"])
-            except smtplib.SMTPAuthenticationError as exc:
-                hint = (" Gmail needs an App Password (2-Step Verification on), not the account password."
-                        if "gmail" in m["host"] else
-                        " For Microsoft 365, Authenticated SMTP must be enabled for this mailbox.")
-                raise RuntimeError(f"The mail server refused the login ({exc.smtp_code}).{hint}") from exc
+        if config.SMTP_USER:
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
         server.send_message(msg, to_addrs=list(dict.fromkeys(to + cc)))
     finally:
         try:
@@ -292,8 +198,7 @@ def _subject(d, test=False):
 def render_email(d, recipients, test=False):
     """HTML (inline styles, for mail clients) and plain-text versions of one digest."""
     e = html.escape
-    public = mail_config()["public_url"]
-    link = f"{public.rstrip('/')}/purchasing/#compliance" if public else ""
+    link = f"{config.PUBLIC_URL.rstrip('/')}/purchasing/#compliance" if config.PUBLIC_URL else ""
     navy, primary, ink, muted, line, sky = "#08303f", "#0c475e", "#0e2733", "#5c7482", "#d9dcdd", "#e4f3f9"
     red, redbg = "#c0392b", "#fbecea"
     th = (f"text-align:left;padding:8px 10px;background:{sky};color:{ink};font-size:12px;"

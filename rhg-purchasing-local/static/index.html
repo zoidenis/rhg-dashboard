@@ -636,23 +636,6 @@ td.num,th.num{text-align:right}
       <div class="card-head"><div><h2>Email notifications</h2>
         <p class="hint">A daily email of the invoices posted without a purchase order: the new ones since the last notice, and those reported before that nobody has closed. An invoice is closed when its action in the Action center is Resolved or Dismissed.</p></div>
         <span class="rhg-pill" id="ntSmtp">Mail server…</span></div>
-      <div class="card" style="border:1px dashed var(--rhg-line);box-shadow:none;margin:14px 0 18px" id="mailCard">
-        <h2 style="font-size:16px">Mail server</h2>
-        <p class="hint">The account the tower sends from. For Gmail, use an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a> after enabling 2-Step Verification; for Microsoft 365, smtp.office365.com with Authenticated SMTP enabled for the mailbox. Saving here applies without a restart.</p>
-        <div class="formgrid">
-          <label class="field">SMTP host<input id="mlHost" placeholder="smtp.gmail.com"></label>
-          <label class="field">Port<input id="mlPort" type="number" min="1" max="65535" placeholder="587"></label>
-          <label class="field">Security<select id="mlSec"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">None</option></select></label>
-          <label class="field">SMTP username<input id="mlUser" placeholder="name@gmail.com" autocomplete="off"></label>
-          <label class="field">From address<input id="mlFrom" placeholder="name@gmail.com"></label>
-          <label class="field">Public site URL (without /purchasing)<input id="mlUrl" placeholder="https://dashboard.rhg.al"></label>
-          <label class="field">App Password<input id="mlPass" type="password" autocomplete="new-password" placeholder="Paste App Password without spaces"></label>
-        </div>
-        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px">
-          <input type="checkbox" id="mlClear" style="width:auto"> Remove saved App Password</label>
-        <button class="btn dark" id="mlSave">Save mail server</button>
-        <span class="meta" id="mlMsg" style="margin-left:10px">The password stays hidden after saving.</span>
-      </div>
       <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:12px">
         <input type="checkbox" id="ntEnabled" style="width:auto"> <b>Send the daily notice of invoices without a PO</b></label>
       <div class="formgrid">
@@ -1606,20 +1589,8 @@ async function loadNotify(){
 function renderNotify(){
   const j = ntStatus, n = j.settings || {}, sm = j.smtp || {};
   $("ntSmtp").className = "rhg-pill " + (sm.configured ? "ok" : "warning");
-  $("ntSmtp").textContent = sm.configured ? `Mail server · ${sm.host}:${sm.port} · from ${sm.from}`
-    : (sm.host || sm.user ? "Mail server incomplete" : "Mail server not set");
-  $("ntSmtp").title = sm.configured ? "" : "Missing: " + (sm.missing || []).join(", ");
-  if (!mailFilled){
-    $("mlHost").value = sm.host || ""; $("mlPort").value = sm.port || "";
-    $("mlSec").value = sm.security || "starttls"; $("mlUser").value = sm.user || "";
-    $("mlFrom").value = sm.from || ""; $("mlUrl").value = sm.public_url || "";
-    mailFilled = true;
-  }
-  $("mlPass").value = "";
-  $("mlPass").placeholder = sm.password_set ? "Saved · leave blank to keep it" : "Paste App Password without spaces";
-  $("mlClear").checked = false;
-  $("mlClear").parentElement.style.display = sm.password_set ? "" : "none";
-  ["mlSave"].forEach(id => { $(id).disabled = !can("settings"); });
+  $("ntSmtp").textContent = sm.configured ? `Mail server · ${sm.host}:${sm.port} · from ${sm.from}` : "Mail server not set";
+  $("ntSmtp").title = sm.configured ? "" : "Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in the tower's .env on the server.";
   $("ntEnabled").checked = !!n.enabled;
   $("ntCoord").value = n.coordinator || ""; $("ntMgr").value = n.manager || ""; $("ntCost").value = n.cost_controller || "";
   $("ntTime").value = n.time || "08:00"; $("ntCompanies").value = n.companies || "";
@@ -1633,7 +1604,7 @@ function renderNotify(){
       : "Off: nothing is sent until the box above is ticked and saved.")
     + (rec.to && rec.to.length ? ` · To ${esc(rec.to.join(", "))}${rec.cc.length ? ` · Cc ${esc(rec.cc.join(", "))}` : ""}` : " · No recipient set yet.")
     + (rec.invalid && rec.invalid.length ? ` · <span class="up">Not an email address: ${esc(rec.invalid.join(", "))}</span>` : "")
-    + (sm.configured ? "" : ` · <span class="warn">The mail server above is not complete, so nothing can be sent yet.</span>`);
+    + (sm.configured ? "" : ` · <span class="warn">The mail server is not set on the server, so nothing can be sent yet.</span>`);
   const runs = j.runs || [];
   $("ntRuns").innerHTML = `<tr><th>When</th><th>Company</th><th class="num">New</th><th class="num">Still open</th><th>Sent to</th><th>Result</th></tr>` +
     (runs.length ? runs.slice(0,15).map(x => `<tr><td class="meta">${esc((x.ts||"").replace("T"," "))}${x.test?' <span class="chip">test</span>':""}</td>
@@ -1645,24 +1616,6 @@ function renderNotify(){
   ["ntSave","ntTest"].forEach(id => { $(id).disabled = !can("settings");
     if(!can("settings")) $(id).title = "Your role cannot change Settings."; });
 }
-let mailFilled = false;
-$("mlSec").onchange = () => {
-  const p = $("mlPort").value;
-  if (!p || p === "587" || p === "465" || p === "25") $("mlPort").value = $("mlSec").value === "ssl" ? 465 : 587;
-};
-$("mlSave").onclick = async () => {
-  $("mlMsg").textContent = "Saving…";
-  try{
-    const r = await fetch("/api/notify/mail", {method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({host: $("mlHost").value, port: $("mlPort").value, security: $("mlSec").value,
-        user: $("mlUser").value, from: $("mlFrom").value, public_url: $("mlUrl").value,
-        password: $("mlPass").value, clear_password: $("mlClear").checked})});
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || "save failed");
-    $("mlMsg").textContent = j.configured ? "Saved. Send a test to check it." : "Saved. Still missing: " + j.missing.join(", ");
-    await loadNotify();
-  }catch(e){ $("mlMsg").textContent = "Could not save: " + e.message; }
-};
 function notifyPatch(){
   return {enabled: $("ntEnabled").checked, coordinator: $("ntCoord").value, manager: $("ntMgr").value,
     cost_controller: $("ntCost").value, time: $("ntTime").value || "08:00", companies: $("ntCompanies").value,
