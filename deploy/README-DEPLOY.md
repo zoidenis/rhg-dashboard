@@ -55,7 +55,7 @@ chmod 600 /opt/rhg/rhg-*/.env
 ```
 `APP_HOST` dhe `APP_PORT` **mos i ndrysho** — compose i mbishkruan vetë.
 
-Për emailet e Purchasing (Faturat pa PO), shto te `/opt/rhg/rhg-purchasing-local/.env` blloqet `SMTP_*` dhe `PUBLIC_URL` nga `.env.example`, pastaj rindiz kontejnerin: `docker compose up -d purchasing`. Pa `SMTP_HOST` tower-i punon normalisht, por emailet nuk dërgohen.
+Për emailet e Purchasing (Faturat pa PO), hap **Purchasing → Settings → Email notifications → Mail server** dhe plotëso hostin SMTP, portën, sigurinë, përdoruesin, adresën From, fjalëkalimin e aplikacionit dhe URL-në publike. Ruajtja zbatohet pa rinisje. Vlerat `SMTP_*` dhe `PUBLIC_URL` në `.env` mbeten si konfigurim fillestar derisa të ruhet formulari. Fjalëkalimi ruhet në volumin `purchasing-data`, nuk kthehet nga API-ja dhe përfshihet në backup.
 
 ### 4. Nis
 ```bash
@@ -78,7 +78,7 @@ ssh root@139.162.169.104 'cd /opt/rhg/deploy && docker compose build && docker c
 `data/` është volume — përditësimi nuk prek users, actions, settings, audit.
 
 ## Backup
-I gjithë state-i i aplikacionit është në dy volumet; nuk ka databazë.
+State-i i aplikacionit është në volumet `finance-data`, `purchasing-data` dhe `identity-data`. Arkivat përmbajnë edhe kredenciale; `backup.sh` i kufizon për root.
 ```bash
 /opt/rhg/deploy/backup.sh                 # → /opt/rhg/backups, mban 30 ditë
 echo "15 2 * * * /opt/rhg/deploy/backup.sh" | crontab -   # çdo natë 02:15

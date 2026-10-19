@@ -9,9 +9,9 @@ What each email holds:
   counts as closed when its tracked action in the Action center is Resolved or
   Dismissed; nothing is written back to Business Central.
 
-The mail server is set once on the server, in the .env file (SMTP_*). The
-recipients, the time and the window are application settings, editable in the
-tower by anyone allowed to change Settings.
+The mail server can be entered in Settings and is kept in a private data file.
+The .env values remain defaults until someone saves the form. Recipients, the
+time and the window are application settings too.
 """
 import html
 import json
@@ -27,6 +27,7 @@ from email.utils import formatdate, make_msgid
 
 import config
 import currency
+import smtp_config
 import store
 
 STATE_FILE = store.DATA_DIR / "notifications.json"
@@ -44,10 +45,7 @@ MAX_ROWS = 60          # rows per table in one email; the rest are counted and l
 # ---------------------------------------------------------------- mail server
 
 def smtp_info():
-    return {"configured": bool(config.SMTP_HOST and config.SMTP_FROM),
-            "host": config.SMTP_HOST, "port": config.SMTP_PORT,
-            "security": config.SMTP_SECURITY, "from": config.SMTP_FROM,
-            "user": config.SMTP_USER, "public_url": config.PUBLIC_URL}
+    return smtp_config.info()
 
 
 def parse_emails(text):
@@ -61,30 +59,31 @@ def parse_emails(text):
 
 
 def send_mail(to, cc, subject, html_body, text_body):
-    if not (config.SMTP_HOST and config.SMTP_FROM):
-        raise RuntimeError("The mail server is not set. Add SMTP_HOST and SMTP_FROM to the .env file.")
+    smtp = smtp_config.current()
+    if not smtp_config.ready(smtp):
+        raise RuntimeError("Complete the mail server settings before sending email.")
     msg = EmailMessage()
-    msg["From"] = config.SMTP_FROM
+    msg["From"] = smtp["from"]
     msg["To"] = ", ".join(to)
     if cc:
         msg["Cc"] = ", ".join(cc)
     msg["Subject"] = subject
     msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=(config.SMTP_FROM.split("@")[-1] or "rhg.al").strip(">"))
+    msg["Message-ID"] = make_msgid(domain=(smtp["from"].split("@")[-1] or "rhg.al").strip(">"))
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
     context = ssl.create_default_context()
-    if config.SMTP_SECURITY == "ssl":
-        server = smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, timeout=30, context=context)
+    if smtp["security"] == "ssl":
+        server = smtplib.SMTP_SSL(smtp["host"], smtp["port"], timeout=30, context=context)
     else:
-        server = smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30)
+        server = smtplib.SMTP(smtp["host"], smtp["port"], timeout=30)
     try:
         server.ehlo()
-        if config.SMTP_SECURITY == "starttls":
+        if smtp["security"] == "starttls":
             server.starttls(context=context)
             server.ehlo()
-        if config.SMTP_USER:
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+        if smtp["user"]:
+            server.login(smtp["user"], smtp["password"])
         server.send_message(msg, to_addrs=list(dict.fromkeys(to + cc)))
     finally:
         try:
@@ -198,7 +197,8 @@ def _subject(d, test=False):
 def render_email(d, recipients, test=False):
     """HTML (inline styles, for mail clients) and plain-text versions of one digest."""
     e = html.escape
-    link = f"{config.PUBLIC_URL.rstrip('/')}/purchasing/#compliance" if config.PUBLIC_URL else ""
+    public_url = smtp_config.current()["public_url"]
+    link = f"{public_url.rstrip('/')}/purchasing/#compliance" if public_url else ""
     navy, primary, ink, muted, line, sky = "#08303f", "#0c475e", "#0e2733", "#5c7482", "#d9dcdd", "#e4f3f9"
     red, redbg = "#c0392b", "#fbecea"
     th = (f"text-align:left;padding:8px 10px;background:{sky};color:{ink};font-size:12px;"
