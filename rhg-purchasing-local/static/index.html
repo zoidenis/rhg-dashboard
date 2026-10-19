@@ -636,6 +636,25 @@ td.num,th.num{text-align:right}
       <div class="card-head"><div><h2>Email notifications</h2>
         <p class="hint">A daily email of the invoices posted without a purchase order: the new ones since the last notice, and those reported before that nobody has closed. An invoice is closed when its action in the Action center is Resolved or Dismissed.</p></div>
         <span class="rhg-pill" id="ntSmtp">Mail server…</span></div>
+      <div class="setup" id="ntServer" style="margin-bottom:16px">
+        <h3 style="margin:0 0 4px">Mail server</h3>
+        <p class="hint">Enter these details when you are ready to send email. For Gmail, use an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">App Password</a> after enabling 2-Step Verification. Saving here applies without a restart.</p>
+        <div class="formgrid">
+          <label class="field">SMTP host<input id="ntHost" placeholder="smtp.gmail.com" autocomplete="off"></label>
+          <label class="field">Port<input id="ntPort" type="number" min="1" max="65535" value="587"></label>
+          <label class="field">Security<select id="ntSecurity"><option value="starttls">STARTTLS</option><option value="ssl">SSL/TLS</option><option value="none">None</option></select></label>
+          <label class="field">SMTP username<input id="ntUser" placeholder="rhgalbania@gmail.com" autocomplete="off"></label>
+          <label class="field">From address<input id="ntFrom" type="email" placeholder="rhgalbania@gmail.com" autocomplete="off"></label>
+          <label class="field">Public site URL (without /purchasing)<input id="ntPublicUrl" type="url" placeholder="https://dashboard.rhg.al" autocomplete="off"></label>
+          <label class="field">App Password<input id="ntPassword" type="password" autocomplete="new-password" placeholder="Paste App Password without spaces"></label>
+        </div>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:10px">
+          <input type="checkbox" id="ntClearPassword" style="width:auto"> Remove saved App Password</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button class="btn dark" id="ntSmtpSave">Save mail server</button>
+          <span class="meta" id="ntSmtpMsg">The password stays hidden after saving.</span>
+        </div>
+      </div>
       <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:12px">
         <input type="checkbox" id="ntEnabled" style="width:auto"> <b>Send the daily notice of invoices without a PO</b></label>
       <div class="formgrid">
@@ -1586,11 +1605,37 @@ async function loadNotify(){
     ntStatus = j; renderNotify();
   }catch(e){ $("ntMsg").textContent = "Could not read the notification settings: " + e.message; }
 }
+function renderSmtp(sm){
+  $("ntSmtp").className = "rhg-pill " + (sm.configured ? "ok" : "warning");
+  $("ntSmtp").textContent = sm.configured ? `Mail server · ${sm.host}:${sm.port} · from ${sm.from}` : "Mail server incomplete";
+  $("ntSmtp").title = sm.configured ? "" : "Complete the mail server form below.";
+  $("ntHost").value = sm.host || ""; $("ntPort").value = sm.port || 587;
+  $("ntSecurity").value = sm.security || "starttls";
+  $("ntUser").value = sm.user || ""; $("ntFrom").value = sm.from || "";
+  $("ntPublicUrl").value = sm.public_url || "";
+  $("ntPassword").value = "";
+  $("ntPassword").placeholder = sm.has_password ? "Saved — leave blank to keep it" : "Paste App Password without spaces";
+  $("ntClearPassword").checked = false;
+  $("ntSmtpSave").disabled = !can("settings");
+  if(!can("settings")) $("ntSmtpSave").title = "Your role cannot change Settings.";
+  ["ntHost","ntPort","ntSecurity","ntUser","ntFrom","ntPublicUrl","ntPassword"].forEach(id => {
+    $(id).disabled = !can("settings");
+  });
+  $("ntClearPassword").disabled = !can("settings") || !sm.has_password;
+}
+function renderNotifySummary(){
+  const j = ntStatus, n = j.settings || {}, sm = j.smtp || {};
+  const rec = j.recipients || {};
+  $("ntNext").innerHTML = (n.enabled
+      ? (j.next_run ? `Next email: <b>${esc(j.next_run.replace("T"," "))}</b>` : "Next email: not scheduled")
+      : "Off: nothing is sent until the box above is ticked and saved.")
+    + (rec.to && rec.to.length ? ` · To ${esc(rec.to.join(", "))}${rec.cc.length ? ` · Cc ${esc(rec.cc.join(", "))}` : ""}` : " · No recipient set yet.")
+    + (rec.invalid && rec.invalid.length ? ` · <span class="up">Not an email address: ${esc(rec.invalid.join(", "))}</span>` : "")
+    + (sm.configured ? "" : ` · <span class="warn">Complete the mail server form before sending.</span>`);
+}
 function renderNotify(){
   const j = ntStatus, n = j.settings || {}, sm = j.smtp || {};
-  $("ntSmtp").className = "rhg-pill " + (sm.configured ? "ok" : "warning");
-  $("ntSmtp").textContent = sm.configured ? `Mail server · ${sm.host}:${sm.port} · from ${sm.from}` : "Mail server not set";
-  $("ntSmtp").title = sm.configured ? "" : "Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in the tower's .env on the server.";
+  renderSmtp(sm);
   $("ntEnabled").checked = !!n.enabled;
   $("ntCoord").value = n.coordinator || ""; $("ntMgr").value = n.manager || ""; $("ntCost").value = n.cost_controller || "";
   $("ntTime").value = n.time || "08:00"; $("ntCompanies").value = n.companies || "";
@@ -1598,13 +1643,7 @@ function renderNotify(){
   $("ntDays").value = n.lookback_days || 30;
   $("ntWorkdays").checked = !!n.working_days_only; $("ntEmpty").checked = !!n.send_empty;
   if(!$("ntTestTo").value) $("ntTestTo").value = j.me || "";
-  const rec = j.recipients || {};
-  $("ntNext").innerHTML = (n.enabled
-      ? (j.next_run ? `Next email: <b>${esc(j.next_run.replace("T"," "))}</b>` : "Next email: not scheduled")
-      : "Off: nothing is sent until the box above is ticked and saved.")
-    + (rec.to && rec.to.length ? ` · To ${esc(rec.to.join(", "))}${rec.cc.length ? ` · Cc ${esc(rec.cc.join(", "))}` : ""}` : " · No recipient set yet.")
-    + (rec.invalid && rec.invalid.length ? ` · <span class="up">Not an email address: ${esc(rec.invalid.join(", "))}</span>` : "")
-    + (sm.configured ? "" : ` · <span class="warn">The mail server is not set on the server, so nothing can be sent yet.</span>`);
+  renderNotifySummary();
   const runs = j.runs || [];
   $("ntRuns").innerHTML = `<tr><th>When</th><th>Company</th><th class="num">New</th><th class="num">Still open</th><th>Sent to</th><th>Result</th></tr>` +
     (runs.length ? runs.slice(0,15).map(x => `<tr><td class="meta">${esc((x.ts||"").replace("T"," "))}${x.test?' <span class="chip">test</span>':""}</td>
@@ -1616,6 +1655,23 @@ function renderNotify(){
   ["ntSave","ntTest"].forEach(id => { $(id).disabled = !can("settings");
     if(!can("settings")) $(id).title = "Your role cannot change Settings."; });
 }
+$("ntSmtpSave").onclick = async () => {
+  $("ntSmtpMsg").textContent = "Saving…";
+  try{
+    const payload = {host: $("ntHost").value, port: $("ntPort").value,
+      security: $("ntSecurity").value, user: $("ntUser").value,
+      from: $("ntFrom").value, public_url: $("ntPublicUrl").value,
+      password: $("ntPassword").value, clear_password: $("ntClearPassword").checked};
+    const r = await fetch("/api/notify/smtp", {method:"POST",
+      headers:{"Content-Type":"application/json", "X-Requested-With":"RHG-Purchasing"},
+      body:JSON.stringify(payload)});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "save failed");
+    ntStatus.smtp = j.smtp;
+    renderSmtp(j.smtp); renderNotifySummary();
+    $("ntSmtpMsg").textContent = j.smtp.configured ? "Saved. You can send a test now." : "Saved. Complete the remaining fields before sending.";
+  }catch(e){ $("ntSmtpMsg").textContent = "Could not save: " + e.message; }
+};
 function notifyPatch(){
   return {enabled: $("ntEnabled").checked, coordinator: $("ntCoord").value, manager: $("ntMgr").value,
     cost_controller: $("ntCost").value, time: $("ntTime").value || "08:00", companies: $("ntCompanies").value,
@@ -1719,7 +1775,10 @@ function renderContract(){
 }
 // ---------- accounts and permissions ----------
 let me = null, roles = {};
-function can(p){ return !!me && (me.can||[]).includes(p); }
+function can(p){
+  const platform = {settings:"purchasing.settings.manage", actions:"purchasing.actions.manage"};
+  return !!me && ((me.can||[]).includes(p) || (me.permissions||[]).includes(platform[p] || p));
+}
 async function loadSession(){
   try{
     const j = await (await fetch("/api/session")).json();

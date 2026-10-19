@@ -38,6 +38,7 @@ import invoices
 import operations
 import quality
 import reports
+import smtp_config
 import store
 from bc_client import BCClient, BCError, PeriodCache
 
@@ -1023,7 +1024,7 @@ def drill(kind, key):
 
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
-                     "/api/notify/test": "settings",
+                     "/api/notify/test": "settings", "/api/notify/smtp": "settings",
                      "/api/users": "users", "/api/password": "view"}
 
 
@@ -1264,6 +1265,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200 if updated else 404, updated or {"error": "Action not found"})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path == "/api/notify/smtp":
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                self._send(200, {"smtp": smtp_config.save(body, actor)})
             elif url.path == "/api/notify/test":
                 to, bad = notify.parse_emails(body.get("to") or "")
                 if bad:
@@ -1273,6 +1279,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, notifier.send(company, test=True, only_to=to or None, actor=actor))
             else:
                 self._send(404, {"error": "Not found"})
+        except ValueError as exc:
+            self._send(400, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
             traceback.print_exc()
             self._send(500, {"error": f"Unexpected error: {exc}"})
@@ -1346,8 +1354,9 @@ def main():
     print("Press Ctrl+C to stop.")
     threading.Thread(target=_warm_loop, daemon=True).start()
     notifier.start()
-    print("Email notices: " + ("mail server " + config.SMTP_HOST if config.SMTP_HOST
-                               else "no mail server set (SMTP_HOST in .env)"))
+    smtp = notify.smtp_info()
+    print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]
+                               else "mail server not configured in Settings"))
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(link)).start()
     try:
