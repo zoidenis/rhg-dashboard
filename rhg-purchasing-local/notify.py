@@ -21,6 +21,7 @@ import ssl
 import threading
 import time
 import traceback
+import uuid
 from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
@@ -315,6 +316,58 @@ class Notifier:
     def __init__(self, read_window, default_company):
         self.read_window = read_window          # (company, date_from, date_to) -> compliance.build()
         self.default_company = default_company
+        self._tests = {}
+        self._tests_lock = threading.Lock()
+
+    def test_status(self, actor, job_id=None):
+        """Return only this user's test, including after a page refresh."""
+        with self._tests_lock:
+            jobs = [j for j in self._tests.values()
+                    if j["actor"] == actor and (job_id is None or j["id"] == job_id)]
+            return dict(jobs[-1]) if jobs else None
+
+    def start_test(self, company, only_to=None, actor=""):
+        """Accept quickly; BC reads and SMTP must not hold a proxy request open."""
+        recipients = list(only_to or [])
+        with self._tests_lock:
+            active = [j for j in self._tests.values() if j["status"] in ("queued", "running")]
+            for job in active:
+                if job["actor"] == actor:
+                    if job["company"] != company or job["to"] != recipients:
+                        raise ValueError("A test email is already running. Wait for its result first.")
+                    return dict(job)
+            if len(active) >= 10:
+                raise ValueError("Email tests are busy. Please try again later.")
+            # Keep recent results for refreshes without growing memory indefinitely.
+            for key in list(self._tests):
+                if len(self._tests) < 50:
+                    break
+                if self._tests[key]["status"] not in ("queued", "running"):
+                    del self._tests[key]
+            job = {"id": uuid.uuid4().hex, "actor": actor, "company": company,
+                   "to": recipients, "status": "queued", "result": None}
+            self._tests[job["id"]] = job
+            try:
+                threading.Thread(target=self._run_test, args=(job["id"],),
+                                 daemon=True, name="notification-test").start()
+            except Exception:
+                del self._tests[job["id"]]
+                raise
+            return dict(job)
+
+    def _run_test(self, job_id):
+        with self._tests_lock:
+            job = self._tests[job_id]
+            job["status"] = "running"
+        try:
+            result = self.send(job["company"], test=True, only_to=job["to"] or None,
+                               actor=job["actor"])
+        except Exception:                                        # noqa: BLE001
+            traceback.print_exc()
+            result = {"status": "failed", "detail":
+                      "The email result could not be recorded. Check email history and your inbox before retrying."}
+        with self._tests_lock:
+            job.update(status=result["status"], result=result)
 
     def settings(self):
         return store.get_settings().get("notifications", {})

@@ -98,6 +98,24 @@ Një faturë mbyllet kur veprimi i saj në Action center bëhet *Resolved* ose *
 
 Historiku i dërgimeve shfaqet nën formular dhe te Audit history.
 
+**Testet në sfond:** `Send a test` nis punën dhe merr menjëherë një përgjigje `202`.
+Faqja kontrollon rezultatin çdo dy sekonda, kështu leximi i ngadaltë nga BC ose SMTP
+nuk e mban kërkesën hapur deri në timeout të proxy-t. Rifreskimi i faqes vazhdon
+ndjekjen e testit aktiv të përdoruesit; kërkesat e përsëritura gjatë atij testi
+nuk dërgojnë email tjetër. Gabimet SMTP shfaqen në rezultat dhe në historik.
+
+Statusi i testit aktiv mbahet në memorien e procesit. Nëse serveri riniset gjatë
+dërgimit, kontrollo historikun dhe inbox-in para se ta provosh sërish; testi nuk
+riniset automatikisht. Për këtë ndryshim përditësohen bashkë serveri dhe faqja e
+Purchasing, pastaj rifreskohet faqja në browser.
+
+Kontrollet pa lidhje reale me BC ose SMTP (nga dosja `rhg-purchasing-local`):
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+node --test tests/notify_ui.test.cjs
+```
+
 ## Opsione
 - Të tjerët në zyrë ta hapin: `APP_HOST=0.0.0.0`, pastaj `http://IP-e-PC-së:8765` (lejo portin 8765 në Windows Firewall). Pa login — vetëm në rrjet të besuar.
 - Nisje automatike me Windows: shkurtore e `start.bat` te `shell:startup`.
