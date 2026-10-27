@@ -851,7 +851,13 @@ $("cacheLoad").onclick = async () => {
 
 // ---------- accounts and permissions ----------
 let me = null;
-function can(p){ return !!me && (me.can||[]).includes(p); }
+// The central identity sends platform permissions (finance.settings.manage…), not the
+// old short rights, so both are accepted.
+const PLATFORM_RIGHT = {view:"finance.view", actions:"finance.actions.manage", settings:"finance.settings.manage",
+  export:"finance.export", closing:"finance.closing.manage", users:"admin.users.manage"};
+function can(p){
+  return !!me && ((me.can||[]).includes(p) || (me.permissions||[]).includes(PLATFORM_RIGHT[p] || p));
+}
 async function loadSession(){
   try{
     const j = await (await fetch("/api/session")).json();
@@ -1095,7 +1101,8 @@ function renderSimphony(st){
   $("spPass").value = "";
   $("spPass").placeholder = st.has_password ? "Saved · leave blank to keep it" : "API account password";
   $("spClearRow").style.display = st.has_password ? "" : "none"; $("spClear").checked = false;
-  ["spSave","spTest"].forEach(id => { $(id).disabled = !can("settings"); });
+  ["spSave","spTest"].forEach(id => { $(id).disabled = !can("settings");
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
 }
 async function simphonyPost(path, body){
   const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json", "X-Requested-With":"RHG-Finance"},
