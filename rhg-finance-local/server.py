@@ -22,6 +22,7 @@ import localdb
 import memuse
 import finance
 import inventory
+import simphony
 import store
 import treasury
 from concurrent.futures import ThreadPoolExecutor
@@ -38,6 +39,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "login.html": "text/html; charset=utf-8"}
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
+                     "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/users": "users", "/api/password": "view"}
 client = BCClient()
 _last, _last_lock = {}, threading.Lock()
@@ -409,6 +411,164 @@ def inventory_request(company, anchor, mode, dimension, location=None, refresh=F
             _inv_jobs[key] = dict(state, started=now, finished=time.time())
     threading.Thread(target=run, daemon=True, name="inventory").start()
     return {"loaded": False, "pending": True, "elapsed": 0}
+
+
+# ------------------------------------------------------------------ sales (Simphony)
+_latest_cache = {}
+
+
+def _latest(loc_ref):
+    hit = _latest_cache.get(loc_ref)
+    if hit and time.time() - hit[0] < 900:
+        return hit[1]
+    value = simphony.latest_business_date(loc_ref)
+    _latest_cache[loc_ref] = (time.time(), value)
+    return value
+
+
+def sales_screen(anchor, mode):
+    """Net sales, checks and guests by location from Simphony, against the period before."""
+    if not simphony.info()["configured"]:
+        return {"available": False, "configured": False,
+                "error": "The Simphony connection is not set. Fill it in under Settings → Simphony sales."}
+    c_from, c_to, p_from, p_to, *_rest, running, label, method = periods(anchor, mode)
+    t0 = time.time()
+    locs = [l for l in simphony.locations() if l.get("active", True)]
+    mapping = simphony.loc_map()
+    latest = {}
+    for loc, (value, err) in in_parallel_jobs({l["locRef"]: (lambda r=l["locRef"]: _latest(r)) for l in locs}).items():
+        latest[loc] = value if not err else None
+
+    def dates(a, b):
+        out, d = [], a
+        while d <= b:
+            out.append(d.isoformat())
+            d += timedelta(days=1)
+        return out
+    cur_days, prev_days = dates(c_from, c_to), dates(p_from, p_to)
+    jobs = {}
+    for l in locs:
+        last = latest.get(l["locRef"])
+        for d in cur_days + prev_days:
+            if last and d > last:
+                continue                         # that business day has not been closed yet
+            jobs[(l["locRef"], d)] = (lambda r=l["locRef"], dd=d, lt=last: simphony.daily_totals(r, dd, lt))
+    results = in_parallel_jobs(jobs, workers=4)
+    errors = sorted({str(err)[:200] for _, (_, err) in results.items() if err})
+
+    rows, by_day = [], {}
+    keys = ("net", "discounts", "gross", "checks", "guests", "voids", "returns", "service", "tax",
+            "open_checks", "open_value", "error_corrects")
+    for l in locs:
+        cur = dict.fromkeys(keys, 0)
+        prev = dict.fromkeys(keys, 0)
+        read = missing = 0
+        for d in cur_days + prev_days:
+            value, err = results.get((l["locRef"], d), (None, None))
+            if value is None:
+                if (l["locRef"], d) in jobs:
+                    missing += 1
+                continue
+            fig = simphony.day_figures(value.get("rvcs") or [])
+            target = cur if d in cur_days else prev
+            for k in keys:
+                target[k] += fig[k]
+            if d in cur_days:
+                read += 1
+                day = by_day.setdefault(d, {"date": d, "net": {}, "checks": 0, "guests": 0})
+                day["net"][l["currency"] or "?"] = day["net"].get(l["currency"] or "?", 0) + fig["net"]
+                day["checks"] += fig["checks"]
+                day["guests"] += fig["guests"]
+        if not read and not cur["net"] and not prev["net"]:
+            continue                             # a location that sold nothing in either period
+        rows.append({"locRef": l["locRef"], "name": l["name"], "currency": l["currency"],
+                     "bc": mapping.get(l["locRef"], ""), "latest": latest.get(l["locRef"]),
+                     "days_read": read, "days_missing": missing, "cur": cur, "prev": prev,
+                     "change_pct": ((cur["net"] - prev["net"]) / abs(prev["net"]) * 100) if prev["net"] else None,
+                     "avg_check": cur["net"] / cur["checks"] if cur["checks"] else None,
+                     "avg_guest": cur["net"] / cur["guests"] if cur["guests"] else None,
+                     "discount_pct": cur["discounts"] / cur["gross"] * 100 if cur["gross"] else None})
+    rows.sort(key=lambda r: -r["cur"]["net"])
+    totals = {}
+    for r in rows:
+        t = totals.setdefault(r["currency"] or "?", {"cur": dict.fromkeys(keys, 0), "prev": dict.fromkeys(keys, 0),
+                                                       "locations": 0})
+        t["locations"] += 1
+        for k in keys:
+            t["cur"][k] += r["cur"][k]
+            t["prev"][k] += r["prev"][k]
+    for t in totals.values():
+        c, p = t["cur"], t["prev"]
+        t["change_pct"] = (c["net"] - p["net"]) / abs(p["net"]) * 100 if p["net"] else None
+        t["avg_check"] = c["net"] / c["checks"] if c["checks"] else None
+        t["avg_guest"] = c["net"] / c["guests"] if c["guests"] else None
+    main_currency = max(totals, key=lambda k: totals[k]["cur"]["net"]) if totals else ""
+    return {
+        "available": True, "configured": True,
+        "period": {"from": c_from.isoformat(), "to": c_to.isoformat(), "label": label, "running": running},
+        "prior": {"from": p_from.isoformat(), "to": p_to.isoformat(), "method": method},
+        "locations": rows, "totals": totals, "currency": main_currency,
+        "days": sorted(by_day.values(), key=lambda d: d["date"]),
+        "errors": errors, "calls": len(jobs), "ms": int((time.time() - t0) * 1000),
+        "definitions": {
+            "net": "Net sales as Simphony totals them (netSlsTtl): after item and subtotal discounts, "
+                   "excluding tax and service charges.",
+            "checks": "Checks counted by Simphony for the business day (chkCnt). Guests are the covers "
+                      "entered at the POS (gstCnt), so they are only as good as the entry.",
+            "open": "Checks rung on the day and still open: sales that are not yet final.",
+            "currency": "Each location reports in its own currency; totals are kept apart by currency "
+                        "and never converted.",
+        },
+    }
+
+
+def in_parallel_jobs(jobs, workers=6):
+    """{key: callable} -> {key: (value, error)}; a failed read never stops the others."""
+    out = {}
+    if not jobs:
+        return out
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {k: pool.submit(fn) for k, fn in jobs.items()}
+        for k, f in futures.items():
+            try:
+                out[k] = (f.result(), None)
+            except Exception as exc:                             # noqa: BLE001
+                out[k] = (None, exc)
+    return out
+
+
+_sales_jobs, _sales_lock = {}, threading.Lock()
+
+
+def sales_request(anchor, mode, refresh=False):
+    """Runs the Simphony read in the background, like the inventory: the first read of a
+    period is one call per location and day, which can outlast the proxy."""
+    key = (anchor or "", mode or "month")
+    now = time.time()
+    with _sales_lock:
+        job = _sales_jobs.get(key)
+        if job and job["state"] == "running":
+            return {"pending": True, "elapsed": int(now - job["started"])}
+        if job and job["state"] == "done" and not refresh and now - job["finished"] < 600:
+            return job["result"]
+        if job and job["state"] == "failed" and not refresh:
+            _sales_jobs.pop(key, None)
+            return {"available": False, "configured": True, "error": job["error"]}
+        _sales_jobs[key] = {"state": "running", "started": now}
+
+    def run():
+        try:
+            result = sales_screen(anchor, mode)
+            state = {"state": "done", "result": result}
+        except simphony.SimphonyError as exc:
+            state = {"state": "failed", "error": str(exc)}
+        except Exception as exc:                                 # noqa: BLE001
+            traceback.print_exc()
+            state = {"state": "failed", "error": f"The sales could not be read: {str(exc)[:300]}"}
+        with _sales_lock:
+            _sales_jobs[key] = dict(state, started=now, finished=time.time())
+    threading.Thread(target=run, daemon=True, name="sales").start()
+    return {"pending": True, "elapsed": 0}
 
 
 _summary_cache = {}
@@ -954,6 +1114,10 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/gl":
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
+            elif url.path == "/api/sales":
+                self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1"))
+            elif url.path == "/api/simphony/status":
+                self._send(200, simphony.info())
             elif url.path == "/api/inventory":
                 self._send(200, inventory_request(q.get("company") or config.BC_COMPANY, q.get("period"),
                                                   q.get("mode", "month"), q.get("dimension"), q.get("location"),
@@ -1060,6 +1224,26 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200 if updated else 404, updated or {"error": "Action not found"})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path in ("/api/simphony/settings", "/api/simphony/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    try:
+                        self._send(200, simphony.save(body, actor))
+                    except ValueError as exc:
+                        self._send(400, {"error": str(exc)})
+                    return
+                try:
+                    simphony._token(force=True)
+                    locs = simphony.locations(max_age=0)
+                    first = locs[0]["locRef"] if locs else None
+                    latest = simphony.latest_business_date(first) if first else None
+                    store.audit("simphony test", "connection", actor, {}, {"locations": len(locs)}, "")
+                    self._send(200, {"ok": True, "locations": locs, "latest_bus_dt": latest,
+                                     "status": simphony.info()})
+                except simphony.SimphonyError as exc:
+                    self._send(200, {"ok": False, "error": str(exc), "status": simphony.info()})
             elif url.path == "/api/closing":
                 updated = store.update_closing(body.get("company") or config.BC_COMPANY, body.get("period"),
                                                body.get("id"), body, actor)

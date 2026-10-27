@@ -122,6 +122,7 @@ td.num,th.num{text-align:right}
     <div class="grp">Overview</div>
     <button class="on" data-view="overview">Executive overview</button>
     <button data-view="group">Group view</button>
+    <button data-view="sales">Sales · Simphony</button>
 
     <div class="grp">Statements</div>
     <button data-view="pl">Profit &amp; loss</button>
@@ -328,6 +329,22 @@ td.num,th.num{text-align:right}
     <div class="card"><h2>How to read this</h2><p class="hint" id="grpWarn"></p></div>
   </section>
 
+  <section class="view" id="v-sales">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Sales from Simphony</h2>
+      <p class="hint" id="slNote">Net sales, checks and guests by restaurant, read from Simphony Reporting and Analytics.</p></div>
+      <button class="mini dark" id="slLoad">Refresh sales</button></div>
+      <div class="kpis six" id="slKpis"></div></div>
+    <div class="card" style="margin-bottom:15px"><h2>By restaurant</h2>
+      <p class="hint" id="slLocNote"></p>
+      <div class="scroll"><table id="slLoc"></table></div></div>
+    <div class="grid even">
+      <div class="card"><h2>Net sales by day</h2><p class="hint" id="slDayNote"></p><div id="slDays" class="rhg-bars"></div></div>
+      <div class="card"><h2>Control signals</h2><p class="hint">Voids, returns, discounts and checks still open, by restaurant. Large values here are worth a question to the manager.</p>
+        <div class="scroll"><table id="slCtl"></table></div></div>
+    </div>
+    <details class="card" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
+  </section>
+
   <section class="view" id="v-exceptions"><div class="card"><h2>Exceptions</h2>
     <p class="hint">Rules applied to live BC records using the thresholds in Settings. Each one can become a tracked action.</p>
     <div id="excList"></div></div></section>
@@ -376,6 +393,28 @@ td.num,th.num{text-align:right}
       <div class="formgrid" id="ownerForm"></div>
       <div class="formgrid" id="extraForm"></div>
       <button class="btn dark" id="saveSettings">Save</button> <span class="meta" id="saved"></span></div>
+    <div class="card" style="margin-bottom:15px" id="spCard">
+      <div class="card-head"><div><h2>Simphony sales</h2>
+        <p class="hint">The Business Intelligence API account from Reporting and Analytics (Administration → System → API Accounts). Read-only. The password stays on the server and expires every 60 days in Simphony.</p></div>
+        <span class="rhg-pill" id="spPill">Not connected</span></div>
+      <div class="formgrid">
+        <label class="field">Authentication server<input id="spAuth" placeholder="https://ors-idm.mte5.oraclerestaurants.com"></label>
+        <label class="field">Application server<input id="spApp" placeholder="https://simphony-home.mte5.oraclerestaurants.com"></label>
+        <label class="field">Enterprise short name<input id="spOrg" placeholder="RHG"></label>
+        <label class="field">Client ID<input id="spClient" autocomplete="off"></label>
+        <label class="field">API account name<input id="spUser" autocomplete="off" placeholder="RHG-TOWERS"></label>
+        <label class="field">Password<input id="spPass" type="password" autocomplete="new-password" placeholder="API account password"></label>
+        <label class="field" style="grid-column:1/-1">Simphony location → BC code (optional)<input id="spMap" placeholder="1001=SALT, 1002=LIFT, 1003=VESPER"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px" id="spClearRow">
+        <input type="checkbox" id="spClear" style="width:auto"> Remove saved password</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="spSave">Save connection</button>
+        <button class="btn" id="spTest">Test connection</button>
+        <span class="meta" id="spMsg"></span>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table id="spLocs"></table></div>
+    </div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -495,6 +534,8 @@ function render(){
   $("excCount").textContent = k.critical;
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
+  if(!spLoaded) loadSimphony();
+  if($("v-sales").classList.contains("on") && !salesData) loadSales();
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
     if (!(data.inventory||{}).loaded) loadInventory();
@@ -966,6 +1007,125 @@ function renderInventory(){
   $("invRecNote").textContent = rec ? rec.method + " " + (inv.gl_note||"") : (inv.gl_note||"");
 }
 
+// ---------- sales from Simphony ----------
+let salesData = null, salesPoll = null;
+async function loadSales(refresh){
+  const p = new URLSearchParams(params()); if (refresh) p.set("refresh","1");
+  const query = p.toString();
+  if (salesPoll && salesPoll.query === query) return;
+  const me = salesPoll = {query, started: Date.now()};
+  $("slLoad").disabled = true;
+  try{
+    let first = true;
+    while (salesPoll === me){
+      const r = await fetch("/api/sales?" + (first ? query : query.replace("&refresh=1","")));
+      first = false;
+      const j = await readJSON(r);
+      if(!r.ok) throw new Error(j.error || "failed");
+      if(!j.pending){ salesData = j; renderSales(); break; }
+      const s = Math.round((Date.now() - me.started)/1000);
+      $("slNote").textContent = `Reading the daily totals from Simphony… ${s}s. The first read of a period is one call per restaurant and day; later reads come from the local file.`;
+      await new Promise(res => setTimeout(res, 4000));
+    }
+  }catch(e){ if (salesPoll === me) $("slNote").textContent = "Could not read the sales: " + e.message; }
+  finally{ if (salesPoll === me){ salesPoll = null; $("slLoad").disabled = false; } }
+}
+$("slLoad").onclick = () => loadSales(true);
+function renderSales(){
+  const d = salesData; if(!d) return;
+  if (currentView().id === "sales") setHeader();
+  if(!d.available){
+    $("slNote").innerHTML = `<span class="warn">${esc(d.error||"Sales unavailable.")}</span>` +
+      (d.configured === false ? ` <a href="#settings" data-goto-view="settings">Open Settings</a>` : "");
+    bindGotoViews && bindGotoViews($("slNote"));
+    ["slKpis","slLoc","slDays","slCtl"].forEach(id => $(id).innerHTML = ""); return;
+  }
+  const C = d.currency || "ALL", t = (d.totals||{})[C] || {cur:{}, prev:{}};
+  const chip = v => v==null ? "" : `<span class="chip ${v>=0?"down":"up"}">${v>=0?"+":""}${fmt(v,1)}%</span>`;
+  $("slNote").textContent = `${d.period.label} · ${d.period.from} to ${d.period.to}, against ${d.prior.from} to ${d.prior.to}` +
+    `${d.errors.length ? ` · ${d.errors.length} read(s) failed` : ""}`;
+  const k = (l, v, s) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const others = Object.keys(d.totals||{}).filter(c => c !== C);
+  $("slKpis").innerHTML = [
+    k("Net sales", fmt(t.cur.net), `${C} ${chip(t.change_pct)} vs ${fmt(t.prev.net)} before`),
+    k("Checks", fmt(t.cur.checks), `${fmt(t.prev.checks)} in the period before`),
+    k("Guests", fmt(t.cur.guests), `${fmt(t.prev.guests)} in the period before`),
+    k("Average check", fmt(t.avg_check), `${C} net per check`),
+    k("Per guest", fmt(t.avg_guest), `${C} net per guest`),
+    k("Discounts", fmt(t.cur.discounts), `${C} · ${t.cur.gross ? fmt(t.cur.discounts/t.cur.gross*100,1) : "–"}% of gross`),
+  ].join("");
+  $("slLocNote").textContent = `${d.locations.length} restaurant(s) with sales.` +
+    (others.length ? ` Restaurants reporting in ${others.join(", ")} are listed but kept out of the ${C} totals.` : "");
+  $("slLoc").innerHTML = `<tr><th>Restaurant</th><th>BC</th><th class="num">Net sales</th><th class="num">Before</th><th class="num">Change</th>
+    <th class="num">Checks</th><th class="num">Guests</th><th class="num">Avg check</th><th class="num">Per guest</th><th class="num">Days</th></tr>` +
+    d.locations.map(l => `<tr><td class="name">${esc(l.name)} <span class="meta">${esc(l.locRef)}${l.currency&&l.currency!==C?" · "+esc(l.currency):""}</span></td>
+      <td class="meta">${esc(l.bc||"")}</td><td class="num"><b>${fmt(l.cur.net)}</b></td><td class="num">${fmt(l.prev.net)}</td>
+      <td class="num">${chip(l.change_pct)}</td><td class="num">${fmt(l.cur.checks)}</td><td class="num">${fmt(l.cur.guests)}</td>
+      <td class="num">${fmt(l.avg_check)}</td><td class="num">${fmt(l.avg_guest)}</td>
+      <td class="num meta">${fmt(l.days_read)}${l.days_missing?` <span class="warn">· ${l.days_missing} not read</span>`:""}</td></tr>`).join("") +
+    `<tr class="total"><td>Total ${esc(C)}</td><td></td><td class="num">${fmt(t.cur.net)}</td><td class="num">${fmt(t.prev.net)}</td>
+      <td class="num">${chip(t.change_pct)}</td><td class="num">${fmt(t.cur.checks)}</td><td class="num">${fmt(t.cur.guests)}</td>
+      <td class="num">${fmt(t.avg_check)}</td><td class="num">${fmt(t.avg_guest)}</td><td></td></tr>`;
+  const days = d.days || [], max = Math.max(1, ...days.map(x => x.net[C]||0));
+  $("slDayNote").textContent = days.length ? `${C} net sales, every restaurant together.` : "No business day read yet.";
+  $("slDays").innerHTML = days.map(x => `<div class="rhg-row"><span class="meta" style="width:86px">${esc(x.date)}</span>
+    <div style="flex:1;height:10px;background:var(--rhg-sky);border-radius:5px"><div style="height:10px;border-radius:5px;background:var(--rhg-primary);width:${Math.max(0.5,(x.net[C]||0)/max*100)}%"></div></div>
+    <span class="num" style="width:110px;text-align:right">${fmt(x.net[C]||0)}</span></div>`).join("");
+  $("slCtl").innerHTML = `<tr><th>Restaurant</th><th class="num">Discounts %</th><th class="num">Voids</th><th class="num">Returns</th><th class="num">Error corrects</th><th class="num">Open checks</th></tr>` +
+    d.locations.map(l => `<tr><td class="name">${esc(l.name)}</td><td class="num ${l.discount_pct>10?"up":""}">${l.discount_pct==null?"–":fmt(l.discount_pct,1)+"%"}</td>
+      <td class="num">${fmt(l.cur.voids)}</td><td class="num">${fmt(l.cur.returns)}</td><td class="num">${fmt(l.cur.error_corrects)}</td>
+      <td class="num ${l.cur.open_checks?"warn":""}">${fmt(l.cur.open_checks)}${l.cur.open_value?` <span class="meta">· ${fmt(l.cur.open_value)}</span>`:""}</td></tr>`).join("");
+  $("slDefs").innerHTML = Object.values(d.definitions||{}).map(x => `<p>${esc(x)}</p>`).join("") +
+    `<p>${fmt(d.calls)} daily totals checked in ${fmt(d.ms/1000,1)} s. ${d.errors.map(esc).join(" · ")}</p>`;
+}
+
+// ---------- Simphony connection (Settings) ----------
+let spLoaded = false;
+async function loadSimphony(){
+  spLoaded = true;
+  try{ const j = await readJSON(await fetch("/api/simphony/status")); renderSimphony(j); }catch(e){}
+}
+function renderSimphony(st){
+  $("spPill").className = "rhg-pill " + (st.configured ? (st.password_warning ? "warning" : "ok") : "warning");
+  $("spPill").textContent = !st.configured ? (st.auth_server || st.username ? "Connection incomplete" : "Not connected")
+    : st.password_warning ? `Password ${st.password_age_days} days old · renew before 60` : (st.signed_in ? "Connected" : "Saved · not tested");
+  $("spPill").title = st.missing && st.missing.length ? "Missing: " + st.missing.join(", ") : "";
+  $("spAuth").value = st.auth_server || ""; $("spApp").value = st.app_server || ""; $("spOrg").value = st.org || "";
+  $("spClient").value = st.client_id || ""; $("spUser").value = st.username || ""; $("spMap").value = st.loc_map || "";
+  $("spPass").value = "";
+  $("spPass").placeholder = st.has_password ? "Saved · leave blank to keep it" : "API account password";
+  $("spClearRow").style.display = st.has_password ? "" : "none"; $("spClear").checked = false;
+  ["spSave","spTest"].forEach(id => { $(id).disabled = !can("settings"); });
+}
+async function simphonyPost(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json", "X-Requested-With":"RHG-Finance"},
+    body: JSON.stringify(body || {})});
+  const j = await readJSON(r);
+  if(!r.ok) throw new Error(j.error || "failed");
+  return j;
+}
+$("spSave").onclick = async () => {
+  $("spMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/simphony/settings", {auth_server: $("spAuth").value, app_server: $("spApp").value,
+      org: $("spOrg").value, client_id: $("spClient").value, username: $("spUser").value, loc_map: $("spMap").value,
+      password: $("spPass").value, clear_password: $("spClear").checked});
+    renderSimphony(st); salesData = null;
+    $("spMsg").textContent = st.configured ? "Saved. Press Test connection." : "Saved. Still missing: " + st.missing.join(", ");
+  }catch(e){ $("spMsg").textContent = "Could not save: " + e.message; }
+};
+$("spTest").onclick = async () => {
+  $("spMsg").textContent = "Signing in to Simphony…";
+  try{
+    const j = await simphonyPost("/api/simphony/test");
+    renderSimphony(j.status);
+    if(!j.ok) throw new Error(j.error);
+    $("spMsg").textContent = `Connected. ${j.locations.length} location(s) visible to the API account; latest closed business day ${j.latest_bus_dt || "–"}.`;
+    $("spLocs").innerHTML = `<tr><th>Location ref</th><th>Name</th><th>Currency</th><th>Active</th><th>Open since</th></tr>` +
+      j.locations.map(l => `<tr><td>${esc(l.locRef)}</td><td>${esc(l.name)}</td><td>${esc(l.currency)}</td><td>${l.active?"yes":"no"}</td><td class="meta">${esc(l.opened)}</td></tr>`).join("");
+    salesData = null;
+  }catch(e){ $("spMsg").textContent = "Not connected: " + e.message; }
+};
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
   $("ssNote").style.display = "";
@@ -1204,6 +1364,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
+  if(b.dataset.view==="sales" && !salesData) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
   if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");
@@ -1224,6 +1385,13 @@ function setHeader(){
   $("towerFinance").toggleAttribute("aria-current", !inv); $("towerInventory").toggleAttribute("aria-current", inv);
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
+  if (v.id === "sales"){
+    $("title").textContent = "Sales · Simphony · all restaurants";
+    $("period").textContent = salesData && salesData.available
+      ? `${salesData.period.label} · ${salesData.period.from} → ${salesData.period.to} · against ${salesData.prior.from} → ${salesData.prior.to}`
+      : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";
+    return;
+  }
   $("title").textContent = `${v.label} · ${m.company}${m.dimension ? " · " + m.dimension : ""}`;
   const ss = data.stockSummary;
   $("period").textContent = inv && ss && ss.available
