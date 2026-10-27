@@ -434,6 +434,10 @@ def sales_screen(anchor, mode):
     c_from, c_to, p_from, p_to, *_rest, running, label, method = periods(anchor, mode)
     t0 = time.time()
     locs = [l for l in simphony.locations() if l.get("active", True)]
+    fallback = (store.get_settings().get("group") or {}).get("reporting_currency") or "ALL"
+    for l in locs:
+        l["currency_given"] = bool(l["currency"])
+        l["currency"] = l["currency"] or fallback
     mapping = simphony.loc_map()
     latest = {}
     for loc, (value, err) in in_parallel_jobs({l["locRef"]: (lambda r=l["locRef"]: _latest(r)) for l in locs}).items():
@@ -445,6 +449,14 @@ def sales_screen(anchor, mode):
             out.append(d.isoformat())
             d += timedelta(days=1)
         return out
+    # Like for like: the current period stops at the last business day Simphony has
+    # closed, so the period before is cut to the same number of days.
+    closed = [v for v in latest.values() if v]
+    if closed:
+        last_closed = date.fromisoformat(max(closed))
+        if last_closed < c_to:
+            c_to = max(c_from, last_closed)
+            p_to = min(p_to, p_from + (c_to - c_from))
     cur_days, prev_days = dates(c_from, c_to), dates(p_from, p_to)
     jobs = {}
     for l in locs:
@@ -517,7 +529,12 @@ def sales_screen(anchor, mode):
                       "entered at the POS (gstCnt), so they are only as good as the entry.",
             "open": "Checks rung on the day and still open: sales that are not yet final.",
             "currency": "Each location reports in its own currency; totals are kept apart by currency "
-                        "and never converted.",
+                        "and never converted. Where Simphony gives no currency for a location, the tower's "
+                        "default currency is assumed.",
+            "period": "The current period stops at the last business day Simphony has closed, and the "
+                      "period before is cut to the same number of days, so the comparison is like for like.",
+            "guests": "Average per guest is only meaningful where covers are entered at the POS; the "
+                      "screen shows how many checks carry a guest count.",
         },
     }
 

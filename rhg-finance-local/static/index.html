@@ -1057,7 +1057,8 @@ function renderSales(){
     k("Checks", fmt(t.cur.checks), `${fmt(t.prev.checks)} in the period before`),
     k("Guests", fmt(t.cur.guests), `${fmt(t.prev.guests)} in the period before`),
     k("Average check", fmt(t.avg_check), `${C} net per check`),
-    k("Per guest", fmt(t.avg_guest), `${C} net per guest`),
+    k("Per guest", fmt(t.avg_guest), t.cur.checks && t.cur.guests < t.cur.checks
+      ? `${C} · covers entered on few checks, read with care` : `${C} net per guest`),
     k("Discounts", fmt(t.cur.discounts), `${C} · ${t.cur.gross ? fmt(t.cur.discounts/t.cur.gross*100,1) : "–"}% of gross`),
   ].join("");
   $("slLocNote").textContent = `${d.locations.length} restaurant(s) with sales.` +
