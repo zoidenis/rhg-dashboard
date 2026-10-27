@@ -535,7 +535,7 @@ function render(){
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
   if(!spLoaded) loadSimphony();
-  if($("v-sales").classList.contains("on") && !salesData) loadSales();
+  if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
     if (!(data.inventory||{}).loaded) loadInventory();
@@ -1028,7 +1028,7 @@ async function loadSales(refresh){
       first = false;
       const j = await readJSON(r);
       if(!r.ok) throw new Error(j.error || "failed");
-      if(!j.pending){ salesData = j; renderSales(); break; }
+      if(!j.pending){ salesData = j; salesData._q = params(); renderSales(); break; }
       const s = Math.round((Date.now() - me.started)/1000);
       $("slNote").textContent = `Reading the daily totals from Simphony… ${s}s. The first read of a period is one call per restaurant and day; later reads come from the local file.`;
       await new Promise(res => setTimeout(res, 4000));
@@ -1047,15 +1047,16 @@ function renderSales(){
     ["slKpis","slLoc","slDays","slCtl"].forEach(id => $(id).innerHTML = ""); return;
   }
   const C = d.currency || "ALL", t = (d.totals||{})[C] || {cur:{}, prev:{}};
+  const base = (d.prior && d.prior.label) || "the period before";
   const chip = v => v==null ? "" : `<span class="chip ${v>=0?"down":"up"}">${v>=0?"+":""}${fmt(v,1)}%</span>`;
   $("slNote").textContent = `${d.period.label} · ${d.period.from} to ${d.period.to}, against ${d.prior.from} to ${d.prior.to}` +
     `${d.errors.length ? ` · ${d.errors.length} read(s) failed` : ""}`;
   const k = (l, v, s) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   const others = Object.keys(d.totals||{}).filter(c => c !== C);
   $("slKpis").innerHTML = [
-    k("Net sales", fmt(t.cur.net), `${C} ${chip(t.change_pct)} vs ${fmt(t.prev.net)} before`),
-    k("Checks", fmt(t.cur.checks), `${fmt(t.prev.checks)} in the period before`),
-    k("Guests", fmt(t.cur.guests), `${fmt(t.prev.guests)} in the period before`),
+    k("Net sales", fmt(t.cur.net), `${C} ${chip(t.change_pct)} vs ${fmt(t.prev.net)}, ${esc(base)}`),
+    k("Checks", fmt(t.cur.checks), `${fmt(t.prev.checks)}, ${esc(base)}`),
+    k("Guests", fmt(t.cur.guests), `${fmt(t.prev.guests)}, ${esc(base)}`),
     k("Average check", fmt(t.avg_check), `${C} net per check`),
     k("Per guest", fmt(t.avg_guest), t.cur.checks && t.cur.guests < t.cur.checks
       ? `${C} · covers entered on few checks, read with care` : `${C} net per guest`),
@@ -1063,7 +1064,7 @@ function renderSales(){
   ].join("");
   $("slLocNote").textContent = `${d.locations.length} restaurant(s) with sales.` +
     (others.length ? ` Restaurants reporting in ${others.join(", ")} are listed but kept out of the ${C} totals.` : "");
-  $("slLoc").innerHTML = `<tr><th>Restaurant</th><th>BC</th><th class="num">Net sales</th><th class="num">Before</th><th class="num">Change</th>
+  $("slLoc").innerHTML = `<tr><th>Restaurant</th><th>BC</th><th class="num">Net sales</th><th class="num">${d.prior.label === "same dates last year" ? "Last year" : "Before"}</th><th class="num">Change</th>
     <th class="num">Checks</th><th class="num">Guests</th><th class="num">Avg check</th><th class="num">Per guest</th><th class="num">Days</th></tr>` +
     d.locations.map(l => `<tr><td class="name">${esc(l.name)} <span class="meta">${esc(l.locRef)}${l.currency&&l.currency!==C?" · "+esc(l.currency):""}</span></td>
       <td class="meta">${esc(l.bc||"")}</td><td class="num"><b>${fmt(l.cur.net)}</b></td><td class="num">${fmt(l.prev.net)}</td>
@@ -1372,7 +1373,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
-  if(b.dataset.view==="sales" && !salesData) loadSales();
+  if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
   if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");

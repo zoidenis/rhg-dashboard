@@ -426,12 +426,16 @@ def _latest(loc_ref):
     return value
 
 
-def sales_screen(anchor, mode):
-    """Net sales, checks and guests by location from Simphony, against the period before."""
+def sales_screen(anchor, mode, compare="prior"):
+    """Net sales, checks and guests by location from Simphony, against the period before
+    or the same dates last year."""
     if not simphony.info()["configured"]:
         return {"available": False, "configured": False,
                 "error": "The Simphony connection is not set. Fill it in under Settings → Simphony sales."}
-    c_from, c_to, p_from, p_to, *_rest, running, label, method = periods(anchor, mode)
+    c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, method = periods(anchor, mode)
+    if compare == "last_year":
+        p_from, p_to = ly_from, ly_to
+        method = "Same dates of the previous year."
     t0 = time.time()
     locs = [l for l in simphony.locations() if l.get("active", True)]
     fallback = (store.get_settings().get("group") or {}).get("reporting_currency") or "ALL"
@@ -518,7 +522,8 @@ def sales_screen(anchor, mode):
     return {
         "available": True, "configured": True,
         "period": {"from": c_from.isoformat(), "to": c_to.isoformat(), "label": label, "running": running},
-        "prior": {"from": p_from.isoformat(), "to": p_to.isoformat(), "method": method},
+        "prior": {"from": p_from.isoformat(), "to": p_to.isoformat(), "method": method,
+                  "label": "same dates last year" if compare == "last_year" else "the period before"},
         "locations": rows, "totals": totals, "currency": main_currency,
         "days": sorted(by_day.values(), key=lambda d: d["date"]),
         "errors": errors, "calls": len(jobs), "ms": int((time.time() - t0) * 1000),
@@ -557,10 +562,11 @@ def in_parallel_jobs(jobs, workers=6):
 _sales_jobs, _sales_lock = {}, threading.Lock()
 
 
-def sales_request(anchor, mode, refresh=False):
+def sales_request(anchor, mode, refresh=False, compare="prior"):
     """Runs the Simphony read in the background, like the inventory: the first read of a
     period is one call per location and day, which can outlast the proxy."""
-    key = (anchor or "", mode or "month")
+    compare = "last_year" if compare == "last_year" else "prior"
+    key = (anchor or "", mode or "month", compare)
     now = time.time()
     with _sales_lock:
         job = _sales_jobs.get(key)
@@ -575,7 +581,7 @@ def sales_request(anchor, mode, refresh=False):
 
     def run():
         try:
-            result = sales_screen(anchor, mode)
+            result = sales_screen(anchor, mode, compare)
             state = {"state": "done", "result": result}
         except simphony.SimphonyError as exc:
             state = {"state": "failed", "error": str(exc)}
@@ -1132,7 +1138,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
             elif url.path == "/api/sales":
-                self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1"))
+                self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1",
+                                              q.get("compare") or "prior"))
             elif url.path == "/api/simphony/status":
                 self._send(200, simphony.info())
             elif url.path == "/api/inventory":
