@@ -3,7 +3,7 @@
    and survives a dropped connection. Everything under /api/ is deliberately
    NOT cached: this application reports financial figures, and a stale number
    shown as current is exactly the error it exists to prevent. */
-const CACHE = "rhg-shell-v1";
+const CACHE = "rhg-shell-v2";
 const SHELL = ["/app.css", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", e => {
@@ -30,8 +30,14 @@ self.addEventListener("fetch", e => {
   if (SHELL.includes(url.pathname)) {
     e.respondWith(
       fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-        return res;
+        if (!res.ok) return res;
+        // Clone while the network response is still unread. The page can start
+        // consuming `res` as soon as respondWith returns it.
+        const cached = res.clone();
+        return caches.open(CACHE)
+          .then(c => c.put(e.request, cached))
+          .catch(() => {})
+          .then(() => res);
       }).catch(() => caches.match(e.request).then(hit => hit || Response.error()))
     );
   }

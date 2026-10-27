@@ -1192,7 +1192,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"smtp": notify.smtp_info(), "settings": store.get_settings()["notifications"],
                                  "recipients": notifier.recipients(), "companies": notifier.companies(),
                                  "next_run": notifier.next_run(), "runs": notify.recent_runs(),
+                                 "test": notifier.test_status(user["username"]),
                                  "me": (user or {}).get("email") or ""})
+            elif url.path == "/api/notify/test":
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role cannot send email tests."})
+                else:
+                    job = notifier.test_status(user["username"], q.get("id"))
+                    self._send(200 if job else 404, job or {
+                        "error": "Email test not found. The server may have restarted. "
+                                 "Check email history and your inbox before sending again."})
             elif url.path == "/api/notify/preview":
                 try:
                     body = notifier.preview(q.get("company") or notifier.companies()[0])
@@ -1276,7 +1285,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, {"error": f"Not an email address: {', '.join(bad)[:120]}"})
                     return
                 company = body.get("company") or notifier.companies()[0]
-                self._send(200, notifier.send(company, test=True, only_to=to or None, actor=actor))
+                self._send(202, notifier.start_test(company, only_to=to or None, actor=actor))
             else:
                 self._send(404, {"error": "Not found"})
         except ValueError as exc:

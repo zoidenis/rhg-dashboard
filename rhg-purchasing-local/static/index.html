@@ -1598,11 +1598,65 @@ $("saveSettings").onclick = async () => {
 };
 // ---------- email notifications ----------
 let ntStatus = null;
+let ntTestId = null, ntTestTimer = null, ntStarting = false;
+async function notifyRequest(url, options = {}){
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try{
+    const r = await fetch(url, {...options, signal: controller.signal,
+      headers: {Accept:"application/json", ...(options.headers || {})}});
+    let message;
+    if(r.status === 401 || r.redirected) message = "Your session has expired. Sign in again.";
+    else if([502,503,504].includes(r.status)) message = `The email service is unavailable (HTTP ${r.status}).`;
+    let j;
+    if(!message){
+      try{ j = await r.json(); }catch(e){
+        message = `The server returned an unexpected response (HTTP ${r.status}). Refresh the page and check your session.`;
+      }
+    }
+    if(message || !j || typeof j !== "object" || Array.isArray(j) || !r.ok){
+      const error = new Error(message || (j && j.error) || `Request failed (HTTP ${r.status}).`);
+      error.status = r.status; throw error;
+    }
+    return j;
+  }catch(e){
+    if(e.name === "AbortError") throw new Error("The server took too long to respond.");
+    throw e;
+  }finally{ clearTimeout(timeout); }
+}
+function trackNotifyTest(job){
+  clearTimeout(ntTestTimer);
+  if(job.status === "queued" || job.status === "running"){
+    ntTestId = job.id;
+    $("ntTest").disabled = true;
+    $("ntMsg").textContent = `Reading Business Central and sending for ${job.company}… You can leave this page; the test will continue.`;
+    ntTestTimer = setTimeout(() => pollNotifyTest(job.id), 2000);
+    return;
+  }
+  ntTestId = null;
+  $("ntTest").disabled = !can("settings");
+  const result = job.result || job;
+  $("ntMsg").textContent = result.status === "sent"
+    ? `Test sent to ${(result.to||[]).concat(result.cc||[]).join(", ")}.`
+    : `Not sent: ${result.detail || result.status}`;
+}
+async function pollNotifyTest(id){
+  if(ntTestId !== id) return;
+  try{
+    const job = await notifyRequest("/api/notify/test?id=" + encodeURIComponent(id));
+    if(ntStatus) ntStatus.test = job;
+    trackNotifyTest(job);
+    if(!ntTestId) await loadNotify();
+  }catch(e){
+    $("ntMsg").textContent = `Could not read the email result: ${e.message} Sending may still be in progress. Check email history before retrying.`;
+    if(![401,403,404].includes(e.status)) ntTestTimer = setTimeout(() => pollNotifyTest(id), 5000);
+  }
+}
 async function loadNotify(){
   try{
-    const r = await fetch("/api/notify/status"); const j = await r.json();
-    if(!r.ok) throw new Error(j.error || "failed");
+    const j = await notifyRequest("/api/notify/status");
     ntStatus = j; renderNotify();
+    if(j.test && ["queued","running"].includes(j.test.status)) trackNotifyTest(j.test);
   }catch(e){ $("ntMsg").textContent = "Could not read the notification settings: " + e.message; }
 }
 function renderSmtp(sm){
@@ -1654,6 +1708,7 @@ function renderNotify(){
       : `<tr><td colspan="6" class="empty">No email sent yet.</td></tr>`);
   ["ntSave","ntTest"].forEach(id => { $(id).disabled = !can("settings");
     if(!can("settings")) $(id).title = "Your role cannot change Settings."; });
+  $("ntTest").disabled = !can("settings") || ntStarting || !!ntTestId;
 }
 $("ntSmtpSave").onclick = async () => {
   $("ntSmtpMsg").textContent = "Saving…";
@@ -1662,11 +1717,9 @@ $("ntSmtpSave").onclick = async () => {
       security: $("ntSecurity").value, user: $("ntUser").value,
       from: $("ntFrom").value, public_url: $("ntPublicUrl").value,
       password: $("ntPassword").value, clear_password: $("ntClearPassword").checked};
-    const r = await fetch("/api/notify/smtp", {method:"POST",
+    const j = await notifyRequest("/api/notify/smtp", {method:"POST",
       headers:{"Content-Type":"application/json", "X-Requested-With":"RHG-Purchasing"},
       body:JSON.stringify(payload)});
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || "save failed");
     ntStatus.smtp = j.smtp;
     renderSmtp(j.smtp); renderNotifySummary();
     $("ntSmtpMsg").textContent = j.smtp.configured ? "Saved. You can send a test now." : "Saved. Complete the remaining fields before sending.";
@@ -1680,9 +1733,8 @@ function notifyPatch(){
 $("ntSave").onclick = async () => {
   $("ntMsg").textContent = "Saving…";
   try{
-    const r = await fetch("/api/settings", {method:"POST", headers:{"Content-Type":"application/json"},
+    await notifyRequest("/api/settings", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({notifications: notifyPatch()})});
-    if(!r.ok) throw new Error((await r.json()).error || "save failed");
     $("ntMsg").textContent = "Saved."; await loadNotify();
   }catch(e){ $("ntMsg").textContent = "Could not save: " + e.message; }
 };
@@ -1691,16 +1743,23 @@ $("ntPreview").onclick = () => {
   window.open("/api/notify/preview?company=" + encodeURIComponent(c), "_blank");
 };
 $("ntTest").onclick = async () => {
+  if(ntStarting || ntTestId) return;
+  ntStarting = true;
+  $("ntTest").disabled = true;
   $("ntMsg").textContent = "Reading Business Central and sending…";
   try{
     const c = ($("ntCompanies").value.split(",")[0] || "").trim() || $("company").value;
-    const r = await fetch("/api/notify/test", {method:"POST", headers:{"Content-Type":"application/json"},
+    const job = await notifyRequest("/api/notify/test", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({company: c, to: $("ntTestTo").value})});
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || "failed");
-    $("ntMsg").textContent = j.status === "sent" ? `Test sent to ${(j.to||[]).join(", ")}.` : `Not sent: ${j.detail||j.status}`;
+    if(ntStatus) ntStatus.test = job;
+    trackNotifyTest(job);
+  }catch(e){
+    $("ntMsg").textContent = "Could not start the email test: " + e.message + " Check email history before trying again.";
     await loadNotify();
-  }catch(e){ $("ntMsg").textContent = "Could not send: " + e.message; }
+  }finally{
+    ntStarting = false;
+    $("ntTest").disabled = !can("settings") || !!ntTestId;
+  }
 };
 async function loadAudit(){
   try{
