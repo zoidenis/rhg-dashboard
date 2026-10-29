@@ -48,7 +48,7 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
 .kpi .l{color:var(--sub);font-weight:600;font-size:12.5px}
 .kpi .v{font-size:24px;font-weight:800;margin:7px 0 5px;letter-spacing:-.02em}
 .kpi .s{font-size:12px;color:var(--sub)}
-.up{color:var(--up)}.down{color:var(--down)}
+.up{color:var(--up)}.down{color:var(--down)}.warn{color:var(--warn)}
 .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:15px;margin-bottom:15px}
 @media(max-width:1000px){.grid{grid-template-columns:1fr}}
 @media(max-width:760px){aside{display:none}main{padding:16px}}
@@ -134,6 +134,8 @@ td.num,th.num{text-align:right}
     <button data-view="ap">Accounts payable</button>
     <button data-view="ar">Accounts receivable</button>
     <button data-view="inventory">Inventory</button>
+    <button data-view="recipes">Recipe integrity</button>
+    <button data-view="itemmaster">Item master control</button>
 
     <div class="grp">Planning</div>
     <button data-view="treasury">Cash flow &amp; treasury</button>
@@ -251,6 +253,44 @@ td.num,th.num{text-align:right}
       <button class="mini dark" id="glLoad">Read entries</button>
       <button class="mini" data-drill="gl">Open all</button></div></div>
     <div class="scroll"><table id="glTable"></table></div></div></section>
+
+  <section class="view" id="v-recipes">
+    <div class="card">
+      <div class="card-head"><div><h2>Recipe coverage &amp; integrity</h2>
+        <p class="hint" id="rcNote">Which items need a recipe, which have a valid one, and which sell without one. Business Central is read only.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="date" id="rcFrom"> <span class="meta">to</span> <input type="date" id="rcTo">
+          <button class="mini" data-rcq="30">Last 30 days</button><button class="mini" data-rcq="lastmonth">Last month</button>
+          <button class="mini dark" id="rcRead">Read</button><button class="mini" id="rcXlsx">Excel</button></div></div>
+      <div class="kpis" id="rcKpis"></div>
+      <p class="meta" id="rcStatus"></p>
+    </div>
+    <div class="card"><h2>Coverage by location</h2>
+      <p class="hint">Items sold at each location in the period and the state of their recipe. Click a number to see the items. Coverage = valid / items that require a recipe.</p>
+      <div class="scroll"><table id="rcMatrix"></table></div></div>
+    <div class="card" id="rcDrillCard" style="display:none"><div class="card-head"><h2 id="rcDrillTitle"></h2><button class="mini" id="rcDrillClose">Close</button></div>
+      <div class="scroll"><table id="rcDrill"></table></div></div>
+    <div class="card"><h2>Missing recipes</h2>
+      <p class="hint" id="rcMissHint">Items that need a recipe and have no Assembly BOM, sold or not, most sold first. In Business Central they sell with no ingredient consumption.</p>
+      <div class="scroll"><table id="rcMissing"></table></div></div>
+    <div class="card"><h2>Incomplete and inactive recipes</h2>
+      <p class="hint">A BOM exists but a component is missing or blocked, a quantity is zero, a unit has no conversion or a sub-recipe is broken.</p>
+      <div class="scroll"><table id="rcIncomplete"></table></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" id="rcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-itemmaster">
+    <div class="card">
+      <div class="card-head"><div><h2>Item master control</h2>
+        <p class="hint" id="imNote">Configuration checks on the item cards and recipes, for the items in use in the period of Recipe integrity.</p></div>
+        <div style="display:flex;gap:6px"><button class="mini" id="imRead">Read</button><button class="mini" id="imXlsx">Excel</button></div></div>
+      <div class="kpis" id="imKpis"></div></div>
+    <div class="card"><h2>Checks</h2><p class="hint">Click a check to list its items. An item can fail several checks; each list counts it once.</p>
+      <div class="scroll"><table id="imChecks"></table></div></div>
+    <div class="card" id="imListCard" style="display:none"><div class="card-head"><h2 id="imListTitle"></h2><button class="mini" id="imListClose">Close</button></div>
+      <div class="scroll"><table id="imList"></table></div></div>
+  </section>
 
   <section class="view" id="v-inventory">
     <p class="hint" id="ssNote" style="margin:0 0 12px">Company-wide, at the end of the selected period.</p>
@@ -823,6 +863,7 @@ function renderSettings(){
     <label class="field">Inventory accounts (comma separated)<input id="inv-acc" value="${esc((s.inventory||{}).accounts||"")}" placeholder="e.g. 3121,3126"></label>
     <label class="field">Provision rates by stock class (%)<input id="inv-prov" value="${esc((s.inventory||{}).provision_rates||"")}" placeholder="Slow-moving=25, Non-moving=50"></label>
     <label class="field">Accounts left out of days of inventory<input id="inv-dio" value="${esc((s.inventory||{}).dio_exclude||"")}" placeholder="327, 372"></label>
+    <label class="field">PN item categories (recipe required)<input id="inv-pn" value="${esc((s.inventory||{}).pn_categories||"")}" placeholder="PRODUKT I NDERMJETEM"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
     <label class="field">Exchange rates<input id="gr-rates" value="${esc((s.group||{}).rates||"")}" placeholder="EUR=100"></label>
@@ -845,7 +886,7 @@ $("saveSettings").onclick = async ()=>{
   try{
     const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({thresholds,owners,budget:{name:$("bg-name").value},period_closed_before:$("closed").value,
-        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value},
+        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value, pn_categories:$("inv-pn").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -1213,6 +1254,140 @@ $("arTest").onclick = async () => {
 };
 $("arPreview").onclick = () => window.open("/api/arap-notify/preview", "_blank", "noopener");
 $("arPdf").onclick = () => window.open("/api/arap-notify/pdf", "_blank", "noopener");
+
+// ---------- recipe integrity and item master control ----------
+let rcData = null, rcTimer = null;
+const RC_ORDER = ["VALID","MISSING","INCOMPLETE","INACTIVE","PENDING REVIEW","NOT REQUIRED"];
+const RC_PILL = {VALID:"ok", MISSING:"critical", INCOMPLETE:"critical", INACTIVE:"warning", "PENDING REVIEW":"warning", "NOT REQUIRED":"info"};
+const rcIso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function rcQuick(kind){
+  const t = new Date(); let a, b = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  if (kind === "lastmonth") { a = new Date(t.getFullYear(), t.getMonth() - 1, 1); b = new Date(t.getFullYear(), t.getMonth(), 0); }
+  else a = new Date(b.getFullYear(), b.getMonth(), b.getDate() - 29);
+  $("rcFrom").value = rcIso(a); $("rcTo").value = rcIso(b); loadRecipes(false);
+}
+document.querySelectorAll("[data-rcq]").forEach(b => b.onclick = () => rcQuick(b.dataset.rcq));
+const rcQs = () => new URLSearchParams({company: $("company").value || "", from: $("rcFrom").value, to: $("rcTo").value}).toString();
+async function loadRecipes(refresh){
+  clearTimeout(rcTimer);
+  $("rcStatus").textContent = "Reading…"; $("imNote").textContent = "Reading…";
+  try{
+    const j = await readJSON(await fetch("/api/recipes?" + rcQs() + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      const g = j.progress || {};
+      $("rcStatus").textContent = $("imNote").textContent = `${j.note} ${g.stage || ""}${g.total ? ` · ${g.done} of ${g.total} months` : ""}.`;
+      rcTimer = setTimeout(() => loadRecipes(false), 4000); return;
+    }
+    if (j.available === false) throw new Error(j.error);
+    rcData = j; renderRecipes(); renderItemMaster();
+  }catch(e){ $("rcStatus").textContent = $("imNote").textContent = "Could not read: " + e.message; }
+}
+$("rcRead").onclick = () => loadRecipes(true);
+$("imRead").onclick = () => loadRecipes(true);
+$("rcXlsx").onclick = $("imXlsx").onclick = () => { location.href = "/api/recipes/xlsx?" + rcQs(); };
+$("rcDrillClose").onclick = () => { $("rcDrillCard").style.display = "none"; };
+$("imListClose").onclick = () => { $("imListCard").style.display = "none"; };
+const rcPill = st => `<span class="rhg-pill ${RC_PILL[st] || "info"}">${esc(st.toLowerCase())}</span>`;
+function rcTrackBtn(i, loc){
+  const key = `inv-recipe-${i.status.toLowerCase().replace(" ", "-")}-${rcData.company}-${i.item}`;
+  const done = (data && data.action_keys || []).includes(key);
+  return `<button class="mini" data-rctrack="${esc(i.item)}" data-rckey="${esc(key)}" ${done || !can("actions") ? "disabled" : ""}>${done ? "Tracked" : "Track"}</button>`;
+}
+function rcItemRows(list, max){
+  return list.slice(0, max).map(i => `<tr><td><b>${esc(i.item)}</b> ${esc(i.desc)}</td><td>${rcPill(i.status)}</td><td class="meta">${esc(i.policy)} · ${esc(i.category)}${i.pn ? " · PN" : ""}</td>
+    <td class="num">${fmt(i.qty_sold)}</td><td class="num">${fmt(i.sale_entries)}</td><td class="meta">${esc(i.last_sale || "–")}</td>
+    <td class="num">${i.components || "–"}</td><td class="num">${i.recipe_cost == null ? "–" : fmt(i.recipe_cost, 2)}</td>
+    <td class="meta">${esc((i.issues || []).slice(0, 3).join("; "))}${(i.issues || []).length > 3 ? ` … +${i.issues.length - 3}` : ""}</td><td class="meta">${esc((i.locations || []).join(", "))}</td><td>${rcTrackBtn(i)}</td></tr>`).join("");
+}
+const RC_HEAD = `<tr><th>Item</th><th>Status</th><th>Policy · category</th><th class="num">Qty sold</th><th class="num">Sale entries</th><th>Last sale</th><th class="num">Components</th><th class="num">Recipe cost</th><th>Issues</th><th>Locations</th><th></th></tr>`;
+function renderRecipes(){
+  const d = rcData; if (!d) return;
+  const k = d.kpis, cov = k.coverage;
+  const covCls = cov == null ? "" : cov < 95 ? "up" : cov < 98 ? "warn" : "down";
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("rcKpis").innerHTML =
+    card("Recipe coverage", cov == null ? "–" : fmt(cov, 1) + "%", `${fmt(k.valid)} valid of ${fmt(k.required)} sold items that need one · target 98%`, covCls) +
+    card("Missing recipes, sold", fmt(k.missing), `${fmt(k.missing_sold_qty)} units sold with no consumption`, k.missing ? "up" : "") +
+    card("Incomplete or inactive, sold", fmt(k.incomplete + k.inactive), `${fmt(k.incomplete_sold_qty)} units sold on a broken recipe`, (k.incomplete + k.inactive) ? "warn" : "") +
+    card("Assemble-to-Order without a BOM", fmt(k.ato_without_bom), `of ${fmt(k.ato)} Assemble-to-Order items, sold or not`) +
+    card("Items sold in the period", fmt(k.sold_items), `${fmt(k.not_required)} sold as purchased · ${fmt(k.pending_review)} pending review`) +
+    card("PN items", fmt(k.pn), `category rule: ${esc((d.pn_rule || []).join(", "))} (to confirm)`);
+  $("rcStatus").textContent = `${d.period.from} to ${d.period.to} · item cards and recipes read ${d.master_read_at || "–"} · checked ${d.checked_at}${(d.errors || []).length ? " · " + d.errors.join("; ") : ""} · Verified: item cards, BOMs, sales · Derived: status, coverage, recipe cost`;
+  $("rcNote").textContent = `${d.company} · ${d.period.from} to ${d.period.to}`;
+  const cols = ["VALID","MISSING","INCOMPLETE","INACTIVE","PENDING REVIEW","NOT REQUIRED"];
+  const total = {sold_items: 0, required: 0}; cols.forEach(c => total[c] = 0);
+  d.coverage.forEach(c => { total.sold_items += c.sold_items; total.required += c.required; cols.forEach(x => total[x] += c[x]); });
+  const cell = (loc, st, n) => n ? `<a href="#" data-rcloc="${esc(loc)}" data-rcst="${esc(st)}">${fmt(n)}</a>` : "0";
+  $("rcMatrix").innerHTML = `<tr><th>Location</th><th class="num">Items sold</th><th class="num">Recipe required</th>${cols.map(c => `<th class="num">${c.toLowerCase()}</th>`).join("")}<th class="num">Coverage</th></tr>` +
+    d.coverage.map(c => `<tr><td><b>${esc(c.location)}</b></td><td class="num">${cell(c.location, "*", c.sold_items)}</td><td class="num">${fmt(c.required)}</td>${cols.map(x => `<td class="num">${cell(c.location, x, c[x])}</td>`).join("")}
+      <td class="num"><span class="${c.coverage == null ? "" : c.coverage < 95 ? "up" : c.coverage < 98 ? "warn" : "down"}">${c.coverage == null ? "–" : fmt(c.coverage, 1) + "%"}</span></td></tr>`).join("") +
+    `<tr class="total"><td>All locations (an item sold at several counts once per location)</td><td class="num">${fmt(total.sold_items)}</td><td class="num">${fmt(total.required)}</td>${cols.map(x => `<td class="num">${fmt(total[x])}</td>`).join("")}<td class="num">${total.required ? fmt(total.VALID / total.required * 100, 1) + "%" : "–"}</td></tr>`;
+  $("rcMissHint").textContent = `${fmt(d.missing.length)} items need a recipe and have no Assembly BOM, most sold first. In Business Central they sell with no ingredient consumption. Showing ${fmt(Math.min(300, d.missing.length))}; the Excel file has all.`;
+  $("rcMissing").innerHTML = RC_HEAD + (rcItemRows(d.missing, 300) || `<tr><td colspan="11" class="meta">None.</td></tr>`);
+  $("rcIncomplete").innerHTML = RC_HEAD + (rcItemRows(d.incomplete, 300) || `<tr><td colspan="11" class="meta">None.</td></tr>`);
+  $("rcDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-rcloc]");
+  if (a) {
+    e.preventDefault();
+    const loc = rcData.coverage.find(c => c.location === a.dataset.rcloc), st = a.dataset.rcst;
+    const rows = loc.rows.filter(r => st === "*" || r[1] === st).sort((x, y) => y[2] - x[2]);
+    const byItem = {}; [...rcData.missing, ...rcData.incomplete].forEach(i => byItem[i.item] = i);
+    $("rcDrillTitle").textContent = `${loc.location} · ${st === "*" ? "all items sold" : st.toLowerCase()} · ${fmt(rows.length)} items`;
+    $("rcDrill").innerHTML = `<tr><th>Item</th><th>Status</th><th class="num">Qty sold here</th><th class="num">Sale entries</th><th>Last sale</th><th>Issues</th><th></th></tr>` +
+      rows.slice(0, 500).map(([it, s, q, n, last]) => { const i = byItem[it];
+        return `<tr><td><b>${esc(it)}</b> ${esc(rcData.names[it] || "")}</td><td>${rcPill(s)}</td><td class="num">${fmt(q)}</td><td class="num">${fmt(n)}</td><td class="meta">${esc(last || "")}</td>
+          <td class="meta">${esc(i ? (i.issues || []).slice(0, 3).join("; ") : "")}</td><td>${i ? rcTrackBtn(i) : ""}</td></tr>`; }).join("") +
+      (rows.length > 500 ? `<tr><td colspan="7" class="meta">Showing 500 of ${fmt(rows.length)}; the Excel file has all.</td></tr>` : "");
+    $("rcDrillCard").style.display = ""; $("rcDrillCard").scrollIntoView({behavior: "smooth", block: "start"});
+    return;
+  }
+  const t = e.target.closest("[data-rctrack]");
+  if (t) {
+    const i = [...rcData.missing, ...rcData.incomplete].find(x => x.item === t.dataset.rctrack); if (!i) return;
+    createAction({title: `${i.status === "MISSING" ? "Missing recipe" : "Recipe " + i.status.toLowerCase()}: ${i.item} ${i.desc}`,
+      description: `${i.status}: ${(i.issues || []).join("; ")}\nSold ${fmt(i.qty_sold)} units (${fmt(i.sale_entries)} entries) between ${rcData.period.from} and ${rcData.period.to} at ${(i.locations || []).join(", ") || "no location"}.\nRequirement: ${i.why}.`,
+      source_exception: t.dataset.rckey, company: rcData.company, location: (i.locations || []).join(", "),
+      priority: i.qty_sold ? "High" : "Medium", impact: 0, document_type: "Assembly BOM", bc_document: i.item});
+  }
+  const c = e.target.closest("[data-imcheck]");
+  if (c) {
+    e.preventDefault();
+    const key = c.dataset.imcheck, rows = rcData.checks[key] || [];
+    $("imListTitle").textContent = `${IM_LABEL[key] || key} · ${fmt(rcData.check_counts[key])} items`;
+    $("imList").innerHTML = `<tr><th>Item</th><th>Description</th><th>Detail</th></tr>` + rows.slice(0, 500).map(([it, desc, note]) =>
+      `<tr><td><b>${esc(it)}</b></td><td>${esc(desc)}</td><td class="meta">${esc(note)}</td></tr>`).join("") +
+      (rcData.check_counts[key] > 500 ? `<tr><td colspan="3" class="meta">Showing 500; the Excel file has up to 1,000.</td></tr>` : "");
+    $("imListCard").style.display = ""; $("imListCard").scrollIntoView({behavior: "smooth", block: "start"});
+  }
+});
+const IM_LABEL = {
+  ato_without_bom: "Assemble-to-Order without an Assembly BOM", blocked_sold: "Blocked item still sold",
+  blocked_in_recipes: "Blocked item used in a sold recipe", zero_cost_in_use: "Zero unit cost on an item in use",
+  cost_far_from_last_direct: "Unit cost over 3× away from the last direct cost", unit_no_conversion: "Purchase or sales unit without a conversion",
+  no_base_unit: "No base unit of measure", no_category: "No item category", no_inventory_group: "No inventory posting group",
+  no_product_group: "No general product posting group"};
+const IM_SEV = {ato_without_bom: "critical", blocked_sold: "critical", blocked_in_recipes: "critical", zero_cost_in_use: "warning",
+  cost_far_from_last_direct: "warning", unit_no_conversion: "critical", no_base_unit: "critical", no_category: "info", no_inventory_group: "warning", no_product_group: "warning"};
+function renderItemMaster(){
+  const d = rcData; if (!d) return;
+  const n = d.check_counts, k = d.kpis;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const crit = Object.keys(n).filter(x => IM_SEV[x] === "critical").reduce((s, x) => s + n[x], 0);
+  $("imNote").textContent = `${d.company} · ${fmt(k.items)} item cards (${fmt(k.active_items)} active inventory items) · in use = sold or a component of a sold recipe, ${d.period.from} to ${d.period.to}`;
+  $("imKpis").innerHTML = card("Critical configuration issues", fmt(crit), "missing BOMs, blocked items in use, units without conversion", crit ? "up" : "") +
+    card("Blocked but in use", fmt(n.blocked_sold + n.blocked_in_recipes), `${fmt(n.blocked_sold)} sold · ${fmt(n.blocked_in_recipes)} in sold recipes`, (n.blocked_sold + n.blocked_in_recipes) ? "up" : "") +
+    card("Costing to review", fmt(n.zero_cost_in_use + n.cost_far_from_last_direct), `${fmt(n.zero_cost_in_use)} zero cost in use · ${fmt(n.cost_far_from_last_direct)} far from last direct cost`) +
+    card("Missing master data", fmt(n.no_category + n.no_inventory_group + n.no_product_group + n.no_base_unit), "category, posting groups or base unit") +
+    card("Menu Item Number", "Mapping required", "No such field in Business Central; the link to Simphony menu items is still to be verified");
+  $("imChecks").innerHTML = `<tr><th>Check</th><th>Severity</th><th class="num">Items</th></tr>` +
+    Object.keys(IM_LABEL).map(x => `<tr><td>${n[x] ? `<a href="#" data-imcheck="${x}">${esc(IM_LABEL[x])}</a>` : esc(IM_LABEL[x])}</td>
+      <td><span class="rhg-pill ${IM_SEV[x]}">${IM_SEV[x]}</span></td><td class="num">${fmt(n[x])}</td></tr>`).join("") +
+    `<tr><td class="meta">Duplicate Menu Item Numbers, one menu item on several items</td><td><span class="rhg-pill info">mapping required</span></td><td class="num">–</td></tr>` +
+    `<tr><td class="meta">Date a recipe was last changed</td><td><span class="rhg-pill info">not available</span></td><td class="num">–</td></tr>`;
+}
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
   $("ssNote").style.display = "";
@@ -1449,6 +1624,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
+  if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();

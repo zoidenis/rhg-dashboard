@@ -24,6 +24,7 @@ import memuse
 import executive
 import finance
 import inventory
+import recipes
 import simphony
 import store
 import treasury
@@ -1176,6 +1177,32 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/arap-notify/preview":
                 company = q.get("company") or arap.companies()[0]
                 self._send(200, arap.preview(company).encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path in ("/api/recipes", "/api/recipes/xlsx"):
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    r = recipes.request(client, company, q.get("from"), q.get("to"),
+                                        q.get("refresh") == "1" and url.path == "/api/recipes")
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                if url.path == "/api/recipes":
+                    self._send(200, r)
+                elif r.get("pending") or r.get("available") is False:
+                    self._send(409, {"error": "The report is still being read; try again in a moment."})
+                else:
+                    body = recipes.render_xlsx(r)
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                                     f'recipes_{r["period"]["from"]}_{r["period"]["to"]}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
             elif url.path == "/api/simphony/status":
                 self._send(200, simphony.info())
             elif url.path == "/api/inventory":
