@@ -170,6 +170,25 @@ def sales(company, a, b):
 
 
 # ---------------------------------------------------------------- the analysis
+def technical_matcher(settings):
+    """POS technical items (course markers, price fillers, modifiers) that are not products.
+    Settings → inventory.pos_technical_items: item numbers or descriptions; a trailing * means
+    'starts with'. Case does not matter."""
+    text = (settings.get("inventory") or {}).get("pos_technical_items") or ""
+    exact, prefix = set(), []
+    for part in text.split(","):
+        part = part.strip().upper()
+        if not part:
+            continue
+        (prefix.append(part[:-1].strip()) if part.endswith("*") else exact.add(part))
+    prefix = tuple(p for p in prefix if p)
+
+    def match(item, desc):
+        i, d = (item or "").upper(), (desc or "").strip().upper()
+        return i in exact or d in exact or (bool(prefix) and (i.startswith(prefix) or d.startswith(prefix)))
+    return match
+
+
 def _pn_categories(settings):
     text = (settings.get("inventory") or {}).get("pn_categories") or "PRODUKT I NDERMJETEM"
     return {c.strip().upper() for c in text.split(",") if c.strip()}
@@ -184,6 +203,7 @@ def analyse(m, sold, settings, period):
         lines.setdefault(parent, []).append({"line": line_no, "type": typ, "no": no, "desc": desc,
                                              "nested": nested, "qty": qty, "unit": unit.upper()})
     pn = _pn_categories(settings)
+    technical = technical_matcher(settings)
 
     def per_base(item, unit):
         card = items.get(item) or {}
@@ -211,7 +231,8 @@ def analyse(m, sold, settings, period):
         for l in comps:
             comp = items.get(l["no"])
             if comp is None:
-                issues.append(f"component {l['no']} is not in the item list")
+                issues.append("a BOM line has no item number" if not l["no"]
+                              else f"component {l['no']} is not in the item list")
                 cost = None
                 continue
             if l["qty"] <= 0:
@@ -245,6 +266,8 @@ def analyse(m, sold, settings, period):
         if card is None:
             return "PENDING REVIEW", "the item is not in the item list"
         policy = card.get("Assembly_Policy") or ""
+        if technical(item, card.get("Description")):
+            return "NOT REQUIRED", "POS technical item (list in Settings), not a product"
         if policy == "Assemble-to-Order":
             return "required", "Assemble-to-Order"
         if (card.get("Replenishment_System") or "") == "Assembly":
@@ -253,6 +276,9 @@ def analyse(m, sold, settings, period):
             return "required", "has an Assembly BOM"
         if str(card.get("Item_Category_Code") or "").upper() in pn:
             return "required", "PN item (category rule in Settings)"
+        if float(card.get("Unit_Cost") or 0) <= 0:
+            return "PENDING REVIEW", "set up as sold as purchased but has no unit cost: with no recipe and " \
+                                     "no cost it sells with no consumption (a combo or menu item without a recipe?)"
         return "NOT REQUIRED", f"sold as purchased ({policy or 'no policy'}, replenished by " \
                                f"{card.get('Replenishment_System') or 'purchase'})"
 
@@ -309,6 +335,8 @@ def analyse(m, sold, settings, period):
                          key=lambda i: (-i["qty_sold"], i["item"]))
     incomplete = sorted((i for i in info.values() if i["status"] in ("INCOMPLETE", "INACTIVE")),
                         key=lambda i: (-i["qty_sold"], i["item"]))
+    pending = sorted((i for i in info.values() if i["status"] == "PENDING REVIEW" and i["sale_entries"]),
+                     key=lambda i: (-i["qty_sold"], i["item"]))
 
     # ---- item master control
     used_in_sold = {}
@@ -341,12 +369,13 @@ def analyse(m, sold, settings, period):
                     if u and u != base and (it, u) not in uom:
                         checks["unit_no_conversion"].append([it, desc, f"{label} unit {u}, base {base}"])
             uc, ld = float(card.get("Unit_Cost") or 0), float(card.get("Last_Direct_Cost") or 0)
-            if in_use and uc <= 0 and card.get("Assembly_Policy") != "Assemble-to-Order":
+            is_tech = technical(it, desc)
+            if in_use and uc <= 0 and card.get("Assembly_Policy") != "Assemble-to-Order" and not is_tech:
                 checks["zero_cost_in_use"].append([it, desc, "sold" if sold_q else "used in a sold recipe"])
             if (card.get("Replenishment_System") or "") == "Purchase" and uc > 0 and ld > 0 and \
                     (uc > ld * 3 or uc < ld / 3):
                 checks["cost_far_from_last_direct"].append([it, desc, f"unit cost {uc:,.2f}, last direct {ld:,.2f}"])
-            if card.get("Assembly_Policy") == "Assemble-to-Order" and not lines.get(it):
+            if card.get("Assembly_Policy") == "Assemble-to-Order" and not lines.get(it) and not is_tech:
                 checks["ato_without_bom"].append([it, desc, f"sold {sold_q:,.0f}" if sold_q else "not sold"])
         if card.get("Blocked"):
             if sold_q:
@@ -370,7 +399,7 @@ def analyse(m, sold, settings, period):
                  "missing_sold_qty": round(sum(i["qty_sold"] for i in missing_all), 0),
                  "missing_sale_entries": sum(i["sale_entries"] for i in missing_all),
                  "incomplete_sold_qty": round(sum(i["qty_sold"] for i in incomplete), 0)},
-        "coverage": coverage, "missing": missing_all, "incomplete": incomplete,
+        "coverage": coverage, "missing": missing_all, "incomplete": incomplete, "review": pending,
         "checks": {k: v[:1000] for k, v in checks.items()}, "check_counts": counts,
         "names": names, "pn_rule": sorted(pn),
         "master_read_at": m.get("read_at"),
@@ -484,6 +513,9 @@ def render_xlsx(r):
     widths = [12, 40, 18, 16, 5, 12, 60, 11, 16, 10, 11, 11, 30]
     sheet(wb.create_sheet("Missing recipes"), head, item_rows(r["missing"]), widths)
     sheet(wb.create_sheet("Incomplete & inactive"), head, item_rows(r["incomplete"]), widths)
+    sheet(wb.create_sheet("Pending review"), head + ["Reason"],
+          [row + [i["why"]] for row, i in zip(item_rows(r.get("review") or []), r.get("review") or [])],
+          widths + [60])
     rows = []
     for loc in r["coverage"]:
         for it, st, q, n, last in loc["rows"]:
@@ -527,7 +559,11 @@ DEFINITIONS = {
     "incomplete": "INCOMPLETE: the BOM exists but has a zero quantity, a missing or blocked component, a unit "
                   "without conversion, a broken sub-recipe or a circular reference.",
     "inactive": "INACTIVE: the item itself is blocked, or every component is blocked.",
-    "pending": "PENDING REVIEW: the item sold but is not in the item list as read.",
+    "pending": "PENDING REVIEW: the item sold but is not in the item list as read, or it is set up as sold as "
+               "purchased (no recipe needed) yet has no unit cost, which usually means a combo or menu item "
+               "that is missing its recipe.",
+    "technical": "POS technical items listed in Settings (course markers, price fillers, modifiers) are not "
+                 "products and need no recipe.",
     "coverage": "Recipe coverage % = valid / (items sold that require a recipe) x 100, per location on the items "
                 "sold at that location. Business Central keeps one BOM per item, not per location.",
     "cost": "Recipe cost is derived: sum of quantity per x unit conversion x the component's current unit cost. "

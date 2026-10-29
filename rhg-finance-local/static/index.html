@@ -276,6 +276,9 @@ td.num,th.num{text-align:right}
     <div class="card"><h2>Incomplete and inactive recipes</h2>
       <p class="hint">A BOM exists but a component is missing or blocked, a quantity is zero, a unit has no conversion or a sub-recipe is broken.</p>
       <div class="scroll"><table id="rcIncomplete"></table></div></div>
+    <div class="card"><h2>Pending review</h2>
+      <p class="hint">Sold items whose need for a recipe cannot be confirmed. Most are set up as sold as purchased but have no unit cost, which usually means a combo or menu item without a recipe.</p>
+      <div class="scroll"><table id="rcPending"></table></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
       <div class="hint" id="rcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
@@ -864,6 +867,7 @@ function renderSettings(){
     <label class="field">Provision rates by stock class (%)<input id="inv-prov" value="${esc((s.inventory||{}).provision_rates||"")}" placeholder="Slow-moving=25, Non-moving=50"></label>
     <label class="field">Accounts left out of days of inventory<input id="inv-dio" value="${esc((s.inventory||{}).dio_exclude||"")}" placeholder="327, 372"></label>
     <label class="field">PN item categories (recipe required)<input id="inv-pn" value="${esc((s.inventory||{}).pn_categories||"")}" placeholder="PRODUKT I NDERMJETEM"></label>
+    <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
     <label class="field">Exchange rates<input id="gr-rates" value="${esc((s.group||{}).rates||"")}" placeholder="EUR=100"></label>
@@ -886,7 +890,7 @@ $("saveSettings").onclick = async ()=>{
   try{
     const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({thresholds,owners,budget:{name:$("bg-name").value},period_closed_before:$("closed").value,
-        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value, pn_categories:$("inv-pn").value},
+        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value, pn_categories:$("inv-pn").value, pos_technical_items:$("inv-tech").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -1311,7 +1315,8 @@ function renderRecipes(){
     card("Missing recipes, sold", fmt(k.missing), `${fmt(k.missing_sold_qty)} units sold with no consumption`, k.missing ? "up" : "") +
     card("Incomplete or inactive, sold", fmt(k.incomplete + k.inactive), `${fmt(k.incomplete_sold_qty)} units sold on a broken recipe`, (k.incomplete + k.inactive) ? "warn" : "") +
     card("Assemble-to-Order without a BOM", fmt(k.ato_without_bom), `of ${fmt(k.ato)} Assemble-to-Order items, sold or not`) +
-    card("Items sold in the period", fmt(k.sold_items), `${fmt(k.not_required)} sold as purchased · ${fmt(k.pending_review)} pending review`) +
+    card("Pending review, sold", fmt(k.pending_review), "sold as purchased with no unit cost: likely combos or menu items without a recipe", k.pending_review ? "warn" : "") +
+    card("Items sold in the period", fmt(k.sold_items), `${fmt(k.not_required)} need no recipe (sold as purchased or POS technical items)`) +
     card("PN items", fmt(k.pn), `category rule: ${esc((d.pn_rule || []).join(", "))} (to confirm)`);
   $("rcStatus").textContent = `${d.period.from} to ${d.period.to} · item cards and recipes read ${d.master_read_at || "–"} · checked ${d.checked_at}${(d.errors || []).length ? " · " + d.errors.join("; ") : ""} · Verified: item cards, BOMs, sales · Derived: status, coverage, recipe cost`;
   $("rcNote").textContent = `${d.company} · ${d.period.from} to ${d.period.to}`;
@@ -1326,6 +1331,11 @@ function renderRecipes(){
   $("rcMissHint").textContent = `${fmt(d.missing.length)} items need a recipe and have no Assembly BOM, most sold first. In Business Central they sell with no ingredient consumption. Showing ${fmt(Math.min(300, d.missing.length))}; the Excel file has all.`;
   $("rcMissing").innerHTML = RC_HEAD + (rcItemRows(d.missing, 300) || `<tr><td colspan="11" class="meta">None.</td></tr>`);
   $("rcIncomplete").innerHTML = RC_HEAD + (rcItemRows(d.incomplete, 300) || `<tr><td colspan="11" class="meta">None.</td></tr>`);
+  const pend = d.review || [];
+  $("rcPending").innerHTML = `<tr><th>Item</th><th>Policy · category</th><th class="num">Qty sold</th><th class="num">Sale entries</th><th>Last sale</th><th>Why</th><th>Locations</th><th></th></tr>` +
+    (pend.slice(0, 300).map(i => `<tr><td><b>${esc(i.item)}</b> ${esc(i.desc)}</td><td class="meta">${esc(i.policy)} · ${esc(i.category)}</td><td class="num">${fmt(i.qty_sold)}</td>
+      <td class="num">${fmt(i.sale_entries)}</td><td class="meta">${esc(i.last_sale || "–")}</td><td class="meta">${esc(i.why)}</td><td class="meta">${esc((i.locations || []).join(", "))}</td><td>${rcTrackBtn(i)}</td></tr>`).join("")
+      || `<tr><td colspan="8" class="meta">None.</td></tr>`);
   $("rcDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
 }
 document.addEventListener("click", e => {
@@ -1334,7 +1344,7 @@ document.addEventListener("click", e => {
     e.preventDefault();
     const loc = rcData.coverage.find(c => c.location === a.dataset.rcloc), st = a.dataset.rcst;
     const rows = loc.rows.filter(r => st === "*" || r[1] === st).sort((x, y) => y[2] - x[2]);
-    const byItem = {}; [...rcData.missing, ...rcData.incomplete].forEach(i => byItem[i.item] = i);
+    const byItem = {}; [...rcData.missing, ...rcData.incomplete, ...(rcData.review || [])].forEach(i => byItem[i.item] = i);
     $("rcDrillTitle").textContent = `${loc.location} · ${st === "*" ? "all items sold" : st.toLowerCase()} · ${fmt(rows.length)} items`;
     $("rcDrill").innerHTML = `<tr><th>Item</th><th>Status</th><th class="num">Qty sold here</th><th class="num">Sale entries</th><th>Last sale</th><th>Issues</th><th></th></tr>` +
       rows.slice(0, 500).map(([it, s, q, n, last]) => { const i = byItem[it];
@@ -1346,9 +1356,9 @@ document.addEventListener("click", e => {
   }
   const t = e.target.closest("[data-rctrack]");
   if (t) {
-    const i = [...rcData.missing, ...rcData.incomplete].find(x => x.item === t.dataset.rctrack); if (!i) return;
-    createAction({title: `${i.status === "MISSING" ? "Missing recipe" : "Recipe " + i.status.toLowerCase()}: ${i.item} ${i.desc}`,
-      description: `${i.status}: ${(i.issues || []).join("; ")}\nSold ${fmt(i.qty_sold)} units (${fmt(i.sale_entries)} entries) between ${rcData.period.from} and ${rcData.period.to} at ${(i.locations || []).join(", ") || "no location"}.\nRequirement: ${i.why}.`,
+    const i = [...rcData.missing, ...rcData.incomplete, ...(rcData.review || [])].find(x => x.item === t.dataset.rctrack); if (!i) return;
+    createAction({title: `${i.status === "MISSING" ? "Missing recipe" : i.status === "PENDING REVIEW" ? "Recipe to review" : "Recipe " + i.status.toLowerCase()}: ${i.item} ${i.desc}`,
+      description: `${i.status}: ${(i.issues || []).join("; ") || i.why}\nSold ${fmt(i.qty_sold)} units (${fmt(i.sale_entries)} entries) between ${rcData.period.from} and ${rcData.period.to} at ${(i.locations || []).join(", ") || "no location"}.\nRequirement: ${i.why}.`,
       source_exception: t.dataset.rckey, company: rcData.company, location: (i.locations || []).join(", "),
       priority: i.qty_sold ? "High" : "Medium", impact: 0, document_type: "Assembly BOM", bc_document: i.item});
   }

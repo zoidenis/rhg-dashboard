@@ -52,7 +52,10 @@ DEFAULT_SETTINGS = {
                   "dio_exclude": "327, 372",
                   # item categories that make an item a PN (intermediate product, needs a recipe);
                   # an assumption until Finance confirms what PN means
-                  "pn_categories": "PRODUKT I NDERMJETEM"},
+                  "pn_categories": "PRODUKT I NDERMJETEM",
+                  # POS technical items that are not products (no recipe): item numbers or
+                  # descriptions, a trailing * means "starts with"
+                  "pos_technical_items": "FIRE*, 1 LEK*, NO EXTRA*"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses
