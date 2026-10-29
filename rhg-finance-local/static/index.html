@@ -908,6 +908,8 @@ function renderSettings(){
     <label class="field">Seasonal items or categories<input id="inv-seas" value="${esc((s.inventory||{}).seasonal_items||"")}" placeholder="item numbers or categories"></label>
     <label class="field">Perishable categories<input id="inv-per" value="${esc((s.inventory||{}).perishable_categories||"")}" placeholder="e.g. LP"></label>
     <label class="field">Perishable thresholds: monitor, slow, non-moving, dead (days)<input id="inv-perd" value="${esc((s.inventory||{}).perishable_days||"")}" placeholder="7, 14, 30, 60"></label>
+    <label class="field">Movement: locations left out (* = wildcard)<input id="inv-exloc" value="${esc((s.inventory||{}).movement_exclude_locations||"")}" placeholder="*_IM, *_IN, TRANSIT"></label>
+    <label class="field">Movement: categories left out<input id="inv-excat" value="${esc((s.inventory||{}).movement_exclude_categories||"")}" placeholder="INVENTAR I IMET"></label>
     <label class="field">Negative adjustments count as consumption (yes/no)<input id="inv-negadj" value="${esc((s.inventory||{}).count_negative_adjustments||"")}" placeholder="no"></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
@@ -935,7 +937,8 @@ $("saveSettings").onclick = async ()=>{
         inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value, pn_categories:$("inv-pn").value, pos_technical_items:$("inv-tech").value,
                    distribution_locations:$("inv-dist").value, seasonal_items:$("inv-seas").value,
                    perishable_categories:$("inv-per").value, perishable_days:$("inv-perd").value,
-                   count_negative_adjustments:$("inv-negadj").value},
+                   count_negative_adjustments:$("inv-negadj").value,
+                   movement_exclude_locations:$("inv-exloc").value, movement_exclude_categories:$("inv-excat").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -1485,7 +1488,8 @@ function renderMovement(){
     card("Received, never used", fmt(t.received_not_used[1]), `${fmt(t.received_not_used[0])} lines received in the history with no consumption`, t.received_not_used[0] ? "up" : "") +
     card("Negative stock", fmt(t.negative[0]), `lines with a negative quantity · ${fmt(t.negative[1])}`, t.negative[0] ? "up" : "");
   $("mvNote").textContent = `${d.company} · stock as of ${d.as_of} · history ${d.history_days} days from ${d.history_from}`;
-  $("mvStatus").textContent = `${fmt(d.locations_read)} locations read · checked ${d.checked_at}${(d.errors || []).length ? " · " + d.errors.join("; ") : ""} · Verified: quantities, ledger movements · Estimated: value at item unit cost · Derived: classes`;
+  const ex = d.excluded || [], exN = ex.reduce((s, x) => s + x[1], 0), exV = ex.reduce((s, x) => s + x[2], 0);
+  $("mvStatus").textContent = `${ex.length ? `Left out (Settings): ${fmt(exN)} lines, ${fmt(exV)} at ${ex.slice(0, 8).map(x => x[0]).join(", ")}${ex.length > 8 ? " …" : ""} · ` : ""}${fmt(d.locations_read)} locations read · checked ${d.checked_at}${(d.errors || []).length ? " · " + d.errors.join("; ") : ""} · Verified: quantities, ledger movements · Estimated: value at item unit cost · Derived: classes`;
   const cell = (loc, cls, n, v) => n ? `<a href="#" data-mvloc="${esc(loc)}" data-mvcls="${esc(cls)}">${fmt(n)}</a><div class="meta">${fmt(v)}</div>` : "–";
   $("mvLoc").innerHTML = `<tr><th>Location</th><th class="num">Value</th>${MV_CLASSES.map(x => `<th class="num">${x.toLowerCase()}</th>`).join("")}<th class="num">received, never used</th></tr>` +
     d.locations.map(L => `<tr><td><b>${esc(L.location)}</b>${(d.rules.distribution || []).includes(L.location.toUpperCase()) ? ` <span class="meta">distribution</span>` : ""}</td><td class="num">${fmt(L.value)}</td>

@@ -22,6 +22,7 @@ Qualifying consumption (what makes stock "move"), per the Inventory prompt v2:
 
 Nothing is written to Business Central.
 """
+import fnmatch
 import io
 import json
 import sqlite3
@@ -174,6 +175,16 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
     inv = settings.get("inventory") or {}
     base, per = thresholds(settings)
     distribution = _list(inv.get("distribution_locations") or "MAGAZINE, CENTRAL")
+    # locations and categories that hold equipment or goods in transit, not stock that is
+    # consumed (Settings; * is a wildcard). They are left out and reported as left out.
+    ex_locs = _list(inv.get("movement_exclude_locations") if inv.get("movement_exclude_locations") is not None
+                    else "*_IM, *_IN, TRANSIT")
+    ex_cats = _list(inv.get("movement_exclude_categories") if inv.get("movement_exclude_categories") is not None
+                    else "INVENTAR I IMET")
+
+    def left_out_loc(loc):
+        u = (loc or "").upper()
+        return any(fnmatch.fnmatchcase(u, p) for p in ex_locs)
     seasonal = _list(inv.get("seasonal_items"))
     perishable = _list(inv.get("perishable_categories"))
     count_neg = (inv.get("count_negative_adjustments") or "no").strip().lower() in ("yes", "true", "1")
@@ -207,7 +218,7 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
             s["last_rcpt"] = max(s["last_rcpt"], day)
             s["first_rcpt"] = min(s["first_rcpt"] or day, day)
             s["in_qty"] += qty
-        if kind in ("adj_pos", "adj_neg"):
+        if kind in ("adj_pos", "adj_neg") and not left_out_loc(loc):
             a = adj.setdefault(loc, {"location": loc, "pos_qty": 0.0, "pos_cost": 0.0, "neg_qty": 0.0,
                                      "neg_cost": 0.0, "entries": 0})
             if kind == "adj_pos":
@@ -218,9 +229,16 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
                 a["neg_cost"] += cost
 
     out_rows, negative = [], []
+    excluded = {}
     for loc, by_item in qty_by_loc.items():
+        loc_out = left_out_loc(loc)
         for it, qty in by_item.items():
             card = items.get(it) or {}
+            if loc_out or str(card.get("Item_Category_Code") or "").upper() in ex_cats:
+                e = excluded.setdefault(loc if loc_out else f"category {card.get('Item_Category_Code')}", [0, 0.0])
+                e[0] += 1
+                e[1] += qty * float(card.get("Unit_Cost") or 0)
+                continue
             cost = float(card.get("Unit_Cost") or 0)
             s = stats.get((loc, it)) or {"cons": {w: 0.0 for w in WINDOWS}, "last_cons": "", "last_rcpt": "",
                                          "first_rcpt": "", "first_any": "", "in_qty": 0.0, "kinds": {}}
@@ -300,7 +318,9 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
                             key=lambda L: -L["value"]),
         "aging": aging, "buckets": [b[0] for b in buckets],
         "adjustments": sorted(adj.values(), key=lambda a: -(a["pos_cost"] - a["neg_cost"])),
-        "rules": {"limits": base, "perishable_limits": per, "distribution": sorted(distribution),
+        "excluded": sorted(([k, v[0], round(v[1], 0)] for k, v in excluded.items()), key=lambda x: -abs(x[2])),
+        "rules": {"exclude_locations": sorted(ex_locs), "exclude_categories": sorted(ex_cats),
+                  "limits": base, "perishable_limits": per, "distribution": sorted(distribution),
                   "count_negative_adjustments": count_neg, "seasonal": sorted(seasonal),
                   "perishable": sorted(perishable), "new_days": new_days},
         "_rows": out_rows, "_names": names,
@@ -448,6 +468,8 @@ def render_xlsx(r):
           [12, 12, 40, 14, 9, 11, 13, 9, 9, 9, 9, 10, 10, 12, 14, 12, 13, 12])
     sheet(wb.create_sheet("Received never used"), head, [x for x in rows if x[17]],
           [12, 12, 40, 14, 9, 11, 13, 9, 9, 9, 9, 10, 10, 12, 14, 12, 13, 12])
+    sheet(wb.create_sheet("Left out"), ["Location or category", "Lines", "Value (est.)"],
+          [list(x) for x in r.get("excluded") or []], [30, 10, 16])
     sheet(wb.create_sheet("Adjustments"), ["Location", "Positive qty", "Positive cost", "Negative qty", "Negative cost"],
           [[a["location"], round(a["pos_qty"], 2), round(a["pos_cost"], 0), round(a["neg_qty"], 2),
             round(a["neg_cost"], 0)] for a in r["adjustments"]], [14, 14, 16, 14, 16])
@@ -476,6 +498,9 @@ DEFINITIONS = {
                "stock unless the history is at least as long as the dead-stock threshold.",
     "received_not_used": "Received but never used: stock on hand, received (purchase or transfer in) in the "
                          "history read, with no qualifying consumption. Severity by days since the first receipt in the history: review, then warning and critical at the slow and non-moving thresholds.",
+    "excluded": "Locations and item categories set in Settings as equipment, small inventory or goods in transit "
+                "(default locations *_IM, *_IN, TRANSIT and category INVENTAR I IMET) are left out of the classes, "
+                "the aging and the adjustments; what was left out is listed with its count and value.",
     "adjustments": "Positive and negative adjustments are shown apart, by location, until it is agreed which are "
                    "physical counts, corrections or waste.",
 }

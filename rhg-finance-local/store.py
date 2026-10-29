@@ -64,7 +64,11 @@ DEFAULT_SETTINGS = {
                   # adjustments count as consumption (no, until the adjustment types are agreed)
                   "distribution_locations": "MAGAZINE, CENTRAL", "seasonal_items": "",
                   "perishable_categories": "", "perishable_days": "7, 14, 30, 60",
-                  "count_negative_adjustments": "no"},
+                  "count_negative_adjustments": "no",
+                  # left out of movement and dead stock: equipment / small-inventory locations and
+                  # goods in transit (* is a wildcard), and categories that are not consumed stock
+                  "movement_exclude_locations": "*_IM, *_IN, TRANSIT",
+                  "movement_exclude_categories": "INVENTAR I IMET"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses
