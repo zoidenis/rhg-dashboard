@@ -64,3 +64,8 @@ CURRENCY = get("CURRENCY", "ALL")
 # the whole table. The G/L control screen therefore looks at a short window and caps the rows.
 GL_WINDOW_DAYS = int(get("GL_WINDOW_DAYS", "7"))
 GL_MAX_ROWS = int(get("GL_MAX_ROWS", "300"))
+
+# The daily receivables & payables email is handed to the Purchasing tower, which owns
+# the mail server, over the internal network.
+PURCHASING_URL = get("PURCHASING_URL", "http://purchasing:8765").rstrip("/")
+PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")

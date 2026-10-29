@@ -4,6 +4,7 @@ Business Central stays strictly read-only. Everything the Purchasing Director
 creates here (actions, comments, thresholds) lives in JSON files next to the app.
 """
 import json
+import re
 import threading
 import uuid
 from datetime import datetime, timedelta, date
@@ -59,6 +60,9 @@ DEFAULT_SETTINGS = {
     # Executive dashboard (Control center): which accounts make sales, food cost, labour and
     # the items below EBITDA. "641*" means every account starting 641. Blank = the default.
     "executive": {"sales": "", "food": "", "labor": "", "below": ""},
+    # Daily email with the receivables and payables exceptions (sent through Purchasing's mail server)
+    "arap_notify": {"enabled": False, "to": "", "cc": "", "time": "08:00", "working_days_only": True,
+                    "companies": "", "send_empty": True},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,
@@ -95,6 +99,7 @@ def get_settings():
     merged["accounts"].update(s.get("accounts", {}))
     merged["group"].update(s.get("group", {}))
     merged["executive"].update(s.get("executive", {}))
+    merged["arap_notify"].update(s.get("arap_notify", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
         if k in s:
             merged[k] = s[k]
@@ -123,6 +128,15 @@ def save_settings(patch, actor="director"):
         for k, v in (patch.get("group") or {}).items():
             if k in DEFAULT_SETTINGS["group"]:
                 current.setdefault("group", {})[k] = str(v)[:400]
+        for k, v in (patch.get("arap_notify") or {}).items():
+            if k in DEFAULT_SETTINGS["arap_notify"]:
+                if isinstance(DEFAULT_SETTINGS["arap_notify"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "08:00"
+                else:
+                    v = str(v)[:400]
+                current.setdefault("arap_notify", {})[k] = v
         for k, v in (patch.get("executive") or {}).items():
             if k in DEFAULT_SETTINGS["executive"]:
                 current.setdefault("executive", {})[k] = str(v)[:600]

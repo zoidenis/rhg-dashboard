@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import arap_notify
 import assets
 import auth
 import brief
@@ -41,6 +42,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
+                     "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/users": "users", "/api/password": "view"}
 client = BCClient()
 _last, _last_lock = {}, threading.Lock()
@@ -1054,6 +1056,15 @@ def drill(kind, key):
     return {"title": title, "kind": kind, "key": key, "columns": cols, "rows": rows[:500], "count": len(rows)}
 
 
+arap = arap_notify.Notifier(client, company_currency, config.BC_COMPANY)
+
+
+def arap_status(user):
+    return {"settings": arap.settings(), "companies": arap.companies(), "recipients": arap.recipients(),
+            "next_run": arap.next_run(), "runs": arap_notify.recent_runs(), "mail": arap_notify.mail_status(),
+            "test": arap.test_status(user["username"])}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -1151,6 +1162,11 @@ class Handler(BaseHTTPRequestHandler):
                 year = max(date.today().year - 3, min(year, date.today().year))
                 self._send(200, executive.request(client, company, year, company_currency(company),
                                                   q.get("refresh") == "1"))
+            elif url.path == "/api/arap-notify":
+                self._send(200, arap_status(user))
+            elif url.path == "/api/arap-notify/preview":
+                company = q.get("company") or arap.companies()[0]
+                self._send(200, arap.preview(company).encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/api/simphony/status":
                 self._send(200, simphony.info())
             elif url.path == "/api/inventory":
@@ -1279,6 +1295,25 @@ class Handler(BaseHTTPRequestHandler):
                                      "status": simphony.info()})
                 except simphony.SimphonyError as exc:
                     self._send(200, {"ok": False, "error": str(exc), "status": simphony.info()})
+            elif url.path in ("/api/arap-notify/settings", "/api/arap-notify/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    to, bad = arap_notify.parse_emails(body.get("to"))
+                    cc, bad_cc = arap_notify.parse_emails(body.get("cc"))
+                    if bad or bad_cc:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad + bad_cc)})
+                        return
+                    store.save_settings({"arap_notify": body}, actor)
+                    self._send(200, arap_status(user))
+                    return
+                only, bad = arap_notify.parse_emails(body.get("to"))
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                company = body.get("company") or arap.companies()[0]
+                self._send(200, {"test": arap.start_test(company, only or None, actor)})
             elif url.path == "/api/closing":
                 updated = store.update_closing(body.get("company") or config.BC_COMPANY, body.get("period"),
                                                body.get("id"), body, actor)
@@ -1354,6 +1389,7 @@ def main():
     print(f"Finance & Inventory Control Tower running at http://{host}:{config.APP_PORT}")
     print(f"Business Central: {config.BC_BASE_URL}  company: {config.BC_COMPANY}  (read-only)")
     threading.Thread(target=_warm_loop, daemon=True).start()
+    arap.start()
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://{host}:{config.APP_PORT}")).start()
     try:

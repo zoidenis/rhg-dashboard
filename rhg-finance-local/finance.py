@@ -327,6 +327,7 @@ def _aging(rows, party_no, party_name, today, settings, kind):
                 "detail": f"Document {r.get('Document_No')} dated {r.get('Posting_Date')}, due "
                           f"{r.get('Due_Date')}, remaining {remaining:,.0f}.",
                 "impact": remaining, "document": r.get("Document_No"), "area": kind.upper(),
+                "party": p["name"], "days": days, "due": r.get("Due_Date"),
                 "next_action": "Chase the collection." if kind == "ar" else "Confirm the payment plan.",
                 "drill": {"kind": kind, "key": ""}})
         if kind == "ap" and remaining < -th["materiality"]:
@@ -337,12 +338,28 @@ def _aging(rows, party_no, party_name, today, settings, kind):
                 "detail": f"Document {r.get('Document_No')} leaves the supplier owing us money; "
                           f"often an unapplied credit note or a double payment.",
                 "impact": abs(remaining), "document": r.get("Document_No"), "area": "AP",
+                "party": p["name"], "days": days, "due": r.get("Due_Date"),
                 "next_action": "Apply the credit note or request a refund.",
                 "drill": {"kind": "ap", "key": ""}})
     party_rows = sorted(({"party": v["name"], "total": v["total"], "overdue": v["overdue"],
                           "oldest_days": v["oldest"], "entries": v["entries"]}
                          for v in parties.values()), key=lambda x: -abs(x["total"]))
     detail.sort(key=lambda x: -abs(x["remaining"]))
+    if party_rows and total and abs(total) >= th["materiality"]:
+        top = party_rows[0]
+        share = abs(top["total"]) / abs(total) * 100
+        if share >= th["concentration_pct"]:
+            who = "customer" if kind == "ar" else "supplier"
+            exceptions.append({
+                "code": f"{kind}-conc-{top['party']}"[:80], "severity": "warning",
+                "rule": f"Concentration on one {who}",
+                "title": f"{top['party']}: {share:.0f}% of open {'receivables' if kind == 'ar' else 'payables'}",
+                "detail": f"{top['total']:,.0f} of {total:,.0f} open is with one {who}; the warning level "
+                          f"is {th['concentration_pct']:.0f}%.",
+                "impact": abs(top["total"]), "document": "", "area": kind.upper(), "party": top["party"],
+                "next_action": ("Review the credit limit and collection plan." if kind == "ar"
+                                else "Review dependence on this supplier and the payment plan."),
+                "drill": {"kind": kind, "key": ""}})
     return {"total": total, "overdue": overdue, "current": total - overdue,
             "buckets": [{"label": b[0], "value": buckets[b[0]]} for b in BUCKETS],
             "parties": party_rows[:40], "detail": detail[:400], "exceptions": exceptions,

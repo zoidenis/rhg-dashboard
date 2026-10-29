@@ -5,6 +5,7 @@ app are stored locally under ./data and never written back to BC.
 
 Run:  python server.py     then open http://127.0.0.1:8765
 """
+import hmac
 import html
 import json
 import sys
@@ -1082,6 +1083,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == "/internal/mail/status":
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                info = smtp_config.info()
+                self._send(200, {"configured": info.get("configured"), "from": info.get("from"),
+                                 "host": info.get("host")})
+            return
         user = self._user()
         try:
             if url.path in ("/login", "/login.html"):
@@ -1236,9 +1245,42 @@ class Handler(BaseHTTPRequestHandler):
             traceback.print_exc()
             self._send(500, {"error": f"Unexpected error: {exc}"})
 
+    def _service_call(self):
+        """Another RHG service on the internal network, proven by the shared service token."""
+        token = auth.SERVICE_TOKEN
+        given = self.headers.get("X-Service-Token") or ""
+        return bool(token) and hmac.compare_digest(given.encode(), token.encode())
+
+    def _internal_mail(self, body):
+        """Sends one email for another tower (Finance) through the mail server set up here,
+        so the password is entered once. Recipients are given by the calling tower."""
+        if not self._service_call():
+            self._send(403, {"error": "Forbidden."})
+            return
+        to, bad_to = notify.parse_emails(",".join(body.get("to") or []))
+        cc, bad_cc = notify.parse_emails(",".join(body.get("cc") or []))
+        subject = str(body.get("subject") or "")[:300]
+        html_body, text_body = str(body.get("html") or ""), str(body.get("text") or "")
+        if bad_to or bad_cc or not to or len(to) + len(cc) > 20 or not subject or len(html_body) > 2_000_000:
+            self._send(400, {"error": "Recipients, subject or body are not valid."})
+            return
+        source = str(body.get("source") or "another tower")[:60]
+        try:
+            notify.send_mail(to, [c for c in cc if c not in to], subject, html_body, text_body or subject)
+        except Exception as exc:                                # noqa: BLE001
+            store.audit("internal mail", source, "service", {}, {"to": to, "cc": cc, "status": "failed"},
+                        str(exc)[:300])
+            self._send(502, {"error": str(exc)[:300]})
+            return
+        store.audit("internal mail", source, "service", {}, {"to": to, "cc": cc, "status": "sent"}, subject)
+        self._send(200, {"ok": True, "from": smtp_config.current().get("from")})
+
     def do_POST(self):
         url = urlparse(self.path)
         body = self._body()
+        if url.path == "/internal/mail":
+            self._internal_mail(body)
+            return
         user = self._user()
         if url.path == "/api/login":
             self._send(410, {"error": "Sign in at the site root; this tower no longer holds accounts."})

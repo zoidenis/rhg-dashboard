@@ -415,6 +415,30 @@ td.num,th.num{text-align:right}
       </div>
       <div class="scroll" style="margin-top:10px"><table id="spLocs"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="arCard">
+      <div class="card-head"><div><h2>Receivables &amp; payables email</h2>
+        <p class="hint">A daily email with the exceptions of the Payables and Receivables control sections: overdue beyond the critical limit, supplier accounts in debit and concentration, with the ageing. It is sent through the mail server set up in Purchasing → Settings, so no password is entered here.</p></div>
+        <span class="rhg-pill" id="arPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">To<input id="arTo" placeholder="name@rhg.al"></label>
+        <label class="field">Cc (optional)<input id="arCc" placeholder="name@rhg.al, name@rhg.al"></label>
+        <label class="field">Time<input id="arTime" type="time" value="08:00"></label>
+        <label class="field">Companies (blank = default)<input id="arCo" placeholder="SALT"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;margin:4px 0 12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="arOn" style="width:auto"> Send daily</label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="arWork" style="width:auto" checked> Working days only</label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="arEmpty" style="width:auto" checked> Send even when there is nothing to report</label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="arSave">Save</button>
+        <button class="btn" id="arTest">Send a test</button>
+        <button class="btn" id="arPreview">Preview</button>
+        <span class="meta" id="arMsg"></span>
+      </div>
+      <p class="hint" id="arInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="arRuns"></table></div>
+    </div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -535,6 +559,7 @@ function render(){
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
   if(!spLoaded) loadSimphony();
+  if(!arLoaded) loadArap();
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
@@ -1142,6 +1167,50 @@ $("spTest").onclick = async () => {
     salesData = null;
   }catch(e){ $("spMsg").textContent = "Not connected: " + e.message; }
 };
+// ---------- receivables & payables email ----------
+let arLoaded = false, arTimer = null;
+async function loadArap(){
+  arLoaded = true;
+  try{ renderArap(await readJSON(await fetch("/api/arap-notify"))); }catch(e){ $("arMsg").textContent = "Could not read the email settings: " + e.message; }
+}
+function renderArap(st){
+  const s = st.settings || {}, m = st.mail || {};
+  $("arTo").value = s.to || ""; $("arCc").value = s.cc || ""; $("arTime").value = s.time || "08:00"; $("arCo").value = s.companies || "";
+  $("arOn").checked = !!s.enabled; $("arWork").checked = s.working_days_only !== false; $("arEmpty").checked = s.send_empty !== false;
+  $("arPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : "info");
+  $("arPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : `On · next ${st.next_run ? st.next_run.replace("T"," ") : "–"}`;
+  $("arInfo").textContent = (m.configured ? `Sent from ${m.from || "the Purchasing mail server"} through Purchasing.` : `Mail server: ${m.error || "not set up in Purchasing → Settings"}.`)
+    + ` Companies: ${(st.companies || []).join(", ")}.` + ((st.recipients || {}).to && st.recipients.to.length ? ` To: ${st.recipients.to.join(", ")}${st.recipients.cc.length ? " · Cc: " + st.recipients.cc.join(", ") : ""}.` : " No recipient yet.");
+  const runs = st.runs || [];
+  $("arRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Company</th><th>Status</th><th>Exceptions</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 10).map(r => `<tr><td class="meta">${esc(r.ts)}</td><td>${esc(r.company)}</td><td>${esc(r.status)}${r.test ? " · test" : ""}</td>
+      <td class="num">${r.exceptions == null ? "–" : fmt(r.exceptions)}${r.new ? ` (${fmt(r.new)} new)` : ""}</td><td class="meta">${esc((r.to || []).join(", "))}</td><td class="meta">${esc(r.detail || "")}</td></tr>`).join("") : "";
+  const t = st.test;
+  clearTimeout(arTimer);
+  if (t && t.status === "running") { $("arMsg").textContent = "Sending the test…"; arTimer = setTimeout(loadArap, 3000); }
+  else if (t && t.result && $("arMsg").dataset.waiting === "1") {
+    $("arMsg").dataset.waiting = "";
+    $("arMsg").textContent = t.result.status === "sent" ? `Test sent to ${(t.result.to || []).join(", ")}.` : `Test ${t.result.status}: ${t.result.detail || ""}`;
+  }
+  ["arSave","arTest"].forEach(id => { $(id).disabled = !can("settings");
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("arSave").onclick = async () => {
+  $("arMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/arap-notify/settings", {to: $("arTo").value, cc: $("arCc").value, time: $("arTime").value,
+      companies: $("arCo").value, enabled: $("arOn").checked, working_days_only: $("arWork").checked, send_empty: $("arEmpty").checked});
+    renderArap(st); $("arMsg").textContent = st.settings.enabled ? "Saved. The email goes out daily." : "Saved. Tick Send daily to switch it on.";
+  }catch(e){ $("arMsg").textContent = "Could not save: " + e.message; }
+};
+$("arTest").onclick = async () => {
+  const to = $("arTo").value.trim();
+  if (!to) { $("arMsg").textContent = "Enter a recipient first."; return; }
+  $("arMsg").textContent = "Sending the test…"; $("arMsg").dataset.waiting = "1";
+  try{ await simphonyPost("/api/arap-notify/test", {to: $("arTo").value + ($("arCc").value ? ", " + $("arCc").value : "")}); setTimeout(loadArap, 2500); }
+  catch(e){ $("arMsg").dataset.waiting = ""; $("arMsg").textContent = "Could not send: " + e.message; }
+};
+$("arPreview").onclick = () => window.open("/api/arap-notify/preview", "_blank", "noopener");
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
   $("ssNote").style.display = "";
