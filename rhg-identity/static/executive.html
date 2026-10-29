@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>RHG Executive Dashboard</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0}
+header{display:flex;justify-content:space-between}
+.adminlink{margin-top:auto;padding-top:16px}
+.adminlink a{color:var(--rhg-blue);font-size:11px;text-decoration:none}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--down);display:inline-block}
+.pill.err .dot{background:var(--up)} .pill.load .dot{background:var(--warn)}
+
+/* chart tokens: validated two-series pair (actual, comparison) and a four-slot split */
+:root{--c1:#1e78a6;--c2:#c47f1f;--c3:#7a5bbf;--c4:#2e9a6e;--grid:#e6e8e9;--axis:#5c7482;--hl:rgba(30,120,166,.07)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--c1:#3a95c6;--c2:#c4832a;--c3:#9479d6;--c4:#3aa87a;--grid:#194354;--axis:#93b2bf;--hl:rgba(58,149,198,.12)}
+}
+:root[data-theme="dark"]{--c1:#3a95c6;--c2:#c4832a;--c3:#9479d6;--c4:#3aa87a;--grid:#194354;--axis:#93b2bf;--hl:rgba(58,149,198,.12)}
+
+.filters{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin:-8px 0 12px}
+.filters label{flex:1 1 150px;padding-left:14px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tabs button{all:unset;cursor:pointer;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:600;
+  color:var(--rhg-primary);background:var(--card);border:1px solid var(--line)}
+.tabs button:hover{border-color:var(--rhg-primary)}
+.tabs button.on{background:var(--rhg-primary);color:#fff;border-color:var(--rhg-primary)}
+@media (prefers-color-scheme: dark){.tabs button{color:var(--ink)}.tabs button.on{background:#1e78a6;border-color:#1e78a6}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi .v small{font-size:13px;font-weight:600;color:var(--sub);margin-left:4px}
+.dl{font-weight:600;white-space:nowrap}
+.dl.good{color:var(--rhg-green)} .dl.bad{color:var(--rhg-red)} .dl.flat{color:var(--sub)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid2 > .card{min-width:0}
+@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+.card{margin-bottom:16px}
+.grid2 .card{margin-bottom:0}
+.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.chead h2{font-size:15px}
+.chead .hint{margin:4px 0 0}
+.tgl{all:unset;cursor:pointer;font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap}
+.tgl:hover{text-decoration:underline}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin:10px 0 2px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend i.line{height:2px;border-radius:1px;vertical-align:3px;width:14px}
+.chart{position:relative;width:100%;margin-top:6px}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart text{font-family:var(--rhg-font);font-size:11px;fill:var(--axis)}
+.chart .gl{stroke:var(--grid);stroke-width:1}
+.chart .base{stroke:var(--axis);stroke-width:1;opacity:.6}
+.chart .hit{fill:transparent;cursor:default}
+.chart .hit:hover,.chart .hit.on{fill:var(--hl)}
+.chart .sel{fill:var(--hl)}
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--card);color:var(--ink);border:1px solid var(--line);
+  border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.12);display:none;min-width:150px}
+#tip b{display:block;margin-bottom:2px}
+#tip .r{display:flex;justify-content:space-between;gap:14px}
+#tip .r span:first-child{color:var(--sub)}
+#tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.scroll{overflow-x:auto}
+td.num,th.num{font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--rhg-sky)}
+tr.sel td{background:var(--rhg-sky)}
+td.mut{color:var(--sub)}
+.banner{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:10px 14px;margin-bottom:16px;font-size:12px}
+.banner .bar{flex:0 0 160px;height:6px;border-radius:3px;background:var(--grid);overflow:hidden}
+.banner .bar i{display:block;height:100%;background:var(--c1);width:0}
+.banner.warn{border-color:var(--rhg-amber)}
+.note{font-size:11px;color:var(--sub);line-height:1.5;margin:8px 0 0}
+.empty{color:var(--sub);padding:14px 0}
+.prov{color:var(--rhg-amber);font-weight:600}
+.defs{font-size:11px;color:var(--sub);line-height:1.6}
+.defs b{color:var(--ink);font-weight:600}
+@media(max-width:760px){aside{display:none} main{padding:16px} header{flex-direction:column} .hdr-side{align-items:flex-start}
+  .kpis{grid-template-columns:1fr 1fr}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/executive" class="on" aria-current="page">Executive dashboard</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">RHG Control towers / Business Central and Simphony, read-only</div>
+      <h1>Executive dashboard</h1>
+      <div class="period" id="periodLabel">Reading…</div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn dark" id="refreshBtn">Refresh now</button></div>
+      <div class="hdr-meta">
+        <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading…</span></span>
+        <span class="sep">|</span><span id="whoami"></span>
+        <button class="linkbtn" id="logoutBtn">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <label>Company <select id="fCompany"></select></label>
+    <label>Year <select id="fYear"></select></label>
+    <label>Period <select id="fMode">
+      <option value="month">Month</option><option value="quarter">Quarter to date</option>
+      <option value="ytd">Year to date</option></select></label>
+    <label>Up to <select id="fEnd"></select></label>
+    <label>Restaurant <select id="fDept"><option value="*">Whole company</option></select></label>
+    <label>Compare with <select id="fCompare">
+      <option value="ly">Last year</option><option value="budget">Budget</option>
+      <option value="prior">Period before</option></select></label>
+  </div>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button data-tab="overview" class="on">Executive KPIs</button>
+    <button data-tab="sales">Sales</button>
+    <button data-tab="labor">Labour cost</button>
+    <button data-tab="food">Food cost</button>
+    <button data-tab="budget">Budget</button>
+    <button data-tab="purchasing">Purchasing</button>
+  </div>
+
+  <div id="banner"></div>
+  <div id="view"></div>
+  <p class="note" id="foot"></p>
+</main>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n, d=0) => n == null || !isFinite(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const compact = v => { if (v == null || !isFinite(v)) return "–"; const a = Math.abs(v);
+  return a >= 1e9 ? (v/1e9).toFixed(2)+"B" : a >= 1e6 ? (v/1e6).toFixed(1)+"M" : a >= 1e4 ? (v/1e3).toFixed(0)+"K" : fmt(v,0); };
+const pct = (v, d=1) => v == null || !isFinite(v) ? "–" : fmt(v, d) + "%";
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const mlabel = k => { const [y,m] = k.split("-"); return MON[+m-1] + " " + y; };
+const mshort = k => MON[+k.split("-")[1]-1];
+let me = null, CSRF = null;
+const can = p => !!me && (me.permissions||[]).includes(p);
+
+const S = {fin: null, pur: null, finErr: null, purErr: null, timer: null};
+const F = {company: "", year: new Date().getFullYear(), mode: "month", end: "", dept: "*", compare: "ly", tab: "overview"};
+
+async function get(path){
+  const r = await fetch(path, {credentials: "same-origin"});
+  if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+  const t = await r.text(); let j = {};
+  try { j = JSON.parse(t); } catch (e) {
+    throw new Error(r.status === 504 || r.status === 502 ? "The server took too long to answer; it keeps reading, try again in a minute." : "HTTP " + r.status);
+  }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+/* ------------------------------------------------------------ periods */
+const shift = (k, n) => { let [y,m] = k.split("-").map(Number); m += n; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; }
+  return `${y}-${String(m).padStart(2,"0")}`; };
+function rangeKeys(){
+  if (!F.end) return [];
+  const m = +F.end.split("-")[1];
+  const start = F.mode === "ytd" ? 1 : F.mode === "quarter" ? Math.floor((m-1)/3)*3+1 : m;
+  const out = []; for (let i = start; i <= m; i++) out.push(`${F.year}-${String(i).padStart(2,"0")}`);
+  return out;
+}
+const running = () => (S.fin && S.fin.running) || null;
+function compKeys(keys, how){
+  const run = running();
+  if (how === "ly") return keys.map(k => run && k === run.month ? run.ly : shift(k, -12));
+  if (how === "prior") return keys.map(k => keys.length === 1 && run && k === run.month ? run.prior : shift(k, -keys.length));
+  return keys;
+}
+const compName = how => ({ly: "last year", prior: "the period before", budget: "budget"})[how];
+function periodText(keys){
+  if (!keys.length) return "";
+  const run = running(); const last = keys[keys.length-1];
+  const tail = run && last === run.month ? ` (to ${new Date(run.to+"T00:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"})})` : "";
+  return keys.length === 1 ? mlabel(keys[0]) + tail : `${mshort(keys[0])} – ${mlabel(last)}${tail}`;
+}
+
+/* ------------------------------------------------------------ figures */
+const BUCKETS = ["sales","other_income","food","labor_kitchen","labor_service","labor_management","labor_other","opex","da","below"];
+function bucketOf(no){
+  const a = S.fin && S.fin.accounts[no];
+  return a ? a[1] : (String(no).startsWith("7") ? "other_income" : "opex");
+}
+function derive(t){
+  t.labor = t.labor_kitchen + t.labor_service + t.labor_management + t.labor_other;
+  t.prime = t.food + t.labor;
+  t.ebitda = t.sales + t.other_income - t.food - t.labor - t.opex;
+  t.ebit = t.ebitda - t.da; t.net = t.ebit - t.below;
+  const r = v => t.sales ? v / t.sales * 100 : null;
+  t.foodPct = r(t.food); t.laborPct = r(t.labor); t.primePct = r(t.prime); t.ebitdaPct = r(t.ebitda); t.opexPct = r(t.opex);
+  return t;
+}
+function blank(){ const t = {acc: {}, n: 0, missing: 0}; BUCKETS.forEach(b => t[b] = 0); return t; }
+/* sum of cells: src[dept][key] = {account: value}; scale: optional {key: factor} */
+function agg(src, dept, keys, scale){
+  const t = blank();
+  for (const k of keys){
+    const c = src && src[dept] && src[dept][k];
+    if (!c) { t.missing++; continue; }
+    t.n++; const f = scale && scale[k] != null ? scale[k] : 1;
+    for (const no in c){ const v = c[no] * f; t[bucketOf(no)] += v; t.acc[no] = (t.acc[no]||0) + v; }
+  }
+  return derive(t);
+}
+function budgetScale(keys){
+  const run = running(), sc = {};
+  if (run && keys.includes(run.month)){
+    const [y,m] = run.month.split("-").map(Number), days = new Date(y, m, 0).getDate();
+    sc[run.month] = (new Date(run.to+"T00:00:00").getDate()) / days;
+  }
+  return sc;
+}
+function actual(dept, keys){ return agg(S.fin && S.fin.actual, dept, keys); }
+function comparison(dept, keys, how){
+  how = how || F.compare;
+  if (how === "budget") return S.fin && S.fin.budget && S.fin.budget.available ? agg(S.fin.budget.cells, dept, keys, budgetScale(keys)) : null;
+  return agg(S.fin && S.fin.actual, dept, compKeys(keys, how));
+}
+function unassigned(keys, src, scale){
+  const all = agg(src, "*", keys, scale), t = blank();
+  BUCKETS.forEach(b => t[b] = all[b]);
+  for (const d of depts()) { const x = agg(src, d.code, keys, scale); BUCKETS.forEach(b => t[b] -= x[b]); }
+  t.n = all.n; return derive(t);
+}
+const depts = () => (S.fin && S.fin.departments) || [];
+const deptName = c => c === "*" ? "Whole company" : c === "" ? "Not on a restaurant" : ((depts().find(d => d.code === c) || {}).name || c);
+
+/* change against comparison; for costs and ratios a rise is bad */
+function delta(cur, cmp, kind){
+  if (cur == null || cmp == null || !isFinite(cur) || !isFinite(cmp)) return null;
+  if (kind === "pts") { const d = cur - cmp; return {v: d, txt: (d >= 0 ? "+" : "") + fmt(d,1) + " pts"}; }
+  if (!cmp) return null;
+  const d = (cur - cmp) / Math.abs(cmp) * 100; return {v: d, txt: (d >= 0 ? "+" : "") + fmt(d,1) + "%"};
+}
+function dl(d, goodWhenUp, label){
+  if (!d) return label ? `<span class="dl flat">no comparison</span>` : `<span class="mut">–</span>`;
+  const flat = Math.abs(d.v) < 0.05, good = flat ? null : (d.v > 0) === goodWhenUp;
+  const cls = flat ? "flat" : good ? "good" : "bad", arrow = flat ? "→" : d.v > 0 ? "▲" : "▼";
+  return `<span class="dl ${cls}" title="${good === null ? "Unchanged" : good ? "Better" : "Worse"}">${arrow} ${esc(d.txt)}</span>${label ? ` <span class="meta">${esc(label)}</span>` : ""}`;
+}
+function tile(label, value, unit, sub, dlt){
+  return `<div class="card kpi"><div class="l">${esc(label)}</div><div class="v">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>
+    <div class="s">${dlt || ""}${sub ? `<div class="meta">${sub}</div>` : ""}</div></div>`;
+}
+
+/* ------------------------------------------------------------ charts */
+const tip = $("tip");
+function showTip(ev, title, rows){
+  tip.innerHTML = `<b>${esc(title)}</b>` + rows.map(r => `<div class="r"><span>${r.c ? `<i style="background:${r.c}"></i>` : ""}${esc(r.k)}</span><span>${esc(r.v)}</span></div>`).join("");
+  tip.style.display = "block";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){ const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function niceStep(v){ if (!(v > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const n = v / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+function scaleOf(vals){
+  const mx = Math.max(0, ...vals), mn = Math.min(0, ...vals), step = niceStep((mx - mn) / 4);
+  const lo = Math.floor(mn / step) * step, hi = Math.max(step, Math.ceil(mx / step) * step);
+  const ticks = []; for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+  return {lo, hi, ticks};
+}
+function legendHTML(series){
+  if (series.length < 2) return "";
+  return `<div class="legend">${series.map(s => `<span><i class="${s.line ? "line" : ""}" style="background:${cssVar(s.color)}"></i>${esc(s.name)}</span>`).join("")}</div>`;
+}
+/* spec: {type:"vbar"|"hbar"|"line"|"stack", cats:[{key,label,hl}], series:[{name,color,values,line}], fmt, tipFmt, onClick} */
+const CHARTS = new Map();
+function drawChart(host, spec){
+  CHARTS.set(host.id, spec);
+  if (host.dataset.table === "1") return drawTable(host, spec);
+  const W = Math.max(280, host.clientWidth || 600);
+  const vf = spec.fmt || compact, tf = spec.tipFmt || (v => fmt(v,0));
+  host.innerHTML = legendHTML(spec.series);
+  const cats = spec.cats, series = spec.series;
+  if (!cats.length) { host.insertAdjacentHTML("beforeend", `<div class="empty">Nothing to show for this selection.</div>`); return; }
+  const tipRows = i => series.map(s => ({k: s.name, v: s.values[i] == null ? "–" : tf(s.values[i]), c: cssVar(s.color)}));
+  if (spec.type === "hbar"){
+    const rowH = series.length > 1 ? 30 : 22, padL = Math.min(170, Math.max(90, W * .28)), padR = 56, H = cats.length * rowH + 26;
+    const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": spec.title || "chart"}, null);
+    const vals = series.flatMap(s => s.values).filter(v => v != null && isFinite(v));
+    const sc = scaleOf(vals), max = sc.hi, min = sc.lo;
+    const x = v => padL + (v - min) / (max - min) * (W - padL - padR);
+    for (const v of sc.ticks){ const xx = x(v);
+      el("line", {x1: xx, x2: xx, y1: 0, y2: H - 20, class: "gl"}, svg);
+      const tx = el("text", {x: xx, y: H - 6, "text-anchor": "middle"}, svg); tx.textContent = vf(v); }
+    el("line", {x1: x(0), x2: x(0), y1: 0, y2: H - 20, class: "base"}, svg);
+    cats.forEach((c, i) => {
+      const y0 = i * rowH + 3, bh = (rowH - 8) / series.length;
+      if (c.hl) el("rect", {x: 0, y: i * rowH, width: W, height: rowH, class: "sel"}, svg);
+      const lab = el("text", {x: padL - 8, y: y0 + (rowH - 6) / 2 + 4, "text-anchor": "end"}, svg);
+      lab.textContent = c.label.length > 24 ? c.label.slice(0, 23) + "…" : c.label;
+      series.forEach((s, j) => {
+        const v = s.values[i]; if (v == null || !isFinite(v)) return;
+        const a = x(Math.min(0, v)), b = x(Math.max(0, v));
+        el("rect", {x: a, y: y0 + j * bh, width: Math.max(1, b - a), height: Math.max(2, bh - 2), rx: 3, fill: cssVar(s.color)}, svg);
+        if (j === 0) { const t = el("text", {x: b + 4, y: y0 + j * bh + bh / 2 + 3}, svg); t.textContent = vf(v); }
+      });
+      const hit = el("rect", {x: 0, y: i * rowH, width: W, height: rowH, class: "hit"}, svg);
+      hit.addEventListener("mousemove", ev => showTip(ev, c.label, tipRows(i)));
+      hit.addEventListener("mouseleave", hideTip);
+      if (spec.onClick) { hit.style.cursor = "pointer"; hit.addEventListener("click", () => spec.onClick(c)); }
+    });
+    host.appendChild(svg); return;
+  }
+  const H = spec.height || 240, padL = 52, padR = 10, padT = 10, padB = 26;
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": spec.title || "chart"}, null);
+  let vals;
+  if (spec.type === "stack") vals = cats.map((_, i) => series.reduce((a, s) => a + Math.max(0, s.values[i] || 0), 0));
+  else vals = series.flatMap(s => s.values).filter(v => v != null && isFinite(v));
+  const sc = scaleOf(vals), hi = sc.hi, lo = sc.lo;
+  const y = v => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+  const bw = (W - padL - padR) / cats.length, cx = i => padL + bw * i + bw / 2;
+  cats.forEach((c, i) => { if (c.hl) el("rect", {x: padL + bw * i, y: padT, width: bw, height: H - padT - padB, class: "sel"}, svg); });
+  for (const v of sc.ticks){
+    el("line", {x1: padL, x2: W - padR, y1: y(v), y2: y(v), class: "gl"}, svg);
+    const tx = el("text", {x: padL - 6, y: y(v) + 4, "text-anchor": "end"}, svg); tx.textContent = vf(v); }
+  el("line", {x1: padL, x2: W - padR, y1: y(Math.max(lo, 0)), y2: y(Math.max(lo, 0)), class: "base"}, svg);
+  const every = Math.ceil(cats.length / Math.max(1, Math.floor((W - padL) / 46)));
+  cats.forEach((c, i) => { if (i % every) return; const t = el("text", {x: cx(i), y: H - 8, "text-anchor": "middle"}, svg); t.textContent = c.label; });
+  if (spec.type === "vbar"){
+    const inner = Math.min(46, bw * .78), sw = inner / series.length;
+    cats.forEach((c, i) => series.forEach((s, j) => {
+      const v = s.values[i]; if (v == null || !isFinite(v)) return;
+      const x0 = cx(i) - inner / 2 + j * sw;
+      el("rect", {x: x0 + 1, y: Math.min(y(v), y(0)), width: Math.max(1, sw - 2), height: Math.max(1, Math.abs(y(v) - y(0))), rx: 3,
+        fill: cssVar(s.color), opacity: s.faded && s.faded[i] ? .45 : 1}, svg);
+    }));
+  } else if (spec.type === "stack"){
+    const inner = Math.min(40, bw * .7);
+    cats.forEach((c, i) => { let acc = 0;
+      series.forEach(s => { const v = Math.max(0, s.values[i] || 0); if (!v) return;
+        el("rect", {x: cx(i) - inner / 2, y: y(acc + v), width: inner, height: Math.max(1, y(acc) - y(acc + v) - 2), rx: 2, fill: cssVar(s.color)}, svg);
+        acc += v; }); });
+  } else {
+    series.forEach(s => {
+      let d = "", pen = false;
+      s.values.forEach((v, i) => { if (v == null || !isFinite(v)) { pen = false; return; } d += (pen ? "L" : "M") + cx(i) + "," + y(v); pen = true; });
+      el("path", {d, fill: "none", stroke: cssVar(s.color), "stroke-width": 2, "stroke-dasharray": s.dash ? "5 4" : ""}, svg);
+      s.values.forEach((v, i) => { if (v == null || !isFinite(v)) return;
+        const hollow = s.hollow && s.hollow[i];
+        el("circle", {cx: cx(i), cy: y(v), r: 4, fill: hollow ? cssVar("--card") : cssVar(s.color), stroke: cssVar(s.color), "stroke-width": 2}, svg); });
+    });
+  }
+  cats.forEach((c, i) => {
+    const hit = el("rect", {x: padL + bw * i, y: padT, width: bw, height: H - padT - padB, class: "hit"}, svg);
+    const rows = tipRows(i);
+    if (spec.type === "stack") rows.push({k: "Total", v: tf(series.reduce((a, s) => a + (s.values[i] || 0), 0))});
+    if (c.note) rows.push({k: c.note, v: ""});
+    hit.addEventListener("mousemove", ev => showTip(ev, c.title || c.label, rows));
+    hit.addEventListener("mouseleave", hideTip);
+    if (spec.onClick) { hit.style.cursor = "pointer"; hit.addEventListener("click", () => spec.onClick(c)); }
+  });
+  host.appendChild(svg);
+}
+function drawTable(host, spec){
+  const tf = spec.tipFmt || (v => fmt(v,0));
+  host.innerHTML = `<div class="scroll"><table><tr><th></th>${spec.series.map(s => `<th class="num">${esc(s.name)}</th>`).join("")}</tr>` +
+    spec.cats.map((c, i) => `<tr><td>${esc(c.title || c.label)}</td>${spec.series.map(s => `<td class="num">${s.values[i] == null ? "–" : esc(tf(s.values[i]))}</td>`).join("")}</tr>`).join("") +
+    `</table></div>`;
+}
+function chartCard(id, title, hint){
+  return `<div class="card"><div class="chead"><div><h2>${esc(title)}</h2>${hint ? `<p class="hint">${hint}</p>` : ""}</div>
+    <button class="tgl" data-toggle="${id}">Show as table</button></div><div class="chart" id="${id}"></div></div>`;
+}
+function redrawAll(){ for (const [id, spec] of CHARTS) { const h = $(id); if (h) drawChart(h, spec); } }
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-toggle]"); if (!b) return;
+  const h = $(b.dataset.toggle); h.dataset.table = h.dataset.table === "1" ? "" : "1";
+  b.textContent = h.dataset.table === "1" ? "Show as chart" : "Show as table";
+  drawChart(h, CHARTS.get(h.id));
+});
+let rT; addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(redrawAll, 150); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redrawAll);
+
+/* ------------------------------------------------------------ shared pieces */
+const C = () => (S.fin && S.fin.currency) || (S.pur && S.pur.currency) || "ALL";
+const yearKeys = () => (S.fin ? S.fin.months : (S.pur ? S.pur.months : [])).filter(k => k.startsWith(String(F.year)));
+const finOK = () => S.fin && !S.finErr;
+function monthlySeries(metric, how){
+  /* the year's months, actual against the comparison chosen (prior falls back to last year: month by month) */
+  const ks = yearKeys(), sel = new Set(rangeKeys());
+  const h = how === "prior" ? "ly" : how;
+  const cur = ks.map(k => metric(actual(F.dept, [k]))), cmpv = ks.map(k => { const c = comparison(F.dept, [k], h); return c ? metric(c) : null; });
+  const prov = new Set((S.fin && S.fin.provisional) || []), run = running();
+  const cats = ks.map(k => ({key: k, label: mshort(k), title: mlabel(k) + (run && k === run.month ? ` to ${run.to.slice(8)}` : ""), hl: sel.has(k),
+    note: prov.has(k) ? "Provisional: inventory may not be posted" : ""}));
+  return {cats, cur, cmp: cmpv, h, prov: ks.map(k => prov.has(k))};
+}
+function deptRows(keys, how){
+  const rows = depts().map(d => ({code: d.code, name: d.name, a: actual(d.code, keys), c: comparison(d.code, keys, how)}));
+  const u = unassigned(keys, S.fin.actual);
+  if (Math.abs(u.sales) + Math.abs(u.food) + Math.abs(u.labor) + Math.abs(u.opex) > 1)
+    rows.push({code: "", name: "Not on a restaurant", a: u, c: null, unassigned: true});
+  return rows;
+}
+const pickDept = code => { if (code === "" || code == null) return; F.dept = F.dept === code ? "*" : code; $("fDept").value = F.dept; render(); };
+const restaurantsOnly = rows => rows.filter(r => r.a.sales > 0);
+
+/* ------------------------------------------------------------ views */
+function viewOverview(){
+  const keys = rangeKeys(), a = actual(F.dept, keys), c = comparison(F.dept, keys);
+  const lbl = "vs " + compName(F.compare);
+  const p = purAgg(F.dept, keys), pc = purAgg(F.dept, compKeys(keys, F.compare === "budget" ? "ly" : F.compare));
+  let h = `<div class="kpis">` +
+    tile("Revenue", compact(a.sales), C(), `${fmt(a.sales)} ${C()}`, dl(delta(a.sales, c && c.sales), true, lbl)) +
+    tile("Food cost", pct(a.foodPct), "", `${compact(a.food)} ${C()}`, dl(delta(a.foodPct, c && c.foodPct, "pts"), false, lbl)) +
+    tile("Labour cost", pct(a.laborPct), "", `${compact(a.labor)} ${C()}`, dl(delta(a.laborPct, c && c.laborPct, "pts"), false, lbl)) +
+    tile("Prime cost", pct(a.primePct), "", "Food plus labour", dl(delta(a.primePct, c && c.primePct, "pts"), false, lbl)) +
+    tile("EBITDA", compact(a.ebitda), C(), `${pct(a.ebitdaPct)} of revenue`, dl(delta(a.ebitda, c && c.ebitda), true, lbl)) +
+    tile("Purchases invoiced", S.pur ? compact(p.amt) : "–", S.pur ? C() : "", S.pur ? `${pct(p.nopoRate)} without a PO` : (S.purErr || "Purchasing not available"),
+      S.pur ? dl(delta(p.amt, pc.amt), false, "vs " + compName(F.compare === "budget" ? "ly" : F.compare)) : "") +
+    `</div>`;
+  h += `<div class="grid2">` + chartCard("chRev", "Revenue by month", `${F.year}, ${deptName(F.dept)}; the selected period is shaded`) +
+       chartCard("chRatio", "Food and labour as a share of revenue", "Hollow points are provisional months") + `</div>`;
+  h += `<div class="card"><div class="chead"><div><h2>Restaurants</h2><p class="hint">${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a row to filter the whole page.</p></div></div>
+    <div class="scroll" id="tbDept"></div></div>`;
+  $("view").innerHTML = h;
+  const ms = monthlySeries(t => t.sales, F.compare);
+  drawChart($("chRev"), {type: "vbar", cats: ms.cats, series: [{name: "Actual", color: "--c1", values: ms.cur}, {name: ms.h === "budget" ? "Budget" : "Last year", color: "--c2", values: ms.cmp}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  const fp = monthlySeries(t => t.foodPct, F.compare), lp = monthlySeries(t => t.laborPct, F.compare);
+  drawChart($("chRatio"), {type: "line", cats: fp.cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
+    series: [{name: "Food cost %", color: "--c1", values: fp.cur, hollow: fp.prov, line: true}, {name: "Labour %", color: "--c3", values: lp.cur, hollow: lp.prov, line: true}]});
+  const rows = deptRows(keys);
+  $("tbDept").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Revenue</th><th class="num">vs ${esc(compName(F.compare))}</th><th class="num">Food %</th><th class="num">Labour %</th><th class="num">Prime %</th><th class="num">EBITDA</th><th class="num">EBITDA %</th></tr>` +
+    rows.map(r => `<tr class="${r.unassigned ? "" : "click"} ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.a.sales)}</td>
+      <td class="num">${dl(delta(r.a.sales, r.c && r.c.sales), true)}</td><td class="num">${pct(r.a.foodPct)}</td><td class="num">${pct(r.a.laborPct)}</td>
+      <td class="num">${pct(r.a.primePct)}</td><td class="num">${fmt(r.a.ebitda)}</td><td class="num">${pct(r.a.ebitdaPct)}</td></tr>`).join("") +
+    (() => { const t = actual("*", keys), tc = comparison("*", keys); return `<tr class="total"><td>Whole company</td><td class="num">${fmt(t.sales)}</td><td class="num">${dl(delta(t.sales, tc && tc.sales), true)}</td>
+      <td class="num">${pct(t.foodPct)}</td><td class="num">${pct(t.laborPct)}</td><td class="num">${pct(t.primePct)}</td><td class="num">${fmt(t.ebitda)}</td><td class="num">${pct(t.ebitdaPct)}</td></tr>`; })() + `</table>`;
+}
+
+function simAgg(dept, keys){
+  const sim = S.fin && S.fin.simphony;
+  const out = {locs: [], tot: {net: 0, checks: 0, guests: 0, gross: 0, discounts: 0, days: 0}, cmp: {net: 0, checks: 0, guests: 0, days: 0}, any: false};
+  if (!sim || !sim.locations) return out;
+  const cks = compKeys(keys, F.compare === "budget" ? "ly" : F.compare).filter(k => !k.includes("~"));
+  for (const [ref, l] of Object.entries(sim.locations)){
+    if (dept !== "*" && l.dept !== dept) continue;
+    const s = {net: 0, checks: 0, guests: 0, gross: 0, discounts: 0, days: 0}, p = {net: 0, checks: 0, guests: 0, days: 0};
+    keys.forEach(k => { const m = l.months[k]; if (m) for (const f in s) s[f] += m[f] || 0; });
+    cks.forEach(k => { const m = l.months[k]; if (m) for (const f in p) p[f] += m[f] || 0; });
+    if (!s.days && !p.days) continue;
+    out.locs.push({ref, name: l.name, dept: l.dept, currency: l.currency, s, p});
+    if (l.currency === C()) { for (const f in out.tot) out.tot[f] += s[f]; for (const f in out.cmp) out.cmp[f] += p[f]; }
+    out.any = true;
+  }
+  out.locs.sort((a, b) => b.s.net - a.s.net);
+  out.partialCmp = cks.length !== keys.length;
+  return out;
+}
+function viewSales(){
+  const keys = rangeKeys(), a = actual(F.dept, keys), c = comparison(F.dept, keys), lbl = "vs " + compName(F.compare);
+  const sim = simAgg(F.dept, keys), t = sim.tot, p = sim.cmp, simLbl = sim.partialCmp ? "" : "vs " + compName(F.compare === "budget" ? "ly" : F.compare);
+  const sd = (x, y) => sim.partialCmp || !p.days ? null : delta(x, y);
+  let h = `<div class="kpis">` +
+    tile("Revenue (BC)", compact(a.sales), C(), `${fmt(a.sales)} ${C()}`, dl(delta(a.sales, c && c.sales), true, lbl)) +
+    tile("Net sales (Simphony)", sim.any ? compact(t.net) : "–", sim.any ? C() : "", sim.any ? `${fmt(t.days)} location-days read` : simHint(), sim.any ? dl(sd(t.net, p.net), true, simLbl) : "") +
+    tile("Checks", sim.any ? fmt(t.checks) : "–", "", "", sim.any ? dl(sd(t.checks, p.checks), true, simLbl) : "") +
+    tile("Average check", sim.any && t.checks ? fmt(t.net / t.checks) : "–", sim.any ? C() : "", "", sim.any && p.checks ? dl(sd(t.net / t.checks, p.net / p.checks), true, simLbl) : "") +
+    tile("Guests", sim.any ? fmt(t.guests) : "–", "", sim.any && t.guests ? `${fmt(t.net / t.guests)} ${C()} per guest` : "", sim.any ? dl(sd(t.guests, p.guests), true, simLbl) : "") +
+    tile("Discounts", sim.any && t.gross ? pct(t.discounts / t.gross * 100) : "–", "", "of gross sales", "") + `</div>`;
+  h += `<div class="grid2">` + chartCard("chSalesDept", "Revenue by restaurant", `${esc(periodText(keys))}, actual against ${esc(compName(F.compare))}. Click a bar to filter.`) +
+       chartCard("chSalesMonth", "Revenue by month", `${F.year}, ${esc(deptName(F.dept))}`) + `</div>`;
+  h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Revenue by sales account</h2><p class="hint">Where the revenue is posted in Business Central</p></div></div><div class="scroll" id="tbSalesAcc"></div></div>
+    <div class="card"><div class="chead"><div><h2>Simphony by location</h2><p class="hint">${esc(periodText(keys))}. Comparison uses complete months held from Simphony.</p></div></div><div class="scroll" id="tbSim"></div></div></div>`;
+  $("view").innerHTML = h;
+  const rows = restaurantsOnly(deptRows(keys)).sort((x, y) => y.a.sales - x.a.sales);
+  drawChart($("chSalesDept"), {type: "hbar", cats: rows.map(r => ({key: r.code, label: r.name, hl: F.dept === r.code})),
+    series: [{name: "Actual", color: "--c1", values: rows.map(r => r.a.sales)}, {name: cap(compName(F.compare)), color: "--c2", values: rows.map(r => r.c ? r.c.sales : null)}],
+    onClick: c => pickDept(c.key)});
+  const ms = monthlySeries(x => x.sales, F.compare);
+  drawChart($("chSalesMonth"), {type: "vbar", cats: ms.cats, series: [{name: "Actual", color: "--c1", values: ms.cur}, {name: ms.h === "budget" ? "Budget" : "Last year", color: "--c2", values: ms.cmp}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  $("tbSalesAcc").innerHTML = accountTable(a, c, ["sales"], true);
+  $("tbSim").innerHTML = !sim.locs.length ? `<div class="empty">${simHint()}</div>` :
+    `<table><tr><th>Location</th><th class="num">Net sales</th><th class="num">vs ${esc(compName(F.compare === "budget" ? "ly" : F.compare))}</th><th class="num">Checks</th><th class="num">Avg check</th><th class="num">Guests</th><th class="num">Days</th></tr>` +
+    sim.locs.map(l => `<tr><td>${esc(l.name)}${l.dept ? ` <span class="meta">${esc(l.dept)}</span>` : ""}</td><td class="num">${fmt(l.s.net)}${l.currency !== C() ? ` <span class="meta">${esc(l.currency)}</span>` : ""}</td>
+      <td class="num">${sim.partialCmp ? "–" : dl(delta(l.s.net, l.p.net), true)}</td><td class="num">${fmt(l.s.checks)}</td><td class="num">${l.s.checks ? fmt(l.s.net / l.s.checks) : "–"}</td>
+      <td class="num">${fmt(l.s.guests)}</td><td class="num">${fmt(l.s.days)}</td></tr>`).join("") + `</table>`;
+}
+function simHint(){
+  const sim = S.fin && S.fin.simphony;
+  if (!sim || !sim.configured) return "Simphony is not connected (Finance → Settings → Simphony sales).";
+  if (sim.error) return "Simphony: " + sim.error;
+  if (F.dept !== "*" && !sim.tied) return "Simphony locations are not tied to restaurants yet: fill in 'Simphony location → BC code' in Finance → Settings.";
+  return S.fin.pending ? "Simphony days are still being read." : "No Simphony sales for this selection.";
+}
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+
+function accountTable(a, c, buckets, income){
+  const nos = Object.keys(Object.assign({}, a.acc, c ? c.acc : {})).filter(no => buckets.includes(bucketOf(no)));
+  const rows = nos.map(no => ({no, name: (S.fin.accounts[no] || [""])[0], v: a.acc[no] || 0, p: c ? (c.acc[no] || 0) : null}))
+    .filter(r => Math.abs(r.v) >= 0.5 || Math.abs(r.p || 0) >= 0.5).sort((x, y) => Math.abs(y.v) - Math.abs(x.v));
+  if (!rows.length) return `<div class="empty">No postings on these accounts for this selection.</div>`;
+  const tot = rows.reduce((s, r) => s + r.v, 0), totp = c ? rows.reduce((s, r) => s + (r.p || 0), 0) : null;
+  return `<table><tr><th>Account</th><th class="num">Amount</th><th class="num">% of revenue</th><th class="num">${esc(cap(compName(F.compare)))}</th><th class="num">Change</th></tr>` +
+    rows.map(r => `<tr><td>${esc(r.no)} <span class="mut">${esc(r.name)}</span></td><td class="num">${fmt(r.v)}</td><td class="num">${a.sales ? pct(r.v / a.sales * 100) : "–"}</td>
+      <td class="num">${r.p == null ? "–" : fmt(r.p)}</td><td class="num">${dl(delta(r.v, r.p), income)}</td></tr>`).join("") +
+    `<tr class="total"><td>Total</td><td class="num">${fmt(tot)}</td><td class="num">${a.sales ? pct(tot / a.sales * 100) : "–"}</td><td class="num">${totp == null ? "–" : fmt(totp)}</td><td class="num">${dl(delta(tot, totp), income)}</td></tr></table>`;
+}
+
+function viewLabor(){
+  const keys = rangeKeys(), a = actual(F.dept, keys), c = comparison(F.dept, keys), lbl = "vs " + compName(F.compare);
+  const share = v => a.sales ? pct(v / a.sales * 100) : "–";
+  let h = `<div class="kpis">` +
+    tile("Labour cost", compact(a.labor), C(), `${fmt(a.labor)} ${C()}`, dl(delta(a.labor, c && c.labor), false, lbl)) +
+    tile("Labour % of revenue", pct(a.laborPct), "", "", dl(delta(a.laborPct, c && c.laborPct, "pts"), false, lbl)) +
+    tile("Kitchen", compact(a.labor_kitchen), C(), share(a.labor_kitchen) + " of revenue", dl(delta(a.labor_kitchen, c && c.labor_kitchen), false, lbl)) +
+    tile("Service", compact(a.labor_service), C(), share(a.labor_service) + " of revenue", dl(delta(a.labor_service, c && c.labor_service), false, lbl)) +
+    tile("Management", compact(a.labor_management), C(), share(a.labor_management) + " of revenue", dl(delta(a.labor_management, c && c.labor_management), false, lbl)) +
+    tile("Revenue per labour " + C(), a.labor ? fmt(a.sales / a.labor, 2) : "–", "", "Revenue earned per unit of labour cost", c && c.labor ? dl(delta(a.sales / a.labor, c.sales / c.labor), true, lbl) : "") + `</div>`;
+  h += `<div class="grid2">` + chartCard("chLabDept", "Labour % of revenue by restaurant", `${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a bar to filter.`) +
+       chartCard("chLabMonth", "Labour cost by month", `${F.year}, ${esc(deptName(F.dept))}, split by the payroll accounts`) + `</div>`;
+  h += `<div class="card"><div class="chead"><div><h2>Labour by restaurant</h2><p class="hint">${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbLab"></div></div>
+        <div class="card"><div class="chead"><div><h2>Payroll accounts</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbLabAcc"></div></div>`;
+  $("view").innerHTML = h;
+  const rows = restaurantsOnly(deptRows(keys)).sort((x, y) => (y.a.laborPct || 0) - (x.a.laborPct || 0));
+  drawChart($("chLabDept"), {type: "hbar", fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v), cats: rows.map(r => ({key: r.code, label: r.name, hl: F.dept === r.code})),
+    series: [{name: "Actual", color: "--c1", values: rows.map(r => r.a.laborPct)}, {name: cap(compName(F.compare)), color: "--c2", values: rows.map(r => r.c ? r.c.laborPct : null)}],
+    onClick: c => pickDept(c.key)});
+  const ks = yearKeys(), sel = new Set(keys), ms = ks.map(k => actual(F.dept, [k]));
+  drawChart($("chLabMonth"), {type: "stack", cats: ks.map(k => ({key: k, label: mshort(k), title: mlabel(k), hl: sel.has(k)})),
+    series: [{name: "Kitchen", color: "--c1", values: ms.map(m => m.labor_kitchen)}, {name: "Service", color: "--c2", values: ms.map(m => m.labor_service)},
+             {name: "Management", color: "--c3", values: ms.map(m => m.labor_management)}, {name: "Other staff costs", color: "--c4", values: ms.map(m => m.labor_other)}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  const all = deptRows(keys);
+  $("tbLab").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Labour</th><th class="num">% of revenue</th><th class="num">vs ${esc(compName(F.compare))}</th><th class="num">Kitchen</th><th class="num">Service</th><th class="num">Management</th><th class="num">Other</th></tr>` +
+    all.filter(r => r.a.labor).map(r => `<tr class="${r.unassigned ? "" : "click"} ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.a.labor)}</td><td class="num">${pct(r.a.laborPct)}</td>
+      <td class="num">${dl(delta(r.a.laborPct, r.c && r.c.laborPct, "pts"), false)}</td><td class="num">${fmt(r.a.labor_kitchen)}</td><td class="num">${fmt(r.a.labor_service)}</td>
+      <td class="num">${fmt(r.a.labor_management)}</td><td class="num">${fmt(r.a.labor_other)}</td></tr>`).join("") + `</table>`;
+  $("tbLabAcc").innerHTML = accountTable(a, c, ["labor_kitchen","labor_service","labor_management","labor_other"], false);
+}
+
+function viewFood(){
+  const keys = rangeKeys(), a = actual(F.dept, keys), c = comparison(F.dept, keys), lbl = "vs " + compName(F.compare);
+  const prov = keys.filter(k => ((S.fin && S.fin.provisional) || []).includes(k));
+  const p = purAgg(F.dept, keys);
+  let h = `<div class="kpis">` +
+    tile("Food cost", compact(a.food), C(), `${fmt(a.food)} ${C()}`, dl(delta(a.food, c && c.food), false, lbl)) +
+    tile("Food cost % of revenue", pct(a.foodPct), "", prov.length ? `<span class="prov">Provisional</span> · ${esc(prov.map(mshort).join(", "))}` : "Inventory posted", dl(delta(a.foodPct, c && c.foodPct, "pts"), false, lbl)) +
+    tile("Gross profit after food", compact(a.sales - a.food), C(), a.sales ? pct((a.sales - a.food) / a.sales * 100) + " of revenue" : "", dl(delta(a.sales - a.food, c && (c.sales - c.food)), true, lbl)) +
+    tile("Prime cost %", pct(a.primePct), "", "Food plus labour", dl(delta(a.primePct, c && c.primePct, "pts"), false, lbl)) +
+    tile("Purchases invoiced", S.pur ? compact(p.amt) : "–", S.pur ? C() : "", S.pur && a.sales ? `${pct(p.amt / a.sales * 100)} of revenue · all purchases` : "", "") + `</div>`;
+  h += `<div class="grid2">` + chartCard("chFoodDept", "Food cost % by restaurant", `${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a bar to filter.`) +
+       chartCard("chFoodMonth", "Food cost % by month", `${F.year}, ${esc(deptName(F.dept))}; hollow points are provisional`) + `</div>`;
+  h += `<div class="card"><div class="chead"><div><h2>Food cost accounts</h2><p class="hint">The cost-of-goods accounts set for the dashboard, ${esc(deptName(F.dept))}, ${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbFoodAcc"></div></div>
+        <div class="card"><div class="chead"><div><h2>Food cost by restaurant</h2></div></div><div class="scroll" id="tbFood"></div></div>`;
+  $("view").innerHTML = h;
+  const rows = restaurantsOnly(deptRows(keys)).sort((x, y) => (y.a.foodPct || 0) - (x.a.foodPct || 0));
+  drawChart($("chFoodDept"), {type: "hbar", fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v), cats: rows.map(r => ({key: r.code, label: r.name, hl: F.dept === r.code})),
+    series: [{name: "Actual", color: "--c1", values: rows.map(r => r.a.foodPct)}, {name: cap(compName(F.compare)), color: "--c2", values: rows.map(r => r.c ? r.c.foodPct : null)}],
+    onClick: c => pickDept(c.key)});
+  const ms = monthlySeries(x => x.foodPct, F.compare);
+  drawChart($("chFoodMonth"), {type: "line", cats: ms.cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
+    series: [{name: "Actual", color: "--c1", values: ms.cur, hollow: ms.prov, line: true}, {name: ms.h === "budget" ? "Budget" : "Last year", color: "--c2", values: ms.cmp, dash: true, line: true}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  $("tbFoodAcc").innerHTML = accountTable(a, c, ["food"], false);
+  $("tbFood").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Revenue</th><th class="num">Food cost</th><th class="num">Food %</th><th class="num">vs ${esc(compName(F.compare))}</th><th class="num">Purchases</th></tr>` +
+    deptRows(keys).filter(r => r.a.food || r.a.sales).map(r => { const pp = purAgg(r.code, keys);
+      return `<tr class="${r.unassigned ? "" : "click"} ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.a.sales)}</td><td class="num">${fmt(r.a.food)}</td>
+      <td class="num">${pct(r.a.foodPct)}</td><td class="num">${dl(delta(r.a.foodPct, r.c && r.c.foodPct, "pts"), false)}</td><td class="num">${S.pur ? fmt(pp.amt) : "–"}</td></tr>`; }).join("") + `</table>`;
+}
+
+function viewBudget(){
+  const keys = rangeKeys(), b = S.fin && S.fin.budget;
+  if (!b || !b.available) {
+    $("view").innerHTML = `<div class="card"><h2>No budget found</h2><p class="hint">The dashboard looks for the G/L budget "${esc((b && b.name) || "BUDGET" + F.year)}" in Business Central. Set the budget name under Finance → Settings if it is called differently.</p></div>`;
+    return;
+  }
+  const a = actual(F.dept, keys), c = comparison(F.dept, keys, "budget");
+  const lbl = "vs budget";
+  let h = `<div class="kpis">` +
+    tile("Revenue", compact(a.sales), C(), `Budget ${compact(c.sales)}`, dl(delta(a.sales, c.sales), true, lbl)) +
+    tile("Food cost", compact(a.food), C(), `Budget ${compact(c.food)} · ${pct(a.foodPct)} vs ${pct(c.foodPct)}`, dl(delta(a.food, c.food), false, lbl)) +
+    tile("Labour cost", compact(a.labor), C(), `Budget ${compact(c.labor)} · ${pct(a.laborPct)} vs ${pct(c.laborPct)}`, dl(delta(a.labor, c.labor), false, lbl)) +
+    tile("Other operating costs", compact(a.opex), C(), `Budget ${compact(c.opex)}`, dl(delta(a.opex, c.opex), false, lbl)) +
+    tile("EBITDA", compact(a.ebitda), C(), `Budget ${compact(c.ebitda)}`, dl(delta(a.ebitda, c.ebitda), true, lbl)) + `</div>`;
+  h += `<div class="grid2">` + chartCard("chBudMonth", "Revenue against budget by month", `${F.year}, ${esc(deptName(F.dept))}`) +
+       chartCard("chBudEbitda", "EBITDA against budget by month", `${F.year}, ${esc(deptName(F.dept))}`) + `</div>`;
+  h += `<div class="card"><div class="chead"><div><h2>Statement against budget</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}, budget ${esc(b.name)}${running() && keys.includes(running().month) ? "; the month in progress takes its budget pro rata to the days elapsed" : ""}</p></div></div><div class="scroll" id="tbBud"></div></div>
+        <div class="card"><div class="chead"><div><h2>Restaurants against budget</h2><p class="hint">Click a row to filter</p></div></div><div class="scroll" id="tbBudDept"></div></div>`;
+  $("view").innerHTML = h;
+  const ms = monthlySeries(x => x.sales, "budget"), me_ = monthlySeries(x => x.ebitda, "budget");
+  drawChart($("chBudMonth"), {type: "vbar", cats: ms.cats, series: [{name: "Actual", color: "--c1", values: ms.cur}, {name: "Budget", color: "--c2", values: ms.cmp}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  drawChart($("chBudEbitda"), {type: "vbar", cats: me_.cats, series: [{name: "Actual", color: "--c1", values: me_.cur}, {name: "Budget", color: "--c2", values: me_.cmp}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  const lines = [["Revenue","sales",true],["Other operating income","other_income",true],["Food cost","food",false],["Labour","labor",false],["Other operating costs","opex",false],
+                 ["EBITDA","ebitda",true,1],["Depreciation and amortisation","da",false],["Interest, exchange and tax","below",false],["Result","net",true,1]];
+  $("tbBud").innerHTML = `<table><tr><th>Line</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">Variance %</th><th class="num">Actual % of revenue</th><th class="num">Budget % of revenue</th></tr>` +
+    lines.map(([n, k, inc, tot]) => { const v = a[k], bv = c[k], d = v - bv, good = inc ? d >= 0 : d <= 0;
+      return `<tr class="${tot ? "total" : ""}"><td>${esc(n)}</td><td class="num">${fmt(v)}</td><td class="num">${fmt(bv)}</td>
+        <td class="num"><span class="dl ${Math.abs(d) < 0.5 ? "flat" : good ? "good" : "bad"}">${d >= 0 ? "+" : ""}${fmt(d)}</span></td>
+        <td class="num">${dl(delta(v, bv), inc)}</td><td class="num">${a.sales ? pct(v / a.sales * 100) : "–"}</td><td class="num">${c.sales ? pct(bv / c.sales * 100) : "–"}</td></tr>`; }).join("") + `</table>`;
+  const rows = depts().map(d => ({code: d.code, name: d.name, a: actual(d.code, keys), c: comparison(d.code, keys, "budget")})).filter(r => r.a.sales || r.c.sales || r.a.ebitda);
+  $("tbBudDept").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Revenue</th><th class="num">Budget</th><th class="num">Variance %</th><th class="num">EBITDA</th><th class="num">Budget</th><th class="num">Variance</th></tr>` +
+    rows.map(r => `<tr class="click ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.a.sales)}</td><td class="num">${fmt(r.c.sales)}</td>
+      <td class="num">${dl(delta(r.a.sales, r.c.sales), true)}</td><td class="num">${fmt(r.a.ebitda)}</td><td class="num">${fmt(r.c.ebitda)}</td>
+      <td class="num"><span class="dl ${r.a.ebitda >= r.c.ebitda ? "good" : "bad"}">${r.a.ebitda - r.c.ebitda >= 0 ? "+" : ""}${fmt(r.a.ebitda - r.c.ebitda)}</span></td></tr>`).join("") + `</table>`;
+}
+
+/* purchasing: S.pur.invoices[dept][month][vendor] = [amount, invoices, without PO, amount without PO] */
+function purAgg(dept, keys){
+  const out = {amt: 0, n: 0, nopo: 0, nopoAmt: 0, vendors: {}, missing: 0};
+  if (!S.pur) return out;
+  const inv = S.pur.invoices || {};
+  const ds = dept === "*" ? Object.keys(inv) : [dept];
+  for (const k of keys) { let seen = false;
+    for (const d of ds){ const m = inv[d] && inv[d][k]; if (!m) continue; seen = true;
+      for (const [v, r] of Object.entries(m)){ out.amt += r[0]; out.n += r[1]; out.nopo += r[2]; out.nopoAmt += r[3];
+        const t = out.vendors[v] || (out.vendors[v] = [0, 0, 0, 0]); t[0] += r[0]; t[1] += r[1]; t[2] += r[2]; t[3] += r[3]; } }
+    if (!seen) out.missing++; }
+  out.nopoRate = out.n ? out.nopo / out.n * 100 : null;
+  const list = Object.values(out.vendors).map(v => v[0]).sort((a, b) => b - a);
+  out.top5 = out.amt ? list.slice(0, 5).reduce((s, v) => s + v, 0) / out.amt * 100 : null;
+  out.vendorCount = list.filter(v => v).length;
+  return out;
+}
+const foreignIn = keys => keys.reduce((s, k) => s + ((S.pur && S.pur.foreign && S.pur.foreign[k]) || 0), 0);
+function viewPurchasing(){
+  if (!S.pur) { $("view").innerHTML = `<div class="card"><h2>Purchasing</h2><p class="hint">${esc(S.purErr || "Purchasing figures are not available for your role.")}</p></div>`; return; }
+  const keys = rangeKeys(), how = F.compare === "budget" ? "ly" : F.compare, lbl = "vs " + compName(how);
+  const p = purAgg(F.dept, keys), pc = purAgg(F.dept, compKeys(keys, how)), a = finOK() ? actual(F.dept, keys) : null;
+  let h = (F.compare === "budget" ? `<div class="banner">There is no purchasing budget; purchases are compared with the same period last year.</div>` : "") + `<div class="kpis">` +
+    tile("Purchases invoiced", compact(p.amt), C(), `${fmt(p.amt)} ${C()} excl. VAT` + (foreignIn(keys) ? ` · ${fmt(foreignIn(keys))} in a foreign currency at face value` : ""), dl(delta(p.amt, pc.amt), false, lbl)) +
+    tile("Purchases % of revenue", a && a.sales ? pct(p.amt / a.sales * 100) : "–", "", "Invoiced against revenue posted", "") +
+    tile("Invoices", fmt(p.n), "", `${fmt(p.vendorCount)} suppliers`, dl(delta(p.n, pc.n), false, lbl)) +
+    tile("Without a purchase order", pct(p.nopoRate), "", `${fmt(p.nopo)} invoices · ${compact(p.nopoAmt)} ${C()}`, dl(delta(p.nopoRate, pc.nopoRate, "pts"), false, lbl)) +
+    tile("Top 5 suppliers", pct(p.top5), "", "share of purchases", dl(delta(p.top5, pc.top5, "pts"), false, lbl)) + `</div>`;
+  h += `<div class="grid2">` + chartCard("chPurMonth", "Purchases by month", `${F.year}, ${esc(deptName(F.dept))}, against last year`) +
+       chartCard("chPurPo", "Invoices without a purchase order", `${F.year}, share of invoices by month`) + `</div>`;
+  h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Purchases by restaurant</h2><p class="hint">${esc(periodText(keys))}. Click a row to filter.</p></div></div><div class="scroll" id="tbPurDept"></div></div>
+        <div class="card"><div class="chead"><div><h2>Top suppliers</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbPurVend"></div></div></div>`;
+  $("view").innerHTML = h;
+  const ks = yearKeys(), sel = new Set(keys);
+  const cats = ks.map(k => ({key: k, label: mshort(k), title: mlabel(k), hl: sel.has(k)}));
+  const cur = ks.map(k => purAgg(F.dept, [k])), ly = ks.map(k => purAgg(F.dept, compKeys([k], "ly")));
+  drawChart($("chPurMonth"), {type: "vbar", cats, series: [{name: "Actual", color: "--c1", values: cur.map(x => x.missing ? null : x.amt)}, {name: "Last year", color: "--c2", values: ly.map(x => x.missing ? null : x.amt)}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  drawChart($("chPurPo"), {type: "line", cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
+    series: [{name: "Actual", color: "--c1", values: cur.map(x => x.nopoRate), line: true}, {name: "Last year", color: "--c2", values: ly.map(x => x.nopoRate), dash: true, line: true}]});
+  const inv = S.pur.invoices || {};
+  const codes = Array.from(new Set(Object.keys(inv)));
+  const rows = codes.map(code => { const x = purAgg(code, keys), y = purAgg(code, compKeys(keys, how)), r = finOK() && code ? actual(code, keys) : null;
+    return {code, name: code ? deptName(code) : "Not on a restaurant", x, y, r}; }).filter(r => r.x.amt || r.y.amt).sort((u, v) => v.x.amt - u.x.amt);
+  $("tbPurDept").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Purchases</th><th class="num">vs ${esc(compName(how))}</th><th class="num">% of revenue</th><th class="num">Invoices</th><th class="num">Without PO</th></tr>` +
+    rows.map(r => `<tr class="${r.code ? "click" : ""} ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.x.amt)}</td><td class="num">${dl(delta(r.x.amt, r.y.amt), false)}</td>
+      <td class="num">${r.r && r.r.sales ? pct(r.x.amt / r.r.sales * 100) : "–"}</td><td class="num">${fmt(r.x.n)}</td><td class="num">${pct(r.x.nopoRate)}</td></tr>`).join("") + `</table>`;
+  const vend = Object.entries(p.vendors).sort((u, v) => v[1][0] - u[1][0]).slice(0, 12);
+  $("tbPurVend").innerHTML = !vend.length ? `<div class="empty">No invoices for this selection.</div>` :
+    `<table><tr><th>Supplier</th><th class="num">Purchases</th><th class="num">Share</th><th class="num">Invoices</th><th class="num">Without PO</th></tr>` +
+    vend.map(([no, v]) => `<tr><td>${esc((S.pur.vendors || {})[no] || no)} <span class="meta">${esc(no)}</span></td><td class="num">${fmt(v[0])}</td><td class="num">${p.amt ? pct(v[0] / p.amt * 100) : "–"}</td>
+      <td class="num">${fmt(v[1])}</td><td class="num">${v[2] ? `<span class="dl bad">${fmt(v[2])}</span>` : "0"}</td></tr>`).join("") + `</table>`;
+}
+
+/* ------------------------------------------------------------ render */
+const DEF_LABEL = {sales: "Revenue", food: "Food cost", labor: "Labour", prime: "Prime cost", ebitda: "EBITDA", running: "Month in progress", budget: "Budget", simphony: "Simphony"};
+const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, purchasing: viewPurchasing};
+function render(){
+  CHARTS.clear(); hideTip();
+  syncUrl();
+  const keys = rangeKeys();
+  const how = F.tab === "budget" ? "budget" : F.tab === "purchasing" && F.compare === "budget" ? "ly" : F.compare;
+  $("periodLabel").textContent = keys.length ? `${periodText(keys)} · ${deptName(F.dept)} · against ${compName(how)}` : "Reading…";
+  renderBanner();
+  const needsFin = F.tab !== "purchasing";
+  if (needsFin && !S.fin) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">${esc(S.finErr || "Reading Business Central…")}</p></div>`; return; }
+  try { VIEWS[F.tab](); } catch (e) { console.error(e); $("view").innerHTML = `<div class="card"><p class="hint">This view could not be drawn: ${esc(e.message)}</p></div>`; }
+  const defs = (S.fin && S.fin.definitions) || {}, pd = (S.pur && S.pur.definitions) || {};
+  const show = {overview: ["sales","food","labor","prime","ebitda","running"], sales: ["sales","simphony","running"], labor: ["labor","running"],
+                food: ["food","running"], budget: ["budget","ebitda"], purchasing: []}[F.tab];
+  $("foot").innerHTML = `<div class="defs">` + show.filter(k => defs[k]).map(k => `<b>${esc(DEF_LABEL[k] || cap(k))}.</b> ${esc(defs[k])}`).join(" ") +
+    (F.tab === "purchasing" ? Object.values(pd).map(esc).join(" ") : "") + ` Every figure is read-only from Business Central${F.tab === "sales" ? " and Simphony" : ""}; the filters re-cut what is loaded and do not run another report.</div>`;
+}
+function renderBanner(){
+  const f = S.fin, p = S.pur, parts = [];
+  let done = 0, total = 0;
+  if (f && f.pending) { const g = f.progress || {}; parts.push(`Finance: ${g.stage || "reading"}${g.total ? ` ${fmt(g.done)} of ${fmt(g.total)}` : ""}`); done += g.done || 0; total += g.total || 0; }
+  if (p && p.pending) { const g = p.progress || {}; parts.push(`Purchasing: ${fmt(g.done)} of ${fmt(g.total)} months`); done += g.done || 0; total += g.total || 0; }
+  const errs = [...((f && f.errors) || []), ...((p && p.errors) || [])];
+  let h = "";
+  if (parts.length) h += `<div class="banner"><span class="bar"><i style="width:${total ? Math.round(done / total * 100) : 5}%"></i></span><span>${esc(parts.join(" · "))}. The figures fill in as they arrive; the first read of a year takes several minutes, after that it is quick.</span></div>`;
+  if (S.finErr && F.tab !== "purchasing") h += `<div class="banner warn">Finance: ${esc(S.finErr)}</div>`;
+  if (errs.length) h += `<div class="banner warn"><span>${esc(errs.slice(0, 3).join(" · "))}${errs.length > 3 ? ` · and ${errs.length - 3} more` : ""}</span></div>`;
+  $("banner").innerHTML = h;
+  const busy = parts.length > 0;
+  $("pill").className = "pill" + (busy ? " load" : errs.length || S.finErr || S.purErr ? " err" : "");
+  $("pillText").textContent = busy ? "Reading…" : `Live · ${new Date().toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
+}
+document.addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-dept]"); if (!tr || !tr.classList.contains("click")) return;
+  pickDept(tr.dataset.dept);
+});
+
+/* ------------------------------------------------------------ filters and loading */
+function fillEnd(){
+  const ks = yearKeys(), sel = $("fEnd"), run = running();
+  if (!ks.length) { sel.innerHTML = ""; return; }
+  sel.innerHTML = ks.map(k => `<option value="${k}">${mlabel(k)}${run && k === run.month ? " (to date)" : ""}</option>`).join("");
+  if (!ks.includes(F.end)) {
+    // the last month that has ended is the natural default; the month in progress is one click away
+    F.end = ks.length > 1 && run && ks[ks.length - 1] === run.month ? ks[ks.length - 2] : ks[ks.length - 1];
+  }
+  sel.value = F.end;
+}
+function fillDepts(){
+  const sel = $("fDept"), list = depts();
+  const cur = F.dept;
+  sel.innerHTML = `<option value="*">Whole company</option>` + list.map(d => `<option value="${esc(d.code)}">${esc(d.name)}${d.name !== d.code ? ` (${esc(d.code)})` : ""}</option>`).join("");
+  if (cur !== "*" && !list.some(d => d.code === cur) && list.length) F.dept = "*";
+  sel.value = F.dept;
+}
+function syncUrl(){
+  const q = new URLSearchParams({company: F.company, year: F.year, mode: F.mode, end: F.end, dept: F.dept, compare: F.compare, tab: F.tab});
+  history.replaceState(null, "", "/executive?" + q.toString());
+}
+async function load(refresh){
+  clearTimeout(S.timer);
+  const co = encodeURIComponent(F.company), yr = F.year, r = refresh ? "&refresh=1" : "";
+  const jobs = [];
+  if (can("finance.view")) jobs.push(get(`/finance/api/executive?company=${co}&year=${yr}${r}`).then(j => { S.fin = j; S.finErr = null; }).catch(e => { S.finErr = e.message; }));
+  else S.finErr = "Your role does not include the Finance tower.";
+  if (can("purchasing.view")) jobs.push(get(`/purchasing/api/executive?company=${co}&year=${yr}${r}`).then(j => { S.pur = j; S.purErr = null; }).catch(e => { S.purErr = e.message; }));
+  else S.purErr = "Your role does not include the Purchasing tower.";
+  await Promise.all(jobs);
+  if (S.fin && (S.fin.company !== F.company || S.fin.year !== F.year)) S.fin = null;
+  if (S.pur && (S.pur.company !== F.company || S.pur.year !== F.year)) S.pur = null;
+  fillEnd(); fillDepts(); render();
+  if ((S.fin && S.fin.pending) || (S.pur && S.pur.pending)) S.timer = setTimeout(() => load(false), 5000);
+}
+
+$("tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (!b) return;
+  F.tab = b.dataset.tab; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); render(); });
+$("fMode").onchange = e => { F.mode = e.target.value; render(); };
+$("fEnd").onchange = e => { F.end = e.target.value; render(); };
+$("fDept").onchange = e => { F.dept = e.target.value; render(); };
+$("fCompare").onchange = e => { F.compare = e.target.value; render(); };
+$("fCompany").onchange = e => { F.company = e.target.value; S.fin = S.pur = null; F.dept = "*"; render(); load(false); };
+$("fYear").onchange = e => { F.year = +e.target.value; S.fin = S.pur = null; F.end = ""; render(); load(false); };
+$("refreshBtn").onclick = () => load(true);
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login";
+};
+
+(async () => {
+  let s;
+  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  const t = $("towers");
+  [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"]]
+    .filter(([p]) => can(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
+  if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
+  const q = new URLSearchParams(location.search);
+  const now = new Date().getFullYear();
+  $("fYear").innerHTML = [now, now - 1, now - 2].map(y => `<option>${y}</option>`).join("");
+  let companies = [], def = "SALT";
+  try {
+    const c = await get(can("finance.view") ? "/finance/api/companies" : "/purchasing/api/companies");
+    companies = c.companies || []; def = c.default || def;
+  } catch (e) {}
+  if (!companies.length) companies = [def];
+  $("fCompany").innerHTML = companies.map(x => `<option>${esc(x)}</option>`).join("");
+  F.company = companies.includes(q.get("company")) ? q.get("company") : def;
+  F.year = [now, now - 1, now - 2].includes(+q.get("year")) ? +q.get("year") : now;
+  if (["month","quarter","ytd"].includes(q.get("mode"))) F.mode = q.get("mode");
+  if (q.get("end")) F.end = q.get("end");
+  if (q.get("dept")) F.dept = q.get("dept");
+  if (["ly","budget","prior"].includes(q.get("compare"))) F.compare = q.get("compare");
+  if (VIEWS[q.get("tab")]) F.tab = q.get("tab");
+  $("fCompany").value = F.company; $("fYear").value = F.year; $("fMode").value = F.mode; $("fCompare").value = F.compare;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === F.tab));
+  render();
+  load(false);
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

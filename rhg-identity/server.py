@@ -118,6 +118,13 @@ class Handler(BaseHTTPRequestHandler):
             if url.path in ("/login", "/login.html"):
                 self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
                 return
+            if url.path in ("/executive", "/executive.html"):
+                u = self._user()
+                if not u or u.get("must_change"):
+                    self._send(200, (STATIC / "login.html").read_bytes(), "text/html; charset=utf-8")
+                else:
+                    self._send(200, (STATIC / "executive.html").read_bytes(), "text/html; charset=utf-8")
+                return
             if url.path in ("/admin", "/admin.html"):
                 self._send(200, (STATIC / "admin.html").read_bytes(), "text/html; charset=utf-8")
                 return

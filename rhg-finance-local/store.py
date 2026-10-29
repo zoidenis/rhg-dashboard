@@ -56,6 +56,9 @@ DEFAULT_SETTINGS = {
     "group": {"reporting_currency": "ALL",
               "currencies": "SALT=ALL, TBM=ALL, RKS Revo Hospitality Group=EUR, Zoi Greece=EUR",
               "rates": "EUR=100", "rate_note": ""},
+    # Executive dashboard (Control center): which accounts make sales, food cost, labour and
+    # the items below EBITDA. "641*" means every account starting 641. Blank = the default.
+    "executive": {"sales": "", "food": "", "labor": "", "below": ""},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,
@@ -91,6 +94,7 @@ def get_settings():
     merged["inventory"].update(s.get("inventory", {}))
     merged["accounts"].update(s.get("accounts", {}))
     merged["group"].update(s.get("group", {}))
+    merged["executive"].update(s.get("executive", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
         if k in s:
             merged[k] = s[k]
@@ -119,6 +123,9 @@ def save_settings(patch, actor="director"):
         for k, v in (patch.get("group") or {}).items():
             if k in DEFAULT_SETTINGS["group"]:
                 current.setdefault("group", {})[k] = str(v)[:400]
+        for k, v in (patch.get("executive") or {}).items():
+            if k in DEFAULT_SETTINGS["executive"]:
+                current.setdefault("executive", {})[k] = str(v)[:600]
         for k, v in (patch.get("accounts") or {}).items():
             if k in DEFAULT_SETTINGS["accounts"]:
                 current.setdefault("accounts", {})[k] = str(v)[:200]

@@ -23,6 +23,7 @@ import auth
 import brief
 import classify
 import compliance
+import executive
 import notify
 import contracts
 import comparisons
@@ -1150,6 +1151,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"locations": [{"code": c, "name": c} for c in seen],
                                      "error": str(exc)[:300],
                                      "source": "posted movements (the location page could not be read)"})
+            elif url.path == "/api/executive":
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    year = int(q.get("year") or date.today().year)
+                except ValueError:
+                    year = date.today().year
+                year = max(date.today().year - 3, min(year, date.today().year))
+                self._send(200, executive.request(client, company, year, company_currency(company),
+                                                  q.get("refresh") == "1"))
             elif url.path == "/api/compliance":
                 self._send(200, compliance_screen(q.get("company") or config.BC_COMPANY,
                                                   q.get("month") or date.today().strftime("%Y-%m")))

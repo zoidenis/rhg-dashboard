@@ -17,7 +17,7 @@ aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;hei
 main{flex:1;min-width:0}
 header{display:flex;justify-content:space-between}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr)}
-.towers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.towers-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px}
 .towers-grid .card{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .towers-grid h3{font-family:var(--rhg-font-display);font-size:22px;font-weight:600;margin:0;line-height:1.35}
 .towers-grid p{margin:0;font-size:13px;color:var(--sub)}
@@ -42,6 +42,7 @@ header{display:flex;justify-content:space-between}
   <div class="towers" aria-label="Control towers" id="towers">
     <span class="lbl">Control towers</span>
     <a href="/" class="on" aria-current="page">Control center</a>
+    <a href="/executive">Executive dashboard</a>
   </div>
   <div class="adminlink" id="adminLink"></div>
 </aside>
@@ -85,6 +86,8 @@ header{display:flex;justify-content:space-between}
       <span class="rhg-pill info" id="cPurchChip">–</span><a class="btn dark" href="/purchasing/">Open tower →</a></div>
     <div class="card" id="cFin"><h3>Finance tower</h3><p>Performance, liquidity and month-end</p>
       <span class="rhg-pill info" id="cFinChip">–</span><a class="btn dark" href="/finance/">Open tower →</a></div>
+    <div class="card" id="cExec"><h3>Executive dashboard</h3><p>Sales, labour, food cost, budget and purchasing, filtered live</p>
+      <span class="rhg-pill info">BC and Simphony</span><a class="btn dark" href="/executive">Open dashboard →</a></div>
     <div class="card" id="cInv"><h3>Inventory control</h3><p>Stock, movement and ledger reconciliation</p>
       <span class="rhg-pill info" id="cInvChip">–</span><a class="btn dark" href="/finance/#inventory">Open tower →</a></div>
   </div>

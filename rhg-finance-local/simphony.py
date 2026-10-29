@@ -299,24 +299,46 @@ def latest_business_date(loc_ref):
     return j.get("latestBusDt")
 
 
-def _read_days():
-    try:
-        return json.loads(DAYS_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+_days_mem = {"rows": None, "dirty": 0, "saved_at": 0.0}
 
 
-def _write_days(days):
+def _days():
+    """The daily totals held, read from the file once and then kept in memory: a year of
+    locations is thousands of days, and rewriting the whole file per day read was the
+    slow part of a first read."""
+    if _days_mem["rows"] is None:
+        try:
+            _days_mem["rows"] = json.loads(DAYS_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _days_mem["rows"] = {}
+    return _days_mem["rows"]
+
+
+def _save_days(force=False):
+    if not _days_mem["dirty"] or (not force and time.time() - _days_mem["saved_at"] < 15):
+        return
     tmp = DAYS_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(days, separators=(",", ":")), encoding="utf-8")
+    tmp.write_text(json.dumps(_days_mem["rows"], separators=(",", ":")), encoding="utf-8")
     tmp.replace(DAYS_FILE)
+    _days_mem.update(dirty=0, saved_at=time.time())
+
+
+def flush_days():
+    with _days_lock:
+        _save_days(force=True)
+
+
+def held_day(loc_ref, bus_dt):
+    """A day already read, or None; never calls Simphony."""
+    with _days_lock:
+        return _days().get(f"{loc_ref}|{bus_dt}")
 
 
 def daily_totals(loc_ref, bus_dt, latest=None):
     """Operations daily totals of one location and business date, from the file when final."""
     key = f"{loc_ref}|{bus_dt}"
     with _days_lock:
-        hit = _read_days().get(key)
+        hit = _days().get(key)
     final_before = (date.fromisoformat(latest) - timedelta(days=2)).isoformat() if latest else None
     if hit and (hit.get("final") or time.time() - hit.get("at", 0) < 900):
         return hit
@@ -324,9 +346,9 @@ def daily_totals(loc_ref, bus_dt, latest=None):
     row = {"at": time.time(), "rvcs": j.get("revenueCenters") or [],
            "final": bool(final_before and bus_dt <= final_before)}
     with _days_lock:
-        days = _read_days()
-        days[key] = row
-        _write_days(days)
+        _days()[key] = row
+        _days_mem["dirty"] += 1
+        _save_days()
     return row
 
 

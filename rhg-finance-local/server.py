@@ -20,6 +20,7 @@ import brief
 import config
 import localdb
 import memuse
+import executive
 import finance
 import inventory
 import simphony
@@ -470,6 +471,7 @@ def sales_screen(anchor, mode, compare="prior"):
                 continue                         # that business day has not been closed yet
             jobs[(l["locRef"], d)] = (lambda r=l["locRef"], dd=d, lt=last: simphony.daily_totals(r, dd, lt))
     results = in_parallel_jobs(jobs, workers=4)
+    simphony.flush_days()
     errors = sorted({str(err)[:200] for _, (_, err) in results.items() if err})
 
     rows, by_day = [], {}
@@ -1140,6 +1142,15 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/sales":
                 self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1",
                                               q.get("compare") or "prior"))
+            elif url.path == "/api/executive":
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    year = int(q.get("year") or date.today().year)
+                except ValueError:
+                    year = date.today().year
+                year = max(date.today().year - 3, min(year, date.today().year))
+                self._send(200, executive.request(client, company, year, company_currency(company),
+                                                  q.get("refresh") == "1"))
             elif url.path == "/api/simphony/status":
                 self._send(200, simphony.info())
             elif url.path == "/api/inventory":

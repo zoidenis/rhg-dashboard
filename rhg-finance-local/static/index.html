@@ -804,7 +804,12 @@ function renderSettings(){
     <label class="field">Income account prefixes<input id="ac-inc" value="${esc((s.accounts||{}).income_prefixes||"")}" placeholder="7"></label>
     <label class="field">Cost-of-goods prefixes<input id="ac-cogs" value="${esc((s.accounts||{}).cogs_prefixes||"")}" placeholder="60"></label>
     <label class="field">Expense prefixes<input id="ac-exp" value="${esc((s.accounts||{}).expense_prefixes||"")}" placeholder="6"></label>
-    <label class="field">Equity prefixes<input id="ac-eq" value="${esc((s.accounts||{}).equity_prefixes||"")}" placeholder="1"></label>`;
+    <label class="field">Equity prefixes<input id="ac-eq" value="${esc((s.accounts||{}).equity_prefixes||"")}" placeholder="1"></label>
+    <label class="field">Executive dashboard · sales accounts<input id="ex-sales" value="${esc((s.executive||{}).sales||"")}" placeholder="70*, 76"></label>
+    <label class="field">Executive dashboard · labour accounts<input id="ex-labor" value="${esc((s.executive||{}).labor||"")}" placeholder="641*, 644*, 648*"></label>
+    <label class="field" style="grid-column:1/-1">Executive dashboard · food cost accounts (COGS)<input id="ex-food" value="${esc((s.executive||{}).food||"")}" placeholder="6011, 60111, 6012, 60121, 6013, 60122, 60123, 601231, 602, 6027, 60271, 6034, 605, 6051, 6581"></label>
+    <label class="field" style="grid-column:1/-1">Executive dashboard · below EBITDA (interest, exchange, tax)<input id="ex-below" value="${esc((s.executive||{}).below||"")}" placeholder="667, 668, 669*, 69, 727, 769*, 77"></label>
+    <p class="hint" style="grid-column:1/-1;margin:0">Account lists for the executive dashboard: exact account numbers, or a number followed by * for every account that starts with it. Leave blank for the default shown.</p>`;
   settingsDone = true; loadAudit();
 }
 $("saveSettings").onclick = async ()=>{
@@ -818,7 +823,9 @@ $("saveSettings").onclick = async ()=>{
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
-                  expense_prefixes:$("ac-exp").value, equity_prefixes:$("ac-eq").value}})});
+                  expense_prefixes:$("ac-exp").value, equity_prefixes:$("ac-eq").value},
+        executive:{sales:$("ex-sales").value, food:$("ex-food").value, labor:$("ex-labor").value,
+                   below:$("ex-below").value}})});
     if(!r.ok) throw new Error("save failed");
     $("saved").textContent="Saved. Applied on the next refresh."; await load(); loadAudit();
   }catch(e){ $("saved").textContent="Could not save: "+e.message; }

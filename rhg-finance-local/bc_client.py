@@ -184,6 +184,31 @@ class BCClient:
                                  {"$filter": flt, "$select": "Entry_No,Budget_Name,G_L_Account_No,Date,Amount"})
         return self._cached(("bud", company, date_from, date_to, budget_name), max_age, go)
 
+    # ---- executive dashboard: the caller keeps its own cache on disk ----
+    def net_change(self, company, date_from, date_to, dimension=None, first="6", last="8"):
+        """Net change of the income-statement posting accounts for a period, one
+        department or the whole company. Only Net_Change is selected: every flow field
+        asked for is another calculation BC runs over the ledger."""
+        flt = (f"Date_Filter eq '{date_from}..{date_to}' and No ge '{first}' and No lt '{last}'"
+               f" and Account_Type eq 'Posting'")
+        if dimension:
+            flt += f" and Global_Dimension_1_Filter eq '{dimension}'"
+        return self._get_all(self._url(company, config.E_ACCOUNTS),
+                             {"$filter": flt, "$select": "No,Name,Account_Category,Net_Change"})
+
+    def budget_entries(self, company, date_from, date_to, budget_name):
+        flt = f"Date ge {date_from} and Date le {date_to} and Budget_Name eq '{budget_name}'"
+        return self._get_all(self._url(company, config.E_BUDGET),
+                             {"$filter": flt, "$select": "G_L_Account_No,Date,Amount,Dimension_Set_ID"})
+
+    def dimension_sets(self, company, code="DEPARTMENT"):
+        """{dimension set id: value code} for one dimension."""
+        rows = self._get_all(self._url(company, config.E_DIMSET),
+                             {"$filter": f"Dimension_Code eq '{code}'",
+                              "$select": "Dimension_Set_ID,Dimension_Value_Code"})
+        return {int(r["Dimension_Set_ID"]): r.get("Dimension_Value_Code") or "" for r in rows
+                if r.get("Dimension_Set_ID") is not None}
+
     # ---- ledgers ----
     def open_vendor_entries(self, company, max_age=300):
         return self._cached(("ap", company), max_age, lambda: self._get_all(

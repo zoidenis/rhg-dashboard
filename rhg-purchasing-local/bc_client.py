@@ -448,6 +448,15 @@ class BCClient:
                                              "Purchaser_Code,Cancelled,Corrective,Closed"})
         return self._cached_value(("pinv", company, date_from, date_to), max_age, go)
 
+    def posted_invoice_headers(self, company, date_from, date_to):
+        """The same headers as posted_invoices, not held in memory: the executive dashboard
+        keeps its own monthly totals on disk and would only push the screens' readings out."""
+        return self._get_all(self._url(company, config.BC_PINV_ENTITY),
+                             {"$filter": f"Posting_Date ge {date_from} and Posting_Date le {date_to}",
+                              "$select": "No,Order_No,Buy_from_Vendor_No,Buy_from_Vendor_Name,Posting_Date,"
+                                         "Amount,Currency_Code,Location_Code,Shortcut_Dimension_1_Code,"
+                                         "Cancelled,Corrective"})
+
     def invoice_lines_without_order(self, company, first_doc, last_doc, max_age=900):
         """Invoice lines carrying no order number, within a range of document numbers.
 
