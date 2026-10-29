@@ -1170,7 +1170,7 @@ class Handler(BaseHTTPRequestHandler):
                     year = date.today().year
                 year = max(date.today().year - 3, min(year, date.today().year))
                 self._send(200, executive.request(client, company, year, company_currency(company),
-                                                  q.get("refresh") == "1"))
+                                                  q.get("refresh") == "1", cache))
             elif url.path == "/api/compliance":
                 self._send(200, compliance_screen(q.get("company") or config.BC_COMPANY,
                                                   q.get("month") or date.today().strftime("%Y-%m")))

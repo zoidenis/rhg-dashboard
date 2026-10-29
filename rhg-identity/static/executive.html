@@ -656,6 +656,7 @@ function viewPurchasing(){
     tile("Invoices", fmt(p.n), "", `${fmt(p.vendorCount)} suppliers`, dl(delta(p.n, pc.n), false, lbl)) +
     tile("Without a purchase order", pct(p.nopoRate), "", `${fmt(p.nopo)} invoices · ${compact(p.nopoAmt)} ${C()}`, dl(delta(p.nopoRate, pc.nopoRate, "pts"), false, lbl)) +
     tile("Top 5 suppliers", pct(p.top5), "", "share of purchases", dl(delta(p.top5, pc.top5, "pts"), false, lbl)) + `</div>`;
+  h += savingsBlock(keys);
   h += `<div class="grid2">` + chartCard("chPurMonth", "Purchases by month", `${F.year}, ${esc(deptName(F.dept))}, against last year`) +
        chartCard("chPurPo", "Invoices without a purchase order", `${F.year}, share of invoices by month`) + `</div>`;
   h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Purchases by restaurant</h2><p class="hint">${esc(periodText(keys))}. Click a row to filter.</p></div></div><div class="scroll" id="tbPurDept"></div></div>
@@ -668,6 +669,7 @@ function viewPurchasing(){
     onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
   drawChart($("chPurPo"), {type: "line", cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
     series: [{name: "Actual", color: "--c1", values: cur.map(x => x.nopoRate), line: true}, {name: "Last year", color: "--c2", values: ly.map(x => x.nopoRate), dash: true, line: true}]});
+  drawSavings(keys);
   const inv = S.pur.invoices || {};
   const codes = Array.from(new Set(Object.keys(inv)));
   const rows = codes.map(code => { const x = purAgg(code, keys), y = purAgg(code, compKeys(keys, how)), r = finOK() && code ? actual(code, keys) : null;
@@ -680,6 +682,56 @@ function viewPurchasing(){
     `<table><tr><th>Supplier</th><th class="num">Purchases</th><th class="num">Share</th><th class="num">Invoices</th><th class="num">Without PO</th></tr>` +
     vend.map(([no, v]) => `<tr><td>${esc((S.pur.vendors || {})[no] || no)} <span class="meta">${esc(no)}</span></td><td class="num">${fmt(v[0])}</td><td class="num">${p.amt ? pct(v[0] / p.amt * 100) : "–"}</td>
       <td class="num">${fmt(v[1])}</td><td class="num">${v[2] ? `<span class="dl bad">${fmt(v[2])}</span>` : "0"}</td></tr>`).join("") + `</table>`;
+}
+
+/* price savings against the same dates last year, worked out by Purchasing for every period the filters can pick */
+function savingsFor(mode, end){
+  const sv = S.pur && S.pur.savings, r = sv && sv.ranges && sv.ranges[`${mode}|${end}`];
+  if (!r) return {missing: true};
+  return r[F.dept] || {none: true};
+}
+function savingsBlock(keys){
+  const sv = savingsFor(F.mode, F.end);
+  const head = `<div class="card"><div class="chead"><div><h2>Price savings against last year</h2>
+    <p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))} against the same dates last year. Items bought in both periods: what this year's unit cost saved or added on this year's quantity.</p></div></div>`;
+  if (sv.missing) return head + `<p class="hint">${S.pur.pending ? "Still reading the item purchases; the savings appear when the months are in." : "Not available for this period yet."}</p></div>`;
+  if (sv.none) return head + `<p class="hint">No item purchases at location ${esc(F.dept)} in either period. Savings follow the stock location of the purchase.</p></div>`;
+  const net = sv.net, netGood = net <= 0;
+  const share = sv.cur ? sv.matched / sv.cur * 100 : null;
+  return `<div class="kpis">` +
+    tile("Savings from lower prices", compact(sv.save), C(), "items now bought cheaper than last year", `<span class="dl good">▼ cheaper</span>`) +
+    tile("Extra spending from higher prices", compact(sv.extra), C(), "items now bought dearer than last year", `<span class="dl bad">▲ dearer</span>`) +
+    tile(netGood ? "Net saving on price" : "Net extra spending on price", compact(Math.abs(net)), C(),
+      sv.ly ? `${pct(Math.abs(net) / sv.ly * 100)} of last year's spend` : "", `<span class="dl ${netGood ? "good" : "bad"}">${netGood ? "▼ net saving" : "▲ net extra"}</span>`) +
+    tile("Volume and mix", compact(sv.volume), C(), "more or less bought, and items new or dropped", "") +
+    tile("Spend compared", pct(share), "", `${fmt(sv.items)} items bought in both periods, ${compact(sv.matched)} ${C()} of ${compact(sv.cur)}`, "") + `</div>` +
+    `<div class="grid2">` + chartCard("chSave", "Savings and extra spending by month", `${F.year}, ${esc(deptName(F.dept))}, each month against the same month last year`) +
+    `<div class="card"><div class="chead"><div><h2>How spend moved</h2><p class="hint">${esc(periodText(keys))}: item purchases last year → this year</p></div></div><div class="scroll" id="tbBridge"></div></div></div>` +
+    `<div class="grid2"><div class="card"><div class="chead"><div><h2>Largest savings</h2><p class="hint">Items now bought cheaper</p></div></div><div class="scroll" id="tbSave"></div></div>
+      <div class="card"><div class="chead"><div><h2>Largest extra spending</h2><p class="hint">Items now bought dearer</p></div></div><div class="scroll" id="tbExtra"></div></div></div>`;
+}
+function drawSavings(keys){
+  const sv = savingsFor(F.mode, F.end);
+  if (sv.missing || sv.none || !$("chSave")) return;
+  const ks = yearKeys(), sel = new Set(keys);
+  const per = ks.map(k => savingsFor("month", k));
+  drawChart($("chSave"), {type: "vbar", cats: ks.map(k => ({key: k, label: mshort(k), title: mlabel(k), hl: sel.has(k)})),
+    series: [{name: "Savings", color: "--c1", values: per.map(x => x.missing || x.none ? null : x.save)},
+             {name: "Extra spending", color: "--c2", values: per.map(x => x.missing || x.none ? null : x.extra)}],
+    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+  const row = (label, v, cls, bold) => `<tr class="${bold ? "total" : ""}"><td>${esc(label)}</td><td class="num">${cls ? `<span class="dl ${cls}">` : ""}${v >= 0 && !bold ? "+" : ""}${fmt(v)}${cls ? "</span>" : ""}</td></tr>`;
+  $("tbBridge").innerHTML = `<table><tr><th></th><th class="num">${esc(C())}</th></tr>` +
+    row("Item purchases, same dates last year", sv.ly, "", true) +
+    row("Savings from lower prices", -sv.save, "good") + row("Extra spending from higher prices", sv.extra, "bad") +
+    row("Volume and mix", sv.volume, "") + row("Item purchases, this period", sv.cur, "", true) + `</table>` +
+    (sv.excluded ? `<p class="note">${fmt(sv.excluded)} item(s), ${compact(sv.excluded_cost)} ${esc(C())}, left out of the price effect: their unit cost moved more than ${fmt(S.pur.savings.max_jump_pct)}%, usually a unit of measure or entry error. They count in volume and mix.</p>` : "");
+  const names = (S.pur.savings && S.pur.savings.names) || {};
+  const tbl = (list, cls) => !list.length ? `<div class="empty">None in this period.</div>` :
+    `<table><tr><th>Item</th><th class="num">Unit cost last year</th><th class="num">This year</th><th class="num">Change</th><th class="num">Quantity</th><th class="num">${cls === "good" ? "Saved" : "Extra"}</th></tr>` +
+    list.map(([no, ca, la, q, eff]) => `<tr><td>${esc(names[no] || no)} <span class="meta">${esc(no)}</span></td><td class="num">${fmt(la, 2)}</td><td class="num">${fmt(ca, 2)}</td>
+      <td class="num"><span class="dl ${cls}">${ca >= la ? "+" : ""}${fmt((ca - la) / la * 100, 1)}%</span></td><td class="num">${fmt(q, 1)}</td><td class="num"><b>${fmt(Math.abs(eff))}</b></td></tr>`).join("") + `</table>`;
+  $("tbSave").innerHTML = tbl(sv.best || [], "good");
+  $("tbExtra").innerHTML = tbl(sv.worst || [], "bad");
 }
 
 /* ------------------------------------------------------------ render */
