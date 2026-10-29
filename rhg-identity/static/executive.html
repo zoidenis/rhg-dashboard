@@ -693,7 +693,8 @@ function savingsFor(mode, end){
 function savingsBlock(keys){
   const sv = savingsFor(F.mode, F.end);
   const head = `<div class="card"><div class="chead"><div><h2>Price savings against last year</h2>
-    <p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))} against the same dates last year. Items bought in both periods: what this year's unit cost saved or added on this year's quantity.</p></div></div>`;
+    <p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))} against the same dates last year. Items bought in both periods: what this year's unit cost saved or added on this year's quantity, from the posted purchase invoices.</p></div>
+    <a class="tgl" href="/purchasing/#savings">Full report with filters →</a></div>`;
   if (sv.missing) return head + `<p class="hint">${S.pur.pending ? "Still reading the item purchases; the savings appear when the months are in." : "Not available for this period yet."}</p></div>`;
   if (sv.none) return head + `<p class="hint">No item purchases at location ${esc(F.dept)} in either period. Savings follow the stock location of the purchase.</p></div>`;
   const net = sv.net, netGood = net <= 0;
@@ -706,7 +707,7 @@ function savingsBlock(keys){
     tile("Volume and mix", compact(sv.volume), C(), "more or less bought, and items new or dropped", "") +
     tile("Spend compared", pct(share), "", `${fmt(sv.items)} items bought in both periods, ${compact(sv.matched)} ${C()} of ${compact(sv.cur)}`, "") + `</div>` +
     `<div class="grid2">` + chartCard("chSave", "Savings and extra spending by month", `${F.year}, ${esc(deptName(F.dept))}, each month against the same month last year`) +
-    `<div class="card"><div class="chead"><div><h2>How spend moved</h2><p class="hint">${esc(periodText(keys))}: item purchases last year → this year</p></div></div><div class="scroll" id="tbBridge"></div></div></div>` +
+    `<div class="card"><div class="chead"><div><h2>How spend moved</h2><p class="hint">${esc(periodText(keys))}: invoiced items last year → this year</p></div></div><div class="scroll" id="tbBridge"></div></div></div>` +
     `<div class="grid2"><div class="card"><div class="chead"><div><h2>Largest savings</h2><p class="hint">Items now bought cheaper</p></div></div><div class="scroll" id="tbSave"></div></div>
       <div class="card"><div class="chead"><div><h2>Largest extra spending</h2><p class="hint">Items now bought dearer</p></div></div><div class="scroll" id="tbExtra"></div></div></div>`;
 }
@@ -721,9 +722,9 @@ function drawSavings(keys){
     onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
   const row = (label, v, cls, bold) => `<tr class="${bold ? "total" : ""}"><td>${esc(label)}</td><td class="num">${cls ? `<span class="dl ${cls}">` : ""}${v >= 0 && !bold ? "+" : ""}${fmt(v)}${cls ? "</span>" : ""}</td></tr>`;
   $("tbBridge").innerHTML = `<table><tr><th></th><th class="num">${esc(C())}</th></tr>` +
-    row("Item purchases, same dates last year", sv.ly, "", true) +
+    row("Invoiced items, same dates last year", sv.ly, "", true) +
     row("Savings from lower prices", -sv.save, "good") + row("Extra spending from higher prices", sv.extra, "bad") +
-    row("Volume and mix", sv.volume, "") + row("Item purchases, this period", sv.cur, "", true) + `</table>` +
+    row("Volume and mix", sv.volume, "") + row("Invoiced items, this period", sv.cur, "", true) + `</table>` +
     (sv.excluded ? `<p class="note">${fmt(sv.excluded)} item(s), ${compact(sv.excluded_cost)} ${esc(C())}, left out of the price effect: their unit cost moved more than ${fmt(S.pur.savings.max_jump_pct)}%, usually a unit of measure or entry error. They count in volume and mix.</p>` : "");
   const names = (S.pur.savings && S.pur.savings.names) || {};
   const tbl = (list, cls) => !list.length ? `<div class="empty">None in this period.</div>` :

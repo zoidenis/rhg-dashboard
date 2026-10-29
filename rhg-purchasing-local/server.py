@@ -28,6 +28,8 @@ import classify
 import compliance
 import executive
 import notify
+import savings
+import savings_report
 import contracts
 import comparisons
 import config
@@ -1029,6 +1031,7 @@ def drill(kind, key):
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
                      "/api/notify/test": "settings", "/api/notify/smtp": "settings",
+                     "/api/savings/send": "export",
                      "/api/users": "users", "/api/password": "view"}
 
 
@@ -1171,6 +1174,37 @@ class Handler(BaseHTTPRequestHandler):
                 year = max(date.today().year - 3, min(year, date.today().year))
                 self._send(200, executive.request(client, company, year, company_currency(company),
                                                   q.get("refresh") == "1", cache))
+            elif url.path in ("/api/savings", "/api/savings/pdf", "/api/savings/xlsx"):
+                company = q.get("company") or config.BC_COMPANY
+                filters = {k: (q.get(k) or "")[:120] for k in ("location", "vendor", "category", "stream", "q")}
+                try:
+                    r = savings_report.request(client, company, q.get("from"), q.get("to"), filters,
+                                               q.get("refresh") == "1" and url.path == "/api/savings")
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                if url.path == "/api/savings":
+                    r["currency"] = company_currency(company)
+                    r["recipients"] = dict(zip(("to", "cc"), savings_report.recipients()))
+                    r["next_monthly"] = savings_report.next_monthly()
+                    r["runs"] = savings_report.recent_runs()
+                    self._send(200, r)
+                elif r.get("pending"):
+                    self._send(409, {"error": "The months are still being read; try again in a moment."})
+                else:
+                    cur = company_currency(company)
+                    pdf = url.path.endswith("pdf")
+                    body = savings_report.render_pdf(r, cur) if pdf else savings_report.render_xlsx(r, cur)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/pdf" if pdf else
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition",
+                                     f'{"inline" if pdf else "attachment"}; filename="'
+                                     f'{savings_report.file_stem(r)}.{"pdf" if pdf else "xlsx"}"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
             elif url.path == "/api/compliance":
                 self._send(200, compliance_screen(q.get("company") or config.BC_COMPANY,
                                                   q.get("month") or date.today().strftime("%Y-%m")))
@@ -1344,6 +1378,31 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200 if updated else 404, updated or {"error": "Action not found"})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path == "/api/savings/send":
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                company = body.get("company") or config.BC_COMPANY
+                filters = {k: str(body.get(k) or "")[:120] for k in ("location", "vendor", "category", "stream", "q")}
+                try:
+                    r = savings_report.request(client, company, body.get("from"), body.get("to"), filters)
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                if r.get("pending"):
+                    self._send(409, {"error": "The months are still being read; send when the report is on screen."})
+                    return
+                only, bad = notify.parse_emails(body.get("only_to") or "")
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                try:
+                    entry = savings_report.send(r, company_currency(company), to=only or None, cc=[] if only else None,
+                                                actor=actor, test=bool(only))
+                    self._send(200, {"ok": True, "sent": entry})
+                except Exception as exc:                        # noqa: BLE001
+                    traceback.print_exc()
+                    self._send(502, {"error": str(exc)[:300]})
             elif url.path == "/api/notify/smtp":
                 if self.headers.get("X-Requested-With") != "RHG-Purchasing":
                     self._send(403, {"error": "This request must come from Purchasing."})
@@ -1433,6 +1492,7 @@ def main():
     print("Press Ctrl+C to stop.")
     threading.Thread(target=_warm_loop, daemon=True).start()
     notifier.start()
+    savings_report.Monthly(client, lambda: notifier.companies(), company_currency).start()
     smtp = notify.smtp_info()
     print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]
                                else "mail server not configured in Settings"))

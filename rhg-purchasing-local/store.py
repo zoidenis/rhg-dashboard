@@ -63,7 +63,9 @@ DEFAULT_SETTINGS = {
     # so a new install never mails anyone by surprise. Emails are comma separated.
     "notifications": {"enabled": False, "time": "08:00", "companies": "",
                       "coordinator": "", "manager": "", "cost_controller": "",
-                      "lookback_days": 30, "working_days_only": False, "send_empty": False},
+                      "lookback_days": 30, "working_days_only": False, "send_empty": False,
+                      # Price savings report for the month before, on the first working day
+                      "savings_monthly": False},
     "exclude_weekends": True,
     "updated_at": None,
 }

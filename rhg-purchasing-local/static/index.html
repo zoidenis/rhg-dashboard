@@ -211,6 +211,7 @@ td.num,th.num{text-align:right}
     <div class="grp">Prices &amp; contracts</div>
     <button data-view="compare">Comparisons</button>
     <button data-view="contracts">Contract prices</button>
+    <button data-view="savings">Price savings</button>
     <button data-view="prices">Price changes</button>
     <button data-view="locations">Location prices</button>
 
@@ -437,6 +438,36 @@ td.num,th.num{text-align:right}
         <h2 style="margin-top:18px">Risks and recommendations</h2><p class="hint" id="stkExcNote"></p>
         <div id="stkExc"></div></div>
     </div>
+  </section>
+
+  <section class="view" id="v-savings">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Price savings against last year</h2>
+        <p class="hint" id="svNote">Any period against the same dates last year: what paying this year's prices instead of last year's saved or cost, item by item, from the posted purchase invoices.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mini" data-svq="lastmonth">Last month</button><button class="mini" data-svq="month">This month</button>
+          <button class="mini" data-svq="quarter">Quarter to date</button><button class="mini" data-svq="ytd">Year to date</button></div></div>
+      <div class="filters" style="margin:6px 0 10px">
+        <label>From<input type="date" id="svFrom"></label>
+        <label>To<input type="date" id="svTo"></label>
+        <label>Location<select id="svLoc"><option value="">All locations</option></select></label>
+        <label>Supplier<select id="svVendor"><option value="">All suppliers</option></select></label>
+        <label>Purchase type<select id="svStream"><option value="">All types</option></select></label>
+        <label>Item category<select id="svCat"><option value="">All categories</option></select></label>
+        <label>Item<input id="svQ" placeholder="number or name"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="mini dark" id="svRead">Read report</button>
+        <button class="mini" id="svPdf">PDF</button>
+        <button class="mini" id="svXlsx">Excel</button>
+        <button class="mini dark" id="svSend">Send to Manager &amp; Coordinator</button>
+        <input id="svTestTo" placeholder="or send a test to…" style="width:200px;padding:6px 10px;border:1px solid var(--line);border-radius:8px">
+        <button class="mini" id="svTest">Send test</button>
+        <span class="meta" id="svMsg"></span>
+      </div>
+      <p class="meta" id="svRecip" style="margin:10px 0 0"></p>
+    </div>
+    <div id="svBody"></div>
   </section>
 
   <section class="view" id="v-prices">
@@ -669,6 +700,8 @@ td.num,th.num{text-align:right}
         <input type="checkbox" id="ntWorkdays" style="width:auto"> Working days only (Monday's email covers the weekend)</label>
       <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:12px">
         <input type="checkbox" id="ntEmpty" style="width:auto"> Send the email even when there is nothing to report</label>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:10px">
+        <input type="checkbox" id="ntSavings" style="width:auto"> <b>Send the Price savings report for last month</b> on the first working day of each month, at the same time, to the Purchasing Manager and Coordinator (Cost Controller in Cc), with the PDF and Excel file</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <button class="btn dark" id="ntSave">Save notifications</button>
         <button class="btn" id="ntPreview">Preview the email</button>
@@ -1695,7 +1728,7 @@ function renderNotify(){
   $("ntTime").value = n.time || "08:00"; $("ntCompanies").value = n.companies || "";
   $("ntCompanies").placeholder = (j.companies || []).join(", ") || "SALT";
   $("ntDays").value = n.lookback_days || 30;
-  $("ntWorkdays").checked = !!n.working_days_only; $("ntEmpty").checked = !!n.send_empty;
+  $("ntWorkdays").checked = !!n.working_days_only; $("ntEmpty").checked = !!n.send_empty; $("ntSavings").checked = !!n.savings_monthly;
   if(!$("ntTestTo").value) $("ntTestTo").value = j.me || "";
   renderNotifySummary();
   const runs = j.runs || [];
@@ -1728,7 +1761,7 @@ $("ntSmtpSave").onclick = async () => {
 function notifyPatch(){
   return {enabled: $("ntEnabled").checked, coordinator: $("ntCoord").value, manager: $("ntMgr").value,
     cost_controller: $("ntCost").value, time: $("ntTime").value || "08:00", companies: $("ntCompanies").value,
-    lookback_days: $("ntDays").value || 30, working_days_only: $("ntWorkdays").checked, send_empty: $("ntEmpty").checked};
+    lookback_days: $("ntDays").value || 30, working_days_only: $("ntWorkdays").checked, send_empty: $("ntEmpty").checked, savings_monthly: $("ntSavings").checked};
 }
 $("ntSave").onclick = async () => {
   $("ntMsg").textContent = "Saving…";
@@ -2579,6 +2612,7 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   if ((b.dataset.view === "streams" || b.dataset.view === "services") && data) loadStreams(false);
   if (b.dataset.view === "stock") fillStockControls();
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
+  if (b.dataset.view === "savings" && !svData) svQuick("lastmonth");
   // the screen is part of the address, so a link from the control center can open it
   if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
   setHeader();
@@ -2593,6 +2627,111 @@ $("refreshBtn").onclick = () => load(true);
 $("exportBtn").onclick = exportCsv;
 $("search").oninput = () => data && renderMovers();
 
+
+// ---------- price savings ----------
+let svData = null, svTimer = null, svSort = "effect";
+const svIso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function svQuick(kind){
+  const t = new Date(); let a, b = t;
+  if (kind === "lastmonth") { a = new Date(t.getFullYear(), t.getMonth() - 1, 1); b = new Date(t.getFullYear(), t.getMonth(), 0); }
+  else if (kind === "month") a = new Date(t.getFullYear(), t.getMonth(), 1);
+  else if (kind === "quarter") a = new Date(t.getFullYear(), Math.floor(t.getMonth() / 3) * 3, 1);
+  else a = new Date(t.getFullYear(), 0, 1);
+  $("svFrom").value = svIso(a); $("svTo").value = svIso(b);
+  loadSavings();
+}
+document.querySelectorAll("[data-svq]").forEach(b => b.onclick = () => svQuick(b.dataset.svq));
+function svParams(){
+  const p = new URLSearchParams({company: $("company").value || "", from: $("svFrom").value, to: $("svTo").value,
+    location: $("svLoc").value, vendor: $("svVendor").value, category: $("svCat").value, stream: $("svStream").value, q: $("svQ").value.trim()});
+  return p;
+}
+async function loadSavings(refresh){
+  clearTimeout(svTimer);
+  $("svMsg").textContent = "Reading…";
+  try{
+    const r = await fetch("/api/savings?" + svParams().toString() + (refresh ? "&refresh=1" : ""));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "failed");
+    if (j.pending) {
+      $("svMsg").textContent = `${j.note} ${fmt(j.progress.done)} of ${fmt(j.progress.total)} months read.`;
+      svTimer = setTimeout(() => loadSavings(false), 4000);
+      return;
+    }
+    svData = j; $("svMsg").textContent = ""; renderSavings();
+  }catch(e){ $("svMsg").textContent = "Could not read: " + e.message; }
+}
+$("svRead").onclick = () => loadSavings(false);
+["svLoc","svVendor","svCat","svStream"].forEach(id => $(id).onchange = () => loadSavings(false));
+$("svQ").onkeydown = e => { if (e.key === "Enter") loadSavings(false); };
+$("svPdf").onclick = () => window.open("/api/savings/pdf?" + svParams().toString(), "_blank", "noopener");
+$("svXlsx").onclick = () => { location.href = "/api/savings/xlsx?" + svParams().toString(); };
+async function svSendTo(onlyTo){
+  if (!svData) { $("svMsg").textContent = "Read the report first."; return; }
+  $("svMsg").textContent = "Sending…";
+  try{
+    const body = Object.fromEntries(svParams().entries()); if (onlyTo) body.only_to = onlyTo;
+    const r = await fetch("/api/savings/send", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Purchasing"}, body: JSON.stringify(body)});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || "failed");
+    $("svMsg").textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc.length ? " · Cc " + j.sent.cc.join(", ") : ""}, with the PDF and the Excel file.`;
+  }catch(e){ $("svMsg").textContent = "Could not send: " + e.message; }
+}
+$("svSend").onclick = () => svSendTo("");
+$("svTest").onclick = () => { const t = $("svTestTo").value.trim(); if (!t) { $("svMsg").textContent = "Enter an address for the test."; return; } svSendTo(t); };
+function svFill(sel, list, label, cur){
+  const v = cur ?? sel.value;
+  sel.innerHTML = `<option value="">${label}</option>` + list.map(x => typeof x === "string"
+    ? `<option value="${esc(x)}">${esc(x)}</option>` : `<option value="${esc(x.no)}">${esc(x.name)} (${esc(x.no)})</option>`).join("");
+  sel.value = v;
+}
+function renderSavings(){
+  const d = svData; if (!d) return;
+  const C = d.currency || CUR, s = d.summary, o = d.options;
+  svFill($("svLoc"), o.locations, "All locations"); svFill($("svVendor"), o.vendors, "All suppliers");
+  svFill($("svCat"), o.categories, "All categories"); svFill($("svStream"), o.streams, "All types");
+  const rc = d.recipients || {};
+  $("svRecip").textContent = `Send goes to ${(rc.to || []).join(", ") || "nobody yet: set the Purchasing Manager and Coordinator in Settings → Email notifications"}${(rc.cc || []).length ? " · Cc " + rc.cc.join(", ") : ""}. `
+    + (d.next_monthly ? `Monthly report (last month) next on ${d.next_monthly.replace("T", " ")}.` : "Monthly report is off (Settings → Email notifications).");
+  $("svNote").textContent = `${d.period.from} to ${d.period.to} against ${d.last_year.from} to ${d.last_year.to} · ${C} excluding VAT.`;
+  const netGood = s.net <= 0;
+  const g = v => `<span class="down">${fmt(v)}</span>`, r = v => `<span class="up">${fmt(v)}</span>`;
+  const net = v => v <= 0 ? `<span class="down">${sign(v)}</span>` : `<span class="up">${sign(v)}</span>`;
+  const grpTable = (rows, label, nameOf) => `<table><tr><th>${label}</th><th class="num">Last year</th><th class="num">This period</th><th class="num">Savings</th><th class="num">Extra</th><th class="num">Net price effect</th><th class="num">Items</th></tr>` +
+    (rows.length ? rows.map(x => `<tr><td>${nameOf(x)}</td><td class="num">${fmt(x.ly)}</td><td class="num">${fmt(x.cur)}</td><td class="num">${x.save ? g(x.save) : "0"}</td><td class="num">${x.extra ? r(x.extra) : "0"}</td><td class="num"><b>${net(x.net)}</b></td><td class="num">${fmt(x.items)}</td></tr>`).join("")
+      : `<tr><td colspan="7" class="meta">Nothing for this selection.</td></tr>`) + `</table>`;
+  const status = {both: "compared", new: "new", dropped: "not bought now", excluded: "left out", other: ""};
+  const items = d.items.slice().sort((a, b) => svSort === "spend" ? b.cur_cost - a.cur_cost
+    : svSort === "pct" ? Math.abs(b.pct || 0) - Math.abs(a.pct || 0) : Math.abs(b.effect || 0) - Math.abs(a.effect || 0));
+  $("svBody").innerHTML = `<div class="kpis">` +
+    stockCard("Savings from lower prices", `<span class="down">${fmt(s.save)}</span>`, [`${C} · items now bought cheaper`]) +
+    stockCard("Extra from higher prices", `<span class="up">${fmt(s.extra)}</span>`, [`${C} · items now bought dearer`]) +
+    stockCard(netGood ? "Net saving on price" : "Net extra on price", net(s.net), [s.ly ? `${fmt(Math.abs(s.net) / s.ly * 100, 1)}% of last year's spend` : "", "negative = saving"]) +
+    stockCard("Volume and mix", sign(s.volume), ["more or less bought, items new or dropped"]) +
+    stockCard("Items compared", fmt(s.items), [`${all(s.matched)} of ${all(s.cur)} spend`, s.excluded ? `${fmt(s.excluded)} left out (unit cost moved over 4×)` : ""]) + `</div>` +
+    `<div class="grid"><div class="card"><h2>How spend moved</h2><p class="hint">Last year → this period, ${esc(C)}</p><div class="scroll"><table>
+      <tr><td><b>Spend, same dates last year</b></td><td class="num"><b>${fmt(s.ly)}</b></td></tr>
+      <tr><td>Savings from lower prices</td><td class="num">${g(-s.save)}</td></tr>
+      <tr><td>Extra from higher prices</td><td class="num">${r(s.extra)}</td></tr>
+      <tr><td>Volume and mix</td><td class="num">${sign(s.volume)}</td></tr>
+      <tr><td><b>Spend, this period</b></td><td class="num"><b>${fmt(s.cur)}</b></td></tr></table></div>
+      ${d.months.length > 1 ? `<h2 style="margin-top:16px">By month</h2><div class="scroll"><table><tr><th>Month</th><th class="num">Last year</th><th class="num">This year</th><th class="num">Savings</th><th class="num">Extra</th><th class="num">Net</th></tr>` +
+        d.months.map(m => `<tr><td>${esc(m.month)}</td><td class="num">${fmt(m.ly)}</td><td class="num">${fmt(m.cur)}</td><td class="num">${g(m.save)}</td><td class="num">${r(m.extra)}</td><td class="num"><b>${net(m.net)}</b></td></tr>`).join("") + `</table></div>` : ""}</div>
+      <div class="card"><h2>By purchase type</h2><div class="scroll">${grpTable(d.streams, "Type", x => esc(x.key))}</div>
+        <h2 style="margin-top:16px">By location</h2><div class="scroll">${grpTable(d.locations, "Location", x => esc(x.key || "(none)"))}</div></div></div>` +
+    `<div class="card" style="margin-bottom:16px"><h2>By supplier</h2><p class="hint">${esc(d.definitions.suppliers)}</p><div class="scroll">${grpTable(d.vendors, "Supplier", x => `${esc(x.name)} <span class="meta">${esc(x.key)}</span>`)}</div></div>` +
+    `<div class="card" style="margin-bottom:16px"><h2>By item category</h2><div class="scroll">${grpTable(d.categories, "Category", x => esc(x.key))}</div></div>` +
+    `<div class="card"><div class="card-head"><div><h2>Items (${fmt(d.items_total)})</h2><p class="hint">Showing ${fmt(Math.min(300, items.length))}; the Excel file has every item. Sort by:
+       <button class="mini" data-svsort="effect">price effect</button> <button class="mini" data-svsort="pct">change %</button> <button class="mini" data-svsort="spend">spend</button></p></div></div>
+      <div class="scroll"><table><tr><th>Item</th><th>Category</th><th>Status</th><th class="num">Unit cost LY</th><th class="num">Now</th><th class="num">Change</th><th class="num">Quantity</th><th class="num">Spend now</th><th class="num">Price effect</th><th>Suppliers</th></tr>` +
+      items.slice(0, 300).map(i => `<tr><td>${esc(i.desc || i.item)} <span class="meta">${esc(i.item)}</span></td><td class="meta">${esc(i.category)}</td><td class="meta">${status[i.status] || ""}</td>
+        <td class="num">${i.ly_avg == null ? "–" : fmt(i.ly_avg, 2)}</td><td class="num">${i.cur_avg == null ? "–" : fmt(i.cur_avg, 2)}</td>
+        <td class="num">${i.pct == null ? "" : (i.pct <= 0 ? `<span class="down">${fmt(i.pct, 1)}%</span>` : `<span class="up">+${fmt(i.pct, 1)}%</span>`)}</td>
+        <td class="num">${fmt(i.cur_qty, 1)}</td><td class="num">${fmt(i.cur_cost)}</td><td class="num">${i.effect == null ? "" : `<b>${net(i.effect)}</b>`}</td>
+        <td class="meta">${esc(i.vendors.join(", "))}</td></tr>`).join("") + `</table></div>
+      <p class="hint" style="margin-top:10px">${esc(d.definitions.method)} ${esc(d.definitions.source)} ${esc(d.definitions.volume)} ${esc(d.definitions.excluded)}</p></div>` +
+    ((d.errors || []).length ? `<p class="hint up">Some months could not be read: ${esc(d.errors.join("; "))}</p>` : "");
+  document.querySelectorAll("[data-svsort]").forEach(b => { b.classList.toggle("dark", b.dataset.svsort === svSort); b.onclick = () => { svSort = b.dataset.svsort; renderSavings(); }; });
+}
 // ---------- printing any screen to PDF ----------
 const SCREEN_NOTE = {
   prices: "Average unit cost is the period's cost divided by the period's quantity, so a change in pack size or unit of measure reads as a price change.",
