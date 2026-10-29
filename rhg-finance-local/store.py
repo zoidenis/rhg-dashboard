@@ -39,6 +39,8 @@ DEFAULT_SETTINGS = {
         "stock_monitor_days": 30,        # no net movement for this long: monitor
         "stock_slow_days": 60,           # slow moving
         "stock_dead_days": 90,           # non moving
+        "stock_deadstock_days": 180,     # dead stock: no qualifying consumption this long
+        "stock_new_days": 30,            # a first receipt this recent makes a new item
         "stock_value_floor": 10000,      # ignore small balances in the slow-stock lists
         "inventory_difference": 100000,  # inventory against G/L difference worth an exception
     },
@@ -55,7 +57,14 @@ DEFAULT_SETTINGS = {
                   "pn_categories": "PRODUKT I NDERMJETEM",
                   # POS technical items that are not products (no recipe): item numbers or
                   # descriptions, a trailing * means "starts with"
-                  "pos_technical_items": "FIRE*, 1 LEK*, NO EXTRA*"},
+                  "pos_technical_items": "FIRE*, 1 LEK*, NO EXTRA*",
+                  # movement and dead stock: where transfers out count as use (they supply the
+                  # restaurants), seasonal items or categories, perishable categories and their
+                  # monitor / slow / non-moving / dead thresholds in days, and whether negative
+                  # adjustments count as consumption (no, until the adjustment types are agreed)
+                  "distribution_locations": "MAGAZINE, CENTRAL", "seasonal_items": "",
+                  "perishable_categories": "", "perishable_days": "7, 14, 30, 60",
+                  "count_negative_adjustments": "no"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses

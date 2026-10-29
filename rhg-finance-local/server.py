@@ -21,6 +21,7 @@ import brief
 import config
 import localdb
 import memuse
+import movement
 import executive
 import finance
 import inventory
@@ -1177,6 +1178,38 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/arap-notify/preview":
                 company = q.get("company") or arap.companies()[0]
                 self._send(200, arap.preview(company).encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path in ("/api/movement", "/api/movement/rows", "/api/movement/xlsx"):
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    days = int(q.get("days") or 90)
+                except ValueError:
+                    days = 90
+                if url.path == "/api/movement":
+                    r = movement.request(client, company, q.get("as_of"), days, q.get("refresh") == "1")
+                    self._send(200, r if r.get("pending") or r.get("available") is False else movement.public(r))
+                    return
+                r = movement.held(company, q.get("as_of") or "", days)
+                if not r or r.get("available") is False:
+                    self._send(409, {"error": "Read the movement report first."})
+                elif url.path == "/api/movement/rows":
+                    self._send(200, movement.select_rows(r, q.get("location") or "", q.get("class") or "",
+                                                         q.get("category") or "", q.get("q") or "",
+                                                         q.get("rnc") == "1", q.get("sort") or "value",
+                                                         min(2000, int(q.get("limit") or 500))))
+                else:
+                    body = movement.render_xlsx(r)
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                                     f'stock_movement_{r["as_of"]}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
             elif url.path in ("/api/recipes", "/api/recipes/xlsx"):
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})

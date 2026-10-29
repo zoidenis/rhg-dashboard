@@ -136,6 +136,7 @@ td.num,th.num{text-align:right}
     <button data-view="inventory">Inventory</button>
     <button data-view="recipes">Recipe integrity</button>
     <button data-view="itemmaster">Item master control</button>
+    <button data-view="movement">Movement &amp; dead stock</button>
 
     <div class="grp">Planning</div>
     <button data-view="treasury">Cash flow &amp; treasury</button>
@@ -281,6 +282,41 @@ td.num,th.num{text-align:right}
       <div class="scroll"><table id="rcPending"></table></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
       <div class="hint" id="rcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-movement">
+    <div class="card">
+      <div class="card-head"><div><h2>Inventory movement &amp; dead stock</h2>
+        <p class="hint" id="mvNote">Stock on hand by location and what the item ledger says about its use. Business Central is read only.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="meta">As of</span><input type="date" id="mvAsOf">
+          <select id="mvDays" title="Longer histories read the older months of the item ledger from Business Central once; best started outside working hours"><option value="90" selected>90 days of history</option><option value="180">180 days of history</option><option value="365">365 days of history</option></select>
+          <button class="mini dark" id="mvRead">Read</button><button class="mini" id="mvXlsx">Excel</button></div></div>
+      <div class="kpis" id="mvKpis"></div>
+      <p class="meta" id="mvStatus"></p>
+    </div>
+    <div class="card"><h2>By location</h2>
+      <p class="hint">Items with stock on hand and their value at item unit cost (estimated), by movement class. Click a number for the items.</p>
+      <div class="scroll"><table id="mvLoc"></table></div></div>
+    <div class="card"><h2>Stock aging</h2>
+      <p class="hint">Value on hand by days since the last qualifying consumption.</p>
+      <div class="scroll"><table id="mvAging"></table></div></div>
+    <div class="card">
+      <div class="card-head"><div><h2 id="mvItemsTitle">Items</h2><p class="hint" id="mvItemsHint"></p></div></div>
+      <div class="filters" style="margin:4px 0 10px">
+        <label>Location<select id="mvFLoc"><option value="">All</option></select></label>
+        <label>Class<select id="mvFClass"><option value="">All</option></select></label>
+        <label>Category<select id="mvFCat"><option value="">All</option></select></label>
+        <label>Item<input id="mvFQ" placeholder="number or name"></label>
+        <label>Show<select id="mvFRnc"><option value="">All items</option><option value="1">Received, never used</option></select></label>
+        <label>Sort<select id="mvFSort"><option value="value">Value</option><option value="days">Days without use</option><option value="qty">Quantity</option></select></label>
+      </div>
+      <div class="scroll"><table id="mvItems"></table></div></div>
+    <div class="card"><h2>Adjustments by location</h2>
+      <p class="hint">Positive and negative adjustments in the history read, kept apart until it is agreed which are counts, corrections or waste. They do not count as consumption unless Settings says so.</p>
+      <div class="scroll"><table id="mvAdj"></table></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" id="mvDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-itemmaster">
@@ -853,7 +889,8 @@ const TH_LABEL = {materiality:"Materiality (ALL)", stock_monitor_days:"Stock unc
   manual_journal:"Manual journal review (ALL)", prior_period_days:"Posting after document date (days)",
   ap_critical_days:"Payable overdue, critical (days)", ar_warning_days:"Receivable overdue, warning (days)",
   ar_critical_days:"Receivable overdue, critical (days)", concentration_pct:"Concentration warning (%)",
-  cash_warning:"Cash warning level (ALL)"};
+  cash_warning:"Cash warning level (ALL)", stock_deadstock_days:"No consumption, dead stock (days)",
+  stock_new_days:"First receipt within, new item (days)"};
 const OW_LABEL = {default:"Default owner", accounting:"Accounting", treasury:"Treasury", receivables:"Receivables", payables:"Payables", inventory:"Inventory"};
 let settingsDone = false;
 function renderSettings(){
@@ -867,6 +904,11 @@ function renderSettings(){
     <label class="field">Provision rates by stock class (%)<input id="inv-prov" value="${esc((s.inventory||{}).provision_rates||"")}" placeholder="Slow-moving=25, Non-moving=50"></label>
     <label class="field">Accounts left out of days of inventory<input id="inv-dio" value="${esc((s.inventory||{}).dio_exclude||"")}" placeholder="327, 372"></label>
     <label class="field">PN item categories (recipe required)<input id="inv-pn" value="${esc((s.inventory||{}).pn_categories||"")}" placeholder="PRODUKT I NDERMJETEM"></label>
+    <label class="field">Distribution locations (transfers out count as use)<input id="inv-dist" value="${esc((s.inventory||{}).distribution_locations||"")}" placeholder="MAGAZINE, CENTRAL"></label>
+    <label class="field">Seasonal items or categories<input id="inv-seas" value="${esc((s.inventory||{}).seasonal_items||"")}" placeholder="item numbers or categories"></label>
+    <label class="field">Perishable categories<input id="inv-per" value="${esc((s.inventory||{}).perishable_categories||"")}" placeholder="e.g. LP"></label>
+    <label class="field">Perishable thresholds: monitor, slow, non-moving, dead (days)<input id="inv-perd" value="${esc((s.inventory||{}).perishable_days||"")}" placeholder="7, 14, 30, 60"></label>
+    <label class="field">Negative adjustments count as consumption (yes/no)<input id="inv-negadj" value="${esc((s.inventory||{}).count_negative_adjustments||"")}" placeholder="no"></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
@@ -890,7 +932,10 @@ $("saveSettings").onclick = async ()=>{
   try{
     const r = await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({thresholds,owners,budget:{name:$("bg-name").value},period_closed_before:$("closed").value,
-        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value, pn_categories:$("inv-pn").value, pos_technical_items:$("inv-tech").value},
+        inventory:{accounts:$("inv-acc").value, provision_rates:$("inv-prov").value, dio_exclude:$("inv-dio").value, pn_categories:$("inv-pn").value, pos_technical_items:$("inv-tech").value,
+                   distribution_locations:$("inv-dist").value, seasonal_items:$("inv-seas").value,
+                   perishable_categories:$("inv-per").value, perishable_days:$("inv-perd").value,
+                   count_negative_adjustments:$("inv-negadj").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -1398,6 +1443,106 @@ function renderItemMaster(){
     `<tr><td class="meta">Duplicate Menu Item Numbers, one menu item on several items</td><td><span class="rhg-pill info">mapping required</span></td><td class="num">–</td></tr>` +
     `<tr><td class="meta">Date a recipe was last changed</td><td><span class="rhg-pill info">not available</span></td><td class="num">–</td></tr>`;
 }
+
+// ---------- inventory movement and dead stock ----------
+let mvData = null, mvTimer = null;
+const MV_CLASSES = ["ACTIVE","MONITOR","SLOW MOVING","NON-MOVING","DEAD STOCK","NEW ITEM","SEASONAL","NEGATIVE"];
+const MV_PILL = {ACTIVE:"ok", MONITOR:"info", "SLOW MOVING":"warning", "NON-MOVING":"warning", "DEAD STOCK":"critical", "NEW ITEM":"info", SEASONAL:"info", NEGATIVE:"critical"};
+const mvQs = extra => { const p = new URLSearchParams({company: $("company").value || "", days: $("mvDays").value});
+  if (mvData && mvData.as_of) p.set("as_of", mvData.as_of); else if ($("mvAsOf").value) p.set("as_of", $("mvAsOf").value);
+  Object.entries(extra || {}).forEach(([k, v]) => p.set(k, v)); return p.toString(); };
+async function loadMovement(refresh){
+  clearTimeout(mvTimer);
+  if (!$("mvAsOf").value) { const d = new Date(); d.setDate(d.getDate() - 1); $("mvAsOf").value = rcIso(d); }
+  $("mvStatus").textContent = "Reading…";
+  try{
+    const p = new URLSearchParams({company: $("company").value || "", days: $("mvDays").value, as_of: $("mvAsOf").value});
+    const j = await readJSON(await fetch("/api/movement?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      const g = j.progress || {};
+      $("mvStatus").textContent = `${j.note} ${g.stage || ""}${g.total ? ` · ${g.done} of ${g.total} months` : ""}.`;
+      mvTimer = setTimeout(() => loadMovement(false), 5000); return;
+    }
+    mvData = j; renderMovement(); loadMvRows();
+  }catch(e){ $("mvStatus").textContent = "Could not read: " + e.message; }
+}
+$("mvRead").onclick = () => { mvData = null; loadMovement(true); };
+$("mvDays").onchange = () => { mvData = null; loadMovement(false); };
+$("mvAsOf").onchange = () => { mvData = null; loadMovement(false); };
+$("mvXlsx").onclick = () => { if (mvData) location.href = "/api/movement/xlsx?" + mvQs(); };
+["mvFLoc","mvFClass","mvFCat","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => loadMvRows());
+$("mvFQ").onkeydown = e => { if (e.key === "Enter") loadMvRows(); };
+function renderMovement(){
+  const d = mvData, t = d.totals, c = t.classes;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const lim = d.rules.limits;
+  $("mvKpis").innerHTML =
+    card("Stock value (estimated)", fmt(t.value), `${fmt(t.items)} item-location lines with stock`) +
+    card("Slow moving", fmt(c["SLOW MOVING"][1]), `${fmt(c["SLOW MOVING"][0])} lines · no use ${lim[1]}–${lim[2] - 1} days`, c["SLOW MOVING"][1] ? "warn" : "") +
+    card("Non-moving", fmt(c["NON-MOVING"][1]), `${fmt(c["NON-MOVING"][0])} lines · no use ${lim[2]}–${lim[3] - 1} days`, c["NON-MOVING"][1] ? "warn" : "") +
+    card("Dead stock", fmt(c["DEAD STOCK"][1]), `${fmt(c["DEAD STOCK"][0])} lines · no use ${lim[3]}+ days`, c["DEAD STOCK"][1] ? "up" : "") +
+    card("Received, never used", fmt(t.received_not_used[1]), `${fmt(t.received_not_used[0])} lines received in the history with no consumption`, t.received_not_used[0] ? "up" : "") +
+    card("Negative stock", fmt(t.negative[0]), `lines with a negative quantity · ${fmt(t.negative[1])}`, t.negative[0] ? "up" : "");
+  $("mvNote").textContent = `${d.company} · stock as of ${d.as_of} · history ${d.history_days} days from ${d.history_from}`;
+  $("mvStatus").textContent = `${fmt(d.locations_read)} locations read · checked ${d.checked_at}${(d.errors || []).length ? " · " + d.errors.join("; ") : ""} · Verified: quantities, ledger movements · Estimated: value at item unit cost · Derived: classes`;
+  const cell = (loc, cls, n, v) => n ? `<a href="#" data-mvloc="${esc(loc)}" data-mvcls="${esc(cls)}">${fmt(n)}</a><div class="meta">${fmt(v)}</div>` : "–";
+  $("mvLoc").innerHTML = `<tr><th>Location</th><th class="num">Value</th>${MV_CLASSES.map(x => `<th class="num">${x.toLowerCase()}</th>`).join("")}<th class="num">received, never used</th></tr>` +
+    d.locations.map(L => `<tr><td><b>${esc(L.location)}</b>${(d.rules.distribution || []).includes(L.location.toUpperCase()) ? ` <span class="meta">distribution</span>` : ""}</td><td class="num">${fmt(L.value)}</td>
+      ${MV_CLASSES.map(x => `<td class="num">${cell(L.location, x, L[x][0], L[x][1])}</td>`).join("")}<td class="num">${L.rnc[0] ? `<a href="#" data-mvloc="${esc(L.location)}" data-mvrnc="1">${fmt(L.rnc[0])}</a><div class="meta">${fmt(L.rnc[1])}</div>` : "–"}</td></tr>`).join("");
+  const B = d.buckets;
+  $("mvAging").innerHTML = `<tr><th>Location</th>${B.map(b => `<th class="num">${esc(b)}</th>`).join("")}<th>Share</th></tr>` +
+    d.locations.map(L => { const a = d.aging[L.location] || {}; const tot = B.reduce((s, b) => s + (a[b] || 0), 0);
+      const bar = tot ? `<div style="display:flex;height:10px;width:220px;border-radius:3px;overflow:hidden;background:var(--line)">${B.map((b, i) => (a[b] || 0) > 0 ? `<i title="${esc(b)}: ${fmt(a[b])}" style="width:${(a[b] / tot * 100).toFixed(1)}%;background:${["#cfe6f2","#9fcbe3","#6aaed2","#3a8fbf","#1e6f9a","#0c3a4d"][i]}"></i>` : "").join("")}</div>` : "";
+      return `<tr><td><b>${esc(L.location)}</b></td>${B.map(b => `<td class="num">${a[b] ? fmt(a[b]) : "–"}</td>`).join("")}<td>${bar}</td></tr>`; }).join("");
+  $("mvAdj").innerHTML = `<tr><th>Location</th><th class="num">Positive qty</th><th class="num">Positive cost</th><th class="num">Negative qty</th><th class="num">Negative cost</th><th class="num">Net cost</th></tr>` +
+    (d.adjustments.length ? d.adjustments.map(a => `<tr><td>${esc(a.location || "(none)")}</td><td class="num">${fmt(a.pos_qty)}</td><td class="num">${fmt(a.pos_cost)}</td><td class="num">${fmt(a.neg_qty)}</td><td class="num">${fmt(a.neg_cost)}</td><td class="num"><b>${fmt(a.pos_cost + a.neg_cost)}</b></td></tr>`).join("")
+      : `<tr><td colspan="6" class="meta">No adjustments in the history read.</td></tr>`);
+  const locs = d.locations.map(L => L.location);
+  $("mvFLoc").innerHTML = `<option value="">All</option>` + locs.map(l => `<option>${esc(l)}</option>`).join("");
+  $("mvFClass").innerHTML = `<option value="">All</option>` + MV_CLASSES.map(x => `<option value="${x}">${x.toLowerCase()}</option>`).join("");
+  $("mvDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
+    `<p class="meta">Thresholds (days): monitor ${lim[0]}, slow ${lim[1]}, non-moving ${lim[2]}, dead ${lim[3]}; perishable ${d.rules.perishable_limits.join(", ")} for ${esc((d.rules.perishable || []).join(", ") || "no category set")}. Distribution locations: ${esc((d.rules.distribution || []).join(", "))}. Negative adjustments count as consumption: ${d.rules.count_negative_adjustments ? "yes" : "no"}.</p>`;
+}
+async function loadMvRows(){
+  if (!mvData) return;
+  const extra = {location: $("mvFLoc").value, class: $("mvFClass").value, category: $("mvFCat").value, q: $("mvFQ").value.trim(), rnc: $("mvFRnc").value, sort: $("mvFSort").value};
+  try{
+    const j = await readJSON(await fetch("/api/movement/rows?" + mvQs(extra)));
+    if (j.error) throw new Error(j.error);
+    const C = j.cols, ix = n => C.indexOf(n);
+    if (!$("mvFCat").dataset.filled) {
+      const cats = [...new Set((await readJSON(await fetch("/api/movement/rows?" + mvQs({limit: 2000})))).rows.map(r => r[ix("category")]).filter(Boolean))].sort();
+      $("mvFCat").innerHTML = `<option value="">All</option>` + cats.map(c => `<option>${esc(c)}</option>`).join(""); $("mvFCat").dataset.filled = "1";
+    }
+    $("mvItemsTitle").textContent = `Items · ${fmt(j.total)} lines · ${fmt(j.value)}`;
+    $("mvItemsHint").textContent = `Showing ${fmt(j.rows.length)}; the Excel file has every line. Use = qualifying consumption in the window.`;
+    $("mvItems").innerHTML = `<tr><th>Location</th><th>Item</th><th class="num">On hand</th><th class="num">Value</th><th class="num">Used 7d</th><th class="num">30d</th><th class="num">90d</th><th class="num">180d</th><th>Last receipt</th><th>Last use</th><th class="num">Days without use</th><th>Class</th><th></th></tr>` +
+      j.rows.map(r => `<tr><td>${esc(r[ix("location")])}</td><td><b>${esc(r[ix("item")])}</b> ${esc(j.names[r[ix("item")]] || "")} <span class="meta">${esc(r[ix("category")])}${r[ix("perishable")] ? " · perishable" : ""}</span></td>
+        <td class="num">${fmt(r[ix("qty")], 2)}</td><td class="num">${fmt(r[ix("value")])}</td><td class="num">${fmt(r[ix("c7")], 1)}</td><td class="num">${fmt(r[ix("c30")], 1)}</td><td class="num">${fmt(r[ix("c90")], 1)}</td><td class="num">${fmt(r[ix("c180")], 1)}</td>
+        <td class="meta">${esc(r[ix("last_receipt")] || "–")}</td><td class="meta">${esc(r[ix("last_consumption")] || "–")}</td><td class="num">${r[ix("days_without")] == null ? `> ${mvData.history_days}` : fmt(r[ix("days_without")])}</td>
+        <td><span class="rhg-pill ${MV_PILL[r[ix("class")]] || "info"}">${esc(r[ix("class")].toLowerCase())}</span>${r[ix("received_not_used")] ? ` <span class="rhg-pill ${r[ix("received_not_used")] === "critical" ? "critical" : "warning"}">never used</span>` : ""}</td>
+        <td>${mvTrackBtn(r, ix, j.names)}</td></tr>`).join("") || `<tr><td colspan="13" class="meta">Nothing for these filters.</td></tr>`;
+  }catch(e){ $("mvItemsHint").textContent = "Could not read the items: " + e.message; }
+}
+function mvTrackBtn(r, ix, names){
+  const cls = r[ix("class")], rnc = r[ix("received_not_used")];
+  if (!["SLOW MOVING","NON-MOVING","DEAD STOCK","NEGATIVE"].includes(cls) && !rnc) return "";
+  const key = `inv-move-${(rnc ? "rnc" : cls.toLowerCase().replace(" ", "-"))}-${mvData.company}-${r[ix("location")]}-${r[ix("item")]}`;
+  const done = (data && data.action_keys || []).includes(key);
+  return `<button class="mini" data-mvtrack='${esc(JSON.stringify([key, r[ix("location")], r[ix("item")], names[r[ix("item")]] || "", cls, rnc, r[ix("qty")], r[ix("value")], r[ix("last_receipt")], r[ix("last_consumption")], r[ix("days_without")]]))}' ${done || !can("actions") ? "disabled" : ""}>${done ? "Tracked" : "Track"}</button>`;
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-mvloc]");
+  if (a) { e.preventDefault(); $("mvFLoc").value = a.dataset.mvloc; $("mvFClass").value = a.dataset.mvcls || ""; $("mvFRnc").value = a.dataset.mvrnc || "";
+    loadMvRows(); $("mvItems").scrollIntoView({behavior: "smooth", block: "start"}); return; }
+  const t = e.target.closest("[data-mvtrack]");
+  if (t) { const [key, loc, item, desc, cls, rnc, qty, value, lr, lc, dw] = JSON.parse(t.dataset.mvtrack);
+    createAction({title: `${rnc ? "Received, never used" : cls.charAt(0) + cls.slice(1).toLowerCase()}: ${item} ${desc} at ${loc}`,
+      description: `${fmt(qty, 2)} on hand, about ${fmt(value)} at item cost, as of ${mvData.as_of}.\nLast receipt ${lr || "–"}, last use ${lc || "none in " + mvData.history_days + " days"}${dw != null ? ` (${dw} days)` : ""}.\nDecide: use, transfer, return or write down.`,
+      source_exception: key, company: mvData.company, location: loc, impact: Math.abs(value || 0),
+      priority: cls === "DEAD STOCK" || cls === "NEGATIVE" || rnc === "critical" ? "High" : "Medium", bc_document: item, document_type: "Item"}); }
+});
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
   $("ssNote").style.display = "";
@@ -1635,6 +1780,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
   if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
+  if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
