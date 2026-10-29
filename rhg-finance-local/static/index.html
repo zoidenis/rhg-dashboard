@@ -417,7 +417,7 @@ td.num,th.num{text-align:right}
     </div>
     <div class="card" style="margin-bottom:15px" id="arCard">
       <div class="card-head"><div><h2>Receivables &amp; payables email</h2>
-        <p class="hint">A daily email with the exceptions of the Payables and Receivables control sections: overdue beyond the critical limit, supplier accounts in debit and concentration, with the ageing. It is sent through the mail server set up in Purchasing → Settings, so no password is entered here.</p></div>
+        <p class="hint">A daily email with the exceptions of the Payables and Receivables control sections: overdue beyond the critical limit, supplier accounts in debit and concentration, with the ageing; every exception, document by document, comes as an attached PDF. It is sent through the mail server set up in Purchasing → Settings, so no password is entered here.</p></div>
         <span class="rhg-pill" id="arPill">Off</span></div>
       <div class="formgrid">
         <label class="field">To<input id="arTo" placeholder="name@rhg.al"></label>
@@ -434,6 +434,7 @@ td.num,th.num{text-align:right}
         <button class="btn dark" id="arSave">Save</button>
         <button class="btn" id="arTest">Send a test</button>
         <button class="btn" id="arPreview">Preview</button>
+        <button class="btn" id="arPdf">PDF</button>
         <span class="meta" id="arMsg"></span>
       </div>
       <p class="hint" id="arInfo" style="margin:10px 0 0"></p>
@@ -1211,6 +1212,7 @@ $("arTest").onclick = async () => {
   catch(e){ $("arMsg").dataset.waiting = ""; $("arMsg").textContent = "Could not send: " + e.message; }
 };
 $("arPreview").onclick = () => window.open("/api/arap-notify/preview", "_blank", "noopener");
+$("arPdf").onclick = () => window.open("/api/arap-notify/pdf", "_blank", "noopener");
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
   $("ssNote").style.display = "";

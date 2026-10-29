@@ -13,7 +13,9 @@ through the mail server set up in Purchasing → Settings. Recipients, time and
 companies are set in Finance → Settings → Receivables & payables email.
 Business Central is only read.
 """
+import base64
 import html
+import io
 import json
 import re
 import threading
@@ -90,12 +92,16 @@ def mail_status():
     return value
 
 
-def send_mail(to, cc, subject, html_body, text_body):
+def send_mail(to, cc, subject, html_body, text_body, attachments=None):
+    """attachments: [(filename, content_type, bytes)]"""
+    files = [{"filename": n, "content_type": t, "data": base64.b64encode(b).decode("ascii")}
+             for n, t, b in attachments or []]
     try:
         r = requests.post(f"{config.PURCHASING_URL}/internal/mail", timeout=90,
                           headers={"X-Service-Token": auth.SERVICE_TOKEN, "Content-Type": "application/json"},
                           data=json.dumps({"to": to, "cc": cc, "subject": subject, "html": html_body,
-                                           "text": text_body, "source": "Finance · receivables & payables"}))
+                                           "text": text_body, "source": "Finance · receivables & payables",
+                                           "attachments": files}))
     except requests.RequestException as exc:
         raise RuntimeError(f"The Purchasing tower, which sends the email, could not be reached: {exc}") from exc
     try:
@@ -243,7 +249,7 @@ def render(d, test=False):
                     f"<td style='{tdn}'><b>{_m(g['impact'])}</b></td></tr>")
     if len(d["groups"]) > MAX_GROUPS:
         rows.append(f"<tr><td colspan='4' style='{tdm}'>And {len(d['groups']) - MAX_GROUPS} more; "
-                    f"open the tower for the full list.</td></tr>")
+                    f"the attached PDF has the full list.</td></tr>")
     exc_block = (table_open + f"<tr><th style='{th}'></th><th style='{th}'>Customer / supplier</th>"
                  f"<th style='{th}'>Next action</th><th style='{thn}'>Amount ({e(cur)})</th></tr>"
                  + "".join(rows) + "</table>") if rows else \
@@ -278,7 +284,7 @@ def render(d, test=False):
 <tr><td style="background:#fff;padding:22px;border-radius:0 0 12px 12px">
 {banner}{kpis}
 <h3 style="font-size:15px;color:{ink};margin:22px 0 4px">Exceptions</h3>
-<p style="color:{muted};font-size:12px;margin:0 0 10px">The control rules of the Finance tower: receivables or payables overdue beyond the critical limit ({ar['limit']:.0f} / {ap['limit']:.0f} days) above {_m(d['materiality'])} {e(cur)}, supplier accounts in debit, and one customer or supplier holding a large share. Grouped by customer or supplier; "new" means not in the previous email.</p>
+<p style="color:{muted};font-size:12px;margin:0 0 10px">The control rules of the Finance tower: receivables or payables overdue beyond the critical limit ({ar['limit']:.0f} / {ap['limit']:.0f} days) above {_m(d['materiality'])} {e(cur)}, supplier accounts in debit, and one customer or supplier holding a large share. Grouped by customer or supplier; "new" means not in the previous email. <b>The attached PDF lists every exception document by document.</b></p>
 {exc_block}
 <h3 style="font-size:15px;color:{ink};margin:26px 0 10px">Ageing</h3>
 {ageing}
@@ -302,6 +308,130 @@ def render(d, test=False):
     if link:
         text += ["", f"Open: {link}"]
     return html_body, "\n".join(text)
+
+
+# ---------------------------------------------------------------- the PDF
+def render_pdf(d, test=False):
+    """Every exception, document by document, as an A4 landscape PDF for the email.
+    The email body shows a summary; the PDF is the full list to work through."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer, Table,
+                                    TableStyle)
+
+    navy, ink, muted = colors.HexColor("#08303f"), colors.HexColor("#0e2733"), colors.HexColor("#5c7482")
+    sky, line, red, amber = (colors.HexColor("#e4f3f9"), colors.HexColor("#d9dcdd"),
+                             colors.HexColor("#c0392b"), colors.HexColor("#b26a00"))
+    st = {"h1": ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=16, textColor=ink, leading=20),
+          "h2": ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=11.5, textColor=ink, leading=15,
+                               spaceBefore=10, spaceAfter=5),
+          "p": ParagraphStyle("p", fontName="Helvetica", fontSize=8.5, textColor=muted, leading=11),
+          "c": ParagraphStyle("c", fontName="Helvetica", fontSize=8, textColor=ink, leading=10),
+          "cb": ParagraphStyle("cb", fontName="Helvetica-Bold", fontSize=8, textColor=ink, leading=10)}
+    cur = d["currency"]
+    day = date.fromisoformat(d["today"]).strftime("%d %B %Y")
+    ar, ap = d["ar"], d["ap"]
+
+    def esc(t):
+        return html.escape(str(t or ""))
+
+    def grid(rows, widths, num_cols=(), header=1, zebra=True):
+        t = Table(rows, colWidths=widths, repeatRows=header, hAlign="LEFT")
+        style = [("FONT", (0, 0), (-1, header - 1), "Helvetica-Bold", 8),
+                 ("FONT", (0, header), (-1, -1), "Helvetica", 8),
+                 ("TEXTCOLOR", (0, 0), (-1, -1), ink),
+                 ("BACKGROUND", (0, 0), (-1, header - 1), sky),
+                 ("LINEBELOW", (0, 0), (-1, -1), 0.4, line),
+                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                 ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]
+        for c in num_cols:
+            style.append(("ALIGN", (c, 0), (c, -1), "RIGHT"))
+        t.setStyle(TableStyle(style))
+        return t
+
+    story = [Paragraph("Receivables and payables: exceptions", st["h1"]),
+             Paragraph(f"{esc(d['company'])} · {esc(day)} · amounts in {esc(cur)} · open entries as Business "
+                       f"Central holds them" + (" · <font color='#c0392b'>TEST</font>" if test else ""), st["p"]),
+             Spacer(1, 8)]
+    pct = lambda a, b: f"{a / b * 100:.0f}%" if b else "–"
+    story.append(grid([
+        ["", "Open", "Overdue", "Overdue %", f"Over critical limit", "Concentration", "Suppliers in debit"],
+        ["Receivables", _m(ar["total"]), _m(ar["overdue"]), pct(ar["overdue"], ar["total"]),
+         f"{_m(ar['beyond'])} (> {ar['limit']:.0f} d)",
+         f"{ar['concentration']:.0f}%" if ar["concentration"] is not None else "–", ""],
+        ["Payables", _m(ap["total"]), _m(ap["overdue"]), pct(ap["overdue"], ap["total"]),
+         f"{_m(ap['beyond'])} (> {ap['limit']:.0f} d)",
+         f"{ap['concentration']:.0f}%" if ap["concentration"] is not None else "–", _m(ap["debit"])]],
+        [32 * mm, 34 * mm, 34 * mm, 24 * mm, 46 * mm, 30 * mm, 36 * mm], num_cols=range(1, 7)))
+    story.append(Paragraph("Ageing", st["h2"]))
+    labels = [b["label"] for b in ar["buckets"]]
+    story.append(grid([[""] + labels + ["Total"]]
+                      + [[n] + [_m(b["value"]) for b in sec["buckets"]] + [_m(sec["total"])]
+                         for n, sec in (("Receivables", ar), ("Payables", ap))],
+                      [32 * mm] + [34 * mm] * len(labels) + [34 * mm], num_cols=range(1, len(labels) + 2)))
+
+    # 1. by customer / supplier
+    story.append(Paragraph(f"Exceptions by customer and supplier ({len(d['groups'])})", st["h2"]))
+    story.append(Paragraph("Overdue beyond the critical limit and above the materiality of "
+                           f"{_m(d['materiality'])} {esc(cur)}, supplier accounts in debit, and concentration on "
+                           "one party. New = not in the previous email.", st["p"]))
+    story.append(Spacer(1, 4))
+    rows = [["Severity", "Type", "Customer / supplier", "Rule", "Docs", "Oldest", "New", f"Amount {cur}",
+             "Next action"]]
+    for g in d["groups"]:
+        rows.append([Paragraph(f"<font color='{'#c0392b' if g['severity'] == 'critical' else '#b26a00'}'>"
+                               f"{esc(g['severity'].title())}</font>", st["cb"]),
+                     "Receivable" if g["area"] == "AR" else "Payable",
+                     Paragraph(esc(g["party"]), st["cb"]), Paragraph(esc(g["rule"]), st["c"]),
+                     str(g["count"]), f"{g['oldest']} d" if g.get("oldest") else "–",
+                     str(g["new"]) if g["new"] else "", _m(g["impact"]),
+                     Paragraph(esc(g["next_action"]), st["c"])])
+    if len(rows) == 1:
+        rows.append(["", "", "No exceptions today.", "", "", "", "", "", ""])
+    story.append(grid(rows, [17 * mm, 19 * mm, 52 * mm, 50 * mm, 11 * mm, 15 * mm, 10 * mm, 28 * mm, 55 * mm],
+                      num_cols=(4, 5, 6, 7)))
+
+    # 2. every document
+    docs = [(g, x) for g in d["groups"] for x in g["documents"]]
+    story.append(Paragraph(f"Every document ({len(docs)})", st["h2"]))
+    rows = [["Type", "Customer / supplier", "Document", "Due date", "Days overdue", f"Amount {cur}", "Rule",
+             "New"]]
+    for g, x in sorted(docs, key=lambda gx: (gx[0]["area"] != "AR", gx[0]["party"], -(gx[1].get("days") or 0))):
+        rows.append(["Receivable" if g["area"] == "AR" else "Payable", Paragraph(esc(g["party"]), st["c"]),
+                     esc(x["document"]), esc(x.get("due") or ""), str(x["days"]) if x.get("days") else "–",
+                     _m(x["amount"]), Paragraph(esc(g["rule"]), st["c"]), "new" if x.get("new") else ""])
+    if len(rows) == 1:
+        rows.append(["", "No documents.", "", "", "", "", "", ""])
+    story.append(grid(rows, [20 * mm, 62 * mm, 32 * mm, 22 * mm, 22 * mm, 30 * mm, 66 * mm, 12 * mm],
+                      num_cols=(4, 5)))
+
+    def frame(canvas, doc):
+        canvas.saveState()
+        w, h = landscape(A4)
+        canvas.setFillColor(navy)
+        canvas.rect(0, h - 9 * mm, w, 9 * mm, stroke=0, fill=1)
+        canvas.setFillColor(colors.white)
+        canvas.setFont("Helvetica-Bold", 8)
+        canvas.drawString(12 * mm, h - 6 * mm, f"RHG FINANCE · RECEIVABLES & PAYABLES · {d['company']} · {day}")
+        canvas.setFillColor(muted)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.drawString(12 * mm, 7 * mm, "RHG Control Towers · read from Business Central, nothing changed there")
+        canvas.drawRightString(w - 12 * mm, 7 * mm, f"Page {doc.page}")
+        canvas.restoreState()
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=12 * mm, rightMargin=12 * mm,
+                            topMargin=15 * mm, bottomMargin=14 * mm,
+                            title=f"Receivables and payables exceptions {d['company']} {d['today']}",
+                            author="RHG Control Towers")
+    doc.build(story, onFirstPage=frame, onLaterPages=frame)
+    return buf.getvalue()
+
+
+def pdf_name(d):
+    return f"RHG_{re.sub(r'[^A-Za-z0-9]+', '_', d['company'])}_AR_AP_exceptions_{d['today']}.pdf"
 
 
 # ---------------------------------------------------------------- running it
@@ -340,6 +470,10 @@ class Notifier:
     def preview(self, company):
         return render(self.digest(company), test=True)[0]
 
+    def pdf(self, company):
+        d = self.digest(company)
+        return pdf_name(d), render_pdf(d, test=True)
+
     def send(self, company, test=False, only_to=None, actor="scheduler"):
         with _run_lock:
             entry = {"ts": datetime.now().isoformat(timespec="seconds"), "company": company,
@@ -355,8 +489,15 @@ class Notifier:
                     entry.update(status="skipped", detail="Nothing to report.")
                 else:
                     html_body, text_body = render(d, test)
-                    j = send_mail(rec["to"], rec["cc"], subject(d, test), html_body, text_body)
-                    entry.update(status="sent", detail=subject(d, test), sender=j.get("from"))
+                    files, note = [], ""
+                    try:
+                        files = [(pdf_name(d), "application/pdf", render_pdf(d, test))]
+                    except Exception as exc:                     # noqa: BLE001
+                        traceback.print_exc()
+                        note = f" · PDF not attached: {str(exc)[:160]}"
+                    j = send_mail(rec["to"], rec["cc"], subject(d, test), html_body, text_body, files)
+                    entry.update(status="sent", detail=subject(d, test) + note, sender=j.get("from"),
+                                 pdf=bool(files))
                 if not test and entry["status"] == "sent":
                     self._mark(company, d)
             except Exception as exc:                             # noqa: BLE001

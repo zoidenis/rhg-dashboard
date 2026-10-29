@@ -1164,6 +1164,15 @@ class Handler(BaseHTTPRequestHandler):
                                                   q.get("refresh") == "1"))
             elif url.path == "/api/arap-notify":
                 self._send(200, arap_status(user))
+            elif url.path == "/api/arap-notify/pdf":
+                name, pdf = arap.pdf(q.get("company") or arap.companies()[0])
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", f'inline; filename="{name}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(pdf)))
+                self.end_headers()
+                self.wfile.write(pdf)
             elif url.path == "/api/arap-notify/preview":
                 company = q.get("company") or arap.companies()[0]
                 self._send(200, arap.preview(company).encode("utf-8"), "text/html; charset=utf-8")

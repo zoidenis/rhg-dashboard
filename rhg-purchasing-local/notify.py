@@ -59,7 +59,8 @@ def parse_emails(text):
     return out, bad
 
 
-def send_mail(to, cc, subject, html_body, text_body):
+def send_mail(to, cc, subject, html_body, text_body, attachments=None):
+    """attachments: [(filename, maintype, subtype, bytes)]"""
     smtp = smtp_config.current()
     if not smtp_config.ready(smtp):
         raise RuntimeError("Complete the mail server settings before sending email.")
@@ -73,6 +74,8 @@ def send_mail(to, cc, subject, html_body, text_body):
     msg["Message-ID"] = make_msgid(domain=(smtp["from"].split("@")[-1] or "rhg.al").strip(">"))
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
+    for name, maintype, subtype, data in attachments or []:
+        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
     context = ssl.create_default_context()
     if smtp["security"] == "ssl":
         server = smtplib.SMTP_SSL(smtp["host"], smtp["port"], timeout=30, context=context)

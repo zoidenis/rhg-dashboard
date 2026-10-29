@@ -5,9 +5,11 @@ app are stored locally under ./data and never written back to BC.
 
 Run:  python server.py     then open http://127.0.0.1:8765
 """
+import base64
 import hmac
 import html
 import json
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 import threading
@@ -1265,8 +1267,24 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": "Recipients, subject or body are not valid."})
             return
         source = str(body.get("source") or "another tower")[:60]
+        files = []
+        for a in (body.get("attachments") or [])[:5]:
+            name = re.sub(r"[^A-Za-z0-9._ -]", "_", str(a.get("filename") or "attachment"))[:120]
+            ctype = str(a.get("content_type") or "application/octet-stream")
+            if ctype not in ("application/pdf", "text/csv"):
+                self._send(400, {"error": "Only PDF and CSV attachments are accepted."})
+                return
+            try:
+                data = base64.b64decode(a.get("data") or "", validate=True)
+            except (ValueError, TypeError):
+                self._send(400, {"error": "An attachment could not be read."})
+                return
+            if len(data) > 10_000_000:
+                self._send(400, {"error": "An attachment is larger than 10 MB."})
+                return
+            files.append((name, *ctype.split("/", 1), data))
         try:
-            notify.send_mail(to, [c for c in cc if c not in to], subject, html_body, text_body or subject)
+            notify.send_mail(to, [c for c in cc if c not in to], subject, html_body, text_body or subject, files)
         except Exception as exc:                                # noqa: BLE001
             store.audit("internal mail", source, "service", {}, {"to": to, "cc": cc, "status": "failed"},
                         str(exc)[:300])
