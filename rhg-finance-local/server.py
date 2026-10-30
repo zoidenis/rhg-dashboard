@@ -26,6 +26,7 @@ import movement
 import typology
 import executive
 import fiscal
+import fiscal_sales
 import finance
 import inventory
 import recipes
@@ -1220,23 +1221,24 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Your role does not include Payables."})
                     return
                 company = config.FISK_COMPANY
+                mod = fiscal_sales if q.get("side") == "sales" else fiscal
                 if url.path == "/api/fiscal":
-                    self._send(200, fiscal.request(client, company, q.get("from"), q.get("to"),
-                                                   q.get("refresh") == "1"))
+                    self._send(200, mod.request(client, company, q.get("from"), q.get("to"),
+                                                q.get("refresh") == "1"))
                 elif url.path == "/api/fiscal/status":
                     self._send(200, fiscal.status(company))
                 elif url.path == "/api/fiscal/job":
                     self._send(200, {"job": fiscal.job(q.get("id") or "")})
                 elif url.path == "/api/fiscal/xlsx":
-                    r = fiscal.request(client, company, q.get("from"), q.get("to"))
+                    r = mod.request(client, company, q.get("from"), q.get("to"))
                     if r.get("pending") or r.get("available") is False:
                         self._send(409, {"error": "The report is not ready yet."})
                         return
-                    body = fiscal.render_xlsx(r)
+                    body = mod.render_xlsx(r)
                     self.send_response(200)
                     self.send_header("Content-Type",
                                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                    self.send_header("Content-Disposition", f'attachment; filename="{fiscal.xlsx_name(r)}"')
+                    self.send_header("Content-Disposition", f'attachment; filename="{mod.xlsx_name(r)}"')
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
@@ -1456,7 +1458,8 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = config.FISK_COMPANY
                 if url.path == "/api/fiscal/fetch":
-                    self._send(200, {"job": fiscal.start("fetch", client, company, actor)})
+                    kind = "fetch sales" if body.get("side") == "sales" else "fetch"
+                    self._send(200, {"job": fiscal.start(kind, client, company, actor)})
                 elif url.path == "/api/fiscal/import":
                     try:
                         data = base64.b64decode(body.get("data") or "", validate=True)

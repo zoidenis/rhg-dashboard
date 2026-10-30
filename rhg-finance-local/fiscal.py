@@ -67,6 +67,10 @@ def _db():
                 rows INTEGER, at TEXT, detail TEXT);
             CREATE TABLE IF NOT EXISTS taxpayers (tin TEXT PRIMARY KEY, name TEXT, address TEXT, town TEXT,
                 at TEXT);
+            CREATE TABLE IF NOT EXISTS einv_sales (company TEXT, eic TEXT, inv_no TEXT, inv_date TEXT,
+                buyer_nipt TEXT, buyer_name TEXT, total REAL, currency TEXT, status TEXT, due TEXT, source TEXT,
+                seen_at TEXT, PRIMARY KEY (company, eic));
+            CREATE INDEX IF NOT EXISTS einv_sales_date ON einv_sales (company, inv_date);
         """)
     return _conn
 
@@ -262,9 +266,9 @@ def fetch(company, days=None, actor="scheduler", full=False):
     return entry
 
 
-def _names(rows, limit=40):
-    """Supplier names: the service lists only the NIPT. Names already known (from an imported book
-    or an earlier lookup) are reused; up to `limit` new NIPTs a run are asked from the Tax
+def _names(rows, limit=40, nipt_key="seller_nipt", name_key="seller_name"):
+    """Counterparty names: the service lists only the NIPT. Names already known (an imported book,
+    an earlier lookup) are reused; up to `limit` new NIPTs a run are asked from the Tax
     Administration (GetTaxpayers)."""
     with _lock:
         db = _db()
@@ -274,10 +278,10 @@ def _names(rows, limit=40):
             known.setdefault(tin, name)
     asked = 0
     for r in rows:
-        tin = (r.get("seller_nipt") or "").upper()
-        if r.get("seller_name") or not tin:
+        tin = (r.get(nipt_key) or "").upper()
+        if r.get(name_key) or not tin:
             continue
-        if tin not in known and asked < limit:
+        if tin not in known and asked < limit and re.fullmatch(r"[A-Z]\d{8}[A-Z]", tin):
             asked += 1
             try:
                 tp = cis_client.get_taxpayer(tin) or {}
@@ -290,15 +294,15 @@ def _names(rows, limit=40):
                               (tin, tp.get("name") or "", tp.get("address") or "", tp.get("town") or "",
                                datetime.now().isoformat(timespec="seconds")))
                 _db().commit()
-        r["seller_name"] = known.get(tin) or ""
+        r[name_key] = known.get(tin) or ""
 
 
 def coverage(company):
     """The loads and the periods they cover; `from`/`to` is the latest unbroken covered span."""
     with _lock:
         db = _db()
-        cov = db.execute("SELECT source, date_from, date_to, rows, at FROM coverage WHERE company=? "
-                         "ORDER BY at DESC", (company,)).fetchall()
+        cov = db.execute("SELECT source, date_from, date_to, rows, at FROM coverage WHERE company=? AND "
+                         "source NOT LIKE '%:sales' ORDER BY at DESC", (company,)).fetchall()
         n = db.execute("SELECT COUNT(*) FROM einv WHERE company=?", (company,)).fetchone()[0]
     spans = sorted((c[1], c[2]) for c in cov if c[1] and c[2])
     merged = []
@@ -457,6 +461,15 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
                      bc_date=x.get("Posting_Date") or "", bc_amount=round(amount_for(x, cur), 2))
             if cur != "ALL":
                 r["value"] = round(bc_amount(x) or 0, 2)
+        elif cur == "ALL" and r["source"] == "cis" and [c for c in cms if c["Vendor_No"] in vs and (c["Document_No"], c["Vendor_No"]) not in used_cm
+                                                  and abs(abs(float(c.get("Amount_LCY") or 0)) - total) <= tol]:
+            # the service lists credit notes with a positive amount: a posted credit memo of the supplier
+            c = sorted([c for c in cms if c["Vendor_No"] in vs and (c["Document_No"], c["Vendor_No"]) not in used_cm
+                        and abs(abs(float(c.get("Amount_LCY") or 0)) - total) <= tol],
+                       key=lambda c: near(c.get("Document_Date") or c["Posting_Date"], r["date"] or ""))[0]
+            used_cm.add((c["Document_No"], c["Vendor_No"]))
+            r.update(status="credit memo", bc_no=c["Document_No"], bc_vendor=c.get("Vendor_Name") or "",
+                     bc_amount=-abs(float(c.get("Amount_LCY") or 0)), bc_date=c["Posting_Date"], value=-total)
         elif r["eic"] in po_eic:
             p = po_eic[r["eic"]]
             r.update(status="in order", bc_no=p["No"], bc_vendor=p.get("Buy_from_Vendor_Name") or "",
@@ -744,6 +757,18 @@ def send(client, company, test=False, only_to=None, actor="scheduler"):
                 raise RuntimeError(r.get("error") or "The report is not ready.")
             k = r["kpis"]
             issues = k["missing"][0] + k["missing credit note"][0] + k["amount differs"][0] + k["posted twice"][0]
+            # the sales side, when e-invoices issued by us are held
+            import fiscal_sales
+            sales, s_issues, s_html, s_text = None, 0, "", ""
+            try:
+                if fiscal_sales.coverage(company)["loads"]:
+                    sr = fiscal_sales.result_now(client, company)
+                    if sr.get("kpis"):
+                        sales = sr
+                        s_issues, s_html, s_text = fiscal_sales.email_block(sr)
+            except Exception as exc:                             # noqa: BLE001
+                s_html = f'<p style="color:#b26a00">The sales side could not be read: {str(exc)[:200]}</p>'
+            issues += s_issues
             entry.update(issues=issues, to=to, cc=cc)
             if not to:
                 entry.update(status="skipped", detail="No recipient is set in Settings.")
@@ -751,9 +776,17 @@ def send(client, company, test=False, only_to=None, actor="scheduler"):
                 entry.update(status="skipped", detail="Nothing to report.")
             else:
                 subj, html_body, text = render_email(r, test)
-                arap_notify.send_mail(to, [c for c in cc if c not in to], subj, html_body, text,
-                                      [(xlsx_name(r), "application/vnd.openxmlformats-officedocument.spreadsheetml."
-                                                      "sheet", render_xlsx(r))])
+                xl = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                files = [(xlsx_name(r), xl, render_xlsx(r))]
+                if sales:
+                    files.append((fiscal_sales.xlsx_name(sales), xl, fiscal_sales.render_xlsx(sales)))
+                    subj += f" · sales: {sales['kpis']['missing'][0]} missing, {sales['kpis']['b2b without eic'][0]} " \
+                            "B2B without e-invoice"
+                if s_html:
+                    html_body = html_body.replace('<p style="margin:16px 0 0">Every line', s_html +
+                                                  '<p style="margin:16px 0 0">Every line', 1)
+                    text += s_text
+                arap_notify.send_mail(to, [c for c in cc if c not in to], subj, html_body, text, files)
                 entry.update(status="sent", detail=subj)
         except Exception as exc:                                 # noqa: BLE001
             traceback.print_exc()
@@ -774,8 +807,13 @@ def start(kind, client, company, actor, **kw):
 
     def run():
         try:
-            res = fetch(company, actor=actor) if kind == "fetch" else \
-                send(client, company, test=True, only_to=kw.get("to"), actor=actor)
+            if kind == "fetch":
+                res = fetch(company, actor=actor)
+            elif kind == "fetch sales":
+                import fiscal_sales
+                res = fiscal_sales.fetch(company, actor=actor)
+            else:
+                res = send(client, company, test=True, only_to=kw.get("to"), actor=actor)
         except Exception as exc:                                 # noqa: BLE001
             res = {"status": "failed", "detail": str(exc)[:300]}
         with _jobs_lock:
@@ -793,7 +831,9 @@ def job(jid):
 def status(company):
     with _state_lock:
         st = _read_state()
+    import fiscal_sales
     return {"settings": settings(), "certificate": cis_client.certificate_info(), "coverage": coverage(company),
+            "coverage_sales": fiscal_sales.coverage(company),
             "runs": st.get("runs", [])[:15], "next_run": next_run(), "mail": arap_notify.mail_status()}
 
 
@@ -842,7 +882,10 @@ def _due(now):
 
 
 def run_daily(client, company):
+    import fiscal_sales
     f = fetch(company)
+    if f["status"] == "ok":
+        fiscal_sales.fetch(company)
     e = send(client, company) if f["status"] in ("ok", "not configured") else None
     ok = f["status"] in ("ok", "not configured") and e and e["status"] != "failed"
     today = date.today().isoformat()

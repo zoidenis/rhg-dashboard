@@ -326,10 +326,13 @@ def _call(xml, s, action, pk, cert):
     return r.content
 
 
-def get_einvoices(date_from, date_to, progress=None):
-    """Every e-invoice received by the platform in the period. A window that returns the
-    maximum of 100 is split in two until every part returns fewer."""
+def get_einvoices(date_from, date_to, progress=None, party=None):
+    """Every e-invoice received by the platform in the period, where we are the BUYER (default,
+    FISK_PARTY_TYPE) or the SELLER. A window that returns the maximum of 100 is split in two
+    until every part returns fewer."""
     s = _settings()
+    if party:
+        s["party"] = party.upper()
     if not s["url"]:
         raise NotConfigured("The address of the e-invoice service is not set (FISK_EINVOICE_URL).")
     pk, cert, _ = _load()

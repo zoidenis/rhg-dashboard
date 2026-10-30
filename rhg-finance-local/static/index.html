@@ -105,7 +105,7 @@ td.num,th.num{text-align:right}
   main{padding:0} .card{break-inside:avoid} .view:not(.on){display:none!important}
   @page{size:A4 landscape;margin:12mm}}
 
-#fsCert > div{min-width:0;overflow-wrap:anywhere}#v-fiscal .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}@media(max-width:1000px){#v-fiscal .grid{grid-template-columns:minmax(0,1fr)}}
+#fsCert > div{min-width:0;overflow-wrap:anywhere}#v-fiscal .grid,#v-fsales .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}@media(max-width:1000px){#v-fiscal .grid,#v-fsales .grid{grid-template-columns:minmax(0,1fr)}}
 /* typology & turnover */
 :root{--ty-c1:#1e78a6;--ty-c2:#c47f1f;--ty-c3:#7a5bbf;--ty-c4:#2e9a6e;--ty-c5:#9aa5ab}
 @media (prefers-color-scheme: dark){:root{--ty-c1:#3a95c6;--ty-c2:#c4832a;--ty-c3:#9a7fd6;--ty-c4:#3fae80;--ty-c5:#7f8e96}}
@@ -163,7 +163,8 @@ td.num,th.num{text-align:right}
     <div class="grp">Working capital</div>
     <button data-view="cash">Cash &amp; bank</button>
     <button data-view="ap">Accounts payable</button>
-    <button data-view="fiscal">Fiscal invoices vs BC</button>
+    <button data-view="fiscal">Fiscal purchases vs BC</button>
+    <button data-view="fsales">Fiscal sales vs BC</button>
     <button data-view="ar">Accounts receivable</button>
     <button data-view="inventory">Inventory</button>
     <button data-view="typology">Typology &amp; turnover</button>
@@ -327,6 +328,32 @@ td.num,th.num{text-align:right}
         <button class="btn dark" id="fsSave">Save</button><button class="btn" id="fsTest">Send a test</button><span class="meta" id="fsMsg2"></span></div>
       <div class="scroll" style="margin-top:12px"><table id="fsRuns"></table></div>
       <div class="scroll" style="margin-top:12px"><table id="fsLoads"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-fsales">
+    <div class="card">
+      <div class="card-head"><div><h2>E-invoices issued against Business Central</h2>
+        <p class="hint" id="fxNote">The e-invoices we issued to businesses and public bodies, as the Tax Administration lists them for our NIPT as seller, next to the sales invoices and credit memos posted in BC, by e-invoice code (EIC = NIVF), then by buyer NIPT and amount. Sales to individuals at the till are fiscalized by the till and are not in this list. Business Central is only read.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="meta">From</span><input type="date" id="fxFrom"><span class="meta">to</span><input type="date" id="fxTo">
+          <button class="mini dark" id="fxRead">Read</button><button class="mini" id="fxXlsx">Excel</button></div></div>
+      <div class="kpis six" id="fxKpis" style="margin-top:14px"></div>
+      <p class="meta" id="fxStatus"></p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn dark" id="fxFetch">Read issued e-invoices from the Tax Administration now</button>
+        <span class="meta" id="fxMsg">The certificate, the daily run and the email are set on Fiscal purchases vs BC; the daily email carries both sides.</span></div>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>E-invoices issued</h2><p class="hint">Problems first</p></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="fxFilter"></select><input id="fxQ" placeholder="Buyer, NIPT, number, EIC or BC no." style="width:230px"></div></div>
+      <div class="scroll"><table id="fxRows"></table></div></div>
+    <div class="grid">
+      <div class="card"><h2>B2B invoices in BC without e-invoice</h2><p class="hint">Posted in the period to a customer with an Albanian NIPT, no e-invoice code (NIVF)</p>
+        <div class="scroll"><table id="fxB2b"></table></div></div>
+      <div class="card"><h2>BC codes the Tax Administration does not list</h2><p class="hint">Posted documents whose NIVF is not among the e-invoices issued by us; then the same code on two documents</p>
+        <div class="scroll"><table id="fxNotF"></table></div>
+        <div class="scroll" style="margin-top:12px"><table id="fxDup"></table></div></div>
     </div>
   </section>
 
@@ -2228,6 +2255,86 @@ $("fsTest").onclick = async () => {
     fsWait(j.job.id, $("fsMsg2"), r => { $("fsMsg2").textContent = r.status === "sent" ? `Test sent to ${(r.to || []).join(", ")}.` : `Test ${r.status}: ${r.detail || ""}`; }); }
   catch(e){ $("fsMsg2").textContent = "Could not send: " + e.message; }
 };
+// ---------------------------------------------------------------- e-invoices issued against BC (sales)
+let fxData = null, fxTimer = null;
+const FX_ORDER = ["missing", "refused by buyer", "amount differs", "matched, no EIC in BC", "recent", "matched"];
+const FX_CLS = {"missing": "critical", "refused by buyer": "critical", "amount differs": "warning", "matched, no EIC in BC": "info", "recent": "info", "matched": "ok"};
+const FX_PROBLEMS = ["missing", "refused by buyer", "amount differs"];
+function fxQs(){ const p = new URLSearchParams({side: "sales"}); if ($("fxFrom").value) p.set("from", $("fxFrom").value); if ($("fxTo").value) p.set("to", $("fxTo").value); return p.toString(); }
+async function loadFiscalSales(refresh){
+  clearTimeout(fxTimer);
+  $("fxStatus").textContent = "Reading…";
+  fxConn();
+  try{
+    const j = await readJSON(await fetch("/api/fiscal?" + fxQs() + (refresh ? "&refresh=1" : "")));
+    if (j.pending) { $("fxStatus").textContent = `${j.note} ${(j.progress || {}).stage || ""}…`; fxTimer = setTimeout(() => loadFiscalSales(false), 4000); return; }
+    if (j.available === false || j.error) { fxData = null; ["fxKpis","fxRows","fxB2b","fxNotF","fxDup"].forEach(id => $(id).innerHTML = ""); $("fxStatus").textContent = j.error || "Nothing to show."; return; }
+    fxData = j;
+    if (!$("fxFrom").value) $("fxFrom").value = j.date_from;
+    if (!$("fxTo").value) $("fxTo").value = j.date_to;
+    renderFiscalSales();
+  }catch(e){ $("fxStatus").textContent = "Could not read: " + e.message; }
+}
+async function fxConn(){
+  try{
+    const st = await readJSON(await fetch("/api/fiscal/status")), c = st.certificate || {};
+    const ready = c.loaded && c.url_set && !c.expired, canSet = can("settings");
+    $("fxFetch").disabled = !canSet || !ready;
+    $("fxFetch").title = !canSet ? "Your role cannot change Settings (needs finance.settings.manage)." : ready ? "" : "Waiting for the certificate on the server (see Fiscal purchases vs BC).";
+  }catch(e){ /* the status line of the report says enough */ }
+}
+function renderFiscalSales(){
+  const d = fxData, k = d.kpis;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const ok = k["matched"][0] + k["matched, no EIC in BC"][0], base = k.issued[0] - k.recent[0] - k["refused by buyer"][0];
+  $("fxKpis").innerHTML =
+    card("E-invoices issued", fmt(k.issued[0]), `${fmt(k.issued[1])} ALL · ${d.date_from} to ${d.date_to}`) +
+    card("Found in BC", base > 0 ? Math.round(ok / base * 100) + "%" : "–", `${fmt(ok)} matched · ${fmt(k["matched, no EIC in BC"][0])} without NIVF in BC`) +
+    card("Issued, missing in BC", fmt(k.missing[0]), `${fmt(k.missing[1])} ALL issued at the Tax Administration, not posted`, k.missing[0] ? "up" : "") +
+    card("Refused by the buyer", fmt(k["refused by buyer"][0]), `${fmt(k["refused in bc"])} still posted in BC: a credit memo is due`, k["refused in bc"] ? "up" : k["refused by buyer"][0] ? "warn" : "") +
+    card("Amount differs", fmt(k["amount differs"][0]), `net ${fmt(k["amount differs net"])} (fiscal − BC)`, k["amount differs"][0] ? "warn" : "") +
+    card("B2B in BC without e-invoice", fmt(k["b2b without eic"][0]), `${fmt(k["b2b without eic"][1])} ALL to customers with an Albanian NIPT`, k["b2b without eic"][0] ? "up" : "");
+  $("fxStatus").textContent = `${d.company} · source: Tax Administration e-invoice service (as seller) · BC read: ${fmt(d.bc_read.documents)} sales documents (${fmt(d.bc_read.lines)} lines) · ${fmt(k["unpaid due"][0])} e-invoices past due without a payment registered at the Tax Administration (${fmt(k["unpaid due"][1])} ALL) · checked ${d.checked_at.replace("T", " ")}`;
+  const counts = {}; d.rows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+  const keep = $("fxFilter").options.length ? $("fxFilter").value : "problems";
+  $("fxFilter").innerHTML = `<option value="problems">Problems (${fmt(d.rows.filter(r => FX_PROBLEMS.includes(r.status)).length)})</option><option value="">All (${fmt(d.rows.length)})</option>` +
+    FX_ORDER.filter(s => counts[s]).map(s => `<option value="${esc(s)}">${esc(s)} (${fmt(counts[s])})</option>`).join("");
+  $("fxFilter").value = [...$("fxFilter").options].some(o => o.value === keep) ? keep : "problems";
+  fxRows();
+  $("fxB2b").innerHTML = `<tr><th>BC no.</th><th>Customer</th><th>NIPT</th><th>Posted</th><th class="num">Amount</th></tr>` +
+    (d.b2b_without_eic.slice(0, 30).map(x => `<tr><td>${esc(x.bc_no)}${x.kind === "credit memo" ? ` <span class="meta">credit</span>` : ""}</td><td>${esc(x.customer)}</td><td class="meta">${esc(x.nipt)}</td><td class="meta">${esc(x.posting_date || "")}</td><td class="num">${fmt(x.amount)}${x.currency ? ` <span class="meta">${esc(x.currency)}</span>` : ""}</td></tr>`).join("") +
+     (d.b2b_without_eic.length > 30 ? `<tr><td colspan="5" class="meta">Showing 30 of ${fmt(d.b2b_without_eic.length)}; the Excel file has them all.</td></tr>` : "") || `<tr><td colspan="5" class="hint">None.</td></tr>`);
+  $("fxNotF").innerHTML = `<tr><th>BC no.</th><th>Customer</th><th>Posted</th><th class="num">Amount</th><th>EIC</th></tr>` +
+    (d.bc_not_in_fiscal.slice(0, 25).map(x => `<tr><td>${esc(x.bc_no)}</td><td>${esc(x.customer)}</td><td class="meta">${esc(x.posting_date || "")}</td><td class="num">${fmt(x.amount)}</td><td class="meta" title="${esc(x.eic)}">${esc(x.eic.slice(0, 8))}…</td></tr>`).join("") || `<tr><td colspan="5" class="hint">None.</td></tr>`);
+  $("fxDup").innerHTML = d.posted_twice.length ? `<tr><th>EIC</th><th>BC no.</th><th>Customer</th><th class="num">Amount</th><th></th></tr>` +
+    d.posted_twice.slice(0, 20).map(x => `<tr><td class="meta" title="${esc(x.eic)}">${esc(x.eic.slice(0, 8))}…</td><td>${esc(x.bc_no)}</td><td>${esc(x.customer)}</td><td class="num">${fmt(x.amount)}</td><td><span class="rhg-pill ${x.kind === "same amount" ? "critical" : "info"}">${esc(x.kind)}</span></td></tr>`).join("") : "";
+}
+function fxRows(){
+  const d = fxData; if (!d) return;
+  const f = $("fxFilter").value, q = $("fxQ").value.trim().toLowerCase();
+  const list = d.rows.filter(r => (f === "problems" ? FX_PROBLEMS.includes(r.status) : !f || r.status === f) &&
+    (!q || [r.buyer, r.nipt, r.inv_no, r.eic, r.bc_no, r.bc_customer].some(x => String(x || "").toLowerCase().includes(q))));
+  $("fxRows").innerHTML = `<tr><th>Status</th><th>Received</th><th>Buyer</th><th>NIPT</th><th>Number</th><th class="num">Total</th><th>At the Tax Administration</th><th>BC no.</th><th>BC posted</th><th class="num">BC amount</th><th class="num">Difference</th><th>Note</th></tr>` +
+    (list.slice(0, 100).map(r => `<tr><td><span class="rhg-pill ${FX_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.buyer)}</td><td class="meta">${esc(r.nipt)}</td><td class="meta">${esc(r.inv_no)}</td>
+      <td class="num">${fmt(r.total, r.total % 1 ? 2 : 0)}${r.currency !== "ALL" ? ` <span class="meta">${esc(r.currency)}</span>` : ""}</td><td class="meta">${esc((r.status_tax || "").toLowerCase().replace("_", " "))}${r.due ? ` · due ${esc(r.due)}` : ""}</td>
+      <td>${esc(r.bc_no)}</td><td class="meta">${esc(r.bc_date || "")}</td><td class="num">${r.bc_amount == null ? "–" : fmt(r.bc_amount, r.bc_amount % 1 ? 2 : 0)}</td><td class="num ${r.diff ? "up" : ""}">${r.diff == null ? "–" : fmt(r.diff)}</td><td class="meta">${esc(r.note)}</td></tr>`).join("") || `<tr><td colspan="12" class="hint">No e-invoice for this selection.</td></tr>`) +
+    (list.length > 100 ? `<tr><td colspan="12" class="meta">Showing 100 of ${fmt(list.length)}; use the filter or the Excel file for the rest.</td></tr>` : "");
+}
+$("fxRead").onclick = () => { fxData = null; loadFiscalSales(true); };
+$("fxFrom").onchange = $("fxTo").onchange = () => { fxData = null; loadFiscalSales(false); };
+$("fxXlsx").onclick = () => { if (fxData) location.href = "/api/fiscal/xlsx?" + fxQs(); };
+$("fxFilter").onchange = fxRows; $("fxQ").oninput = fxRows;
+$("fxFetch").onclick = async () => {
+  $("fxMsg").textContent = "Reading the e-invoices we issued from the Tax Administration…";
+  try{ const j = await simphonyPost("/api/fiscal/fetch", {side: "sales"});
+    const wait = async () => { const x = (await readJSON(await fetch("/api/fiscal/job?id=" + j.job.id))).job;
+      if (x && x.state === "running") { setTimeout(wait, 2500); return; }
+      const r = (x && x.result) || {};
+      $("fxMsg").textContent = r.status === "ok" ? `${fmt(r.rows)} e-invoices read, ${r.from} to ${r.to}.` : `${r.status}: ${r.detail || ""}`;
+      if (r.status === "ok") { $("fxFrom").value = ""; $("fxTo").value = ""; fxData = null; loadFiscalSales(true); } };
+    wait(); }
+  catch(e){ $("fxMsg").textContent = "Could not start: " + e.message; }
+};
 document.querySelectorAll("[data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
@@ -2237,6 +2344,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
+  if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
