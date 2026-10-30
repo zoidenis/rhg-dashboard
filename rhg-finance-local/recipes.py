@@ -212,6 +212,18 @@ def analyse(m, sold, settings, period):
             return 1.0
         return uom.get((item, unit))
 
+    def needs_own_recipe(card):
+        """A component flagged as an assembly whose BOM has no item lines only breaks the parent recipe
+        when it cannot come from stock at a real cost: Assemble-to-Order, a PN item, or no unit cost.
+        A bought ingredient (e.g. a bitter set to Replenishment Assembly by mistake) is consumed from
+        stock at its own cost, so the parent stays valid; Item master control lists the setup instead."""
+        return (card.get("Assembly_Policy") == "Assemble-to-Order"
+                or str(card.get("Item_Category_Code") or "").upper() in pn
+                or float(card.get("Unit_Cost") or 0) <= 0)
+
+    def has_item_lines(item):
+        return any(x["type"] == "Item" for x in lines.get(item) or [])
+
     memo = {}
 
     def check(item, stack=()):
@@ -244,10 +256,12 @@ def analyse(m, sold, settings, period):
             if comp.get("Blocked"):
                 blocked += 1
                 issues.append(f"{l['no']} {comp.get('Description') or ''}: component is blocked")
-            if l["nested"] or lines.get(l["no"]):
+            if [x for x in lines.get(l["no"]) or [] if x["type"] == "Item"]:
                 sub = check(l["no"], stack + (item,))
                 if sub[0] in ("MISSING", "INCOMPLETE"):
                     issues.append(f"{l['no']}: sub-recipe {sub[0].lower()}")
+            elif (l["nested"] or lines.get(l["no"])) and needs_own_recipe(comp):
+                issues.append(f"{l['no']}: sub-recipe missing (made in-house or no cost, and its BOM has no item lines)")
             if cost is not None and per is not None:
                 cost += l["qty"] * per * float(comp.get("Unit_Cost") or 0)
         if card.get("Blocked") or blocked == len(comps):
@@ -347,7 +361,8 @@ def analyse(m, sold, settings, period):
                     used_in_sold.setdefault(l["no"], set()).add(it)
     checks = {k: [] for k in ("no_category", "no_inventory_group", "no_product_group", "no_base_unit",
                                "unit_no_conversion", "zero_cost_in_use", "cost_far_from_last_direct",
-                               "blocked_sold", "blocked_in_recipes", "ato_without_bom")}
+                               "blocked_sold", "blocked_in_recipes", "ato_without_bom",
+                               "assembly_setup_but_bought")}
     for it, card in items.items():
         active = not card.get("Blocked") and card.get("Type") == "Inventory"
         desc = card.get("Description") or ""
@@ -377,6 +392,14 @@ def analyse(m, sold, settings, period):
                 checks["cost_far_from_last_direct"].append([it, desc, f"unit cost {uc:,.2f}, last direct {ld:,.2f}"])
             if card.get("Assembly_Policy") == "Assemble-to-Order" and not lines.get(it) and not is_tech:
                 checks["ato_without_bom"].append([it, desc, f"sold {sold_q:,.0f}" if sold_q else "not sold"])
+            if card.get("Assembly_Policy") != "Assemble-to-Order" and not is_tech and not has_item_lines(it) and \
+                    ((card.get("Replenishment_System") or "") == "Assembly" or card.get("Assembly_BOM")) and ld > 0:
+                where = f"in {len(used_in_sold[it])} sold recipe(s)" if it in used_in_sold else \
+                    ("sold" if sold_q else "not in use")
+                checks["assembly_setup_but_bought"].append(
+                    [it, desc, f"replenished by {card.get('Replenishment_System') or '-'}, "
+                               f"{len(lines.get(it) or [])} BOM line(s) without an item, last direct cost "
+                               f"{ld:,.2f}; {where}"])
         if card.get("Blocked"):
             if sold_q:
                 checks["blocked_sold"].append([it, desc, f"sold {sold_q:,.0f} in the period"])
@@ -537,6 +560,7 @@ def render_xlsx(r):
 
 CHECK_LABELS = {
     "ato_without_bom": "Assemble-to-Order without an Assembly BOM",
+    "assembly_setup_but_bought": "Set up as assembled but bought (BOM has no item lines)",
     "blocked_sold": "Blocked item still sold",
     "blocked_in_recipes": "Blocked item used in a sold recipe",
     "zero_cost_in_use": "Zero unit cost on an item in use",
@@ -557,7 +581,9 @@ DEFINITIONS = {
     "missing": "MISSING: a recipe is required and the item has no Assembly BOM (or the BOM has no item lines). "
                "In Business Central such an item sells with no ingredient consumption at all.",
     "incomplete": "INCOMPLETE: the BOM exists but has a zero quantity, a missing or blocked component, a unit "
-                  "without conversion, a broken sub-recipe or a circular reference.",
+                  "without conversion, a broken sub-recipe or a circular reference. A component set up as an "
+                  "assembly with no item lines in its BOM counts as a broken sub-recipe only when it is "
+                  "Assemble-to-Order, a PN item or has no unit cost; a bought ingredient is consumed from stock.",
     "inactive": "INACTIVE: the item itself is blocked, or every component is blocked.",
     "pending": "PENDING REVIEW: the item sold but is not in the item list as read, or it is set up as sold as "
                "purchased (no recipe needed) yet has no unit cost, which usually means a combo or menu item "

@@ -1422,12 +1422,13 @@ document.addEventListener("click", e => {
   }
 });
 const IM_LABEL = {
-  ato_without_bom: "Assemble-to-Order without an Assembly BOM", blocked_sold: "Blocked item still sold",
+  ato_without_bom: "Assemble-to-Order without an Assembly BOM",
+  assembly_setup_but_bought: "Set up as assembled but bought (BOM has no item lines)", blocked_sold: "Blocked item still sold",
   blocked_in_recipes: "Blocked item used in a sold recipe", zero_cost_in_use: "Zero unit cost on an item in use",
   cost_far_from_last_direct: "Unit cost over 3× away from the last direct cost", unit_no_conversion: "Purchase or sales unit without a conversion",
   no_base_unit: "No base unit of measure", no_category: "No item category", no_inventory_group: "No inventory posting group",
   no_product_group: "No general product posting group"};
-const IM_SEV = {ato_without_bom: "critical", blocked_sold: "critical", blocked_in_recipes: "critical", zero_cost_in_use: "warning",
+const IM_SEV = {ato_without_bom: "critical", assembly_setup_but_bought: "info", blocked_sold: "critical", blocked_in_recipes: "critical", zero_cost_in_use: "warning",
   cost_far_from_last_direct: "warning", unit_no_conversion: "critical", no_base_unit: "critical", no_category: "info", no_inventory_group: "warning", no_product_group: "warning"};
 function renderItemMaster(){
   const d = rcData; if (!d) return;
