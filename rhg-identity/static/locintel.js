@@ -19,16 +19,25 @@ async function getJSON(path){
 }
 const MARKUP = `<div class="card" style="margin-bottom:14px">
       <div class="card-head"><div><h2>Location intelligence</h2>
-        <p class="hint" style="margin-bottom:0">Every restaurant of the company as a square. Click a restaurant for its KPIs from Simphony and its Finance, Purchasing and Inventory from Business Central; the company totals are further down. Read only.</p></div>
+        <p class="hint" style="margin-bottom:0">Every restaurant of the company as a square, grouped by brand. Click a restaurant for its KPIs; drag squares onto Compare (or use +) to put up to four side by side. Read only.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <label class="meta" style="display:flex;gap:6px;align-items:center">Order
+          <div class="li-seg" id="liTabs" role="tablist"><button class="on" data-t="rest" role="tab">Restaurants</button><button data-t="cmp" role="tab" id="liCmpTab">Compare <span class="li-cnt" id="liCmpCnt"></span></button></div>
+          <label class="meta" style="display:flex;gap:6px;align-items:center" id="liSortLbl">Order
             <select id="liSort" style="font-size:12px;padding:5px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health, weakest first</option><option value="alerts">by alerts</option><option value="fc">by food cost</option><option value="name">by name</option></select></label>
           <button class="mini" id="liRefresh">Read again</button></div></div>
       <p class="meta" id="liStatus" style="margin:10px 0 0"></p>
     </div>
     <div id="liBody" style="display:none">
-      <div class="li-sec"><h2>Restaurants<small id="liRestScope"></small></h2><span class="meta">click a restaurant for its KPIs</span></div>
-      <div class="li-rest" id="liRest"></div>
+    <div id="liCmpView" style="display:none">
+      <div class="li-sec"><h2>Compare<small>up to four restaurants, same period</small></h2><span class="meta">drag restaurants into the box, or click them</span></div>
+      <div class="li-cmpgrid">
+        <div class="card li-pal"><div id="liPal"></div></div>
+        <div style="min-width:0"><div class="li-drop" id="liDrop" aria-label="Restaurants to compare"></div><div id="liCmpOut"></div></div>
+      </div>
+    </div>
+    <div id="liRestView">
+      <div class="li-sec"><h2>Restaurants<small id="liRestScope"></small></h2><span class="meta">click a restaurant for its KPIs · drag it onto Compare</span></div>
+      <div id="liRest"></div>
       <div id="liOther"></div>
       <div class="li-sec" style="margin-top:22px"><h2><span class="li-src">Simphony</span>Whole company<small id="liScope"></small></h2><span class="meta">click a square for every restaurant, the daily trend and alerts</span></div>
       <div class="li-sqs" id="liSqs"></div>
@@ -38,11 +47,13 @@ const MARKUP = `<div class="card" style="margin-bottom:14px">
         <div class="li-mapwrap" id="liMap"></div>
         <div class="li-legend"><span><span class="li-dot" style="border-color:var(--down)"></span>Healthy 75+</span><span><span class="li-dot" style="border-color:var(--warn)"></span>Watch 55–74</span><span><span class="li-dot" style="border-color:var(--up)"></span>Act below 55</span><span>Positions are schematic; set them in Finance → Settings → Location intelligence</span></div>
       </div>
+    </div>
       <p class="note" id="liFoot" style="font-size:12px;color:var(--sub);line-height:1.6"></p>
     </div>
   `;
 const key = () => `${opts.company || ""}|${opts.period || ""}`;
-let liData = null, liTimer = null, liKey = "", host = null, opts = {}, liSort = "net";
+let liData = null, liTimer = null, liKey = "", host = null, opts = {}, liSort = "net", liTab = "rest", liCmp = [];
+const LI_CC = ["var(--li-c1)", "var(--li-c2)", "var(--li-c3)", "var(--li-c4)"], LI_MAXCMP = 4;
 document.body.insertAdjacentHTML("beforeend", `<div class="li-bd" id="liBd"><div class="li-pop" id="liPop" role="dialog" aria-modal="true"></div></div>
   <div class="li-bd" id="liBd2"><div class="li-pop" id="liPop2" role="dialog" aria-modal="true"></div></div><div id="liTip"></div>`);
 const LI_G = {
@@ -155,6 +166,22 @@ function bind(){
   $("liRefresh").onclick = () => loadLocations(true);
   $("liSort").value = liSort;
   $("liSort").onchange = () => { liSort = $("liSort").value; if (liData) liDrawRest(); };
+  $("liTabs").querySelectorAll("button").forEach(b => b.onclick = () => liShowTab(b.dataset.t));
+  // drop targets: the Compare tab button and the compare box
+  for (const el of [$("liCmpTab"), $("liDrop")]) {
+    el.addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; el.classList.add("over"); });
+    el.addEventListener("dragleave", () => el.classList.remove("over"));
+    el.addEventListener("drop", e => { e.preventDefault(); el.classList.remove("over");
+      const ref = e.dataTransfer.getData("text/x-li-loc") || e.dataTransfer.getData("text/plain"); if (ref) liCmpAdd(ref); });
+  }
+  liShowTab(liTab);
+}
+function liShowTab(tab){
+  liTab = tab;
+  $("liTabs").querySelectorAll("button").forEach(x => { x.classList.toggle("on", x.dataset.t === tab); x.setAttribute("aria-selected", x.dataset.t === tab); });
+  $("liCmpView").style.display = tab === "cmp" ? "" : "none"; $("liRestView").style.display = tab === "cmp" ? "none" : "";
+  $("liSortLbl").style.display = tab === "cmp" ? "none" : "";
+  if (liData && tab === "cmp") liDrawCmp();
 }
 
 // ---- derive
@@ -236,7 +263,8 @@ function liRender(){
   if (!j.simphony) $("liStatus").innerHTML += " · Simphony is not connected (Settings → Simphony sales).";
   $("liScope").textContent = `${LI.company} · ${LI.scope.length} restaurant${LI.scope.length === 1 ? "" : "s"} open${LI.tot.length < LI.scope.length ? ` · totals in ${LI.ccy}` : ""} · ${LI.curLab}`;
   $("liRestScope").textContent = `${LI.company} · ${LI.scope.length} open · ${LI.curLab}`;
-  liDrawRest(); liDrawSquares(); liDrawKpis(); liDrawMap();
+  liCmp = liCmp.filter(r => liData.locations.some(l => l.ref === r && l.sim));
+  liDrawRest(); liDrawSquares(); liDrawKpis(); liDrawMap(); liDrawCmp();
   $("liFoot").innerHTML = Object.values(j.definitions || {}).map(esc).join(" ");
   if (opts.onState) opts.onState(j);
 }
@@ -298,34 +326,145 @@ function liRestSquare(l){
   const dS = c && p && p.net ? (c.net / p.net - 1) * 100 : null;
   const top = l.alerts.find(a => a[0] !== "good"), n = l.alerts.filter(a => a[0] !== "good").length;
   const stat = (lab, v, cls) => `<div><span>${lab}</span><b class="${cls || ""}">${v}</b></div>`;
-  const posted = l.bc_posted && l.snet ? (l.bc_posted.total / l.snet - 1) * 100 : null;
-  return `<button class="li-rsq" data-loc="${esc(l.ref)}" aria-label="${esc(l.name)}: open its KPIs">
+  const posted = l.bc_posted && l.snet ? (l.bc_posted.total / l.snet - 1) * 100 : null, on = liCmp.includes(l.ref);
+  return `<div class="li-rsq${on ? " cmp-on" : ""}" role="button" tabindex="0" draggable="true" data-loc="${esc(l.ref)}" aria-label="${esc(l.name)}: open its KPIs">
     <div class="hd"><div class="ic" style="border-color:${ring}">${liGlyph(l.brand)}</div>
       <div class="nm"><b>${esc(l.name)}</b><span>${esc([l.area, l.region].filter(Boolean).join(" · "))}</span></div>
       <span class="li-score ${l.h}" title="Health score">${l.score ?? "–"}</span></div>
-    <div class="big"><span class="v">${liFv(LI_KB.net, l.snet, l)}</span><span class="u">net sales, VAT incl.</span></div>
-    <div class="cmp"><span>vs ${LI.lyLab} <b class="${l.lyD == null ? "" : l.lyD <= -LI.th.sales_drop ? "up" : l.lyD >= 5 ? "down" : ""}">${liPct(l.lyD)}</b></span><span>vs ${LI.prevLab} <b class="${dS != null && dS <= -LI.th.sales_drop ? "up" : ""}">${liPct(dS)}</b></span></div>
+    <div class="big"><span class="v">${liFv(LI_KB.net, l.snet, l)}</span>
+      <span class="cmp">LY <b class="${l.lyD == null ? "" : l.lyD <= -LI.th.sales_drop ? "up" : l.lyD >= 5 ? "down" : ""}">${liPct(l.lyD)}</b> · ${LI.prevLab} <b class="${dS != null && dS <= -LI.th.sales_drop ? "up" : ""}">${liPct(dS)}</b></span></div>
     ${l.daily ? `<div class="sp">${liSpark(l.daily.net)}</div>` : ""}
     <div class="st">${stat("Checks", c ? liN(c.checks) : "–")}${stat("Avg check", c && c.checks ? liN(c.net / c.checks) : "–")}
       ${stat("Food cost", l.fc != null ? l.fc.toFixed(1) + "%" : "–", l.fc != null && l.fc > LI.th.food_cost + 2 ? "warn" : "")}
-      ${l.inv ? stat("Stock cover", l.inv.doh != null ? l.inv.doh + " d" : "–", l.inv.doh != null && l.inv.doh > LI.th.cover_days ? "up" : "")
-              : stat("Posted in BC", posted != null ? liPct(posted) : "–", posted != null && posted < -3 ? "up" : "")}</div>
-    <div class="al ${top ? top[0] : "good"}"><i></i><span>${top ? esc(top[1]) : "No exception"}</span>${n > 1 ? `<em>+${n - 1}</em>` : ""}</div>
-  </button>`;
+      ${l.inv ? stat("Cover", l.inv.doh != null ? l.inv.doh + " d" : "–", l.inv.doh != null && l.inv.doh > LI.th.cover_days ? "up" : "")
+              : stat("Posted BC", posted != null ? liPct(posted) : "–", posted != null && posted < -3 ? "up" : "")}</div>
+    <div class="ft"><div class="al ${top ? top[0] : "good"}" title="${esc(top ? top[1] : "No exception")}"><i></i><span>${top ? esc(top[1]) : "No exception"}</span>${n > 1 ? `<em>+${n - 1}</em>` : ""}</div>
+      <button class="li-add" data-cmp="${esc(l.ref)}" title="${on ? "Remove from" : "Add to"} Compare" aria-pressed="${on}">${on ? "✓" : "+"}</button></div>
+  </div>`;
+}
+// brands with two or more open restaurants get a row of their own (all the OPA together), so that
+// like is next to like; the single-brand restaurants share the first row
+function liGroups(list){
+  const by = {};
+  list.forEach(l => (by[l.brand] = by[l.brand] || []).push(l));
+  const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = list.filter(l => !multi.includes(l.brand));
+  const out = [];
+  if (singles.length) out.push({title: multi.length ? [...new Set(singles.map(l => l.brand))].join(" · ") : "", list: singles});
+  multi.forEach(b => out.push({title: b, list: by[b]}));
+  return out;
 }
 function liDrawRest(){
   const by = liSort;
   const key = {net: l => -(l.snet || 0), ly: l => l.lyD ?? 1e9, score: l => l.score ?? 1e9, fc: l => -(l.fc ?? -1), name: l => 0,
                alerts: l => (l.alerts[0] ? LI_ORDER[l.alerts[0][0]] * 100 : 400) - l.alerts.filter(a => a[0] !== "good").length}[by] || (l => 0);
-  const list = [...LI.scope].sort((a, b) => key(a) - key(b) || (by === "name" ? a.name.localeCompare(b.name) : (b.snet || 0) - (a.snet || 0)));
-  $("liRest").innerHTML = list.length ? list.map(liRestSquare).join("") : `<p class="meta">No restaurant of ${esc(LI.company)} sold in this period.</p>`;
-  const small = (title, arr, txt) => arr.length ? `<div class="meta" style="margin:14px 0 6px">${title}</div><div class="li-small">${arr.map(l => `<button class="li-ssq" data-loc="${esc(l.ref)}">
-      <span class="li-mini">${liGlyph(l.brand)}</span><span class="nm"><b>${esc(l.name)}</b><span>${txt(l)}</span></span></button>`).join("")}</div>` : "";
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (by === "name" ? a.name.localeCompare(b.name) : (b.snet || 0) - (a.snet || 0)));
+  const groups = liGroups(LI.scope);
+  $("liRest").innerHTML = LI.scope.length ? groups.map(g => {
+    const s = g.list.reduce((a, l) => a + (l.currency === LI.ccy && l.snet ? l.snet : 0), 0);
+    return `${g.title ? `<div class="li-grp"><b>${esc(g.title)}</b><span>${g.list.length} restaurant${g.list.length > 1 ? "s" : ""} · ${liM(s)}</span></div>` : ""}
+      <div class="li-rest">${sorted(g.list).map(liRestSquare).join("")}</div>`; }).join("")
+    : `<p class="meta">No restaurant of ${esc(LI.company)} sold in this period.</p>`;
+  const small = (title, arr, txt) => arr.length ? `<div class="meta" style="margin:14px 0 6px">${title}</div><div class="li-small">${arr.map(l => `<div class="li-ssq" role="button" tabindex="0" data-loc="${esc(l.ref)}" draggable="${l.sim ? "true" : "false"}">
+      <span class="li-mini">${liGlyph(l.brand)}</span><span class="nm"><b>${esc(l.name)}</b><span>${txt(l)}</span></span></div>`).join("")}</div>` : "";
   $("liOther").innerHTML =
     small("Closed this period", LI.closed, l => l.sim ? `${LI.prevLab} ${liFv(LI_KB.net, l.sim.prev.net, l)}` : "no sales") +
     small("Other companies", LI.others, l => `${esc(l.company || "?")}${l.sim ? " · " + liFv(LI_KB.net, l.sim.cur.net || l.sim.prev.net, l) : ""}`) +
     small("In Simphony, not in the registry", LI.unreg, l => liFv(LI_KB.net, l.sim.cur.net, l));
 }
+
+// ---- compare: up to four restaurants side by side
+function liCmpAdd(ref){
+  if (!liData || liCmp.includes(ref)) { if (liTab !== "cmp") liFlash(); return; }
+  const l = liData.locations.find(x => x.ref === ref); if (!l || !l.sim) return;
+  if (liCmp.length >= LI_MAXCMP) liCmp.shift();
+  liCmp.push(ref); liCmpChanged();
+}
+function liCmpToggle(ref){ if (liCmp.includes(ref)) { liCmp = liCmp.filter(r => r !== ref); liCmpChanged(); } else liCmpAdd(ref); }
+function liCmpChanged(){
+  document.querySelectorAll(".li-rsq").forEach(el => { const on = liCmp.includes(el.dataset.loc); el.classList.toggle("cmp-on", on);
+    const b = el.querySelector(".li-add"); if (b) { b.textContent = on ? "✓" : "+"; b.setAttribute("aria-pressed", on); b.title = (on ? "Remove from" : "Add to") + " Compare"; } });
+  liDrawCmp(); if (liTab !== "cmp") liFlash();
+}
+function liFlash(){ const b = $("liCmpTab"); if (!b) return; b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
+function liCmpPool(){ return [...LI.scope, ...LI.others.filter(l => l.sim && l.sim.cur.net > 0)]; }
+function liMultiLine(series){
+  const W = 760, H = 190, L = 46, R = 8, T0 = 10, B = 22, n = LI.days;
+  if (n < 2) return "";
+  const max = Math.max(1, ...series.flatMap(s => s.vals.filter(v => v != null))) * 1.08;
+  const x = i => L + i * (W - L - R) / (n - 1), y = v => T0 + (1 - (v || 0) / max) * (H - T0 - B);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Net sales a day">`;
+  for (const t of [0, .5, 1]) s += `<line x1="${L}" x2="${W - R}" y1="${y(max * t / 1.08)}" y2="${y(max * t / 1.08)}" stroke="var(--line)" stroke-opacity=".6"/><text x="${L - 6}" y="${y(max * t / 1.08) + 4}" font-size="10" fill="var(--sub)" text-anchor="end">${(max * t / 1.08 / 1e6).toFixed(1)}M</text>`;
+  const ticks = [...new Set([0, Math.round((n - 1) / 4), Math.round((n - 1) / 2), Math.round(3 * (n - 1) / 4), n - 1])];
+  for (const i of ticks) s += `<text x="${x(i)}" y="${H - 6}" font-size="10" fill="var(--sub)" text-anchor="middle">${liDay(LI.dates[i])}</text>`;
+  series.forEach(se => s += `<path d="${se.vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${se.color}" stroke-width="2" stroke-linejoin="round"/>`);
+  s += `<line class="li-cx" x1="0" x2="0" y1="${T0}" y2="${H - B}" stroke="var(--ink)" stroke-width="1" opacity="0"/>`;
+  const w = (W - L - R) / (n - 1);
+  for (let i = 0; i < n; i++) s += `<rect x="${x(i) - w / 2}" y="${T0}" width="${w}" height="${H - T0 - B}" fill="transparent" data-i="${i}" data-tip="${esc(`<b>${liDay(LI.dates[i])} ${liMon(LI.dates[i])}</b>` + series.map(se => `<br>${esc(se.name)}: ${liN(se.vals[i])}`).join(""))}"/>`;
+  return s + `</svg>`;
+}
+const LI_ROWS = [
+  ["Simphony", "Net sales, VAT incl.", l => l.snet, v => liM(v), 1],
+  ["Simphony", "vs " + "last year", l => l.lyD, liPct, 1, "pct"],
+  ["Simphony", "vs month before", l => { const c = liT(l, "cur"), p = liT(l, "prev"); return c && p && p.net ? (c.net / p.net - 1) * 100 : null; }, liPct, 1, "pct"],
+  ["Simphony", "Net sales a day", l => l.snet != null ? l.snet / LI.days : null, liN, 1],
+  ["Simphony", "Checks", l => liT(l, "cur") && liT(l, "cur").checks, liN, 1],
+  ["Simphony", "Average check", l => { const c = liT(l, "cur"); return c && c.checks ? c.net / c.checks : null; }, liN, 0],
+  ["Simphony", "Guests (covers)", l => { const c = liT(l, "cur"); return c && c.guests ? c.guests : null; }, liN, 0],
+  ["Simphony", "Spend per guest", l => { const c = liT(l, "cur"); return c && c.gGuests ? c.gNet / c.gGuests : null; }, liN, 0],
+  ["Simphony", "Discounts, % of gross", l => liVal(LI_KB.disc, l, "cur"), liP1, -1],
+  ["Simphony", "Voids, % of gross", l => liVal(LI_KB.voids, l, "cur"), liP1, -1],
+  ["Simphony", "Error corrects, % of net", l => liVal(LI_KB.err, l, "cur"), liP1, -1],
+  ["Business Central", "Food cost (estimated)", l => l.fc, liP1, -1],
+  ["Business Central", "Posted in BC vs Simphony", l => l.bc_posted && l.snet ? (l.bc_posted.total / l.snet - 1) * 100 : null, liPct, "abs", "pct"],
+  ["Business Central", "Bought direct", l => l.purch ? l.purch.amount : null, v => liM(v), 0],
+  ["Business Central", "Stock value", l => l.inv ? l.inv.stock : null, v => liM(v), 0],
+  ["Business Central", "Days of cover", l => l.inv ? l.inv.doh : null, liN, -1],
+  ["Business Central", "Fresh lines to count", l => l.inv ? l.inv.count : null, liN, -1],
+  ["Business Central", "Negative stock lines", l => l.inv ? l.inv.neg_lines : null, liN, -1],
+  ["Overall", "Health score", l => l.score, liN, 1],
+  ["Overall", "Alerts", l => l.alerts.filter(a => a[0] !== "good").length, liN, -1]
+];
+function liDrawCmp(){
+  if (!$("liPal") || !liData) return;
+  const pool = liCmpPool();
+  $("liCmpCnt").textContent = liCmp.length ? liCmp.length : "";
+  $("liPal").innerHTML = liGroups(LI.scope).concat(LI.others.filter(l => l.sim && l.sim.cur.net > 0).length ? [{title: "Other companies", list: LI.others.filter(l => l.sim && l.sim.cur.net > 0)}] : [])
+    .map(g => `${g.title ? `<div class="li-pgh">${esc(g.title)}</div>` : ""}${g.list.map(l => { const i = liCmp.indexOf(l.ref);
+      return `<div class="li-chip${i >= 0 ? " on" : ""}" role="button" tabindex="0" draggable="true" data-cmp="${esc(l.ref)}" aria-pressed="${i >= 0}" title="Drag into the box, or click">
+        <span class="li-mini">${liGlyph(l.brand)}</span><span class="nm">${esc(l.name)}</span>${i >= 0 ? `<i style="background:${LI_CC[i]}"></i>` : ""}</div>`; }).join("")}`).join("");
+  const sel = liCmp.map(r => pool.find(l => l.ref === r) || liData.locations.find(l => l.ref === r)).filter(Boolean);
+  $("liDrop").innerHTML = sel.length ? sel.map((l, i) => `<span class="li-pick" style="border-color:${LI_CC[i]}"><i style="background:${LI_CC[i]}"></i>${esc(l.name)}<button data-cmpdel="${esc(l.ref)}" aria-label="Remove ${esc(l.name)}">×</button></span>`).join("")
+      + (sel.length < LI_MAXCMP ? `<span class="li-droph">+ drop ${sel.length ? "another" : "a restaurant"} here</span>` : "")
+    : `<span class="li-droph">Drag restaurants here to compare them (up to ${LI_MAXCMP}), or click them on the left. You can also drag a square from Restaurants onto the Compare tab.</span>`;
+  if (sel.length < 2) { $("liCmpOut").innerHTML = sel.length ? `<p class="meta" style="margin-top:12px">Add one more restaurant to compare.</p>` : ""; return; }
+  const head = `<tr><th></th>${sel.map((l, i) => `<th class="num"><span class="li-th"><i style="background:${LI_CC[i]}"></i>${esc(l.name)}</span></th>`).join("")}</tr>`;
+  let grp = "", body = "";
+  for (const [g, lab, fn, fmt, dir, kind] of LI_ROWS) {
+    const vals = sel.map(l => { const v = fn(l); return v == null || !isFinite(v) ? null : v; });
+    if (vals.every(v => v == null)) continue;
+    if (g !== grp) { body += `<tr class="li-cg"><td colspan="${sel.length + 1}">${g}</td></tr>`; grp = g; }
+    const got = vals.filter(v => v != null), mx = Math.max(...got.map(Math.abs)) || 1;
+    let best = null;
+    if (got.length > 1 && dir) best = dir === "abs" ? Math.min(...got.map(Math.abs)) : dir > 0 ? Math.max(...got) : Math.min(...got);
+    body += `<tr><td>${esc(lab)}</td>${vals.map((v, i) => {
+      const isBest = v != null && best != null && (dir === "abs" ? Math.abs(v) === best : v === best) && new Set(got).size > 1;
+      const cls = kind === "pct" && v != null ? (v <= -LI.th.sales_drop && dir !== "abs" ? "up" : "") : "";
+      return `<td class="num${isBest ? " li-best" : ""}"><span class="${cls}">${v == null ? "–" : fmt(v)}</span>${v != null && kind !== "pct" ? `<span class="li-cb"><i style="width:${Math.abs(v) / mx * 100}%;background:${LI_CC[i]}"></i></span>` : ""}</td>`; }).join("")}</tr>`;
+  }
+  $("liCmpOut").innerHTML = `<div class="card" style="margin-top:12px"><div class="card-head" style="margin-bottom:6px"><h2>Net sales a day</h2><span class="meta">Simphony, VAT incl. · ${LI.curLab}</span></div>
+      <div class="li-legend" style="margin:0 0 6px">${sel.map((l, i) => `<span><span class="li-lg" style="background:${LI_CC[i]}"></span>${esc(l.name)}</span>`).join("")}</div>
+      ${liMultiLine(sel.map((l, i) => ({name: l.name, color: LI_CC[i], vals: l.daily ? l.daily.net : []})))}</div>
+    <div class="card"><div class="card-head" style="margin-bottom:6px"><h2>Side by side</h2><span class="meta">${LI.curLab} · the best of each row is marked · bars are relative to the largest in the row</span></div>
+      <div class="scroll"><table class="li-ctab">${head}${body}</table></div></div>`;
+}
+document.addEventListener("dragstart", e => {
+  const el = e.target.closest && e.target.closest(".li-wrap [draggable='true']"); if (!el) return;
+  const ref = el.dataset.loc || el.dataset.cmp; if (!ref) return;
+  e.dataTransfer.setData("text/x-li-loc", ref); e.dataTransfer.setData("text/plain", ref); e.dataTransfer.effectAllowed = "copy";
+  document.querySelector(".li-wrap").classList.add("li-dragging");
+});
+document.addEventListener("dragend", () => { const w = document.querySelector(".li-wrap"); if (w) w.classList.remove("li-dragging"); });
 
 // ---- restaurant popup
 function liSimTiles(l, p){
@@ -455,10 +594,15 @@ document.addEventListener("click", e => {
   $("liTip").style.opacity = 0;
   const c = e.target.closest("[data-liclose]"); if (c) { $(c.dataset.liclose).classList.remove("show"); return; }
   const k = e.target.closest("[data-kpi]"); if (k) { liKpi(k.dataset.kpi, k.dataset.kloc); return; }
+  const cd = e.target.closest("[data-cmpdel]"); if (cd) { liCmpToggle(cd.dataset.cmpdel); return; }
+  const cm = e.target.closest("[data-cmp]"); if (cm) { liCmpToggle(cm.dataset.cmp); return; }
   const t = e.target.closest("[data-loc]"); if (t) { liOpen(t.dataset.loc); return; }
   if (e.target === $("liBd2")) $("liBd2").classList.remove("show"); else if (e.target === $("liBd")) $("liBd").classList.remove("show");
 });
-document.addEventListener("keydown", e => { if (e.key !== "Escape") return;
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.closest && e.target.closest(".li-wrap") && e.target.getAttribute("role") === "button") {
+    e.preventDefault(); if (e.target.dataset.cmp) liCmpToggle(e.target.dataset.cmp); else if (e.target.dataset.loc) liOpen(e.target.dataset.loc); return; }
+  if (e.key !== "Escape") return;
   if ($("liBd2").classList.contains("show")) $("liBd2").classList.remove("show"); else $("liBd").classList.remove("show"); });
 document.addEventListener("mousemove", e => {
   const tip = $("liTip"), t = e.target.closest(".li-wrap [data-tip], #liBd [data-tip], #liBd2 [data-tip]");
