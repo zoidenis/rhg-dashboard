@@ -118,12 +118,19 @@ Në `/opt/rhg/rhg-finance-local/.env` shtoni (fjalëkalimin e fut vetë administ
 
 ```
 FISK_CERT_PASSWORD=...
-FISK_NIPT=L91520027A
+FISK_NIPT=<NIPT-i i kompanisë që rakordohet, i njëjti me certifikatën>
 FISK_COMPANY=SALT
 # FISK_EINVOICE_URL bosh = https://einvoice.tatime.gov.al/EinvoiceService-v1 (prodhim)
 ```
 
-Pastaj `docker compose up -d finance`. Te Finance → Fiscal invoices vs BC, karta
+Certifikata duhet të jetë e **po atij NIPT-i** si kompania e BC-së që rakordohet: shërbimi i
+Tatimeve kthen vetëm faturat e mbajtësit të certifikatës (certifikata e RHG-së, L91520027A,
+lexon faturat e RHG-së, jo të SALT-it). Për të zëvendësuar një certifikatë: kopjoni të renë mbi
+`/opt/rhg/secrets/fisk.p12` me po ato komanda (chown/chmod), ndryshoni `FISK_CERT_PASSWORD` dhe
+`FISK_NIPT` te `.env`, dhe rindizni Finance.
+
+Pastaj `docker compose up -d finance` (rikrijon kontejnerin, që të lexojë `.env` e re; një
+`restart` i thjeshtë nuk e lexon). Te Finance → Fiscal invoices vs BC, karta
 "Connection to the Tax Administration" tregon nëse certifikata u hap dhe deri kur vlen.
 `/opt/rhg/secrets` është jashtë dosjeve që deploy-i i zëvendëson, kështu që nuk preket.
 
