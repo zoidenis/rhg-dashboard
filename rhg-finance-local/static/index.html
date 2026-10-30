@@ -2100,9 +2100,9 @@ function tyItems(){
 })();
 // ---------------------------------------------------------------- fiscalized invoices against BC
 let fsData = null, fsTimer = null, fsStat = null;
-const FS_ORDER = ["missing", "amount differs", "missing credit note", "in order", "matched, no EIC in BC", "recent", "credit memo", "zero", "matched"];
+const FS_ORDER = ["missing", "amount differs", "missing credit note", "in order", "matched, no EIC in BC", "recent", "credit memo", "refused", "zero", "matched"];
 const FS_CLS = {"missing": "critical", "amount differs": "warning", "missing credit note": "warning", "in order": "info",
-  "matched, no EIC in BC": "info", "recent": "info", "credit memo": "ok", "zero": "info", "matched": "ok"};
+  "matched, no EIC in BC": "info", "recent": "info", "credit memo": "ok", "refused": "info", "zero": "info", "matched": "ok"};
 const fsM = v => v == null ? "–" : fmt(v);
 function fsQs(){ const p = new URLSearchParams(); if ($("fsFrom").value) p.set("from", $("fsFrom").value); if ($("fsTo").value) p.set("to", $("fsTo").value); return p.toString(); }
 async function loadFiscal(refresh){
@@ -2157,7 +2157,7 @@ function fsRows(){
     (!q || [r.seller, r.nipt, r.eic, r.bc_no, r.bc_vendor].some(x => String(x || "").toLowerCase().includes(q))));
   $("fsRows").innerHTML = `<tr><th>Status</th><th>Date</th><th>Supplier</th><th>NIPT</th><th class="num">Total</th><th>EIC</th><th>BC no.</th><th>BC posted</th><th class="num">BC amount</th><th class="num">Difference</th><th>Note</th></tr>` +
     (list.slice(0, 100).map(r => `<tr><td><span class="rhg-pill ${FS_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.seller)}</td><td class="meta">${esc(r.nipt)}</td>
-      <td class="num">${fsM(r.total)}</td><td class="meta" title="${esc(r.eic)}">${esc(r.eic.slice(0, 8))}…</td><td>${esc(r.bc_no)}</td><td class="meta">${esc(r.bc_date || "")}</td>
+      <td class="num">${fsM(r.total)}${r.currency && r.currency !== "ALL" ? ` <span class="meta">${esc(r.currency)}</span>` : ""}</td><td class="meta" title="${esc(r.eic)}">${esc(r.eic.slice(0, 8))}…</td><td>${esc(r.bc_no)}</td><td class="meta">${esc(r.bc_date || "")}</td>
       <td class="num">${fsM(r.bc_amount)}</td><td class="num ${r.diff ? "up" : ""}">${r.diff == null ? "–" : fsM(r.diff)}</td><td class="meta">${esc(r.note)}</td></tr>`).join("") || `<tr><td colspan="11" class="hint">No invoice for this selection.</td></tr>`) +
     (list.length > 100 ? `<tr><td colspan="11" class="meta">Showing 100 of ${fmt(list.length)}; use the filter or the Excel file for the rest.</td></tr>` : "");
 }
@@ -2173,7 +2173,7 @@ function renderFiscalStatus(){
   const box = (l, v, sub) => `<div><div class="meta">${l}</div><b>${v}</b><div class="meta">${sub || ""}</div></div>`;
   $("fsCert").innerHTML = box("Certificate", c.loaded ? "Loaded" : c.present ? "On the server, not opened" : "Not on the server", c.loaded ? `${esc(c.subject || "")} · valid to ${esc(c.valid_to || "")}` : esc(c.error || "FISK_CERT_PATH")) +
     box("NIPT", esc(c.nipt || "not set"), `party ${esc(c.party || "BUYER")}`) +
-    box("E-invoice service", c.url_set ? "Address set" : "Address not set", c.url_set ? "" : "FISK_EINVOICE_URL, from the service specification") +
+    box("E-invoice service", c.url_set ? "einvoice.tatime.gov.al" : "Address not set", c.url_set ? "GetEinvoices as BUYER, by received date · reading only" : "FISK_EINVOICE_URL") +
     box("Invoices held", fmt(cov.count || 0), cov.from ? `dated ${cov.from} to ${cov.to}` : "none yet") +
     box("Email", m.configured ? "Mail server ready" : "Mail server not ready", m.configured ? `from ${esc(m.from || "Purchasing")}` : esc((m.error || "Purchasing → Settings").slice(0, 120)));
   $("fsTo2").value = s.to || ""; $("fsCc").value = s.cc || ""; $("fsTime").value = s.time || "07:30"; $("fsDays").value = s.days || 45;

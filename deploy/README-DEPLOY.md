@@ -120,7 +120,7 @@ Në `/opt/rhg/rhg-finance-local/.env` shtoni (fjalëkalimin e fut vetë administ
 FISK_CERT_PASSWORD=...
 FISK_NIPT=L91520027A
 FISK_COMPANY=SALT
-FISK_EINVOICE_URL=          # nga specifikimi "Einvoice Service - Technical"
+# FISK_EINVOICE_URL bosh = https://einvoice.tatime.gov.al/EinvoiceService-v1 (prodhim)
 ```
 
 Pastaj `docker compose up -d finance`. Te Finance → Fiscal invoices vs BC, karta

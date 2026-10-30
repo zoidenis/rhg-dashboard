@@ -17,10 +17,15 @@ The request follows the signing rules of the Fiscalization Service technical spe
 (v09, section 5.3): enveloped XML signature of the element with Id="Request", exclusive
 canonicalization, SHA-256 digest, RSA-SHA256, the certificate in KeyInfo/X509Data.
 
-The address, namespace and field names of the e-invoice service come from its own technical
-specification ("Einvoice Service - Technical"). Until it is in hand they are settings
-(FISK_EINVOICE_URL, FISK_REQUEST_TEMPLATE, FISK_FIELD_MAP); with no address set the client
-reports "not configured" and makes no call.
+The e-invoice service (WSDL https://einvoice.tatime.gov.al/EinvoiceService-v1/EinvoiceService.wsdl,
+schema alimc-einvoice-service.xsd, namespace https://Einvoice.tatime.gov.al/EinvoiceService/schema):
+- GetEinvoicesRequest: Header(UUID, SendDateTime), PartyType BUYER|SELLER, RecDateTimeFrom/To (the
+  date-time the platform received the invoice), or one EIC (then the signed PDF comes back).
+  The answer holds at most 100 Einvoice elements, each with the attributes EIC, FIC, DocNumber,
+  RecDateTime, DueDateTime, Status, Amount, BuyerTin, SellerTin, PartyType and the currency.
+  A period that returns 100 is split in two until every part returns fewer.
+- GetTaxpayersRequest: Filter Tin or Name; Taxpayer Name, Tin, Address, Town, Country.
+The registering operations of the same service (RegisterEinvoice, EinvoiceChangeStatus) are refused.
 """
 import base64
 import hashlib
@@ -41,15 +46,22 @@ RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
 
 # The only operations this application may send: reading, never registering.
-ALLOWED = ("GetEinvoicesRequest",)
+ALLOWED = ("GetEinvoicesRequest", "GetTaxpayersRequest")
+NS = "https://Einvoice.tatime.gov.al/EinvoiceService/schema"
+DEFAULT_URL = "https://einvoice.tatime.gov.al/EinvoiceService-v1"
+ACTION = "https://Einvoice.tatime.gov.al/EinvoiceService/"
+MAX_PER_ANSWER = 100
 
 DEFAULT_TEMPLATE = (
-    '<GetEinvoicesRequest xmlns="https://Einvoice.tatime.gov.al/EinvoiceService/schema" Id="Request" Version="1">'
+    '<GetEinvoicesRequest xmlns="' + NS + '" Id="Request" Version="1">'
     '<Header SendDateTime="{send}" UUID="{uuid}"/>'
     '<PartyType>{party}</PartyType>'
-    '<DateTimeFrom>{date_from}T00:00:00{tz_from}</DateTimeFrom>'
-    '<DateTimeTo>{date_to}T23:59:59{tz_to}</DateTimeTo>'
+    '<RecDateTimeFrom>{dt_from}</RecDateTimeFrom>'
+    '<RecDateTimeTo>{dt_to}</RecDateTimeTo>'
     '</GetEinvoicesRequest>')
+TAXPAYER_TEMPLATE = (
+    '<GetTaxpayersRequest xmlns="' + NS + '" Id="Request" Version="1">'
+    '<Header SendDateTime="{send}" UUID="{uuid}"/><Filter><Tin>{tin}</Tin></Filter></GetTaxpayersRequest>')
 
 # candidate names of each field in the response (lower case, without separators); the
 # specification's exact names can be added with FISK_FIELD_MAP, e.g. "total=TotPrice"
@@ -57,13 +69,16 @@ FIELDS = {
     "eic": ["eic", "einvoicecode"],
     "iic": ["iic", "invoiceidentificationcode"],
     "inv_no": ["docnumber", "invoicenumber", "invnum", "invoiceno", "number", "documentnumber"],
-    "date": ["docissuedate", "issuedate", "invoicedate", "issuedatetime", "dateissued", "docdate"],
+    "date": ["recdatetime", "docissuedate", "issuedate", "invoicedate", "issuedatetime", "dateissued", "docdate"],
+    "due": ["duedatetime", "duedate"],
+    "fic": ["fic"],
+    "party": ["partytype"],
     "seller_nipt": ["sellertin", "sellernuis", "sellernipt", "sellertaxid", "sellerid"],
     "seller_name": ["sellername", "suppliername", "partyname"],
     "buyer_nipt": ["buyertin", "buyernuis", "buyernipt", "buyertaxid", "buyerid"],
     "total": ["amount", "totprice", "totalprice", "invoicetotal", "totamount", "amountincludingvat",
               "payableamount", "taxinclusiveamount"],
-    "currency": ["currency", "currencycode", "doccurrencycode"],
+    "currency": ["currencycodestype", "currency", "currencycode", "doccurrencycode"],
     "doc_type": ["doctype", "documenttype", "einvoicedocumenttype", "typeofinv"],
     "status": ["status", "einvoicestatus"],
 }
@@ -79,14 +94,14 @@ class NotConfigured(CISError):
 
 def _settings():
     return {
-        "url": (config.get("FISK_EINVOICE_URL", "") or "").strip(),
-        "action": config.get("FISK_SOAP_ACTION", "") or "",
+        "url": (config.get("FISK_EINVOICE_URL", "") or DEFAULT_URL).strip(),
+        "action": config.get("FISK_SOAP_ACTION", "") or ACTION + "GetEinvoices",
         "template": config.get("FISK_REQUEST_TEMPLATE", "") or DEFAULT_TEMPLATE,
         "cert_path": config.get("FISK_CERT_PATH", "/app/secrets/fisk.p12"),
         "password": config.get("FISK_CERT_PASSWORD", "") or "",
         "nipt": (config.get("FISK_NIPT", "") or "").strip().upper(),
         "party": (config.get("FISK_PARTY_TYPE", "BUYER") or "BUYER").strip().upper(),
-        "window_days": max(1, int(config.get("FISK_WINDOW_DAYS", "7") or 7)),
+        "window_days": max(1, int(config.get("FISK_WINDOW_DAYS", "1") or 1)),
         "timeout": int(config.get("FISK_TIMEOUT", "60") or 60),
         "field_map": config.get("FISK_FIELD_MAP", "") or "",
     }
@@ -217,12 +232,23 @@ def _offset(day, end=False):
     return z[:3] + ":" + z[3:]
 
 
-def build_request(date_from, date_to, s=None):
+def _dt(x):
+    """A naive Tirana date-time as the service wants it: 2026-10-05T13:00:00+02:00."""
+    return x.strftime("%Y-%m-%dT%H:%M:%S") + _offset(x.date(), x.hour >= 12)
+
+
+def build_request(dt_from, dt_to, s=None):
     s = s or _settings()
     now = datetime.now().astimezone()
+    if not isinstance(dt_from, datetime):
+        dt_from = datetime.combine(date.fromisoformat(str(dt_from)[:10]), datetime.min.time())
+    if not isinstance(dt_to, datetime):
+        dt_to = datetime.combine(date.fromisoformat(str(dt_to)[:10]), datetime.max.time().replace(microsecond=0))
     return s["template"].format(send=now.isoformat(timespec="seconds"), uuid=str(uuid.uuid4()),
-                                party=s["party"], nipt=s["nipt"], date_from=date_from, date_to=date_to,
-                                tz=_offset(now.date()), tz_from=_offset(date_from), tz_to=_offset(date_to, True))
+                                party=s["party"], nipt=s["nipt"], dt_from=_dt(dt_from), dt_to=_dt(dt_to),
+                                date_from=dt_from.date().isoformat(), date_to=dt_to.date().isoformat(),
+                                tz=_offset(now.date()), tz_from=_offset(dt_from.date()),
+                                tz_to=_offset(dt_to.date(), True))
 
 
 def _envelope(signed):
@@ -245,7 +271,7 @@ def _flat(el):
         for k, v in ch.attrib.items():
             out.setdefault(norm(ch.tag) + norm(k), v)
             out.setdefault(norm(k), v)
-        if ch.text and ch.text.strip() and len(ch) == 0:
+        if ch.text and ch.text.strip() and len(ch) == 0 and norm(ch.tag) != "pdf":
             out.setdefault(norm(ch.tag), ch.text.strip())
     return out
 
@@ -288,28 +314,63 @@ def parse_response(xml, field_map=""):
     return out
 
 
+def _call(xml, s, action, pk, cert):
+    signed = sign(xml.encode("utf-8"), pk, cert)
+    headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": action}
+    try:
+        r = requests.post(s["url"], data=_envelope(signed), headers=headers, timeout=s["timeout"])
+    except requests.RequestException as exc:
+        raise CISError(f"Could not reach the Tax Administration ({s['url']}): {str(exc)[:200]}") from exc
+    if r.status_code >= 400 and b"Fault" not in r.content:
+        raise CISError(f"The Tax Administration returned HTTP {r.status_code}: {r.text[:300]}")
+    return r.content
+
+
 def get_einvoices(date_from, date_to, progress=None):
-    """Every e-invoice of the period, read in windows of FISK_WINDOW_DAYS days."""
+    """Every e-invoice received by the platform in the period. A window that returns the
+    maximum of 100 is split in two until every part returns fewer."""
     s = _settings()
     if not s["url"]:
         raise NotConfigured("The address of the e-invoice service is not set (FISK_EINVOICE_URL).")
     pk, cert, _ = _load()
     a, b = date.fromisoformat(str(date_from)[:10]), date.fromisoformat(str(date_to)[:10])
-    out, d = [], a
+    found, calls = {}, [0]
+
+    def read(t0, t1):
+        calls[0] += 1
+        if calls[0] > 2000:
+            raise CISError("Too many requests for one period; stopped.")
+        rows = parse_response(_call(build_request(t0, t1, s), s, s["action"], pk, cert), s["field_map"])
+        if len(rows) >= MAX_PER_ANSWER and (t1 - t0) > timedelta(minutes=2):
+            mid = t0 + (t1 - t0) / 2
+            mid = mid.replace(microsecond=0)
+            read(t0, mid)
+            read(mid + timedelta(seconds=1), t1)
+            return
+        for r in rows:
+            found[r["eic"]] = r
+    d = a
     while d <= b:
         e = min(b, d + timedelta(days=s["window_days"] - 1))
-        signed = sign(build_request(d.isoformat(), e.isoformat(), s).encode("utf-8"), pk, cert)
-        headers = {"Content-Type": "text/xml; charset=utf-8"}
-        if s["action"]:
-            headers["SOAPAction"] = s["action"]
-        try:
-            r = requests.post(s["url"], data=_envelope(signed), headers=headers, timeout=s["timeout"])
-        except requests.RequestException as exc:
-            raise CISError(f"Could not reach the Tax Administration ({s['url']}): {str(exc)[:200]}") from exc
-        if r.status_code >= 400 and b"Fault" not in r.content:
-            raise CISError(f"The Tax Administration returned HTTP {r.status_code}: {r.text[:300]}")
-        out.extend(parse_response(r.content, s["field_map"]))
+        read(datetime.combine(d, datetime.min.time()), datetime.combine(e, datetime.max.time().replace(microsecond=0)))
         if progress:
-            progress(d, e, len(out))
+            progress(d, e, len(found))
         d = e + timedelta(days=1)
-    return out
+    return list(found.values())
+
+
+def get_taxpayer(tin):
+    """Name, address and town of a NIPT, from the Tax Administration."""
+    s = _settings()
+    pk, cert, _ = _load()
+    xml = TAXPAYER_TEMPLATE.format(send=datetime.now().astimezone().isoformat(timespec="seconds"),
+                                   uuid=str(uuid.uuid4()), tin=str(tin).strip().upper())
+    from lxml import etree
+    root = etree.fromstring(_call(xml, s, ACTION + "GetTaxpayers", pk, cert))
+    fault = root.find(f".//{{{SOAP}}}Fault")
+    if fault is not None:
+        raise CISError((fault.findtext("faultstring") or "").strip()[:300])
+    for el in root.iter():
+        if isinstance(el.tag, str) and etree.QName(el).localname == "Taxpayer":
+            return {k.lower(): v for k, v in el.attrib.items()}
+    return None

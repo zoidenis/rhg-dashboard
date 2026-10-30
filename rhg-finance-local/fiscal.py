@@ -65,6 +65,8 @@ def _db():
             CREATE INDEX IF NOT EXISTS einv_date ON einv (company, inv_date);
             CREATE TABLE IF NOT EXISTS coverage (company TEXT, source TEXT, date_from TEXT, date_to TEXT,
                 rows INTEGER, at TEXT, detail TEXT);
+            CREATE TABLE IF NOT EXISTS taxpayers (tin TEXT PRIMARY KEY, name TEXT, address TEXT, town TEXT,
+                at TEXT);
         """)
     return _conn
 
@@ -219,22 +221,35 @@ def import_book(company, data, filename=""):
 
 
 # ---------------------------------------------------------------- the Tax Administration
-def fetch(company, days=None, actor="scheduler"):
-    """Reads the e-invoices of the last `days` days from the e-invoice service."""
+def fetch(company, days=None, actor="scheduler", full=False):
+    """Reads the e-invoices received by the platform from the e-invoice service. The first read
+    (or a full one) covers the `days` setting; later ones start two days before the last read,
+    since an invoice is listed by the date-time the platform received it."""
     days = int(days or _num(settings(), "days", 45))
     b = date.today()
     a = b - timedelta(days=days)
+    with _state_lock:
+        last = (_read_state().get("fetched_to") or {}).get(company)
+    if last and not full:
+        a = max(a, date.fromisoformat(last) - timedelta(days=2))
     entry = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": "fetch", "company": company,
              "actor": actor, "from": a.isoformat(), "to": b.isoformat()}
     try:
         rows = cis_client.get_einvoices(a, b)
         own = (config.get("FISK_NIPT", "") or "").strip().upper()
         for r in rows:
-            r.setdefault("buyer_nipt", own)
+            if not r.get("buyer_nipt"):
+                r["buyer_nipt"] = own
+            r["doc_type"] = r.get("doc_type") or ("credit note" if (r.get("total") or 0) < 0 else "invoice")
         party = (config.get("FISK_PARTY_TYPE", "BUYER") or "BUYER").upper()
         if party == "BUYER" and own:
             rows = [r for r in rows if not r.get("buyer_nipt") or r["buyer_nipt"].upper() == own]
+        _names(rows)
         _store_rows(company, rows, "cis", (a.isoformat(), b.isoformat()))
+        with _state_lock:
+            st = _read_state()
+            st.setdefault("fetched_to", {})[company] = b.isoformat()
+            _write_state(st)
         entry.update(status="ok", rows=len(rows))
     except cis_client.NotConfigured as exc:
         entry.update(status="not configured", detail=str(exc))
@@ -245,6 +260,37 @@ def fetch(company, days=None, actor="scheduler"):
     store.audit("fiscal fetch", company, actor, {}, {k: entry.get(k) for k in ("status", "rows", "from", "to")},
                 entry.get("detail", ""))
     return entry
+
+
+def _names(rows, limit=40):
+    """Supplier names: the service lists only the NIPT. Names already known (from an imported book
+    or an earlier lookup) are reused; up to `limit` new NIPTs a run are asked from the Tax
+    Administration (GetTaxpayers)."""
+    with _lock:
+        db = _db()
+        known = dict(db.execute("SELECT tin, name FROM taxpayers").fetchall())
+        for tin, name in db.execute("SELECT seller_nipt, seller_name FROM einv WHERE seller_name<>'' "
+                                    "GROUP BY seller_nipt").fetchall():
+            known.setdefault(tin, name)
+    asked = 0
+    for r in rows:
+        tin = (r.get("seller_nipt") or "").upper()
+        if r.get("seller_name") or not tin:
+            continue
+        if tin not in known and asked < limit:
+            asked += 1
+            try:
+                tp = cis_client.get_taxpayer(tin) or {}
+            except Exception as exc:                             # noqa: BLE001
+                print(f"fiscal: taxpayer {tin} not read: {str(exc)[:120]}")
+                tp = {}
+            known[tin] = tp.get("name") or ""
+            with _lock:
+                _db().execute("INSERT OR REPLACE INTO taxpayers VALUES (?,?,?,?,?)",
+                              (tin, tp.get("name") or "", tp.get("address") or "", tp.get("town") or "",
+                               datetime.now().isoformat(timespec="seconds")))
+                _db().commit()
+        r["seller_name"] = known.get(tin) or ""
 
 
 def coverage(company):
@@ -314,6 +360,16 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
         if x.get("Currency_Code"):
             return lcy.get(x["No"])
         return float(x.get("Amount_Including_VAT") or 0)
+
+    def amount_for(x, cur):
+        """BC amount in the e-invoice's currency: lek (posted lek amount) or the invoice's own currency."""
+        if cur in ("", "ALL", "LEK"):
+            return bc_amount(x)
+        return float(x.get("Amount_Including_VAT") or 0) if (x.get("Currency_Code") or "").upper() == cur else None
+    name_of_nipt = {}
+    for v in vend:
+        for key in nipt_keys(v.get("VAT_Registration_No")):
+            name_of_nipt.setdefault(key, v.get("Name") or "")
     by_eic = {}
     for x in inv:
         k = (x.get("NIVF") or "").strip().lower()
@@ -337,9 +393,17 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
             return 999
     for e in einv:
         total = e["total"] or 0.0
-        r = {"eic": e["eic"], "date": e["inv_date"], "seller": e["seller_name"] or "", "nipt": e["seller_nipt"] or "",
-             "total": round(total, 2), "source": e["source"], "bc_no": "", "bc_vendor": "", "bc_amount": None,
-             "bc_date": "", "diff": None, "status": "", "note": ""}
+        cur = (e.get("currency") or "ALL").upper()
+        cur = "ALL" if cur in ("", "LEK") else cur
+        seller = e["seller_name"] or next((name_of_nipt[k] for k in nipt_keys(e["seller_nipt"]) if k in name_of_nipt), "")
+        r = {"eic": e["eic"], "date": e["inv_date"], "seller": seller, "nipt": e["seller_nipt"] or "",
+             "total": round(total, 2), "currency": cur, "source": e["source"], "bc_no": "", "bc_vendor": "",
+             "bc_amount": None, "bc_date": "", "diff": None, "status": "", "note": "",
+             "value": round(total, 2) if cur == "ALL" else 0.0}
+        if (e.get("status") or "").upper() == "REFUSED":
+            r.update(status="refused", note="refused by us at the Tax Administration")
+            rows.append(r)
+            continue
         if abs(total) < 0.005:
             r["status"] = "zero"
             rows.append(r)
@@ -347,7 +411,7 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
         if total < 0:
             vs = vendors(r["nipt"])
             cand = [c for c in cms if c["Vendor_No"] in vs and (c["Document_No"], c["Vendor_No"]) not in used_cm
-                    and abs(abs(float(c.get("Amount_LCY") or 0)) - abs(total)) <= tol]
+                    and cur == "ALL" and abs(abs(float(c.get("Amount_LCY") or 0)) - abs(total)) <= tol]
             cand.sort(key=lambda c: near(c.get("Document_Date") or c["Posting_Date"], r["date"] or ""))
             if cand:
                 c = cand[0]
@@ -365,12 +429,15 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
         if m:
             x = m[0]
             used.add(x["No"])
-            amt = bc_amount(x)
+            amt = amount_for(x, cur)
             r.update(bc_no=x["No"], bc_vendor=x.get("Buy_from_Vendor_Name") or "", bc_date=x.get("Posting_Date") or "",
                      bc_amount=round(amt, 2) if amt is not None else None)
-            limit = max(tol, abs(total) * 0.01) if x.get("Currency_Code") else tol
+            if cur != "ALL":
+                r["value"] = round(bc_amount(x) or 0, 2)
+            limit = max(tol, abs(total) * 0.01) if (x.get("Currency_Code") and cur == "ALL") else tol
             if amt is None:
-                r.update(status="matched", note=f"in {x['Currency_Code']}; lek amount not found")
+                r.update(status="matched", note=f"fiscal in {cur}, BC in {x.get('Currency_Code') or 'ALL'}: "
+                                                "amount not compared")
             elif abs(total - amt) <= limit:
                 r["status"] = "matched"
             else:
@@ -380,14 +447,16 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
             continue
         vs = vendors(r["nipt"])
         cand = [x for v in vs for x in by_vendor.get(v, []) if x["No"] not in used
-                and not (x.get("NIVF") or "").strip() and (bc_amount(x) is not None)
-                and abs(bc_amount(x) - total) <= tol and near(x.get("Document_Date") or "", r["date"] or "") <= 45]
+                and not (x.get("NIVF") or "").strip() and (amount_for(x, cur) is not None)
+                and abs(amount_for(x, cur) - total) <= tol and near(x.get("Document_Date") or "", r["date"] or "") <= 45]
         cand.sort(key=lambda x: near(x.get("Document_Date") or "", r["date"] or ""))
         if cand:
             x = cand[0]
             used.add(x["No"])
             r.update(status="matched, no EIC in BC", bc_no=x["No"], bc_vendor=x.get("Buy_from_Vendor_Name") or "",
-                     bc_date=x.get("Posting_Date") or "", bc_amount=round(bc_amount(x), 2))
+                     bc_date=x.get("Posting_Date") or "", bc_amount=round(amount_for(x, cur), 2))
+            if cur != "ALL":
+                r["value"] = round(bc_amount(x) or 0, 2)
         elif r["eic"] in po_eic:
             p = po_eic[r["eic"]]
             r.update(status="in order", bc_no=p["No"], bc_vendor=p.get("Buy_from_Vendor_Name") or "",
@@ -427,9 +496,9 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
 
     def tally(st):
         sel = [r for r in rows if r["status"] == st]
-        return [len(sel), round(sum(r["total"] for r in sel), 0)]
+        return [len(sel), round(sum(r["value"] for r in sel), 0)]
     statuses = ["matched", "matched, no EIC in BC", "amount differs", "credit memo", "in order", "recent",
-                "missing", "missing credit note", "zero"]
+                "missing", "missing credit note", "zero", "refused"]
     k = {st: tally(st) for st in statuses}
     dup_same = [d for d in dup if d["kind"] == "same amount"]
     groups = {}
@@ -438,7 +507,9 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
     k["posted twice"] = [len(groups), round(sum(g[0]["amount"] * (len(g) - 1) for g in groups.values()), 0)]
     k["bc not in fiscal"] = [len(not_fiscal), round(sum(r["amount"] for r in not_fiscal), 0)]
     k["bc without eic"] = [len(no_eic), round(sum(r["amount"] for r in no_eic), 0)]
-    k["fiscal"] = [len(rows), round(sum(r["total"] for r in rows), 0)]
+    k["fiscal"] = [len(rows), round(sum(r["value"] for r in rows), 0)]
+    k["foreign"] = [sum(1 for r in rows if r["currency"] != "ALL"),
+                    sorted({r["currency"] for r in rows if r["currency"] != "ALL"})]
     k["amount differs net"] = round(sum(r["diff"] or 0 for r in rows if r["status"] == "amount differs"), 0)
     miss = [r for r in rows if r["status"] in ("missing", "missing credit note")]
     by_sup = {}
@@ -446,10 +517,11 @@ def reconcile(einv, inv, vle, vend, po, a, b, today, s):
         t = by_sup.setdefault(r["nipt"] or r["seller"], {"seller": r["seller"], "nipt": r["nipt"], "count": 0,
                                                           "value": 0.0, "oldest": r["date"]})
         t["count"] += 1
-        t["value"] += r["total"]
+        t["value"] += r["value"]
         t["oldest"] = min(t["oldest"] or r["date"], r["date"] or t["oldest"])
     order = {st: i for i, st in enumerate(["missing", "amount differs", "missing credit note", "in order",
-                                           "matched, no EIC in BC", "recent", "credit memo", "zero", "matched"])}
+                                           "matched, no EIC in BC", "recent", "credit memo", "refused", "zero",
+                                           "matched"])}
     rows.sort(key=lambda r: (order.get(r["status"], 99), -abs(r["total"])))
     return {"kpis": k, "rows": rows, "posted_twice": dup, "bc_not_in_fiscal": not_fiscal, "bc_without_eic": no_eic,
             "missing_by_supplier": sorted(({**v, "value": round(v["value"], 0)} for v in by_sup.values()),
@@ -489,7 +561,7 @@ def _run(client, company, a, b, key, job):
             job["stage"] = "Matching"
         with _lock:
             cur = _db().execute("SELECT eic, iic, inv_no, inv_date, seller_nipt, seller_name, total, currency, "
-                                "doc_type, source FROM einv WHERE company=? AND inv_date>=? AND inv_date<=?",
+                                "doc_type, status, source FROM einv WHERE company=? AND inv_date>=? AND inv_date<=?",
                                 (company, a, b))
             cols = [c[0] for c in cur.description]
             einv = [dict(zip(cols, r)) for r in cur.fetchall()]
@@ -533,6 +605,10 @@ DEFINITIONS = {
     "missing": "Missing: fiscalized to us, older than the grace days, and not found in BC by EIC, by NIPT and amount, "
                "or on a purchase order. Recent: the same, but still within the grace days.",
     "credit": "Credit notes (negative totals) are matched to posted credit memos by supplier NIPT and amount.",
+    "dates": "Date: the invoice date in the Self-Care book; the date-time the platform received the invoice when it "
+             "comes from the e-invoice service. Amounts in another currency are compared in that currency with the "
+             "BC invoice in the same currency; values in the summary are in lek (BC's posted lek amount).",
+    "refused": "Refused: invoices we refused at the Tax Administration are listed apart and not counted as missing.",
     "posted_twice": "Posted twice: the same EIC on two or more posted purchase invoices with the same amount. Check "
                     "whether one was reversed before acting.",
     "bc_side": "BC not in fiscal: posted invoices of the period whose EIC the Tax Administration does not list for us. "
@@ -568,18 +644,19 @@ def render_xlsx(r):
               ("amount differs", "EIC posted with a different amount"), ("credit memo", "Credit notes matched"),
               ("in order", "On a purchase order, not posted"), ("recent", "Recent, within the grace days"),
               ("missing", "Missing in BC"), ("missing credit note", "Credit notes missing in BC"),
-              ("zero", "Zero value"), ("posted twice", "BC: same EIC posted twice, same amount (extra value)"),
+              ("zero", "Zero value"), ("refused", "Refused by us at the Tax Administration"), ("posted twice", "BC: same EIC posted twice, same amount (extra value)"),
               ("bc not in fiscal", "BC: EIC not listed by the Tax Administration"),
               ("bc without eic", "BC: posted invoices without EIC")]
     sheet(ws, ["Check", "Count", "Value (ALL)"], [[l, k[key][0], k[key][1]] for key, l in labels], [52, 10, 16])
     ws.append([])
     ws.append([f"{r['company']} · invoices dated {r['date_from']} to {r['date_to']} · checked {r['checked_at']}"])
-    cols = ["Status", "Invoice date", "Supplier", "NIPT", "Total (ALL)", "EIC", "BC document", "BC supplier",
-            "BC posting date", "BC amount (ALL)", "Difference", "Note", "Source"]
+    cols = ["Status", "Date", "Supplier", "NIPT", "Total", "Currency", "EIC", "BC document", "BC supplier",
+            "BC posting date", "BC amount", "Difference", "Note", "Source"]
     sheet(wb.create_sheet("Fiscalized invoices"), cols,
-          [[x["status"], x["date"], x["seller"], x["nipt"], x["total"], x["eic"], x["bc_no"], x["bc_vendor"],
-            x["bc_date"], x["bc_amount"], x["diff"], x["note"], x["source"]] for x in r["rows"]],
-          [20, 11, 30, 13, 14, 38, 11, 26, 12, 14, 12, 34, 8])
+          [[x["status"], x["date"], x["seller"], x["nipt"], x["total"], x.get("currency", "ALL"), x["eic"], x["bc_no"],
+            x["bc_vendor"], x["bc_date"], x["bc_amount"], x["diff"], x["note"],
+            "Tax Administration" if x["source"] == "cis" else "Self-Care book"] for x in r["rows"]],
+          [20, 11, 30, 13, 14, 8, 38, 11, 26, 12, 14, 12, 34, 16])
     sheet(wb.create_sheet("Missing by supplier"), ["Supplier", "NIPT", "Invoices", "Value (ALL)", "Oldest"],
           [[x["seller"], x["nipt"], x["count"], x["value"], x["oldest"]] for x in r["missing_by_supplier"]],
           [34, 13, 10, 14, 11])
