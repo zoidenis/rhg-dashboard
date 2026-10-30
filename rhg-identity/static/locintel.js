@@ -23,7 +23,7 @@ const MARKUP = `<div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <div class="li-seg" id="liTabs" role="tablist"><button class="on" data-t="rest" role="tab">Restaurants</button><button data-t="cmp" role="tab" id="liCmpTab">Compare <span class="li-cnt" id="liCmpCnt"></span></button></div>
           <label class="meta" style="display:flex;gap:6px;align-items:center" id="liSortLbl">Order
-            <select id="liSort" style="font-size:12px;padding:5px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health, weakest first</option><option value="alerts">by alerts</option><option value="fc">by food cost</option><option value="name">by name</option></select></label>
+            <select id="liSort" style="font-size:12px;padding:5px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health, weakest first</option><option value="alerts">by alerts</option><option value="fc">by food cost</option><option value="ebitda">by EBITDA margin (BC)</option><option value="name">by name</option></select></label>
           <button class="mini" id="liRefresh">Read again</button></div></div>
       <p class="meta" id="liStatus" style="margin:10px 0 0"></p>
     </div>
@@ -148,19 +148,20 @@ const liTile = (lab, v, s, cls, attrs) => `<div class="li-tile ${cls || ""}" ${a
 // ---- read
 async function loadLocations(refresh){
   clearTimeout(liTimer);
+  const want = key();          // the answer is kept only if company and month are still the same
   const p = new URLSearchParams({company: opts.company || ""});
   if (opts.period) p.set("period", opts.period);
   if (refresh) p.set("refresh", "1");
   $("liStatus").textContent = "Reading Simphony and Business Central…";
   try{
     const j = await getJSON(opts.api + "?" + p.toString());
-    if (!host || !host.isConnected) return;
+    if (!host || !host.isConnected || want !== key()) return;
     if (j.error) throw new Error(j.error);
     if (j.pending) { $("liStatus").textContent = `Reading · ${j.stage || "starting"} · ${j.elapsed || 0} s. The first read of a month reads every restaurant and day once; later reads come from what is held.`;
       liTimer = setTimeout(() => host && host.isConnected && loadLocations(false), 4000); return; }
     liData = j; liKey = key(); liRender();
     if (j.inventory && j.inventory.state === "pending") liTimer = setTimeout(() => host && host.isConnected && loadLocations(false), 15000);
-  }catch(e){ $("liStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){ if (want === key() && host && host.isConnected) $("liStatus").textContent = "Could not read: " + e.message; }
 }
 function bind(){
   $("liRefresh").onclick = () => loadLocations(true);
@@ -231,7 +232,11 @@ function liDerive(){
   LI.closed = mine.filter(l => l.status === "closed");
   LI.others = all.filter(l => l.company !== LI.company && l.registered && l.status !== "no sales");
   LI.unreg = all.filter(l => !l.registered);
+  const FN = opts.finance && opts.finance.company === LI.company ? opts.finance : null;
+  LI.fin = FN;
   for (const l of all) {
+    l.pl = FN && l.company === LI.company && l.dept && FN.has(l.dept) ? FN.get(l.dept) : null;
+    if (l.pl && !(l.pl.cur && (l.pl.cur.sales || l.pl.cur.ebitda))) l.pl = null;
     const c = l.sim && l.sim.cur, y = l.sim && l.sim.ly;
     l.snet = c ? c.net : null;
     l.lyD = c && y && y.net ? (c.net / y.net - 1) * 100 : null;
@@ -246,6 +251,11 @@ function liDerive(){
       if (inv.slow > 3e6) al.push(["info", `${liM(inv.slow)} slow or non-moving`, "Stock not used for 60+ days; see Movement & dead stock."]);
     }
     if (l.fc != null && l.fc > th.food_cost + 2) al.push(["warn", `Food cost ${l.fc.toFixed(1)}%`, `Above the ${th.food_cost}% target: use at cost ${liM(l.use)} for ${liM(l.exvat)} sales ex VAT.`]);
+    const pc = l.pl && l.pl.cur;
+    if (pc && pc.sales > 0) {
+      if (pc.ebitda < 0) al.push(["warn", `EBITDA negative in ${FN.label}`, `${liM(pc.ebitda)} on ${liM(pc.sales)} revenue (BC, department ${esc(l.dept)}).`]);
+      if (pc.primePct != null && pc.primePct > LI_PRIME) al.push(["warn", `Prime cost ${pc.primePct.toFixed(1)}% in ${FN.label}`, `Food ${pc.foodPct.toFixed(1)}% plus labour ${pc.laborPct.toFixed(1)}% of revenue (BC).`]);
+    }
     if (!al.length && l.status === "open") al.push(["good", "No exception", "Nothing above the thresholds this month."]);
     const order = ["crit", "warn", "info", "good"];
     l.alerts = al.sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
@@ -298,6 +308,43 @@ function liDrawKpis(){
     kpi("Stock in restaurants", inv.length ? liM(stock) : "–", inv.length ? `at item cost · ${esc((liData.inventory || {}).as_of || "")}` : esc((liData.inventory || {}).note || "")) +
     kpi("Bought direct", liM(purch), "posted purchase invoices with the restaurant's location, VAT incl.") +
     kpi("Restaurants to act on", `${toAct} of ${s.length}`, `${toWatch} to watch${notPosted ? ` · ${notPosted} with posting gaps` : ""}`, toAct ? "up" : "");
+  const F = LI.fin;
+  if (F) {
+    const T = F.total(), c = T.cur, y = T.ly;
+    const d = (a, b) => b ? liPct((a / b - 1) * 100) : "–";
+    $("liKpis").innerHTML +=
+      kpi(`Revenue · ${esc(F.label)}`, liM(c.sales), `BC P&L, whole company · ${d(c.sales, y && y.sales)} vs a year before`) +
+      kpi(`EBITDA · ${esc(F.label)}`, liM(c.ebitda), `${c.ebitdaPct != null ? c.ebitdaPct.toFixed(1) + "% of revenue" : ""}${y ? ` · ${liPPf(liPP(c.ebitdaPct, y.ebitdaPct))} vs a year before` : ""}`, c.ebitda < 0 ? "up" : "") +
+      kpi(`Prime cost · ${esc(F.label)}`, c.primePct != null ? c.primePct.toFixed(1) + "%" : "–", `food ${c.foodPct != null ? c.foodPct.toFixed(1) : "–"}% + labour ${c.laborPct != null ? c.laborPct.toFixed(1) : "–"}%${F.provisional ? " · provisional" : ""}`, c.primePct > LI_PRIME ? "warn" : "");
+    $("liBcScope").textContent = `${LI.company} · ${LI.curLab} posted · P&L ${F.label}`;
+  }
+}
+// the P&L panel of a restaurant: the posted month against a year before (and budget), and the year to date
+function liPlPanel(l){
+  const F = LI.fin; if (!F) return "";
+  if (!l.pl) return `<div class="li-panel li-span2"><div class="ttl"><h3>P&amp;L</h3><span class="li-tag">BC · ${esc(F.label)}</span></div>
+    <p class="meta">No P&amp;L for this restaurant: ${l.dept ? `department ${esc(l.dept)} has no postings in ${esc(F.label)}` : "no BC department in the registry"} (Finance → Settings → Location intelligence, key dept).</p></div>`;
+  const c = l.pl.cur, y = l.pl.ly, b = l.pl.bud, Y = l.pl.ytd, YL = l.pl.ytdLy;
+  const pct = v => v == null ? "–" : v.toFixed(1) + "%";
+  const chg = (a, z, up) => { if (a == null || z == null || !z) return ""; const v = (a / Math.abs(z) - 1) * 100; return `<b class="${(v >= 0) === up ? "down" : v ? "up" : ""}">${liPct(v)}</b>`; };
+  const pp = (a, z, up) => { const v = liPP(a, z); return v == null ? "" : `<b class="${v === 0 ? "" : (v > 0) === up ? "down" : "up"}">${liPPf(v)}</b>`; };
+  const vs = (x, lab) => x ? ` · ${lab}` : "";
+  const tiles = [
+    liTile("Revenue", liM(c.sales), `LY ${chg(c.sales, y && y.sales, true) || "–"}${b && b.sales ? ` · budget ${chg(c.sales, b.sales, true)}` : ""}`),
+    liTile("Food cost", pct(c.foodPct), `LY ${pp(c.foodPct, y && y.foodPct, false) || "–"} · ${liM(c.food)}`),
+    liTile("Labour", pct(c.laborPct), `LY ${pp(c.laborPct, y && y.laborPct, false) || "–"} · ${liM(c.labor)}`),
+    liTile("Prime cost", `<span class="${c.primePct > LI_PRIME ? "warn" : ""}">${pct(c.primePct)}</span>`, `food + labour${y ? ` · LY ${pp(c.primePct, y.primePct, false)}` : ""}`),
+    liTile("Other operating costs", pct(c.opexPct), `${liM(c.opex)}${y ? ` · LY ${pp(c.opexPct, y.opexPct, false)}` : ""}`),
+    liTile("EBITDA", `<span class="${c.ebitda < 0 ? "up" : ""}">${liM(c.ebitda)}</span>`, `${pct(c.ebitdaPct)} of revenue · LY ${pp(c.ebitdaPct, y && y.ebitdaPct, true) || "–"}`),
+    liTile(`Revenue ${esc(F.ytdLabel)}`, liM(Y && Y.sales), `year to date · LY ${chg(Y && Y.sales, YL && YL.sales, true) || "–"}`),
+    liTile(`EBITDA ${esc(F.ytdLabel)}`, liM(Y && Y.ebitda), `${pct(Y && Y.ebitdaPct)} of revenue · LY ${pp(Y && Y.ebitdaPct, YL && YL.ebitdaPct, true) || "–"}`)].join("");
+  // where each 100 lek of revenue went: food, labour, other costs and what is left (EBITDA)
+  const tot = Math.max(c.sales + (c.other_income || 0), 1);
+  const parts = [["Food", c.food, "var(--li-c1)"], ["Labour", c.labor, "var(--li-c2)"], ["Other costs", c.opex, "var(--li-c3)"], ["EBITDA", Math.max(c.ebitda, 0), "var(--li-c4)"]];
+  const bar = c.sales > 0 ? `<div class="li-split">${parts.map(p => p[1] > 0 ? `<i style="flex:${p[1] / tot};background:${p[2]}" title="${p[0]} ${(p[1] / tot * 100).toFixed(1)}%"></i>` : "").join("")}</div>
+    <div class="li-legend" style="margin-top:6px">${parts.map(p => `<span><span class="li-lg" style="background:${p[2]}"></span>${p[0]} ${(p[1] / tot * 100).toFixed(1)}%</span>`).join("")}${c.ebitda < 0 ? `<span class="up">loss ${liM(-c.ebitda)}</span>` : ""}</div>` : "";
+  return `<div class="li-panel li-span2"><div class="ttl"><h3>P&amp;L · ${esc(F.label)}</h3><span class="li-tag">BC · department ${esc(l.dept)}${F.provisional ? " · provisional until the inventory is posted" : ""}${F.wanted !== F.month ? ` · the latest month with payroll and food cost posted` : ""}</span></div>
+    <div class="li-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">${tiles}</div>${bar}</div>`;
 }
 function liDrawMap(){
   const pins = LI.scope.filter(l => l.x != null && !l.region);
@@ -321,6 +368,9 @@ function liDrawMap(){
   $("liMap").innerHTML = s;
 }
 const LI_ORDER = {crit: 0, warn: 1, info: 2, good: 3};
+const LI_PRIME = 65;      // prime cost (food + labour) above this share of revenue raises an alert
+const liPP = (a, b) => a == null || b == null || !isFinite(a) || !isFinite(b) ? null : a - b;
+const liPPf = x => x == null ? "–" : (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "") + x.toFixed(1)) + " pp";
 function liRestSquare(l){
   const c = liT(l, "cur"), p = liT(l, "prev"), ring = {"h-ok": "var(--down)", "h-mid": "var(--warn)", "h-low": "var(--up)"}[l.h] || "var(--line)";
   const dS = c && p && p.net ? (c.net / p.net - 1) * 100 : null;
@@ -337,7 +387,9 @@ function liRestSquare(l){
     <div class="st">${stat("Checks", c ? liN(c.checks) : "–")}${stat("Avg check", c && c.checks ? liN(c.net / c.checks) : "–")}
       ${stat("Food cost", l.fc != null ? l.fc.toFixed(1) + "%" : "–", l.fc != null && l.fc > LI.th.food_cost + 2 ? "warn" : "")}
       ${l.inv ? stat("Cover", l.inv.doh != null ? l.inv.doh + " d" : "–", l.inv.doh != null && l.inv.doh > LI.th.cover_days ? "up" : "")
-              : stat("Posted BC", posted != null ? liPct(posted) : "–", posted != null && posted < -3 ? "up" : "")}</div>
+              : stat("Posted BC", posted != null ? liPct(posted) : "–", posted != null && posted < -3 ? "up" : "")}
+      ${LI.fin ? stat(`EBITDA ${esc(liMon(LI.fin.month + "-01"))}`, l.pl && l.pl.cur.ebitdaPct != null ? l.pl.cur.ebitdaPct.toFixed(1) + "%" : "–", l.pl && l.pl.cur.ebitda < 0 ? "up" : "")
+              + stat(`Labour ${esc(liMon(LI.fin.month + "-01"))}`, l.pl && l.pl.cur.laborPct != null ? l.pl.cur.laborPct.toFixed(1) + "%" : "–") : ""}</div>
     <div class="ft"><div class="al ${top ? top[0] : "good"}" title="${esc(top ? top[1] : "No exception")}"><i></i><span>${top ? esc(top[1]) : "No exception"}</span>${n > 1 ? `<em>+${n - 1}</em>` : ""}</div>
       <button class="li-add" data-cmp="${esc(l.ref)}" title="${on ? "Remove from" : "Add to"} Compare" aria-pressed="${on}">${on ? "✓" : "+"}</button></div>
   </div>`;
@@ -357,6 +409,7 @@ function liGroups(list){
 function liDrawRest(){
   const by = liSort;
   const key = {net: l => -(l.snet || 0), ly: l => l.lyD ?? 1e9, score: l => l.score ?? 1e9, fc: l => -(l.fc ?? -1), name: l => 0,
+               ebitda: l => -((l.pl && l.pl.cur.ebitdaPct) ?? -1e9),
                alerts: l => (l.alerts[0] ? LI_ORDER[l.alerts[0][0]] * 100 : 400) - l.alerts.filter(a => a[0] !== "good").length}[by] || (l => 0);
   const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (by === "name" ? a.name.localeCompare(b.name) : (b.snet || 0) - (a.snet || 0)));
   const groups = liGroups(LI.scope);
@@ -422,6 +475,15 @@ const LI_ROWS = [
   ["Business Central", "Days of cover", l => l.inv ? l.inv.doh : null, liN, -1],
   ["Business Central", "Fresh lines to count", l => l.inv ? l.inv.count : null, liN, -1],
   ["Business Central", "Negative stock lines", l => l.inv ? l.inv.neg_lines : null, liN, -1],
+  ["P&L", "Revenue", l => l.pl && l.pl.cur.sales, v => liM(v), 1],
+  ["P&L", "Food cost, % of revenue", l => l.pl && l.pl.cur.foodPct, liP1, -1],
+  ["P&L", "Labour, % of revenue", l => l.pl && l.pl.cur.laborPct, liP1, -1],
+  ["P&L", "Prime cost, % of revenue", l => l.pl && l.pl.cur.primePct, liP1, -1],
+  ["P&L", "Other costs, % of revenue", l => l.pl && l.pl.cur.opexPct, liP1, -1],
+  ["P&L", "EBITDA", l => l.pl && l.pl.cur.ebitda, v => liM(v), 1],
+  ["P&L", "EBITDA margin", l => l.pl && l.pl.cur.ebitdaPct, liP1, 1],
+  ["P&L", "Revenue, year to date", l => l.pl && l.pl.ytd && l.pl.ytd.sales, v => liM(v), 1],
+  ["P&L", "EBITDA, year to date", l => l.pl && l.pl.ytd && l.pl.ytd.ebitda, v => liM(v), 1],
   ["Overall", "Health score", l => l.score, liN, 1],
   ["Overall", "Alerts", l => l.alerts.filter(a => a[0] !== "good").length, liN, -1]
 ];
@@ -443,7 +505,7 @@ function liDrawCmp(){
   for (const [g, lab, fn, fmt, dir, kind] of LI_ROWS) {
     const vals = sel.map(l => { const v = fn(l); return v == null || !isFinite(v) ? null : v; });
     if (vals.every(v => v == null)) continue;
-    if (g !== grp) { body += `<tr class="li-cg"><td colspan="${sel.length + 1}">${g}</td></tr>`; grp = g; }
+    if (g !== grp) { body += `<tr class="li-cg"><td colspan="${sel.length + 1}">${g === "P&L" && LI.fin ? `P&amp;L · ${esc(LI.fin.label)} · Business Central` : g}</td></tr>`; grp = g; }
     const got = vals.filter(v => v != null), mx = Math.max(...got.map(Math.abs)) || 1;
     let best = null;
     if (got.length > 1 && dir) best = dir === "abs" ? Math.min(...got.map(Math.abs)) : dir > 0 ? Math.max(...got) : Math.min(...got);
@@ -530,7 +592,7 @@ function liOpen(ref){
         ${l.parts.length ? `<div class="ttl" style="margin-top:16px"><h3>Health score</h3><span class="li-tag">${l.score}/100${l.parts.length < 4 ? ` · ${l.parts.length} of 4 parts` : ""}</span></div>
         <div class="li-bk">${l.parts.map(p => `<span>${p[0]}</span><div class="tr"><i style="width:${p[1] / 25 * 100}%;background:${p[1] >= 18 ? "var(--down)" : p[1] >= 10 ? "var(--warn)" : "var(--up)"}"></i></div><span class="meta">${Math.round(p[1])}/25</span><span></span><span class="meta" style="grid-column:span 2;margin-top:-4px">${esc(p[2])}</span>`).join("")}</div>` : ""}
         <div class="li-links"><a href="${opts.links.sales}">Finance · Sales · Simphony ›</a>${mine && l.bc ? `<a href="${opts.links.typology}">Finance · Typology &amp; turnover ›</a><a href="${opts.links.movement}">Finance · Movement &amp; dead stock ›</a><a href="${opts.links.fsales}">Finance · Fiscal sales vs BC ›</a>` : ""}</div></div>
-      ${fin}${pur}${inv}
+      ${mine ? liPlPanel(l) : ""}${fin}${pur}${inv}
     </div>`;
   $("liBd").classList.add("show");
 }

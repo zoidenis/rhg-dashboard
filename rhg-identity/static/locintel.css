@@ -186,3 +186,6 @@
 .li-pgh ~ .li-pgh{margin-top:12px}
 .li-chip:focus-visible,.li-ssq:focus-visible{outline:2px solid var(--li-c1);outline-offset:1px}
 @media (max-width:900px){.li-pal{order:2}}
+.li-split{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-top:4px}
+.li-split i{display:block;min-width:2px}
+.li-rsq .st{grid-template-columns:1fr 1fr}

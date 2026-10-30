@@ -749,11 +749,40 @@ function liMonth(){
   const d = new Date();
   return F.year === d.getFullYear() ? `${F.year}-${String(d.getMonth() + 1).padStart(2, "0")}` : `${F.year}-12`;
 }
+/* The P&L of each restaurant from Business Central (the department cube this page already holds), for
+   the latest month whose payroll and food cost are posted: the month in progress has neither until the
+   month-end closing, so its food cost and EBITDA would mislead. */
+function liFinance(){
+  if (!S.fin || S.fin.pending || !S.fin.actual || S.fin.company !== F.company) return null;
+  const want = liMonth(), ks = (S.fin.months || []).filter(k => k <= want), run = running();
+  const posted = k => { const t = actual("*", [k]); return t.n && t.sales > 0 && t.food > 0 && t.labor > 0; };
+  let month = null;
+  for (let i = ks.length - 1; i >= 0; i--) {
+    const k = ks[i];
+    if (run && k === run.month) continue;
+    if (!posted(k)) continue;
+    const prev = ks.slice(Math.max(0, i - 3), i).map(x => actual("*", [x]).labor).filter(v => v > 0);
+    const avg = prev.length ? prev.reduce((a, v) => a + v, 0) / prev.length : 0;
+    if (avg && actual("*", [k]).labor < 0.5 * avg) continue;      // payroll only partly posted
+    month = k; break;
+  }
+  if (!month) return null;
+  const ytd = (S.fin.months || []).filter(k => k.slice(0, 4) === month.slice(0, 4) && k <= month);
+  const pick = t => t && {sales: t.sales, other_income: t.other_income, food: t.food, labor: t.labor, opex: t.opex, da: t.da,
+    prime: t.prime, ebitda: t.ebitda, foodPct: t.foodPct, laborPct: t.laborPct, primePct: t.primePct, opexPct: t.opexPct, ebitdaPct: t.ebitdaPct, n: t.n};
+  const codes = new Set(depts().map(d => d.code));
+  return {company: F.company, month, label: mlabel(month), ytdLabel: `${mshort(ytd[0])}–${mlabel(month)}`, wanted: want,
+    provisional: (S.fin.provisional || []).includes(month), budget: !!(S.fin.budget && S.fin.budget.available), currency: S.fin.currency,
+    has: dept => codes.has(dept),
+    get: dept => ({cur: pick(actual(dept, [month])), ly: pick(comparison(dept, [month], "ly")), bud: pick(comparison(dept, [month], "budget")),
+                   ytd: pick(actual(dept, ytd)), ytdLy: pick(comparison(dept, ytd, "ly"))}),
+    total: () => ({cur: pick(actual("*", [month])), ly: pick(comparison("*", [month], "ly"))})};
+}
 function viewLocations(){
   if (!can("finance.view")) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">Your role does not include the Finance tower.</p></div>`; return; }
   if (!window.LocIntel) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">Location intelligence could not be loaded; reload the page.</p></div>`; return; }
   $("periodLabel").textContent = `${mlabel(liMonth())} · every restaurant of ${F.company}`;
-  LocIntel.mount($("view"), {company: F.company, period: liMonth() + "-01",
+  LocIntel.mount($("view"), {company: F.company, period: liMonth() + "-01", finance: liFinance(),
     onState: j => { if (F.tab === "locations") $("periodLabel").textContent = `${j.period.label} · whole days ${j.period.from} → ${j.period.to} · against the month before and the same dates last year`; }});
 }
 function render(){

@@ -26,6 +26,7 @@ import typology
 # One line per restaurant: Simphony location | name | key=value ...
 #   brand     icon on the map (SALT, LIFT, OPA, VESPER, LE DISTRICT, SIN, ZOI)
 #   company   BC company;  bc = BC location code;  customer = BC customer the POS sales post to
+#   dept      BC department (global dimension 1) of its P&L; blank = the same as bc
 #   area      shown under the name;  region = anything but blank puts it outside the city map
 #   currency  overrides what Simphony says (blank in Simphony means the group currency)
 #   map=x,y   position on the city map in % of its width and height;  seasonal = closes off season
@@ -39,8 +40,8 @@ OPA_9KAT | OPA 9 Katëshet       | brand=OPA         | company=SALT | bc=OPA 9KA
 OPA_A    | OPA Arena            | brand=OPA         | company=SALT | bc=OPA3       | customer=OPA3     | area=Arena Center     | map=63,52
 OPA_TE   | OPA TEG              | brand=OPA         | company=SALT | bc=OPA TEG    | customer=OPA TEG  | area=Tirana East Gate | map=84,80
 OPA_Q    | OPA QTU              | brand=OPA         | company=SALT | bc=OPA QTU    | customer=OPA QTU  | area=QTU, Kashar      | map=14,40
-OPA_SK   | OPA Shkodër          | brand=OPA         | company=SALT | bc=OPASHKODER | customer=         | area=Shkodër          | region=Shkodër
-OPA_RK   | OPA Rruga e Kavajës  | brand=OPA         | company=SALT | bc=           | customer=         | area=Rr. e Kavajës
+OPA_SK   | OPA Shkodër          | brand=OPA         | company=SALT | bc=OPASHKODER | customer=         | area=Shkodër          | region=Shkodër | dept=OPA SHKODER
+OPA_RK   | OPA Rruga e Kavajës  | brand=OPA         | company=SALT | bc=           | customer=         | area=Rr. e Kavajës    | dept=OPA2
 SALT_GC  | SALT Green Coast     | brand=SALT        | company=SALT | bc=SALT GC    | customer=SALT GC  | area=Palasë           | seasonal
 SIN      | SIN GC               | brand=SIN         | company=SALT | bc=SIN        | customer=SIN      | area=Palasë           | seasonal
 District | Le District          | brand=LE DISTRICT | company=TBM  | bc=           | customer=LEDISTRICT | area=Tirana
@@ -71,7 +72,7 @@ def registry(settings=None):
             continue
         seen.add(ref)
         d = {"ref": ref, "name": ref, "brand": "", "company": "", "bc": "", "customer": "", "area": "",
-             "region": "", "currency": "", "x": None, "y": None, "seasonal": False}
+             "region": "", "currency": "", "dept": "", "x": None, "y": None, "seasonal": False}
         for i, p in enumerate(parts[1:]):
             if "=" in p:
                 k, _, v = p.partition("=")
@@ -92,6 +93,7 @@ def registry(settings=None):
             elif i == 0 and p:
                 d["name"] = p[:80]
         d["brand"] = (d["brand"] or d["name"].split()[0]).upper()
+        d["dept"] = d["dept"] or d["bc"]
         out.append(d)
     return out
 
@@ -425,7 +427,7 @@ def build(client, company, period, latest_fn, parallel_fn, progress):
         if ref in known_refs or not any(s[p]["net"] for p in ("cur", "prev", "ly")):
             continue
         rows.append({"ref": ref, "name": s["name"], "brand": s["name"].split()[0].upper() if s["name"] else ref,
-                     "company": "", "bc": "", "customer": "", "area": "", "region": "", "x": None, "y": None,
+                     "company": "", "bc": "", "customer": "", "dept": "", "area": "", "region": "", "x": None, "y": None,
                      "seasonal": False, "registered": False, "currency": s["currency_given"] or group_ccy,
                      "sim": {k: s[k] for k in ("cur", "prev", "ly")}, "daily": s["daily"], "latest": s["latest"],
                      "bc_posted": None, "purch": None, "use": None, "inv": None})
