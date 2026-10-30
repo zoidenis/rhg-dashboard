@@ -30,6 +30,8 @@ STATIC_FILES = {
     "icon.svg": "image/svg+xml",
     "select.js": "application/javascript; charset=utf-8",
     "select.css": "text/css; charset=utf-8",
+    "locintel.js": "application/javascript; charset=utf-8",
+    "locintel.css": "text/css; charset=utf-8",
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",
                 "/brand.css", "/app.css", "/icon.svg", "/manifest.webmanifest", "/sw.js",

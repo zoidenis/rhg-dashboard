@@ -85,6 +85,7 @@ td.mut{color:var(--sub)}
   .kpis{grid-template-columns:1fr 1fr}}
 </style>
 <link rel="stylesheet" href="/brand.css">
+<link rel="stylesheet" href="/locintel.css">
 </head>
 <body>
 <div class="app">
@@ -135,6 +136,7 @@ td.mut{color:var(--sub)}
     <button data-tab="food">Food cost</button>
     <button data-tab="budget">Budget</button>
     <button data-tab="purchasing">Purchasing</button>
+    <button data-tab="locations" id="tabLocations">Location intelligence</button>
   </div>
 
   <div id="banner"></div>
@@ -143,6 +145,7 @@ td.mut{color:var(--sub)}
 </main>
 </div>
 <div id="tip" role="tooltip"></div>
+<script src="/locintel.js"></script>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -737,7 +740,22 @@ function drawSavings(keys){
 
 /* ------------------------------------------------------------ render */
 const DEF_LABEL = {sales: "Revenue", food: "Food cost", labor: "Labour", prime: "Prime cost", ebitda: "EBITDA", running: "Month in progress", budget: "Budget", simphony: "Simphony"};
-const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, purchasing: viewPurchasing};
+const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, purchasing: viewPurchasing, locations: viewLocations};
+/* Location intelligence: every restaurant of the company from Simphony and Business Central, read by the
+   Finance tower (/finance/api/locations) and drawn by the shared module locintel.js. It follows the
+   Company and "Up to" filters (month to date of that month); the other filters do not apply. */
+function liMonth(){
+  if (F.end) return F.end;
+  const d = new Date();
+  return F.year === d.getFullYear() ? `${F.year}-${String(d.getMonth() + 1).padStart(2, "0")}` : `${F.year}-12`;
+}
+function viewLocations(){
+  if (!can("finance.view")) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">Your role does not include the Finance tower.</p></div>`; return; }
+  if (!window.LocIntel) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">Location intelligence could not be loaded; reload the page.</p></div>`; return; }
+  $("periodLabel").textContent = `${mlabel(liMonth())} · every restaurant of ${F.company}`;
+  LocIntel.mount($("view"), {company: F.company, period: liMonth() + "-01",
+    onState: j => { if (F.tab === "locations") $("periodLabel").textContent = `${j.period.label} · whole days ${j.period.from} → ${j.period.to} · against the month before and the same dates last year`; }});
+}
 function render(){
   CHARTS.clear(); hideTip();
   syncUrl();
@@ -745,6 +763,12 @@ function render(){
   const how = F.tab === "budget" ? "budget" : F.tab === "purchasing" && F.compare === "budget" ? "ly" : F.compare;
   $("periodLabel").textContent = keys.length ? `${periodText(keys)} · ${deptName(F.dept)} · against ${compName(how)}` : "Reading…";
   renderBanner();
+  if (F.tab === "locations") {
+    $("banner").innerHTML = "";
+    viewLocations();
+    $("foot").innerHTML = `<div class="defs">Location intelligence follows the Company and “Up to” filters: the month to date of that month, whole days, against the same days of the month before and the same dates last year. Period, Restaurant and Compare with do not apply here. The restaurant list and the alert limits are in Finance → Settings → Location intelligence. Every figure is read-only from Simphony and Business Central.</div>`;
+    return;
+  }
   const needsFin = F.tab !== "purchasing";
   if (needsFin && !S.fin) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">${esc(S.finErr || "Reading Business Central…")}</p></div>`; return; }
   try { VIEWS[F.tab](); } catch (e) { console.error(e); $("view").innerHTML = `<div class="card"><p class="hint">This view could not be drawn: ${esc(e.message)}</p></div>`; }
@@ -819,7 +843,7 @@ $("fDept").onchange = e => { F.dept = e.target.value; render(); };
 $("fCompare").onchange = e => { F.compare = e.target.value; render(); };
 $("fCompany").onchange = e => { F.company = e.target.value; S.fin = S.pur = null; F.dept = "*"; render(); load(false); };
 $("fYear").onchange = e => { F.year = +e.target.value; S.fin = S.pur = null; F.end = ""; render(); load(false); };
-$("refreshBtn").onclick = () => load(true);
+$("refreshBtn").onclick = () => F.tab === "locations" && window.LocIntel ? LocIntel.refresh() : load(true);
 $("logoutBtn").onclick = async () => {
   try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
   location.href = "/login";
@@ -830,6 +854,7 @@ $("logoutBtn").onclick = async () => {
   try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
   if (!s.user || s.user.must_change) { location.href = "/login"; return; }
   me = s.user; CSRF = s.user.csrf;
+  if (!can("finance.view")) $("tabLocations").style.display = "none";
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   const t = $("towers");
   [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"]]
