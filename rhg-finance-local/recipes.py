@@ -40,7 +40,7 @@ OPEN_DAYS = 35
 ITEM_FIELDS = ("No,Description,Type,Assembly_Policy,Assembly_BOM,Replenishment_System,Base_Unit_of_Measure,"
                "Sales_Unit_of_Measure,Purch_Unit_of_Measure,Costing_Method,Unit_Cost,Standard_Cost,"
                "Last_Direct_Cost,Item_Category_Code,Item_Category_Group_1,Item_Category_Group_2,"
-               "Item_Category_Group_3,Inventory_Posting_Group,Gen_Prod_Posting_Group,Blocked,"
+               "Item_Category_Group_3,Item_Category_Group_4,Inventory_Posting_Group,Gen_Prod_Posting_Group,Blocked,"
                "Last_Date_Modified")
 STATUSES = ("VALID", "MISSING", "INCOMPLETE", "INACTIVE", "PENDING REVIEW", "NOT REQUIRED")
 
@@ -74,12 +74,18 @@ def _master_cache():
         return {}
 
 
+def master_cached(company):
+    """The item cards last read, whatever their age (no read from BC)."""
+    with _lock:
+        return _master_cache().get(company)
+
+
 def master(client, company, force=False):
     """Item cards, BOM lines and units of measure, refreshed every six hours."""
     with _lock:
         cache = _master_cache()
     hit = cache.get(company)
-    if hit and not force and time.time() - hit.get("at", 0) < MASTER_TTL:
+    if hit and not force and time.time() - hit.get("at", 0) < MASTER_TTL and hit.get("fields") == ITEM_FIELDS:
         return hit
     items = client._get_all(client._url(company, config.E_ITEMS), {"$select": ITEM_FIELDS})
     bom = client._get_all(client._url(company, "AssemblyBOM"),
@@ -87,7 +93,7 @@ def master(client, company, force=False):
                                       "Unit_of_Measure_Code"})
     uom = client._get_all(client._url(company, "ItemUnitsOfMeasure"),
                           {"$select": "Item_No,Code,Qty_per_Unit_of_Measure"})
-    value = {"at": time.time(), "read_at": datetime.now().isoformat(timespec="seconds"),
+    value = {"at": time.time(), "read_at": datetime.now().isoformat(timespec="seconds"), "fields": ITEM_FIELDS,
              "items": {str(r["No"]): {k: r.get(k) for k in ITEM_FIELDS.split(",") if k != "No"} for r in items
                        if r.get("No")},
              "bom": [[str(r.get("Parent_Item_No")), r.get("Line_No"), r.get("Type") or "", str(r.get("No") or ""),

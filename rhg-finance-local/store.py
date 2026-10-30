@@ -68,7 +68,21 @@ DEFAULT_SETTINGS = {
                   # left out of movement and dead stock: equipment / small-inventory locations and
                   # goods in transit (* is a wildcard), and categories that are not consumed stock
                   "movement_exclude_locations": "*_IM, *_IN, TRANSIT",
-                  "movement_exclude_categories": "INVENTAR I IMET"},
+                  "movement_exclude_categories": "INVENTAR I IMET",
+                  # typology & turnover: nature of each item type (Group 2), safety days added to the
+                  # delivery cycle, family targets that replace it (FAMILY=days), whether negative
+                  # adjustments count as use for operating supplies, and the fresh families whose
+                  # cover beyond the count threshold (days) means the book stock needs a count
+                  "turnover_natures": "LP=ingredients, PN=ingredients, LP E SHITSHME=resale, "
+                                      "I SHITSHEM=resale, AMBALAZH=supplies, PRODUKT PASTRIMI=supplies, "
+                                      "BAR=supplies, RESTORANT=supplies, LENDE DJEGESE=supplies, "
+                                      "MJETE KANCELARIE=supplies, MATERIALE NDIHMESE=supplies, "
+                                      "MIREMBAJTJE=supplies, UNIFORMA=equipment, II=equipment",
+                  "turnover_safety_days": "2", "turnover_targets": "",
+                  "turnover_supplies_adjustments": "yes",
+                  "turnover_fresh_families": "PERIME&FRUTE, MISH&SHPENDE, PESHK&PROD.DETI, BULMET&DJATHE, "
+                                             "PROD BUKE&FURRE",
+                  "turnover_fresh_check_days": "30"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses
@@ -143,7 +157,7 @@ def save_settings(patch, actor="director"):
                 current.setdefault("budget", {})[k] = str(v)[:200]
         for k, v in (patch.get("inventory") or {}).items():
             if k in DEFAULT_SETTINGS["inventory"]:
-                current.setdefault("inventory", {})[k] = str(v)[:400]
+                current.setdefault("inventory", {})[k] = str(v)[:1000]
         for k, v in (patch.get("group") or {}).items():
             if k in DEFAULT_SETTINGS["group"]:
                 current.setdefault("group", {})[k] = str(v)[:400]

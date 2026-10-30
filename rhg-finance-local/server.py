@@ -22,6 +22,7 @@ import config
 import localdb
 import memuse
 import movement
+import typology
 import executive
 import finance
 import inventory
@@ -1206,6 +1207,40 @@ class Handler(BaseHTTPRequestHandler):
                                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
                                      f'stock_movement_{r["as_of"]}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+            elif url.path in ("/api/typology", "/api/typology/xlsx"):
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    days = int(q.get("days") or 90)
+                except ValueError:
+                    days = 90
+                if url.path == "/api/typology":
+                    r = movement.request(client, company, q.get("as_of"), days, q.get("refresh") == "1")
+                else:
+                    r = movement.held(company, q.get("as_of") or "", days)
+                    if not r:
+                        self._send(409, {"error": "Read the report first."})
+                        return
+                if r.get("pending") or r.get("available") is False:
+                    self._send(200, r)
+                    return
+                m = recipes.master_cached(company) or {}
+                t = typology.analyse(r, m.get("items") or {}, store.get_settings())
+                if url.path == "/api/typology":
+                    self._send(200, t)
+                else:
+                    body = typology.render_xlsx(t)
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                                     f'typology_turnover_{t["as_of"]}.xlsx"')
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()

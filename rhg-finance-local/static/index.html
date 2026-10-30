@@ -104,6 +104,36 @@ td.num,th.num{text-align:right}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   main{padding:0} .card{break-inside:avoid} .view:not(.on){display:none!important}
   @page{size:A4 landscape;margin:12mm}}
+
+/* typology & turnover */
+:root{--ty-c1:#1e78a6;--ty-c2:#c47f1f;--ty-c3:#7a5bbf;--ty-c4:#2e9a6e;--ty-c5:#9aa5ab}
+@media (prefers-color-scheme: dark){:root{--ty-c1:#3a95c6;--ty-c2:#c4832a;--ty-c3:#9a7fd6;--ty-c4:#3fae80;--ty-c5:#7f8e96}}
+.ty-stack{display:flex;height:24px;border-radius:6px;overflow:hidden;gap:2px;margin:10px 0 8px}
+.ty-stack div{min-width:2px}
+.ty-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px}
+.ty-legend b{font-variant-numeric:tabular-nums}
+.ty-sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#tyTable td,#tyTable th{padding-left:7px;padding-right:7px}
+.ty-st{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.ty-st.ok{color:var(--down);background:var(--down-bg)}.ty-st.over{color:var(--warn);background:var(--warn-bg)}
+.ty-st.excess{color:var(--up);background:var(--up-bg)}.ty-st.info,.ty-st.na,.ty-st.nouse{color:var(--sub);background:var(--bg)}
+.ty-st.nouse{color:var(--warn)}
+.ty-st.count{color:var(--up);background:var(--card);border:1px solid var(--up)}
+#tyTable tr.ty-type td{font-weight:600;cursor:pointer}
+#tyTable tr.ty-type td:first-child::before{content:"▸";display:inline-block;width:14px;color:var(--sub);transition:transform .15s}
+#tyTable tr.ty-type.open td:first-child::before{transform:rotate(90deg)}
+#tyTable tr.ty-fam{display:none}#tyTable tr.ty-fam.show{display:table-row}
+#tyTable tr.ty-fam td:first-child{padding-left:30px;color:var(--sub)}
+#tyTable tr.ty-total td{font-weight:700;border-top:2px solid var(--line)}
+.ty-share{display:inline-block;height:6px;border-radius:3px;background:var(--ty-c1);vertical-align:middle;margin-right:6px}
+#tyHeat td.c{text-align:center;font-variant-numeric:tabular-nums;font-weight:600;border:2px solid var(--card);border-radius:6px;min-width:58px}
+#tyHeat td.c.ok{background:var(--down-bg);color:var(--down)}#tyHeat td.c.over{background:var(--warn-bg);color:var(--warn)}
+#tyHeat td.c.excess{background:var(--up-bg);color:var(--up)}#tyHeat td.c.none{background:var(--bg);color:var(--sub);font-weight:400}
+#tyHeat th{text-align:center;white-space:normal;line-height:1.2;vertical-align:bottom;font-size:11px}
+#tyHeat th small{display:block;font-weight:400;color:var(--sub)}
+.ty-callout{border-left:3px solid var(--up);background:var(--up-bg);padding:10px 14px;border-radius:6px;font-size:12.5px;margin-top:12px}
+#tyTip{position:fixed;pointer-events:none;background:#0e2733;color:#fff;font-size:12px;padding:8px 10px;border-radius:8px;opacity:0;transition:opacity .1s;max-width:300px;z-index:50;line-height:1.5}
+#tyTip b{color:#a0d8ea}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -134,6 +164,7 @@ td.num,th.num{text-align:right}
     <button data-view="ap">Accounts payable</button>
     <button data-view="ar">Accounts receivable</button>
     <button data-view="inventory">Inventory</button>
+    <button data-view="typology">Typology &amp; turnover</button>
     <button data-view="recipes">Recipe integrity</button>
     <button data-view="itemmaster">Item master control</button>
     <button data-view="movement">Movement &amp; dead stock</button>
@@ -357,6 +388,38 @@ td.num,th.num{text-align:right}
     <div class="card" id="invRecCard"><h2>General ledger reconciliation</h2>
       <p class="rhg-caution" id="invRecLine" style="margin:12px 0 0;font-size:13px"></p>
       <p class="hint" id="invRecNote" style="margin:12px 0 0"></p></div>
+  </section>
+
+  <section class="view" id="v-typology">
+    <div class="card">
+      <div class="card-head"><div><h2>Inventory typology &amp; turnover</h2>
+        <p class="hint" id="tyNote">What the stock is made of and how many days of use it covers. Built on the Movement &amp; dead stock data; Business Central is read only.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select id="tyLoc"><option value="">All locations</option></select>
+          <select id="tyNat"><option value="">All natures</option></select>
+          <span class="meta">As of</span><input type="date" id="tyAsOf">
+          <select id="tyDays"><option value="90" selected>90 days of history</option><option value="180">180 days of history</option><option value="365">365 days of history</option></select>
+          <button class="mini dark" id="tyRead">Read</button><button class="mini" id="tyXlsx">Excel</button></div></div>
+      <div class="kpis six" id="tyKpis" style="margin-top:14px"></div>
+      <p class="meta" id="tyStatus"></p>
+      <div class="ty-callout" id="tyCallout" style="display:none"></div>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>Inventory typology</h2>
+      <p class="hint">Stock value by nature, then by item type (BC Item Category Group 2) and family (Group 4). Click a type to open its families.</p></div></div>
+      <div class="ty-stack" id="tyStack"></div><div class="ty-legend" id="tyLegend"></div>
+      <div class="scroll" style="margin-top:12px"><table id="tyTable"></table></div>
+      <p class="hint" id="tyHow" style="margin-top:10px;line-height:1.55"></p></div>
+    <div class="card"><div class="card-head"><div><h2>Days of cover against target</h2>
+      <p class="hint">Food, beverage and resale families, ordered by stock above target. The dark tick is the target; bars beyond the scale end in ›.</p></div></div>
+      <div id="tyBars"></div></div>
+    <div class="card"><div class="card-head"><div><h2>Days of cover by location</h2>
+      <p class="hint">The ten largest food, beverage and resale families. Each cell against its own target; hover for value and delivery cycle.</p></div></div>
+      <div class="scroll"><table id="tyHeat"></table></div>
+      <div class="ty-legend" style="margin-top:10px"><span class="ty-st ok">✓ Within target</span><span class="ty-st over">▲ Up to 2× target</span><span class="ty-st excess">▲▲ Over 2× target</span><span class="meta">· no stock or no use</span></div></div>
+    <div class="card"><div class="card-head"><div><h2>Lines to review</h2>
+      <p class="hint" id="tyItemsNote"></p></div>
+      <div style="display:flex;gap:6px;align-items:center"><label class="meta"><input type="checkbox" id="tyOnlyCount"> Only “count it”</label></div></div>
+      <div class="scroll"><table id="tyItems"></table></div></div>
   </section>
 
   <section class="view" id="v-closing">
@@ -911,6 +974,12 @@ function renderSettings(){
     <label class="field">Movement: locations left out (* = wildcard)<input id="inv-exloc" value="${esc((s.inventory||{}).movement_exclude_locations||"")}" placeholder="*_IM, *_IN, TRANSIT"></label>
     <label class="field">Movement: categories left out<input id="inv-excat" value="${esc((s.inventory||{}).movement_exclude_categories||"")}" placeholder="INVENTAR I IMET"></label>
     <label class="field">Negative adjustments count as consumption (yes/no)<input id="inv-negadj" value="${esc((s.inventory||{}).count_negative_adjustments||"")}" placeholder="no"></label>
+    <label class="field" style="grid-column:1/-1">Turnover: nature of each item type (Group 2 = ingredients, resale, supplies or equipment)<input id="inv-tynat" value="${esc((s.inventory||{}).turnover_natures||"")}" placeholder="LP=ingredients, LP E SHITSHME=resale, AMBALAZH=supplies, UNIFORMA=equipment"></label>
+    <label class="field" style="grid-column:1/-1">Turnover: family targets in days, replacing the delivery cycle (Group 4 family=days)<input id="inv-tytg" value="${esc((s.inventory||{}).turnover_targets||"")}" placeholder="e.g. PERIME&amp;FRUTE=4, VERE=90 · blank = from deliveries"></label>
+    <label class="field">Turnover: safety days added to the delivery cycle<input id="inv-tysafe" value="${esc((s.inventory||{}).turnover_safety_days||"")}" placeholder="2"></label>
+    <label class="field">Turnover: negative adjustments count as use for operating supplies (yes/no)<input id="inv-tyadj" value="${esc((s.inventory||{}).turnover_supplies_adjustments||"")}" placeholder="yes"></label>
+    <label class="field">Turnover: fresh families checked for a count<input id="inv-tyfresh" value="${esc((s.inventory||{}).turnover_fresh_families||"")}" placeholder="PERIME&amp;FRUTE, MISH&amp;SHPENDE"></label>
+    <label class="field">Turnover: count when fresh cover exceeds (days)<input id="inv-tyfd" value="${esc((s.inventory||{}).turnover_fresh_check_days||"")}" placeholder="30"></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
@@ -938,7 +1007,10 @@ $("saveSettings").onclick = async ()=>{
                    distribution_locations:$("inv-dist").value, seasonal_items:$("inv-seas").value,
                    perishable_categories:$("inv-per").value, perishable_days:$("inv-perd").value,
                    count_negative_adjustments:$("inv-negadj").value,
-                   movement_exclude_locations:$("inv-exloc").value, movement_exclude_categories:$("inv-excat").value},
+                   movement_exclude_locations:$("inv-exloc").value, movement_exclude_categories:$("inv-excat").value,
+                   turnover_natures:$("inv-tynat").value, turnover_targets:$("inv-tytg").value,
+                   turnover_safety_days:$("inv-tysafe").value, turnover_supplies_adjustments:$("inv-tyadj").value,
+                   turnover_fresh_families:$("inv-tyfresh").value, turnover_fresh_check_days:$("inv-tyfd").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -1779,6 +1851,196 @@ $("modalCsv").onclick=()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
+// ---------------------------------------------------------------- typology & turnover
+let tyData = null, tyTimer = null;
+const TY_NAT = ["ingredients","resale","supplies","equipment","other"];
+const TY_COL = {ingredients:"var(--ty-c1)", resale:"var(--ty-c2)", supplies:"var(--ty-c3)", equipment:"var(--ty-c4)", other:"var(--ty-c5)"};
+const TY_ST = {ok:"✓ Within", over:"▲ Above", excess:"▲▲ Over 2×", info:"No target", na:"Not turned", nouse:"No use"};
+const tyTurned = n => n !== "equipment";
+const tySt = b => `<span class="ty-st ${b}">${TY_ST[b]}</span>`;
+const tyBand = (doh, tg) => doh == null || !tg ? "info" : doh <= tg ? "ok" : doh <= 2 * tg ? "over" : "excess";
+const tyM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? (v / 1e6).toFixed(2) + " M" : fmt(v);
+const tyDays = d => d == null ? "–" : d > 999 ? "999+" : fmt(d);
+function tyQs(){
+  return new URLSearchParams({company: $("company").value || "", days: $("tyDays").value,
+    as_of: (tyData && tyData.as_of) || $("tyAsOf").value}).toString();
+}
+async function loadTypology(refresh){
+  clearTimeout(tyTimer);
+  if (!$("tyAsOf").value) { const d = new Date(); d.setDate(d.getDate() - 1); $("tyAsOf").value = rcIso(d); }
+  $("tyStatus").textContent = "Reading…";
+  try{
+    const p = new URLSearchParams({company: $("company").value || "", days: $("tyDays").value, as_of: $("tyAsOf").value});
+    const j = await readJSON(await fetch("/api/typology?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      const g = j.progress || {};
+      $("tyStatus").textContent = `${j.note} ${g.stage || ""}${g.total ? ` · ${g.done} of ${g.total} months` : ""}.`;
+      tyTimer = setTimeout(() => loadTypology(false), 5000); return;
+    }
+    tyData = j;
+    const locs = {};
+    j.rows.forEach(r => locs[r[0]] = (locs[r[0]] || 0) + r[5]);
+    const keepL = $("tyLoc").value, keepN = $("tyNat").value;
+    $("tyLoc").innerHTML = `<option value="">All locations</option>` + Object.entries(locs).sort((a, b) => b[1] - a[1]).map(([l]) => `<option>${esc(l)}</option>`).join("");
+    $("tyNat").innerHTML = `<option value="">All natures</option>` + TY_NAT.filter(n => j.rows.some(r => r[3] === n)).map(n => `<option value="${n}">${esc(j.natures[n] || n)}</option>`).join("");
+    $("tyLoc").value = keepL in locs ? keepL : ""; $("tyNat").value = keepN;
+    renderTypology();
+  }catch(e){ $("tyStatus").textContent = "Could not read: " + e.message; }
+}
+$("tyRead").onclick = () => { tyData = null; loadTypology(true); };
+$("tyDays").onchange = () => { tyData = null; loadTypology(false); };
+$("tyAsOf").onchange = () => { tyData = null; loadTypology(false); };
+$("tyXlsx").onclick = () => { if (tyData) location.href = "/api/typology/xlsx?" + tyQs(); };
+["tyLoc", "tyNat", "tyOnlyCount"].forEach(id => $(id).onchange = () => tyData && renderTypology());
+// sum the (location, type, family) rows; for the whole group the use of distribution locations
+// (their transfers out) is left out, so the restaurants' use is not counted twice
+function tyAgg(keyf, opt = {}){
+  const d = tyData, dist = new Set(d.rules.distribution), loc = opt.loc ?? $("tyLoc").value, nat = opt.nat ?? $("tyNat").value;
+  const group = !loc, out = {};
+  for (const r of d.rows) {
+    const [l, typ, fam, n, lines, v, neg, use, nouse, ex, tw, cw, dw, cnt] = r;
+    if ((loc && l !== loc) || (nat && n !== nat)) continue;
+    const k = keyf(r); if (k == null) continue;
+    const a = out[k] ||= {key: k, nat: n, typ, fam, lines: 0, v: 0, neg: 0, use: 0, nouse: 0, ex: 0, tw: 0, cw: 0, dw: 0, cnt: 0};
+    a.lines += lines; a.v += v; a.neg += neg; a.nouse += nouse; a.ex += ex; a.cnt += cnt;
+    if (group && dist.has(l.toUpperCase())) continue;
+    a.use += use; a.tw += tw; a.cw += cw; a.dw += dw;
+  }
+  const days = d.history_days;
+  for (const a of Object.values(out)) {
+    const t = tyTurned(a.nat);
+    a.doh = t && a.use > 0 ? Math.round(a.v / (a.use / days)) : null;
+    a.turn = t && a.v > 0 && a.use > 0 ? a.use * 365 / days / a.v : null;
+    a.tg = t && a.dw ? Math.round(a.tw / a.dw) : null;
+    a.cyc = t && a.dw ? a.cw / a.dw : null;
+    a.band = !t ? "na" : !a.use && a.v > 0 ? "nouse" : tyBand(a.doh, a.tg);
+  }
+  return out;
+}
+function renderTypology(){
+  const d = tyData, days = d.history_days, loc = $("tyLoc").value;
+  const byNat = tyAgg(r => r[3]), all = tyAgg(() => "all").all || {v: 0, lines: 0, ex: 0, nouse: 0, use: 0};
+  const T = k => byNat[k] || {v: 0, use: 0, ex: 0, nouse: 0, tw: 0, dw: 0, lines: 0};
+  const ing = T("ingredients"), res = T("resale"), eq = T("equipment");
+  const turnV = ing.v + res.v, turnU = ing.use + res.use;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("tyKpis").innerHTML =
+    card("Stock in scope", tyM(all.v), `${fmt(all.lines)} item-location lines with stock`) +
+    card(`Use at cost, ${days} days`, tyM(turnU), "food, beverage and resale") +
+    card("Turnover, food &amp; beverage", ing.turn ? ing.turn.toFixed(1) + "× a year" : "–", ing.doh != null ? `${fmt(ing.doh)} days of cover · target ${ing.tg != null ? fmt(ing.tg) : "–"} days` : "no use in the history", ing.band === "excess" ? "up" : ing.band === "over" ? "warn" : "") +
+    card("Stock above target", tyM(ing.ex + res.ex), turnV ? `${Math.round((ing.ex + res.ex) / turnV * 100)}% of food, beverage and resale stock` : "", (ing.ex + res.ex) ? "up" : "") +
+    card("No use in the history", tyM(all.nouse - (eq.nouse || 0)), "stock with no use at all, not counted above target", all.nouse ? "warn" : "") +
+    card("Not turned over", tyM(eq.v), "uniforms and small equipment in stock");
+  const ex = d.excluded || [], exV = ex.reduce((s, x) => s + x[2], 0);
+  $("tyNote").textContent = `${d.company} · stock as of ${d.as_of} · history ${days} days from ${d.history_from}${loc ? " · " + loc : " · all locations"}`;
+  $("tyStatus").textContent = `${ex.length ? `Left out as in Movement: ${tyM(exV)} at ${ex.slice(0, 6).map(x => x[0]).join(", ")}${ex.length > 6 ? " …" : ""} · ` : ""}checked ${d.checked_at} · Verified: quantities, deliveries, use · Estimated: values at item unit cost · Derived: targets from the delivery cycle + ${d.rules.safety_days} safety days${Object.keys(d.rules.targets).length ? `, ${Object.keys(d.rules.targets).length} family targets from Settings` : ""}`;
+  // the fresh families that cannot physically hold the stock the books show
+  const fam = tyAgg(r => r[2]);
+  const fresh = Object.values(fam).filter(f => d.rules.fresh.includes(f.fam) && f.doh != null && f.doh > d.rules.fresh_days).sort((a, b) => b.v - a.v);
+  const cnt = Object.values(fam).reduce((s, f) => s + f.cnt, 0);
+  $("tyCallout").style.display = fresh.length ? "" : "none";
+  if (fresh.length) $("tyCallout").innerHTML = `<b>Book stock to count.</b> ${fresh.slice(0, 3).map(f => `${esc(f.fam)} ${tyM(f.v)} of stock for ${tyM(f.use)} used in ${days} days (<b>${fmt(f.doh)} days of cover</b>)`).join("; ")}. Fresh goods turn in days, so this stock is not on the shelf: positive adjustments or use that was not posted. ${fmt(cnt)} lines are flagged “count it” below.`;
+  // typology: stack, legend, type and family table
+  const nats = TY_NAT.filter(n => byNat[n] && byNat[n].v > 0), tot = nats.reduce((s, n) => s + byNat[n].v, 0) || 1;
+  $("tyStack").innerHTML = nats.map(n => `<div style="flex:${byNat[n].v};background:${TY_COL[n]}" data-tytip="<b>${esc(d.natures[n])}</b><br>${tyM(byNat[n].v)} · ${(byNat[n].v / tot * 100).toFixed(1)}%"></div>`).join("");
+  $("tyLegend").innerHTML = nats.map(n => `<span><span class="ty-sw" style="background:${TY_COL[n]}"></span>${esc(d.natures[n])} <b>${tyM(byNat[n].v)}</b> <span class="meta">${(byNat[n].v / tot * 100).toFixed(1)}%</span></span>`).join("");
+  const types = Object.values(tyAgg(r => r[1])).sort((a, b) => TY_NAT.indexOf(a.nat) - TY_NAT.indexOf(b.nat) || b.v - a.v);
+  const famsOf = tyAgg(r => r[1] + "\u0001" + r[2]);
+  const row = (cls, label, a, attr) => `<tr class="${cls}" ${attr || ""}><td>${label}</td><td class="num">${fmt(a.lines)}</td><td class="num">${tyM(a.v)}</td>
+    <td class="num"><span class="ty-share" style="width:${Math.max(2, a.v / tot * 50)}px"></span>${(a.v / tot * 100).toFixed(1)}%</td>
+    <td class="num">${a.use ? tyM(a.use) : "–"}</td><td class="num">${tyDays(a.doh)}</td><td class="num">${a.cyc != null ? a.cyc.toFixed(1) : "–"}</td>
+    <td class="num">${a.tg != null ? fmt(a.tg) : "–"}</td><td class="num">${a.turn != null ? a.turn.toFixed(1) + "×" : "–"}</td>
+    <td class="num">${a.ex ? tyM(a.ex) : "–"}</td><td class="num">${a.nouse ? tyM(a.nouse) : "–"}</td><td>${tySt(a.band)}</td></tr>`;
+  let h = `<tr><th>Type / family</th><th class="num">Lines</th><th class="num">Stock value</th><th class="num">Share</th><th class="num">Used, ${days} days</th><th class="num">Days of cover</th><th class="num" title="Days between deliveries in the history, weighted by use">Delivery every</th><th class="num">Target days</th><th class="num">Turnover / yr</th><th class="num">Above target</th><th class="num">No use</th><th>Status</th></tr>`;
+  types.forEach((t, i) => {
+    h += row("ty-type", `<span class="ty-sw" style="background:${TY_COL[t.nat]}"></span>${esc(t.typ)}`, t, `data-ty="${i}"`);
+    const fs = Object.values(famsOf).filter(f => f.typ === t.typ).sort((a, b) => b.v - a.v);
+    const small = fs.length > 6 ? fs.filter(f => f.v < 1e6) : [];
+    fs.filter(f => !small.includes(f)).forEach(f => h += row(`ty-fam ty-f${i}`, esc(f.fam), f));
+    if (small.length) {
+      const s = {nat: t.nat, lines: 0, v: 0, use: 0, ex: 0, nouse: 0, tw: 0, cw: 0, dw: 0};
+      small.forEach(f => ["lines", "v", "use", "ex", "nouse", "tw", "cw", "dw"].forEach(k => s[k] += f[k]));
+      const tt = tyTurned(t.nat);
+      s.doh = tt && s.use > 0 ? Math.round(s.v / (s.use / days)) : null; s.turn = tt && s.v && s.use ? s.use * 365 / days / s.v : null;
+      s.tg = tt && s.dw ? Math.round(s.tw / s.dw) : null; s.cyc = tt && s.dw ? s.cw / s.dw : null; s.band = !tt ? "na" : !s.use && s.v > 0 ? "nouse" : tyBand(s.doh, s.tg);
+      h += row(`ty-fam ty-f${i}`, `${small.length} smaller families`, s);
+    }
+  });
+  const tt = {lines: all.lines, v: all.v, use: turnU, ex: all.ex, nouse: all.nouse, doh: turnU ? Math.round(turnV / (turnU / days)) : null,
+    turn: turnV && turnU ? turnU * 365 / days / turnV : null, cyc: null, tg: null};
+  h += `<tr class="ty-total"><td>Total</td><td class="num">${fmt(tt.lines)}</td><td class="num">${tyM(tt.v)}</td><td class="num">100%</td><td class="num">${tyM(tt.use)}</td><td class="num">${tyDays(tt.doh)}</td><td></td><td></td><td class="num">${tt.turn ? tt.turn.toFixed(1) + "×" : "–"}</td><td class="num">${tyM(tt.ex)}</td><td class="num">${tyM(tt.nouse)}</td><td class="meta">cover and turnover: food, beverage, resale</td></tr>`;
+  $("tyTable").innerHTML = h;
+  document.querySelectorAll("#tyTable tr.ty-type").forEach(tr => tr.onclick = () => { tr.classList.toggle("open"); document.querySelectorAll("#tyTable .ty-f" + tr.dataset.ty).forEach(x => x.classList.toggle("show")); });
+  $("tyHow").innerHTML = `<b>How it is read.</b> Days of cover = stock value ÷ average daily use at cost; turnover = yearly use ÷ stock value. Use = recipe (assembly) consumption and sales net of returns${d.rules.supplies_adjustments ? "; for operating supplies also negative adjustments" : ""}. Transfers out of ${esc(d.rules.distribution.join(", "))} count only on those locations, not in the group total. Target = days between deliveries (or production runs) seen in the history + ${d.rules.safety_days} safety days, or the family target in Settings. Equipment and uniforms are not turned over.`;
+  tyBars(tyAgg(r => r[1] + "\u0001" + r[2])); tyHeat(); tyItems();
+}
+function tyBars(fam){
+  const d = tyData;
+  const nat = $("tyNat").value;
+  const list = Object.values(fam).filter(f => (nat ? f.nat === nat : f.nat === "ingredients" || f.nat === "resale") && tyTurned(f.nat) && f.doh != null && f.tg && f.v > 300000).sort((a, b) => b.ex - a.ex).slice(0, 14);
+  if (!list.length) { $("tyBars").innerHTML = `<p class="hint">No family with stock, use and a target for this selection.</p>`; return; }
+  const W = 1100, L = 200, R = 70, rowH = 26, top = 22, max = Math.max(60, Math.min(240, Math.ceil(Math.max(...list.map(f => Math.max(f.tg * 2, Math.min(f.doh, 240)))) / 30) * 30));
+  const H = top + list.length * rowH + 8, x = v => L + Math.min(v, max) / max * (W - L - R);
+  const col = {ok: "var(--down)", over: "var(--warn)", excess: "var(--up)", info: "var(--ty-c5)"};
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Days of cover against target by family">`;
+  for (let g = 0; g <= max; g += max <= 120 ? 15 : 30) s += `<line x1="${x(g)}" x2="${x(g)}" y1="${top - 6}" y2="${H - 6}" stroke="var(--line)"/><text x="${x(g)}" y="${top - 10}" font-size="10" fill="#8a979e" text-anchor="middle">${g}${g === max ? "+" : ""}</text>`;
+  list.forEach((f, i) => {
+    const y = top + i * rowH, w = Math.max(x(f.doh) - L, 1);
+    s += `<g data-tytip="<b>${esc(f.fam)}</b> · ${esc(f.typ)}<br>Stock ${tyM(f.v)} · used ${tyM(f.use)} in ${d.history_days} days<br>${fmt(f.doh)} days of cover · target ${fmt(f.tg)}${f.cyc != null ? ` (delivery every ${f.cyc.toFixed(1)} days)` : ""}<br>Above target ${tyM(f.ex)}">
+      <rect x="0" y="${y}" width="${W}" height="${rowH}" fill="transparent"/>
+      <text x="${L - 8}" y="${y + 16}" font-size="11.5" text-anchor="end" fill="currentColor">${esc(f.fam)}${f.fam !== f.typ ? `<tspan fill="#8a979e" font-size="10"> ${esc(f.typ)}</tspan>` : ""}</text>
+      <path d="M${L} ${y + 5} h${Math.max(w - 4, 0)} a4 4 0 0 1 4 4 v6 a4 4 0 0 1 -4 4 h-${Math.max(w - 4, 0)} z" fill="${col[f.band]}"/>
+      <line x1="${x(f.tg)}" x2="${x(f.tg)}" y1="${y + 2}" y2="${y + rowH - 2}" stroke="currentColor" stroke-width="2"/>
+      <text x="${x(f.doh) + 6}" y="${y + 16}" font-size="11" font-weight="600" fill="currentColor">${fmt(f.doh)}${f.doh > max ? " ›" : ""}</text></g>`;
+  });
+  $("tyBars").innerHTML = s + "</svg>";
+}
+function tyHeat(){
+  const d = tyData, nat = $("tyNat").value;
+  const fam = Object.values(tyAgg(r => r[2], {loc: ""})).filter(f => (nat ? f.nat === nat : f.nat === "ingredients" || f.nat === "resale") && tyTurned(f.nat)).sort((a, b) => b.v - a.v).slice(0, 10).map(f => f.fam);
+  const cells = tyAgg(r => fam.includes(r[2]) ? r[0] + "\u0001" + r[2] : null, {loc: ""});
+  const famAll = tyAgg(r => r[2], {loc: ""});
+  const locs = {};
+  Object.values(cells).forEach(c => { const l = c.key.split("\u0001")[0]; locs[l] = (locs[l] || 0) + c.v; });
+  // per location: its own use (a distribution location's transfers out are its use)
+  const own = {};
+  for (const l of Object.keys(locs)) Object.assign(own, Object.fromEntries(Object.values(tyAgg(r => fam.includes(r[2]) ? r[0] + "\u0001" + r[2] : null, {loc: l})).map(c => [c.key, c])));
+  const ls = Object.entries(locs).filter(([, v]) => v > 300000).sort((a, b) => b[1] - a[1]);
+  if (!fam.length || !ls.length) { $("tyHeat").innerHTML = `<tr><td class="hint">Nothing to show for this selection.</td></tr>`; return; }
+  let h = `<tr><th style="text-align:left">Location</th>${fam.map(f => `<th>${esc(f)}<small>target ${famAll[f] && famAll[f].tg != null ? fmt(famAll[f].tg) : "–"}</small></th>`).join("")}</tr>`;
+  for (const [l, v] of ls) {
+    h += `<tr${l === $("tyLoc").value ? ` style="outline:2px solid var(--accent)"` : ""}><td><b>${esc(l)}</b><div class="meta">${tyM(v)}</div></td>` + fam.map(f => {
+      const c = own[l + "\u0001" + f];
+      if (!c || !c.v || c.doh == null) return `<td class="c none">·</td>`;
+      const b = c.tg ? tyBand(c.doh, c.tg) : "none";
+      return `<td class="c ${b === "info" ? "none" : b}" data-tytip="<b>${esc(l)} · ${esc(f)}</b><br>Stock ${tyM(c.v)} · used ${tyM(c.use)}<br>${fmt(c.doh)} days of cover · target ${c.tg != null ? fmt(c.tg) : "–"}${c.cyc != null ? `<br>Delivery every ${c.cyc.toFixed(1)} days` : ""}">${tyDays(c.doh)}</td>`;
+    }).join("") + "</tr>";
+  }
+  $("tyHeat").innerHTML = h;
+}
+function tyItems(){
+  const d = tyData, loc = $("tyLoc").value, nat = $("tyNat").value, only = $("tyOnlyCount").checked;
+  const list = d.items.filter(x => (!loc || x[0] === loc) && (!nat || x[5] === nat) && (!only || x[15]));
+  $("tyItemsNote").textContent = `Lines covering more than 3× their target, fresh lines to count, and stock of ${fmt(100000)} or more with no use, ordered by value above target · ${fmt(list.length)} of ${fmt(d.items_total)} lines${d.items_total > d.items.length ? " (the Excel file has them all)" : ""}`;
+  $("tyItems").innerHTML = `<tr><th>Location</th><th>Item</th><th>Description</th><th>Family</th><th class="num">Qty on hand</th><th class="num">Value</th><th class="num">Used, ${d.history_days} days</th><th class="num">Days of cover</th><th class="num">Delivery every</th><th class="num">Target</th><th class="num">Above target</th><th></th></tr>` +
+    (list.slice(0, 100).map(x => `<tr><td>${esc(x[0])}</td><td>${esc(x[1])}</td><td>${esc(x[2])}</td><td class="meta">${esc(x[4])}</td>
+      <td class="num">${fmt(x[6], x[6] % 1 ? 2 : 0)} ${esc(x[7])}</td><td class="num">${tyM(x[8])}</td><td class="num">${fmt(x[9], x[9] % 1 ? 2 : 0)} ${esc(x[7])}</td>
+      <td class="num"><b>${x[10] == null ? "no use" : fmt(x[10])}</b></td><td class="num">${x[13] != null ? x[13] : "–"}</td>
+      <td class="num">${x[11] != null ? fmt(x[11]) + (x[12] === "settings" ? " ⚙" : "") : "–"}</td><td class="num">${x[14] ? tyM(x[14]) : "–"}</td>
+      <td>${x[15] ? `<span class="ty-st count">⚑ Count it</span>` : x[10] == null ? `<span class="ty-st info">No use</span>` : tySt("excess")}</td></tr>`).join("")
+     || `<tr><td colspan="12" class="hint">No lines for this selection.</td></tr>`) +
+    (list.length > 100 ? `<tr><td colspan="12" class="meta">Showing 100; the Excel file has all lines.</td></tr>` : "");
+}
+(function(){
+  const tip = document.createElement("div"); tip.id = "tyTip"; document.body.appendChild(tip);
+  document.addEventListener("mousemove", e => {
+    const t = e.target.closest && e.target.closest("[data-tytip]");
+    if (!t) { tip.style.opacity = 0; return; }
+    tip.innerHTML = t.dataset.tytip; tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY + 14) + "px";
+  });
+})();
 document.querySelectorAll("[data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
@@ -1786,6 +2048,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
   if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
+  if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();

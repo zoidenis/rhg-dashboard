@@ -199,7 +199,8 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
     adj = {}
     for loc, it, kind, day, qty, cost in rows:
         s = stats.setdefault((loc, it), {"cons": {w: 0.0 for w in WINDOWS}, "last_cons": "", "last_rcpt": "",
-                                         "first_rcpt": "", "first_any": "", "in_qty": 0.0, "kinds": {}})
+                                         "first_rcpt": "", "first_any": "", "in_qty": 0.0, "kinds": {},
+                                         "rdays": set(), "adj_neg": 0.0})
         age = (as_of - date.fromisoformat(day)).days
         k = s["kinds"].setdefault(kind, [0.0, 0.0])
         k[0] += qty
@@ -214,6 +215,10 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
                     s["cons"][w] += used
             if used > 0:
                 s["last_cons"] = max(s["last_cons"], day)
+        if kind == "adj_neg":
+            s["adj_neg"] -= qty                 # kept as a positive quantity used up
+        if kind in ("receipt", "transfer_in", "output"):
+            s["rdays"].add(day)             # a delivery, or a production run for made items
         if kind in ("receipt", "transfer_in"):
             s["last_rcpt"] = max(s["last_rcpt"], day)
             s["first_rcpt"] = min(s["first_rcpt"] or day, day)
@@ -279,6 +284,23 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
             if qty < 0:
                 negative.append(row)
 
+    # raw lines for Typology & turnover: every location-item with stock or movement in the history,
+    # with the same exclusions. [location, item, qty on hand, unit cost, qualifying use in the history,
+    # negative adjustments in the history, days with a delivery (receipt or transfer in)]
+    typo = []
+    for key in set(stats) | {(loc, it) for loc, by in qty_by_loc.items() for it in by}:
+        loc, it = key
+        card = items.get(it) or {}
+        if left_out_loc(loc) or str(card.get("Item_Category_Code") or "").upper() in ex_cats:
+            continue
+        s = stats.get(key)
+        qty = (qty_by_loc.get(loc) or {}).get(it, 0.0)
+        use = s["cons"][history_days] if s and history_days in s["cons"] else 0.0
+        if not qty and not use and not (s and (s["adj_neg"] or s["rdays"])):
+            continue
+        typo.append([loc, it, round(qty, 3), float(card.get("Unit_Cost") or 0), round(use, 3),
+                     round(s["adj_neg"], 3) if s else 0.0, len(s["rdays"]) if s else 0])
+
     # summaries
     classes = ["ACTIVE", "MONITOR", "SLOW MOVING", "NON-MOVING", "DEAD STOCK", "NEW ITEM", "SEASONAL", "NEGATIVE"]
     by_loc = {}
@@ -323,7 +345,7 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
                   "limits": base, "perishable_limits": per, "distribution": sorted(distribution),
                   "count_negative_adjustments": count_neg, "seasonal": sorted(seasonal),
                   "perishable": sorted(perishable), "new_days": new_days},
-        "_rows": out_rows, "_names": names,
+        "_rows": out_rows, "_names": names, "_typo": typo,
     }
 
 
