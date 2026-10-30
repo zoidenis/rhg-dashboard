@@ -301,7 +301,9 @@ def parse_response(xml, field_map=""):
         if not isinstance(el.tag, str):
             continue
         f = _flat(el)
-        eic = f.get(extra.get("eic", "")) or f.get("eic")
+        # the key is the FIC (NIVF): that is the code Business Central keeps on the invoice and
+        # Self-Care prints as the serial number; the EIC is the e-invoice's own code
+        eic = f.get(extra.get("eic", "")) or f.get("fic") or f.get("eic")
         name = etree.QName(el).localname.lower()
         if not eic or "invoice" not in name or eic in seen:
             continue
@@ -311,6 +313,7 @@ def parse_response(xml, field_map=""):
             names = ([extra[key]] if key in extra else []) + names
             rec[key] = next((f[n] for n in names if f.get(n) not in (None, "")), None)
         rec["eic"] = eic.lower()
+        rec["einvoice_code"] = (f.get("eic") or "").lower() or None
         try:
             rec["total"] = float(str(rec["total"]).replace(",", ".")) if rec["total"] is not None else None
         except ValueError:
@@ -362,8 +365,12 @@ def _sample(xml):
 
 def get_einvoices(date_from, date_to, progress=None, party=None):
     """Every e-invoice received by the platform in the period, where we are the BUYER (default,
-    FISK_PARTY_TYPE) or the SELLER. A window that returns the maximum of 100 is split in two
-    until every part returns fewer."""
+    FISK_PARTY_TYPE) or the SELLER, read one window of whole days at a time.
+
+    The service filters by day: a window from 00:00:00 to 23:59:59 of the same day comes back empty,
+    while 00:00 to 00:00 of the next day lists the day (checked on 30 Oct 2026, 124 invoices for
+    20 Oct). So every window ends at midnight after its last day, and a window is never cut below
+    one day. A multi-day window that returns the maximum is read again day by day."""
     s = _settings()
     if party:
         s["party"] = party.upper()
@@ -386,18 +393,18 @@ def get_einvoices(date_from, date_to, progress=None, party=None):
             last_diag["with_rows"] += 1
         elif "empty_answer" not in last_diag:
             last_diag["empty_answer"] = dict(_sample(answer), window=f"{t0.isoformat()} to {t1.isoformat()}")
-        if len(rows) >= MAX_PER_ANSWER and (t1 - t0) > timedelta(minutes=2):
-            mid = t0 + (t1 - t0) / 2
-            mid = mid.replace(microsecond=0)
-            read(t0, mid)
-            read(mid + timedelta(seconds=1), t1)
+        if len(rows) == MAX_PER_ANSWER and (t1 - t0) > timedelta(days=1):
+            d0 = t0
+            while d0 < t1:
+                read(d0, d0 + timedelta(days=1))
+                d0 += timedelta(days=1)
             return
         for r in rows:
             found[r["eic"]] = r
     d = a
     while d <= b:
         e = min(b, d + timedelta(days=s["window_days"] - 1))
-        read(datetime.combine(d, datetime.min.time()), datetime.combine(e, datetime.max.time().replace(microsecond=0)))
+        read(datetime.combine(d, datetime.min.time()), datetime.combine(e + timedelta(days=1), datetime.min.time()))
         if progress:
             progress(d, e, len(found))
         d = e + timedelta(days=1)
@@ -427,7 +434,7 @@ def probe(eic=None, party="BUYER", date_from=None, date_to=None):
     window = ""
     if date_from and date_to:
         a = datetime.combine(date.fromisoformat(str(date_from)[:10]), datetime.min.time())
-        b = datetime.combine(date.fromisoformat(str(date_to)[:10]), datetime.max.time().replace(microsecond=0))
+        b = datetime.combine(date.fromisoformat(str(date_to)[:10]) + timedelta(days=1), datetime.min.time())
         parts += [f"<RecDateTimeFrom>{_dt(a)}</RecDateTimeFrom>", f"<RecDateTimeTo>{_dt(b)}</RecDateTimeTo>"]
         window = f"{_dt(a)} to {_dt(b)}"
     xml = f'<GetEinvoicesRequest xmlns="{NS}" Id="Request" Version="1">' + "".join(parts) + "</GetEinvoicesRequest>"
