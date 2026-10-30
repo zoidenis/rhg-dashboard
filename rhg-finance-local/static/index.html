@@ -105,6 +105,7 @@ td.num,th.num{text-align:right}
   main{padding:0} .card{break-inside:avoid} .view:not(.on){display:none!important}
   @page{size:A4 landscape;margin:12mm}}
 
+#fsCert > div{min-width:0;overflow-wrap:anywhere}#v-fiscal .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}@media(max-width:1000px){#v-fiscal .grid{grid-template-columns:minmax(0,1fr)}}
 /* typology & turnover */
 :root{--ty-c1:#1e78a6;--ty-c2:#c47f1f;--ty-c3:#7a5bbf;--ty-c4:#2e9a6e;--ty-c5:#9aa5ab}
 @media (prefers-color-scheme: dark){:root{--ty-c1:#3a95c6;--ty-c2:#c4832a;--ty-c3:#9a7fd6;--ty-c4:#3fae80;--ty-c5:#7f8e96}}
@@ -162,6 +163,7 @@ td.num,th.num{text-align:right}
     <div class="grp">Working capital</div>
     <button data-view="cash">Cash &amp; bank</button>
     <button data-view="ap">Accounts payable</button>
+    <button data-view="fiscal">Fiscal invoices vs BC</button>
     <button data-view="ar">Accounts receivable</button>
     <button data-view="inventory">Inventory</button>
     <button data-view="typology">Typology &amp; turnover</button>
@@ -272,6 +274,61 @@ td.num,th.num{text-align:right}
     <button class="mini" data-drill="ap">Open entries</button></div>
     <div class="money" id="apTotals"></div><div id="apBuckets"></div>
     <div class="scroll" style="margin-top:12px"><table id="apTable"></table></div></div></section>
+
+  <section class="view" id="v-fiscal">
+    <div class="card">
+      <div class="card-head"><div><h2>Fiscalized purchase invoices against Business Central</h2>
+        <p class="hint" id="fsNote">The invoices fiscalized to us at the Tax Administration (what Self-Care shows) next to the purchase invoices posted in BC, by e-invoice code (EIC = NIVF), then by supplier NIPT and amount. Business Central is only read.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="meta">Invoices from</span><input type="date" id="fsFrom"><span class="meta">to</span><input type="date" id="fsTo">
+          <button class="mini dark" id="fsRead">Read</button><button class="mini" id="fsXlsx">Excel</button></div></div>
+      <div class="kpis six" id="fsKpis" style="margin-top:14px"></div>
+      <p class="meta" id="fsStatus"></p>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>Fiscalized invoices</h2><p class="hint">Problems first. Click a status to filter.</p></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="fsFilter"></select><input id="fsQ" placeholder="Supplier, NIPT, EIC or BC no." style="width:220px"></div></div>
+      <div class="scroll"><table id="fsRows"></table></div></div>
+    <div class="grid">
+      <div class="card"><h2>Missing in BC, by supplier</h2><p class="hint">Invoices and credit notes older than the grace days</p>
+        <div class="scroll"><table id="fsSup"></table></div></div>
+      <div class="card"><h2>Same EIC posted more than once</h2><p class="hint">Same amount: possibly posted twice; check whether one was reversed first</p>
+        <div class="scroll"><table id="fsDup"></table></div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>BC: EIC not listed by the Tax Administration</h2><p class="hint">Posted invoices of the period whose NIVF is not among our fiscalized invoices</p>
+        <div class="scroll"><table id="fsNotF"></table></div></div>
+      <div class="card"><h2>BC: posted invoices without EIC</h2><p class="hint">Of the period, not matched by NIPT and amount; farmers and individuals often issue none</p>
+        <div class="scroll"><table id="fsNoEic"></table></div></div>
+    </div>
+    <div class="card" id="fsConn">
+      <div class="card-head"><div><h2>Connection to the Tax Administration</h2>
+        <p class="hint">Every morning the tower reads the e-invoices of the last days with the fiscalization certificate (reading only, nothing is registered), reconciles them and emails the result. The certificate and its password stay on the server and are never entered here.</p></div>
+        <span class="rhg-pill" id="fsPill">–</span></div>
+      <div class="money" id="fsCert" style="margin-bottom:10px"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+        <button class="btn dark" id="fsFetch">Read from the Tax Administration now</button>
+        <label class="btn" style="cursor:pointer">Import a Self-Care purchases book<input type="file" id="fsFile" accept=".xlsx" style="display:none"></label>
+        <span class="meta" id="fsMsg"></span></div>
+      <div class="formgrid">
+        <label class="field">Email to<input id="fsTo2" placeholder="name@rhg.al"></label>
+        <label class="field">Cc (optional)<input id="fsCc" placeholder="name@rhg.al"></label>
+        <label class="field">Time<input id="fsTime" type="time" value="07:30"></label>
+        <label class="field">Days read back<input id="fsDays" type="number" min="7" max="120" value="45"></label>
+        <label class="field">Grace days before "missing"<input id="fsGrace" type="number" min="0" max="60" value="7"></label>
+        <label class="field">Amount tolerance (ALL)<input id="fsTol" type="number" min="0" max="1000" value="1"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;margin:4px 0 12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="fsOn" style="width:auto"> Read and send daily</label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="fsWork" style="width:auto" checked> Working days only</label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="fsEmpty" style="width:auto"> Send even when there is nothing to report</label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="fsSave">Save</button><button class="btn" id="fsTest">Send a test</button><span class="meta" id="fsMsg2"></span></div>
+      <div class="scroll" style="margin-top:12px"><table id="fsRuns"></table></div>
+      <div class="scroll" style="margin-top:12px"><table id="fsLoads"></table></div>
+    </div>
+  </section>
 
   <section class="view" id="v-ar"><div class="card"><div class="card-head"><div><h2>Accounts receivable</h2><p class="hint" id="arHint"></p></div>
     <button class="mini" data-drill="ar">Open entries</button></div>
@@ -2041,6 +2098,136 @@ function tyItems(){
     tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY + 14) + "px";
   });
 })();
+// ---------------------------------------------------------------- fiscalized invoices against BC
+let fsData = null, fsTimer = null, fsStat = null;
+const FS_ORDER = ["missing", "amount differs", "missing credit note", "in order", "matched, no EIC in BC", "recent", "credit memo", "zero", "matched"];
+const FS_CLS = {"missing": "critical", "amount differs": "warning", "missing credit note": "warning", "in order": "info",
+  "matched, no EIC in BC": "info", "recent": "info", "credit memo": "ok", "zero": "info", "matched": "ok"};
+const fsM = v => v == null ? "–" : fmt(v);
+function fsQs(){ const p = new URLSearchParams(); if ($("fsFrom").value) p.set("from", $("fsFrom").value); if ($("fsTo").value) p.set("to", $("fsTo").value); return p.toString(); }
+async function loadFiscal(refresh){
+  clearTimeout(fsTimer);
+  $("fsStatus").textContent = "Reading…";
+  loadFiscalStatus();
+  try{
+    const j = await readJSON(await fetch("/api/fiscal?" + fsQs() + (refresh ? "&refresh=1" : "")));
+    if (j.pending) { $("fsStatus").textContent = `${j.note} ${(j.progress || {}).stage || ""}…`; fsTimer = setTimeout(() => loadFiscal(false), 4000); return; }
+    if (j.available === false || j.error) { fsData = null; $("fsKpis").innerHTML = ""; ["fsRows","fsSup","fsDup","fsNotF","fsNoEic"].forEach(id => $(id).innerHTML = ""); $("fsStatus").textContent = j.error || "Nothing to show."; return; }
+    fsData = j;
+    if (!$("fsFrom").value) $("fsFrom").value = j.date_from;
+    if (!$("fsTo").value) $("fsTo").value = j.date_to;
+    renderFiscal();
+  }catch(e){ $("fsStatus").textContent = "Could not read: " + e.message; }
+}
+function renderFiscal(){
+  const d = fsData, k = d.kpis;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const ok = k["matched"][0] + k["matched, no EIC in BC"][0] + k["credit memo"][0];
+  const base = k.fiscal[0] - k.zero[0] - k.recent[0];
+  $("fsKpis").innerHTML =
+    card("Fiscalized invoices", fmt(k.fiscal[0]), `${fsM(k.fiscal[1])} ALL · ${d.date_from} to ${d.date_to}`) +
+    card("Found in BC", base ? Math.round(ok / base * 100) + "%" : "–", `${fmt(ok)} matched · ${fmt(k["matched, no EIC in BC"][0])} of them without NIVF in BC`) +
+    card("Missing in BC", fmt(k.missing[0] + k["missing credit note"][0]), `${fsM(k.missing[1])} ALL invoices · ${fmt(k["missing credit note"][0])} credit notes ${fsM(k["missing credit note"][1])}`, (k.missing[0] + k["missing credit note"][0]) ? "up" : "") +
+    card("Amount differs", fmt(k["amount differs"][0]), `net ${fsM(k["amount differs net"])} ALL (fiscal − BC)`, k["amount differs"][0] ? "warn" : "") +
+    card("Posted twice", fmt(k["posted twice"][0]), `same EIC and amount on two BC invoices · ${fsM(k["posted twice"][1])} ALL extra`, k["posted twice"][0] ? "up" : "") +
+    card("BC without EIC", fmt(k["bc without eic"][0]), `${fsM(k["bc without eic"][1])} ALL posted in the period without NIVF · ${fmt(k["in order"][0])} EICs on unposted orders`);
+  const srcs = [...new Set(d.rows.map(r => r.source))].map(s => s === "cis" ? "Tax Administration service" : "Self-Care book").join(" + ");
+  $("fsStatus").textContent = `${d.company} · source: ${srcs || "–"} · BC read: ${fmt(d.bc_read.invoices)} posted invoices, ${fmt(d.bc_read.ledger)} supplier ledger entries${d.bc_read.orders == null ? " (purchase orders not read)" : `, ${fmt(d.bc_read.orders)} orders with an EIC`} · checked ${d.checked_at.replace("T", " ")} · Verified: EIC, amounts, BC documents · Derived: matching by NIPT and amount`;
+  const counts = {}; d.rows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+  const keep = $("fsFilter").options.length ? $("fsFilter").value : "problems";
+  $("fsFilter").innerHTML = `<option value="problems">Problems (${fmt(d.rows.filter(r => ["missing","amount differs","missing credit note"].includes(r.status)).length)})</option><option value="">All (${fmt(d.rows.length)})</option>` +
+    FS_ORDER.filter(s => counts[s]).map(s => `<option value="${esc(s)}">${esc(s)} (${fmt(counts[s])})</option>`).join("");
+  $("fsFilter").value = [...$("fsFilter").options].some(o => o.value === keep) ? keep : "problems";
+  fsRows();
+  $("fsSup").innerHTML = `<tr><th>Supplier</th><th>NIPT</th><th class="num">Invoices</th><th class="num">Value</th><th>Oldest</th></tr>` +
+    (d.missing_by_supplier.slice(0, 25).map(x => `<tr><td><a href="#" data-fsq="${esc(x.nipt)}">${esc(x.seller)}</a></td><td class="meta">${esc(x.nipt)}</td><td class="num">${fmt(x.count)}</td><td class="num">${fsM(x.value)}</td><td class="meta">${esc(x.oldest || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="hint">Nothing missing.</td></tr>`);
+  $("fsDup").innerHTML = `<tr><th>EIC</th><th>BC no.</th><th>Supplier</th><th>Posted</th><th class="num">Amount</th><th></th></tr>` +
+    (d.posted_twice.slice(0, 40).map(x => `<tr><td class="meta" title="${esc(x.eic)}">${esc(x.eic.slice(0, 8))}…</td><td>${esc(x.bc_no)}</td><td>${esc(x.vendor)}</td><td class="meta">${esc(x.posting_date || "")}</td><td class="num">${fsM(x.amount)}${x.currency ? " " + esc(x.currency) : ""}</td><td><span class="rhg-pill ${x.kind === "same amount" ? "critical" : "info"}">${esc(x.kind)}</span></td></tr>`).join("") || `<tr><td colspan="6" class="hint">None.</td></tr>`);
+  $("fsNotF").innerHTML = `<tr><th>BC no.</th><th>Supplier</th><th>Date</th><th class="num">Amount</th><th>EIC</th></tr>` +
+    (d.bc_not_in_fiscal.slice(0, 25).map(x => `<tr><td>${esc(x.bc_no)}</td><td>${esc(x.vendor)}</td><td class="meta">${esc(x.document_date || "")}</td><td class="num">${fsM(x.amount)}</td><td class="meta" title="${esc(x.eic)}">${esc(String(x.eic).slice(0, 8))}…</td></tr>`).join("") || `<tr><td colspan="5" class="hint">None.</td></tr>`);
+  $("fsNoEic").innerHTML = `<tr><th>BC no.</th><th>Supplier</th><th>NIPT</th><th>Date</th><th class="num">Amount</th></tr>` +
+    (d.bc_without_eic.slice(0, 25).map(x => `<tr><td>${esc(x.bc_no)}</td><td>${esc(x.vendor)}</td><td class="meta">${esc(x.nipt || "no NIPT")}</td><td class="meta">${esc(x.document_date || "")}</td><td class="num">${fsM(x.amount)}</td></tr>`).join("") +
+     (d.bc_without_eic.length > 25 ? `<tr><td colspan="5" class="meta">Showing 25 of ${fmt(d.bc_without_eic.length)}; the Excel file has them all.</td></tr>` : "") || `<tr><td colspan="5" class="hint">None.</td></tr>`);
+  document.querySelectorAll("[data-fsq]").forEach(a => a.onclick = e => { e.preventDefault(); $("fsQ").value = a.dataset.fsq; $("fsFilter").value = ""; fsRows(); $("fsRows").scrollIntoView({behavior: "smooth", block: "start"}); });
+}
+function fsRows(){
+  const d = fsData; if (!d) return;
+  const f = $("fsFilter").value, q = $("fsQ").value.trim().toLowerCase();
+  const list = d.rows.filter(r => (f === "problems" ? ["missing","amount differs","missing credit note"].includes(r.status) : !f || r.status === f) &&
+    (!q || [r.seller, r.nipt, r.eic, r.bc_no, r.bc_vendor].some(x => String(x || "").toLowerCase().includes(q))));
+  $("fsRows").innerHTML = `<tr><th>Status</th><th>Date</th><th>Supplier</th><th>NIPT</th><th class="num">Total</th><th>EIC</th><th>BC no.</th><th>BC posted</th><th class="num">BC amount</th><th class="num">Difference</th><th>Note</th></tr>` +
+    (list.slice(0, 100).map(r => `<tr><td><span class="rhg-pill ${FS_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.seller)}</td><td class="meta">${esc(r.nipt)}</td>
+      <td class="num">${fsM(r.total)}</td><td class="meta" title="${esc(r.eic)}">${esc(r.eic.slice(0, 8))}…</td><td>${esc(r.bc_no)}</td><td class="meta">${esc(r.bc_date || "")}</td>
+      <td class="num">${fsM(r.bc_amount)}</td><td class="num ${r.diff ? "up" : ""}">${r.diff == null ? "–" : fsM(r.diff)}</td><td class="meta">${esc(r.note)}</td></tr>`).join("") || `<tr><td colspan="11" class="hint">No invoice for this selection.</td></tr>`) +
+    (list.length > 100 ? `<tr><td colspan="11" class="meta">Showing 100 of ${fmt(list.length)}; use the filter or the Excel file for the rest.</td></tr>` : "");
+}
+async function loadFiscalStatus(){
+  try{ fsStat = await readJSON(await fetch("/api/fiscal/status")); renderFiscalStatus(); }catch(e){ $("fsMsg").textContent = "Could not read the connection status: " + e.message; }
+}
+function renderFiscalStatus(){
+  const st = fsStat, c = st.certificate || {}, s = st.settings || {}, cov = st.coverage || {}, m = st.mail || {};
+  const ready = c.loaded && c.url_set && !c.expired;
+  $("fsPill").className = "rhg-pill " + (ready ? (s.enabled ? "ok" : "info") : "warning");
+  $("fsPill").textContent = ready ? (s.enabled ? `Connected · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}` : "Connected · daily run off") :
+    !c.present ? "Certificate not on the server" : !c.loaded ? "Certificate not readable" : c.expired ? "Certificate expired" : "Service address not set";
+  const box = (l, v, sub) => `<div><div class="meta">${l}</div><b>${v}</b><div class="meta">${sub || ""}</div></div>`;
+  $("fsCert").innerHTML = box("Certificate", c.loaded ? "Loaded" : c.present ? "On the server, not opened" : "Not on the server", c.loaded ? `${esc(c.subject || "")} · valid to ${esc(c.valid_to || "")}` : esc(c.error || "FISK_CERT_PATH")) +
+    box("NIPT", esc(c.nipt || "not set"), `party ${esc(c.party || "BUYER")}`) +
+    box("E-invoice service", c.url_set ? "Address set" : "Address not set", c.url_set ? "" : "FISK_EINVOICE_URL, from the service specification") +
+    box("Invoices held", fmt(cov.count || 0), cov.from ? `dated ${cov.from} to ${cov.to}` : "none yet") +
+    box("Email", m.configured ? "Mail server ready" : "Mail server not ready", m.configured ? `from ${esc(m.from || "Purchasing")}` : esc((m.error || "Purchasing → Settings").slice(0, 120)));
+  $("fsTo2").value = s.to || ""; $("fsCc").value = s.cc || ""; $("fsTime").value = s.time || "07:30"; $("fsDays").value = s.days || 45;
+  $("fsGrace").value = s.grace_days || 7; $("fsTol").value = s.tolerance || 1; $("fsOn").checked = !!s.enabled; $("fsWork").checked = s.working_days_only !== false; $("fsEmpty").checked = !!s.send_empty;
+  const runs = st.runs || [];
+  $("fsRuns").innerHTML = runs.length ? `<tr><th>When</th><th>What</th><th>Status</th><th>Detail</th></tr>` + runs.slice(0, 10).map(r => `<tr><td class="meta">${esc(r.ts)}</td><td>${esc(r.kind)}${r.test ? " · test" : ""}</td><td>${esc(r.status)}</td><td class="meta">${esc(r.kind === "fetch" ? (r.rows != null ? `${fmt(r.rows)} e-invoices ${r.from} to ${r.to}` : r.detail || "") : r.detail || "")}</td></tr>`).join("") : "";
+  const loads = cov.loads || [];
+  $("fsLoads").innerHTML = loads.length ? `<tr><th>Loaded</th><th>Source</th><th class="num">Invoices</th><th>Dated</th></tr>` + loads.slice(0, 8).map(l => `<tr><td class="meta">${esc((l.at || "").replace("T", " "))}</td><td>${l.source === "cis" ? "Tax Administration" : "Self-Care book"}</td><td class="num">${fmt(l.rows)}</td><td class="meta">${esc(l.from || "")} to ${esc(l.to || "")}</td></tr>`).join("") : "";
+  const canSet = can("settings");
+  ["fsFetch","fsSave","fsTest"].forEach(id => { $(id).disabled = !canSet; $(id).title = canSet ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+  $("fsFetch").disabled = !canSet || !ready; if (canSet && !ready) $("fsFetch").title = "Waiting for the certificate and the service address on the server.";
+  $("fsFile").disabled = !canSet;
+}
+async function fsWait(id, msgEl, done){
+  const j = (await readJSON(await fetch("/api/fiscal/job?id=" + id))).job;
+  if (j && j.state === "running") { setTimeout(() => fsWait(id, msgEl, done), 2500); return; }
+  done(j && j.result || {}); loadFiscalStatus();
+}
+$("fsRead").onclick = () => { fsData = null; loadFiscal(true); };
+$("fsFrom").onchange = $("fsTo").onchange = () => { fsData = null; loadFiscal(false); };
+$("fsXlsx").onclick = () => { if (fsData) location.href = "/api/fiscal/xlsx?" + fsQs(); };
+$("fsFilter").onchange = fsRows; $("fsQ").oninput = fsRows;
+$("fsFetch").onclick = async () => {
+  $("fsMsg").textContent = "Reading the e-invoices from the Tax Administration…";
+  try{ const j = await simphonyPost("/api/fiscal/fetch");
+    fsWait(j.job.id, $("fsMsg"), r => { $("fsMsg").textContent = r.status === "ok" ? `${fmt(r.rows)} e-invoices read, ${r.from} to ${r.to}.` : `${r.status}: ${r.detail || ""}`; if (r.status === "ok") { fsData = null; loadFiscal(true); } }); }
+  catch(e){ $("fsMsg").textContent = "Could not start: " + e.message; }
+};
+$("fsFile").onchange = async () => {
+  const f = $("fsFile").files[0]; if (!f) return;
+  $("fsMsg").textContent = `Importing ${f.name}…`;
+  try{
+    const buf = new Uint8Array(await f.arrayBuffer()); let bin = "";
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    const j = await simphonyPost("/api/fiscal/import", {name: f.name, data: btoa(bin)});
+    $("fsMsg").textContent = `${fmt(j.rows)} invoices imported, dated ${j.from} to ${j.to}${j.nipt ? " · NIPT " + j.nipt : ""}.`;
+    $("fsFrom").value = ""; $("fsTo").value = ""; fsData = null; loadFiscal(true);
+  }catch(e){ $("fsMsg").textContent = "Could not import: " + e.message; }
+  $("fsFile").value = "";
+};
+$("fsSave").onclick = async () => {
+  $("fsMsg2").textContent = "Saving…";
+  try{ fsStat = await simphonyPost("/api/fiscal/settings", {to: $("fsTo2").value, cc: $("fsCc").value, time: $("fsTime").value, days: $("fsDays").value,
+      grace_days: $("fsGrace").value, tolerance: $("fsTol").value, enabled: $("fsOn").checked, working_days_only: $("fsWork").checked, send_empty: $("fsEmpty").checked});
+    renderFiscalStatus(); $("fsMsg2").textContent = "Saved."; }
+  catch(e){ $("fsMsg2").textContent = "Could not save: " + e.message; }
+};
+$("fsTest").onclick = async () => {
+  const to = $("fsTo2").value.trim(); if (!to) { $("fsMsg2").textContent = "Enter a recipient first."; return; }
+  $("fsMsg2").textContent = "Sending the test…";
+  try{ const j = await simphonyPost("/api/fiscal/test", {to: to + ($("fsCc").value ? ", " + $("fsCc").value : "")});
+    fsWait(j.job.id, $("fsMsg2"), r => { $("fsMsg2").textContent = r.status === "sent" ? `Test sent to ${(r.to || []).join(", ")}.` : `Test ${r.status}: ${r.detail || ""}`; }); }
+  catch(e){ $("fsMsg2").textContent = "Could not send: " + e.message; }
+};
 document.querySelectorAll("[data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
@@ -2049,6 +2236,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
+  if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();

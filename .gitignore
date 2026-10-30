@@ -19,6 +19,9 @@ data/
 *.key
 *.pem
 *.crt
+*.p12
+*.pfx
+secrets/
 deploy/certs/
 
 # Backup-e

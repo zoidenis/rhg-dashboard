@@ -3,6 +3,7 @@
 Business Central is read only. Actions, thresholds and the audit trail are the
 application's own and live under ./data.
 """
+import base64
 import json
 import sys
 import threading
@@ -24,6 +25,7 @@ import memuse
 import movement
 import typology
 import executive
+import fiscal
 import finance
 import inventory
 import recipes
@@ -46,6 +48,8 @@ PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.c
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
+                     "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
+                     "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings",
                      "/api/users": "users", "/api/password": "view"}
 client = BCClient()
 _last, _last_lock = {}, threading.Lock()
@@ -1211,6 +1215,34 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path.startswith("/api/fiscal"):
+                if not auth.can(user, "finance.ap.view"):
+                    self._send(403, {"error": "Your role does not include Payables."})
+                    return
+                company = config.FISK_COMPANY
+                if url.path == "/api/fiscal":
+                    self._send(200, fiscal.request(client, company, q.get("from"), q.get("to"),
+                                                   q.get("refresh") == "1"))
+                elif url.path == "/api/fiscal/status":
+                    self._send(200, fiscal.status(company))
+                elif url.path == "/api/fiscal/job":
+                    self._send(200, {"job": fiscal.job(q.get("id") or "")})
+                elif url.path == "/api/fiscal/xlsx":
+                    r = fiscal.request(client, company, q.get("from"), q.get("to"))
+                    if r.get("pending") or r.get("available") is False:
+                        self._send(409, {"error": "The report is not ready yet."})
+                        return
+                    body = fiscal.render_xlsx(r)
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="{fiscal.xlsx_name(r)}"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self._send(404, {"error": "Not found"})
             elif url.path in ("/api/typology", "/api/typology/xlsx"):
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})
@@ -1418,6 +1450,45 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or arap.companies()[0]
                 self._send(200, {"test": arap.start_test(company, only or None, actor)})
+            elif url.path.startswith("/api/fiscal/"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                company = config.FISK_COMPANY
+                if url.path == "/api/fiscal/fetch":
+                    self._send(200, {"job": fiscal.start("fetch", client, company, actor)})
+                elif url.path == "/api/fiscal/import":
+                    try:
+                        data = base64.b64decode(body.get("data") or "", validate=True)
+                    except ValueError:
+                        self._send(400, {"error": "The file could not be read."})
+                        return
+                    if not data or len(data) > 25 * 1024 * 1024:
+                        self._send(400, {"error": "Choose the Self-Care purchases book (.xlsx, up to 25 MB)."})
+                        return
+                    try:
+                        res = fiscal.import_book(company, data, str(body.get("name") or "")[:200])
+                    except ValueError as exc:
+                        self._send(400, {"error": str(exc)})
+                        return
+                    store.audit("fiscal import", company, actor, {}, res, "")
+                    self._send(200, res)
+                elif url.path == "/api/fiscal/settings":
+                    to, bad = arap_notify.parse_emails(body.get("to"))
+                    cc, bad_cc = arap_notify.parse_emails(body.get("cc"))
+                    if bad or bad_cc:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad + bad_cc)})
+                        return
+                    store.save_settings({"fiscal": body}, actor)
+                    self._send(200, fiscal.status(company))
+                elif url.path == "/api/fiscal/test":
+                    only, bad = arap_notify.parse_emails(body.get("to"))
+                    if bad:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                        return
+                    self._send(200, {"job": fiscal.start("test", client, company, actor, to=only or None)})
+                else:
+                    self._send(404, {"error": "Not found"})
             elif url.path == "/api/closing":
                 updated = store.update_closing(body.get("company") or config.BC_COMPANY, body.get("period"),
                                                body.get("id"), body, actor)
@@ -1494,6 +1565,7 @@ def main():
     print(f"Business Central: {config.BC_BASE_URL}  company: {config.BC_COMPANY}  (read-only)")
     threading.Thread(target=_warm_loop, daemon=True).start()
     arap.start()
+    fiscal.start_scheduler(client, config.FISK_COMPANY)
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://{host}:{config.APP_PORT}")).start()
     try:

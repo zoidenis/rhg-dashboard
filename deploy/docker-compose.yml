@@ -71,6 +71,9 @@ services:
       COOKIE_NAME: "rhg_session"
     volumes:
       - finance-data:/app/data
+      # fiscalization certificate (.p12) for reading the e-invoices: only on the server,
+      # outside the code that deploy replaces; read-only for the tower
+      - /opt/rhg/secrets:/app/secrets:ro
     networks: [rhg]
     healthcheck:
       test: ["CMD", "python", "-c",

@@ -2,3 +2,6 @@ requests>=2.28
 requests_ntlm>=1.2
 reportlab>=4.0
 openpyxl>=3.1
+# signing requests to the Tax Administration e-invoice service (fiscal.py / cis_client.py)
+lxml>=5.0
+cryptography>=42

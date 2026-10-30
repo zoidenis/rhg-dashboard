@@ -96,6 +96,9 @@ DEFAULT_SETTINGS = {
     # Daily email with the receivables and payables exceptions (sent through Purchasing's mail server)
     "arap_notify": {"enabled": False, "to": "", "cc": "", "time": "08:00", "working_days_only": True,
                     "companies": "", "send_empty": True},
+    # fiscalized purchase invoices (Tax Administration / Self-Care) against BC: daily read and email
+    "fiscal": {"enabled": False, "to": "", "cc": "", "time": "07:30", "working_days_only": True,
+               "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,
@@ -133,6 +136,7 @@ def get_settings():
     merged["group"].update(s.get("group", {}))
     merged["executive"].update(s.get("executive", {}))
     merged["arap_notify"].update(s.get("arap_notify", {}))
+    merged["fiscal"].update(s.get("fiscal", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
         if k in s:
             merged[k] = s[k]
@@ -170,6 +174,21 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("arap_notify", {})[k] = v
+        for k, v in (patch.get("fiscal") or {}).items():
+            if k in DEFAULT_SETTINGS["fiscal"]:
+                if isinstance(DEFAULT_SETTINGS["fiscal"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "07:30"
+                elif k in ("days", "grace_days", "tolerance"):
+                    try:
+                        v = str(max(0, min(400, float(v))))
+                    except (TypeError, ValueError):
+                        continue
+                    v = v[:-2] if v.endswith(".0") else v
+                else:
+                    v = str(v)[:400]
+                current.setdefault("fiscal", {})[k] = v
         for k, v in (patch.get("executive") or {}).items():
             if k in DEFAULT_SETTINGS["executive"]:
                 current.setdefault("executive", {})[k] = str(v)[:600]

@@ -69,3 +69,10 @@ GL_MAX_ROWS = int(get("GL_MAX_ROWS", "300"))
 # the mail server, over the internal network.
 PURCHASING_URL = get("PURCHASING_URL", "http://purchasing:8765").rstrip("/")
 PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")
+
+# Fiscalized purchase invoices against BC. The certificate and its password stay on the server
+# (FISK_CERT_PATH, FISK_CERT_PASSWORD; see cis_client.py); the company whose NIPT they belong to:
+FISK_COMPANY = get("FISK_COMPANY", "") or BC_COMPANY
+E_PINV = get("E_PINV", "PostedPurchaseInvoices")
+E_VENDOR_CARD = get("E_VENDOR_CARD", "VendorCard")
+E_PO = get("E_PO", "PurchaseOrder")

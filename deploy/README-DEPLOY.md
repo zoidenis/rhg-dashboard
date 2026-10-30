@@ -100,6 +100,33 @@ docker compose restart finance
 docker compose down                # ndal (volumet mbeten)
 ```
 
+## Certifikata e fiskalizimit (faturat e fiskalizuara kundrejt BC)
+
+Finance lexon e-faturat nga shërbimi i Tatimeve me certifikatën e fiskalizimit të NIPT-it
+(vetëm lexim, asnjë regjistrim). Certifikata **nuk** shkon në git dhe nuk futet në ekran:
+
+```bash
+sudo mkdir -p /opt/rhg/secrets
+sudo cp fisk.p12 /opt/rhg/secrets/fisk.p12          # skedari .p12 i certifikatës
+# përdoruesi brenda kontejnerit duhet ta lexojë: merr uid-in e tij
+UID_RHG=$(docker compose -f /opt/rhg/deploy/docker-compose.yml exec -T finance id -u)
+sudo chown "$UID_RHG" /opt/rhg/secrets/fisk.p12 && sudo chmod 400 /opt/rhg/secrets/fisk.p12
+sudo chmod 711 /opt/rhg/secrets
+```
+
+Në `/opt/rhg/rhg-finance-local/.env` shtoni (fjalëkalimin e fut vetë administratori):
+
+```
+FISK_CERT_PASSWORD=...
+FISK_NIPT=L91520027A
+FISK_COMPANY=SALT
+FISK_EINVOICE_URL=          # nga specifikimi "Einvoice Service - Technical"
+```
+
+Pastaj `docker compose up -d finance`. Te Finance → Fiscal invoices vs BC, karta
+"Connection to the Tax Administration" tregon nëse certifikata u hap dhe deri kur vlen.
+`/opt/rhg/secrets` është jashtë dosjeve që deploy-i i zëvendëson, kështu që nuk preket.
+
 ## Vendime të zbatuara
 
 **TLS self-signed.** Let's Encrypt nuk lëshon certifikata për IP, pra pa domain
