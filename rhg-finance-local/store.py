@@ -99,6 +99,11 @@ DEFAULT_SETTINGS = {
     # fiscalized purchase invoices (Tax Administration / Self-Care) against BC: daily read and email
     "fiscal": {"enabled": False, "to": "", "cc": "", "time": "07:30", "working_days_only": True,
                "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False},
+    # Location intelligence: the registry (Simphony location | name | brand, BC company, location,
+    # POS customer, area, map position) is empty here, which means the built-in list in
+    # locintel.py; the thresholds that raise a restaurant's alerts
+    "locations": {"registry": "", "food_cost_target": "30", "cover_days": "30", "error_corrects_pct": "5",
+                  "discounts_pct": "8", "voids_pct": "2", "sales_drop_pct": "15"},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,
@@ -137,6 +142,7 @@ def get_settings():
     merged["executive"].update(s.get("executive", {}))
     merged["arap_notify"].update(s.get("arap_notify", {}))
     merged["fiscal"].update(s.get("fiscal", {}))
+    merged["locations"].update(s.get("locations", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
         if k in s:
             merged[k] = s[k]
@@ -189,6 +195,17 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("fiscal", {})[k] = v
+        for k, v in (patch.get("locations") or {}).items():
+            if k in DEFAULT_SETTINGS["locations"]:
+                if k == "registry":
+                    v = str(v).replace("\r\n", "\n")[:8000]
+                else:
+                    try:
+                        v = str(max(0.0, min(1000.0, float(v))))
+                    except (TypeError, ValueError):
+                        continue
+                    v = v[:-2] if v.endswith(".0") else v
+                current.setdefault("locations", {})[k] = v
         for k, v in (patch.get("executive") or {}).items():
             if k in DEFAULT_SETTINGS["executive"]:
                 current.setdefault("executive", {})[k] = str(v)[:600]

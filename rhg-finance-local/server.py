@@ -24,6 +24,7 @@ import localdb
 import memuse
 import movement
 import typology
+import locintel
 import executive
 import fiscal
 import fiscal_sales
@@ -450,10 +451,17 @@ def sales_screen(anchor, mode, compare="prior"):
     t0 = time.time()
     locs = [l for l in simphony.locations() if l.get("active", True)]
     fallback = (store.get_settings().get("group") or {}).get("reporting_currency") or "ALL"
+    reg = {r["ref"]: r for r in locintel.registry()}
     for l in locs:
-        l["currency_given"] = bool(l["currency"])
-        l["currency"] = l["currency"] or fallback
+        # the registry in Settings wins (SALT Prishtina is EUR, Simphony gives no currency);
+        # "L" and "LEK" are lek, so Vesper is no longer a currency of its own
+        given = locintel.norm_currency(l["currency"])
+        l["currency_given"] = bool(given) or bool(reg.get(l["locRef"], {}).get("currency"))
+        l["currency"] = (reg.get(l["locRef"], {}).get("currency")) or given or fallback
     mapping = simphony.loc_map()
+    for ref, r in reg.items():
+        if r.get("bc") and ref not in mapping:
+            mapping[ref] = r["bc"]
     latest = {}
     for loc, (value, err) in in_parallel_jobs({l["locRef"]: (lambda r=l["locRef"]: _latest(r)) for l in locs}).items():
         latest[loc] = value if not err else None
@@ -541,7 +549,7 @@ def sales_screen(anchor, mode, compare="prior"):
         "errors": errors, "calls": len(jobs), "ms": int((time.time() - t0) * 1000),
         "definitions": {
             "net": "Net sales as Simphony totals them (netSlsTtl): after item and subtotal discounts, "
-                   "excluding tax and service charges.",
+                   "before service charges. VAT is included (the tax collected is inside it).",
             "checks": "Checks counted by Simphony for the business day (chkCnt). Guests are the covers "
                       "entered at the POS (gstCnt), so they are only as good as the entry.",
             "open": "Checks rung on the day and still open: sales that are not yet final.",
@@ -1161,6 +1169,17 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/sales":
                 self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1",
                                               q.get("compare") or "prior"))
+            elif url.path == "/api/locations":
+                try:
+                    c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, _ = periods(q.get("period"), "month")
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                rights = {"purchases": auth.can(user, "finance.ap.view"),
+                          "inventory": auth.can(user, "finance.inventory.view")}
+                self._send(200, locintel.request(client, q.get("company") or config.BC_COMPANY,
+                                                 (c_from, c_to, p_from, p_to, ly_from, ly_to, running, label),
+                                                 _latest, in_parallel_jobs, rights, q.get("refresh") == "1"))
             elif url.path == "/api/executive":
                 company = q.get("company") or config.BC_COMPANY
                 try:
@@ -1337,7 +1356,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"actions": store.list_actions(), "statuses": store.STATUSES,
                                  "priorities": store.PRIORITIES})
             elif url.path == "/api/settings":
-                self._send(200, store.get_settings())
+                self._send(200, dict(store.get_settings(), locations_registry_default=locintel.DEFAULT_REGISTRY))
             elif url.path == "/api/audit":
                 self._send(200, {"audit": store.get_audit()})
             elif url.path == "/api/cache":
