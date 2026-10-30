@@ -404,6 +404,42 @@ def get_einvoices(date_from, date_to, progress=None, party=None):
     return list(found.values())
 
 
+def probe(eic=None, party="BUYER", date_from=None, date_to=None):
+    """One GetEinvoices request, as given, to see what the service answers: by EIC (one e-invoice,
+    as the service documents it) and/or by received date-time. Reading only, like every request
+    here. Returns the invoices found (without PDFs) and a sample of the answer."""
+    import re as _re
+    from xml.sax.saxutils import escape
+    s = _settings()
+    pk, cert, _ = _load()
+    party = (party or "").upper()
+    if party not in ("", "BUYER", "SELLER"):
+        raise ValueError("party must be BUYER or SELLER")
+    eic = (eic or "").strip().lower()
+    if eic and not _re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", eic):
+        raise ValueError("An EIC looks like 8-4-4-4-12 hexadecimal characters.")
+    now = datetime.now().astimezone()
+    parts = [f'<Header SendDateTime="{now.isoformat(timespec="seconds")}" UUID="{uuid.uuid4()}"/>']
+    if eic:
+        parts.append(f"<EIC>{escape(eic)}</EIC>")
+    if party:
+        parts.append(f"<PartyType>{party}</PartyType>")
+    window = ""
+    if date_from and date_to:
+        a = datetime.combine(date.fromisoformat(str(date_from)[:10]), datetime.min.time())
+        b = datetime.combine(date.fromisoformat(str(date_to)[:10]), datetime.max.time().replace(microsecond=0))
+        parts += [f"<RecDateTimeFrom>{_dt(a)}</RecDateTimeFrom>", f"<RecDateTimeTo>{_dt(b)}</RecDateTimeTo>"]
+        window = f"{_dt(a)} to {_dt(b)}"
+    xml = f'<GetEinvoicesRequest xmlns="{NS}" Id="Request" Version="1">' + "".join(parts) + "</GetEinvoicesRequest>"
+    answer = _call(xml, s, s["action"], pk, cert)
+    rows = parse_response(answer, s["field_map"])
+    for r in rows:
+        r.pop("raw", None)
+    return {"request": {"eic": eic, "party": party, "window": window,
+                        "cert_nipt": (NIPT_RE.search(cert.subject.rfc4514_string()) or [""])[0]},
+            "found": len(rows), "rows": rows[:20], "answer": _sample(answer)}
+
+
 def get_taxpayer(tin):
     """Name, address and town of a NIPT, from the Tax Administration."""
     s = _settings()

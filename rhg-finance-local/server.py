@@ -27,6 +27,7 @@ import typology
 import locintel
 import executive
 import fiscal
+import cis_client
 import fiscal_sales
 import finance
 import inventory
@@ -51,7 +52,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
-                     "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings",
+                     "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
 client = BCClient()
 _last, _last_lock = {}, threading.Lock()
@@ -1503,6 +1504,15 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     store.save_settings({"fiscal": body}, actor)
                     self._send(200, fiscal.status(company))
+                elif url.path == "/api/fiscal/probe":
+                    # one reading request to the e-invoice service, to see what it answers
+                    try:
+                        self._send(200, cis_client.probe(body.get("eic"), body.get("party") or "BUYER",
+                                                         body.get("from"), body.get("to")))
+                    except ValueError as exc:
+                        self._send(400, {"error": str(exc)})
+                    except Exception as exc:                     # noqa: BLE001
+                        self._send(200, {"error": str(exc)[:500]})
                 elif url.path == "/api/fiscal/test":
                     only, bad = arap_notify.parse_emails(body.get("to"))
                     if bad:
