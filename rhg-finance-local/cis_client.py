@@ -51,6 +51,10 @@ NS = "https://Einvoice.tatime.gov.al/EinvoiceService/schema"
 DEFAULT_URL = "https://einvoice.tatime.gov.al/EinvoiceService-v1"
 ACTION = "https://Einvoice.tatime.gov.al/EinvoiceService/"
 MAX_PER_ANSWER = 100
+# what the last GetEinvoices read saw: calls, answers, and (when nothing was found) a sample of
+# the answer without the signature or PDFs, so a read that finds nothing can be explained
+last_diag = {}
+NIPT_RE = __import__("re").compile(r"\b[A-Z]\d{8}[A-Z]\b")
 
 DEFAULT_TEMPLATE = (
     '<GetEinvoicesRequest xmlns="' + NS + '" Id="Request" Version="1">'
@@ -139,7 +143,7 @@ def certificate_info():
     s = _settings()
     out = {"path_set": bool(s["cert_path"]), "present": Path(s["cert_path"]).is_file(),
            "password_set": bool(s["password"]), "url_set": bool(s["url"]), "nipt": s["nipt"],
-           "party": s["party"], "loaded": False}
+           "party": s["party"], "loaded": False, "cert_nipt": ""}
     if not out["present"]:
         return out
     try:
@@ -149,6 +153,8 @@ def certificate_info():
         out.update(loaded=True, subject=cert.subject.rfc4514_string(), issuer=cert.issuer.rfc4514_string(),
                    valid_from=nb.date().isoformat(), valid_to=na.date().isoformat(),
                    expired=na.date() < date.today(), serial=format(cert.serial_number, "x"))
+        m = NIPT_RE.search(out["subject"])
+        out["cert_nipt"] = m.group(0) if m else ""
     except CISError as exc:
         out["error"] = str(exc)
     return out
@@ -326,6 +332,34 @@ def _call(xml, s, action, pk, cert):
     return r.content
 
 
+def _sample(xml):
+    """The answer with the signature and any PDF taken out, cut short, plus the texts of elements
+    that look like messages or codes."""
+    from lxml import etree
+    try:
+        root = etree.fromstring(xml)
+    except Exception:                                            # noqa: BLE001
+        return {"sample": (xml or b"")[:1500].decode("utf-8", "replace"), "messages": []}
+    msgs = []
+    for el in list(root.iter()):
+        if not isinstance(el.tag, str):
+            continue
+        name = etree.QName(el).localname.lower()
+        if name in ("signature", "pdf"):
+            parent = el.getparent()
+            if parent is not None:
+                parent.remove(el)
+            continue
+        if any(w in name for w in ("message", "error", "code", "description", "result", "status")) and (el.text or "").strip():
+            msgs.append(f"{etree.QName(el).localname}: {el.text.strip()[:200]}")
+        for k, v in el.attrib.items():
+            if any(w in k.lower() for w in ("message", "error", "code", "result")):
+                msgs.append(f"{etree.QName(el).localname}@{k}: {str(v)[:200]}")
+    body = etree.tostring(root, encoding="unicode")
+    return {"sample": body[:1500], "messages": msgs[:10], "root": etree.QName(root).localname,
+            "elements": sum(1 for _ in root.iter())}
+
+
 def get_einvoices(date_from, date_to, progress=None, party=None):
     """Every e-invoice received by the platform in the period, where we are the BUYER (default,
     FISK_PARTY_TYPE) or the SELLER. A window that returns the maximum of 100 is split in two
@@ -338,12 +372,20 @@ def get_einvoices(date_from, date_to, progress=None, party=None):
     pk, cert, _ = _load()
     a, b = date.fromisoformat(str(date_from)[:10]), date.fromisoformat(str(date_to)[:10])
     found, calls = {}, [0]
+    last_diag.clear()
+    last_diag.update(calls=0, with_rows=0, party=s["party"], cert_nipt=(NIPT_RE.search(cert.subject.rfc4514_string()) or [""])[0])
 
     def read(t0, t1):
         calls[0] += 1
         if calls[0] > 2000:
             raise CISError("Too many requests for one period; stopped.")
-        rows = parse_response(_call(build_request(t0, t1, s), s, s["action"], pk, cert), s["field_map"])
+        answer = _call(build_request(t0, t1, s), s, s["action"], pk, cert)
+        rows = parse_response(answer, s["field_map"])
+        last_diag["calls"] = calls[0]
+        if rows:
+            last_diag["with_rows"] += 1
+        elif "empty_answer" not in last_diag:
+            last_diag["empty_answer"] = dict(_sample(answer), window=f"{t0.isoformat()} to {t1.isoformat()}")
         if len(rows) >= MAX_PER_ANSWER and (t1 - t0) > timedelta(minutes=2):
             mid = t0 + (t1 - t0) / 2
             mid = mid.replace(microsecond=0)

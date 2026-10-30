@@ -234,12 +234,17 @@ def fetch(company, days=None, actor="scheduler", full=False):
     a = b - timedelta(days=days)
     with _state_lock:
         last = (_read_state().get("fetched_to") or {}).get(company)
+    with _lock:
+        held = _db().execute("SELECT COUNT(*) FROM einv WHERE company=? AND source='cis'", (company,)).fetchone()[0]
+    if not held:
+        full = True            # nothing from the service yet: read the whole window again
     if last and not full:
         a = max(a, date.fromisoformat(last) - timedelta(days=2))
     entry = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": "fetch", "company": company,
              "actor": actor, "from": a.isoformat(), "to": b.isoformat()}
     try:
         rows = cis_client.get_einvoices(a, b)
+        read = len(rows)
         own = (config.get("FISK_NIPT", "") or "").strip().upper()
         for r in rows:
             if not r.get("buyer_nipt"):
@@ -254,7 +259,12 @@ def fetch(company, days=None, actor="scheduler", full=False):
             st = _read_state()
             st.setdefault("fetched_to", {})[company] = b.isoformat()
             _write_state(st)
-        entry.update(status="ok", rows=len(rows))
+        entry.update(status="ok", rows=len(rows), read=read, diag=dict(cis_client.last_diag))
+        company_nipt = (settings().get("company_nipt") or "").strip().upper()
+        cert_nipt = entry["diag"].get("cert_nipt") or own
+        if company_nipt and cert_nipt and company_nipt != cert_nipt:
+            entry["detail"] = (f"The certificate is for NIPT {cert_nipt}, not {company} ({company_nipt}): the service lists "
+                               f"the e-invoices of {cert_nipt}.")
     except cis_client.NotConfigured as exc:
         entry.update(status="not configured", detail=str(exc))
     except Exception as exc:                                     # noqa: BLE001

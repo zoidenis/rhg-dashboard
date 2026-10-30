@@ -316,6 +316,7 @@ td.num,th.num{text-align:right}
         <label class="field">Cc (optional)<input id="fsCc" placeholder="name@rhg.al"></label>
         <label class="field">Time<input id="fsTime" type="time" value="07:30"></label>
         <label class="field">Days read back<input id="fsDays" type="number" min="7" max="120" value="45"></label>
+        <label class="field">NIPT of the company reconciled<input id="fsNipt" placeholder="the BC company's NIPT" autocomplete="off"></label>
         <label class="field">Grace days before "missing"<input id="fsGrace" type="number" min="0" max="60" value="7"></label>
         <label class="field">Amount tolerance (ALL)<input id="fsTol" type="number" min="0" max="1000" value="1"></label>
       </div>
@@ -2208,25 +2209,40 @@ async function loadFiscalStatus(){
 function renderFiscalStatus(){
   const st = fsStat, c = st.certificate || {}, s = st.settings || {}, cov = st.coverage || {}, m = st.mail || {};
   const ready = c.loaded && c.url_set && !c.expired;
-  $("fsPill").className = "rhg-pill " + (ready ? (s.enabled ? "ok" : "info") : "warning");
-  $("fsPill").textContent = ready ? (s.enabled ? `Connected · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}` : "Connected · daily run off") :
+  const own = (s.company_nipt || "").toUpperCase(), other = ready && own && c.cert_nipt && c.cert_nipt !== own;
+  $("fsPill").className = "rhg-pill " + (other ? "warning" : ready ? (s.enabled ? "ok" : "info") : "warning");
+  $("fsPill").textContent = other ? `Certificate is for ${c.cert_nipt}, not ${own}` : ready ? (s.enabled ? `Connected · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}` : "Connected · daily run off") :
     !c.present ? "Certificate not on the server" : !c.loaded ? "Certificate not readable" : c.expired ? "Certificate expired" : "Service address not set";
   const box = (l, v, sub) => `<div><div class="meta">${l}</div><b>${v}</b><div class="meta">${sub || ""}</div></div>`;
   $("fsCert").innerHTML = box("Certificate", c.loaded ? "Loaded" : c.present ? "On the server, not opened" : "Not on the server", c.loaded ? `${esc(c.subject || "")} · valid to ${esc(c.valid_to || "")}` : esc(c.error || "FISK_CERT_PATH")) +
-    box("NIPT", esc(c.nipt || "not set"), `party ${esc(c.party || "BUYER")}`) +
+    box("NIPT", esc(c.cert_nipt || c.nipt || "not set"), other ? `<span class="up">the certificate's holder; the company reconciled is ${esc(own)}, so its invoices are not in this read</span>`
+      : `certificate holder · party ${esc(c.party || "BUYER")}${own ? "" : " · set the company's NIPT below to check it"}`) +
     box("E-invoice service", c.url_set ? "einvoice.tatime.gov.al" : "Address not set", c.url_set ? "GetEinvoices as BUYER, by received date · reading only" : "FISK_EINVOICE_URL") +
     box("Invoices held", fmt(cov.count || 0), cov.from ? `dated ${cov.from} to ${cov.to}` : "none yet") +
     box("Email", m.configured ? "Mail server ready" : "Mail server not ready", m.configured ? `from ${esc(m.from || "Purchasing")}` : esc((m.error || "Purchasing → Settings").slice(0, 120)));
-  $("fsTo2").value = s.to || ""; $("fsCc").value = s.cc || ""; $("fsTime").value = s.time || "07:30"; $("fsDays").value = s.days || 45;
+  $("fsTo2").value = s.to || ""; $("fsCc").value = s.cc || ""; $("fsTime").value = s.time || "07:30"; $("fsDays").value = s.days || 45; $("fsNipt").value = s.company_nipt || "";
   $("fsGrace").value = s.grace_days || 7; $("fsTol").value = s.tolerance || 1; $("fsOn").checked = !!s.enabled; $("fsWork").checked = s.working_days_only !== false; $("fsEmpty").checked = !!s.send_empty;
   const runs = st.runs || [];
-  $("fsRuns").innerHTML = runs.length ? `<tr><th>When</th><th>What</th><th>Status</th><th>Detail</th></tr>` + runs.slice(0, 10).map(r => `<tr><td class="meta">${esc(r.ts)}</td><td>${esc(r.kind)}${r.test ? " · test" : ""}</td><td>${esc(r.status)}</td><td class="meta">${esc(r.kind === "fetch" ? (r.rows != null ? `${fmt(r.rows)} e-invoices ${r.from} to ${r.to}` : r.detail || "") : r.detail || "")}</td></tr>`).join("") : "";
+  $("fsRuns").innerHTML = runs.length ? `<tr><th>When</th><th>What</th><th>Status</th><th>Detail</th></tr>` + runs.slice(0, 10).map(r => `<tr><td class="meta">${esc(r.ts)}</td><td>${esc(r.kind)}${r.test ? " · test" : ""}</td><td>${esc(r.status)}</td><td class="meta">${fsRunDetail(r)}</td></tr>`).join("") : "";
   const loads = cov.loads || [];
   $("fsLoads").innerHTML = loads.length ? `<tr><th>Loaded</th><th>Source</th><th class="num">Invoices</th><th>Dated</th></tr>` + loads.slice(0, 8).map(l => `<tr><td class="meta">${esc((l.at || "").replace("T", " "))}</td><td>${l.source === "cis" ? "Tax Administration" : "Self-Care book"}</td><td class="num">${fmt(l.rows)}</td><td class="meta">${esc(l.from || "")} to ${esc(l.to || "")}</td></tr>`).join("") : "";
   const canSet = can("settings");
   ["fsFetch","fsSave","fsTest"].forEach(id => { $(id).disabled = !canSet; $(id).title = canSet ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
   $("fsFetch").disabled = !canSet || !ready; if (canSet && !ready) $("fsFetch").title = "Waiting for the certificate and the service address on the server.";
   $("fsFile").disabled = !canSet;
+}
+// a read that finds nothing says what the service answered: how many calls, the certificate's NIPT,
+// any message or code in the answer, and a short sample of it (signature and PDFs taken out)
+function fsRunDetail(r){
+  if (r.kind !== "fetch") return esc(r.detail || "");
+  if (r.rows == null) return esc(r.detail || "");
+  const d = r.diag || {}, e = d.empty_answer;
+  let h = `${fmt(r.rows)} e-invoices ${esc(r.from)} to ${esc(r.to)}`;
+  if (r.read != null && r.read !== r.rows) h += ` · ${fmt(r.read)} read, ${fmt(r.read - r.rows)} left out as another buyer's`;
+  if (d.calls != null) h += ` · ${fmt(d.calls)} request${d.calls === 1 ? "" : "s"}, ${fmt(d.with_rows || 0)} with invoices${d.cert_nipt ? ` · as ${esc(d.party || "BUYER")} ${esc(d.cert_nipt)}` : ""}`;
+  if (r.detail) h += `<br><span class="up">${esc(r.detail)}</span>`;
+  if (e) h += `<details style="margin-top:4px"><summary>What the service answered (${esc(e.window || "")})</summary>${(e.messages || []).length ? `<div>${e.messages.map(esc).join("<br>")}</div>` : ""}<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;max-height:220px;overflow:auto;background:var(--bg);padding:8px;border-radius:8px">${esc(e.sample || "")}</pre></details>`;
+  return h;
 }
 async function fsWait(id, msgEl, done){
   const j = (await readJSON(await fetch("/api/fiscal/job?id=" + id))).job;
@@ -2258,7 +2274,8 @@ $("fsFile").onchange = async () => {
 $("fsSave").onclick = async () => {
   $("fsMsg2").textContent = "Saving…";
   try{ fsStat = await simphonyPost("/api/fiscal/settings", {to: $("fsTo2").value, cc: $("fsCc").value, time: $("fsTime").value, days: $("fsDays").value,
-      grace_days: $("fsGrace").value, tolerance: $("fsTol").value, enabled: $("fsOn").checked, working_days_only: $("fsWork").checked, send_empty: $("fsEmpty").checked});
+      grace_days: $("fsGrace").value, tolerance: $("fsTol").value, enabled: $("fsOn").checked, working_days_only: $("fsWork").checked, send_empty: $("fsEmpty").checked,
+      company_nipt: $("fsNipt").value.trim().toUpperCase()});
     renderFiscalStatus(); $("fsMsg2").textContent = "Saved."; }
   catch(e){ $("fsMsg2").textContent = "Could not save: " + e.message; }
 };

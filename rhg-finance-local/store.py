@@ -98,7 +98,10 @@ DEFAULT_SETTINGS = {
                     "companies": "", "send_empty": True},
     # fiscalized purchase invoices (Tax Administration / Self-Care) against BC: daily read and email
     "fiscal": {"enabled": False, "to": "", "cc": "", "time": "07:30", "working_days_only": True,
-               "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False},
+               "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False,
+               # the NIPT of the BC company being reconciled; when the certificate is another NIPT's,
+               # the screen says so (the service answers for the certificate's holder only)
+               "company_nipt": ""},
     # Location intelligence: the registry (Simphony location | name | brand, BC company, location,
     # POS customer, area, map position) is empty here, which means the built-in list in
     # locintel.py; the thresholds that raise a restaurant's alerts
