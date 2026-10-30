@@ -19,33 +19,30 @@ async function getJSON(path){
 }
 const MARKUP = `<div class="card" style="margin-bottom:14px">
       <div class="card-head"><div><h2>Location intelligence</h2>
-        <p class="hint" style="margin-bottom:0">Every restaurant of a company at a glance: click a restaurant for Finance, Purchasing, Inventory and Operations, or a square for one KPI across all restaurants. Simphony and Business Central are read only.</p></div>
+        <p class="hint" style="margin-bottom:0">Every restaurant of the company as a square. Click a restaurant for its KPIs from Simphony and its Finance, Purchasing and Inventory from Business Central; the company totals are further down. Read only.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <div class="li-seg" id="liSeg"><button class="on" data-v="map">Map</button><button data-v="grid">Cards</button></div>
+          <label class="meta" style="display:flex;gap:6px;align-items:center">Order
+            <select id="liSort" style="font-size:12px;padding:5px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health, weakest first</option><option value="alerts">by alerts</option><option value="fc">by food cost</option><option value="name">by name</option></select></label>
           <button class="mini" id="liRefresh">Read again</button></div></div>
       <p class="meta" id="liStatus" style="margin:10px 0 0"></p>
     </div>
     <div id="liBody" style="display:none">
-      <div class="li-sec"><h2><span class="li-src">Simphony</span>Main KPIs<small id="liScope"></small></h2><span class="meta">click a square for every restaurant, the daily trend and alerts</span></div>
+      <div class="li-sec"><h2>Restaurants<small id="liRestScope"></small></h2><span class="meta">click a restaurant for its KPIs</span></div>
+      <div class="li-rest" id="liRest"></div>
+      <div id="liOther"></div>
+      <div class="li-sec" style="margin-top:22px"><h2><span class="li-src">Simphony</span>Whole company<small id="liScope"></small></h2><span class="meta">click a square for every restaurant, the daily trend and alerts</span></div>
       <div class="li-sqs" id="liSqs"></div>
       <div class="li-sec"><h2><span class="li-src">Business Central</span>Finance &amp; stock<small id="liBcScope"></small></h2></div>
       <div class="kpis li-kpis" id="liKpis"></div>
-      <div class="li-layout" id="liMapView">
-        <div class="card" id="liMapCard"><div class="card-head" style="margin-bottom:10px"><h2 id="liMapTitle">Tirana and the airport</h2><span class="meta">ring colour = health · label = Simphony net sales</span></div>
-          <div class="li-mapwrap" id="liMap"></div>
-          <div class="li-legend"><span><span class="li-dot" style="border-color:var(--down)"></span>Healthy 75+</span><span><span class="li-dot" style="border-color:var(--warn)"></span>Watch 55–74</span><span><span class="li-dot" style="border-color:var(--up)"></span>Act below 55</span><span>Positions are schematic; set them in Finance → Settings → Location intelligence</span></div>
-        </div>
-        <div class="card"><div class="card-head" style="margin-bottom:6px"><h2>Ranking</h2>
-          <select id="liSort" style="font-size:12px;padding:4px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health</option><option value="fc">by food cost</option><option value="doh">by days of cover</option></select></div>
-          <div class="scroll"><table id="liRank"></table></div>
-          <div id="liRails"></div></div>
+      <div class="card" id="liMapCard"><div class="card-head" style="margin-bottom:10px"><h2 id="liMapTitle">On the map · Tirana and the airport</h2><span class="meta">ring colour = health · label = Simphony net sales</span></div>
+        <div class="li-mapwrap" id="liMap"></div>
+        <div class="li-legend"><span><span class="li-dot" style="border-color:var(--down)"></span>Healthy 75+</span><span><span class="li-dot" style="border-color:var(--warn)"></span>Watch 55–74</span><span><span class="li-dot" style="border-color:var(--up)"></span>Act below 55</span><span>Positions are schematic; set them in Finance → Settings → Location intelligence</span></div>
       </div>
-      <div class="li-grid" id="liGrid" style="display:none"></div>
       <p class="note" id="liFoot" style="font-size:12px;color:var(--sub);line-height:1.6"></p>
     </div>
   `;
 const key = () => `${opts.company || ""}|${opts.period || ""}`;
-let liData = null, liTimer = null, liView = "map", liKey = "", host = null, opts = {};
+let liData = null, liTimer = null, liKey = "", host = null, opts = {}, liSort = "net";
 document.body.insertAdjacentHTML("beforeend", `<div class="li-bd" id="liBd"><div class="li-pop" id="liPop" role="dialog" aria-modal="true"></div></div>
   <div class="li-bd" id="liBd2"><div class="li-pop" id="liPop2" role="dialog" aria-modal="true"></div></div><div id="liTip"></div>`);
 const LI_G = {
@@ -156,11 +153,8 @@ async function loadLocations(refresh){
 }
 function bind(){
   $("liRefresh").onclick = () => loadLocations(true);
-  $("liSort").onchange = () => liData && liDrawRank();
-  document.querySelectorAll("#liSeg button").forEach(b => b.onclick = () => {
-    liView = b.dataset.v; document.querySelectorAll("#liSeg button").forEach(x => x.classList.toggle("on", x === b));
-    $("liMapView").style.display = liView === "map" ? "" : "none"; $("liGrid").style.display = liView === "grid" ? "" : "none";
-  });
+  $("liSort").value = liSort;
+  $("liSort").onchange = () => { liSort = $("liSort").value; if (liData) liDrawRest(); };
 }
 
 // ---- derive
@@ -241,7 +235,8 @@ function liRender(){
   $("liStatus").innerHTML = `${esc(j.period.label)} · whole days ${LI.curLab}, against ${liDay(j.period.prev_from)}–${liDay(j.period.prev_to)} ${LI.prevLab} and the same dates of ${j.period.ly_from.slice(0, 4)} · read ${esc(j.checked_at.replace("T", " "))}${j.inventory ? " · " + esc(j.inventory.note || "") : ""}${errs}`;
   if (!j.simphony) $("liStatus").innerHTML += " · Simphony is not connected (Settings → Simphony sales).";
   $("liScope").textContent = `${LI.company} · ${LI.scope.length} restaurant${LI.scope.length === 1 ? "" : "s"} open${LI.tot.length < LI.scope.length ? ` · totals in ${LI.ccy}` : ""} · ${LI.curLab}`;
-  liDrawSquares(); liDrawKpis(); liDrawMap(); liDrawRank(); liDrawGrid();
+  $("liRestScope").textContent = `${LI.company} · ${LI.scope.length} open · ${LI.curLab}`;
+  liDrawRest(); liDrawSquares(); liDrawKpis(); liDrawMap();
   $("liFoot").innerHTML = Object.values(j.definitions || {}).map(esc).join(" ");
   if (opts.onState) opts.onState(j);
 }
@@ -278,7 +273,6 @@ function liDrawKpis(){
 }
 function liDrawMap(){
   const pins = LI.scope.filter(l => l.x != null && !l.region);
-  $("liMapView").classList.toggle("nomap", !pins.length);
   $("liMapCard").style.display = pins.length ? "" : "none";
   if (!pins.length) return;
   const W = 1000, H = 560;
@@ -298,29 +292,39 @@ function liDrawMap(){
       <div class="ic">${liGlyph(l.brand)}</div><div class="lb">${esc(l.name.replace(" Steak & Rooftop", "").replace(" Tirana", ""))} <span>${liFv(LI_KB.net, l.snet, l)}</span></div></div>`;
   $("liMap").innerHTML = s;
 }
-function liDrawRank(){
-  const by = $("liSort").value;
-  const key = {net: l => -(l.snet || 0), ly: l => l.lyD ?? 1e9, score: l => l.score ?? 1e9, fc: l => -(l.fc ?? -1), doh: l => -((l.inv && l.inv.doh) ?? -1)}[by];
-  $("liRank").innerHTML = `<tr><th>Restaurant</th><th class="num">Simphony</th><th class="num">vs LY</th><th class="num">Food cost</th><th class="num">Health</th></tr>` +
-    [...LI.scope].sort((a, b) => key(a) - key(b)).map(l => {
-      return `<tr class="r" data-loc="${esc(l.ref)}"><td><span class="li-mini">${liGlyph(l.brand)}</span>${esc(l.name)}${l.region ? ` <span class="meta">· ${esc(l.region)}</span>` : ""}</td>
-      <td class="num">${liFv(LI_KB.net, l.snet, l)}</td><td class="num ${l.lyD != null && l.lyD <= -LI.th.sales_drop ? "up" : l.lyD >= 5 ? "down" : ""}">${liPct(l.lyD)}</td>
-      <td class="num ${l.fc != null && l.fc > LI.th.food_cost + 2 ? "warn" : ""}">${l.fc != null ? l.fc.toFixed(1) + "%" : "–"}</td>
-      <td class="num"><span class="li-score ${l.h}">${l.score ?? "–"}</span></td></tr>`; }).join("");
-  const rail = (title, list, txt) => list.length ? `<div class="meta" style="margin-top:12px">${title}</div><div class="li-rail">${list.map(l => `<div class="s" data-loc="${esc(l.ref)}"><span class="li-mini">${liGlyph(l.brand)}</span>${esc(l.name)} · ${txt(l)}</div>`).join("")}</div>` : "";
-  $("liRails").innerHTML =
-    rail("Closed this period", LI.closed, l => l.sim ? `${LI.prevLab} ${liFv(LI_KB.net, l.sim.prev.net, l)}` : "") +
-    rail("Other companies in Simphony", LI.others, l => `${esc(l.company || "?")}${l.sim ? " · " + liFv(LI_KB.net, l.sim.cur.net || l.sim.prev.net, l) : ""}`) +
-    rail("Simphony locations not in the registry", LI.unreg, l => liFv(LI_KB.net, l.sim.cur.net, l));
+const LI_ORDER = {crit: 0, warn: 1, info: 2, good: 3};
+function liRestSquare(l){
+  const c = liT(l, "cur"), p = liT(l, "prev"), ring = {"h-ok": "var(--down)", "h-mid": "var(--warn)", "h-low": "var(--up)"}[l.h] || "var(--line)";
+  const dS = c && p && p.net ? (c.net / p.net - 1) * 100 : null;
+  const top = l.alerts.find(a => a[0] !== "good"), n = l.alerts.filter(a => a[0] !== "good").length;
+  const stat = (lab, v, cls) => `<div><span>${lab}</span><b class="${cls || ""}">${v}</b></div>`;
+  const posted = l.bc_posted && l.snet ? (l.bc_posted.total / l.snet - 1) * 100 : null;
+  return `<button class="li-rsq" data-loc="${esc(l.ref)}" aria-label="${esc(l.name)}: open its KPIs">
+    <div class="hd"><div class="ic" style="border-color:${ring}">${liGlyph(l.brand)}</div>
+      <div class="nm"><b>${esc(l.name)}</b><span>${esc([l.area, l.region].filter(Boolean).join(" · "))}</span></div>
+      <span class="li-score ${l.h}" title="Health score">${l.score ?? "–"}</span></div>
+    <div class="big"><span class="v">${liFv(LI_KB.net, l.snet, l)}</span><span class="u">net sales, VAT incl.</span></div>
+    <div class="cmp"><span>vs ${LI.lyLab} <b class="${l.lyD == null ? "" : l.lyD <= -LI.th.sales_drop ? "up" : l.lyD >= 5 ? "down" : ""}">${liPct(l.lyD)}</b></span><span>vs ${LI.prevLab} <b class="${dS != null && dS <= -LI.th.sales_drop ? "up" : ""}">${liPct(dS)}</b></span></div>
+    ${l.daily ? `<div class="sp">${liSpark(l.daily.net)}</div>` : ""}
+    <div class="st">${stat("Checks", c ? liN(c.checks) : "–")}${stat("Avg check", c && c.checks ? liN(c.net / c.checks) : "–")}
+      ${stat("Food cost", l.fc != null ? l.fc.toFixed(1) + "%" : "–", l.fc != null && l.fc > LI.th.food_cost + 2 ? "warn" : "")}
+      ${l.inv ? stat("Stock cover", l.inv.doh != null ? l.inv.doh + " d" : "–", l.inv.doh != null && l.inv.doh > LI.th.cover_days ? "up" : "")
+              : stat("Posted in BC", posted != null ? liPct(posted) : "–", posted != null && posted < -3 ? "up" : "")}</div>
+    <div class="al ${top ? top[0] : "good"}"><i></i><span>${top ? esc(top[1]) : "No exception"}</span>${n > 1 ? `<em>+${n - 1}</em>` : ""}</div>
+  </button>`;
 }
-function liDrawGrid(){
-  $("liGrid").innerHTML = [...LI.scope].sort((a, b) => (b.snet || 0) - (a.snet || 0)).map(l => { const c = liT(l, "cur"); return `<div class="li-card" data-loc="${esc(l.ref)}">
-    <div class="hd"><div class="ic" style="border-color:var(--${l.h === "h-ok" ? "down" : l.h === "h-mid" ? "warn" : l.h === "h-low" ? "up" : "line"})">${liGlyph(l.brand)}</div>
-      <div style="flex:1;min-width:0"><b>${esc(l.name)}</b><div class="meta">${esc(l.area)}</div></div><span class="li-score ${l.h}">${l.score ?? "–"}</span></div>
-    <div class="stats"><div>Simphony sales<b>${liFv(LI_KB.net, l.snet, l)}</b><span class="${l.lyD != null && l.lyD <= -LI.th.sales_drop ? "up" : "meta"}">${liPct(l.lyD)} vs ${LI.lyLab}</span></div>
-      <div>Checks<b>${c ? liN(c.checks) : "–"}</b><span class="meta">avg ${c && c.checks ? liN(c.net / c.checks) : "–"}</span></div>
-      <div>Food cost<b class="${l.fc != null && l.fc > LI.th.food_cost + 2 ? "warn" : ""}">${l.fc != null ? l.fc.toFixed(1) + "%" : "–"}</b><span class="meta">target ${LI.th.food_cost}%</span></div>
-      <div>Alerts<b class="${l.alerts.some(a => a[0] === "crit") ? "up" : ""}">${l.alerts.filter(a => a[0] !== "good").length}</b><span class="meta">${esc((l.alerts[0] || [])[1] || "")}</span></div></div></div>`; }).join("");
+function liDrawRest(){
+  const by = liSort;
+  const key = {net: l => -(l.snet || 0), ly: l => l.lyD ?? 1e9, score: l => l.score ?? 1e9, fc: l => -(l.fc ?? -1), name: l => 0,
+               alerts: l => (l.alerts[0] ? LI_ORDER[l.alerts[0][0]] * 100 : 400) - l.alerts.filter(a => a[0] !== "good").length}[by] || (l => 0);
+  const list = [...LI.scope].sort((a, b) => key(a) - key(b) || (by === "name" ? a.name.localeCompare(b.name) : (b.snet || 0) - (a.snet || 0)));
+  $("liRest").innerHTML = list.length ? list.map(liRestSquare).join("") : `<p class="meta">No restaurant of ${esc(LI.company)} sold in this period.</p>`;
+  const small = (title, arr, txt) => arr.length ? `<div class="meta" style="margin:14px 0 6px">${title}</div><div class="li-small">${arr.map(l => `<button class="li-ssq" data-loc="${esc(l.ref)}">
+      <span class="li-mini">${liGlyph(l.brand)}</span><span class="nm"><b>${esc(l.name)}</b><span>${txt(l)}</span></span></button>`).join("")}</div>` : "";
+  $("liOther").innerHTML =
+    small("Closed this period", LI.closed, l => l.sim ? `${LI.prevLab} ${liFv(LI_KB.net, l.sim.prev.net, l)}` : "no sales") +
+    small("Other companies", LI.others, l => `${esc(l.company || "?")}${l.sim ? " · " + liFv(LI_KB.net, l.sim.cur.net || l.sim.prev.net, l) : ""}`) +
+    small("In Simphony, not in the registry", LI.unreg, l => liFv(LI_KB.net, l.sim.cur.net, l));
 }
 
 // ---- restaurant popup
@@ -473,8 +477,6 @@ window.LocIntel = {
       movement: "/finance/#movement", fsales: "/finance/#fsales"}}, o || {});
     el.innerHTML = `<div class="li-wrap">${MARKUP}</div>`;
     bind();
-    $("liSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.v === liView));
-    $("liMapView").style.display = liView === "map" ? "" : "none"; $("liGrid").style.display = liView === "grid" ? "" : "none";
     if (liData && liKey === key()) liRender(); else { liData = null; loadLocations(false); }
   },
   refresh(){ if (host && host.isConnected) loadLocations(true); }
