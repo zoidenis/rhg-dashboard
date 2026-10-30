@@ -21,9 +21,12 @@ The e-invoice service (WSDL https://einvoice.tatime.gov.al/EinvoiceService-v1/Ei
 schema alimc-einvoice-service.xsd, namespace https://Einvoice.tatime.gov.al/EinvoiceService/schema):
 - GetEinvoicesRequest: Header(UUID, SendDateTime), PartyType BUYER|SELLER, RecDateTimeFrom/To (the
   date-time the platform received the invoice), or one EIC (then the signed PDF comes back).
-  The answer holds at most 100 Einvoice elements, each with the attributes EIC, FIC, DocNumber,
-  RecDateTime, DueDateTime, Status, Amount, BuyerTin, SellerTin, PartyType and the currency.
-  A period that returns 100 is split in two until every part returns fewer.
+  The service compares only the dates, with RecDateTimeTo excluded: 29 00:00 to 29 23:59 finds
+  nothing, 29 00:00 to 30 00:00 finds the 29th. So a window always ends at 00:00 of the next day.
+  Each Einvoice element carries the attributes EIC, FIC, DocNumber, RecDateTime, DueDateTime,
+  Status, Amount, BuyerTin, SellerTin, PartyType and the currency. A window of several days that
+  returns 100 or more is split by whole days (answers of 2,500 in one month were seen, so the
+  documented cap of 100 does not seem to apply).
 - GetTaxpayersRequest: Filter Tin or Name; Taxpayer Name, Tin, Address, Town, Country.
 The registering operations of the same service (RegisterEinvoice, EinvoiceChangeStatus) are refused.
 """
@@ -310,7 +313,10 @@ def parse_response(xml, field_map=""):
         for key, names in FIELDS.items():
             names = ([extra[key]] if key in extra else []) + names
             rec[key] = next((f[n] for n in names if f.get(n) not in (None, "")), None)
-        rec["eic"] = eic.lower()
+        # The key matched against BC is the FIC: BC keeps it as NIVF and the Self-Care book as
+        # "Numri Serial". The platform's own EIC never appears in BC; it is kept apart.
+        rec["einvoice_code"] = eic.lower()
+        rec["eic"] = (rec["fic"] or eic).lower()
         try:
             rec["total"] = float(str(rec["total"]).replace(",", ".")) if rec["total"] is not None else None
         except ValueError:
@@ -362,8 +368,8 @@ def _sample(xml):
 
 def get_einvoices(date_from, date_to, progress=None, party=None):
     """Every e-invoice received by the platform in the period, where we are the BUYER (default,
-    FISK_PARTY_TYPE) or the SELLER. A window that returns the maximum of 100 is split in two
-    until every part returns fewer."""
+    FISK_PARTY_TYPE) or the SELLER. A window of several days that returns 100 or more is split
+    by whole days, since the service ignores the time of day."""
     s = _settings()
     if party:
         s["party"] = party.upper()
@@ -375,10 +381,13 @@ def get_einvoices(date_from, date_to, progress=None, party=None):
     last_diag.clear()
     last_diag.update(calls=0, with_rows=0, party=s["party"], cert_nipt=(NIPT_RE.search(cert.subject.rfc4514_string()) or [""])[0])
 
-    def read(t0, t1):
+    def read(d0, d1):
+        """The days d0 to d1, both included: the request ends at 00:00 of the day after d1."""
         calls[0] += 1
         if calls[0] > 2000:
             raise CISError("Too many requests for one period; stopped.")
+        t0 = datetime.combine(d0, datetime.min.time())
+        t1 = datetime.combine(d1 + timedelta(days=1), datetime.min.time())
         answer = _call(build_request(t0, t1, s), s, s["action"], pk, cert)
         rows = parse_response(answer, s["field_map"])
         last_diag["calls"] = calls[0]
@@ -386,18 +395,17 @@ def get_einvoices(date_from, date_to, progress=None, party=None):
             last_diag["with_rows"] += 1
         elif "empty_answer" not in last_diag:
             last_diag["empty_answer"] = dict(_sample(answer), window=f"{t0.isoformat()} to {t1.isoformat()}")
-        if len(rows) >= MAX_PER_ANSWER and (t1 - t0) > timedelta(minutes=2):
-            mid = t0 + (t1 - t0) / 2
-            mid = mid.replace(microsecond=0)
-            read(t0, mid)
-            read(mid + timedelta(seconds=1), t1)
+        if len(rows) >= MAX_PER_ANSWER and d1 > d0:
+            mid = d0 + (d1 - d0) // 2
+            read(d0, mid)
+            read(mid + timedelta(days=1), d1)
             return
         for r in rows:
             found[r["eic"]] = r
     d = a
     while d <= b:
         e = min(b, d + timedelta(days=s["window_days"] - 1))
-        read(datetime.combine(d, datetime.min.time()), datetime.combine(e, datetime.max.time().replace(microsecond=0)))
+        read(d, e)
         if progress:
             progress(d, e, len(found))
         d = e + timedelta(days=1)
@@ -427,7 +435,8 @@ def probe(eic=None, party="BUYER", date_from=None, date_to=None):
     window = ""
     if date_from and date_to:
         a = datetime.combine(date.fromisoformat(str(date_from)[:10]), datetime.min.time())
-        b = datetime.combine(date.fromisoformat(str(date_to)[:10]), datetime.max.time().replace(microsecond=0))
+        # the service excludes the end date: end at 00:00 of the day after date_to
+        b = datetime.combine(date.fromisoformat(str(date_to)[:10]) + timedelta(days=1), datetime.min.time())
         parts += [f"<RecDateTimeFrom>{_dt(a)}</RecDateTimeFrom>", f"<RecDateTimeTo>{_dt(b)}</RecDateTimeTo>"]
         window = f"{_dt(a)} to {_dt(b)}"
     xml = f'<GetEinvoicesRequest xmlns="{NS}" Id="Request" Version="1">' + "".join(parts) + "</GetEinvoicesRequest>"
