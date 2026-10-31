@@ -821,10 +821,19 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-exceptions">
+    <div class="ov-tabs" id="exTabs" role="tablist"><button data-t="list" class="on" role="tab" aria-selected="true">Exceptions</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="exMain">
     <div class="card" style="margin-bottom:16px"><h2>Service-level exceptions</h2>
       <p class="hint">Rules applied to live BC records, using the thresholds in Settings. Each exception can be turned into a tracked action.</p>
       <div id="slaList"></div></div>
     <div class="card"><h2>Price and stock signals</h2><p class="hint">Movements worth a look that are not threshold breaches</p><div id="exList"></div></div>
+    </div>
+    <div id="exLocView" style="display:none">
+      <div class="pl-bar"><div><h2 style="margin:0">Exceptions by location</h2><p class="hint" style="margin:4px 0 0" id="exlNote">Every location as a square with the exceptions that concern it, for the period chosen above. An exception that names several locations counts at each. Click a location for its list.</p></div>
+        <label class="field" style="flex-direction:row;align-items:center;gap:6px">Order <select id="exlSort"><option value="severity">by severity</option><option value="count">by number</option><option value="impact">by impact</option><option value="untracked">by not tracked</option><option value="name">by code</option></select></label></div>
+      <div class="kpis five" id="exlTotals"></div>
+      <div id="exlGrid"></div>
+    </div>
   </section>
 
   <section class="view" id="v-feed">
@@ -855,6 +864,7 @@ td.num,th.num{text-align:right}
 </main>
 </div>
 
+<div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
 <div class="pl-bd" id="plBd"><div class="pl-pop" id="plPop" role="dialog" aria-modal="true"></div></div>
 <div class="modal-bg" id="modalBg">
   <div class="modal">
@@ -1542,7 +1552,8 @@ function renderSla(){
         ${e.document?`<button class="mini" data-sladrill="${i}">Supporting records</button>`:""}
         <button class="mini dark" data-slaaction="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
       </div></div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
-  document.querySelectorAll("[data-exopen]").forEach(b => b.onclick = () => openException(+b.dataset.exopen));
+  document.querySelectorAll("#slaList [data-exopen]").forEach(b => b.onclick = () => openException(+b.dataset.exopen));
+  if (exlTab === "loc") exlRender();
   document.querySelectorAll("[data-sladrill]").forEach(b => b.onclick = () => {
     const e = sla[+b.dataset.sladrill];
     const kind = e.drill ? e.drill.kind : (e.document_type==="Purchase Order" ? "po" : "document");
@@ -1558,6 +1569,119 @@ function renderSla(){
   });
 }
 
+// ---------- Exceptions → Location intelligence ----------
+// The exceptions of the period on screen, tied to the location they concern: every location as a square
+// (by severity, impact and whether an action tracks them), grouped like the overview's squares; a click
+// opens that location's list with the same buttons as the Exceptions tab.
+let exlTab = "list", exlSort = "severity";
+function exlShowTab(tab){
+  exlTab = tab;
+  document.querySelectorAll("#exTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("exMain").style.display = tab === "loc" ? "none" : "";
+  $("exLocView").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { plLoadNames(); exlRender(); }
+}
+document.querySelectorAll("#exTabs button").forEach(b => b.onclick = () => exlShowTab(b.dataset.t));
+$("exlSort").onchange = () => { exlSort = $("exlSort").value; exlRender(); };
+const EXL_NONE = "(no location)";
+const exlLocs = e => { const l = String(e.location || "").split(",").map(x => x.trim()).filter(Boolean); return l.length ? l : [EXL_NONE]; };
+function exlModel(){
+  const sla = (data && data.operations || {}).sla || [], tracked = new Set(data && data.action_keys || []);
+  const B = {};
+  sla.forEach((e, i) => exlLocs(e).forEach(loc => {
+    const x = B[loc] = B[loc] || {items: [], critical: 0, warning: 0, info: 0, impact: 0, untracked: 0, rules: {}, owners: {}};
+    x.items.push(i);
+    const sv = e.severity === "critical" || e.severity === "warning" ? e.severity : "info";
+    x[sv]++; x.impact += Math.abs(e.impact || 0);
+    if (!tracked.has(e.code)) x.untracked++;
+    x.rules[e.rule || "Other"] = (x.rules[e.rule || "Other"] || 0) + 1;
+    if (e.owner) x.owners[e.owner] = (x.owners[e.owner] || 0) + 1;
+  }));
+  return {sla, tracked, B};
+}
+function exlSquare(code, x){
+  const n = x.items.length, top = Object.entries(x.rules).sort((a, b) => b[1] - a[1]);
+  const first = (data.operations.sla[x.items.find(i => data.operations.sla[i].severity === "critical") ?? x.items[0]] || {});
+  const flag = x.critical ? ["crit", first.title || `${x.critical} critical`] : x.warning ? ["warn", first.title || `${x.warning} to review`] : ["info", first.title || "To look at"];
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const none = code === EXL_NONE, name = none ? "No location" : plName(code);
+  return `<div class="pl-sq" role="button" tabindex="0" data-exlloc="${esc(code)}" aria-label="${esc(name || code)}: ${n} exceptions">
+    <div class="hd"><div class="ic">${none ? PL_GLYPH.WH : plGlyph(code)}</div><div class="nm"><b>${esc(name || code)}</b><span>${esc(name && !none ? code : none ? "the exception names none" : "")}</span></div></div>
+    <div class="big"><span class="v ${x.critical ? "up" : ""}">${fmt(n)}</span><span class="cmp">exception${n === 1 ? "" : "s"} · ${x.critical ? `<b class="up">${x.critical} critical</b>` : "none critical"}${x.warning ? ` · ${x.warning} warning` : ""}</span></div>
+    <div class="st">${stat("Critical", fmt(x.critical), x.critical ? "up" : "")}${stat("Warning", fmt(x.warning), x.warning ? "warn" : "")}
+      ${stat("Impact", x.impact ? plM(x.impact) : "–", "", `${CUR}, where the rule measures one`)}${stat("Not tracked", fmt(x.untracked), x.untracked ? "up" : "", "With no action in the Action center")}</div>
+    <div class="sup" title="${esc(top.map(r => `${r[0]} ${r[1]}`).join(" · "))}">${top[0] ? `<b>${esc(top[0][0])}</b> ${top[0][1]}${top.length > 1 ? ` · +${top.length - 1} rule${top.length > 2 ? "s" : ""}` : ""}` : "&nbsp;"}</div>
+    <div class="al ${flag[0]}" title="${esc(flag[1])}"><i></i><span>${esc(flag[1])}</span></div>
+  </div>`;
+}
+function exlRender(){
+  if (exlTab !== "loc" || !$("exlGrid")) return;
+  if (!data) { $("exlGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const {sla, tracked, B} = exlModel(), codes = Object.keys(B);
+  const per = {week: "this week", month: "this month", ytd: "this year"}[data.meta.mode] || "this period";
+  $("exlNote").innerHTML = `Every location as a square with the exceptions that concern it, ${per}${data.meta.location ? ` — the Location filter shows <b>${esc(data.meta.location)}</b> only <button class="mini" id="exlClear">Show all locations</button>` : ""}. An exception that names several locations counts at each. Click a location for its list.`;
+  if ($("exlClear")) $("exlClear").onclick = () => { $("location").value = ""; load(true); };
+  const crit = sla.filter(e => e.severity === "critical").length, untr = sla.filter(e => !tracked.has(e.code)).length;
+  const withLoc = codes.filter(c => c !== EXL_NONE), worst = withLoc.sort((a, b) => B[b].critical - B[a].critical || B[b].items.length - B[a].items.length)[0];
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("exlTotals").innerHTML = k("Exceptions", fmt(sla.length), `${per} · ${withLoc.length} location${withLoc.length === 1 ? "" : "s"} concerned`) +
+    k("Critical", fmt(crit), "by the rules in Settings", crit ? "up" : "") +
+    k("Not tracked", fmt(untr), "no action in the Action center yet", untr ? "up" : "") +
+    k("Most exposed", worst ? esc(plName(worst) || worst) : "–", worst ? `${B[worst].items.length} exceptions · ${B[worst].critical} critical` : "") +
+    k("No location", fmt((B[EXL_NONE] || {items: []}).items.length), "exceptions that name no location");
+  const key = {severity: c => -(B[c].critical * 1e6 + B[c].warning * 1e3 + B[c].items.length), count: c => -B[c].items.length,
+    impact: c => -B[c].impact, untracked: c => -B[c].untracked, name: c => 0}[exlSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || a.localeCompare(b));
+  const groups = plGroups(codes.filter(c => c !== EXL_NONE));
+  if (B[EXL_NONE]) groups.push({t: "Not tied to a location", c: [EXL_NONE]});
+  $("exlGrid").innerHTML = codes.length ? groups.map(g => {
+    const n = g.c.reduce((a, c) => a + B[c].items.length, 0), cr = g.c.reduce((a, c) => a + B[c].critical, 0);
+    return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${n} exception${n === 1 ? "" : "s"}${cr ? ` · <b class="up">${cr} critical</b>` : ""}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(c => exlSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">No rule was breached in this period.</p>`;
+  if ($("exlBd").classList.contains("show") && $("exlPop").dataset.code) exlDraw($("exlPop").dataset.code);
+}
+function exlOpen(code){ $("exlPop").dataset.code = code; exlDraw(code); $("exlBd").classList.add("show"); }
+function exlDraw(code){
+  const {sla, tracked, B} = exlModel(), x = B[code];
+  const none = code === EXL_NONE, name = none ? "Exceptions with no location" : (plName(code) || code);
+  if (!x) { $("exlPop").innerHTML = `<div class="ph"><div><h2>${esc(name)}</h2></div><div class="sp"></div><button class="close" data-exlclose="1">Close ✕</button></div><div class="pl-body"><p class="hint">No exception left here in this period.</p></div>`; return; }
+  const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
+  const rules = Object.entries(x.rules).sort((a, b) => b[1] - a[1]), owners = Object.entries(x.owners).sort((a, b) => b[1] - a[1]);
+  const m = data.meta;
+  $("exlPop").innerHTML = `<div class="ph"><div class="ic">${none ? PL_GLYPH.WH : plGlyph(code)}</div><div><h2>${esc(name)}</h2><div class="sub">${esc(none ? "" : code + " · ")}${esc(m.company || "")} · ${esc(m.current ? m.current[0] + " → " + m.current[1] : "")}</div></div><div class="sp"></div>
+      ${none ? "" : `<button class="close" data-exlfilter="${esc(code)}" title="Set the Location filter of the tower to this location">Filter the tower ›</button>`}<button class="close" data-exlclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      <div class="pl-tiles">${tile("Exceptions", fmt(x.items.length), "concerning this location")}${tile("Critical", fmt(x.critical), "", x.critical ? "up" : "")}${tile("Impact", x.impact ? plM(x.impact) + " " + CUR : "–", "where the rule measures one")}${tile("Not tracked", fmt(x.untracked), "no action yet", x.untracked ? "up" : "")}</div>
+      <div class="pl-cols" style="margin-bottom:12px">
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">By rule</h3><table data-nosort>${rules.map(r => `<tr><td>${esc(r[0])}</td><td class="num"><b>${r[1]}</b></td></tr>`).join("")}</table></div>
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">By owner</h3><table data-nosort>${owners.length ? owners.map(r => `<tr><td>${esc(r[0])}</td><td class="num"><b>${r[1]}</b></td></tr>`).join("") : `<tr><td class="empty">No owner named by the rules</td></tr>`}</table></div>
+      </div>
+      <div class="pl-panel">${x.items.map(i => { const e = sla[i]; return `<div class="act">
+        <div class="row1"><h4><span class="sev ${esc(e.severity)}"></span>${esc(e.title)}</h4><span class="meta">${esc(e.rule)}</span></div>
+        <p class="hint" style="margin:6px 0">${esc(e.detail)}${String(e.location || "").includes(",") ? ` <span class="meta">(also ${esc(String(e.location).split(",").map(s => s.trim()).filter(s => s !== code).join(", "))})</span>` : ""}</p>
+        <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action || "")}${e.owner ? ` · <b>Owner:</b> ${esc(e.owner)}` : ""}${e.impact ? ` · <b>Impact:</b> ${sign(e.impact)} ${CUR}` : ""}</p>
+        <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="mini" data-exlopen="${i}">Open detail</button>
+          ${e.document ? `<button class="mini" data-exldrill="${i}">Supporting records</button>` : ""}
+          <button class="mini dark" data-exlaction="${i}" ${tracked.has(e.code) ? "disabled" : ""}>${tracked.has(e.code) ? "Already tracked" : "Create action"}</button>
+        </div></div>`; }).join("")}</div>
+    </div>`;
+}
+document.addEventListener("click", ev => {
+  const t = ev.target;
+  if (t.closest("[data-exlclose]") || t === $("exlBd")) { $("exlBd").classList.remove("show"); return; }
+  const f = t.closest("[data-exlfilter]"); if (f) { $("exlBd").classList.remove("show"); $("location").value = f.dataset.exlfilter; load(true); return; }
+  const o = t.closest("[data-exlopen]"); if (o) { $("exlBd").classList.remove("show"); openException(+o.dataset.exlopen); return; }
+  // the same records and actions as the Exceptions tab: its buttons do the work
+  const d = t.closest("[data-exldrill]"); if (d) { const b = document.querySelector(`#slaList [data-sladrill="${d.dataset.exldrill}"]`); if (b) b.click(); return; }
+  const a = t.closest("[data-exlaction]"); if (a) { $("exlBd").classList.remove("show"); const b = document.querySelector(`#slaList [data-slaaction="${a.dataset.exlaction}"]`); if (b) b.click(); return; }
+  const s = t.closest("[data-exlloc]"); if (s) exlOpen(s.dataset.exlloc);
+});
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && $("exlBd").classList.contains("show")) { $("exlBd").classList.remove("show"); return; }
+  if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.exlloc) { ev.preventDefault(); exlOpen(ev.target.dataset.exlloc); }
+});
 // ---------- action center ----------
 let actions = [], overdueOnly = false;
 async function createAction(payload){
