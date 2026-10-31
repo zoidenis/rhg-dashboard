@@ -26,18 +26,20 @@ ROLES = [("purchasing_coordinator", "Purchasing coordinator"),
          ("cost_controller", "Cost controller"),
          ("finance", "Finance · payables and receivables"),
          ("accounting", "Chief accountant · fiscal"),
+         ("inputer", "Inputer · invoice entry in BC"),
          ("operations", "Operations"),
          ("management", "Management")]
-# key, label, tower, To roles, Cc roles (the defaults; changed in Settings)
+# key, label, tower, To roles, Cc roles (the defaults; changed in Settings). The inputer, who enters
+# the invoices in BC, is in Cc of the two reports that list invoices missing or posted without a PO.
 REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
-            ["purchasing_coordinator"], ["purchasing_manager", "cost_controller"]),
+            ["purchasing_coordinator"], ["purchasing_manager", "cost_controller", "inputer"]),
            ("purchasing_weekly", "Purchasing report · weekly", "Purchasing",
             ["purchasing_manager", "purchasing_coordinator"], ["cost_controller"]),
            ("savings_monthly", "Price savings · monthly", "Purchasing",
             ["purchasing_manager", "purchasing_coordinator"], ["cost_controller"]),
            ("arap_daily", "Payables and receivables exceptions · daily", "Finance", ["finance"], ["accounting"]),
            ("cost_weekly", "Cost control · weekly", "Finance", ["cost_controller"], ["purchasing_manager"]),
-           ("fiscal_daily", "Fiscal invoices against BC · daily", "Finance", ["accounting"], ["finance"]),
+           ("fiscal_daily", "Fiscal invoices against BC · daily", "Finance", ["accounting"], ["finance", "inputer"]),
            ("brand_performance", "Brand performance · weekly and monthly", "Finance",
             [], ["finance", "operations"])]
 ROLE_KEYS = {k for k, _ in ROLES}
