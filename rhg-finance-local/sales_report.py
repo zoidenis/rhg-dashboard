@@ -165,8 +165,16 @@ def category_highlight(C):
         return None
     g = sorted(rows, key=lambda x: _pct(x[2]["ex"], x[4]["ex"]))
     lo, hi = g[0], g[-1]
-    return ("info", f"Categories against last year: {hi[1]} {_p(_pct(hi[2]['ex'], hi[4]['ex']))} "
-                    f"(best), {lo[1]} {_p(_pct(lo[2]['ex'], lo[4]['ex']))} (weakest).")
+    text = (f"Categories against last year: {hi[1]} {_p(_pct(hi[2]['ex'], hi[4]['ex']))} "
+            f"(best), {lo[1]} {_p(_pct(lo[2]['ex'], lo[4]['ex']))} (weakest).")
+    # subcategories worth a line: at least 5% of this week's sales
+    tot = sum(x[2]["ex"] for x in category_rows(C) if x[2]["ex"] > 0) or 0
+    fam = [x for x in category_rows(C, True) if x[0] == 1 and x[4]["ex"] and tot and x[2]["ex"] >= tot * .05]
+    if len(fam) >= 2:
+        f = sorted(fam, key=lambda x: _pct(x[2]["ex"], x[4]["ex"]))
+        text += (f" Subcategories: {f[-1][1]} {_p(_pct(f[-1][2]['ex'], f[-1][4]['ex']))} (best), "
+                 f"{f[0][1]} {_p(_pct(f[0][2]['ex'], f[0][4]['ex']))} (weakest).")
+    return ("info", text)
 
 
 def render_categories(C, title, note, families=False, brands=None):
@@ -205,7 +213,7 @@ def render_categories(C, title, note, families=False, brands=None):
     hs = "".join(f"<th style='{thn if n else th}'>{e(h)}</th>" for h, n in head)
     rows = body(C, families)
     for name, Cb in brands or []:
-        rows += body(Cb, False, name)
+        rows += body(Cb, True, name)
     if not rows:
         return ""
     return (f"<h3 style='font-size:14px;color:{ink};margin:22px 0 4px'>{e(title)}</h3>"
@@ -217,7 +225,7 @@ def render_categories(C, title, note, families=False, brands=None):
 def category_note(r):
     per = category_periods(date.fromisoformat(r["period"]["from"]), date.fromisoformat(r["period"]["to"]))
     f = lambda p: f"{p[0]:%d %b} – {p[1]:%d %b %Y}"
-    return html.escape(f"Simphony major groups, sales excluding VAT. Last year = {f(per['ly'])}; "
+    return html.escape(f"Categories = Simphony major groups, subcategories = family groups (a combo meal counts in the family group of the combo item); sales excluding VAT. Last year = {f(per['ly'])}; "
                        f"month before = the same weekdays four weeks earlier, {f(per['m1'])}. Each day's menu item sales "
                        f"are scaled to that day's sales, so the categories add up to the total.")
 
@@ -382,7 +390,7 @@ def render_all(r):
 <h3 style="font-size:14px;color:{ink};margin:22px 0 4px">By brand and restaurant</h3>
 <div style="font-size:12px;color:{muted};margin-bottom:6px">Sales excluding VAT from Simphony; budget = the G/L budget of the restaurant's department for these days; month to date from {e(r['mtd_from'])}.</div>
 {table}{other}
-{render_categories(r.get("cats") or {}, "Categories", category_note(r) + " By brand below.", brands=r.get("cats_brands")) if (r.get("cats") or {}).get("cur") else ""}
+{render_categories(r.get("cats") or {}, "Categories", category_note(r) + " By brand below, with the subcategories (family groups) of each category.", brands=r.get("cats_brands")) if (r.get("cats") or {}).get("cur") else ""}
 {f"<p style='margin:20px 0 0'><a href='{e(public)}/finance/#sales' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>Open Sales in the Finance tower</a></p>" if public else ''}
 <p style="color:{muted};font-size:11px;margin:22px 0 0;border-top:1px solid {line};padding-top:12px">Sent every week by RHG Control Towers from Simphony and Business Central; nothing was changed there. Recipients are in Finance → Settings → Email recipients by company ("Sales against last year and budget"); the day and time in Sales weekly email.</p>
 </td></tr></table></td></tr></table></body></html>"""
@@ -423,7 +431,7 @@ class Reporter:
     @staticmethod
     def render_location(r):
         C = r.get("cats") or {}
-        extra = render_categories(C, "Categories", category_note(r) + " Family groups under each category.", families=True) if C.get("cur") else ""
+        extra = render_categories(C, "Categories", category_note(r), families=True) if C.get("cur") else ""
         body, text = brand_report.render(r, extra)
         return body.replace("Recipients and schedule are in Finance → Settings → Brand performance email.",
                             "Sent every week to the people of this restaurant in Finance → Settings → Email recipients "
