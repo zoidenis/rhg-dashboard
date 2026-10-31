@@ -37,6 +37,10 @@ PERMISSIONS = {
     "purchasing.settings.manage": "Change purchasing thresholds",
     "purchasing.export":          "Export purchasing data",
 
+    # --- Layout of the towers (drag and drop, hiding sections)
+    "layout.personal":       "Rearrange and hide sections for yourself",
+    "layout.roles.manage":   "Set the sections each role sees, and their order",
+
     # --- Platform
     "admin.users.manage":    "Create, edit and disable accounts",
     "admin.roles.manage":    "Change what roles are allowed to do",
@@ -59,12 +63,12 @@ DEFAULT_ROLES = {
     },
     "CFO": {
         "description": "Both towers in full, closing sign-off and thresholds; cannot manage accounts.",
-        "permissions": _FINANCE_ALL + _PURCHASING_READ + ["admin.audit.view"],
+        "permissions": _FINANCE_ALL + _PURCHASING_READ + ["admin.audit.view", "layout.personal"],
         "system": False,
     },
     "Finance director": {
         "description": "Finance in full, including closing and thresholds.",
-        "permissions": _FINANCE_ALL,
+        "permissions": _FINANCE_ALL + ["layout.personal"],
         "system": False,
     },
     "Chief accountant": {
@@ -80,7 +84,7 @@ DEFAULT_ROLES = {
     },
     "Purchasing director": {
         "description": "Purchasing in full, including thresholds.",
-        "permissions": _PURCHASING_ALL,
+        "permissions": _PURCHASING_ALL + ["layout.personal"],
         "system": False,
     },
     "Buyer": {

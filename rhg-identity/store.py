@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS audit (
   detail    TEXT,
   ip        TEXT
 );
+-- Layout of a tower: the order of its sections and the ones hidden. scope "role" (owner = role
+-- name) is what a role sees; scope "user" (owner = username) is one person's own arrangement.
+CREATE TABLE IF NOT EXISTS layouts (
+  app         TEXT NOT NULL,
+  scope       TEXT NOT NULL,
+  owner       TEXT NOT NULL,
+  data        TEXT NOT NULL,     -- JSON
+  updated_at  TEXT,
+  updated_by  TEXT,
+  PRIMARY KEY (app, scope, owner)
+);
 CREATE INDEX IF NOT EXISTS ix_sessions_user ON sessions(username);
 CREATE INDEX IF NOT EXISTS ix_audit_at ON audit(at);
 """
@@ -83,6 +94,13 @@ def _seed_roles(conn):
             conn.execute("INSERT INTO roles(name,description,permissions,system) VALUES(?,?,?,?)",
                          (name, spec["description"], json.dumps(spec["permissions"]),
                           1 if spec["system"] else 0))
+    # A system role (Administrator) holds every permission, including ones added to the
+    # catalogue after it was stored.
+    for r in conn.execute("SELECT name, permissions FROM roles WHERE system=1").fetchall():
+        held = json.loads(r["permissions"] or "[]")
+        missing = [p for p in permissions.PERMISSIONS if p not in held]
+        if missing:
+            conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + missing), r["name"]))
 
 
 def now():

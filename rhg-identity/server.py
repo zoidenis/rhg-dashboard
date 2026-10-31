@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 import auth
 import config
+import layouts
 import permissions
 import store
 
@@ -152,6 +153,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"users": auth.list_users(),
                                  "roles": [dict(r) for r in store.q("SELECT * FROM roles ORDER BY name")],
                                  "permissions": permissions.PERMISSIONS})
+            elif url.path == "/api/layout":
+                # The towers' layout (order and hidden sections) for the signed-in person.
+                qs = parse_qs(url.query)
+                app = (qs.get("app") or [""])[0]
+                if app not in layouts.APPS:
+                    self._send(400, {"error": "Unknown tower."}); return
+                self._send(200, layouts.view(user, app, (qs.get("role") or [""])[0] or None))
             elif url.path == "/api/roles":
                 if not auth.can(user, "admin.roles.manage"):
                     self._send(403, {"error": "Your role cannot manage roles."}); return
@@ -247,6 +255,9 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     updated, err = auth.update_user(target, body, user["username"], ip)
                     self._send(200 if updated else 400, updated or {"error": err})
+            elif url.path == "/api/layout":
+                status, answer = layouts.save(user, body, ip)
+                self._send(status, answer)
             elif url.path == "/api/roles":
                 if not auth.can(user, "admin.roles.manage"):
                     self._send(403, {"error": "Your role cannot manage roles."}); return

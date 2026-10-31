@@ -62,6 +62,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "select.js": "application/javascript; charset=utf-8",
                 "select.css": "text/css; charset=utf-8",
                 "tables.js": "application/javascript; charset=utf-8",
+                "layout.js": "application/javascript; charset=utf-8",
                 "recipients.js": "application/javascript; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
