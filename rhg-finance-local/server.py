@@ -1439,6 +1439,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, consolidation_screen(q.get("period"), q.get("mode", "month")))
             elif url.path == "/api/drill":
                 self._send(200, drill(q.get("kind", "pl"), q.get("key", "")))
+            elif url.path == "/api/recipients/locations":
+                try:
+                    locs = client.locations(q.get("company") or config.BC_COMPANY)
+                except Exception as exc:                         # noqa: BLE001
+                    self._send(200, {"locations": [], "error": str(exc)[:200]})
+                    return
+                self._send(200, {"locations": sorted(set(locs))})
             elif url.path == "/api/recipients":
                 d = recipients.directory(max_age=0)
                 try:

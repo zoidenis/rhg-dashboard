@@ -262,7 +262,7 @@ def render_email(d, recipients, test=False):
             + kpi("New since the last notice", str(len(d["new"])), f"{_money(d['new_value'])} {d['currency']}")
             + kpi("Earlier, still open", str(len(d["still"])), f"{_money(d['still_value'])} {d['currency']}, "
                                                                 f"not closed yet")
-            + kpi(f"Last {d['window_days']} days", f"{w['rate']:.1f}%",
+            + kpi(f"{d['company_name'] + ' · ' if d.get('location') else ''}Last {d['window_days']} days", f"{w['rate']:.1f}%",
                   f"{w['breaches']} of {w['invoices']} posted invoices had no order")
             + "</tr></table>")
     new_block = (table(d["new"]) if d["new"] else
@@ -441,7 +441,17 @@ class Notifier:
                     html_body, text_body = render_email(d, rec, test=test)
                     send_mail(rec["to"], rec["cc"], _subject(d, test), html_body, text_body)
                     entry.update(status="sent", detail=_subject(d, test))
-                if not test and entry["status"] in ("sent", "skipped") and rec["to"]:
+                # each location with its own people (Settings → Email recipients by company) gets the
+                # invoices of that location only
+                loc_sent = []
+                if not only_to:
+                    for loc, to, cc in recipients_dir.location_targets("purchasing_daily", company):
+                        res = self._send_location(company, loc, d, to, cc, s, test)
+                        loc_sent.append(res)
+                    if loc_sent:
+                        entry["locations"] = loc_sent
+                if not test and ((entry["status"] in ("sent", "skipped") and rec["to"])
+                                 or any(x["status"] == "sent" for x in loc_sent)):
                     self._mark_reported(company, d)
             except Exception as exc:                             # noqa: BLE001
                 traceback.print_exc()
@@ -453,6 +463,25 @@ class Notifier:
             print(f"[{datetime.now():%H:%M:%S}] notice {RULE} {company}: {entry['status']} "
                   f"{entry.get('detail', '')}")
             return entry
+
+    @staticmethod
+    def _send_location(company, loc, d, to, cc, s, test):
+        new = [r for r in d["new"] if (r.get("location") or "") == loc]
+        still = [r for r in d["still"] if (r.get("location") or "") == loc]
+        d2 = dict(d, company=f"{company} · {loc}", company_name=company, location=loc, new=new, still=still,
+                  new_value=sum(r["unlinked_value"] for r in new), still_value=sum(r["unlinked_value"] for r in still))
+        res = {"location": loc, "to": to, "cc": cc, "new": len(new), "still": len(still)}
+        try:
+            if not new and not still and not s.get("send_empty") and not test:
+                res["status"] = "skipped"
+            else:
+                html_body, text_body = render_email(d2, {"to": to, "cc": cc, "roles": [f"the {loc} contacts"]}, test=test)
+                send_mail(to, cc, _subject(d2, test), html_body, text_body)
+                res["status"] = "sent"
+        except Exception as exc:                                 # noqa: BLE001
+            traceback.print_exc()
+            res.update(status="failed", detail=str(exc)[:200])
+        return res
 
     def _mark_reported(self, company, d):
         with _state_lock:

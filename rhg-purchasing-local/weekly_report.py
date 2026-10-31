@@ -66,14 +66,15 @@ def last_week(today=None):
 
 
 # ---------------------------------------------------------------- the figures
-def build(company, read_dashboard, client, currency, today=None):
-    """read_dashboard(company, week_start_iso) -> the Purchasing dashboard payload of that week."""
+def build(company, read_dashboard, client, currency, today=None, location=None):
+    """read_dashboard(company, week_start_iso[, location]) -> the Purchasing dashboard payload of that week.
+    With a location, every part is that location's only (its own email, Settings → Email recipients)."""
     today = today or date.today()
     a, b = last_week(today)
     s = store.get_settings()
     th = s["thresholds"]
     errors = []
-    data = read_dashboard(company, a.isoformat())
+    data = read_dashboard(company, a.isoformat(), location) if location else read_dashboard(company, a.isoformat())
     k = data.get("kpis") or {}
     ops = data.get("operations") or {}
     meta = data.get("meta") or {}
@@ -82,6 +83,8 @@ def build(company, read_dashboard, client, currency, today=None):
     po_rows = []
     try:
         po_rows = client.purchase_order_list(company)
+        if location:
+            po_rows = [r for r in po_rows if (r.get("Location_Code") or "") == location]
     except Exception as exc:                                       # noqa: BLE001
         errors.append(f"Purchase orders: {str(exc)[:200]}")
     pos = operations.purchase_orders(po_rows, s, today)
@@ -126,7 +129,7 @@ def build(company, read_dashboard, client, currency, today=None):
         if errs:
             errors.append("Savings: " + "; ".join(errs)[:200])
         for key, (x, y) in (("week", (a, b)), ("month", (m_from, b))):
-            r = savings.report(client, company, x, y)
+            r = savings.report(client, company, x, y, location=location or "")
             both = [i for i in r["items"] if i["status"] == "both" and i["effect"] is not None]
             sv[key] = {"from": x.isoformat(), "to": y.isoformat(), "summary": r["summary"],
                        "extra": sorted([i for i in both if i["effect"] > 0], key=lambda i: -i["effect"])[:200],
@@ -191,7 +194,8 @@ def build(company, read_dashboard, client, currency, today=None):
                              f"with no owner in the Action center."))
 
     return {
-        "company": company, "currency": currency, "week": {"from": a.isoformat(), "to": b.isoformat()},
+        "company": company, "location": location or "", "label": f"{company} · {location}" if location else company,
+        "currency": currency, "week": {"from": a.isoformat(), "to": b.isoformat()},
         "prior": {"from": (meta.get("prior") or [None, None])[0], "to": (meta.get("prior") or [None, None])[1]},
         "built_at": datetime.now().isoformat(timespec="seconds"), "errors": errors,
         "kpis": k, "actions": acts,
@@ -216,7 +220,7 @@ def _period(r):
 
 def subject(r, test=False):
     n = len(r["not_received"])
-    return (("[Test] " if test else "") + f"[RHG Purchasing] {r['company']} · Weekly report {_period(r)} · "
+    return (("[Test] " if test else "") + f"[RHG Purchasing] {r.get('label') or r['company']} · Weekly report {_period(r)} · "
             f"{n} open order{'s' if n != 1 else ''} not received")
 
 
@@ -345,7 +349,7 @@ def render_email(r):
 <tr><td style="background:{navy};color:#fff;padding:18px 22px;border-radius:12px 12px 0 0">
 <div style="font-size:11px;letter-spacing:.12em;color:#a0d8ea">REVO HOSPITALITY GROUP · RHG PURCHASING</div>
 <div style="font-size:20px;font-weight:700;margin-top:4px">Weekly purchasing report</div>
-<div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(r['company'])} · {e(_period(r))} · against {e(r['prior']['from'] or '')} → {e(r['prior']['to'] or '')} · open orders as of {e(r['built_at'][:10])}</div></td></tr>
+<div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(r.get('label') or r['company'])} · {e(_period(r))} · against {e(r['prior']['from'] or '')} → {e(r['prior']['to'] or '')} · open orders as of {e(r['built_at'][:10])}</div></td></tr>
 <tr><td style="background:#fff;padding:22px;border-radius:0 0 12px 12px">
 {errs}{kpis}
 {h3("What needs action this week")}{actions}
@@ -374,7 +378,7 @@ def render_email(r):
 {button}
 <p style="color:{muted};font-size:11px;margin:24px 0 0;border-top:1px solid {line};padding-top:12px">Sent every week by RHG Control Towers from Business Central; nothing was changed there. Recipients and the day are in Purchasing → Settings → Email notifications.</p>
 </td></tr></table></td></tr></table></body></html>"""
-    text = (f"RHG Purchasing · Weekly report · {r['company']} · {_period(r)}\n\n"
+    text = (f"RHG Purchasing · Weekly report · {r.get('label') or r['company']} · {_period(r)}\n\n"
             + "\n".join(f"- {t}" for _, t in r["actions"])
             + f"\n\nOpen orders not received: {len(nr)} ({_m(sum(x['amount'] for x in nr))} {C})"
             + f"\nReceived, not invoiced: {len(r['to_invoice'])}"
@@ -498,11 +502,11 @@ def send(r, to=None, cc=None, actor="scheduler", test=False):
     if not to:
         raise RuntimeError("No Purchasing Manager, Coordinator or weekly report address is set in Settings → Email notifications.")
     body, text = render_email(r)
-    stem = f"RHG_{r['company'].replace(' ', '_')}_purchasing_week_{r['week']['from']}"
+    stem = f"RHG_{(r.get('label') or r['company']).replace(' · ', '_').replace(' ', '_')}_purchasing_week_{r['week']['from']}"
     notify.send_mail(to, cc or [], subject(r, test), body, text,
                      [(f"{stem}.xlsx", "application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                        render_xlsx(r))])
-    entry = {"ts": datetime.now().isoformat(timespec="seconds"), "actor": actor, "company": r["company"],
+    entry = {"ts": datetime.now().isoformat(timespec="seconds"), "actor": actor, "company": r.get("label") or r["company"],
              "week": r["week"], "to": to, "cc": cc or [], "status": "sent", "test": test,
              "detail": f"{len(r['not_received'])} orders not received · {len(r['actions'])} points"}
     _log(entry)
@@ -599,6 +603,16 @@ class Weekly:
                 ok = False
                 _log({"ts": datetime.now().isoformat(timespec="seconds"), "actor": "scheduler", "company": company,
                       "status": "failed", "detail": str(exc)[:300], "week": {"from": week}})
+            # the locations with their own people get the report of their location only
+            for loc, to, cc in recipients_dir.location_targets("purchasing_weekly", company):
+                try:
+                    send(build(company, self.read, self.client, self.currency_of(company), location=loc), to=to, cc=cc)
+                except Exception as exc:                            # noqa: BLE001
+                    traceback.print_exc()
+                    ok = False
+                    _log({"ts": datetime.now().isoformat(timespec="seconds"), "actor": "scheduler",
+                          "company": f"{company} · {loc}", "status": "failed", "detail": str(exc)[:300],
+                          "week": {"from": week}})
         with _state_lock:
             s = _state()
             if ok:

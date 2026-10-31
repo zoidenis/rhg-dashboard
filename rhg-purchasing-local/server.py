@@ -690,7 +690,7 @@ def nopo_window(company, date_from, date_to):
 
 
 notifier = notify.Notifier(nopo_window, config.BC_COMPANY)
-weekly = weekly_report.Weekly(lambda company, week: _dashboard_build(company, week, "", "week"), client,
+weekly = weekly_report.Weekly(lambda company, week, location="": _dashboard_build(company, week, location or "", "week"), client,
                               lambda: notifier.companies(), company_currency)
 
 
@@ -1336,6 +1336,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"audit": store.get_audit()})
             elif url.path == "/api/companies":
                 self._send(200, {"companies": client.list_companies(), "default": config.BC_COMPANY})
+            elif url.path == "/api/recipients/locations":
+                try:
+                    locs = [x["code"] for x in client.locations(q.get("company") or config.BC_COMPANY)]
+                except Exception as exc:                         # noqa: BLE001
+                    self._send(200, {"locations": [], "error": str(exc)[:200]})
+                    return
+                self._send(200, {"locations": sorted(set(locs))})
             elif url.path == "/api/recipients":
                 try:
                     companies = client.list_companies()

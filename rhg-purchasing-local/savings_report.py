@@ -393,7 +393,7 @@ def render_email(r, currency, note=""):
 def subject(r, test=False):
     s = r["summary"]
     word = "net saving" if s["net"] <= 0 else "net extra spending"
-    return (("[Test] " if test else "") + f"[RHG Purchasing] {r.get('company')} · Price savings "
+    return (("[Test] " if test else "") + f"[RHG Purchasing] {r.get('company')}{' · ' + r['filters']['location'] if (r.get('filters') or {}).get('location') else ''} · Price savings "
             f"{r['period']['from']} to {r['period']['to']} · {word} {_m(abs(s['net']))}")
 
 
@@ -514,6 +514,18 @@ class Monthly:
                 r["company"] = company
                 send(r, self.currency_of(company), actor="scheduler",
                      note=("Some months could not be read: " + "; ".join(errors)) if errors else "")
+                # the locations with their own people get the savings of their location only
+                for loc, to, cc in recipients_dir.location_targets("savings_monthly", company):
+                    try:
+                        rl = savings.report(self.client, company, a, b, location=loc)
+                        rl["company"] = company
+                        send(rl, self.currency_of(company), to=to, cc=cc, actor="scheduler")
+                    except Exception as exc:                       # noqa: BLE001
+                        traceback.print_exc()
+                        ok = False
+                        _log({"ts": datetime.now().isoformat(timespec="seconds"), "actor": "scheduler",
+                              "company": f"{company} · {loc}", "status": "failed", "detail": str(exc)[:300],
+                              "period": {"from": a.isoformat(), "to": b.isoformat()}})
             except Exception as exc:                               # noqa: BLE001
                 traceback.print_exc()
                 ok = False

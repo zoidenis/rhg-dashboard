@@ -75,11 +75,48 @@ def _wait(fn, what):
 
 
 # ---------------------------------------------------------------- the figures
-def build(company, client, stock_summary, currency, today=None):
+def _mv_at(mv, loc):
+    """Movement & dead stock of one location: the same read, its lines only, totals of its own."""
+    rows = [r for r in mv.get("_rows") or [] if r[0] == loc]
+    L = next((x for x in mv.get("locations") or [] if x["location"] == loc), None)
+    classes = list((mv["totals"].get("classes") or {}).keys())
+    rnc = [r for r in rows if r[14]]
+    neg = [r for r in rows if r[2] < 0]
+    return dict(mv, _rows=rows, _typo=[x for x in mv.get("_typo") or [] if x[0] == loc],
+                locations=[L] if L else [], adjustments=[x for x in mv.get("adjustments") or [] if x.get("location") == loc],
+                aging={loc: (mv.get("aging") or {}).get(loc, {})},
+                totals={"items": len(rows), "value": round(sum(r[3] for r in rows if r[2] > 0), 0),
+                        "classes": {c: (L[c] if L else [0, 0.0]) for c in classes},
+                        "received_not_used": [len(rnc), round(sum(r[3] for r in rnc), 0)],
+                        "negative": [len(neg), round(sum(r[3] for r in neg), 0)]})
+
+
+def build(company, client, stock_summary, currency, today=None, location=None, parts=None):
+    """The report of a company, or with location, of one of its locations: movement & dead stock and
+    typology & turnover of that location only (the G/L, recipes and item cards are company-wide, so they
+    stay in the company email). parts: the reads of a company report already built, reused."""
     today = today or date.today()
     a, b = last_week(today)
     settings = store.get_settings()
-    errors, parts = [], {}
+    errors = []
+    if parts is not None:
+        ss, mv, rc, errors = parts["ss"], parts["mv"], parts["rc"], list(parts["errors"])
+        if location:
+            ss, rc = None, None
+            mv = _mv_at(mv, location) if mv else None
+        ty = None
+        if mv:
+            try:
+                m = recipes.master_cached(company) or {}
+                ty = typology.analyse(mv, m.get("items") or {}, settings)
+            except Exception as exc:                               # noqa: BLE001
+                traceback.print_exc()
+                errors.append(f"Typology & turnover: {str(exc)[:200]}")
+        return _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, location, parts)
+    return _read_and_assemble(company, client, stock_summary, currency, a, b, settings, errors, location)
+
+
+def _read_and_assemble(company, client, stock_summary, currency, a, b, settings, errors, location):
 
     # ---- the stock position against the G/L, at the end of last week's month
     ss = None
@@ -104,6 +141,9 @@ def build(company, client, stock_summary, currency, today=None):
         rc = _wait(lambda: recipes.request(client, company, a.isoformat(), b.isoformat()), "Recipe integrity")
     except Exception as exc:                                       # noqa: BLE001
         errors.append(str(exc)[:200])
+    parts = {"ss": ss, "mv": mv, "rc": rc, "errors": list(errors)}
+    if location:
+        return build(company, client, stock_summary, currency, b + timedelta(days=7), location, parts)
     if mv:
         try:
             m = recipes.master_cached(company) or {}
@@ -111,7 +151,10 @@ def build(company, client, stock_summary, currency, today=None):
         except Exception as exc:                                   # noqa: BLE001
             traceback.print_exc()
             errors.append(f"Typology & turnover: {str(exc)[:200]}")
+    return _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, None, parts)
 
+
+def _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, location, parts):
     H = {}                                       # the headline numbers, kept for next week's comparison
     acts = []
 
@@ -262,9 +305,11 @@ def build(company, client, stock_summary, currency, today=None):
 
     rank = {"crit": 0, "warn": 1, "info": 2}
     acts.sort(key=lambda x: (rank[x["sev"]], -(x["value"] or 0)))
+    key = f"{company}|{location}" if location else company
     with _state_lock:
-        prev = (_read_state().get("last") or {}).get(company)
-    return {"company": company, "currency": currency, "week": {"from": a.isoformat(), "to": b.isoformat()},
+        prev = (_read_state().get("last") or {}).get(key)
+    return {"company": company, "location": location or "", "label": f"{company} · {location}" if location else company,
+            "key": key, "_parts": parts, "currency": currency, "week": {"from": a.isoformat(), "to": b.isoformat()},
             "built_at": datetime.now().isoformat(timespec="seconds"), "errors": errors,
             "headline": H, "previous": prev, "actions": acts,
             "inventory": inv, "movement": mvx, "typology": tyx, "recipes": rcx, "item_master": imx}
@@ -274,7 +319,7 @@ def build(company, client, stock_summary, currency, today=None):
 def subject(r, test=False):
     crit = sum(1 for x in r["actions"] if x["sev"] == "crit")
     a, b = date.fromisoformat(r["week"]["from"]), date.fromisoformat(r["week"]["to"])
-    return (("[Test] " if test else "") + f"[RHG Finance] {r['company']} · Cost control {a:%d %b} – {b:%d %b %Y} · "
+    return (("[Test] " if test else "") + f"[RHG Finance] {r.get('label') or r['company']} · Cost control {a:%d %b} – {b:%d %b %Y} · "
             f"{len(r['actions'])} actions, {crit} critical")
 
 
@@ -326,11 +371,15 @@ def render(r, public_url=""):
              red if H.get("doh") and H.get("target") and H["doh"] > 2 * H["target"] else ink, delta("above_target")),
         tile("Fresh lines to count", f"{H.get('count_lines', 0):,}", "cover beyond the count limit", amber if H.get("count_lines") else ink,
              delta("count_lines", money=False)),
+        tile("Recipe coverage", "company-wide", "recipes and item cards are in the company email", ink)
+        if r.get("location") else
         tile("Recipe coverage", f"{H['coverage']:.0f}%" if H.get("coverage") is not None else "–",
              f"{H.get('missing', 0)} missing · {H.get('incomplete', 0)} incomplete, items sold last week" if rc else "",
              red if (H.get("coverage") or 100) < 90 else ink, delta("coverage", bad_up=False, money=False)),
         tile("Item master, critical", f"{H.get('im_critical', 0):,}", "blocked in use, no BOM, units", red if H.get("im_critical") else ink,
              delta("im_critical", money=False))]
+    if r.get("location"):
+        tiles2 = tiles2[:3]
     tiles = ("<table role='presentation' cellspacing='6' cellpadding='0' style='width:100%;margin:0 -6px'><tr>" + "".join(tiles1)
              + "</tr><tr>" + "".join(tiles2) + "</tr></table>")
     dot = {"crit": red, "warn": amber, "info": primary}
@@ -408,7 +457,7 @@ def render(r, public_url=""):
 <tr><td style="background:{navy};color:#fff;padding:18px 22px;border-radius:12px 12px 0 0">
 <div style="font-size:11px;letter-spacing:.12em;color:#a0d8ea">REVO HOSPITALITY GROUP · RHG FINANCE</div>
 <div style="font-size:20px;font-weight:700;margin-top:4px">Weekly cost control report</div>
-<div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(r['company'])} · week {a:%d %b} – {b:%d %b %Y} · stock as of {e(mv.get('as_of') or b.isoformat())}{' · against the report of ' + e(r['previous']['week']['to']) if r.get('previous') else ''}</div></td></tr>
+<div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(r.get('label') or r['company'])} · week {a:%d %b} – {b:%d %b %Y} · stock as of {e(mv.get('as_of') or b.isoformat())}{' · against the report of ' + e(r['previous']['week']['to']) if r.get('previous') else ''}</div></td></tr>
 <tr><td style="background:#fff;padding:20px 22px;border-radius:0 0 12px 12px">
 {errs}
 <h3 style="font-size:14px;color:{ink};margin:0 0 6px">Highlights</h3>{tiles}
@@ -418,7 +467,7 @@ def render(r, public_url=""):
 {f"<p style='margin:20px 0 0'><a href='{e(public_url)}/finance/#inventory' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>Open Inventory in the Finance tower</a></p>" if public_url else ''}
 <p style="color:{muted};font-size:11px;margin:22px 0 0;border-top:1px solid {line};padding-top:12px">Sent every week by RHG Control Towers from Business Central; nothing was changed there. Recipients and the day are in Finance → Settings → Cost control weekly email.</p>
 </td></tr></table></td></tr></table></body></html>"""
-    text = (f"RHG Finance · Weekly cost control report · {r['company']} · {a:%d %b} – {b:%d %b %Y}\n\nAction list:\n"
+    text = (f"RHG Finance · Weekly cost control report · {r.get('label') or r['company']} · {a:%d %b} – {b:%d %b %Y}\n\nAction list:\n"
             + "\n".join(f"- [{pr[x['sev']]}] {x['area']}: {x['text']} ({x['owner']})" for x in r["actions"])
             + "\n\nThe attached Excel file holds every line.")
     return body, text
@@ -548,21 +597,24 @@ class Reporter:
         cc, bad2 = arap_notify.parse_emails(s.get("cc"))
         return {"to": to, "cc": [c for c in cc if c not in to], "invalid": bad + bad2}
 
-    def build(self, company):
-        return build(company, self.client, self.stock_summary, self.currency_of(company))
+    def build(self, company, location=None, parts=None):
+        return build(company, self.client, self.stock_summary, self.currency_of(company), location=location, parts=parts)
 
-    def send(self, company, r=None, only_to=None, actor="scheduler", test=False):
-        entry = {"ts": datetime.now().isoformat(timespec="seconds"), "company": company, "actor": actor, "test": test}
+    def send(self, company, r=None, only_to=None, actor="scheduler", test=False, location=None, to=None, cc=None):
+        entry = {"ts": datetime.now().isoformat(timespec="seconds"), "company": f"{company} · {location}" if location else company,
+                 "actor": actor, "test": test}
         try:
             rec = {"to": only_to, "cc": []} if only_to else self.recipients()
-            if not only_to:                  # the company's people (Settings → Email recipients by company)
+            if location and not only_to:     # a location's own people
+                rec = {"to": to or [], "cc": cc or []}
+            elif not only_to:                # the company's people (Settings → Email recipients by company)
                 rec = recipients.resolve("cost_weekly", [company], rec["to"], rec["cc"])
             if not rec["to"]:
                 raise RuntimeError("No recipient is set in Settings → Cost control weekly email.")
-            r = r or self.build(company)
+            r = r or self.build(company, location)
             public = (config.PUBLIC_URL or "").rstrip("/")
             body, text = render(r, public)
-            name = f"RHG_{company.replace(' ', '_')}_cost_control_week_{r['week']['from']}.xlsx"
+            name = f"RHG_{r['label'].replace(' · ', '_').replace(' ', '_')}_cost_control_week_{r['week']['from']}.xlsx"
             arap_notify.send_mail(rec["to"], rec["cc"], subject(r, test), body, text,
                                   [(name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", render_xlsx(r))])
             entry.update(status="sent", to=rec["to"], cc=rec["cc"], week=r["week"],
@@ -570,7 +622,7 @@ class Reporter:
             if not test:
                 with _state_lock:
                     s = _read_state()
-                    s.setdefault("last", {})[company] = {"week": r["week"], "headline": r["headline"]}
+                    s.setdefault("last", {})[r["key"]] = {"week": r["week"], "headline": r["headline"]}
                     _write_state(s)
         except Exception as exc:                                   # noqa: BLE001
             traceback.print_exc()
@@ -662,7 +714,22 @@ class Reporter:
 
     def run(self, week):
         with _run_lock:
-            results = [self.send(c) for c in self.companies()]
+            results = []
+            for c in self.companies():
+                r = None
+                try:
+                    r = self.build(c)
+                except Exception:                                  # noqa: BLE001
+                    traceback.print_exc()
+                results.append(self.send(c, r))
+                # the locations with their own people get the movement and typology of their location
+                for loc, to, cc in recipients.location_targets("cost_weekly", c):
+                    try:
+                        rl = self.build(c, loc, r["_parts"]) if r else None
+                    except Exception:                              # noqa: BLE001
+                        traceback.print_exc()
+                        rl = None
+                    results.append(self.send(c, rl, location=loc, to=to, cc=cc))
             with _state_lock:
                 st = _read_state()
                 if all(x["status"] == "sent" for x in results):

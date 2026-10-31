@@ -5,6 +5,7 @@ For every company, the people in each role (finance, chief accountant, cost cont
 plus a row for the whole group added to every company; each report goes to the roles set for it. When a
 company has nobody in the roles of a report, the report keeps the addresses of its own Settings card.
 If Purchasing cannot be reached, the last directory read is used, else the general addresses.
+People set for a location get, for the reports cut by location, an email of their location only.
 """
 import re
 import threading
@@ -98,3 +99,26 @@ def resolve(report, companies, general_to=(), general_cc=(), promote_cc=True):
         general_to, general_cc = list(general_to or []), list(general_cc or [])
         return {"to": general_to, "cc": [x for x in general_cc if x not in general_to], "source": "general"}
     return resolve_in(d, report, companies, general_to, general_cc, promote_cc)
+
+
+def location_targets_in(d, report, company):
+    """[(location, to, cc)]: the locations of a company that have people in the roles of a report, for
+    the reports cut by location. Nobody in To: the first Cc moves up. Same function in Finance."""
+    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly"}:
+        return []
+    route = (d.get("routing") or {}).get(report) or {"to": [], "cc": []}
+    locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).strip().upper() == str(company or "").strip().upper()), {})
+    out = []
+    for loc, row in sorted(locs.items()):
+        to = list(dict.fromkeys(e for r in route.get("to") or [] for e in parse(row.get(r, ""))[0]))
+        cc = list(dict.fromkeys(e for r in route.get("cc") or [] for e in parse(row.get(r, ""))[0]))
+        if not to:
+            to, cc = cc[:1], cc[1:]
+        if to:
+            out.append((loc, to, [x for x in cc if x not in to]))
+    return out
+
+
+def location_targets(report, company):
+    d = directory()
+    return location_targets_in(d, report, company) if d else []

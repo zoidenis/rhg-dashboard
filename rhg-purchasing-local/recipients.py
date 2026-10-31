@@ -8,6 +8,10 @@ saves through the same path.
 
 When a company has nobody in the roles of a report, the report keeps the addresses set in its own
 Settings, as before the directory existed. When it has people in Cc only, the general To stays.
+
+People can also be set for a location of a company (a restaurant, the warehouse). The reports that
+can be cut by location (LOCATION_REPORTS) then send each such location its own email with only that
+location's figures, to the location's people in the same roles; the company email is unchanged.
 """
 import json
 import re
@@ -27,6 +31,7 @@ ROLES = [("purchasing_coordinator", "Purchasing coordinator"),
          ("finance", "Finance · payables and receivables"),
          ("accounting", "Chief accountant · fiscal"),
          ("inputer", "Inputer · invoice entry in BC"),
+         ("stock_manager", "Stock manager"),
          ("operations", "Operations"),
          ("management", "Management")]
 # key, label, tower, To roles, Cc roles (the defaults; changed in Settings). The inputer, who enters
@@ -34,14 +39,16 @@ ROLES = [("purchasing_coordinator", "Purchasing coordinator"),
 REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
             ["purchasing_coordinator"], ["purchasing_manager", "cost_controller", "inputer"]),
            ("purchasing_weekly", "Purchasing report · weekly", "Purchasing",
-            ["purchasing_manager", "purchasing_coordinator"], ["cost_controller"]),
+            ["purchasing_manager", "purchasing_coordinator"], ["cost_controller", "stock_manager"]),
            ("savings_monthly", "Price savings · monthly", "Purchasing",
             ["purchasing_manager", "purchasing_coordinator"], ["cost_controller"]),
            ("arap_daily", "Payables and receivables exceptions · daily", "Finance", ["finance"], ["accounting"]),
-           ("cost_weekly", "Cost control · weekly", "Finance", ["cost_controller"], ["purchasing_manager"]),
+           ("cost_weekly", "Cost control · weekly", "Finance", ["cost_controller"], ["purchasing_manager", "stock_manager"]),
            ("fiscal_daily", "Fiscal invoices against BC · daily", "Finance", ["accounting"], ["finance", "inputer"]),
            ("brand_performance", "Brand performance · weekly and monthly", "Finance",
             [], ["finance", "operations"])]
+# the reports that also go out location by location, with that location's figures only
+LOCATION_REPORTS = {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly"}
 ROLE_KEYS = {k for k, _ in ROLES}
 REPORT_KEYS = {r[0] for r in REPORTS}
 
@@ -62,6 +69,7 @@ def load():
         except (OSError, ValueError):
             d = {}
     d.setdefault("people", {})
+    d.setdefault("locations", {})
     routing = d.get("routing") or {}
     d["routing"] = {k: {"to": list((routing.get(k) or {}).get("to", to)), "cc": list((routing.get(k) or {}).get("cc", cc))}
                     for k, _, _, to, cc in REPORTS}
@@ -71,31 +79,44 @@ def load():
 def public():
     """The directory and what it means, for both towers' screens and for Finance's reports."""
     d = load()
-    return {"people": d["people"], "routing": d["routing"], "group": GROUP,
+    return {"people": d["people"], "locations": d["locations"], "routing": d["routing"], "group": GROUP,
             "roles": [{"key": k, "label": label} for k, label in ROLES],
-            "reports": [{"key": k, "label": label, "tower": tower, "default": {"to": to, "cc": cc}}
+            "reports": [{"key": k, "label": label, "tower": tower, "default": {"to": to, "cc": cc},
+                         "by_location": k in LOCATION_REPORTS}
                         for k, label, tower, to, cc in REPORTS],
             "updated_at": d.get("updated_at"), "updated_by": d.get("updated_by")}
 
 
 def save(patch, actor):
-    """patch: {"people": {company: {role: "emails"}}, "routing": {report: {"to": [roles], "cc": [roles]}}}.
-    Raises ValueError on an address that is not one."""
-    people, bad = {}, []
-    for company, roles in (patch.get("people") or {}).items():
-        company = str(company).strip()[:80]
-        if not company or not isinstance(roles, dict):
-            continue
+    """patch: {"people": {company: {role: "emails"}}, "locations": {company: {location: {role: "emails"}}},
+    "routing": {report: {"to": [roles], "cc": [roles]}}}. Raises ValueError on an address that is not one."""
+    bad = []
+
+    def roles_of(roles):
         row = {}
-        for role, text in roles.items():
+        for role, text in (roles if isinstance(roles, dict) else {}).items():
             if role not in ROLE_KEYS:
                 continue
             good, wrong = parse(str(text or "")[:600])
-            bad += wrong
+            bad.extend(wrong)
             if good:
                 row[role] = ", ".join(dict.fromkeys(good))
+        return row
+    people, locations = {}, {}
+    for company, roles in (patch.get("people") or {}).items():
+        company = str(company).strip()[:80]
+        row = roles_of(roles) if company else {}
         if row:
             people[company] = row
+    for company, locs in (patch.get("locations") or {}).items():
+        company = str(company).strip()[:80]
+        if not company or company == GROUP or not isinstance(locs, dict):
+            continue
+        for loc, roles in locs.items():
+            loc = str(loc).strip()[:40]
+            row = roles_of(roles) if loc else {}
+            if row:
+                locations.setdefault(company, {})[loc] = row
     if bad:
         raise ValueError("Not an email address: " + ", ".join(bad[:8]))
     routing = {}
@@ -108,15 +129,15 @@ def save(patch, actor):
         c = [x for x in dict.fromkeys(r.get("cc") or []) if x in ROLE_KEYS and x not in t]
         routing[k] = {"to": t, "cc": c}
     before = load()
-    d = {"people": people, "routing": routing, "updated_at": datetime.now().isoformat(timespec="seconds"),
+    d = {"people": people, "locations": locations, "routing": routing, "updated_at": datetime.now().isoformat(timespec="seconds"),
          "updated_by": actor}
     with _lock:
         tmp = FILE.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
         tmp.replace(FILE)
     store.audit("settings", "email recipients by company", actor,
-                {"people": before.get("people"), "routing": before.get("routing")},
-                {"people": people, "routing": routing})
+                {"people": before.get("people"), "locations": before.get("locations"), "routing": before.get("routing")},
+                {"people": people, "locations": locations, "routing": routing})
     return public()
 
 
@@ -144,3 +165,25 @@ def resolve_in(d, report, companies, general_to=(), general_cc=(), promote_cc=Tr
 
 def resolve(report, companies, general_to=(), general_cc=(), promote_cc=True):
     return resolve_in(load(), report, companies, general_to, general_cc, promote_cc)
+
+
+def location_targets_in(d, report, company):
+    """[(location, to, cc)]: the locations of a company that have people in the roles of a report, for
+    the reports cut by location. Nobody in To: the first Cc moves up. Same function in Finance."""
+    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly"}:
+        return []
+    route = (d.get("routing") or {}).get(report) or {"to": [], "cc": []}
+    locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).strip().upper() == str(company or "").strip().upper()), {})
+    out = []
+    for loc, row in sorted(locs.items()):
+        to = list(dict.fromkeys(e for r in route.get("to") or [] for e in parse(row.get(r, ""))[0]))
+        cc = list(dict.fromkeys(e for r in route.get("cc") or [] for e in parse(row.get(r, ""))[0]))
+        if not to:
+            to, cc = cc[:1], cc[1:]
+        if to:
+            out.append((loc, to, [x for x in cc if x not in to]))
+    return out
+
+
+def location_targets(report, company):
+    return location_targets_in(load(), report, company)
