@@ -2948,7 +2948,7 @@ function flDraw(code){
   const vcell = (a, z, k) => { const v = flVar(a, z); if (v == null) return `<td class="num meta">–</td>`; const bad = costUp(k) ? v > 0 : v < 0;
     return `<td class="num ${Math.abs(v) < 0.5 ? "" : bad ? "fl-bad" : "fl-good"}">${flPct(v)}</td>`; };
   const lines = [["sales", "Sales"], ["food", "Food & beverage cost"], ["labor", "Labour"], ["prime", "Prime cost"], ["opex", "Other costs"], ["ebitda", "EBITDA"]];
-  const plTable = p.cur ? `<table class="fl-tab"><tr><th></th><th class="num">${esc(flMonS(mon))}</th><th class="num">% sales</th><th class="num">Last year</th><th class="num">vs LY</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">YTD</th><th class="num">YTD LY</th><th class="num">YTD budget</th></tr>` +
+  const plTable = p.cur ? `<table class="fl-tab" data-nosort><tr><th></th><th class="num">${esc(flMonS(mon))}</th><th class="num">% sales</th><th class="num">Last year</th><th class="num">vs LY</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">YTD</th><th class="num">YTD LY</th><th class="num">YTD budget</th></tr>` +
     lines.map(([k, l]) => `<tr${k === "ebitda" || k === "prime" ? ` style="font-weight:700"` : ""}><td>${l}</td><td class="num ${k === "ebitda" && c[k] < 0 ? "fl-bad" : ""}">${flM(c[k])}</td><td class="num meta">${k === "sales" ? "100%" : c[k + "_pct"] != null ? fmt(c[k + "_pct"], 1) + "%" : "–"}</td>
       <td class="num meta">${flM(ly[k])}</td>${vcell(c[k], ly[k], k)}<td class="num meta">${b ? flM(b[k]) : "–"}</td>${b ? vcell(c[k], b[k], k) : `<td class="num meta">–</td>`}
       <td class="num">${flM(y[k])}</td><td class="num meta">${flM(yly[k])}</td><td class="num meta">${yb ? flM(yb[k]) : "–"}</td></tr>`).join("") + `</table>`
@@ -3032,5 +3032,6 @@ document.addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.flloc != null) { e.preventDefault(); flOpen(e.target.dataset.flloc); }
 });
 </script>
+<script src="tables.js"></script>
 </body>
 </html>
