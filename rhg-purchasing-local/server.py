@@ -30,6 +30,7 @@ import executive
 import notify
 import savings
 import savings_report
+import weekly_report
 import contracts
 import comparisons
 import config
@@ -687,6 +688,8 @@ def nopo_window(company, date_from, date_to):
 
 
 notifier = notify.Notifier(nopo_window, config.BC_COMPANY)
+weekly = weekly_report.Weekly(lambda company, week: _dashboard_build(company, week, "", "week"), client,
+                              lambda: notifier.companies(), company_currency)
 
 
 _streams_cache = {}
@@ -1071,7 +1074,7 @@ def drill(kind, key):
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
                      "/api/notify/test": "settings", "/api/notify/smtp": "settings",
-                     "/api/savings/send": "export",
+                     "/api/savings/send": "export", "/api/weekly/job": "settings",
                      "/api/users": "users", "/api/password": "view"}
 
 
@@ -1297,6 +1300,23 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200 if job else 404, job or {
                         "error": "Email test not found. The server may have restarted. "
                                  "Check email history and your inbox before sending again."})
+            elif url.path == "/api/weekly/status":
+                to, cc = weekly_report.recipients()
+                self._send(200, {"next_run": weekly_report.next_run(), "runs": weekly_report.recent_runs(),
+                                 "to": to, "cc": cc, "companies": notifier.companies(),
+                                 "week": [d.isoformat() for d in weekly_report.last_week()]})
+            elif url.path in ("/api/weekly/job", "/api/weekly/preview"):
+                job = weekly.job(q.get("id") or "", user["username"])
+                if not job:
+                    self._send(404, {"error": "This report is no longer held; build it again."})
+                elif url.path == "/api/weekly/job":
+                    self._send(200, {k: v for k, v in job.items() if k != "html"})
+                elif job.get("html"):
+                    self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
+                else:
+                    msg = "Still reading Business Central…" if job["status"] == "running" else html.escape(job.get("detail") or "")
+                    self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='4'><p style='font-family:sans-serif;"
+                                     f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/api/notify/preview":
                 try:
                     body = notifier.preview(q.get("company") or notifier.companies()[0])
@@ -1443,6 +1463,16 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as exc:                        # noqa: BLE001
                     traceback.print_exc()
                     self._send(502, {"error": str(exc)[:300]})
+            elif url.path == "/api/weekly/job":
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                to, bad = notify.parse_emails(body.get("to") or "")
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)[:120]})
+                    return
+                company = body.get("company") or notifier.companies()[0]
+                self._send(202, weekly.start_job(company, actor, to or None))
             elif url.path == "/api/notify/smtp":
                 if self.headers.get("X-Requested-With") != "RHG-Purchasing":
                     self._send(403, {"error": "This request must come from Purchasing."})
@@ -1533,6 +1563,7 @@ def main():
     threading.Thread(target=_warm_loop, daemon=True).start()
     notifier.start()
     savings_report.Monthly(client, lambda: notifier.companies(), company_currency).start()
+    weekly.start()
     smtp = notify.smtp_info()
     print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]
                                else "mail server not configured in Settings"))

@@ -239,6 +239,7 @@ td.num,th.num{text-align:right}
 .pl-ex{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
 @media (max-width:1000px){.pl-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pl-cols{grid-template-columns:minmax(0,1fr)}.pl-span2{grid-column:auto}}
 @media (max-width:600px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.wk-box{border-top:1px solid var(--line);margin:12px 0;padding-top:12px}
 </style>
 <!-- brand layer last, so the Revo tokens override the built-in defaults -->
 <link rel="stylesheet" href="/brand.css">
@@ -769,6 +770,24 @@ td.num,th.num{text-align:right}
         <input type="checkbox" id="ntEmpty" style="width:auto"> Send the email even when there is nothing to report</label>
       <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:10px">
         <input type="checkbox" id="ntSavings" style="width:auto"> <b>Send the Price savings report for last month</b> on the first working day of each month, at the same time, to the Purchasing Manager and Coordinator (Cost Controller in Cc), with the PDF and Excel file</label>
+      <div class="wk-box">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <input type="checkbox" id="wkOn" style="width:auto"> <b>Send the weekly purchasing report</b> every
+          <select id="wkDay" style="width:auto;min-width:120px"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select>
+          at the time above, for the week before (Monday to Sunday)</label>
+        <p class="hint" style="margin:0 0 10px">To the Purchasing Manager and Coordinator (Cost Controller in Cc) and the addresses below, with an Excel file of every line: what needs action, open purchase orders with nothing received yet (oldest first, by location), orders received but not invoiced, price changes against the week before, contract price coverage and items paid above the agreed price, savings and extra costs against last year (the week and the month to date), the same item dearer at another location, spend by location, supplier concentration and the critical exceptions with no owner. One email per company above.</p>
+        <div class="formgrid">
+          <label class="field">Also send to (comma separated)<input id="wkTo" placeholder="buyer@rhg.al, other@rhg.al"></label>
+          <label class="field">Send a test to<input id="wkTestTo" placeholder="you@rhg.al"></label>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button class="btn" id="wkPreview">Preview the weekly report</button>
+          <button class="btn" id="wkTest">Send a test</button>
+          <span class="meta" id="wkMsg"></span>
+        </div>
+        <p class="meta" id="wkNext" style="margin-top:8px"></p>
+        <div class="scroll" style="margin-top:6px"><table id="wkRuns"></table></div>
+      </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <button class="btn dark" id="ntSave">Save notifications</button>
         <button class="btn" id="ntPreview">Preview the email</button>
@@ -1757,7 +1776,7 @@ async function pollNotifyTest(id){
 async function loadNotify(){
   try{
     const j = await notifyRequest("/api/notify/status");
-    ntStatus = j; renderNotify();
+    ntStatus = j; renderNotify(); loadWeekly();
     if(j.test && ["queued","running"].includes(j.test.status)) trackNotifyTest(j.test);
   }catch(e){ $("ntMsg").textContent = "Could not read the notification settings: " + e.message; }
 }
@@ -1798,6 +1817,8 @@ function renderNotify(){
   $("ntCompanies").placeholder = (j.companies || []).join(", ") || "SALT";
   $("ntDays").value = n.lookback_days || 30;
   $("ntWorkdays").checked = !!n.working_days_only; $("ntEmpty").checked = !!n.send_empty; $("ntSavings").checked = !!n.savings_monthly;
+  $("wkOn").checked = !!n.weekly_report; $("wkDay").value = String(n.weekly_day ?? "0"); $("wkTo").value = n.weekly_to || "";
+  if(!$("wkTestTo").value) $("wkTestTo").value = j.me || "";
   if(!$("ntTestTo").value) $("ntTestTo").value = j.me || "";
   renderNotifySummary();
   const runs = j.runs || [];
@@ -1830,7 +1851,8 @@ $("ntSmtpSave").onclick = async () => {
 function notifyPatch(){
   return {enabled: $("ntEnabled").checked, coordinator: $("ntCoord").value, manager: $("ntMgr").value,
     cost_controller: $("ntCost").value, time: $("ntTime").value || "08:00", companies: $("ntCompanies").value,
-    lookback_days: $("ntDays").value || 30, working_days_only: $("ntWorkdays").checked, send_empty: $("ntEmpty").checked, savings_monthly: $("ntSavings").checked};
+    lookback_days: $("ntDays").value || 30, working_days_only: $("ntWorkdays").checked, send_empty: $("ntEmpty").checked, savings_monthly: $("ntSavings").checked,
+    weekly_report: $("wkOn").checked, weekly_day: $("wkDay").value, weekly_to: $("wkTo").value};
 }
 $("ntSave").onclick = async () => {
   $("ntMsg").textContent = "Saving…";
@@ -3051,6 +3073,53 @@ setInterval(() => {
   openFromHash();
   load(true);
 })();
+
+// ---------- weekly purchasing report ----------
+let wkJob = null, wkTimer = null;
+async function loadWeekly(){
+  try{
+    const j = await notifyRequest("/api/weekly/status");
+    const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+    $("wkNext").textContent = (j.next_run ? `Next weekly report: ${j.next_run.replace("T", " ")}` : "The weekly report is off.")
+      + ` · To: ${(j.to || []).join(", ") || "nobody yet (Manager, Coordinator or the addresses above)"}${(j.cc || []).length ? " · Cc: " + j.cc.join(", ") : ""}`
+      + ` · Companies: ${(j.companies || []).join(", ")} · The last report covers ${j.week[0]} to ${j.week[1]}.`;
+    const runs = j.runs || [];
+    $("wkRuns").innerHTML = `<tr><th>When</th><th>Company</th><th>Week</th><th>Sent to</th><th>Result</th></tr>` +
+      (runs.length ? runs.slice(0, 12).map(x => `<tr><td class="meta">${esc((x.ts || "").replace("T", " "))}${x.test ? ' <span class="chip">test</span>' : ""}</td>
+        <td>${esc(x.company || "")}</td><td class="meta">${esc((x.week || {}).from || "")}${(x.week || {}).to ? " → " + esc(x.week.to) : ""}</td>
+        <td class="meta">${esc((x.to || []).concat(x.cc || []).join(", "))}</td>
+        <td><span class="rhg-pill ${x.status === "sent" ? "ok" : x.status === "failed" ? "critical" : "info"}">${esc(x.status || "")}</span><div class="meta">${esc(x.detail || "")}</div></td></tr>`).join("")
+        : `<tr><td colspan="5" class="empty">No weekly report sent yet.</td></tr>`);
+    ["wkPreview", "wkTest"].forEach(id => { $(id).disabled = !can("settings") || !!wkJob; if (!can("settings")) $(id).title = "Your role cannot change Settings."; });
+  }catch(e){ $("wkMsg").textContent = "Could not read the weekly report: " + e.message; }
+}
+async function startWeekly(to, win){
+  const c = ($("ntCompanies").value.split(",")[0] || "").trim() || $("company").value;
+  $("wkMsg").textContent = "Reading last week from Business Central… a minute or two the first time.";
+  try{
+    const job = await notifyRequest("/api/weekly/job", {method: "POST",
+      headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Purchasing"}, body: JSON.stringify({company: c, to})});
+    wkJob = job; ["wkPreview", "wkTest"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/weekly/preview?id=" + encodeURIComponent(job.id);
+    pollWeekly();
+  }catch(e){ $("wkMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollWeekly(){
+  clearTimeout(wkTimer);
+  if (!wkJob) return;
+  try{
+    const j = await notifyRequest("/api/weekly/job?id=" + encodeURIComponent(wkJob.id));
+    if (j.status === "running") { wkTimer = setTimeout(pollWeekly, 4000); return; }
+    $("wkMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || "");
+  }catch(e){ $("wkMsg").textContent = "Lost track of the report: " + e.message; }
+  wkJob = null; loadWeekly();
+}
+$("wkPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the weekly report…</p>"); startWeekly("", w); };
+$("wkTest").onclick = () => {
+  const to = $("wkTestTo").value.trim();
+  if (!to) { $("wkMsg").textContent = "Enter an address for the test."; return; }
+  startWeekly(to, null);
+};
 </script>
 <script src="tables.js"></script>
 </body>

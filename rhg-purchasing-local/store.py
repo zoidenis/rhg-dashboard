@@ -65,7 +65,10 @@ DEFAULT_SETTINGS = {
                       "coordinator": "", "manager": "", "cost_controller": "",
                       "lookback_days": 30, "working_days_only": False, "send_empty": False,
                       # Price savings report for the month before, on the first working day
-                      "savings_monthly": False},
+                      "savings_monthly": False,
+                      # Weekly purchasing report for the week before: on/off, the day (0 = Monday) at the
+                      # same time, and addresses added to the Manager and Coordinator
+                      "weekly_report": False, "weekly_day": "0", "weekly_to": ""},
     "exclude_weekends": True,
     "updated_at": None,
 }
