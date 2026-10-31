@@ -107,6 +107,10 @@ DEFAULT_SETTINGS = {
     # weekly sales email (Monday by default): every restaurant against last year and budget, to the group's
     # people (Email recipients -> "Sales against last year and budget") and one filtered email per location
     "sales_report": {"enabled": False, "day": "0", "time": "08:00", "to": "", "cc": ""},
+    # monthly P&L memo of the month before, on the day set (20th), moved to Monday from a weekend; people from
+    # Email recipients ("P&L memo · monthly"); note = a comment from Finance for the next memo only
+    "pl_memo": {"enabled": False, "day": "20", "time": "09:00", "working_day": True, "to": "", "cc": "",
+                "companies": "", "note": ""},
     # fiscalized purchase invoices (Tax Administration / Self-Care) against BC: daily read and email
     "fiscal": {"enabled": False, "to": "", "cc": "", "time": "07:30", "working_days_only": True,
                "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False,
@@ -164,6 +168,7 @@ def get_settings():
     merged["cost_report"].update(s.get("cost_report", {}))
     merged["brand_report"].update(s.get("brand_report", {}))
     merged["sales_report"].update(s.get("sales_report", {}))
+    merged["pl_memo"].update(s.get("pl_memo", {}))
     merged["fiscal"].update(s.get("fiscal", {}))
     merged["locations"].update(s.get("locations", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
@@ -243,6 +248,22 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("sales_report", {})[k] = v
+        for k, v in (patch.get("pl_memo") or {}).items():
+            if k in DEFAULT_SETTINGS["pl_memo"]:
+                if isinstance(DEFAULT_SETTINGS["pl_memo"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "09:00"
+                elif k == "day":
+                    try:
+                        v = str(max(1, min(28, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "20"
+                elif k == "note":
+                    v = str(v)[:3000]
+                else:
+                    v = str(v)[:400]
+                current.setdefault("pl_memo", {})[k] = v
         for k, v in (patch.get("fiscal") or {}).items():
             if k in DEFAULT_SETTINGS["fiscal"]:
                 if isinstance(DEFAULT_SETTINGS["fiscal"][k], bool):

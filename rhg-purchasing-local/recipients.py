@@ -55,9 +55,10 @@ REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
            ("brand_performance", "Brand performance · weekly and monthly", "Finance",
             [], ["finance", "operations"]),
            ("sales_weekly", "Sales against last year and budget · weekly", "Finance",
-            ["unit_manager", "operations"], ["head_chef", "executive_chef", "coo", "cfo", "ceo", "others"])]
+            ["unit_manager", "operations"], ["head_chef", "executive_chef", "coo", "cfo", "ceo", "others"]),
+           ("pl_monthly", "P&L memo · monthly", "Finance", ["cfo", "ceo"], ["coo", "finance", "accounting", "management"])]
 # the reports that also go out location by location, with that location's figures only
-LOCATION_REPORTS = {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly"}
+LOCATION_REPORTS = {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly", "pl_monthly"}
 ROLE_KEYS = {k for k, _ in ROLES}
 REPORT_KEYS = {r[0] for r in REPORTS}
 
@@ -179,7 +180,7 @@ def resolve(report, companies, general_to=(), general_cc=(), promote_cc=True):
 def location_targets_in(d, report, company):
     """[(location, to, cc)]: the locations of a company that have people in the roles of a report, for
     the reports cut by location. Nobody in To: the first Cc moves up. Same function in Finance."""
-    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly"}:
+    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly", "pl_monthly"}:
         return []
     route = (d.get("routing") or {}).get(report) or {"to": [], "cc": []}
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).strip().upper() == str(company or "").strip().upper()), {})

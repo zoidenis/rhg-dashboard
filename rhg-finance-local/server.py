@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 import arap_notify
 import brand_report
 import sales_report
+import pl_memo
 import cashloc
 import kartloc
 import faloc
@@ -67,6 +68,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
+                     "/api/pl-memo/settings": "settings", "/api/pl-memo/job": "settings",
                      "/api/recipients": "settings",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
@@ -1130,6 +1132,22 @@ def restaurants_by_company():
 salesrep = sales_report.Reporter(client, _latest, in_parallel_jobs, company_currency)
 
 
+plmemo = pl_memo.Reporter(client, company_currency)
+
+
+def pl_memo_status():
+    s = pl_memo.settings()
+    try:
+        cos = client.companies()
+    except Exception:                                               # noqa: BLE001
+        cos = []
+    m = pl_memo.report_month()
+    return {"settings": s, "next_run": plmemo.next_run(), "runs": pl_memo.recent_runs(), "mail": arap_notify.mail_status(),
+            "month": m, "companies": pl_memo.companies(s), "all_companies": cos,
+            "plan": [{"companies": c, "to": to, "cc": cc} for c, to, cc in plmemo.plan()],
+            "locations": [{"company": c, "dept": d, "name": n, "to": to, "cc": cc} for c, d, n, to, cc in plmemo.location_plan()]}
+
+
 def sales_report_status():
     to, cc, source = salesrep.group_recipients()
     reg = sales_report.registry()
@@ -1332,6 +1350,21 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, brand_report_status())
             elif url.path == "/api/sales-report":
                 self._send(200, sales_report_status())
+            elif url.path == "/api/pl-memo":
+                self._send(200, pl_memo_status())
+            elif url.path in ("/api/pl-memo/job", "/api/pl-memo/preview"):
+                job = plmemo.job(q.get("id") or "", user["username"])
+                if not job:
+                    self._send(404, {"error": "This memo is no longer held; build it again."})
+                elif url.path.endswith("/job"):
+                    self._send(200, {k: v for k, v in job.items() if k != "html"})
+                elif job.get("html"):
+                    self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
+                else:
+                    msg = ("Reading the P&L of every company from Business Central… the first read can take several minutes."
+                           if job["status"] == "running" else html.escape(job.get("detail") or ""))
+                    self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
+                                     f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
             elif url.path in ("/api/sales-report/job", "/api/sales-report/preview"):
                 job = salesrep.job(q.get("id") or "", user["username"])
                 if not job:
@@ -1676,6 +1709,32 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, {"error": str(exc)[:300]})
                     return
                 self._send(200, dict(d, companies=client.companies(), tower="Finance", restaurants=restaurants_by_company()))
+            elif url.path in ("/api/pl-memo/settings", "/api/pl-memo/job"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    bad = arap_notify.parse_emails(body.get("to"))[1] + arap_notify.parse_emails(body.get("cc"))[1]
+                    if bad:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                        return
+                    store.save_settings({"pl_memo": body}, actor)
+                    self._send(200, pl_memo_status())
+                    return
+                only, bad = arap_notify.parse_emails(body.get("to"))
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                target = str(body.get("target") or "all").strip()
+                ok_targets = {"all"} | set(pl_memo.companies()) | {f"{c}|{d}" for c, d, _, _, _ in plmemo.location_plan()}
+                try:
+                    ok_targets |= set(client.companies())
+                except Exception:                                   # noqa: BLE001
+                    pass
+                if target not in ok_targets:
+                    self._send(400, {"error": "Choose all companies, one company or a restaurant with its own people."})
+                    return
+                self._send(202, plmemo.start_job(target, actor, only or None))
             elif url.path in ("/api/sales-report/settings", "/api/sales-report/job"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -1867,6 +1926,7 @@ def main():
     costrep.start()
     brandrep.start()
     salesrep.start()
+    plmemo.start()
     fiscal.start_scheduler(client, config.FISK_COMPANY)
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://{host}:{config.APP_PORT}")).start()

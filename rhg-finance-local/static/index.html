@@ -1009,6 +1009,38 @@ td.num,th.num{text-align:right}
       <p class="hint" id="srInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="srRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="pmCard">
+      <div class="card-head"><div><h2>P&amp;L memo · monthly</h2>
+        <p class="hint">Every month on the day set (the 20th by default, when payroll and stock usage are posted), the P&amp;L of the month before for each company: a memo in sentences (sales, food and beverage, labour, other costs and EBITDA against the <b>budget</b> and <b>last year</b>, the year to date and the forecast, the restaurants ahead and behind, the accounts that moved EBITDA most), the P&amp;L table for the month and the year to date, and every restaurant and department. Who gets it is set in <b>Email recipients</b> below, under <i>P&amp;L memo · monthly</i> (CEO and CFO in To, COO, finance, accounting and management in Cc by default): people set for several companies get them in one email; a restaurant with people of its own gets its own P&amp;L. Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="pmPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">Day of the month<input id="pmDay" type="number" min="1" max="28" value="20"></label>
+        <label class="field">Time<input id="pmTime" type="time" value="09:00"></label>
+        <label class="field">Companies · blank = those of the registry<input id="pmCos" autocomplete="off" list="pmCoList"></label>
+        <label class="field">To · if nobody is set in Email recipients<input id="pmTo" autocomplete="off"></label>
+        <label class="field">Cc · if nobody is set in Email recipients<input id="pmCc" autocomplete="off"></label>
+      </div>
+      <datalist id="pmCoList"></datalist>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;margin:4px 0 12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" id="pmOn" style="width:auto"> Send every month</label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" id="pmWork" style="width:auto" checked> On a Saturday or Sunday, send on Monday</label>
+      </div>
+      <label class="field" style="margin-bottom:10px">Comment from Finance · goes at the top of the next memo only, then clears<textarea id="pmNote" rows="3" style="font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);resize:vertical"></textarea></label>
+      <div id="pmWho" class="hint" style="margin:0 0 10px"></div>
+      <div class="formgrid">
+        <label class="field">Preview or test<select id="pmTarget"></select></label>
+        <label class="field">Send a test to<input id="pmTestTo" autocomplete="off"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="pmSave">Save</button>
+        <button class="btn" id="pmPreview">Preview</button>
+        <button class="btn" id="pmTest">Send a test</button>
+        <button class="btn" id="pmPeople">Set the people</button>
+        <span class="meta" id="pmMsg"></span>
+      </div>
+      <p class="hint" id="pmInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="pmRuns"></table></div>
+    </div>
     <div class="card" style="margin-bottom:15px" id="rcCard" data-header="RHG-Finance"></div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
@@ -1141,6 +1173,7 @@ function render(){
   if(!crLoaded) loadCostReport();
   if(!brLoaded) loadBrandReport();
   if(!srLoaded) loadSalesReport();
+  if(!pmLoaded) loadPlMemo();
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
@@ -3629,6 +3662,72 @@ $("srPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.d
 $("srTest").onclick = () => { const to = $("srTestTo").value.trim(); if (!to) { $("srMsg").textContent = "Enter an address for the test."; return; } startSalesReport(to, null); };
 $("srPeople").onclick = () => { const c = $("rcCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); };
 $("slEmail").onclick = () => { navTo("settings"); setTimeout(() => { const c = $("srCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); }, 150); };
+// ---------- monthly P&L memo (people from Email recipients) ----------
+var pmLoaded = false, pmJob = null, pmTimer = null;
+async function loadPlMemo(){
+  pmLoaded = true;
+  try{ renderPlMemo(await readJSON(await fetch("/api/pl-memo"))); }catch(e){ $("pmMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function renderPlMemo(st){
+  const s = st.settings || {}, m = st.mail || {};
+  $("pmDay").value = s.day || "20"; $("pmTime").value = s.time || "09:00"; $("pmCos").value = s.companies || "";
+  $("pmTo").value = s.to || ""; $("pmCc").value = s.cc || ""; $("pmOn").checked = !!s.enabled; $("pmWork").checked = s.working_day !== false;
+  if (document.activeElement !== $("pmNote")) $("pmNote").value = s.note || "";
+  $("pmCoList").innerHTML = (st.all_companies || []).map(c => `<option value="${esc(c)}">`).join("");
+  const keep = $("pmTarget").value, locs = st.locations || [];
+  $("pmTarget").innerHTML = `<option value="all">All companies</option>` + (st.companies || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("")
+    + locs.map(l => `<option value="${esc(l.company + "|" + l.dept)}">${esc(l.name)} · ${esc(l.company)}</option>`).join("");
+  if (keep && [...$("pmTarget").options].some(o => o.value === keep)) $("pmTarget").value = keep;
+  const plan = st.plan || [];
+  if (!$("pmTestTo").value) $("pmTestTo").value = ((plan[0] || {}).to || [])[0] || "";
+  const list = a => (a || []).length ? a.map(esc).join(", ") : "–";
+  $("pmWho").innerHTML = plan.length ? plan.map(p => `<b>${esc(p.companies.join(", "))}</b> · To: ${list(p.to)}${(p.cc || []).length ? " · Cc: " + list(p.cc) : ""}`).join("<br>")
+      + (locs.length ? "<br>" + locs.map(l => `<b>${esc(l.name)}</b> (own P&amp;L) · ${list(l.to)}${(l.cc || []).length ? " (cc " + list(l.cc) + ")" : ""}`).join(" · ") : "")
+    : `<span class="meta">Nobody to send to yet: set the people in Email recipients under “P&amp;L memo · monthly”, or fill To above.</span>`;
+  $("pmPill").className = "rhg-pill " + (s.enabled ? (m.configured && plan.length ? "ok" : "warning") : "info");
+  $("pmPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : !plan.length ? "On · nobody to send to" : "On";
+  const mon = st.month ? new Date(st.month + "-01T00:00:00").toLocaleDateString("en-GB", {month: "long", year: "numeric"}) : "";
+  $("pmInfo").textContent = (s.enabled ? `Every month on day ${s.day || 20} at ${s.time || "09:00"}${s.working_day !== false ? " (a weekend moves to Monday)" : ""}, next ${(st.next_run || "–").replace("T", " ")}. ` : "Off. ")
+    + `A memo now would be about ${mon} (or the latest closed month before it). Companies: ${(st.companies || []).join(", ")}.`
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [];
+  $("pmRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Memo</th><th>Month</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 12).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.target || "")}</td><td class="meta">${esc(x.month || "")}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc([...(x.to || []), ...(x.cc || []).map(c => "cc " + c)].join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["pmSave", "pmTest", "pmPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "pmSave" && !!pmJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("pmSave").onclick = async () => {
+  $("pmMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/pl-memo/settings", {enabled: $("pmOn").checked, day: $("pmDay").value, time: $("pmTime").value,
+      working_day: $("pmWork").checked, companies: $("pmCos").value, to: $("pmTo").value, cc: $("pmCc").value, note: $("pmNote").value});
+    renderPlMemo(st);
+    $("pmMsg").textContent = st.settings.enabled ? "Saved." : "Saved. Tick “Send every month” to switch it on.";
+  }catch(e){ $("pmMsg").textContent = "Could not save: " + e.message; }
+};
+async function startPlMemo(to, win){
+  $("pmMsg").textContent = "Reading the P&L from Business Central… several minutes the first time.";
+  try{
+    const job = await simphonyPost("/api/pl-memo/job", {target: $("pmTarget").value || "all", to});
+    pmJob = job; ["pmTest", "pmPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/pl-memo/preview?id=" + encodeURIComponent(job.id);
+    pollPlMemo();
+  }catch(e){ $("pmMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollPlMemo(){
+  clearTimeout(pmTimer);
+  if (!pmJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/pl-memo/job?id=" + encodeURIComponent(pmJob.id)));
+    if (j.status === "running") { pmTimer = setTimeout(pollPlMemo, 5000); return; }
+    $("pmMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("pmMsg").textContent = "Lost track of the memo: " + e.message; }
+  pmJob = null; loadPlMemo();
+}
+$("pmPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the P&amp;L memo…</p>"); startPlMemo("", w); };
+$("pmTest").onclick = () => { const to = $("pmTestTo").value.trim(); if (!to) { $("pmMsg").textContent = "Enter an address for the test."; return; } startPlMemo(to, null); };
+$("pmPeople").onclick = () => { const c = $("rcCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); };
 // ---------------------------------------------------------------- Kartela → Location intelligence
 // Per location: payables and receivables open today on the restaurant's department, by age past the due
 // date, with the month's invoices and payments; built on the server (/api/kartela/locations).
