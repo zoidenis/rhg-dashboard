@@ -265,10 +265,9 @@ td.num,th.num{text-align:right}
 
     <div class="grp">Working capital</div>
     <button data-view="cash">Cash &amp; bank</button>
-    <button data-view="ap">Accounts payable</button>
+    <button data-view="kartela">Kartela</button>
     <button data-view="fiscal">Fiscal purchases vs BC</button>
     <button data-view="fsales">Fiscal sales vs BC</button>
-    <button data-view="ar">Accounts receivable</button>
     <button data-view="inventory">Inventory</button>
     <button data-view="typology">Typology &amp; turnover</button>
     <button data-view="recipes">Recipe integrity</button>
@@ -391,10 +390,17 @@ td.num,th.num{text-align:right}
       <div class="scroll"><table id="bankTable"></table></div></div>
   </section>
 
-  <section class="view" id="v-ap"><div class="card"><div class="card-head"><div><h2>Accounts payable</h2><p class="hint" id="apHint"></p></div>
+  <section class="view" id="v-kartela">
+    <div class="ov-tabs" id="kaTabs" role="tablist"><button data-t="ap" class="on" role="tab" aria-selected="true" aria-controls="kaAp">Accounts payable</button><button data-t="ar" role="tab" aria-selected="false" aria-controls="kaAr">Accounts receivable</button></div>
+    <div id="kaAp" role="tabpanel"><div class="card"><div class="card-head"><div><h2>Accounts payable</h2><p class="hint" id="apHint"></p></div>
     <button class="mini" data-drill="ap">Open entries</button></div>
     <div class="money" id="apTotals"></div><div id="apBuckets"></div>
-    <div class="scroll" style="margin-top:12px"><table id="apTable"></table></div></div></section>
+    <div class="scroll" style="margin-top:12px"><table id="apTable"></table></div></div></div>
+    <div id="kaAr" role="tabpanel" hidden><div class="card"><div class="card-head"><div><h2>Accounts receivable</h2><p class="hint" id="arHint"></p></div>
+    <button class="mini" data-drill="ar">Open entries</button></div>
+    <div class="money" id="arTotals"></div><div id="arBuckets"></div>
+    <div class="scroll" style="margin-top:12px"><table id="arTable"></table></div></div></div>
+  </section>
 
   <section class="view" id="v-fiscal">
     <div class="card">
@@ -478,10 +484,6 @@ td.num,th.num{text-align:right}
     </div>
   </section>
 
-  <section class="view" id="v-ar"><div class="card"><div class="card-head"><div><h2>Accounts receivable</h2><p class="hint" id="arHint"></p></div>
-    <button class="mini" data-drill="ar">Open entries</button></div>
-    <div class="money" id="arTotals"></div><div id="arBuckets"></div>
-    <div class="scroll" style="margin-top:12px"><table id="arTable"></table></div></div></section>
 
   <section class="view" id="v-gl"><div class="card"><div class="card-head"><div><h2>Material general ledger entries</h2><p class="hint" id="glNote"></p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -2634,11 +2636,33 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="group" && data && !(data.group||{}).loaded) loadPane("/api/consolidation","group",renderGroup,"grpNote");
   // the open screen is part of the address, so the control center can link straight to it
   if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
+  if (b.dataset.view === "kartela") kaShow(kaTab);
   setHeader();
 });
 function currentView(){
   const b = document.querySelector("#nav button.on");
-  return {id: (b && b.dataset.view) || "overview", label: (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"")};
+  const id = (b && b.dataset.view) || "overview";
+  let label = (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"");
+  if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : "Accounts payable");
+  return {id, label};
+}
+// ---- Kartela: accounts payable and accounts receivable as two tabs of one screen. The old addresses
+// (#ap, #ar, links and buttons that open "ap" or "ar") land on the matching tab.
+var kaTab = "ap";
+function kaShow(tab){
+  kaTab = tab === "ar" ? "ar" : "ap";
+  document.querySelectorAll("#kaTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === kaTab); b.setAttribute("aria-selected", b.dataset.t === kaTab); });
+  $("kaAp").hidden = kaTab !== "ap"; $("kaAr").hidden = kaTab !== "ar";
+  if ($("v-kartela").classList.contains("on")) {
+    if (history.replaceState) history.replaceState(null, "", "#" + kaTab);
+    setHeader();
+  }
+}
+document.querySelectorAll("#kaTabs button").forEach(b => b.onclick = () => kaShow(b.dataset.t));
+function navTo(view){
+  if (view === "ap" || view === "ar") { kaTab = view; view = "kartela"; }
+  const b = document.querySelector(`#nav button[data-view="${view}"]`);
+  if (b) { if (b.classList.contains("on") && view === "kartela") kaShow(kaTab); else b.click(); }
 }
 function setHeader(){
   const v = currentView();
@@ -2662,6 +2686,7 @@ function setHeader(){
 }
 function openFromHash(){
   const v = (location.hash || "").slice(1);
+  if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();
 }
@@ -2669,7 +2694,7 @@ window.addEventListener("hashchange", openFromHash);
 function bindGotoViews(root){
   (root || document).querySelectorAll("[data-goto-view]").forEach(el => el.onclick = ev => {
     ev.preventDefault();
-    const b = document.querySelector(`#nav button[data-view="${el.dataset.gotoView}"]`); if (b) b.click();
+    navTo(el.dataset.gotoView);
   });
 }
 bindGotoViews(document);
@@ -2677,7 +2702,7 @@ bindGotoViews(document);
 $("exportBtn").onclick = () => {
   const view = document.querySelector(".view.on"); if (!view || !data) return;
   const cell = t => `"${String(t).replace(/\s+/g," ").trim().replace(/"/g,'""')}"`;
-  const blocks = Array.from(view.querySelectorAll("table")).filter(t => t.rows.length > 1).map(t => {
+  const blocks = Array.from(view.querySelectorAll("table")).filter(t => t.rows.length > 1 && !t.closest("[hidden]")).map(t => {
     const card = t.closest(".card"), h = card && card.querySelector("h2");
     return [[cell(h ? h.textContent : "")]].concat(Array.from(t.rows).map(r => Array.from(r.cells).map(c => cell(c.textContent))));
   });
@@ -2892,7 +2917,7 @@ function ilGo(view, code){
   $("ilBd").classList.remove("show");
   if (view === "movement") { if (mvData) { $("mvFLoc").value = code; loadMvRows(); } else mvWantLoc = code; }
   if (view === "typology") { if (tyData && [...$("tyLoc").options].some(o => o.value === code)) { $("tyLoc").value = code; renderTypology(); } else tyWantLoc = code; }
-  const b = document.querySelector(`#nav button[data-view="${view}"]`); if (b) b.click();
+  navTo(view);
   if (view === "movement" && mvData) setTimeout(() => { const el = $("mvItemsTitle"); if (el) el.scrollIntoView({block: "start"}); }, 50);
 }
 document.addEventListener("click", e => {
@@ -3113,7 +3138,7 @@ function flGo(view, code){
   $("flBd").classList.remove("show");
   if (view === "exec") { location.href = "/executive?tab=locations"; return; }
   if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; load(); }
-  const b = document.querySelector(`#nav button[data-view="${view}"]`); if (b) b.click();
+  navTo(view);
 }
 document.addEventListener("click", e => {
   const c = e.target.closest("[data-flclose]"); if (c) { $("flBd").classList.remove("show"); return; }
@@ -3539,7 +3564,7 @@ function blDraw(code){
 function blGo(view, code){
   $("blBd").classList.remove("show");
   if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; load(); }
-  const b = document.querySelector(`#nav button[data-view="${view}"]`); if (b) b.click();
+  navTo(view);
 }
 document.addEventListener("click", e => {
   const c = e.target.closest("[data-blclose]"); if (c) { $("blBd").classList.remove("show"); return; }
