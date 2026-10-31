@@ -1,57 +1,84 @@
 /* ---------------------------------------------------------------
-   Revo / RHG brand layer — RHG Control Towers design system.
-   Source: Figma "RHG Control Towers" (screens 01–05, components
-   RHG/KPI, RHG/Button primary, RHG/Button secondary) and the Revo
-   Brand Guide: #0C475E deep blue · #A0D8EA light blue · #ECEBEB grey.
+   pulse brand layer for the RHG workspace (pulse Brand guidelines v1.1).
 
-   This file is identical in both towers and loads after each page's
-   own styles, so the whole look of the platform lives here. The
-   --rhg-* names are the Figma variable names, one to one.
+   The client leads, pulse stays consistent:
+   - client (Revo Hospitality Group): the logo in the menu and on sign-in, and one colour for the
+     navigation and the primary buttons (#08303F menu, #0C475E buttons);
+   - pulse: Paper canvas, White surfaces, Graphite text, Stone secondary text; Manrope ExtraBold for
+     headings and key figures, Inter for the interface and the data (tabular figures); the data
+     palette (current Graphite, previous #CFCDC4, third Data Blue, fourth Pulse Green) and the status
+     colours (Pulse/Deep Green good, Amber warning, Alert Red only for overdue or errors). The client
+     colour stays out of charts and statuses. "powered by pulse" signs the menu.
+
+   This file is identical in every app and loads after each page's own styles, so the whole look
+   lives here. The --rhg-* names are kept so the pages need no change.
    --------------------------------------------------------------- */
-@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Archivo:wght@500;600;700;800&display=swap");
-
-/* Aktifo B is licensed and we do not hold the files, so nothing is declared
-   for it: Figtree (text) and Archivo (headings, figures) carry the same
-   geometric, low-contrast character. If the files arrive, add the
-   @font-face rules here; the stacks below already ask for it first. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap");
 
 :root{
-  /* --- Figma variables --- */
-  --rhg-bg:       #ecebeb;
-  --rhg-nav:      #08303f;
-  --rhg-primary:  #0c475e;
-  --rhg-blue:     #a0d8ea;
-  --rhg-sky:      #e4f3f9;
+  /* --- pulse --- */
+  --pulse-graphite: #16181d;
+  --pulse-green:    #12a866;   /* the live dot, good status marks, growth */
+  --pulse-deep:     #0b7a4a;   /* positive text on white */
+  --pulse-blue:     #3b6fd8;   /* data blue: a third series */
+  --pulse-paper:    #f5f4ef;
+  --pulse-stone:    #5f636b;
+  --pulse-prev:     #cfcdc4;   /* the comparison series */
+  --pulse-amber:    #b86e0e;
+  --pulse-red:      #c2412d;
+  --data-cur: var(--pulse-graphite); --data-prev: var(--pulse-prev); --data-3: var(--pulse-blue); --data-4: var(--pulse-green);
+
+  /* --- the variables the pages use --- */
+  --rhg-bg:       var(--pulse-paper);
+  --rhg-nav:      #08303f;     /* client colour: navigation */
+  --rhg-primary:  #0c475e;     /* client colour: primary buttons, links, the open tab */
+  --rhg-blue:     #a0d8ea;     /* client light blue: text on the menu */
+  --rhg-sky:      #efede6;     /* table heads and neutral pills: pulse neutral, not the client colour */
   --rhg-white:    #ffffff;
-  --rhg-ink:      #0e2733;
-  --rhg-muted:    #5c7482;
-  --rhg-line:     #d9dcdd;
-  --rhg-red:      #c0392b;  --rhg-redbg:   #fbecea;
-  --rhg-amber:    #b26a00;  --rhg-amberbg: #fdf3e2;
-  --rhg-green:    #0e8a57;  --rhg-greenbg: #e6f6ef;   /* savings; not in the Figma file yet */
+  --rhg-ink:      var(--pulse-graphite);
+  --rhg-muted:    var(--pulse-stone);
+  --rhg-line:     #e3e1d9;
+  --rhg-red:      var(--pulse-red);   --rhg-redbg:   #f9e9e5;
+  --rhg-amber:    var(--pulse-amber); --rhg-amberbg: #f8eedf;
+  --rhg-green:    var(--pulse-deep);  --rhg-greenbg: #e3f4ea;
   --rhg-space-6: 6px; --rhg-space-8: 8px; --rhg-space-12: 12px; --rhg-space-16: 16px; --rhg-space-20: 20px;
   --rhg-radius:   12px;
-  --rhg-font:         "Aktifo B", "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --rhg-font-display: "Aktifo B", "Archivo", var(--rhg-font);
+  --rhg-font:         "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --rhg-font-display: "Manrope", "Inter", system-ui, sans-serif;
   --rhg-mark: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>');
 
-  /* --- the application's own variable names, mapped onto the system --- */
   --bg: var(--rhg-bg);  --card: var(--rhg-white);  --ink: var(--rhg-ink);  --sub: var(--rhg-muted);
   --line: var(--rhg-line);  --side: var(--rhg-nav);  --side-ink: var(--rhg-blue);
-  --accent: var(--rhg-primary);  --prev: var(--rhg-blue);
+  --accent: var(--rhg-primary);  --prev: var(--data-prev);
   --up: var(--rhg-red);    --up-bg: var(--rhg-redbg);
   --down: var(--rhg-green); --down-bg: var(--rhg-greenbg);
   --warn: var(--rhg-amber); --warn-bg: var(--rhg-amberbg);
-  /* older names some screens still use */
   --revo-blue: var(--rhg-primary); --revo-blue-deep: var(--rhg-nav); --revo-sky: var(--rhg-blue);
   --revo-sky-soft: var(--rhg-sky); --brand-muted: var(--rhg-muted); --brand-radius: var(--rhg-radius);
+
+  /* categorical series of the screens, from the pulse data palette */
+  --fl-c1: var(--pulse-graphite); --fl-c2: var(--pulse-prev); --fl-c3: var(--pulse-blue); --fl-c4: var(--pulse-green);
+  --ty-c1: var(--pulse-graphite); --ty-c2: var(--pulse-blue); --ty-c3: var(--pulse-green); --ty-c4: #9a978c; --ty-c5: var(--pulse-prev);
+  /* ageing: not due → overdue beyond 90 days */
+  --kl-a0: var(--pulse-green); --kl-a1: #dcc07a; --kl-a2: var(--pulse-amber); --kl-a3: #d47458; --kl-a4: var(--pulse-red);
 }
 
+/* ---------------------------------------------------------------- the pulse signature */
+.pulse-mark{ font-family: var(--rhg-font-display); font-weight: 800; letter-spacing: -.035em; color: inherit; white-space: nowrap; }
+.pulse-mark::after{ content: ""; display: inline-block; width: .2em; height: .2em; border-radius: 50%;
+  background: var(--pulse-green); margin-left: .06em; vertical-align: baseline; }
+.powered{ display: flex; align-items: baseline; gap: 5px; font-size: 11px; color: rgba(255,255,255,.62); margin-top: 10px; }
+.powered .pulse-mark{ font-size: 15px; color: #fff; }
+.by-t0{ background: var(--pulse-graphite) !important; } .by-t1{ background: var(--pulse-blue) !important; } .by-t2{ background: var(--pulse-green) !important; }
+.by-t3{ background: var(--pulse-prev) !important; } .by-t4{ background: #9a978c !important; } .by-t5{ background: #c9c7bf !important; }
+
 /* ---------------------------------------------------------------- base */
-html, body{ font-family: var(--rhg-font); font-size: 13px; letter-spacing: 0; background: var(--bg); color: var(--ink); }
-h1{ font-family: var(--rhg-font-display); font-size: 27px; font-weight: 600; line-height: 1.35; letter-spacing: 0; margin: 0; }
-h2{ font-family: var(--rhg-font); font-size: 17px; font-weight: 600; line-height: 1.35; margin: 0; }
-h3, h4{ font-family: var(--rhg-font); }
+html, body{ font-family: var(--rhg-font); font-size: 13.5px; letter-spacing: 0; background: var(--bg); color: var(--ink);
+  -webkit-font-smoothing: antialiased; }
+h1{ font-family: var(--rhg-font-display); font-size: 28px; font-weight: 800; line-height: 1.25; letter-spacing: -.02em; margin: 0; }
+h2{ font-family: var(--rhg-font-display); font-size: 17px; font-weight: 700; line-height: 1.35; letter-spacing: -.01em; margin: 0; }
+h3, h4{ font-family: var(--rhg-font-display); font-weight: 700; }
+td, .num, .kpi .v, .money b, .pl-sq .big .v, .pl-tile .v{ font-variant-numeric: tabular-nums; }
 .hint{ font-size: 12px; color: var(--sub); }
 .meta{ font-size: 11px; color: var(--sub); font-weight: 400; }
 .up{ color: var(--rhg-red); } .down{ color: var(--rhg-green); }
@@ -104,7 +131,7 @@ nav .count{ background: none; color: inherit; font-size: 11px; font-weight: inhe
 main{ padding: 24px; }
 header{ gap: 18px; margin-bottom: var(--rhg-space-20); align-items: flex-start; flex-wrap: nowrap; }
 header > div:first-child{ flex: 1; min-width: 0; }
-.eyebrow{ font-size: 10px; font-weight: 600; line-height: 1.35; color: var(--sub); text-transform: uppercase; margin-bottom: 6px; }
+.eyebrow{ font-size: 11px; font-weight: 600; line-height: 1.35; color: var(--pulse-deep); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 6px; }
 .period{ font-size: 13px; color: var(--sub); margin-top: 6px; line-height: 1.35; }
 .hdr-side{ display: flex; flex-direction: column; gap: var(--rhg-space-8); align-items: flex-end; }
 .hdr-btns{ display: flex; gap: var(--rhg-space-8); flex-wrap: wrap; justify-content: flex-end; }
@@ -124,6 +151,7 @@ header > div:first-child{ flex: 1; min-width: 0; }
 .btn:hover{ border-color: var(--rhg-line); }
 .btn.dark, .btn.primary{ background: var(--rhg-primary); color: var(--rhg-white); border-color: var(--rhg-primary); }
 .btn.dark:hover, .btn.primary:hover{ background: #0a3d51; }
+.btn, .mini{ font-family: var(--rhg-font); }
 .card .btn:not(.dark):not(.primary), .brief .btn:not(.dark):not(.primary){ background: transparent; }
 .card .btn:not(.dark):not(.primary):hover{ background: var(--rhg-sky); border-color: transparent; }
 .mini{
@@ -173,10 +201,10 @@ header > div:first-child{ flex: 1; min-width: 0; }
   display: flex; flex-direction: column; gap: 8px;
 }
 .card.kpi.clickable:hover{ box-shadow: 0 0 0 1px var(--rhg-primary); }
-.kpi .l{ font-size: 12px; font-weight: 600; color: var(--ink); line-height: normal; }
-.kpi .v{ font-family: var(--rhg-font-display); font-size: 24px; font-weight: 600; line-height: normal; letter-spacing: 0; margin: 0; color: var(--ink); }
+.kpi .l{ font-size: 12.5px; font-weight: 500; color: var(--sub); line-height: normal; }
+.kpi .v{ font-family: var(--rhg-font-display); font-size: 28px; font-weight: 800; line-height: normal; letter-spacing: -.02em; margin: 0; color: var(--ink); }
 .kpi .v.up{ color: var(--rhg-red); } .kpi .v.down{ color: var(--rhg-green); } .kpi .v.warn{ color: var(--rhg-amber); }
-.kpi .s{ font-size: 11px; font-weight: 600; color: var(--sub); line-height: 1.35; }
+.kpi .s{ font-size: 11.5px; font-weight: 500; color: var(--sub); line-height: 1.4; }
 .kpi .s .meta{ font-weight: 400; }
 
 /* ---------------------------------------------------------------- tables */
@@ -184,12 +212,12 @@ table{ width: 100%; border-collapse: collapse; }
 th{ text-align: left; white-space: nowrap; }
 td.num, th.num{ text-align: right; }
 th{
-  background: var(--rhg-sky); color: var(--sub); font-size: 12px; font-weight: 600; line-height: 1.35;
+  background: var(--rhg-sky); color: var(--sub); font-size: 12px; font-weight: 500; line-height: 1.35;
   padding: 10px 7px; border-bottom: 0; text-transform: none; letter-spacing: 0;
 }
 th:first-child, td:first-child{ padding-left: 8px; }
 th:last-child, td:last-child{ padding-right: 8px; }
-td{ font-size: 12px; line-height: 1.35; padding: 9px 7px; border-bottom: 1px solid #f0f1f2; color: var(--ink); }
+td{ font-size: 12.5px; line-height: 1.4; padding: 9px 7px; border-bottom: 1px solid #efede7; color: var(--ink); }
 tr:last-child td{ border-bottom: 0; }
 .name{ font-weight: 400; }
 td.name b, .name b{ font-weight: 600; }
@@ -203,7 +231,8 @@ tr.total td, .total td{ font-weight: 600; background: transparent; }
 .chip.up, .prio.Critical, .status-crit, .rhg-pill.critical{ background: var(--rhg-redbg); color: var(--rhg-red); }
 .chip.down, .rhg-pill.ok{ background: var(--rhg-greenbg); color: var(--rhg-green); }
 .prio.High, .status-warn, .rhg-pill.warning{ background: var(--rhg-amberbg); color: var(--rhg-amber); }
-.status-ok, .rhg-pill.info{ background: var(--rhg-sky); color: var(--rhg-primary); }
+.status-ok, .rhg-pill.info{ background: var(--rhg-sky); color: var(--ink); }
+.chip, .prio, .status-pill, .rhg-pill{ color: var(--ink); }
 .prio.Medium, .prio.Low{ background: var(--rhg-bg); color: var(--sub); }
 .rhg-pill{ padding: 6px; }
 
@@ -221,7 +250,7 @@ tr.total td, .total td{ font-weight: 600; background: transparent; }
 .brief details{ margin-top: var(--rhg-space-12); }
 .brief details > summary{ cursor: pointer; font-size: 12px; color: var(--rhg-primary); font-weight: 600; }
 .money div{ background: var(--rhg-bg); border-radius: 8px; font-size: 11px; }
-.money b{ font-family: var(--rhg-font-display); font-weight: 600; }
+.money b{ font-family: var(--rhg-font-display); font-weight: 800; }
 
 /* a worklist row: severity · title + owner line · action */
 .rhg-list{ display: flex; flex-direction: column; gap: var(--rhg-space-12); }
@@ -233,17 +262,17 @@ tr.total td, .total td{ font-weight: 600; background: transparent; }
 .rhg-row .btn{ flex: none; }
 .act{ border: 1px solid var(--rhg-line); border-radius: var(--rhg-radius); }
 
-/* comparison bars: this period (primary) over the comparison (light blue) */
+/* comparison bars: this period (Graphite) over the comparison (#CFCDC4) */
 .rhg-bars{ display: flex; flex-direction: column; gap: var(--rhg-space-12); }
 .rhg-bars .row{ display: grid; grid-template-columns: 100px 1fr auto; gap: var(--rhg-space-12); align-items: center; }
 .rhg-bars .lbl{ font-size: 11px; font-weight: 600; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rhg-bars .pair{ display: flex; flex-direction: column; gap: 4px; }
-.rhg-bars .pair i{ display: block; height: 7px; background: var(--rhg-primary); }
-.rhg-bars .pair i + i{ background: var(--rhg-blue); }
+.rhg-bars .pair i{ display: block; height: 7px; background: var(--data-cur); border-radius: 2px; }
+.rhg-bars .pair i + i{ background: var(--data-prev); }
 .rhg-bars .amt{ font-size: 11px; color: var(--sub); text-align: right; min-width: 80px; }
 .rhg-legend{ font-size: 11px; color: var(--sub); }
-.rhg-legend i{ display: inline-block; width: 14px; height: 7px; background: var(--rhg-primary); margin: 0 4px 0 2px; vertical-align: 1px; }
-.rhg-legend i.prev{ background: var(--rhg-blue); }
+.rhg-legend i{ display: inline-block; width: 14px; height: 7px; background: var(--data-cur); margin: 0 4px 0 2px; vertical-align: 1px; border-radius: 2px; }
+.rhg-legend i.prev{ background: var(--data-prev); }
 
 /* stacked ageing bar */
 .rhg-stack-bar{ display: flex; height: 24px; overflow: hidden; }
@@ -252,29 +281,33 @@ tr.total td, .total td{ font-weight: 600; background: transparent; }
 .rhg-buckets b{ display: block; font-size: 12px; color: var(--ink); font-weight: 600; margin-top: 4px; }
 
 /* a one-line headline figure, e.g. the posting follow-up */
-.rhg-headline{ font-size: 18px; font-weight: 600; color: var(--rhg-primary); line-height: 1.35; display: flex; gap: 14px; flex-wrap: wrap; }
+.rhg-headline{ font-family: var(--rhg-font-display); font-size: 19px; font-weight: 800; color: var(--ink); line-height: 1.35; display: flex; gap: 14px; flex-wrap: wrap; }
 .rhg-headline .sep{ color: var(--sub); font-weight: 400; }
-.rhg-insight{ font-size: 20px; font-weight: 600; line-height: 1.35; }
+.rhg-insight{ font-family: var(--rhg-font-display); font-size: 20px; font-weight: 800; line-height: 1.35; }
 .rhg-caution{ color: var(--rhg-amber); font-weight: 600; }
 .rhg-back{ margin-bottom: var(--rhg-space-20); }
 
-/* --- dark mode: the deep blue becomes the surface, the light blue the accent --- */
+/* --- dark mode: Graphite surfaces (pulse "white on Graphite"); the client blue stays on the menu --- */
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#08222d; --card:#0e2f3d; --ink:#e8f2f6; --sub:#93b2bf; --line:#194354;
-    --side:#061a23; --accent: var(--rhg-blue); --prev:#2b5a6c;
-    --up:#ef6a5c; --up-bg:#3a1d1a; --down:#3fc08c; --down-bg:#0d2e24; --warn:#e0a44a; --warn-bg:#32270f;
-    --rhg-white:#0e2f3d; --rhg-ink:#e8f2f6; --rhg-muted:#93b2bf; --rhg-line:#194354; --rhg-bg:#08222d;
-    --rhg-sky:#123a4a; --rhg-redbg:#3a1d1a; --rhg-amberbg:#32270f; --rhg-greenbg:#0d2e24;
-    --rhg-red:#ef6a5c; --rhg-amber:#e0a44a; --rhg-green:#3fc08c;
+    --bg:#111316; --card:#1a1d22; --ink:#f0efea; --sub:#a4a8af; --line:#2b2f36;
+    --side:#061a23; --accent: var(--rhg-blue);
+    --data-cur:#ecebe6; --data-prev:#4b4e55; --prev:#4b4e55;
+    --up:#e8705c; --up-bg:#3a1f1a; --down:#3fc58a; --down-bg:#12291f; --warn:#e0a44a; --warn-bg:#33270f;
+    --rhg-white:#1a1d22; --rhg-ink:#f0efea; --rhg-muted:#a4a8af; --rhg-line:#2b2f36; --rhg-bg:#111316;
+    --rhg-sky:#22262c; --rhg-redbg:#3a1f1a; --rhg-amberbg:#33270f; --rhg-greenbg:#12291f;
+    --rhg-red:#e8705c; --rhg-amber:#e0a44a; --rhg-green:#3fc58a;
+    --fl-c1:#ecebe6; --fl-c2:#5d6068; --ty-c1:#ecebe6; --ty-c5:#5d6068;
   }
   aside{ background: #061a23; }
   .logo, .brand b, .brand small, nav button, .towers a.on{ color: #fff; }
   .btn.dark, .btn.primary, .mini.dark, .towers a.on{ background: var(--rhg-blue); color: #08303f; border-color: var(--rhg-blue); }
   .btn, .mini{ color: var(--rhg-blue); }
-  .rhg-bars .pair i{ background: var(--rhg-blue); } .rhg-bars .pair i + i{ background: #2b5a6c; }
-  .rhg-headline{ color: var(--rhg-blue); }
-  td{ border-bottom-color: #133c4b; }
+  .rhg-headline{ color: var(--ink); }
+  td{ border-bottom-color: #24282e; }
+  .by-t0{ background: #ecebe6 !important; } .by-t3{ background: #5d6068 !important; }
+  aside nav button.on{ color: #fff; }
+  aside .towers a.on, .ov-tabs button.on{ color: #08303f; }
 }
 
 /* --- phone: the side panel folds away, the cards stack --- */

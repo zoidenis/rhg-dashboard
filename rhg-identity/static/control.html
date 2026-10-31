@@ -45,6 +45,7 @@ header{display:flex;justify-content:space-between}
     <a href="/executive">Executive dashboard</a>
   </div>
   <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
 
 <main>
@@ -213,7 +214,7 @@ function render(p, f){
   renderPeriods();
   const t = new Date((pOk && p.meta.checked_at) || (fOk && f.meta.checked_at) || Date.now());
   $("pill").className = "pill" + ((p && p.error) || (f && f.error) ? " err" : "");
-  $("pillText").textContent = `Live · updated ${t.toLocaleTimeString("en-GB")}`;
+  $("pillText").textContent = `LIVE · updated ${t.toLocaleTimeString("en-GB", {hour:"2-digit",minute:"2-digit"})}`;
 }
 
 function renderStock(ss, f){
@@ -241,7 +242,7 @@ $("refreshBtn").onclick = () => load();
 $("company").onchange = () => load();
 $("logoutBtn").onclick = async () => {
   try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
-  location.href = "/login";
+  location.href = "/login?signedout=1";
 };
 
 (async () => {

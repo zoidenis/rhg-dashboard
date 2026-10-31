@@ -149,7 +149,7 @@ def list_users():
 def login(username, password, ip="", agent=""):
     username = (username or "").strip().lower()
     row = find(username)
-    generic = "Wrong username or password."
+    generic = "The username or password is incorrect."
 
     if not row:
         # Spend comparable time so a missing user is not obvious from timing.
@@ -161,7 +161,7 @@ def login(username, password, ip="", agent=""):
         return None, None, "This account is disabled."
     if row["locked_until"] and row["locked_until"] > time.time():
         mins = int((row["locked_until"] - time.time()) / 60) + 1
-        return None, None, f"The account is locked. Try again in {mins} minute(s)."
+        return None, None, f"Too many failed attempts. Try again in {mins} minute{'s' if mins != 1 else ''}."
 
     if not verify_password(password or "", row["salt"], row["hash"]):
         failures = row["failures"] + 1
@@ -170,7 +170,7 @@ def login(username, password, ip="", agent=""):
                   (failures, locked, username))
         store.audit("login failed", username, username, {"failures": failures}, ip)
         if locked:
-            return None, None, f"Too many attempts. The account is locked for {config.LOCK_MINUTES} minutes."
+            return None, None, f"Too many failed attempts. Try again in {config.LOCK_MINUTES} minutes."
         left = config.MAX_FAILURES - failures
         return None, None, f"{generic} {left} attempt(s) left before the account locks."
 

@@ -2,15 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pulse RHG · Purchasing · Sign in</title>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>RHG · Purchasing · Sign in</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#ecebeb;--card:#fff;--ink:#0e2733;--sub:#5c7482;--line:#d9dcdd;--accent:#0c475e;--sky:#a0d8ea;--up:#c0392b}
+/* pulse brand book: the client leads (Revo logo and colour), Paper canvas, Graphite ink, "powered by pulse" at the foot */
+:root{--bg:#f5f4ef;--card:#fff;--ink:#16181d;--sub:#5f636b;--line:#e3e1d9;--accent:#0c475e;--sky:#a0d8ea;--up:#c2412d;--green:#12a866}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-size:14px}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:14px}
 .wrap{min-height:100%;display:grid;place-items:center;padding:24px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px;width:100%;max-width:400px}
-.brand{display:flex;gap:11px;align-items:center;margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 10px 30px rgba(22,24,29,.07)}
+.client{background:var(--accent);color:#fff;padding:20px 26px 18px}
+.client b{display:block;font-family:Manrope,system-ui,sans-serif;font-weight:800;font-size:16px}
+.client small{color:#b9d4de}
+.tagline{margin:12px 0 0;font-size:13px;color:#d6e9f0}
+.body{padding:26px}
+h2{font-family:Manrope,system-ui,sans-serif;font-weight:800;font-size:26px;letter-spacing:-.025em;margin:0}
+.lead{margin:6px 0 4px;color:var(--sub)}
+.help{margin:12px 0 0;font-size:12.5px;color:var(--sub);text-align:center}
+.sig{border-top:1px solid var(--line);padding:13px 26px;display:flex;align-items:baseline;gap:6px;font-size:12px;color:var(--sub)}
+.pulse-mark{font-family:Manrope,system-ui,sans-serif;font-weight:800;font-size:16px;letter-spacing:-.035em;color:var(--ink)}
+.pulse-mark::after{content:"";display:inline-block;width:.2em;height:.2em;border-radius:50%;background:var(--green);margin-left:.06em}
+.brand{display:flex;gap:11px;align-items:center}
 .logo{width:40px;height:40px;border-radius:11px;background:var(--sky);color:var(--accent);display:grid;place-items:center;font-size:0}
 /* Same mark as the rest of the app, inlined so the page needs no extra request. */
 .logo::after{content:"";width:56%;height:56%;background-color:currentColor;
@@ -18,9 +30,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
           mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>') center/contain no-repeat}
 h1{font-size:17px;margin:0}
 small{color:var(--sub)}
-label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin:14px 0 5px}
+label{display:block;font-size:12px;font-weight:600;color:var(--sub);margin:14px 0 5px}
 input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--bg)}
-button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}
 button:disabled{opacity:.6;cursor:default}
 .msg{margin-top:14px;font-size:13px;font-weight:600;color:var(--up);min-height:18px}
 .note{margin-top:20px;font-size:12px;color:var(--sub);line-height:1.5}
@@ -28,12 +40,18 @@ button:disabled{opacity:.6;cursor:default}
 </head>
 <body>
 <div class="wrap"><div class="card">
-  <div class="brand"><div class="logo" role="img" aria-label="RHG"></div><div><h1>Pulse RHG</h1><small>Purchasing</small></div></div>
-  <svg viewBox="0 0 340 40" preserveAspectRatio="none" aria-hidden="true" style="display:block;width:100%;height:30px;margin:-8px 0 8px"><path d="M0 26H90l8-7 7 7h16l8-24 9 38 8-22 6 8h44l6-5 6 5h50l7-16 8 24 7-10h55" fill="none" stroke="#a0d8ea" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <header class="client">
+    <div class="brand"><div class="logo" role="img" aria-label="Revo"></div><div><b>Revo</b><small>Hospitality Group · Purchasing</small></div></div>
+    <p class="tagline">Your business pulse, in real time.</p>
+  </header>
+  <div class="body">
+  <h2>Welcome</h2>
+  <p class="lead">Sign in with your work account</p>
   <div id="loginForm">
     <label for="u">Username</label><input id="u" autocomplete="username" autofocus>
     <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
     <button id="go">Sign in</button>
+    <p class="help">Forgot your password? Contact your administrator.</p>
   </div>
   <div id="changeForm" style="display:none">
     <p style="margin:0;color:var(--sub)">Choose a new password before you continue.</p>
@@ -45,6 +63,8 @@ button:disabled{opacity:.6;cursor:default}
   <div class="msg" id="msg"></div>
   <div class="note">Sessions last 12 hours. Five wrong attempts lock the account for 15 minutes.
     This application runs on this PC over plain HTTP; do not publish it to the network without HTTPS in front of it.</div>
+  </div>
+  <footer class="sig">powered by <span class="pulse-mark">pulse</span></footer>
 </div></div>
 <script>
 const $ = id => document.getElementById(id);

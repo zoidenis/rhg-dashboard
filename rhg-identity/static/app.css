@@ -1,35 +1,37 @@
 /* ---------------------------------------------------------------
-   RHG platform shell - Revo brand, enterprise layer.
-   Palette and type match the control towers so the platform reads
-   as one product: #0c475e deep blue, #a0d8ea sky, #ecebeb grey.
+   RHG platform shell. The client leads (Revo #0c475e, #a0d8ea),
+   pulse supplies the neutrals, type and the signature (pulse brand
+   book): Paper canvas, Graphite ink, Stone secondary text,
+   Manrope for display, Inter for interface text.
    --------------------------------------------------------------- */
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap");
 
 :root{
   /* Native controls follow the theme too. */
   color-scheme: light dark;
   --revo-blue:#0c475e; --revo-blue-deep:#08303f; --revo-sky:#a0d8ea;
-  --revo-sky-soft:#e4f3f9; --revo-grey:#ecebeb;
+  --revo-sky-soft:#e4f3f9; --revo-grey:#f5f4ef;
 
-  --bg:var(--revo-grey); --card:#fff; --ink:#0e2733; --sub:#5c7482;
-  --line:#d9dcdd; --accent:var(--revo-blue); --side:var(--revo-blue-deep);
+  --bg:var(--revo-grey); --card:#fff; --ink:#16181d; --sub:#5f636b;
+  --line:#e3e1d9; --accent:var(--revo-blue); --side:var(--revo-blue-deep);
   --side-ink:#b9d4de;
-  --negative:#c0392b; --positive:#0e8a57; --warning:#b26a00;
+  --negative:#c2412d; --positive:#0b7a4a; --warning:#b86e0e;
+  --pulse-green:#12a866; --pulse-graphite:#16181d;
   --radius:12px; --radius-sm:9px;
   --shadow:0 1px 2px rgba(12,71,94,.06), 0 4px 14px rgba(12,71,94,.06);
-  --font:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mark:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 70"><path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/><path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/><path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/></svg>');
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#08222d; --card:#0e2f3d; --ink:#e8f2f6; --sub:#93b2bf; --line:#194354;
+    --bg:#111316; --card:#1a1d22; --ink:#f0efea; --sub:#a4a8af; --line:#2b2f36;
     --accent:var(--revo-sky); --side:#061a23;
     --revo-sky-soft:rgba(160,216,234,.14);
     --shadow:0 1px 2px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.24);
   }
 }
 :root[data-theme="dark"]{
-  --bg:#08222d; --card:#0e2f3d; --ink:#e8f2f6; --sub:#93b2bf; --line:#194354;
+  --bg:#111316; --card:#1a1d22; --ink:#f0efea; --sub:#a4a8af; --line:#2b2f36;
   --accent:var(--revo-sky); --side:#061a23; --revo-sky-soft:rgba(160,216,234,.14);
   --shadow:0 1px 2px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.24);
 }
@@ -83,3 +85,10 @@ input:focus,select:focus,.btn:focus-visible{outline:2px solid var(--accent);outl
 /* --- accessibility --- */
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* pulse signature: the wordmark and "powered by pulse" (pulse brand book) */
+.pulse-mark{font-family:"Manrope",system-ui,sans-serif;font-weight:800;letter-spacing:-.035em}
+.pulse-mark::after{content:"";display:inline-block;width:.2em;height:.2em;border-radius:50%;background:var(--pulse-green);margin-left:.06em}
+.powered{display:flex;align-items:baseline;gap:5px;font-size:11px;color:rgba(255,255,255,.62);margin-top:10px}
+.powered .pulse-mark{font-size:15px;color:#fff}
+h1,h2,h3{font-family:"Manrope",system-ui,sans-serif}

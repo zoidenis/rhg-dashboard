@@ -73,7 +73,7 @@ td.num,th.num{text-align:right}
 .brief h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:15px 0 7px}
 .brief ul{margin:0;padding-left:18px}.brief li{margin-bottom:6px;line-height:1.55}
 .status-pill{font-weight:800;font-size:12.5px;padding:6px 13px;border-radius:999px}
-.status-ok{background:#e4f3f9;color:var(--accent)}.status-warn{background:var(--warn-bg);color:var(--warn)}.status-crit{background:var(--up-bg);color:var(--up)}
+.status-ok{background:var(--down-bg);color:var(--down)}.status-warn{background:var(--warn-bg);color:var(--warn)}.status-crit{background:var(--up-bg);color:var(--up)}
 .tag{font-size:10px;font-weight:800;text-transform:uppercase;border-radius:4px;padding:1px 5px;margin-right:6px;background:var(--bg);color:var(--sub);border:1px solid var(--line)}
 .tag.inference{color:var(--warn)}.tag.rec{color:var(--accent)}
 .act{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px}
@@ -100,7 +100,7 @@ td.num,th.num{text-align:right}
 .mhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
 .bar{display:grid;grid-template-columns:minmax(110px,150px) 1fr 110px;gap:10px;align-items:center;padding:6px 0}
 .track{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
-.fill{height:100%;background:var(--accent);border-radius:6px}
+.fill{height:100%;background:var(--data-cur);border-radius:6px}
 .foot{color:var(--sub);font-size:12px;line-height:1.6;margin-top:20px}
 @media print{aside,.filters,.mini,.btn,.hdr-side,.banner{display:none!important}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -169,7 +169,7 @@ td.num,th.num{text-align:right}
 .pl-sq .al span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-sq .al.crit{background:var(--up-bg)} .pl-sq .al.crit i{background:var(--up)}
 .pl-sq .al.warn{background:var(--warn-bg)} .pl-sq .al.warn i{background:var(--warn)}
-.pl-sq .al.info i{background:var(--accent)}
+.pl-sq .al.info i{background:var(--sub)}
 .pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
 .pl-bd.show{display:flex}
 .pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
@@ -201,18 +201,18 @@ td.num,th.num{text-align:right}
 .pl-sq .st b small{font-size:10.5px;font-weight:600;color:var(--sub);margin-left:3px}
 .pl-sq .st b{white-space:nowrap}
 .il-bar{display:flex;align-items:stretch;gap:2px;height:14px;border-radius:5px;overflow:hidden;background:var(--bg);margin:4px 0 10px}
-.il-c-mov{background:var(--accent)}.il-c-mon{background:var(--prev)}.il-c-slow{background:var(--warn)}.il-c-dead{background:var(--up)}
+.il-c-mov{background:var(--data-cur)}.il-c-mon{background:var(--prev)}.il-c-slow{background:var(--warn)}.il-c-dead{background:var(--up)}
 .il-lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--sub)}
 .il-lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .il-age{display:grid;grid-template-columns:110px 1fr 70px;gap:6px 8px;align-items:center;font-size:12px}
-.il-age .t{height:10px;border-radius:0 4px 4px 0;background:var(--accent)}
+.il-age .t{height:10px;border-radius:0 4px 4px 0;background:var(--data-cur)}
 .il-age .t.late{background:var(--warn)}.il-age .t.dead{background:var(--up)}
 .il-parts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .il-part{font-size:11.5px;border-radius:999px;padding:3px 9px;background:var(--bg);color:var(--sub)}
 .il-part.ready{background:var(--down-bg);color:var(--down)}.il-part.pending{background:var(--warn-bg);color:var(--warn)}.il-part.failed{background:var(--up-bg);color:var(--up)}
 .pl-sq .st b.warn{color:var(--warn)}
 .pl-sq .al.good{background:var(--down-bg)} .pl-sq .al.good i{background:var(--down)}
-.pl-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--accent)}
+.pl-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--sub)}
 .pl-sev.crit{background:var(--up)}.pl-sev.warn{background:var(--warn)}
 .fl-split{display:flex;gap:2px;height:7px;flex:0 0 7px;border-radius:4px;overflow:hidden;background:var(--bg)}
 .fl-split.big{height:14px;flex-basis:14px;margin:4px 0 10px}
@@ -247,7 +247,7 @@ td.num,th.num{text-align:right}
 .bl-att .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
 .bl-att .tr b{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink);left:calc(100% / 1.3 - 1px)}
 .bl-att .v{text-align:right;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
-.bl-good{background:var(--down)}.bl-bad{background:var(--up)}.bl-mid{background:var(--accent)}
+.bl-good{background:var(--down)}.bl-bad{background:var(--up)}.bl-mid{background:var(--data-cur)}
 .bl-tab td,.bl-tab th{white-space:nowrap}
 .bl-tab tr.cls td{font-weight:800;background:var(--bg)}
 .bl-tab tr.grp td{font-weight:700}
@@ -313,12 +313,13 @@ td.num,th.num{text-align:right}
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
   </nav>
   <div class="side-foot">Reads Business Central directly, on this PC. BC stays read-only; actions and thresholds live here.</div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
 
 <main>
   <header>
     <div><div class="eyebrow">RHG Finance / Business Central, read-only</div>
-      <h1 id="title">Executive overview</h1><div class="period" id="period">Loading…</div></div>
+      <h1 id="title">Executive overview</h1><div class="period" id="period">Loading your data…</div></div>
     <div class="hdr-side">
       <div class="hdr-btns">
         <button class="btn" id="exportBtn">Export CSV</button>
@@ -1824,7 +1825,7 @@ function slSpark(l){
   const v = days.map(d => l.daily[d]), w = prev.map(d => l.daily_prev[d]);
   const mx = Math.max(1, ...v, ...w), W = 200, H = 26, n = Math.max(v.length, w.length, 2);
   const line = (arr, col, dash) => arr.length > 1 ? `<polyline points="${arr.map((x, i) => `${(i / (n - 1) * W).toFixed(1)},${(H - 2 - x / mx * (H - 4)).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${dash ? 1.4 : 2}" ${dash ? 'stroke-dasharray="3 3"' : ""} vector-effect="non-scaling-stroke"/>` : "";
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:22px;display:block" aria-hidden="true">${line(w, "var(--sub)", true)}${line(v, "var(--accent)")}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:22px;display:block" aria-hidden="true">${line(w, "var(--sub)", true)}${line(v, "var(--data-cur)")}</svg>`;
 }
 function slSquare(i, l, lim){
   const c = l.cur || {}, p = l.prev || {}, sg = slSignals(l, lim), a = sg.al[0] || ["good", "Within the limits"];
@@ -3432,8 +3433,8 @@ function flDraw(code){
     tr.forEach((t, i) => {
       const x = 40 + i * gw + gw / 2, h = v => Math.max(0, v || 0) / max * H;
       chart += `<rect x="${x - bw - 1}" y="${H - h(t[3])}" width="${bw}" height="${h(t[3])}" rx="3" fill="var(--prev)"><title>${esc(flMon(t[0]))} last year: ${fmt(t[3])}</title></rect>`;
-      chart += `<rect x="${x + 1}" y="${H - h(t[1])}" width="${bw}" height="${h(t[1])}" rx="3" fill="var(--accent)" opacity="${t[5] ? 0.45 : 1}"><title>${esc(flMon(t[0]))}${t[5] ? " (running, to yesterday)" : ""}: sales ${fmt(t[1])}, EBITDA ${fmt(t[2])}</title></rect>`;
-      if (t[4]) chart += `<line x1="${x - bw - 3}" x2="${x + bw + 3}" y1="${H - h(t[4])}" y2="${H - h(t[4])}" stroke="var(--ink)" stroke-width="2"><title>${esc(flMon(t[0]))} budget: ${fmt(t[4])}</title></line>`;
+      chart += `<rect x="${x + 1}" y="${H - h(t[1])}" width="${bw}" height="${h(t[1])}" rx="3" fill="var(--data-cur)" opacity="${t[5] ? 0.45 : 1}"><title>${esc(flMon(t[0]))}${t[5] ? " (running, to yesterday)" : ""}: sales ${fmt(t[1])}, EBITDA ${fmt(t[2])}</title></rect>`;
+      if (t[4]) chart += `<line x1="${x - bw - 3}" x2="${x + bw + 3}" y1="${H - h(t[4])}" y2="${H - h(t[4])}" stroke="var(--data-3)" stroke-width="2"><title>${esc(flMon(t[0]))} budget: ${fmt(t[4])}</title></line>`;
       chart += `<text x="${x}" y="${H + 16}" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(flMonS(t[0]))}</text>`;
     });
     chart += `<line x1="40" y1="${H}" x2="${W}" y2="${H}" stroke="var(--line)"/><text x="0" y="10" font-size="11" fill="var(--sub)">${flM(max)}</text></svg></div>`;
@@ -3446,7 +3447,7 @@ function flDraw(code){
     daily = `<svg viewBox="0 0 ${W} ${H + 20}" width="100%" role="img" aria-label="Sales by day, Simphony against BC posted">`;
     s.daily.forEach((v, i) => {
       const x = 34 + i * gw + (gw - bw) / 2, miss = v > 0 && !(pd[i]);
-      daily += `<rect x="${x}" y="${H - v / max * H}" width="${bw}" height="${v / max * H}" rx="2" fill="${miss ? "var(--warn)" : "var(--accent)"}"><title>${esc(s.days[i])}: Simphony ${fmt(v)} · BC posted ${fmt(pd[i] || 0)}${miss ? " · not posted" : ""}</title></rect>`;
+      daily += `<rect x="${x}" y="${H - v / max * H}" width="${bw}" height="${v / max * H}" rx="2" fill="${miss ? "var(--warn)" : "var(--data-cur)"}"><title>${esc(s.days[i])}: Simphony ${fmt(v)} · BC posted ${fmt(pd[i] || 0)}${miss ? " · not posted" : ""}</title></rect>`;
       if (pd[i]) daily += `<circle cx="${x + bw / 2}" cy="${H - pd[i] / max * H}" r="2.6" fill="var(--card)" stroke="var(--ink)" stroke-width="1.5"><title>${esc(s.days[i])}: BC posted ${fmt(pd[i])}</title></circle>`;
       if (n <= 16 || i % Math.ceil(n / 10) === 0) daily += `<text x="${x + bw / 2}" y="${H + 14}" text-anchor="middle" font-size="10" fill="var(--sub)">${new Date(s.days[i] + "T00:00:00").getDate()}</text>`;
     });
@@ -3472,10 +3473,10 @@ function flDraw(code){
         <div class="pl-panel pl-span2"><div class="ttl"><h3>P&amp;L · ${esc(flMon(mon) || "")}</h3><span class="hint" style="margin:0">${(P.pl || {}).budget ? esc((P.pl || {}).budget_name || "budget") : "no budget loaded"}</span></div>
           ${flSplit(c, "fl-split big")}<div class="il-lg" style="margin-bottom:8px"><span><i class="fl-c1"></i>Food &amp; beverage</span><span><i class="fl-c2"></i>Labour</span><span><i class="fl-c3"></i>Other costs</span><span><i class="fl-c4"></i>EBITDA</span></div>
           <div class="scroll">${plTable}</div></div>
-        <div class="pl-panel pl-span2"><div class="ttl"><h3>Sales by month</h3><span class="hint" style="margin:0">this year <i class="pl-sw" style="background:var(--accent)"></i> · last year <i class="pl-sw" style="background:var(--prev)"></i> · budget <i class="pl-sw" style="background:var(--ink);height:3px;vertical-align:3px"></i></span></div>${chart || `<p class="hint">${wait("pl") || "No months held."}</p>`}</div>
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>Sales by month</h3><span class="hint" style="margin:0">this year <i class="pl-sw" style="background:var(--data-cur)"></i> · last year <i class="pl-sw" style="background:var(--prev)"></i> · budget <i class="pl-sw" style="background:var(--data-3);height:3px;vertical-align:3px"></i></span></div>${chart || `<p class="hint">${wait("pl") || "No months held."}</p>`}</div>
         <div class="pl-panel"><div class="ttl"><h3>Budget and forecast ${esc(mon ? mon.slice(0, 4) : "")}</h3></div>
           ${p.ytd ? `<table class="fl-tab"><tr><th></th><th class="num">YTD</th><th class="num">YTD budget</th><th class="num">Budget year</th><th class="num">Forecast</th><th class="num">vs budget</th></tr>${fyRow("Sales", "sales")}${fyRow("EBITDA", "ebitda")}</table><p class="hint" style="margin:8px 0 0">Forecast: ${esc(fc.method || "")}.</p>` : `<p class="hint">${wait("pl") || "No P&L on this department."}</p>`}</div>
-        <div class="pl-panel"><div class="ttl"><h3>Sales this month, by day</h3><span class="hint" style="margin:0">Simphony <i class="pl-sw" style="background:var(--accent)"></i> · not posted <i class="pl-sw" style="background:var(--warn)"></i> · BC ○</span></div>${daily || `<p class="hint">${wait("sales") || "No Simphony sales for this department."}</p>`}
+        <div class="pl-panel"><div class="ttl"><h3>Sales this month, by day</h3><span class="hint" style="margin:0">Simphony <i class="pl-sw" style="background:var(--data-cur)"></i> · not posted <i class="pl-sw" style="background:var(--warn)"></i> · BC ○</span></div>${daily || `<p class="hint">${wait("sales") || "No Simphony sales for this department."}</p>`}
           ${s.unposted && s.unposted.length ? `<div class="fl-days">${s.unposted.map(x => `<span>${esc(x)}</span>`).join("")}${s.unposted_n > s.unposted.length ? `<span>+${s.unposted_n - s.unposted.length}</span>` : ""}</div>` : ""}</div>
         <div class="pl-panel"><div class="ttl"><h3>Payables</h3><span class="hint" style="margin:0">open, largest suppliers</span></div>${rows(ap.top, `<th>Supplier</th><th class="num">Open</th>`, x => `<tr><td>${esc(x[0])}</td><td class="num">${flM(x[1])}</td></tr>`, wait("ledgers") || "No open supplier entry on this department.")}
           ${ap.purch_top && ap.purch_top.length ? `<table style="margin-top:10px"><tr><th>Invoiced in ${esc(flMonS(((P.sales || {}).from || "").slice(0, 7)) || "the period")}</th><th class="num">${flM(ap.purchases)}</th></tr>${ap.purch_top.map(x => `<tr><td>${esc(x[0])}</td><td class="num">${flM(x[1])}</td></tr>`).join("")}</table>` : ""}</div>

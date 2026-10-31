@@ -97,6 +97,7 @@ td.mut{color:var(--sub)}
     <a href="/executive" class="on" aria-current="page">Executive dashboard</a>
   </div>
   <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
 
 <main>
@@ -820,7 +821,7 @@ function renderBanner(){
   $("banner").innerHTML = h;
   const busy = parts.length > 0;
   $("pill").className = "pill" + (busy ? " load" : errs.length || S.finErr || S.purErr ? " err" : "");
-  $("pillText").textContent = busy ? "Reading…" : `Live · ${new Date().toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
+  $("pillText").textContent = busy ? "Reading…" : `LIVE · updated ${new Date().toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
 }
 document.addEventListener("click", e => {
   const tr = e.target.closest("tr[data-dept]"); if (!tr || !tr.classList.contains("click")) return;
@@ -875,7 +876,7 @@ $("fYear").onchange = e => { F.year = +e.target.value; S.fin = S.pur = null; F.e
 $("refreshBtn").onclick = () => F.tab === "locations" && window.LocIntel ? LocIntel.refresh() : load(true);
 $("logoutBtn").onclick = async () => {
   try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
-  location.href = "/login";
+  location.href = "/login?signedout=1";
 };
 
 (async () => {

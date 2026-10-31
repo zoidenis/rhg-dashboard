@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0c475e"/>
-  <g transform="translate(140 126) scale(3.6)" fill="#a0d8ea">
-    <path d="M0 0V22.6109L22.6078 34.6779V0H0Z"/>
-    <path d="M22.6078 34.6905V34.678L0 46.7481V69.3559H22.6078V34.6905Z"/>
-    <path d="M22.6079 34.6904L46.3518 0H62.1177V34.6779L22.6079 34.6904Z"/>
-  </g>
+  <!-- pulse app icon (pulse brand book, 07): Graphite circle, white "p", green dot. Identical for every client. -->
+  <circle cx="256" cy="256" r="256" fill="#16181D"/>
+  <rect x="150" y="150" width="50" height="232" rx="6" fill="#FFFFFF"/>
+  <circle cx="252" cy="230" r="62" fill="none" stroke="#FFFFFF" stroke-width="48"/>
+  <circle cx="356" cy="322" r="30" fill="#12A866"/>
 </svg>

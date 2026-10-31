@@ -200,7 +200,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if url.path == "/api/login":
                 if rate_limited(ip):
-                    self._send(429, {"error": "Too many attempts. Wait a few minutes."}); return
+                    self._send(429, {"error": "Too many failed attempts. Try again in a few minutes."}); return
                 token, csrf, err = auth.login(body.get("username"), body.get("password"),
                                               ip, self.headers.get("User-Agent", ""))
                 if err:

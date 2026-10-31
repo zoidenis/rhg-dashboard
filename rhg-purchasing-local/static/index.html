@@ -90,7 +90,7 @@ td.num,th.num{text-align:right}
 .bars .row{display:grid;grid-template-columns:minmax(120px,190px) 1fr 100px;gap:10px;align-items:center;padding:6px 0}
 .bars .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:13px}
 .track{height:10px;background:var(--line);border-radius:6px;overflow:hidden;position:relative}
-.fill{height:100%;background:var(--accent);border-radius:6px}
+.fill{height:100%;background:var(--data-cur);border-radius:6px}
 .fill.prev{position:absolute;top:0;left:0;background:transparent;border-right:2px solid var(--ink);border-radius:0;opacity:.55}
 .amt{text-align:right;font-weight:700;font-size:12.5px}
 .ex{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:11px 13px;margin-bottom:9px}
@@ -111,7 +111,7 @@ td.num,th.num{text-align:right}
 .setup code{background:var(--bg);padding:1px 6px;border-radius:5px}
 .warnrow td{background:var(--warn-bg)}
 .hours{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:6px}
-.hours div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:1px;position:relative}
+.hours div{flex:1;background:var(--data-cur);border-radius:3px 3px 0 0;min-height:1px;position:relative}
 .hours-lbl{display:flex;gap:3px;font-size:10px;color:var(--sub);margin-top:4px}
 .hours-lbl span{flex:1;text-align:center}
 .brief{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin-bottom:18px}
@@ -220,7 +220,7 @@ td.num,th.num{text-align:right}
 .pl-sq .al span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-sq .al.crit{background:var(--up-bg)} .pl-sq .al.crit i{background:var(--up)}
 .pl-sq .al.warn{background:var(--warn-bg)} .pl-sq .al.warn i{background:var(--warn)}
-.pl-sq .al.info i{background:var(--accent)}
+.pl-sq .al.info i{background:var(--sub)}
 .td-host.td-on>:not(.ov-tabs):not(.td-view){display:none!important}
 .td-view{display:none}.td-host.td-on>.td-view{display:block}
 .pl-sq .big .v.up{color:var(--up)}
@@ -311,6 +311,7 @@ td.num,th.num{text-align:right}
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
   </nav>
   <div class="side-foot">Runs on this PC. Data comes straight from Business Central and refreshes on its own.</div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
 
 <main>
@@ -318,7 +319,7 @@ td.num,th.num{text-align:right}
     <div>
       <div class="eyebrow">RHG Purchasing / Business Central, live</div>
       <h1 id="title">Purchasing overview</h1>
-      <div class="period" id="period">Loading…</div>
+      <div class="period" id="period">Loading your data…</div>
     </div>
     <div class="hdr-side status">
       <div class="hdr-btns">
@@ -1011,7 +1012,7 @@ function render(){
   const t = new Date(m.checked_at);
   setPill(m.serving ? "load" : "", m.serving
     ? `Showing figures from ${t.toLocaleTimeString("en-GB")} · reading the new ones now`
-    : `Live · updated ${t.toLocaleTimeString("en-GB")} · next in ${refreshSec}s`);
+    : `LIVE · updated ${t.toLocaleTimeString("en-GB", {hour:"2-digit",minute:"2-digit"})} · next in ${refreshSec}s`);
   $("foot").textContent = `Source: Business Central, company ${m.company}, purchase value entries. Costs ex-VAT${m.expected_cost_included ? ", including goods received but not yet invoiced at expected cost" : ", invoiced cost only"}. Last check took ${m.query_ms} ms and found ${m.new_since_last} new entries.`;
 }
 
@@ -1026,7 +1027,7 @@ function renderDaily(){
     const pv = prev[i]?.[1] || 0, cv = cur[i]?.[1] || 0;
     const ph = pv/max*H, ch = cv/max*H;
     svg += `<rect x="${x-bw-2}" y="${H-ph}" width="${bw}" height="${ph}" rx="4" fill="var(--prev)"><title>${prev[i]?dayName(prev[i][0]):""}: ${all(pv)}</title></rect>`;
-    svg += `<rect x="${x+2}" y="${H-ch}" width="${bw}" height="${ch}" rx="4" fill="var(--accent)"><title>${cur[i]?dayName(cur[i][0]):""}: ${all(cv)}</title></rect>`;
+    svg += `<rect x="${x+2}" y="${H-ch}" width="${bw}" height="${ch}" rx="4" fill="var(--data-cur)"><title>${cur[i]?dayName(cur[i][0]):""}: ${all(cv)}</title></rect>`;
     const lbl = cur[i] ? dayName(cur[i][0]) : (prev[i] ? new Date(prev[i][0]+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short"}) : "");
     svg += `<text x="${x}" y="${H+18}" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(lbl)}</text>`;
   }
@@ -1291,7 +1292,7 @@ function renderInvoices(){
 
   const days = Object.entries(I.daily), max = Math.max(1, ...days.map(d => d[1].invoices + d[1].credit_memos));
   $("invDaily").innerHTML = days.length ? `<div class="hours" style="height:170px">${days.map(([d,v]) =>
-     `<div title="${dayName(d)}: ${v.invoices} invoices, ${v.credit_memos} credit memos" style="height:${(v.invoices+v.credit_memos)/max*100}%;background:linear-gradient(to top, var(--prev) ${v.credit_memos/(v.invoices+v.credit_memos||1)*100}%, var(--accent) 0)"></div>`).join("")}</div>
+     `<div title="${dayName(d)}: ${v.invoices} invoices, ${v.credit_memos} credit memos" style="height:${(v.invoices+v.credit_memos)/max*100}%;background:linear-gradient(to top, var(--prev) ${v.credit_memos/(v.invoices+v.credit_memos||1)*100}%, var(--data-cur) 0)"></div>`).join("")}</div>
      <div class="hours-lbl">${days.map(([d,v]) => `<span>${dayName(d).split(",")[0]}<br><b>${v.invoices}</b></span>`).join("")}</div>` : '<div class="empty">No invoices posted yet in this period.</div>';
 
   renderBars("invBuckets", I.buckets.map(b => ({l:b.label, v:b.count, p:0})));
@@ -2888,7 +2889,7 @@ function plSpark(daily){
   const v = Object.values(daily || {}); if (v.length < 2) return "";
   const mx = Math.max(...v), mn = Math.min(0, ...v), W = 200, H = 26;
   const pts = v.map((x, i) => `${(i / (v.length - 1) * W).toFixed(1)},${(H - 2 - (x - mn) / ((mx - mn) || 1) * (H - 4)).toFixed(1)}`).join(" ");
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--data-cur)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 function plSquare(code, x){
   const ex = x.exceptions || {}, o = x.orders || {}, ts = x.top_supplier || [];
@@ -2979,7 +2980,7 @@ function plDraw(code, j){
   for (let i = 0; i < n; i++) {
     const x = 30 + i * gw + gw / 2, pv = (prev[i] || [0, 0])[1], cv = (cur[i] || [0, 0])[1];
     chart += `<rect x="${x - bw - 1}" y="${H - pv / max * H}" width="${bw}" height="${pv / max * H}" rx="3" fill="var(--prev)"><title>${prev[i] ? esc(prev[i][0]) : ""}: ${all(pv)}</title></rect>`;
-    chart += `<rect x="${x + 1}" y="${H - cv / max * H}" width="${bw}" height="${cv / max * H}" rx="3" fill="var(--accent)"><title>${cur[i] ? esc(cur[i][0]) : ""}: ${all(cv)}</title></rect>`;
+    chart += `<rect x="${x + 1}" y="${H - cv / max * H}" width="${bw}" height="${cv / max * H}" rx="3" fill="var(--data-cur)"><title>${cur[i] ? esc(cur[i][0]) : ""}: ${all(cv)}</title></rect>`;
     if (n <= 16 || i % Math.ceil(n / 12) === 0) chart += `<text x="${x}" y="${H + 16}" text-anchor="middle" font-size="10" fill="var(--sub)">${cur[i] ? new Date(cur[i][0] + "T00:00:00").getDate() : ""}</text>`;
   }
   chart += `<line x1="30" y1="${H}" x2="${W}" y2="${H}" stroke="var(--line)"/><text x="0" y="10" font-size="10" fill="var(--sub)">${plM(max)}</text></svg>`;
@@ -3001,7 +3002,7 @@ function plDraw(code, j){
         ${tile("Exceptions", fmt((ops.sla || []).length), `${fmt((ops.sla || []).filter(e => e.severity === "critical").length)} critical`, (ops.sla || []).some(e => e.severity === "critical") ? "up" : "")}
       </div>
       <div class="pl-cols">
-        <div class="pl-panel pl-span2"><div class="ttl"><h3>Spend by day</h3><span class="hint" style="margin:0">This period <i class="pl-sw" style="background:var(--accent)"></i> · comparison <i class="pl-sw" style="background:var(--prev)"></i></span></div>${chart}</div>
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>Spend by day</h3><span class="hint" style="margin:0">This period <i class="pl-sw" style="background:var(--data-cur)"></i> · comparison <i class="pl-sw" style="background:var(--prev)"></i></span></div>${chart}</div>
         <div class="pl-panel"><div class="ttl"><h3>Largest items</h3></div>${rows(top, `<th>Item</th><th class="num">Spend</th><th class="num">Comparison</th>`, t => `<tr><td>${esc(t.desc || t.item_no)}</td><td class="num">${plM(t.cost)}</td><td class="num meta">${plM(t.prev_cost)}</td></tr>`, "Nothing bought in this period.")}</div>
         <div class="pl-panel"><div class="ttl"><h3>Suppliers</h3></div>${rows(sup, `<th>Supplier</th><th class="num">Spend</th><th class="num">Share</th>`, s => `<tr><td>${esc(s.supplier)}</td><td class="num">${plM(s.spend)}</td><td class="num ${s.share >= 35 ? "up" : ""}">${fmt(s.share, 0)}%</td></tr>`, "No supplier matched in this period.")}</div>
         <div class="pl-panel"><div class="ttl"><h3>Price changes</h3><span class="hint" style="margin:0">by money impact</span></div>${rows(mov, `<th>Item</th><th class="num">Change</th><th class="num">Impact</th>`, x => `<tr><td>${esc(x.desc || x.item_no)}<div class="meta">${fmt(x.prev_avg, 2)} → ${fmt(x.cur_avg, 2)}</div></td><td class="num ${x.pct > 0 ? "up" : "down"}">${x.pct > 0 ? "+" : ""}${fmt(x.pct, 1)}%</td><td class="num ${x.impact > 0 ? "up" : "down"}">${x.impact > 0 ? "+" : ""}${plM(x.impact)}</td></tr>`, "No price moved beyond the threshold.")}</div>
@@ -3234,8 +3235,8 @@ setInterval(() => {
   countdown--;
   if (countdown <= 0) { if (!document.hidden) load(false); else countdown = refreshSec; }
   else if (!$("pill").classList.contains("err")) {
-    const t = new Date(data.meta.checked_at).toLocaleTimeString("en-GB");
-    $("pillText").textContent = `Live · updated ${t} · next in ${countdown}s`;
+    const t = new Date(data.meta.checked_at).toLocaleTimeString("en-GB", {hour:"2-digit",minute:"2-digit"});
+    $("pillText").textContent = `LIVE · updated ${t} · next in ${countdown}s`;
   }
 }, 1000);
 
