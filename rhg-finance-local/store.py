@@ -96,6 +96,9 @@ DEFAULT_SETTINGS = {
     # Daily email with the receivables and payables exceptions (sent through Purchasing's mail server)
     "arap_notify": {"enabled": False, "to": "", "cc": "", "time": "08:00", "working_days_only": True,
                     "companies": "", "send_empty": True},
+    # weekly cost control email (inventory exceptions and an action list) for the week before:
+    # the day (0 = Monday) and time it goes out, recipients and companies
+    "cost_report": {"enabled": False, "to": "", "cc": "", "day": "0", "time": "08:30", "companies": ""},
     # fiscalized purchase invoices (Tax Administration / Self-Care) against BC: daily read and email
     "fiscal": {"enabled": False, "to": "", "cc": "", "time": "07:30", "working_days_only": True,
                "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False,
@@ -150,6 +153,7 @@ def get_settings():
     merged["group"].update(s.get("group", {}))
     merged["executive"].update(s.get("executive", {}))
     merged["arap_notify"].update(s.get("arap_notify", {}))
+    merged["cost_report"].update(s.get("cost_report", {}))
     merged["fiscal"].update(s.get("fiscal", {}))
     merged["locations"].update(s.get("locations", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
@@ -189,6 +193,17 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("arap_notify", {})[k] = v
+        for k, v in (patch.get("cost_report") or {}).items():
+            if k in DEFAULT_SETTINGS["cost_report"]:
+                if isinstance(DEFAULT_SETTINGS["cost_report"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "08:30"
+                elif k == "day":
+                    v = str(v) if str(v) in ("0", "1", "2", "3", "4", "5", "6") else "0"
+                else:
+                    v = str(v)[:400]
+                current.setdefault("cost_report", {})[k] = v
         for k, v in (patch.get("fiscal") or {}).items():
             if k in DEFAULT_SETTINGS["fiscal"]:
                 if isinstance(DEFAULT_SETTINGS["fiscal"][k], bool):

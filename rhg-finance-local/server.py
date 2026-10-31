@@ -4,6 +4,7 @@ Business Central is read only. Actions, thresholds and the audit trail are the
 application's own and live under ./data.
 """
 import base64
+import html
 import json
 import sys
 import threading
@@ -16,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import arap_notify
+import cost_report
 import assets
 import auth
 import brief
@@ -54,6 +56,7 @@ PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.c
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
+                     "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -1077,6 +1080,13 @@ def drill(kind, key):
 
 
 arap = arap_notify.Notifier(client, company_currency, config.BC_COMPANY)
+costrep = cost_report.Reporter(client, stock_summary, company_currency, config.BC_COMPANY)
+
+
+def cost_report_status():
+    return {"settings": costrep.settings(), "companies": costrep.companies(), "recipients": costrep.recipients(),
+            "next_run": costrep.next_run(), "runs": cost_report.recent_runs(), "mail": arap_notify.mail_status(),
+            "week": [d.isoformat() for d in cost_report.last_week()]}
 
 
 def arap_status(user):
@@ -1215,6 +1225,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(pdf)))
                 self.end_headers()
                 self.wfile.write(pdf)
+            elif url.path == "/api/cost-report":
+                self._send(200, cost_report_status())
+            elif url.path in ("/api/cost-report/job", "/api/cost-report/preview"):
+                job = costrep.job(q.get("id") or "", user["username"])
+                if not job:
+                    self._send(404, {"error": "This report is no longer held; build it again."})
+                elif url.path.endswith("/job"):
+                    self._send(200, {k: v for k, v in job.items() if k != "html"})
+                elif job.get("html"):
+                    self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
+                else:
+                    msg = ("Reading Business Central: stock, movements, recipes and item cards of last week… "
+                           "the first read can take several minutes." if job["status"] == "running"
+                           else html.escape(job.get("detail") or ""))
+                    self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
+                                     f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/api/arap-notify/preview":
                 company = q.get("company") or arap.companies()[0]
                 self._send(200, arap.preview(company).encode("utf-8"), "text/html; charset=utf-8")
@@ -1473,6 +1499,25 @@ class Handler(BaseHTTPRequestHandler):
                                      "status": simphony.info()})
                 except simphony.SimphonyError as exc:
                     self._send(200, {"ok": False, "error": str(exc), "status": simphony.info()})
+            elif url.path in ("/api/cost-report/settings", "/api/cost-report/job"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    _, bad = arap_notify.parse_emails(body.get("to"))
+                    _, bad_cc = arap_notify.parse_emails(body.get("cc"))
+                    if bad or bad_cc:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad + bad_cc)})
+                        return
+                    store.save_settings({"cost_report": body}, actor)
+                    self._send(200, cost_report_status())
+                    return
+                only, bad = arap_notify.parse_emails(body.get("to"))
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                company = body.get("company") or costrep.companies()[0]
+                self._send(202, costrep.start_job(company, actor, only or None))
             elif url.path in ("/api/arap-notify/settings", "/api/arap-notify/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -1617,6 +1662,7 @@ def main():
     print(f"Business Central: {config.BC_BASE_URL}  company: {config.BC_COMPANY}  (read-only)")
     threading.Thread(target=_warm_loop, daemon=True).start()
     arap.start()
+    costrep.start()
     fiscal.start_scheduler(client, config.FISK_COMPANY)
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://{host}:{config.APP_PORT}")).start()

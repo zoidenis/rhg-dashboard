@@ -806,6 +806,28 @@ td.num,th.num{text-align:right}
       <p class="hint" id="arInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="arRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="crCard">
+      <div class="card-head"><div><h2>Cost control weekly email</h2>
+        <p class="hint">Every week, for the week before, a short report for the cost controller: highlights against the previous report (stock against the G/L, slow and dead stock, stock received and never used, days of cover, items below zero, recipe coverage, item master issues), an action list with priority, owner and value, and five lines each from Inventory, Movement &amp; dead stock, Typology &amp; turnover, Recipe integrity and Item master control. Every line behind it comes in an Excel file. Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="crPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">To<input id="crTo" placeholder="costcontroller@rhg.al"></label>
+        <label class="field">Cc (optional)<input id="crCc" placeholder="name@rhg.al, name@rhg.al"></label>
+        <label class="field">Day<select id="crDay"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select></label>
+        <label class="field">Time<input id="crTime" type="time" value="08:30"></label>
+        <label class="field">Companies (blank = default)<input id="crCo" placeholder="SALT"></label>
+        <label class="field">Send a test to<input id="crTestTo" placeholder="you@rhg.al"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="crOn" style="width:auto"> Send every week</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="crSave">Save</button>
+        <button class="btn" id="crPreview">Preview</button>
+        <button class="btn" id="crTest">Send a test</button>
+        <span class="meta" id="crMsg"></span>
+      </div>
+      <p class="hint" id="crInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="crRuns"></table></div>
+    </div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -929,6 +951,7 @@ function render(){
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
   if(!spLoaded) loadSimphony();
   if(!arLoaded) loadArap();
+  if(!crLoaded) loadCostReport();
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
@@ -3031,6 +3054,60 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("flBd").classList.contains("show")) { $("flBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.flloc != null) { e.preventDefault(); flOpen(e.target.dataset.flloc); }
 });
+
+// ---------- cost control weekly email ----------
+let crLoaded = false, crJob = null, crTimer = null;
+async function loadCostReport(){
+  crLoaded = true;
+  try{ renderCostReport(await readJSON(await fetch("/api/cost-report"))); }catch(e){ $("crMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function renderCostReport(st){
+  const s = st.settings || {}, m = st.mail || {}, days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  $("crTo").value = s.to || ""; $("crCc").value = s.cc || ""; $("crDay").value = String(s.day ?? "0"); $("crTime").value = s.time || "08:30";
+  $("crCo").value = s.companies || ""; $("crOn").checked = !!s.enabled;
+  if (!$("crTestTo").value) $("crTestTo").value = (s.to || "").split(",")[0].trim();
+  $("crPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : "info");
+  $("crPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : `On · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}`;
+  const r = st.recipients || {};
+  $("crInfo").textContent = `Every ${days[+(s.day || 0)]} at ${s.time || "08:30"}, for the week before (the last one: ${st.week[0]} to ${st.week[1]}). Companies: ${(st.companies || []).join(", ")}. `
+    + ((r.to || []).length ? `To: ${r.to.join(", ")}${(r.cc || []).length ? " · Cc: " + r.cc.join(", ") : ""}.` : "No recipient yet.")
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [];
+  $("crRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Company</th><th>Week</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 10).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.company)}</td><td class="meta">${esc((x.week || {}).from || "")}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc((x.to || []).join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["crSave", "crTest", "crPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "crSave" && !!crJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("crSave").onclick = async () => {
+  $("crMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/cost-report/settings", {to: $("crTo").value, cc: $("crCc").value, day: $("crDay").value,
+      time: $("crTime").value, companies: $("crCo").value, enabled: $("crOn").checked});
+    renderCostReport(st); $("crMsg").textContent = st.settings.enabled ? "Saved. The report goes out every week." : "Saved. Tick Send every week to switch it on.";
+  }catch(e){ $("crMsg").textContent = "Could not save: " + e.message; }
+};
+async function startCostReport(to, win){
+  $("crMsg").textContent = "Reading last week from Business Central… several minutes the first time.";
+  try{
+    const job = await simphonyPost("/api/cost-report/job", {company: ($("crCo").value.split(",")[0] || "").trim() || $("company").value, to});
+    crJob = job; ["crTest", "crPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/cost-report/preview?id=" + encodeURIComponent(job.id);
+    pollCostReport();
+  }catch(e){ $("crMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollCostReport(){
+  clearTimeout(crTimer);
+  if (!crJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/cost-report/job?id=" + encodeURIComponent(crJob.id)));
+    if (j.status === "running") { crTimer = setTimeout(pollCostReport, 5000); return; }
+    $("crMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("crMsg").textContent = "Lost track of the report: " + e.message; }
+  crJob = null; loadCostReport();
+}
+$("crPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the cost control report…</p>"); startCostReport("", w); };
+$("crTest").onclick = () => { const to = $("crTestTo").value.trim(); if (!to) { $("crMsg").textContent = "Enter an address for the test."; return; } startCostReport(to, null); };
 </script>
 <script src="tables.js"></script>
 </body>
