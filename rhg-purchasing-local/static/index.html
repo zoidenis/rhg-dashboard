@@ -40,7 +40,13 @@ nav .grp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppe
 nav .grp:first-child{margin-top:0}
 nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center}
 nav button:hover{background:rgba(255,255,255,.05)}
-nav button.on{background:rgba(255,255,255,.09);color:#fff;font-weight:700}
+nav button.on,nav button.sub-on{background:rgba(255,255,255,.09);color:#fff;font-weight:700}
+#pcTabs{overflow-x:auto;scrollbar-width:thin}
+#pcTabs button{white-space:nowrap}
+/* embedded in another tower (?embed=stock): the screen only, no menu, header or filters */
+html.embed aside, html.embed main > header, html.embed main > .filters, html.embed #banner, html.embed #printHead{display:none!important}
+html.embed main{padding:4px 2px 30px}
+html.embed body{background:transparent}
 nav .count{background:#5c1d1a;color:#ffb4ae;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
 .side-foot{flex:none;font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 28px 60px}
@@ -266,16 +272,14 @@ td.num,th.num{text-align:right}
     <button data-view="invoices">Invoices</button>
     <button data-view="streams">Purchase types</button>
     <button data-view="services">Services &amp; CAPEX</button>
-
-    <div class="grp">Prices &amp; contracts</div>
-    <button data-view="compare">Comparisons</button>
-    <button data-view="contracts">Contract prices</button>
-    <button data-view="savings">Price savings</button>
-    <button data-view="prices">Price changes</button>
-    <button data-view="locations">Location prices</button>
-
-    <div class="grp">Stock</div>
-    <button data-view="stock">Stock &amp; working capital</button>
+    <!-- Prices & contracts: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
+    <button data-view="compare" data-tab="Comparisons" data-group="Prices &amp; contracts">Prices &amp; contracts</button>
+    <button data-view="contracts" data-parent="compare" data-tab="Contract prices" style="display:none">Contract prices</button>
+    <button data-view="savings" data-parent="compare" data-tab="Price savings" style="display:none">Price savings</button>
+    <button data-view="prices" data-parent="compare" data-tab="Price changes" style="display:none">Price changes</button>
+    <button data-view="locations" data-parent="compare" data-tab="Location prices" style="display:none">Location prices</button>
+    <!-- Stock & working capital is a tab of Finance → Inventory now (this view, embedded); #stock still opens it here -->
+    <button data-view="stock" style="display:none">Stock &amp; working capital</button>
 
     <div class="grp">Control</div>
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
@@ -382,6 +386,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-compare">
+    <div class="ov-tabs" id="pcTabs" role="tablist"><button data-t="compare" class="on" role="tab" aria-selected="true">Comparisons</button><button data-t="contracts" role="tab" aria-selected="false">Contract prices</button><button data-t="savings" role="tab" aria-selected="false">Price savings</button><button data-t="prices" role="tab" aria-selected="false">Price changes</button><button data-t="locations" role="tab" aria-selected="false">Location prices</button></div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-head"><div><h2>Equivalent period comparisons</h2>
         <p class="hint" id="cmpHint">Every comparison uses the same weekdays, so trading days match. Loaded on demand and cached for 15 minutes.</p></div>
@@ -2258,8 +2263,8 @@ function renderStock(){
     $("stkKpis").innerHTML = ""; return;
   }
   const t = d.totals, p = d.policy, m = d.completeness;
-  $("stkMismatch").style.display = d.period_mismatch ? "block" : "none";
-  if (d.period_mismatch) $("stkMismatch").textContent =
+  $("stkMismatch").style.display = d.period_mismatch && data ? "block" : "none";
+  if (d.period_mismatch && data) $("stkMismatch").textContent =
     `The filter at the top of the page shows ${data.meta.current[0]} to ${data.meta.current[1]}, while this screen shows ${d.month}. The figures below are for ${d.month}.`;
   $("stkNote").innerHTML = `${esc(d.location)} · ${esc(d.month)} · opening at ${esc(d.opening_date)}, closing at ${esc(d.period[1])}`
     + ` · ${fmt(m.ile_rows_read)} movements read${m.ile_rows_expected!=null?` of ${fmt(m.ile_rows_expected)} BC counts`:""}`
@@ -2861,8 +2866,18 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("plBd").classList.contains("show")) { $("plBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.plloc) { e.preventDefault(); plOpen(e.target.dataset.plloc); }
 });
+// Prices & contracts: five views under one menu item, with one tab bar on top of the open one
+var PC_TABS = ["compare", "contracts", "savings", "prices", "locations"];
+function pcTabsSync(view){
+  const bar = $("pcTabs"), sec = $("v-" + view);
+  if (!bar || !sec || !PC_TABS.includes(view)) return;
+  if (bar.parentNode !== sec) sec.insertBefore(bar, sec.firstChild);
+  bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === view); b.setAttribute("aria-selected", b.dataset.t === view); });
+  const on = bar.querySelector("button.on"); if (on && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
+}
+document.querySelectorAll("#pcTabs button").forEach(b => b.onclick = () => { const n = document.querySelector(`#nav button[data-view="${b.dataset.t}"]`); if (n) n.click(); });
 document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x===b));
+  document.querySelectorAll("#nav button").forEach(x => { x.classList.toggle("on", x===b); x.classList.toggle("sub-on", !!b.dataset.parent && x.dataset.view === b.dataset.parent); });
   if ($("v-exdetail").classList.contains("on")) exCurrent = null;
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.view));
   if (b.dataset.view === "compare") loadComparisons(false);
@@ -2871,7 +2886,8 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
   if (b.dataset.view === "savings" && !svData) svQuick("lastmonth");
   // the screen is part of the address, so a link from the control center can open it
-  if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
+  if (history.replaceState) history.replaceState(null, "", (b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view).replace(/^#/, location.search + "#"));
+  pcTabsSync(b.dataset.view);
   setHeader();
 });
 function openFromHash(){
@@ -3004,8 +3020,12 @@ const SCREEN_NOTE = {
 };
 function currentView(){
   const btn = document.querySelector("#nav button.on");
-  return {id: (btn && btn.dataset.view) || "overview",
-          label: (btn ? btn.textContent : "Overview").replace(/\s*\d+$/, "").trim()};
+  let label = (btn ? btn.textContent : "Overview").replace(/\s*\d+$/, "").trim();
+  if (btn && btn.dataset.tab) {           // a tab of a menu item: "<item> · <tab>"
+    const head = btn.dataset.group || (document.querySelector(`#nav button[data-view="${btn.dataset.parent}"]`) || {dataset: {}}).dataset.group || "";
+    label = (head ? head + " · " : "") + btn.dataset.tab;
+  }
+  return {id: (btn && btn.dataset.view) || "overview", label};
 }
 function printContext(){
   const m = data.meta;
@@ -3063,14 +3083,23 @@ setInterval(() => {
   }
 }, 1000);
 
+// ?embed=stock (Finance → Inventory → Stock & working capital): that screen only, for the company asked
+const EMBED = new URLSearchParams(location.search).get("embed") || "";
+if (EMBED) document.documentElement.classList.add("embed");
 (async () => {
   await loadSession();
   $("week").value = snapDate(mondayOf(new Date()));
   try {
     const r = await fetch("/api/companies"); const j = await r.json();
-    if (r.ok) $("company").innerHTML = j.companies.map(c => `<option ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
+    const want = new URLSearchParams(location.search).get("company");
+    const pickCo = want && j.companies.includes(want) ? want : j.default;
+    if (r.ok) $("company").innerHTML = j.companies.map(c => `<option ${c===pickCo?"selected":""}>${esc(c)}</option>`).join("");
     else throw new Error(j.error);
   } catch(e) { $("company").innerHTML = `<option>SALT</option>`; }
+  if (EMBED) {                 // the screen only: no dashboard read
+    const b = document.querySelector(`#nav button[data-view="${CSS.escape(EMBED)}"]`); if (b) b.click();
+    return;
+  }
   openFromHash();
   load(true);
 })();

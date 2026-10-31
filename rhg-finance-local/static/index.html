@@ -277,6 +277,7 @@ td.num,th.num{text-align:right}
     <button data-view="recipes" data-parent="inventory" style="display:none">Recipe integrity</button>
     <button data-view="itemmaster" data-parent="inventory" style="display:none">Item master control</button>
     <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
+    <button data-view="stockwc" data-parent="inventory" style="display:none">Stock &amp; working capital</button>
 
     <div class="grp">Planning</div>
     <button data-view="budget">Budget &amp; forecast</button>
@@ -575,7 +576,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -619,6 +620,11 @@ td.num,th.num{text-align:right}
     </div>
   </section>
 
+  <!-- Stock & working capital: the Purchasing tower's screen, embedded (same site, same sign-in) -->
+  <section class="view" id="v-stockwc">
+    <p class="hint" id="swNote" style="margin:0 0 8px">From the Purchasing tower: a location and a completed month, opening and closing stock, where the capital is tied up and why. <a href="/purchasing/#stock" target="_blank" rel="noopener">Open in Purchasing ›</a></p>
+    <iframe id="swFrame" title="Stock and working capital" style="width:100%;min-height:900px;border:0;display:block;background:transparent" loading="lazy"></iframe>
+  </section>
   <section class="view" id="v-typology">
     <div class="card">
       <div class="card-head"><div><h2>Inventory typology &amp; turnover</h2>
@@ -2643,6 +2649,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
   if (b.dataset.view === "kartela") kaShow(kaTab);
   invTabsSync(b.dataset.view); fbTabsSync(b.dataset.view);
+  if (b.dataset.view === "stockwc") swShow();
   setHeader();
 });
 function currentView(){
@@ -2781,7 +2788,18 @@ function ilBar(L, cls){
 // Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
 // Typology & turnover, Recipe integrity, Item master control and Movement & dead stock, which stay views
 // of their own (their addresses and loading do not change) with the same tab bar on top.
-var INV_TABS = new Set(["typology", "recipes", "itemmaster", "movement"]);
+var INV_TABS = new Set(["typology", "recipes", "itemmaster", "movement", "stockwc"]);
+// the embedded Purchasing screen: loaded when the tab opens (again when the company changes), sized to its content
+var swCompany = null, swTimer = null;
+function swShow(){
+  const co = $("company").value || "";
+  if (swCompany !== co) { swCompany = co; $("swFrame").src = "/purchasing/?embed=stock&company=" + encodeURIComponent(co) + "#stock"; }
+  clearInterval(swTimer);
+  swTimer = setInterval(() => {
+    if (!$("v-stockwc").classList.contains("on")) { clearInterval(swTimer); return; }
+    try { const h = $("swFrame").contentDocument.documentElement.scrollHeight; if (h) $("swFrame").style.height = Math.max(600, h + 10) + "px"; } catch (e) { /* not reachable yet */ }
+  }, 800);
+}
 function invTabsSync(view){
   const bar = $("invTabs"), sec = $("v-" + view);
   if (!bar || !sec || !(view === "inventory" || INV_TABS.has(view))) return;
