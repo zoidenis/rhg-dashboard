@@ -1108,6 +1108,24 @@ def cost_report_status():
 brandrep = brand_report.Reporter(client, _latest, in_parallel_jobs, company_currency)
 
 
+def restaurants_by_company():
+    """{company: [{key, name, brand}]} of the restaurant registry, for Email recipients: the key is the
+    restaurant's BC location code, else its department, else its Simphony reference (what the location
+    emails of both towers look a location up by)."""
+    out = {}
+    try:
+        rows = locintel.registry()
+    except Exception:                                               # noqa: BLE001
+        return out
+    for r in rows:
+        if not r.get("company"):
+            continue
+        key = (r.get("bc") or r.get("dept") or r.get("ref") or "").strip()
+        if key:
+            out.setdefault(r["company"], []).append({"key": key, "name": r.get("name") or key, "brand": r.get("brand") or ""})
+    return out
+
+
 salesrep = sales_report.Reporter(client, _latest, in_parallel_jobs, company_currency)
 
 
@@ -1510,7 +1528,7 @@ class Handler(BaseHTTPRequestHandler):
                     companies = client.companies()
                 except Exception:                                # noqa: BLE001
                     companies = []
-                self._send(200, dict(d or {}, companies=companies, tower="Finance",
+                self._send(200, dict(d or {}, companies=companies, tower="Finance", restaurants=restaurants_by_company(),
                                      error="" if d else ("Purchasing could not be reached: " + recipients.last_error())))
             elif url.path == "/api/companies":
                 self._send(200, {"companies": client.companies(), "default": config.BC_COMPANY,
@@ -1643,7 +1661,7 @@ class Handler(BaseHTTPRequestHandler):
                 except (ValueError, requests.RequestException) as exc:
                     self._send(400, {"error": str(exc)[:300]})
                     return
-                self._send(200, dict(d, companies=client.companies(), tower="Finance"))
+                self._send(200, dict(d, companies=client.companies(), tower="Finance", restaurants=restaurants_by_company()))
             elif url.path in ("/api/sales-report/settings", "/api/sales-report/job"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

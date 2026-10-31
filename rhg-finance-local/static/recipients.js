@@ -72,6 +72,20 @@
   }
   const row = c => { const k = ci(D.people, c); return k ? D.people[k] : {}; };
   const locsOf = c => { const k = ci(D.locations, c); return k ? D.locations[k] : {}; };
+  // the restaurants of the registry (Finance → Location intelligence) of a company: {key, name}; the key is the
+  // restaurant's BC location code (else its department or Simphony reference), so both towers find it
+  const restOf = c => { const k = ci(D.restaurants, c); return k ? D.restaurants[k] : []; };
+  const lname = (c, l) => { const r = restOf(c).find(x => x.key.toUpperCase() === String(l).toUpperCase()); return r && r.name !== l ? `${r.name} (${l})` : l; };
+  function addOptions(c) {
+    const have = Object.keys(locsOf(c)).map(x => x.toUpperCase());
+    const rs = restOf(c).filter(x => !have.includes(x.key.toUpperCase()));
+    const rk = restOf(c).map(x => x.key.toUpperCase());
+    const other = (codes[c] || []).filter(x => !have.includes(x.toUpperCase()) && !rk.includes(x.toUpperCase()));
+    const head = rs.length || other.length ? (rs.length ? "Add a restaurant or location…" : "Add a location…") : (codes[c] ? "No locations read" : "Add a location…");
+    return `<option value="">${head}</option>`
+      + (rs.length ? `<optgroup label="Restaurants">${rs.map(x => `<option value="${esc(x.key)}">${esc(x.name)}${x.name !== x.key ? " · " + esc(x.key) : ""}</option>`).join("")}</optgroup>` : "")
+      + (other.length ? `<optgroup label="${rs.length ? "Other BC locations" : "BC locations"}">${other.map(x => `<option>${esc(x)}</option>`).join("")}</optgroup>` : "");
+  }
   const filled = p => (D.roles || []).filter(r => parse(p[r.key]).length);
   const roleInputs = (p, attrs) => `<div class="formgrid">${(D.roles || []).map(r => `<label class="field">${esc(r.label)}<input ${attrs} data-role="${esc(r.key)}" value="${esc(p[r.key] || "")}"></label>`).join("")}</div>`;
   const summary = p => { const f = filled(p); return f.length ? `${f.length} role${f.length > 1 ? "s" : ""} · ${f.map(r => esc(r.label.split(SEP)[0])).join(", ")}` : "nobody yet"; };
@@ -81,16 +95,17 @@
     const open = new Set([...box.querySelectorAll("details[open]")].map(d => d.dataset.k));
     const byLoc = reports.filter(r => r.by_location).map(r => r.label.split(SEP)[0]);
     const choices = [...cos, ...cos.flatMap(c => Object.keys(locsOf(c)).sort().map(l => c + SEP + l))];
+    const choiceLabel = x => { const i = x.lastIndexOf(SEP); return i > 0 && cos.includes(x.slice(0, i)) ? x.slice(0, i) + SEP + lname(x.slice(0, i), x.slice(i + SEP.length)) : x; };
     if (!pick || !choices.includes(pick)) pick = cos[0] || "";
     const coBlock = c => {
       const L = locsOf(c), names = Object.keys(L).sort();
-      return `<details class="rc-co" data-k="${esc(c)}"${open.has(c) ? " open" : ""}><summary><b>${esc(c)}</b><span>${summary(row(c))}${names.length ? ` · ${names.length} location${names.length > 1 ? "s" : ""}: ${esc(names.join(", "))}` : ""}</span></summary>
+      return `<details class="rc-co" data-k="${esc(c)}"${open.has(c) ? " open" : ""}><summary><b>${esc(c)}</b><span>${summary(row(c))}${names.length ? ` · ${names.length} location${names.length > 1 ? "s" : ""}: ${esc(names.map(l => lname(c, l)).join(", "))}` : ""}</span></summary>
         ${roleInputs(row(c), `data-co="${esc(c)}"`)}
-        <div class="rc-locs"><p class="rc-sub"><b>Locations of ${esc(c)}</b> · people set here get their own email with only their location's figures for ${esc(byLoc.join(", "))}; the company email does not change.</p>
-          ${names.map(l => `<details class="rc-co" data-k="${esc(c + SEP + l)}"${open.has(c + SEP + l) ? " open" : ""}><summary><b>${esc(l)}</b><span>${summary(L[l])}</span></summary>
+        <div class="rc-locs"><p class="rc-sub"><b>Restaurants and locations of ${esc(c)}</b> · people set here (a unit manager, a head chef…) get their own email with only that restaurant's or location's figures for ${esc(byLoc.join(", "))}; the company email does not change.${restOf(c).length ? " Restaurants come from Settings → Location intelligence." : ""}</p>
+          ${names.map(l => `<details class="rc-co" data-k="${esc(c + SEP + l)}"${open.has(c + SEP + l) ? " open" : ""}><summary><b>${esc(lname(c, l))}</b><span>${summary(L[l])}</span></summary>
             ${roleInputs(L[l], `data-co="${esc(c)}" data-loc="${esc(l)}"`)}
-            <div style="padding:0 12px 10px"><button class="mini" data-rmloc="${esc(l)}" data-co="${esc(c)}">Remove ${esc(l)}</button></div></details>`).join("")}
-          <div class="rc-add"><select data-addco="${esc(c)}" aria-label="Add a location of ${esc(c)}"><option value="">Add a location…</option>${(codes[c] || []).filter(x => !names.includes(x)).map(x => `<option>${esc(x)}</option>`).join("")}</select>
+            <div style="padding:0 12px 10px"><button class="mini" data-rmloc="${esc(l)}" data-co="${esc(c)}">Remove ${esc(lname(c, l))}</button></div></details>`).join("")}
+          <div class="rc-add"><select data-addco="${esc(c)}" aria-label="Add a restaurant or location of ${esc(c)}">${addOptions(c)}</select>
             <button class="mini" data-addbtn="${esc(c)}">Add</button><span class="meta" data-addmsg="${esc(c)}"></span></div></div></details>`;
     };
     box.innerHTML = `
@@ -107,7 +122,7 @@
           return `<td><select data-rep="${esc(rep.key)}" data-role="${esc(r.key)}" class="${v}" aria-label="${esc(rep.label)}: ${esc(r.label)}"><option value="">–</option><option value="to"${v === "to" ? " selected" : ""}>To</option><option value="cc"${v === "cc" ? " selected" : ""}>Cc</option></select></td>`; }).join("")}</tr>`).join("")}</table></div>
       <div style="margin:6px 0 0"><button class="mini" id="rcDefault">Back to the suggested roles</button></div>
       <div class="rc-h" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>Who gets what</b>
-        <select id="rcPick" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit;max-width:100%">${choices.map(c => `<option${c === pick ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+        <select id="rcPick" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit;max-width:100%">${choices.map(c => `<option value="${esc(c)}"${c === pick ? " selected" : ""}>${esc(choiceLabel(c))}</option>`).join("")}</select></div>
       <div class="scroll"><table id="rcWho" data-nosort></table></div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px">
         <button class="btn dark" id="rcSave">Save recipients</button><span class="meta" id="rcMsg"></span></div>`;
@@ -123,14 +138,14 @@
     box.querySelectorAll("select[data-addco]").forEach(s => s.onfocus = s.onmousedown = () => loadCodes(s.dataset.addco));
     box.querySelectorAll("[data-addbtn]").forEach(b => b.onclick = () => {
       const c = b.dataset.addbtn, sel = box.querySelector(`select[data-addco="${CSS.escape(c)}"]`), l = (sel.value || "").trim();
-      if (!l) { box.querySelector(`[data-addmsg="${CSS.escape(c)}"]`).textContent = "Choose a location first."; return; }
+      if (!l) { box.querySelector(`[data-addmsg="${CSS.escape(c)}"]`).textContent = "Choose a restaurant or location first."; return; }
       keep(); const k = ci(D.locations, c) || c; (D.locations[k] = D.locations[k] || {})[l] = {};
       render(); const d = box.querySelector(`details[data-k="${CSS.escape(c + SEP + l)}"]`); if (d) { d.open = true; d.closest("details[data-k]") && (box.querySelector(`details[data-k="${CSS.escape(c)}"]`).open = true); }
-      msg(`${l} added to ${c}. Fill its people and Save.`);
+      msg(`${lname(c, l)} added to ${c}. Fill its people and Save.`);
     });
     box.querySelectorAll("[data-rmloc]").forEach(b => b.onclick = () => {
       keep(); const k = ci(D.locations, b.dataset.co); if (k) delete D.locations[k][b.dataset.rmloc];
-      render(); msg(`${b.dataset.rmloc} removed; Save to keep it.`);
+      render(); msg(`${lname(b.dataset.co, b.dataset.rmloc)} removed; Save to keep it.`);
     });
     box.querySelector("#rcSave").onclick = save;
     const ok = allowed();
@@ -149,8 +164,9 @@
     } catch (e) { codes[c] = []; }
     const sel = box.querySelector(`select[data-addco="${CSS.escape(c)}"]`);
     if (!sel) return;
-    const have = Object.keys(locsOf(c));
-    sel.innerHTML = `<option value="">${codes[c].length ? "Add a location…" : "No locations read"}</option>` + codes[c].filter(x => !have.includes(x)).map(x => `<option>${esc(x)}</option>`).join("");
+    const keepV = sel.value;
+    sel.innerHTML = addOptions(c);
+    if (keepV) sel.value = keepV;
   }
   function mark(i) { const bad = parse(i.value).filter(x => !RE.test(x)); i.closest(".field").classList.toggle("rc-bad", !!bad.length); i.title = bad.length ? "Not an email address: " + bad.join(", ") : ""; }
 
@@ -194,7 +210,7 @@
       if (isLoc) {
         const r = rep.by_location ? resolveLoc(dir, rep.key, c, l) : null;
         if (!rep.by_location) { to = gen("company email only"); cc = ""; }
-        else if (!r) { to = gen(`no ${esc(l)} email: nobody in these roles`); cc = ""; }
+        else if (!r) { to = gen(`no ${esc(lname(c, l))} email: nobody in these roles`); cc = ""; }
         else { to = esc(r.to.join(", ")); cc = esc(r.cc.join(", ")); }
       } else {
         const r = resolve(dir, rep.key, [c]), brand = rep.key === "brand_performance";
