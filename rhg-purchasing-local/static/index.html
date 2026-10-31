@@ -181,6 +181,64 @@ td.num,th.num{text-align:right}
 }
 
 .foot{color:var(--sub);font-size:12px;line-height:1.6;margin-top:22px}
+/* Overview → Location intelligence */
+.ov-tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px;width:max-content;max-width:100%}
+.ov-tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;cursor:pointer;color:var(--sub);font-weight:600;font:inherit}
+.ov-tabs button.on{background:var(--accent);color:#fff}
+.pl-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.pl-grp{display:flex;align-items:baseline;gap:10px;margin:14px 0 8px;font-size:13px}
+.pl-grp span{font-size:11.5px;color:var(--sub)}
+.pl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.pl-sq{box-sizing:border-box;display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;cursor:pointer;min-width:0}
+.pl-sq:hover,.pl-sq:focus-visible{border-color:var(--accent);box-shadow:0 4px 14px rgba(8,48,63,.12);outline:none}
+.pl-sq .hd{display:flex;align-items:center;gap:8px}
+.pl-sq .ic{flex-shrink:0;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line);background:#fff}
+.pl-sq .ic svg{width:16px;height:16px}
+.pl-sq .nm{min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.pl-sq .nm b{font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pl-sq .nm span{font-size:10.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-sq .big{display:flex;flex-direction:column}
+.pl-sq .big .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.pl-sq .big .cmp{font-size:10.5px;color:var(--sub)}
+.pl-sq .sp svg{width:100%;height:22px;display:block}
+.pl-sq .st{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:var(--sub)}
+.pl-sq .st div{display:flex;flex-direction:column;line-height:1.25}
+.pl-sq .st b{font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.pl-sq .st b.up{color:var(--up)}
+.pl-sq .sup{font-size:10.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-sq .sup b{color:var(--ink)}
+.pl-sq .al{margin-top:auto;display:flex;align-items:center;gap:5px;font-size:10.5px;border-radius:7px;padding:4px 6px;background:var(--bg);min-width:0}
+.pl-sq .al i{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:var(--down)}
+.pl-sq .al span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-sq .al.crit{background:var(--up-bg)} .pl-sq .al.crit i{background:var(--up)}
+.pl-sq .al.warn{background:var(--warn-bg)} .pl-sq .al.warn i{background:var(--warn)}
+.pl-sq .al.info i{background:var(--accent)}
+.pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
+.pl-bd.show{display:flex}
+.pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.pl-pop .ph{background:var(--side,#08303f);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pl-pop .ph .ic{flex-shrink:0;width:48px;height:48px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.pl-pop .ph .ic svg{width:26px;height:26px}
+.pl-pop .ph h2{font-size:20px;color:#fff;margin:0}
+.pl-pop .ph .sub{color:#a0d8ea;font-size:12.5px}
+.pl-pop .ph .sp{flex:1}
+.pl-pop .ph .close{background:transparent;border:1px solid #2b5a6c;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}
+.pl-body{padding:16px 18px 18px}
+.pl-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.pl-tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+.pl-tile .l{font-size:11px;color:var(--sub)} .pl-tile .v{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.pl-tile .v.up{color:var(--up)} .pl-tile .v.warn{color:var(--warn)} .pl-tile .s{font-size:11px;color:var(--sub);overflow-wrap:anywhere}
+.pl-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.pl-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;overflow-x:auto}
+.pl-panel .ttl{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.pl-panel .ttl h3{margin:0;font-size:13.5px}
+.pl-panel table{width:100%;border-collapse:collapse;font-size:12.5px}
+.pl-panel td,.pl-panel th{padding:6px 6px}
+.pl-span2{grid-column:span 2}
+.pl-sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px}
+.pl-ex{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+@media (max-width:1000px){.pl-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pl-cols{grid-template-columns:minmax(0,1fr)}.pl-span2{grid-column:auto}}
+@media (max-width:600px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 <!-- brand layer last, so the Revo tokens override the built-in defaults -->
 <link rel="stylesheet" href="/brand.css">
@@ -273,6 +331,8 @@ td.num,th.num{text-align:right}
   <div id="printHead"></div>
 
   <section class="view on" id="v-overview">
+    <div class="ov-tabs" id="ovTabs" role="tablist"><button class="on" data-t="overview" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="ovMain">
     <div class="brief" id="brief"></div>
     <div class="kpis five">
       <div class="card kpi clickable" data-drill="purchases"><div class="l" id="kTotalL">Purchase spend this week</div><div class="v" id="kTotal">–</div><div class="s" id="kTotalS"></div></div>
@@ -300,6 +360,13 @@ td.num,th.num{text-align:right}
         <div id="daily"></div>
       </div>
       <div class="card"><h2>Top spend items</h2><p class="hint rhg-legend">This period <i></i> &nbsp; Comparison <i class="prev"></i></p><div class="rhg-bars" id="topSpend"></div></div>
+    </div>
+    </div>
+    <div id="ovLoc" style="display:none">
+      <div class="pl-bar"><div><h2 style="margin:0">Location intelligence</h2><p class="hint" style="margin:4px 0 0">Every location as a square with its main purchase figures for the period chosen above. Click a location for its purchases in detail.</p></div>
+        <label class="field" style="flex-direction:row;align-items:center;gap:6px">Order <select id="plSort"><option value="spend">by spend</option><option value="change">by change vs comparison</option><option value="price">by price rises</option><option value="awaiting">by received, not invoiced</option><option value="exceptions">by exceptions</option><option value="name">by code</option></select></label></div>
+      <div class="kpis five" id="plTotals"></div>
+      <div id="plGrid"></div>
     </div>
   </section>
 
@@ -759,6 +826,7 @@ td.num,th.num{text-align:right}
 </main>
 </div>
 
+<div class="pl-bd" id="plBd"><div class="pl-pop" id="plPop" role="dialog" aria-modal="true"></div></div>
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <div class="mhead"><div><h2 id="modalTitle">Records</h2><p class="hint" id="modalHint" style="margin:0"></p></div>
@@ -874,6 +942,7 @@ function render(){
   renderOvExceptions(); renderOvPostings(); bindGotoViews($("v-overview"));
   renderMovers(); renderSpreads(); renderExceptions(); renderPostings(); renderContracts(); renderInvoices(); renderUsers();
   renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
+  plRender();
 
   const t = new Date(m.checked_at);
   setPill(m.serving ? "load" : "", m.serving
@@ -2604,6 +2673,167 @@ function exportCsv(){
   a.click();
 }
 
+// ---------------------------------------------------------------- Overview → Location intelligence
+// Every location as a small square with its main purchase figures; a click opens the location's
+// purchases in detail (a read of the same period filtered to that location).
+let plTab = "overview", plSort = "spend", plNames = null, plDetail = {};
+const PL_GLYPH = {
+  OPA: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M5 9h14M6 9v10M10 9v10M14 9v10M18 9v10M4 21h16M8 3h8"/></svg>',
+  WH: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linejoin="round"><path d="M3 10l9-6 9 6v10H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>',
+  DOT: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v8a3 3 0 006 0V3M9 3v18M17 3c-2 2-2 6 0 8v10"/></svg>'
+};
+const plIsWh = code => /MAGAZ|CENTRAL|WAREHOUSE|DEPO|\bMAG\b| MAG$|_MAG|LAB/i.test(code);
+const plGlyph = code => plIsWh(code) ? PL_GLYPH.WH : /^OPA/i.test(code) ? PL_GLYPH.OPA : PL_GLYPH.DOT;
+const plM = v => v == null || !isFinite(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3).toLocaleString("en-US") + " k" : fmt(v);
+const plPct = v => v == null || !isFinite(v) ? "–" : Math.abs(v) < 0.5 ? "0%" : (v > 0 ? "+" : "") + v.toFixed(0) + "%";
+const plName = code => (plNames && plNames[code] && plNames[code] !== code) ? plNames[code] : "";
+async function plLoadNames(){
+  if (plNames) return;
+  plNames = {};
+  try{ const r = await fetch("/api/locations?company=" + encodeURIComponent($("company").value || "")); const j = await r.json();
+    (j.locations || []).forEach(l => plNames[l.code || l.Code] = l.name || l.Name || ""); }catch(e){}
+  if (plTab === "loc") plRender();
+}
+function plShowTab(tab){
+  plTab = tab;
+  document.querySelectorAll("#ovTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("ovMain").style.display = tab === "loc" ? "none" : "";
+  $("ovLoc").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { plLoadNames(); plRender(); }
+}
+document.querySelectorAll("#ovTabs button").forEach(b => b.onclick = () => plShowTab(b.dataset.t));
+$("plSort").onchange = () => { plSort = $("plSort").value; plRender(); };
+function plSpark(daily){
+  const v = Object.values(daily || {}); if (v.length < 2) return "";
+  const mx = Math.max(...v), mn = Math.min(0, ...v), W = 200, H = 26;
+  const pts = v.map((x, i) => `${(i / (v.length - 1) * W).toFixed(1)},${(H - 2 - (x - mn) / ((mx - mn) || 1) * (H - 4)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+function plSquare(code, x){
+  const ex = x.exceptions || {}, o = x.orders || {}, ts = x.top_supplier || [];
+  const flag = ex.critical ? ["crit", `${ex.critical} critical exception${ex.critical > 1 ? "s" : ""}`] :
+    ex.warning ? ["warn", `${ex.warning} exception${ex.warning > 1 ? "s" : ""} to review`] :
+    (x.price_up && x.price_up[1] > 0) ? ["warn", `Prices up on ${x.price_up[0]} item${x.price_up[0] > 1 ? "s" : ""}: +${plM(x.price_up[1])}`] :
+    o.awaiting > 0 ? ["info", `${plM(o.awaiting)} received, not invoiced`] : ["good", "No exception"];
+  const stat = (l, v, cls) => `<div><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const name = plName(code);
+  return `<div class="pl-sq" role="button" tabindex="0" data-plloc="${esc(code)}" aria-label="${esc(code)}: purchases in detail">
+    <div class="hd"><div class="ic">${plGlyph(code)}</div><div class="nm"><b>${esc(name || code)}</b><span>${esc(name ? code : "")}</span></div></div>
+    <div class="big"><span class="v">${plM(x.cur)}</span><span class="cmp">vs comparison <b class="${x.pct == null ? "" : x.pct > 10 ? "up" : x.pct < -10 ? "down" : ""}">${plPct(x.pct)}</b> · ${plM(x.prev)}</span></div>
+    <div class="sp">${plSpark(x.daily)}</div>
+    <div class="st">${stat("Documents", fmt(x.documents || 0))}${stat("Suppliers", x.suppliers != null ? fmt(x.suppliers) : "–")}
+      ${stat("Price rises", x.price_up && x.price_up[0] ? `+${plM(x.price_up[1])}` : "–", x.price_up && x.price_up[1] > 0 ? "up" : "")}
+      ${stat("Open orders", o.open ? `${fmt(o.open)} · ${plM(o.value)}` : "–")}</div>
+    <div class="sup" title="${esc(ts[0] || "")}">${ts[0] ? `Top: <b>${esc(ts[0])}</b> ${ts[2] != null ? Math.round(ts[2]) + "%" : ""}` : "&nbsp;"}</div>
+    <div class="al ${flag[0]}" title="${esc(flag[1])}"><i></i><span>${esc(flag[1])}</span></div>
+  </div>`;
+}
+function plGroups(codes){
+  const wh = codes.filter(plIsWh), rest = codes.filter(c => !plIsWh(c));
+  const by = {}; rest.forEach(c => { const k = c.split(/[\s_]/)[0].toUpperCase(); (by[k] = by[k] || []).push(c); });
+  const multi = Object.keys(by).filter(k => by[k].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes(c.split(/[\s_]/)[0].toUpperCase()));
+  const out = [];
+  if (singles.length) out.push({t: multi.length ? "Restaurants" : "Locations", c: singles});
+  multi.forEach(k => out.push({t: k, c: by[k]}));
+  if (wh.length) out.push({t: "Warehouses, central and production", c: wh});
+  return out;
+}
+function plRender(){
+  if (plTab !== "loc" || !$("plGrid")) return;
+  if (!data) { $("plGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  if (data.meta && data.meta.location) {
+    $("plGrid").innerHTML = `<div class="card"><p class="hint" style="margin:0">Location intelligence shows every location; the Location filter is set to <b>${esc(data.meta.location)}</b>. <button class="mini" id="plClear">Show all locations</button></p></div>`;
+    $("plClear").onclick = () => { $("location").value = ""; load(true); }; $("plTotals").innerHTML = ""; return;
+  }
+  const B = data.by_location || {};
+  const codes = Object.keys(B).filter(c => B[c].cur || B[c].prev || (B[c].orders && B[c].orders.open));
+  const key = {spend: c => -(B[c].cur || 0), change: c => -((B[c].pct) ?? -1e9), price: c => -((B[c].price_up || [0, 0])[1]),
+    awaiting: c => -(((B[c].orders || {}).awaiting) || 0), exceptions: c => -(((B[c].exceptions || {}).critical || 0) * 1000 + ((B[c].exceptions || {}).warning || 0)),
+    name: c => 0}[plSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (plSort === "name" ? a.localeCompare(b) : (B[b].cur || 0) - (B[a].cur || 0)));
+  const per = {week: "this week", month: "this month", ytd: "this year"}[data.meta.mode] || "this period";
+  const tot = codes.reduce((s, c) => s + (B[c].cur || 0), 0), totp = codes.reduce((s, c) => s + (B[c].prev || 0), 0);
+  const up = codes.reduce((s, c) => s + ((B[c].price_up || [0, 0])[1] || 0), 0), aw = codes.reduce((s, c) => s + (((B[c].orders || {}).awaiting) || 0), 0);
+  const ex = codes.reduce((s, c) => s + (((B[c].exceptions || {}).critical) || 0), 0);
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("plTotals").innerHTML = k(`Spend ${per}`, plM(tot), `${CUR} · ${plPct(totp ? (tot / totp - 1) * 100 : null)} vs the comparison · ${codes.length} locations`) +
+    k("Price rises", up > 0 ? "+" + plM(up) : "–", "extra cost of items bought dearer, location by location", up > 0 ? "up" : "") +
+    k("Received, not invoiced", plM(aw), "open purchase orders, all locations") +
+    k("Critical exceptions", fmt(ex), "by the location they concern", ex ? "up" : "");
+  $("plGrid").innerHTML = codes.length ? plGroups(codes).map(g => {
+    const s = g.c.reduce((a, c) => a + (B[c].cur || 0), 0);
+    return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${plM(s)}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(c => plSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">No purchases in this period.</p>`;
+}
+// ---- the location popup: the same period read for that location only
+async function plOpen(code){
+  $("plPop").innerHTML = `<div class="ph"><div class="ic">${plGlyph(code)}</div><div><h2>${esc(plName(code) || code)}</h2><div class="sub">Reading the purchases of ${esc(code)}…</div></div><div class="sp"></div><button class="close" data-plclose="1">Close ✕</button></div><div class="pl-body"><p class="hint">Reading Business Central for this location…</p></div>`;
+  $("plBd").classList.add("show");
+  const p = new URLSearchParams(params()); p.set("location", code);
+  try{
+    const r = await fetch("/api/dashboard?" + p.toString());
+    if (r.status === 401) { location.href = "/login"; return; }
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
+    if (!$("plBd").classList.contains("show")) return;
+    plDetail = j; plDraw(code, j);
+  }catch(e){ $("plPop").querySelector(".pl-body").innerHTML = `<p class="hint">Could not read: ${esc(e.message)}</p>`; }
+}
+function plDraw(code, j){
+  const k = j.kpis || {}, ops = j.operations || {}, po = ops.po_summary || {}, m = j.meta || {};
+  const B = (data && data.by_location && data.by_location[code]) || {};
+  const per = {week: "this week", month: "this month", ytd: "this year"}[m.mode] || "this period";
+  const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
+  const sev = s => `<span class="sev ${esc(s)}"></span>`;
+  // spend by day: this period against the comparison
+  const cur = Object.entries(j.daily_cur || {}), prev = Object.entries(j.daily_prev || {});
+  const n = Math.max(cur.length, prev.length, 1), max = Math.max(1, ...cur.map(x => x[1]), ...prev.map(x => x[1]));
+  const W = 1000, H = 140, gw = (W - 30) / n, bw = Math.min(16, gw / 3);
+  let chart = `<svg viewBox="0 0 ${W} ${H + 24}" width="100%" role="img" aria-label="Spend by day">`;
+  for (let i = 0; i < n; i++) {
+    const x = 30 + i * gw + gw / 2, pv = (prev[i] || [0, 0])[1], cv = (cur[i] || [0, 0])[1];
+    chart += `<rect x="${x - bw - 1}" y="${H - pv / max * H}" width="${bw}" height="${pv / max * H}" rx="3" fill="var(--prev)"><title>${prev[i] ? esc(prev[i][0]) : ""}: ${all(pv)}</title></rect>`;
+    chart += `<rect x="${x + 1}" y="${H - cv / max * H}" width="${bw}" height="${cv / max * H}" rx="3" fill="var(--accent)"><title>${cur[i] ? esc(cur[i][0]) : ""}: ${all(cv)}</title></rect>`;
+    if (n <= 16 || i % Math.ceil(n / 12) === 0) chart += `<text x="${x}" y="${H + 16}" text-anchor="middle" font-size="10" fill="var(--sub)">${cur[i] ? new Date(cur[i][0] + "T00:00:00").getDate() : ""}</text>`;
+  }
+  chart += `<line x1="30" y1="${H}" x2="${W}" y2="${H}" stroke="var(--line)"/><text x="0" y="10" font-size="10" fill="var(--sub)">${plM(max)}</text></svg>`;
+  const rows = (arr, head, fn, empty) => arr.length ? `<table><tr>${head}</tr>${arr.map(fn).join("")}</table>` : `<p class="hint">${empty}</p>`;
+  const top = (j.top_spend || []).slice(0, 8), mov = (j.movers || []).slice(0, 8), sup = (ops.suppliers || []).slice(0, 8);
+  const pos = (ops.purchase_orders || []).slice(0, 10), sla = (ops.sla || []).slice(0, 8);
+  $("plPop").innerHTML = `<div class="ph"><div class="ic">${plGlyph(code)}</div>
+      <div><h2>${esc(plName(code) || code)}</h2><div class="sub">${esc(code)} · ${esc(m.period_label || per)} · ${esc((m.current || []).join(" → "))} against ${esc((m.prior || []).join(" → "))} · ${esc(m.company || "")}</div></div><div class="sp"></div>
+      <button class="close" data-plopen="${esc(code)}" title="Open every screen filtered to this location">Filter the tower ›</button><button class="close" data-plclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      <div class="pl-tiles">
+        ${tile(`Spend ${per}`, plM(k.total_cur), `${CUR} · ${plPct(k.total_pct)} vs ${plM(k.total_prev)}`, k.total_pct > 10 ? "up" : "")}
+        ${tile("Documents · items", `${fmt(k.documents || 0)} · ${fmt(k.items || 0)}`, `${fmt(k.lines || 0)} lines`)}
+        ${tile("Suppliers", B.suppliers != null ? fmt(B.suppliers) : fmt(sup.length), B.top_supplier && B.top_supplier[0] ? `top ${esc(B.top_supplier[0])} ${B.top_supplier[2] != null ? Math.round(B.top_supplier[2]) + "%" : ""}` : "")}
+        ${tile("Price rises", k.increases ? "+" + plM(k.increase_impact) : "–", `${fmt(k.increases || 0)} items dearer · ${fmt(k.decreases || 0)} cheaper (${plM(k.saving)} saved)`, k.increase_impact > 0 ? "up" : "")}
+        ${tile("Open purchase orders", fmt(po.orders || 0), `${plM(po.value)} · ${fmt(po.released || 0)} released`)}
+        ${tile("Received, not invoiced", plM(po.awaiting_invoice), `${fmt(po.awaiting_invoice_orders || 0)} orders`, po.awaiting_invoice > 0 ? "warn" : "")}
+        ${tile("Uninvoiced receipts in the period", plM(k.uninvoiced_in_period), `${fmt(k.uninvoiced_receipts || 0)} receipts at expected cost`)}
+        ${tile("Exceptions", fmt((ops.sla || []).length), `${fmt((ops.sla || []).filter(e => e.severity === "critical").length)} critical`, (ops.sla || []).some(e => e.severity === "critical") ? "up" : "")}
+      </div>
+      <div class="pl-cols">
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>Spend by day</h3><span class="hint" style="margin:0">This period <i class="pl-sw" style="background:var(--accent)"></i> · comparison <i class="pl-sw" style="background:var(--prev)"></i></span></div>${chart}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Largest items</h3></div>${rows(top, `<th>Item</th><th class="num">Spend</th><th class="num">Comparison</th>`, t => `<tr><td>${esc(t.desc || t.item_no)}</td><td class="num">${plM(t.cost)}</td><td class="num meta">${plM(t.prev_cost)}</td></tr>`, "Nothing bought in this period.")}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Suppliers</h3></div>${rows(sup, `<th>Supplier</th><th class="num">Spend</th><th class="num">Share</th>`, s => `<tr><td>${esc(s.supplier)}</td><td class="num">${plM(s.spend)}</td><td class="num ${s.share >= 35 ? "up" : ""}">${fmt(s.share, 0)}%</td></tr>`, "No supplier matched in this period.")}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Price changes</h3><span class="hint" style="margin:0">by money impact</span></div>${rows(mov, `<th>Item</th><th class="num">Change</th><th class="num">Impact</th>`, x => `<tr><td>${esc(x.desc || x.item_no)}<div class="meta">${fmt(x.prev_avg, 2)} → ${fmt(x.cur_avg, 2)}</div></td><td class="num ${x.pct > 0 ? "up" : "down"}">${x.pct > 0 ? "+" : ""}${fmt(x.pct, 1)}%</td><td class="num ${x.impact > 0 ? "up" : "down"}">${x.impact > 0 ? "+" : ""}${plM(x.impact)}</td></tr>`, "No price moved beyond the threshold.")}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Open purchase orders</h3></div>${rows(pos, `<th>Order</th><th>Supplier</th><th class="num">Amount</th><th class="num">Not invoiced</th>`, x => `<tr><td>${esc(x.no)}<div class="meta">${esc(x.status || "")}${x.age_days != null ? " · " + x.age_days + " days" : ""}</div></td><td>${esc(x.supplier || "")}</td><td class="num">${plM(x.amount)}</td><td class="num ${x.received_not_invoiced > 0 ? "warn" : ""}">${plM(x.received_not_invoiced)}</td></tr>`, ops.po_error ? esc(ops.po_error) : "No open order for this location.")}</div>
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>Exceptions</h3></div>${sla.length ? `<div class="pl-ex">${sla.map(e => `<div>${sev(e.severity)}<b>${esc(e.title)}</b><span class="meta"> ${esc(e.detail || "")}</span></div>`).join("")}</div>` : `<p class="hint">No exception for this location in this period.</p>`}</div>
+      </div></div>`;
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-plclose]"); if (c) { $("plBd").classList.remove("show"); return; }
+  const f = e.target.closest("[data-plopen]"); if (f) { $("plBd").classList.remove("show"); $("location").value = f.dataset.plopen; plShowTab("overview"); load(true); return; }
+  const s = e.target.closest("[data-plloc]"); if (s) { plOpen(s.dataset.plloc); return; }
+  if (e.target === $("plBd")) $("plBd").classList.remove("show");
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("plBd").classList.contains("show")) { $("plBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.plloc) { e.preventDefault(); plOpen(e.target.dataset.plloc); }
+});
 document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x===b));
   if ($("v-exdetail").classList.contains("on")) exCurrent = null;

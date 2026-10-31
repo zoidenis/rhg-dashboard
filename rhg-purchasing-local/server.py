@@ -207,6 +207,8 @@ def _dashboard_build(company, week, location, mode="week"):
     prev = first["prev"][0] if not first["prev"][1] else {"rows": [], "checked_at": time.time(),
                                                           "new_since_last": 0}
     data = analytics.build(cur["rows"], prev["rows"], location or None)
+    # Location intelligence (Overview): every location's purchase figures, on the all-locations read
+    data["by_location"] = analytics.by_location(cur["rows"], prev["rows"]) if not location else None
 
     meta = {
         "company": company, "location": location or "",
@@ -263,6 +265,29 @@ def _dashboard_build(company, week, location, mode="week"):
         else:
             po_error = None
         pos = operations.purchase_orders(po_rows, settings)
+        if data.get("by_location") is not None:
+            # suppliers and open orders of every location, for the location squares
+            from collections import defaultdict as _dd
+            loc_sup = _dd(lambda: _dd(float))
+            for r in ve_cur:
+                sup = (suppliers.get(r.get("Document_No")) or {}).get("vendor") or "?"
+                loc_sup[r.get("Location_Code") or "?"][sup] += analytics._cost(r)
+            for loc, sups in loc_sup.items():
+                tot = sum(v for v in sups.values() if v > 0)
+                best = max(sups.items(), key=lambda kv: kv[1]) if sups else ("", 0)
+                rec = data["by_location"].setdefault(loc, {"cur": 0, "prev": 0})
+                rec["suppliers"] = sum(1 for v in sups.values() if v > 0)
+                rec["top_supplier"] = [best[0], best[1], (best[1] / tot * 100) if tot else None]
+            for p in pos:
+                rec = data["by_location"].get(p["location"] or "?")
+                if rec is None:
+                    continue
+                o = rec.setdefault("orders", {"open": 0, "value": 0.0, "awaiting": 0.0, "awaiting_orders": 0, "stale": 0})
+                o["open"] += 1
+                o["value"] += p.get("amount") or 0
+                o["awaiting"] += p["received_not_invoiced"]
+                o["awaiting_orders"] += 1 if p["received_not_invoiced"] > 0 else 0
+                o["stale"] += 1 if p.get("flag") else 0
         if location:
             pos = [p for p in pos if p["location"] == location]
         order_hist = history.track_orders(company, pos)
@@ -306,6 +331,13 @@ def _dashboard_build(company, week, location, mode="week"):
                + req_exceptions + contract_exceptions)
         rank = {"critical": 0, "warning": 1, "info": 2}
         sla.sort(key=lambda e: (rank.get(e["severity"], 3), -abs(e.get("impact") or 0)))
+        if data.get("by_location") is not None:
+            for e in sla:
+                for loc in {x.strip() for x in str(e.get("location") or "").split(",") if x.strip()}:
+                    rec = data["by_location"].get(loc)
+                    if rec is not None:
+                        x = rec.setdefault("exceptions", {"critical": 0, "warning": 0, "info": 0})
+                        x[e.get("severity") if e.get("severity") in x else "info"] += 1
         sup_rows, sup_total = operations.supplier_summary(docs, settings)
         ops = {
             "events": operations.events(docs, pos, reqs=reqs, closed_reqs=closed_reqs, order_hist=order_hist),

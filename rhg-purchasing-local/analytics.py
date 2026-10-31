@@ -234,3 +234,43 @@ def build(cur_rows, prior_rows, location=None):
         "locations": locations, "top_spend": top_spend, "latest": latest,
         "all_locations": all_locations,
     }
+
+
+def by_location(cur_rows, prior_rows):
+    """Purchase figures of every location for the location squares: spend against the comparison,
+    documents, items, price moves of the items it buys, goods received but not invoiced, credits,
+    its three largest items and the spend by day. Built from the rows already read."""
+    cur_by, prev_by = defaultdict(list), defaultdict(list)
+    for r in cur_rows:
+        cur_by[r.get("Location_Code") or "?"].append(r)
+    for r in prior_rows:
+        prev_by[r.get("Location_Code") or "?"].append(r)
+    out = {}
+    for loc in set(cur_by) | set(prev_by):
+        c, p = cur_by.get(loc, []), prev_by.get(loc, [])
+        ci, pi = _by_item(c), _by_item(p)
+        tc, tp = sum(i["cost"] for i in ci.values()), sum(i["cost"] for i in pi.values())
+        up, down = [], []
+        for no, x in ci.items():
+            y = pi.get(no)
+            if not y or not x["avg"] or not y["avg"] or y["avg"] <= 0 or x["cost"] < config.MIN_SPEND_FOR_MOVER:
+                continue
+            pct = (x["avg"] - y["avg"]) / y["avg"] * 100
+            if abs(pct) < config.MIN_PCT_FOR_MOVER:
+                continue
+            impact = (x["avg"] - y["avg"]) * x["qty"]
+            (up if pct > 0 else down).append((impact, x["desc"] or no, pct))
+        un = uninvoiced_in_period(c)
+        top = sorted(ci.items(), key=lambda kv: kv[1]["cost"], reverse=True)[:3]
+        out[loc] = {
+            "cur": tc, "prev": tp, "pct": ((tc - tp) / tp * 100) if tp else None,
+            "lines": len(c), "documents": len({r.get("Document_No") for r in c}), "items": len(ci),
+            "price_up": [len(up), sum(m[0] for m in up)], "price_down": [len(down), -sum(m[0] for m in down)],
+            "top_up": [[m[1], m[2], m[0]] for m in sorted(up, key=lambda m: -m[0])[:3]],
+            "uninvoiced": un["value"], "open_receipts": un["open_receipts"],
+            "credits": sum(_cost(r) for r in c if _cost(r) < 0),
+            "top_items": [[v["desc"] or no, v["cost"]] for no, v in top],
+            "daily": dict(sorted(_sum(c, lambda r: r.get("Posting_Date")).items())),
+        }
+    return out
+
