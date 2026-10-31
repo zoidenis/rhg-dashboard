@@ -781,7 +781,7 @@ td.num,th.num{text-align:right}
     <div id="slMain">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Sales from Simphony</h2>
       <p class="hint" id="slNote">Net sales, checks and guests by restaurant, read from Simphony Reporting and Analytics.</p></div>
-      <button class="mini dark" id="slLoad">Refresh sales</button></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="slEmail" title="The weekly email against last year and budget">Weekly email</button><button class="mini dark" id="slLoad">Refresh sales</button></div></div>
       <div class="kpis six" id="slKpis"></div></div>
     <div class="card" style="margin-bottom:15px"><h2>By restaurant</h2>
       <p class="hint" id="slLocNote"></p>
@@ -961,6 +961,34 @@ td.num,th.num{text-align:right}
       <p class="hint" id="brInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="brRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="srCard">
+      <div class="card-head"><div><h2>Sales weekly email</h2>
+        <p class="hint">Every week (Monday by default), the sales of the week before against <b>last year</b> (the same weekdays) and the <b>budget</b> of those days, with the week before, checks, the average check and the month to date. One email with all the restaurants by brand goes to the people of the companies; each restaurant with people of its own gets one more email with that restaurant only, day by day. Who gets it is set in <b>Email recipients</b> below, under <i>Sales against last year and budget</i>: unit manager, operations manager, head chef, executive chef, COO, CFO, CEO and others, for all companies, one company or one location (a role at a location gets that location's email). Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="srPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">Every<select id="srDay"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select></label>
+        <label class="field">Time<input id="srTime" type="time" value="08:00"></label>
+        <label class="field">To · if nobody is set in Email recipients<input id="srTo" autocomplete="off"></label>
+        <label class="field">Cc · if nobody is set in Email recipients<input id="srCc" autocomplete="off"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;margin:4px 0 12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" id="srOn" style="width:auto"> Send every week</label>
+      </div>
+      <div id="srWho" class="hint" style="margin:0 0 10px"></div>
+      <div class="formgrid">
+        <label class="field">Preview or test<select id="srTarget"></select></label>
+        <label class="field">Send a test to<input id="srTestTo" autocomplete="off"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="srSave">Save</button>
+        <button class="btn" id="srPreview">Preview</button>
+        <button class="btn" id="srTest">Send a test</button>
+        <button class="btn" id="srPeople">Set the people</button>
+        <span class="meta" id="srMsg"></span>
+      </div>
+      <p class="hint" id="srInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="srRuns"></table></div>
+    </div>
     <div class="card" style="margin-bottom:15px" id="rcCard" data-header="RHG-Finance"></div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
@@ -1091,6 +1119,7 @@ function render(){
   if(!arLoaded) loadArap();
   if(!crLoaded) loadCostReport();
   if(!brLoaded) loadBrandReport();
+  if(!srLoaded) loadSalesReport();
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
@@ -3511,6 +3540,72 @@ async function pollBrandReport(){
 $("brPreview").onclick = () => { if (!$("brBrand").value) { $("brMsg").textContent = "No brand in the registry yet."; return; }
   const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the brand performance report…</p>"); startBrandReport("", w); };
 $("brTest").onclick = () => { const to = $("brTestTo").value.trim(); if (!to) { $("brMsg").textContent = "Enter an address for the test."; return; } startBrandReport(to, null); };
+// ---------- sales weekly email (against last year and budget; people from Email recipients) ----------
+var srLoaded = false, srJob = null, srTimer = null;
+async function loadSalesReport(){
+  srLoaded = true;
+  try{ renderSalesReport(await readJSON(await fetch("/api/sales-report"))); }catch(e){ $("srMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function renderSalesReport(st){
+  const s = st.settings || {}, m = st.mail || {}, days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  $("srDay").value = String(s.day ?? "0"); $("srTime").value = s.time || "08:00";
+  $("srTo").value = s.to || ""; $("srCc").value = s.cc || ""; $("srOn").checked = !!s.enabled;
+  const keep = $("srTarget").value, locs = st.locations || [];
+  $("srTarget").innerHTML = `<option value="all">All restaurants</option>` + locs.map(l => `<option value="${esc(l.ref)}">${esc(l.name)}${l.brand ? " · " + esc(l.brand) : ""}</option>`).join("");
+  if (keep && [...$("srTarget").options].some(o => o.value === keep)) $("srTarget").value = keep;
+  if (!$("srTestTo").value) $("srTestTo").value = (st.to || [])[0] || "";
+  const list = a => (a || []).length ? a.map(esc).join(", ") : "–";
+  const lr = st.location_recipients || [];
+  $("srWho").innerHTML = `<b>All restaurants</b> · To: ${list(st.to)}${(st.cc || []).length ? " · Cc: " + list(st.cc) : ""}
+      <span class="meta">${st.source !== "general" ? "(from Email recipients)" : (st.to || []).length ? "(the addresses above: nobody is set in Email recipients)" : ""}</span>`
+    + (lr.length ? `<br><b>One restaurant each</b> · ` + lr.map(x => `${esc(x.name)}: ${list(x.to)}${(x.cc || []).length ? " (cc " + list(x.cc) + ")" : ""}`).join(" · ")
+      : `<br><span class="meta">No restaurant has people of its own yet: add a unit manager or head chef at a location in Email recipients.</span>`);
+  $("srPill").className = "rhg-pill " + (s.enabled ? (m.configured && (st.to || []).length ? "ok" : "warning") : "info");
+  $("srPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : !(st.to || []).length ? "On · nobody to send to" : "On";
+  const w = st.week || [];
+  $("srInfo").textContent = (s.enabled ? `Every ${days[+(s.day || 0)]} at ${s.time || "08:00"} (next ${(st.next_run || "–").replace("T", " ")}), for the week before` + (w.length ? ` (now ${w[0]} → ${w[1]}). ` : ". ") : "Off. ")
+    + `${locs.length} restaurant${locs.length === 1 ? "" : "s"} in the registry.`
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [];
+  $("srRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Email</th><th>Week</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 12).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.target || "")}</td>
+      <td class="meta">${esc((x.period || {}).from || "")}${x.period ? " → " + esc(x.period.to) : ""}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc([...(x.to || []), ...(x.cc || []).map(c => "cc " + c)].join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["srSave", "srTest", "srPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "srSave" && !!srJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("srSave").onclick = async () => {
+  $("srMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/sales-report/settings", {enabled: $("srOn").checked, day: $("srDay").value,
+      time: $("srTime").value, to: $("srTo").value, cc: $("srCc").value});
+    renderSalesReport(st);
+    $("srMsg").textContent = st.settings.enabled ? "Saved." : "Saved. Tick “Send every week” to switch it on.";
+  }catch(e){ $("srMsg").textContent = "Could not save: " + e.message; }
+};
+async function startSalesReport(to, win){
+  $("srMsg").textContent = "Reading Simphony and the budget… several minutes the first time.";
+  try{
+    const job = await simphonyPost("/api/sales-report/job", {target: $("srTarget").value || "all", to});
+    srJob = job; ["srTest", "srPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/sales-report/preview?id=" + encodeURIComponent(job.id);
+    pollSalesReport();
+  }catch(e){ $("srMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollSalesReport(){
+  clearTimeout(srTimer);
+  if (!srJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/sales-report/job?id=" + encodeURIComponent(srJob.id)));
+    if (j.status === "running") { srTimer = setTimeout(pollSalesReport, 5000); return; }
+    $("srMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("srMsg").textContent = "Lost track of the report: " + e.message; }
+  srJob = null; loadSalesReport();
+}
+$("srPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the weekly sales email…</p>"); startSalesReport("", w); };
+$("srTest").onclick = () => { const to = $("srTestTo").value.trim(); if (!to) { $("srMsg").textContent = "Enter an address for the test."; return; } startSalesReport(to, null); };
+$("srPeople").onclick = () => { const c = $("rcCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); };
+$("slEmail").onclick = () => { navTo("settings"); setTimeout(() => { const c = $("srCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); }, 150); };
 // ---------------------------------------------------------------- Cash & bank → Location intelligence
 // Per location: the till's takings by tender (Simphony) against the receipts in BC's cash boxes, banks
 // and online accounts on the restaurant's department; built on the server (/api/cash/locations).

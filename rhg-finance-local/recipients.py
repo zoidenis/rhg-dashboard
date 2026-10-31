@@ -104,7 +104,7 @@ def resolve(report, companies, general_to=(), general_cc=(), promote_cc=True):
 def location_targets_in(d, report, company):
     """[(location, to, cc)]: the locations of a company that have people in the roles of a report, for
     the reports cut by location. Nobody in To: the first Cc moves up. Same function in Finance."""
-    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly"}:
+    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly"}:
         return []
     route = (d.get("routing") or {}).get(report) or {"to": [], "cc": []}
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).strip().upper() == str(company or "").strip().upper()), {})

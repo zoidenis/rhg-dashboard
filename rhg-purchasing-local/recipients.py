@@ -32,8 +32,15 @@ ROLES = [("purchasing_coordinator", "Purchasing coordinator"),
          ("accounting", "Chief accountant · fiscal"),
          ("inputer", "Inputer · invoice entry in BC"),
          ("stock_manager", "Stock manager"),
-         ("operations", "Operations"),
-         ("management", "Management")]
+         ("operations", "Operations manager"),
+         ("unit_manager", "Unit manager · restaurant"),
+         ("head_chef", "Head chef"),
+         ("executive_chef", "Executive chef"),
+         ("coo", "COO"),
+         ("cfo", "CFO"),
+         ("ceo", "CEO"),
+         ("management", "Management"),
+         ("others", "Others")]
 # key, label, tower, To roles, Cc roles (the defaults; changed in Settings). The inputer, who enters
 # the invoices in BC, is in Cc of the two reports that list invoices missing or posted without a PO.
 REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
@@ -46,9 +53,11 @@ REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
            ("cost_weekly", "Cost control · weekly", "Finance", ["cost_controller"], ["purchasing_manager", "stock_manager"]),
            ("fiscal_daily", "Fiscal invoices against BC · daily", "Finance", ["accounting"], ["finance", "inputer"]),
            ("brand_performance", "Brand performance · weekly and monthly", "Finance",
-            [], ["finance", "operations"])]
+            [], ["finance", "operations"]),
+           ("sales_weekly", "Sales against last year and budget · weekly", "Finance",
+            ["unit_manager", "operations"], ["head_chef", "executive_chef", "coo", "cfo", "ceo", "others"])]
 # the reports that also go out location by location, with that location's figures only
-LOCATION_REPORTS = {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly"}
+LOCATION_REPORTS = {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly"}
 ROLE_KEYS = {k for k, _ in ROLES}
 REPORT_KEYS = {r[0] for r in REPORTS}
 
@@ -170,7 +179,7 @@ def resolve(report, companies, general_to=(), general_cc=(), promote_cc=True):
 def location_targets_in(d, report, company):
     """[(location, to, cc)]: the locations of a company that have people in the roles of a report, for
     the reports cut by location. Nobody in To: the first Cc moves up. Same function in Finance."""
-    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly"}:
+    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly"}:
         return []
     route = (d.get("routing") or {}).get(report) or {"to": [], "cc": []}
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).strip().upper() == str(company or "").strip().upper()), {})

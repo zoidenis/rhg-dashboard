@@ -197,11 +197,14 @@ def _cube(client, company, year, currency_of):
 
 
 # ---------------------------------------------------------------- the figures of one brand
-def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None):
+def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, only_ref=None, label=None):
+    """only_ref: one location of the brand (the weekly sales email of a location); label names it."""
     today = today or date.today()
     rows = brands().get(brand)
     if not rows:
         raise RuntimeError(f"{brand} is not in the restaurant registry (Settings → Location intelligence).")
+    if only_ref:
+        rows = [r for r in rows if r["ref"] == only_ref]
     weekly = kind == "weekly"
     a, b = last_week(today) if weekly else last_month(today)
     if weekly:
@@ -394,7 +397,7 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None):
             hl.append(("info", "Costs posted so far this month are partial: payroll and stock usage are posted at "
                                "month end, so the weekly email shows them only as a running indication."))
     other = [c for c in totals if c != main]
-    return {"kind": kind, "brand": brand, "period": {"from": a.isoformat(), "to": b.isoformat()},
+    return {"kind": kind, "brand": label or brand, "brand_key": brand, "period": {"from": a.isoformat(), "to": b.isoformat()},
             "prev": {"from": prev[0].isoformat(), "to": prev[1].isoformat()} if prev else None,
             "ly": {"from": ly[0].isoformat(), "to": ly[1].isoformat()}, "mtd_from": m_from.isoformat(),
             "cost_to": cost_to.isoformat() if cost_to else None,
@@ -551,7 +554,7 @@ def render(r):
 <tr><td style="background:{navy};color:#fff;padding:18px 22px;border-radius:12px 12px 0 0">
 <div style="font-size:11px;letter-spacing:.12em;color:#a0d8ea">REVO HOSPITALITY GROUP · {e(r['brand'])}</div>
 <div style="font-size:20px;font-weight:700;margin-top:4px">{e(KINDS[r['kind']])} performance · {e(r['brand'])}</div>
-<div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(period)} · {len(r['locations'])} locations · {e(comp)}</div></td></tr>
+<div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(period)} · {len(r['locations'])} location{'' if len(r['locations']) == 1 else 's'} · {e(comp)}</div></td></tr>
 <tr><td style="background:#fff;padding:20px 22px;border-radius:0 0 12px 12px">
 {errs}{tiles}
 <h3 style="font-size:14px;color:{ink};margin:18px 0 6px">Highlights</h3>{hl}
