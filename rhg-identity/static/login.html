@@ -3,75 +3,147 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0c475e">
-<title>RHG Control Towers · Sign in</title>
+<meta name="theme-color" content="#08303f">
+<title>Pulse RHG · Sign in</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/select.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Archivo:wght@600;700;800&display=swap">
 <style>
-.wrap{min-height:100dvh;display:grid;place-items:center;padding:24px 16px}
-.panel{width:100%;max-width:400px}
-.brand{display:flex;gap:11px;align-items:center;margin-bottom:22px}
-.brand h1{font-size:17px}
-.box{padding:28px 24px}
+/* Pulse RHG · sign in. Brand panel on the left (deep blue, the pulse line), the form on the right;
+   on a phone the brand becomes a short header above the form. Tokens from app.css. */
+:root{--pulse-sky:#a0d8ea;--pulse-deep:#08303f;--pulse-blue:#0c475e;--font:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --display:"Archivo","Figtree",system-ui,sans-serif}
+body{font-family:var(--font)}
+.shell{min-height:100dvh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+/* ---- brand panel ---- */
+.hero{position:relative;overflow:hidden;color:#fff;padding:40px 52px;display:flex;flex-direction:column;
+  background:radial-gradient(120% 80% at 15% 0%,#0f5a76 0%,rgba(15,90,118,0) 55%),
+             radial-gradient(90% 70% at 100% 100%,#0c475e 0%,rgba(12,71,94,0) 60%),var(--pulse-deep)}
+.hero::before{content:"";position:absolute;inset:0;opacity:.07;pointer-events:none;
+  background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:44px 44px;
+  -webkit-mask:linear-gradient(180deg,transparent,#000 30%,#000 70%,transparent);mask:linear-gradient(180deg,transparent,#000 30%,#000 70%,transparent)}
+.org{position:relative;display:flex;align-items:center;gap:11px;font-size:13px;color:#b9d4de;font-weight:600;letter-spacing:.02em}
+.org .logo{width:34px;height:34px;border-radius:10px;background:var(--pulse-sky);color:var(--pulse-blue)}
+.mid{position:relative;margin:auto 0;padding:40px 0}
+.word{font-family:var(--display);font-weight:800;font-size:clamp(56px,7vw,88px);line-height:.95;letter-spacing:-.035em;display:flex;align-items:flex-start;gap:14px}
+.word .rhg{font-size:.26em;letter-spacing:.14em;font-weight:700;color:var(--pulse-deep);background:var(--pulse-sky);border-radius:8px;padding:.32em .5em .28em;margin-top:.55em}
+.beat{display:block;width:100%;max-width:560px;height:84px;margin:18px 0 10px;overflow:visible}
+.beat .base{stroke:rgba(160,216,234,.22);stroke-width:2;fill:none}
+.beat .line{stroke:var(--pulse-sky);stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:1200;stroke-dashoffset:1200;animation:trace 3.4s cubic-bezier(.6,.05,.3,1) .25s forwards;filter:drop-shadow(0 0 6px rgba(160,216,234,.55))}
+.beat .dot{fill:#fff;opacity:0;animation:dot 3.4s ease .25s forwards}
+@keyframes trace{to{stroke-dashoffset:0}}
+@keyframes dot{0%,85%{opacity:0}100%{opacity:1}}
+.tag{font-size:18px;line-height:1.5;color:#d6e9f0;max-width:500px;margin:0}
+.mods{display:grid;gap:12px;margin-top:30px;max-width:500px}
+.mod{display:flex;gap:13px;align-items:flex-start}
+.mod i{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(160,216,234,.12);border:1px solid rgba(160,216,234,.22)}
+.mod svg{width:17px;height:17px;stroke:var(--pulse-sky);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.mod b{display:block;font-size:14px}
+.mod span{font-size:12.5px;color:#9fc0cc}
+.legal{position:relative;font-size:12px;color:#86a9b6;display:flex;gap:16px;flex-wrap:wrap}
+/* ---- form side ---- */
+.side{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--bg)}
+.panel{width:100%;max-width:390px}
+.panel h1{font-family:var(--display);font-size:28px;font-weight:700;letter-spacing:-.02em}
+.panel .lead{margin:6px 0 22px;color:var(--sub);font-size:14px}
+.box{padding:26px 24px 22px}
+.pw{position:relative}
+.pw input{padding-right:72px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--sub);
+  font:inherit;font-size:12px;font-weight:700;padding:6px 8px;border-radius:7px;cursor:pointer;min-height:0}
+.pw button:hover{color:var(--accent);background:var(--revo-sky-soft)}
+.go{width:100%;margin-top:20px;min-height:48px;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px}
+.go svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .apps{margin-top:18px;display:grid;gap:10px}
 a.tower{display:flex;align-items:center;gap:13px;padding:15px 16px;border:1px solid var(--line);
-  border-radius:var(--radius);text-decoration:none;color:inherit;background:var(--card);
-  transition:border-color .15s,transform .15s}
+  border-radius:var(--radius);text-decoration:none;color:inherit;background:var(--card);transition:border-color .15s,transform .15s}
 a.tower:hover{border-color:var(--accent);transform:translateY(-1px)}
-.mark{width:36px;height:36px;flex:none;border-radius:10px;background:var(--revo-sky-soft);
-  color:var(--accent);display:grid;place-items:center}
-.mark svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;
-  stroke-linecap:round;stroke-linejoin:round}
+.mark{width:36px;height:36px;flex:none;border-radius:10px;background:var(--revo-sky-soft);color:var(--accent);display:grid;place-items:center}
+.mark svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .t-name{font-weight:700}
 .t-desc{color:var(--sub);font-size:12.5px;margin-top:1px}
-.foot{margin-top:18px;font-size:12px;color:var(--sub);line-height:1.5}
+.foot{margin-top:16px;font-size:12px;color:var(--sub);line-height:1.55;display:flex;gap:8px;align-items:flex-start}
+.foot svg{flex:none;width:15px;height:15px;margin-top:1px;stroke:var(--sub);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-@media(max-width:380px){ .box{padding:22px 18px} }
+/* ---- phone and narrow windows ---- */
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .hero{padding:22px 20px 18px}
+  .mid{margin:0;padding:22px 0 4px}
+  .word{font-size:48px}
+  .beat{height:52px;margin:10px 0 6px}
+  .tag{font-size:14.5px}
+  .mods,.legal{display:none}
+  .side{align-items:flex-start;padding:24px 16px 32px}
+}
+@media (max-width:380px){ .box{padding:22px 18px} .word{font-size:42px} }
+@media (prefers-reduced-motion:reduce){ .beat .line{stroke-dashoffset:0;animation:none} .beat .dot{opacity:1;animation:none} }
 </style>
 </head>
 <body>
-<div class="wrap"><div class="panel">
-  <div class="brand"><div class="logo"></div>
-    <div><h1>RHG Control Towers</h1><small class="muted">Revo Hospitality Group</small></div></div>
-
-  <div class="card box">
-    <!-- sign in -->
-    <div id="signin">
-      <label for="u">Username</label>
-      <input id="u" autocomplete="username" autocapitalize="none" autofocus>
-      <label for="p">Password</label>
-      <input id="p" type="password" autocomplete="current-password">
-      <button class="btn primary" id="go" style="width:100%;margin-top:18px">Sign in</button>
+<div class="shell">
+  <section class="hero" aria-label="Pulse RHG">
+    <div class="org"><div class="logo" role="img" aria-label="Revo"></div>Revo Hospitality Group</div>
+    <div class="mid">
+      <div class="word">Pulse<span class="rhg">RHG</span></div>
+      <svg class="beat" viewBox="0 0 560 84" preserveAspectRatio="none" aria-hidden="true">
+        <path class="base" d="M0 52H560"/>
+        <path class="line" d="M0 52H150l14-12 12 12h26l12-46 16 74 14-40 10 12h72l10-8 10 8h82l12-30 14 44 12-14h86"/>
+        <circle class="dot" cx="560" cy="52" r="4.5"/>
+      </svg>
+      <p class="tag">The pulse of every restaurant, every day: sales, costs, stock and suppliers, live from Business Central and Simphony.</p>
+      <div class="mods">
+        <div class="mod"><i><svg viewBox="0 0 24 24"><path d="M3 20h18M6 20V10M12 20V4M18 20v-7"/></svg></i><div><b>Finance &amp; Inventory</b><span>P&amp;L against budget, cash and bank, payables and receivables, stock</span></div></div>
+        <div class="mod"><i><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="18" cy="20" r="1.2"/></svg></i><div><b>Purchasing</b><span>Spend, suppliers, prices, orders and requisitions</span></div></div>
+        <div class="mod"><i><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg></i><div><b>Location intelligence</b><span>Every restaurant on one screen, today and against last year</span></div></div>
+      </div>
     </div>
+    <div class="legal"><span>Business Central and Simphony are only read</span><span>© Revo Hospitality Group</span></div>
+  </section>
 
-    <!-- forced password change -->
-    <div id="change" hidden>
-      <p class="muted" style="margin:0">Choose a new password before you continue.</p>
-      <label for="n1">New password</label>
-      <input id="n1" type="password" autocomplete="new-password">
-      <label for="n2">Repeat new password</label>
-      <input id="n2" type="password" autocomplete="new-password">
-      <p class="muted" style="font-size:12px;margin:10px 0 0">
-        At least 12 characters, with upper case, lower case and a digit.</p>
-      <button class="btn primary" id="save" style="width:100%;margin-top:14px">Save and continue</button>
+  <main class="side">
+  <div class="panel">
+    <h1 id="hTitle">Sign in</h1>
+    <p class="lead" id="hLead">Welcome back to Pulse RHG.</p>
+    <div class="card box">
+      <!-- sign in -->
+      <div id="signin">
+        <label for="u">Username</label>
+        <input id="u" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
+        <label for="p">Password</label>
+        <div class="pw"><input id="p" type="password" autocomplete="current-password"><button type="button" data-show="p" aria-label="Show the password">Show</button></div>
+        <button class="btn primary go" id="go">Sign in <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+
+      <!-- forced password change -->
+      <div id="change" hidden>
+        <p class="muted" style="margin:0">Choose a new password before you continue.</p>
+        <label for="n1">New password</label>
+        <div class="pw"><input id="n1" type="password" autocomplete="new-password"><button type="button" data-show="n1" aria-label="Show the new password">Show</button></div>
+        <label for="n2">Repeat new password</label>
+        <input id="n2" type="password" autocomplete="new-password">
+        <p class="muted" style="font-size:12px;margin:10px 0 0">At least 12 characters, with upper case, lower case and a digit.</p>
+        <button class="btn primary go" id="save">Save and continue</button>
+      </div>
+
+      <!-- app chooser, once signed in -->
+      <div id="chooser" hidden>
+        <div class="row"><div><b id="who"></b><div class="muted" id="role" style="font-size:12.5px"></div></div>
+          <button class="btn sm" id="out">Sign out</button></div>
+        <div class="apps" id="apps"></div>
+        <div id="adminLink"></div>
+      </div>
+
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
     </div>
-
-    <!-- app chooser, once signed in -->
-    <div id="chooser" hidden>
-      <div class="row"><div><b id="who"></b><div class="muted" id="role" style="font-size:12.5px"></div></div>
-        <button class="btn sm" id="out">Sign out</button></div>
-      <div class="apps" id="apps"></div>
-      <div id="adminLink"></div>
-    </div>
-
-    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    <div class="foot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <span>Sessions last 12 hours and end after 60 minutes idle. Five wrong attempts lock the account for 15 minutes.</span></div>
   </div>
-
-  <div class="foot">Business Central is read-only. Sessions last 12 hours and end after
-    60 minutes idle. Five wrong attempts lock the account for 15 minutes.</div>
-</div></div>
+  </main>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -100,7 +172,13 @@ async function api(path, body, method){
 
 function show(which){
   for(const id of ["signin","change","chooser"]) $(id).hidden = (id !== which);
+  $("hTitle").textContent = which === "change" ? "New password" : which === "chooser" ? "Where to?" : "Sign in";
+  $("hLead").textContent = which === "change" ? "One step before Pulse RHG opens." : which === "chooser" ? "Choose an application." : "Welcome back to Pulse RHG.";
 }
+document.querySelectorAll("[data-show]").forEach(b => b.onclick = () => {
+  const i = $(b.dataset.show), on = i.type === "password";
+  i.type = on ? "text" : "password"; b.textContent = on ? "Hide" : "Show"; i.focus();
+});
 
 function renderChooser(user){
   // Signed in: the control center at the root is the front door to every tower.
