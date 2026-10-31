@@ -132,7 +132,17 @@ def system_prompt():
     return master_prompt() + "\n\n" + deployment_note()
 
 
-BRIEF_ASK = """Write today's RHG EXECUTIVE BRIEFING (daily) from the FACTS of {day} ({weekday}) below, for management.
+# The brief is asked as the chat is (which answers reliably): the FACTS first, Unicorn acknowledging them, then the
+# request with the previous briefing at the end - long material first, the question last.
+FACTS_TURN = """<facts day="{day}" weekday="{weekday}">
+{facts}
+</facts>"""
+
+BRIEF_ASK = """<previous_briefing day="{prev_day}">
+{previous}
+</previous_briefing>
+
+Write today's RHG EXECUTIVE BRIEFING (daily) from the FACTS of {day} ({weekday}) above, for management.
 
 Structure (section 15 of your prompt), in {language}, at most about 500 words:
 - First line: the single most important thing to know this morning, with its figure.
@@ -145,17 +155,11 @@ Structure (section 15 of your prompt), in {language}, at most about 500 words:
 - ## 7. Vendimet e rekomanduara — at most five, each as: Issue → Evidence → Impact → Recommendation → Priority → Owner
 Focus on what changed since the previous briefing; repeat an unchanged issue only if it is still material, and say
 it is still open. Leave out a section with nothing material and say so in one line; if its facts are unavailable,
-say exactly which.
-
-PREVIOUS BRIEFING ({prev_day}):
-{previous}
-
-FACTS (JSON):
-{facts}"""
+say exactly which. Write the briefing itself now, starting with the first line."""
 
 
 # ---------------------------------------------------------------- Claude
-def claude(messages, max_tokens=1800, system=None):
+def _claude_once(messages, max_tokens, system):
     if not API_KEY:
         raise RuntimeError("Unicorn has no Anthropic API key (ANTHROPIC_API_KEY in identity's .env).")
     body = json.dumps({"model": MODEL, "max_tokens": max_tokens, "system": system or system_prompt(),
@@ -176,8 +180,22 @@ def claude(messages, max_tokens=1800, system=None):
         raise RuntimeError(f"The Anthropic API could not be reached: {exc}") from None
     text = "".join(b.get("text", "") for b in j.get("content") or [] if b.get("type") == "text").strip()
     if not text:
-        raise RuntimeError("The Anthropic API gave an empty answer.")
+        kinds = ",".join(b.get("type") or "?" for b in j.get("content") or []) or "none"
+        raise EmptyAnswer(f"The Anthropic API gave an empty answer (stop_reason {j.get('stop_reason')}, blocks {kinds}).")
     return text, j.get("usage") or {}
+
+
+class EmptyAnswer(RuntimeError):
+    pass
+
+
+def claude(messages, max_tokens=1800, system=None):
+    """One call to the Messages API; an empty answer is asked once more before it counts as a failure."""
+    try:
+        return _claude_once(messages, max_tokens, system)
+    except EmptyAnswer:
+        time.sleep(3)
+        return _claude_once(messages, max_tokens, system)
 
 
 # ---------------------------------------------------------------- the towers' facts
@@ -285,10 +303,15 @@ def run(day, actor="scheduler"):
         _running["stage"] = "Writing the brief"
         prev = store.one("""SELECT day, text FROM unicorn_messages WHERE username='*' AND kind='brief' AND day < ?
                             ORDER BY id DESC LIMIT 1""", (day.isoformat(),))
-        text, usage = claude([{"role": "user", "content": BRIEF_ASK.format(
-            day=day.isoformat(), weekday=day.strftime("%A"), language=LANGUAGE, facts=_compact(facts),
-            prev_day=prev["day"] if prev else "none", previous=prev["text"] if prev else "(this is the first briefing)")}],
-            max_tokens=3000)
+        text, usage = claude([
+            {"role": "user", "content": FACTS_TURN.format(day=day.isoformat(), weekday=day.strftime("%A"),
+                                                          facts=_compact(facts))},
+            {"role": "assistant", "content": f"I have read the facts of {day.isoformat()}."},
+            {"role": "user", "content": BRIEF_ASK.format(
+                day=day.isoformat(), weekday=day.strftime("%A"), language=LANGUAGE,
+                prev_day=prev["day"] if prev else "none",
+                previous=prev["text"] if prev else "(this is the first briefing)")}],
+            max_tokens=4000)
         mid = _post("*", "unicorn", "brief", text, day.isoformat(),
                     {"model": MODEL, "usage": usage, "actor": actor})
         store.run("UPDATE unicorn_runs SET state='done', at=?, message_id=? WHERE day=?",
@@ -354,6 +377,8 @@ def _due(now):
 def loop():
     # a run left "running" by a restart is taken as failed
     store.run("UPDATE unicorn_runs SET state='failed', error='Interrupted by a restart' WHERE state='running'")
+    # after a deploy the towers start with identity: give them time before the first scheduled read
+    time.sleep(int(config.get("UNICORN_START_DELAY", "180")))
     while True:
         try:
             day = _due(datetime.now())
