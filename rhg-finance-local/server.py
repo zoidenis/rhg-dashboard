@@ -6,6 +6,7 @@ application's own and live under ./data.
 import base64
 import html
 import json
+import re
 import sys
 import threading
 import time
@@ -22,6 +23,7 @@ import sales_report
 import pl_memo
 import cashloc
 import kartloc
+import supstock
 import today as todayloc
 import faloc
 import recipients
@@ -1291,6 +1293,34 @@ class Handler(BaseHTTPRequestHandler):
                 scope = "all" if q.get("scope") == "all" else "company"
                 self._send(200, todayloc.request(client, company, scope, company_currency, _latest, in_parallel_jobs,
                                               q.get("refresh") == "1"))
+            elif url.path in ("/api/supplier-stock", "/api/supplier-stock/statement"):
+                if not auth.can(user, "finance.ap.view"):
+                    self._send(403, {"error": "Your role does not include Payables."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                if url.path.endswith("/statement"):
+                    r = supstock.held(company)
+                    no = q.get("vendor") or ""
+                    if not r or not any(x["no"] == no for x in r["suppliers"]):
+                        self._send(404, {"error": "Open Suppliers & stock first, then the statement."})
+                        return
+                    name = next(x["name"] for x in r["suppliers"] if x["no"] == no)
+                    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", f"{name}_{r['as_of']}")[:80]
+                    if q.get("format") == "pdf":
+                        body, ctype, ext = supstock.statement_pdf(r, no, company_currency(company)), "application/pdf", "pdf"
+                    else:
+                        body, ctype, ext = (supstock.statement_xlsx(r, no, company_currency(company)),
+                                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx")
+                    self.send_response(200)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Disposition", f'attachment; filename="Statement_{safe}.{ext}"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    store.audit("export", f"supplier statement · {name}", user["username"], {}, {"format": ext}, company)
+                    return
+                self._send(200, supstock.request(client, company, 18, q.get("refresh") == "1"))
             elif url.path == "/api/kartela/locations":
                 try:
                     period = periods(q.get("period"), "month")[:8]

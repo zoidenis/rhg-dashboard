@@ -344,6 +344,56 @@ class BCClient:
                                  {"$filter": flt, "$select": ",".join(self.FA_FIELDS)})
         return self._cached_immutable("fa", company, date_from, date_to, go)
 
+    def open_item_entries(self, company, max_age=1800):
+        """Item ledger entries still holding stock (Open, Remaining Quantity above zero): what is on hand,
+        entry by entry, with the receipt or transfer that brought it in."""
+        def go():
+            return self._get_all(self._url(company, config.E_ILE),
+                                 {"$filter": "Open eq true and Remaining_Quantity gt 0",
+                                  "$select": "Entry_No,Entry_Type,Item_No,Item_Description,Item_Category_Code,"
+                                             "Location_Code,Posting_Date,Document_No,Document_Type,Quantity,"
+                                             "Remaining_Quantity,Cost_Amount_Actual,Cost_Amount_Expected,"
+                                             "Unit_of_Measure_Code"})
+        return self._cached(("openile", company), max_age, go)
+
+    def hold_purchase_invoice_values(self, company, date_from, date_to, top_up_after=900):
+        """Makes sure the local file holds the value entries of purchase invoices of the window (the item
+        ledger entry each invoice line valued), month by month as hold_item_ledger does; returns the store
+        kind to read them from with localdb.iter_rows. Nothing is kept in memory."""
+        kind = "pve"
+        cursor = date.fromisoformat(date_from).replace(day=1)
+        end = date.fromisoformat(date_to)
+        while cursor <= end:
+            nxt = (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+            m_from, m_to = cursor.isoformat(), (nxt - timedelta(days=1)).isoformat()
+            flt = (f"Item_Ledger_Entry_Type eq 'Purchase' and Document_Type eq 'Purchase Invoice' "
+                   f"and Posting_Date ge {m_from} and Posting_Date le {m_to}")
+            marker = localdb.period_loaded(kind, company, m_from, m_to)
+            wait = top_up_after if nxt > date.today() - timedelta(days=35) else 24 * 3600
+            if marker and time.time() - marker["loaded_at"] < wait:
+                cursor = nxt
+                continue
+            if marker:
+                flt += f" and Entry_No gt {localdb.max_entry(kind, company, m_from, m_to) or 0}"
+            added = [0]
+
+            def keep(page, k=kind, c=company):
+                added[0] += localdb.store(k, c, page)
+            self._get_all(self._url(company, config.E_VALUE),
+                          {"$filter": flt, "$select": "Entry_No,Item_Ledger_Entry_No,Item_No,Document_No,"
+                                                      "Posting_Date,Cost_Amount_Actual,Invoiced_Quantity"},
+                          on_page=keep)
+            localdb.mark_period(kind, company, m_from, m_to, (marker["rows"] if marker else 0) + added[0])
+            cursor = nxt
+        return kind
+
+    def purchase_invoice_headers(self, company, date_from, date_to):
+        """Posted purchase invoices (number, supplier, dates) of a period; not kept here (the caller keeps
+        them), so the small ledger cache is not pushed out."""
+        return self._get_all(self._url(company, config.E_PINV),
+                             {"$filter": f"Posting_Date ge {date_from} and Posting_Date le {date_to}",
+                              "$select": "No,Buy_from_Vendor_No,Buy_from_Vendor_Name,Posting_Date,Due_Date"})
+
     ITEM_FIELDS = ["No", "Description", "InventorybyDate", "InventoryField", "Unit_Cost", "Last_Direct_Cost",
                    "Item_Category_Code", "Base_Unit_of_Measure", "Costing_Method", "Blocked", "Vendor_No",
                    "Inventory_Posting_Group"]

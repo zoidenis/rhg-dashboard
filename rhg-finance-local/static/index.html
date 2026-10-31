@@ -138,7 +138,8 @@ td.num,th.num{text-align:right}
 #tyTip{position:fixed;pointer-events:none;background:#0e2733;color:#fff;font-size:12px;padding:8px 10px;border-radius:8px;opacity:0;transition:opacity .1s;max-width:300px;z-index:50;line-height:1.5}
 #tyTip b{color:#a0d8ea}
 /* Inventory → Location intelligence (same pattern as Purchasing) */
-.ov-tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px;width:max-content;max-width:100%}
+.ov-tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px;width:max-content;max-width:100%;box-sizing:border-box;overflow-x:auto;scrollbar-width:thin}
+.ov-tabs button{white-space:nowrap;flex-shrink:0}
 .ov-tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;cursor:pointer;color:var(--sub);font-weight:600;font:inherit}
 .ov-tabs button.on{background:var(--accent);color:#fff}
 .pl-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px}
@@ -233,6 +234,10 @@ td.num,th.num{text-align:right}
 .kl-age i{display:block;min-width:2px}
 .td-host.td-on>:not(.ov-tabs):not(.td-view){display:none!important}
 .td-view{display:none}.td-host.td-on>.td-view{display:block}
+.ss-bar{display:flex;flex-direction:column;gap:2px}.ss-bar i{display:block;height:6px;border-radius:3px;min-width:2px}
+.ss-o{background:var(--warn)}.ss-s{background:var(--fl-c1)}
+.ss-row{cursor:pointer}.ss-row:hover td{background:var(--bg)}
+.ss-cats{display:flex;flex-wrap:wrap;gap:6px}.ss-cats span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px}.ss-cats span.on{border-color:var(--accent)}
 .kl-row{display:grid;grid-template-columns:24px 1fr;gap:4px 6px;align-items:center;font-size:10px;color:var(--sub)}
 .fl-tab th.grp{text-align:center;border-bottom:1px solid var(--line)}
 .fl-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
@@ -427,7 +432,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-kartela">
-    <div class="ov-tabs" id="kaTabs" role="tablist"><button data-t="ap" class="on" role="tab" aria-selected="true" aria-controls="kaAp">Accounts payable</button><button data-t="ar" role="tab" aria-selected="false" aria-controls="kaAr">Accounts receivable</button><button data-t="loc" role="tab" aria-selected="false" aria-controls="kaLoc">Location intelligence</button></div>
+    <div class="ov-tabs" id="kaTabs" role="tablist"><button data-t="ap" class="on" role="tab" aria-selected="true" aria-controls="kaAp">Accounts payable</button><button data-t="ar" role="tab" aria-selected="false" aria-controls="kaAr">Accounts receivable</button><button data-t="loc" role="tab" aria-selected="false" aria-controls="kaLoc">Location intelligence</button><button data-t="sup" role="tab" aria-selected="false" aria-controls="kaSup">Suppliers &amp; stock</button></div>
     <div id="kaAp" role="tabpanel"><div class="card"><div class="card-head"><div><h2>Accounts payable</h2><p class="hint" id="apHint"></p></div>
     <button class="mini" data-drill="ap">Open entries</button></div>
     <div class="money" id="apTotals"></div><div id="apBuckets"></div>
@@ -436,6 +441,23 @@ td.num,th.num{text-align:right}
     <button class="mini" data-drill="ar">Open entries</button></div>
     <div class="money" id="arTotals"></div><div id="arBuckets"></div>
     <div class="scroll" style="margin-top:12px"><table id="arTable"></table></div></div></div>
+    <div id="kaSup" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-head"><div><h2>Suppliers: what we owe and their stock on hand</h2>
+          <p class="hint">For every supplier, the open payables next to the stock still in our stores from their deliveries, at cost, and how fast it sells: when we pay late, what of theirs is still unsold (wine and spirits turn slowly). Choose a category to see only that part of the stock. Click a supplier for its invoices and items; Excel and PDF give the statement to send them.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <select id="ssCat" aria-label="Category"><option value="">All categories</option></select>
+            <input id="ssFind" placeholder="Find a supplier" aria-label="Find a supplier" style="padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit;font-size:12.5px;width:150px">
+            <label class="meta" for="ssSort">Order</label><select id="ssSort"><option value="both">by owed and stock</option><option value="overdue">by overdue</option><option value="owed">by owed</option><option value="stock">by stock</option><option value="dead">by not moved and slow</option><option value="name">by name</option></select>
+            <label class="meta" style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="ssLate"> overdue with stock</label>
+            <button class="mini dark" id="ssRead">Read again</button></div></div>
+        <p class="meta" id="ssStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="ssKpis"></div>
+      <div class="card"><div class="scroll"><table id="ssTable" data-nosort></table></div></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="ssDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
     <div id="kaLoc" role="tabpanel" hidden>
       <div class="card">
         <div class="card-head"><div><h2>Payables and receivables by location</h2>
@@ -1053,6 +1075,7 @@ td.num,th.num{text-align:right}
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
 <div class="pl-bd" id="slBd"><div class="pl-pop" id="slPop" role="dialog" aria-modal="true" aria-label="Restaurant sales"></div></div>
 <div class="pl-bd" id="faBd"><div class="pl-pop" id="faPop" role="dialog" aria-modal="true" aria-label="Location fixed assets"></div></div>
+<div class="pl-bd" id="ssBd"><div class="pl-pop" id="ssPop" role="dialog" aria-modal="true" aria-label="Supplier payables and stock"></div></div>
 <div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="klBd"><div class="pl-pop" id="klPop" role="dialog" aria-modal="true" aria-label="Location payables and receivables"></div></div>
 <div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
@@ -1183,6 +1206,7 @@ function render(){
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
   if($("v-kartela").classList.contains("on") && kaTab === "loc" && klKey !== flQuery()) loadKl(false);
+  if($("v-kartela").classList.contains("on") && kaTab === "sup" && ssKey !== ssQuery()) loadSs(false);
   if(typeof tdState !== "undefined" && tdState.bar){ tdRender(); if (!tdCur()) tdLoad(false); }
   if($("v-assets").classList.contains("on") && faTab === "loc" && faKey !== faQuery()) loadFa(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
@@ -2924,7 +2948,7 @@ function currentView(){
   const b = document.querySelector("#nav button.on");
   const id = (b && b.dataset.view) || "overview";
   let label = (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"");
-  if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : kaTab === "loc" ? "Location intelligence" : "Accounts payable");
+  if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : kaTab === "loc" ? "Location intelligence" : kaTab === "sup" ? "Suppliers & stock" : "Accounts payable");
   if (b && b.dataset.parent === "inventory") label = "Inventory · " + label;
   if (b && b.dataset.tab) {           // a tab of a menu item: "<item> · <tab>"
     const head = b.dataset.group || (document.querySelector(`#nav button[data-view="${b.dataset.parent}"]`) || {dataset: {}}).dataset.group || "";
@@ -2936,13 +2960,14 @@ function currentView(){
 // (#ap, #ar, links and buttons that open "ap" or "ar") land on the matching tab.
 var kaTab = "ap";
 function kaShow(tab){
-  kaTab = tab === "ar" || tab === "loc" ? tab : "ap";
+  kaTab = tab === "ar" || tab === "loc" || tab === "sup" ? tab : "ap";
   document.querySelectorAll("#kaTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === kaTab); b.setAttribute("aria-selected", b.dataset.t === kaTab); });
-  $("kaAp").hidden = kaTab !== "ap"; $("kaAr").hidden = kaTab !== "ar"; $("kaLoc").hidden = kaTab !== "loc";
+  $("kaAp").hidden = kaTab !== "ap"; $("kaAr").hidden = kaTab !== "ar"; $("kaLoc").hidden = kaTab !== "loc"; $("kaSup").hidden = kaTab !== "sup";
   if ($("v-kartela").classList.contains("on")) {
-    if (history.replaceState) history.replaceState(null, "", "#" + (kaTab === "loc" ? "kartela" : kaTab));
+    if (history.replaceState) history.replaceState(null, "", "#" + (kaTab === "loc" || kaTab === "sup" ? "kartela" : kaTab));
     setHeader();
     if (kaTab === "loc") { if (!klData || klKey !== flQuery()) loadKl(false); else klRender(); }
+    if (kaTab === "sup") { if (!ssData || ssKey !== ssQuery()) loadSs(false); else ssRender(); }
   }
 }
 document.querySelectorAll("#kaTabs button").forEach(b => b.onclick = () => kaShow(b.dataset.t));
@@ -3732,6 +3757,113 @@ async function pollPlMemo(){
 $("pmPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the P&amp;L memo…</p>"); startPlMemo("", w); };
 $("pmTest").onclick = () => { const to = $("pmTestTo").value.trim(); if (!to) { $("pmMsg").textContent = "Enter an address for the test."; return; } startPlMemo(to, null); };
 $("pmPeople").onclick = () => { const c = $("rcCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); };
+// ---------------------------------------------------------------- Kartela → Suppliers & stock
+// Per supplier: what we owe them next to the stock still on hand from their deliveries, how fast it moves,
+// and a statement (Excel, PDF) to send; built on the server (/api/supplier-stock).
+var ssData = null, ssKey = "", ssTimer = null;
+function ssQuery(){ const p = new URLSearchParams(); if ($("company").value) p.set("company", $("company").value); return p.toString(); }
+async function loadSs(refresh){
+  clearTimeout(ssTimer);
+  const q = ssQuery();
+  if (ssKey !== q) { ssData = null; ssKey = q; }
+  if (!ssData) $("ssTable").innerHTML = `<tr><td class="hint">Reading…</td></tr>`;
+  $("ssRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/supplier-stock?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (ssKey !== q) return;
+    if (j.pending) {
+      $("ssStatus").textContent = `Reading: ${j.stage || "starting"}… the first read holds a year and a half of purchase invoices and takes a few minutes.`;
+      if (kaTab === "sup") ssTimer = setTimeout(() => loadSs(false), 5000);
+      return;
+    }
+    ssData = j; ssFill(); ssRender();
+  }catch(e){ $("ssStatus").textContent = "Could not read: " + e.message; }
+  finally{ $("ssRead").disabled = false; }
+}
+function ssFill(){
+  const keep = $("ssCat").value;
+  $("ssCat").innerHTML = `<option value="">All categories</option>` + (ssData.categories || []).map(([c, v]) => `<option value="${esc(c)}">${esc(c)} · ${flM(v)}</option>`).join("");
+  if (keep && [...$("ssCat").options].some(o => o.value === keep)) $("ssCat").value = keep;
+}
+// a supplier seen through the category chosen: its stock, not-moved and slow parts of that category only
+function ssView(x, cat){
+  if (!cat) return x;
+  const items = x.items.filter(i => i[2] === cat), stock = items.reduce((a, i) => a + i[5], 0);
+  return Object.assign({}, x, {items, stock, exact: items.reduce((a, i) => a + i[6], 0),
+    dead: items.filter(i => !i[10]).reduce((a, i) => a + i[5], 0), slow: items.filter(i => i[11] != null && i[11] > 90).reduce((a, i) => a + i[5], 0),
+    cover: null, item_count: items.length});
+}
+function ssRender(){
+  if (kaTab !== "sup" || !ssData) return;
+  const d = ssData, cat = $("ssCat").value, q = $("ssFind").value.trim().toLowerCase(), C = (data && data.meta && data.meta.currency) || "";
+  $("ssStatus").innerHTML = `Payables open today · stock on hand ${esc(d.as_of)} · purchases read ${esc(d.window.from)} → ${esc(d.window.to)} · read ${esc(d.read_at)}`
+    + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
+  let rows = d.suppliers.map(x => ssView(x, cat)).filter(x => !cat || x.stock);
+  if (q) rows = rows.filter(x => (x.name + " " + x.no).toLowerCase().includes(q));
+  if ($("ssLate").checked) rows = rows.filter(x => x.overdue > 0 && x.stock > 0);
+  const key = {both: x => -Math.min(x.owed, x.stock), owed: x => -x.owed, overdue: x => -x.overdue, stock: x => -x.stock, dead: x => -(x.dead + x.slow), name: x => 0}[$("ssSort").value];
+  rows.sort((a, b) => key(a) - key(b) || a.name.localeCompare(b.name));
+  const sum = f => rows.reduce((a, x) => a + (x[f] || 0), 0);
+  const lateStock = rows.filter(x => x.overdue > 0).reduce((a, x) => a + x.stock, 0);
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("ssKpis").innerHTML = k("Owed to these suppliers", flM(sum("owed")), `${C} · overdue ${flM(sum("overdue"))} · beyond 60 days ${flM(sum("overdue_60"))}`, sum("overdue_60") ? "up" : "") +
+    k("Their stock on hand", flM(sum("stock")), `${cat ? esc(cat) + " · " : ""}at cost · from their own receipts ${flM(sum("exact"))}`) +
+    k("Stock of suppliers we pay late", flM(lateStock), `held from ${fmt(rows.filter(x => x.overdue > 0 && x.stock > 0).length)} suppliers with overdue invoices`, lateStock ? "warn" : "") +
+    k("Not moved or slow", flM(sum("dead") + sum("slow")), `no sale in 90 days ${flM(sum("dead"))} · over 90 days of cover ${flM(sum("slow"))}`);
+  const bar = x => { const m = Math.max(x.owed, x.stock, 1);
+    return `<div class="ss-bar" title="Owed ${fmt(x.owed)} · stock ${fmt(x.stock)}"><i class="ss-o" style="width:${x.owed / m * 100}%"></i><i class="ss-s" style="width:${x.stock / m * 100}%"></i></div>`; };
+  $("ssTable").innerHTML = rows.length ? `<tr><th>Supplier</th><th class="num">Owed</th><th class="num">Overdue</th><th class="num">Beyond 60 d</th><th class="num">Stock on hand</th><th class="num">Not moved · slow</th><th class="num">Days of cover</th><th style="min-width:90px">Owed / stock</th><th>Statement</th></tr>` +
+    rows.slice(0, 400).map(x => `<tr class="ss-row" data-ss="${esc(x.no)}" tabindex="0"><td><b>${esc(x.name)}</b><div class="meta">${esc(x.no === "?" ? "items not bought in the window" : x.no)} · ${fmt(x.item_count || 0)} items${x.oldest_due ? ` · oldest due ${esc(x.oldest_due)}` : ""}</div></td>
+      <td class="num">${fmt(x.owed)}</td><td class="num ${x.overdue ? "warn" : ""}">${fmt(x.overdue)}</td><td class="num ${x.overdue_60 ? "up" : ""}">${fmt(x.overdue_60)}</td>
+      <td class="num"><b>${fmt(x.stock)}</b>${x.stock ? `<div class="meta">own receipts ${x.stock ? Math.round(x.exact / x.stock * 100) : 0}%</div>` : ""}</td>
+      <td class="num ${x.dead ? "warn" : ""}">${fmt(x.dead)}<div class="meta">${fmt(x.slow)}</div></td><td class="num">${x.cover == null ? "–" : fmt(x.cover)}</td>
+      <td>${bar(x)}</td>
+      <td style="white-space:nowrap">${x.no !== "?" ? `<a class="mini" href="/api/supplier-stock/statement?${ssQuery()}&vendor=${encodeURIComponent(x.no)}&format=xlsx">Excel</a> <a class="mini" href="/api/supplier-stock/statement?${ssQuery()}&vendor=${encodeURIComponent(x.no)}&format=pdf">PDF</a>` : ""}</td></tr>`).join("")
+    : `<tr><td class="hint">No supplier with payables or stock${cat ? " in this category" : ""}.</td></tr>`;
+  $("ssDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("");
+  if ($("ssBd").classList.contains("show") && $("ssPop").dataset.no) ssDraw($("ssPop").dataset.no);
+}
+function ssOpen(no){ $("ssPop").dataset.no = no; ssDraw(no); $("ssBd").classList.add("show"); }
+function ssDraw(no){
+  const x0 = (ssData.suppliers || []).find(s => s.no === no); if (!x0) return;
+  const cat = $("ssCat").value, x = ssView(x0, cat), C = (data && data.meta && data.meta.currency) || "";
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const inv = x0.invoices.length ? `<div class="scroll"><table data-nosort><tr><th>Document</th><th>Posted</th><th>Due</th><th class="num">Days late</th><th class="num">Open</th></tr>${x0.invoices.map(i => `<tr><td>${esc(i[0])}<div class="meta">${esc(i[1])}</div></td><td class="meta">${esc(i[2])}</td><td class="meta">${esc(i[3])}</td><td class="num ${i[4] > 60 ? "up" : i[4] ? "warn" : ""}">${i[4] ? fmt(i[4]) : ""}</td><td class="num">${fmt(i[5])}</td></tr>`).join("")}</table></div>` : `<p class="hint">Nothing owed.</p>`;
+  const items = x.items.length ? `<div class="scroll"><table data-nosort><tr><th>Item</th><th class="num">Quantity</th><th class="num">Value</th><th>Where</th><th>Since</th><th class="num">Used 90 d</th><th class="num">Cover (days)</th></tr>${x.items.slice(0, 200).map(i => `<tr><td>${esc(i[1])}<div class="meta">${esc(i[0])} · ${esc(i[2])}${i[6] < i[5] ? ` · ${i[6] ? "partly " : ""}allocated` : ""}</div></td>
+      <td class="num">${fmt(i[3], i[3] % 1 ? 2 : 0)} ${esc(i[4])}</td><td class="num">${fmt(i[5])}</td><td class="meta">${esc(i[7].slice(0, 3).map(([l, q]) => `${l || "–"} ${fmt(q, q % 1 ? 1 : 0)}`).join(", "))}${i[7].length > 3 ? " …" : ""}</td>
+      <td class="meta">${esc(i[8] || "")}${i[9] != null ? `<div>${fmt(i[9])} days</div>` : ""}</td><td class="num">${i[10] ? fmt(i[10], i[10] % 1 ? 1 : 0) : `<span class="warn">none</span>`}</td><td class="num ${i[11] == null ? "warn" : i[11] > 90 ? "warn" : ""}">${i[11] == null ? "no sales" : fmt(i[11])}</td></tr>`).join("")}</table></div>` : `<p class="hint">No stock of theirs on hand${cat ? " in " + esc(cat) : ""}.</p>`;
+  const q = ssQuery() + "&vendor=" + encodeURIComponent(no);
+  $("ssPop").innerHTML = `<div class="ph"><div class="ic">${IL_GLYPH.BOX}</div>
+      <div><h2>${esc(x0.name)}</h2><div class="sub">${esc([no, "payables open today, stock on hand " + ssData.as_of, C, cat].filter(Boolean).join(" · "))}</div></div><div class="sp"></div>
+      ${no !== "?" ? `<a class="close" href="/api/supplier-stock/statement?${q}&format=xlsx" style="text-decoration:none">Statement · Excel</a><a class="close" href="/api/supplier-stock/statement?${q}&format=pdf" style="text-decoration:none">PDF</a>` : ""}
+      <button class="close" data-ssclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      <div class="pl-tiles">${tile("Owed", flM(x0.owed), `overdue ${flM(x0.overdue)} · not due ${flM(x0.not_due)}${x0.advance ? ` · advances ${flM(x0.advance)}` : ""}`, x0.overdue_60 ? "up" : x0.overdue ? "warn" : "")}
+        ${tile("Their stock on hand", flM(x.stock), `own receipts ${flM(x.exact)} · allocated ${flM(x.stock - x.exact)}`)}
+        ${tile("Not moved in 90 days", flM(x.dead), `slow (over 90 days of cover) ${flM(x.slow)}`, x.dead ? "warn" : "")}
+        ${tile("Stock against what we owe", x0.owed ? Math.round(x.stock / x0.owed * 100) + "%" : "–", x0.owed ? "of the open payables is still on our shelves" : "nothing owed")}</div>
+      ${x0.cats.length > 1 ? `<div class="pl-panel" style="margin-bottom:12px"><h3 style="margin:0 0 6px;font-size:14px">By category</h3><div class="ss-cats">${x0.cats.map(([c, v]) => `<span${c === cat ? ' class="on"' : ""}>${esc(c)} <b>${flM(v)}</b></span>`).join("")}</div></div>` : ""}
+      <div class="pl-cols">
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Open invoices · ${fmt(x0.invoices.length)}</h3>${inv}</div>
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Their products in our stock · ${fmt(x.items.length)}</h3>${items}</div>
+      </div>
+    </div>`;
+}
+["ssCat", "ssSort"].forEach(id => $(id).onchange = () => ssRender());
+$("ssLate").onchange = () => ssRender();
+$("ssFind").oninput = () => ssRender();
+$("ssRead").onclick = () => loadSs(true);
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-ssclose]") || t === $("ssBd")) { $("ssBd").classList.remove("show"); return; }
+  if (t.closest("a")) return;
+  const r = t.closest("[data-ss]"); if (r) ssOpen(r.dataset.ss);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("ssBd").classList.contains("show")) { $("ssBd").classList.remove("show"); return; }
+  if (e.key === "Enter" && e.target.dataset && e.target.dataset.ss) ssOpen(e.target.dataset.ss);
+});
 // ---------------------------------------------------------------- Kartela → Location intelligence
 // Per location: payables and receivables open today on the restaurant's department, by age past the due
 // date, with the month's invoices and payments; built on the server (/api/kartela/locations).

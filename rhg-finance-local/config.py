@@ -74,5 +74,6 @@ PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")
 # (FISK_CERT_PATH, FISK_CERT_PASSWORD; see cis_client.py); the company whose NIPT they belong to:
 FISK_COMPANY = get("FISK_COMPANY", "") or BC_COMPANY
 E_PINV = get("E_PINV", "PostedPurchaseInvoices")
+E_VALUE = get("E_VALUE", "ValueEntries")
 E_VENDOR_CARD = get("E_VENDOR_CARD", "VendorCard")
 E_PO = get("E_PO", "PurchaseOrder")
