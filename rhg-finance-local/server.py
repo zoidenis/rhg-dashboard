@@ -1229,8 +1229,14 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError:
                     year = date.today().year
                 year = max(date.today().year - 3, min(year, date.today().year))
-                self._send(200, executive.request(client, company, year, company_currency(company),
-                                                  q.get("refresh") == "1"))
+                res = executive.request(client, company, year, company_currency(company), q.get("refresh") == "1")
+                # the restaurants of the registry on this company's departments, for Budget → Location
+                # intelligence to name and group the departments by brand (as the other location screens)
+                reg = [{"dept": r.get("dept") or r.get("bc"), "name": r["name"], "brand": r.get("brand") or "",
+                        "ref": r["ref"], "seasonal": bool(r.get("seasonal"))}
+                       for r in locintel.registry() if (r.get("company") or "").upper() == company.upper()
+                       and (r.get("dept") or r.get("bc"))]
+                self._send(200, dict(res, registry=reg))
             elif url.path == "/api/arap-notify":
                 self._send(200, arap_status(user))
             elif url.path == "/api/arap-notify/pdf":

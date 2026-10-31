@@ -3353,10 +3353,13 @@ function blModel(){
   const d = blData, {keys, month} = blKeys();
   const bud = d.budget && d.budget.available ? d.budget.cells : null, sc = blScale(keys);
   const depts = (d.departments || []).map(x => ({code: x.code, name: x.name}));
+  // the registry names the restaurant behind a department and its brand (Settings → Location intelligence)
+  const reg = {}; (d.registry || []).forEach(r => { if (r.dept && !reg[r.dept]) reg[r.dept] = r; });
   const L = {};
   const one = (code, name, act, b) => {
-    const t = blTotals(act, b || {});
-    L[code] = {code, name, act, bud: b || {}, t, off: bud ? blOff(act, b || {}, t) : []};
+    const t = blTotals(act, b || {}), r = reg[code];
+    L[code] = {code, name: (r && r.name) || name, dname: name, brand: (r && r.brand) || "", seasonal: !!(r && r.seasonal),
+      group: !code ? "unassigned" : r ? "restaurant" : "support", act, bud: b || {}, t, off: bud ? blOff(act, b || {}, t) : []};
   };
   let sumA = {}, sumB = {};
   for (const x of depts) {
@@ -3395,7 +3398,7 @@ function blSquare(x, m){
   const stat = (l, v, cls, tt) => `<div${tt ? ` title="${esc(tt)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
   const gap = t.res - t.bres;
   return `<div class="pl-sq" role="button" tabindex="0" data-blloc="${esc(x.code)}" aria-label="${esc(x.name)}: accounts against budget">
-    <div class="hd"><div class="ic">${x.code ? IL_GLYPH.DOT : IL_GLYPH.BOX}</div><div class="nm"><b>${esc(x.name || x.code)}</b><span>${esc(x.code && x.name !== x.code ? x.code : "")}</span></div></div>
+    <div class="hd"><div class="ic">${flGlyph(x)}</div><div class="nm"><b>${esc(x.name || x.code || "Not on a location")}</b><span>${esc([x.code && x.name !== x.code ? x.code : "", x.seasonal ? "seasonal" : ""].filter(Boolean).join(" · "))}</span></div></div>
     <div class="big"><span class="v">${blM(t.res)}</span><span class="cmp">result · budget ${blM(t.bres)} · <b class="${!m.hasBudget ? "" : gap < 0 ? "up" : "down"}">${m.hasBudget ? blS(gap) : "–"}</b></span></div>
     <div class="bl-att">${blAtt("Revenue", t.rev, t.brev, false)}${blAtt("Expenses", t.exp, t.bexp, true)}</div>
     <div class="st">${stat("Revenue gap", m.hasBudget && (t.rev || t.brev) ? blS(t.rev - t.brev) : "–", t.rev < t.brev ? "up" : "", `${blM(t.rev)} against ${blM(t.brev)}`)}${stat("Expense gap", m.hasBudget && (t.exp || t.bexp) ? blS(t.exp - t.bexp) : "–", t.exp > t.bexp ? "up" : "", `${blM(t.exp)} against ${blM(t.bexp)}`)}
@@ -3428,14 +3431,30 @@ function blRender(){
   const key = {result: x => (B[x].t.res - B[x].t.bres), expenses: x => -((B[x].t.exp - B[x].t.bexp)), revenue: x => (B[x].t.rev - B[x].t.brev),
     over: x => -B[x].off.length, actual: x => -B[x].t.rev, name: x => 0}[blSort];
   const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (B[a].name || a).localeCompare(B[b].name || b));
-  const rev = codes.filter(x => x && (B[x].t.rev || B[x].t.brev)), cc = codes.filter(x => x && !(B[x].t.rev || B[x].t.brev)), none = codes.filter(x => !x);
-  const grp = (t, list, hint) => list.length ? `<div class="pl-grp"><b>${t}</b><span>${list.length} location${list.length > 1 ? "s" : ""}${hint ? " · " + hint : ""}</span></div><div class="pl-grid">${sorted(list).map(x => blSquare(B[x], m)).join("")}</div>` : "";
-  $("blGrid").innerHTML = grp("Locations with revenue", rev, "restaurants and other revenue centres") + grp("Cost centres", cc, "head office, central kitchen, warehouses") + grp("Not on a location", none, "posted with no department");
+  // grouped as the other location screens: restaurants by brand (a brand with several places is its own
+  // group), then the departments that are not restaurants, then what has no department
+  const rest = codes.filter(x => B[x].group === "restaurant"), by = {};
+  rest.forEach(x => { const b = (B[x].brand || x).toUpperCase(); (by[b] = by[b] || []).push(x); });
+  const multi = Object.keys(by).filter(b => by[b].length > 1)
+    .sort((a, b) => by[b].length - by[a].length || by[b].reduce((s, x) => s + B[x].t.rev, 0) - by[a].reduce((s, x) => s + B[x].t.rev, 0));
+  const singles = rest.filter(x => !multi.includes((B[x].brand || x).toUpperCase()));
+  const groups = [];
+  if (singles.length) groups.push({t: "Restaurants", c: singles});
+  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  const sup = codes.filter(x => B[x].group === "support"), none = codes.filter(x => B[x].group === "unassigned");
+  if (sup.length) groups.push({t: "Head office, central and warehouses", c: sup, hint: "departments that are not restaurants in the registry"});
+  if (none.length) groups.push({t: "Not on a location", c: none, hint: "posted with no department"});
+  $("blGrid").innerHTML = groups.map(g => {
+    const T = g.c.reduce((a, x) => { const t = B[x].t; a.rev += t.rev; a.res += t.res; a.bres += t.bres; a.off += B[x].off.length; return a; }, {rev: 0, res: 0, bres: 0, off: 0});
+    const gap = T.res - T.bres;
+    return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}${T.rev ? ` · revenue ${blM(T.rev)} ${esc(C)}` : ""} · result ${blM(T.res)}${m.hasBudget ? ` · <b class="${gap < 0 ? "up" : "down"}" style="font-weight:600">${blS(gap)}</b> against budget` : ""}${T.off ? ` · ${T.off} account${T.off > 1 ? "s" : ""} off` : ""}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(x => blSquare(B[x], m)).join("")}</div>`; }).join("");
   $("blDefs").innerHTML = [
     "Actual = net change of every posting account of class 6 (expenses) and class 7 (revenue) in Business Central, by department (global dimension 1). Revenue and expenses are both shown as positive amounts; result = revenue − expenses.",
     `Budget = the G/L budget ${esc((d.budget || {}).name || "")} placed on the department through its dimension set. In a running month the budget counts only the days already gone, like the actual.`,
     `Off budget: an expense account above its budget, or a revenue account below it, by more than ${fmt(tol)}% (Settings → Location intelligence → EBITDA under budget) and by more than 0.5% of the location's revenue and expenses.`,
     "Not on a location = what the company posted or budgeted with no department: the company total less the departments.",
+    "Grouping: the departments named in the restaurant registry (Settings → Location intelligence) carry the restaurant's name and brand; a brand with several places (OPA, SALT) is its own group, single-place brands sit under Restaurants. Departments not in the registry (head office, central kitchen, warehouses) follow.",
     "Accounts are grouped by their first two digits; a group carries the name of its own account in the chart when there is one, otherwise the names of the accounts in it."].map(x => `<p style="margin:0 0 8px">${x}</p>`).join("");
   if ($("blBd").classList.contains("show") && $("blPop").dataset.code != null) blDraw($("blPop").dataset.code);
 }
