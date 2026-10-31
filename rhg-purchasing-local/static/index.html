@@ -41,8 +41,10 @@ nav .grp:first-child{margin-top:0}
 nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center}
 nav button:hover{background:rgba(255,255,255,.05)}
 nav button.on,nav button.sub-on{background:rgba(255,255,255,.09);color:#fff;font-weight:700}
-#pcTabs{overflow-x:auto;scrollbar-width:thin}
-#pcTabs button{white-space:nowrap}
+#pcTabs,#byTabs{overflow-x:auto;scrollbar-width:thin}
+#pcTabs button,#byTabs button{white-space:nowrap}
+#byTabs .count{background:var(--up-bg);color:var(--up);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:4px}
+#byTabs button.on .count{background:rgba(255,255,255,.22);color:#fff}
 /* embedded in another tower (?embed=stock): the screen only, no menu, header or filters */
 html.embed aside, html.embed main > header, html.embed main > .filters, html.embed #banner, html.embed #printHead{display:none!important}
 html.embed main{padding:4px 2px 30px}
@@ -266,12 +268,13 @@ td.num,th.num{text-align:right}
     <button class="on" data-view="overview">Overview</button>
     <button data-view="live">Live operations</button>
 
-    <div class="grp">Buying</div>
-    <button data-view="reqs">Requisitions <span class="count" id="reqCount">0</span></button>
-    <button data-view="po">Purchase orders <span class="count" id="poCount">0</span></button>
-    <button data-view="invoices">Invoices</button>
-    <button data-view="streams">Purchase types</button>
-    <button data-view="services">Services &amp; CAPEX</button>
+    <div class="grp">Buying &amp; prices</div>
+    <!-- Buying: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
+    <button data-view="reqs" data-tab="Requisitions" data-group="Buying">Buying</button>
+    <button data-view="po" data-parent="reqs" data-tab="Purchase orders" style="display:none">Purchase orders</button>
+    <button data-view="invoices" data-parent="reqs" data-tab="Invoices" style="display:none">Invoices</button>
+    <button data-view="streams" data-parent="reqs" data-tab="Purchase types" style="display:none">Purchase types</button>
+    <button data-view="services" data-parent="reqs" data-tab="Services &amp; CAPEX" style="display:none">Services &amp; CAPEX</button>
     <!-- Prices & contracts: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
     <button data-view="compare" data-tab="Comparisons" data-group="Prices &amp; contracts">Prices &amp; contracts</button>
     <button data-view="contracts" data-parent="compare" data-tab="Contract prices" style="display:none">Contract prices</button>
@@ -610,6 +613,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-reqs">
+    <div class="ov-tabs" id="byTabs" role="tablist"><button data-t="reqs" class="on" role="tab" aria-selected="true">Requisitions <span class="count" id="reqCount">0</span></button><button data-t="po" role="tab" aria-selected="false">Purchase orders <span class="count" id="poCount">0</span></button><button data-t="invoices" role="tab" aria-selected="false">Invoices</button><button data-t="streams" role="tab" aria-selected="false">Purchase types</button><button data-t="services" role="tab" aria-selected="false">Services &amp; CAPEX</button></div>
     <div id="reqSetup"></div>
     <div id="reqBody">
       <div class="kpis five" id="reqKpis"></div>
@@ -2866,16 +2870,19 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("plBd").classList.contains("show")) { $("plBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.plloc) { e.preventDefault(); plOpen(e.target.dataset.plloc); }
 });
-// Prices & contracts: five views under one menu item, with one tab bar on top of the open one
-var PC_TABS = ["compare", "contracts", "savings", "prices", "locations"];
+// Buying and Prices & contracts: views under one menu item each, with one tab bar on top of the open one
+var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services"],
+                pcTabs: ["compare", "contracts", "savings", "prices", "locations"]};
 function pcTabsSync(view){
-  const bar = $("pcTabs"), sec = $("v-" + view);
-  if (!bar || !sec || !PC_TABS.includes(view)) return;
-  if (bar.parentNode !== sec) sec.insertBefore(bar, sec.firstChild);
-  bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === view); b.setAttribute("aria-selected", b.dataset.t === view); });
-  const on = bar.querySelector("button.on"); if (on && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
+  for (const [id, views] of Object.entries(TAB_BARS)) {
+    const bar = $(id), sec = $("v-" + view);
+    if (!bar || !sec || !views.includes(view)) continue;
+    if (bar.parentNode !== sec) sec.insertBefore(bar, sec.firstChild);
+    bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === view); b.setAttribute("aria-selected", b.dataset.t === view); });
+    const on = bar.querySelector("button.on"); if (on && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
+  }
 }
-document.querySelectorAll("#pcTabs button").forEach(b => b.onclick = () => { const n = document.querySelector(`#nav button[data-view="${b.dataset.t}"]`); if (n) n.click(); });
+document.querySelectorAll("#pcTabs button, #byTabs button").forEach(b => b.onclick = () => { const n = document.querySelector(`#nav button[data-view="${b.dataset.t}"]`); if (n) n.click(); });
 document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#nav button").forEach(x => { x.classList.toggle("on", x===b); x.classList.toggle("sub-on", !!b.dataset.parent && x.dataset.view === b.dataset.parent); });
   if ($("v-exdetail").classList.contains("on")) exCurrent = null;
