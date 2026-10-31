@@ -252,6 +252,8 @@ def build_all(client, latest_fn, parallel_fn, currency_of, today=None):
                 T[k] += t.get(k) or 0
             for k in ("sales", "ly", "budget", "b_sales"):
                 T["mtd"][k] = T["mtd"].get(k, 0.0) + ((t.get("mtd") or {}).get(k) or 0)
+                if t.get("pm"):
+                    T.setdefault("pm", {})[k] = T.setdefault("pm", {}).get(k, 0.0) + (t["pm"].get(k) or 0)
     main = max(totals, key=lambda c: totals[c]["sales"]) if totals else None
     locs = [dict(L, brand=r["brand"]) for r in out for L in r["locations"]]
     hl = []
@@ -299,7 +301,13 @@ def build_all(client, latest_fn, parallel_fn, currency_of, today=None):
     except Exception as exc:                                        # noqa: BLE001
         traceback.print_exc()
         errors.append(f"Categories: {str(exc)[:200]}")
-    return {"cats": cats, "cats_brands": cats_brands, "brands": out, "totals": totals, "main": main, "other": [c for c in totals if c != main],
+    pt = T.get("pm") or {}
+    if period.get("pm") and pt.get("sales"):
+        hl.insert(2 if len(hl) > 1 else len(hl), (
+            "good" if (_pct(pt.get("b_sales"), pt.get("budget")) or 0) >= 0 else "bad",
+            f"{date.fromisoformat(period['pm']['from']):%B} closed at {_m(pt['sales'])}: "
+            f"{_p(_pct(pt.get('b_sales'), pt.get('budget')))} against budget, {_p(_pct(pt['sales'], pt.get('ly')))} against last year."))
+    return {"pm": period.get("pm"), "cats": cats, "cats_brands": cats_brands, "brands": out, "totals": totals, "main": main, "other": [c for c in totals if c != main],
             "period": period["period"], "prev": period["prev"], "ly": period["ly"], "mtd_from": period["mtd_from"],
             "highlights": hl, "errors": errors, "locations": len(locs), "built_at": datetime.now().isoformat(timespec="seconds")}
 
@@ -349,29 +357,66 @@ def render_all(r):
                  f"background:{dot.get(k, primary)};margin-top:5px'></span></td><td style='padding:3px 0;font-size:13px;color:{ink}'>{e(t)}</td></tr>"
                  for k, t in r["highlights"])
     head = [("Restaurant", 0), ("Sales", 1), ("Budget", 1), ("vs budget", 1), ("Last year", 1), ("vs LY", 1), ("vs week before", 1),
-            ("Checks", 1), ("Avg check", 1), ("MTD vs budget", 1), ("MTD vs LY", 1)]
+            ("Checks", 1), ("Avg check", 1)]
     rows = []
     for br in r["brands"]:
         bt = br["totals"].get(br["main"]) or {}
-        mt = bt.get("mtd") or {}
         rows.append(f"<tr><td style='{td};background:#f6f8f9;font-weight:700'>{e(br['brand'])}</td>"
                     f"<td style='{tdn};background:#f6f8f9;font-weight:700'>{_m(bt.get('sales'))}</td><td style='{tdn};background:#f6f8f9;color:{muted}'>{_m(bt.get('budget')) if bt.get('has_budget') else '–'}</td>"
                     f"<td style='{tdn};background:#f6f8f9'>{var(_pct(bt.get('b_sales'), bt.get('budget')) if bt.get('has_budget') else None)}</td>"
                     f"<td style='{tdn};background:#f6f8f9;color:{muted}'>{_m(bt.get('ly')) if bt.get('ly') else '–'}</td><td style='{tdn};background:#f6f8f9'>{var(_pct(bt.get('sales'), bt.get('ly')))}</td>"
                     f"<td style='{tdn};background:#f6f8f9'>{var(_pct(bt.get('sales'), bt.get('prev')))}</td><td style='{tdn};background:#f6f8f9'>{(bt.get('checks') or 0):,}</td>"
-                    f"<td style='{tdn};background:#f6f8f9'>{_m(bt['net'] / bt['checks']) if bt.get('checks') else '–'}</td>"
-                    f"<td style='{tdn};background:#f6f8f9'>{var(_pct(mt.get('b_sales'), mt.get('budget')))}</td><td style='{tdn};background:#f6f8f9'>{var(_pct(mt.get('sales'), mt.get('ly')))}</td></tr>")
+                    f"<td style='{tdn};background:#f6f8f9'>{_m(bt['net'] / bt['checks']) if bt.get('checks') else '–'}</td></tr>")
         for L in sorted(br["locations"], key=lambda L: -L["sales"]["ex"]):
             s, bu = L["sales"], (L.get("budget") or {}).get("sales")
-            m = L.get("mtd") or {}
-            mb = (m.get("budget") or {}).get("sales")
             rows.append(f"<tr><td style='{td};padding-left:18px'>{e(L['name'])}<div style='color:{muted};font-size:11px'>{e(L['currency'])}{' · ' + e(L['dept']) if L.get('dept') else ''}</div></td>"
                         f"<td style='{tdn}'>{_m(s['ex'])}</td><td style='{tdn};color:{muted}'>{_m(bu) if bu else '–'}</td><td style='{tdn}'>{var(_pct(s['ex'], bu) if bu else None)}</td>"
                         f"<td style='{tdn};color:{muted}'>{_m(L['ly']['ex']) if L['ly']['ex'] else '–'}</td><td style='{tdn}'>{var(_pct(s['ex'], L['ly']['ex']))}</td>"
                         f"<td style='{tdn}'>{var(_pct(s['ex'], (L.get('prev') or {}).get('ex')))}</td><td style='{tdn}'>{s['checks']:,}</td>"
-                        f"<td style='{tdn}'>{_m(s['net'] / s['checks']) if s['checks'] else '–'}</td>"
-                        f"<td style='{tdn}'>{var(_pct((m.get('sales') or {}).get('ex'), mb) if mb else None)}</td><td style='{tdn}'>{var(_pct((m.get('sales') or {}).get('ex'), (m.get('ly') or {}).get('ex')))}</td></tr>")
+                        f"<td style='{tdn}'>{_m(s['net'] / s['checks']) if s['checks'] else '–'}</td></tr>")
     hs = "".join(f"<th style='{thn if n else th}'>{e(h)}</th>" for h, n in head)
+
+    def month_table(key):
+        """The month to date ("mtd") or the month that closed ("pm"), by brand and restaurant."""
+        mh = [("Restaurant", 0), ("Sales", 1), ("Budget", 1), ("vs budget", 1), ("Last year", 1), ("vs LY", 1)]
+        out = []
+
+        def cells(sales, bud, b_sales, ly, shade=""):
+            return (f"<td style='{tdn};{shade}'>{_m(sales)}</td><td style='{tdn};{shade}color:{muted}'>{_m(bud) if bud else '–'}</td>"
+                    f"<td style='{tdn};{shade}'>{var(_pct(b_sales, bud) if bud else None)}</td>"
+                    f"<td style='{tdn};{shade}color:{muted}'>{_m(ly) if ly else '–'}</td><td style='{tdn};{shade}'>{var(_pct(sales, ly) if ly else None)}</td>")
+        for br in r["brands"]:
+            bt = (br["totals"].get(br["main"]) or {}).get(key) or {}
+            if not bt.get("sales") and not bt.get("ly"):
+                continue
+            sh = "background:#f6f8f9;"
+            out.append(f"<tr><td style='{td};{sh}font-weight:700'>{e(br['brand'])}</td>"
+                       + cells(bt.get("sales"), bt.get("budget"), bt.get("b_sales"), bt.get("ly"), sh).replace(f"<td style='{tdn};{sh}'>{_m(bt.get('sales'))}", f"<td style='{tdn};{sh}font-weight:700'>{_m(bt.get('sales'))}", 1) + "</tr>")
+            for L in sorted(br["locations"], key=lambda L: -((L.get(key) or {}).get("sales") or {}).get("ex", 0)):
+                m = L.get(key) or {}
+                ms, ml, mb = (m.get("sales") or {}).get("ex"), (m.get("ly") or {}).get("ex"), (m.get("budget") or {}).get("sales")
+                if not ms and not ml:
+                    continue
+                out.append(f"<tr><td style='{td};padding-left:18px'>{e(L['name'])}<div style='color:{muted};font-size:11px'>{e(L['currency'])}</div></td>"
+                           + cells(ms, mb, ms, ml) + "</tr>")
+        if not out:
+            return ""
+        hh = "".join(f"<th style='{thn if n else th}'>{e(h)}</th>" for h, n in mh)
+        return (f"<div style='overflow-x:auto'><table role='presentation' cellspacing='0' cellpadding='0' style='width:100%;"
+                f"border-collapse:collapse;border:1px solid {line}'><tr>{hh}</tr>{''.join(out)}</table></div>")
+
+    mtd_html = month_table("mtd")
+    if mtd_html:
+        mf = date.fromisoformat(r["mtd_from"])
+        mtd_html = (f"<h3 style='font-size:14px;color:{ink};margin:22px 0 4px'>Month to date · {mf:%d %b}{f" – {b:%d %b}" if mf != b else ""} {b:%Y}</h3>"
+                    f"<div style='font-size:12px;color:{muted};margin-bottom:6px'>Sales excluding VAT from the first of the month to the last day of the week, "
+                    f"against the budget of these days and the same dates last year.</div>" + mtd_html)
+    pm_html = month_table("pm") if r.get("pm") else ""
+    if pm_html:
+        pf, pe = date.fromisoformat(r["pm"]["from"]), date.fromisoformat(r["pm"]["to"])
+        pm_html = (f"<h3 style='font-size:14px;color:{ink};margin:22px 0 4px'>{pf:%B %Y} · the whole month</h3>"
+                   f"<div style='font-size:12px;color:{muted};margin-bottom:6px'>The month closed during this week: {pf:%d %b} – {pe:%d %b}, "
+                   f"against its budget and the same month last year.</div>" + pm_html)
     table = f"<div style='overflow-x:auto'><table role='presentation' cellspacing='0' cellpadding='0' style='width:100%;border-collapse:collapse;border:1px solid {line}'><tr>{hs}</tr>{''.join(rows)}</table></div>"
     other = (f"<div style='font-size:11px;color:{muted};margin-top:4px'>Totals above are in {e(main)}; "
              + ", ".join(f"{e(c)}: sales {_m(r['totals'][c]['sales'])} ({_p(_pct(r['totals'][c]['sales'], r['totals'][c]['ly']))} vs LY)" for c in r["other"]) + ".</div>") if r["other"] else ""
@@ -388,8 +433,9 @@ def render_all(r):
 {errs}{tiles}
 <h3 style="font-size:14px;color:{ink};margin:18px 0 6px">Highlights</h3><table role="presentation" cellspacing="0" cellpadding="0" style="width:100%">{hl}</table>
 <h3 style="font-size:14px;color:{ink};margin:22px 0 4px">By brand and restaurant</h3>
-<div style="font-size:12px;color:{muted};margin-bottom:6px">Sales excluding VAT from Simphony; budget = the G/L budget of the restaurant's department for these days; month to date from {e(r['mtd_from'])}.</div>
+<div style="font-size:12px;color:{muted};margin-bottom:6px">Sales excluding VAT from Simphony; budget = the G/L budget of the restaurant's department for these days.</div>
 {table}{other}
+{mtd_html}{pm_html}
 {render_categories(r.get("cats") or {}, "Categories", category_note(r) + " By brand below, with the subcategories (family groups) of each category.", brands=r.get("cats_brands")) if (r.get("cats") or {}).get("cur") else ""}
 {f"<p style='margin:20px 0 0'><a href='{e(public)}/finance/#sales' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>Open Sales in the Finance tower</a></p>" if public else ''}
 <p style="color:{muted};font-size:11px;margin:22px 0 0;border-top:1px solid {line};padding-top:12px">Sent every week by RHG Control Towers from Simphony and Business Central; nothing was changed there. Recipients are in Finance → Settings → Email recipients by company ("Sales against last year and budget"); the day and time in Sales weekly email.</p>

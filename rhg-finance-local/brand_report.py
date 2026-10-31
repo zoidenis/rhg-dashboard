@@ -232,6 +232,14 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
         need |= set(_days(*prev))
     if weekly:
         need |= set(_days(m_from, b)) | set(_days(*mly))
+    # the month that closed during this week (or the day before it began): shown whole next to the month to
+    # date, which then holds only a few days
+    pm = pml = None
+    if weekly and (a.month != b.month or a.day == 1):
+        pe = m_from - timedelta(days=1)
+        pm = (pe.replace(day=1), pe)
+        pml = (pm[0].replace(year=pe.year - 1), date(pe.year - 1, pe.month, monthrange(pe.year - 1, pe.month)[1]))
+        need |= set(_days(*pm)) | set(_days(*pml))
     refs = [r["ref"] for r in rows]
     try:
         sim = _simphony_days(refs, sorted(need), latest_fn, parallel_fn)
@@ -246,8 +254,8 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
         try:
             cubes[company] = _cube(client, company, b.year, currency_of)
             years[(company, b.year)] = cubes[company]
-            if a.year != b.year:
-                years[(company, a.year)] = _cube(client, company, a.year, currency_of)
+            for y in {a.year, pm[0].year if pm else b.year} - {b.year}:
+                years[(company, y)] = _cube(client, company, y, currency_of)
         except Exception as exc:                                    # noqa: BLE001
             traceback.print_exc()
             errors.append(f"{company}: {str(exc)[:200]}")
@@ -280,6 +288,9 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
             L["budget"] = _budget_days(cube_of, dept, a, b) if cube else None
             L["mtd"] = {"sales": _sales(f, _days(m_from, b)), "ly": _sales(f, _days(*mly)),
                         "budget": _budget_days(cube_of, dept, m_from, b) if cube else None}
+            if pm:
+                L["pm"] = {"sales": _sales(f, _days(*pm)), "ly": _sales(f, _days(*pml)),
+                           "budget": _budget_days(cube_of, dept, *pm) if cube else None}
             # the costs posted so far in the month of the week's last day: the cube's running month runs
             # to yesterday, so its budget and last year are cut at the same day
             if cube:
@@ -335,6 +346,11 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
             for k_, v in (("sales", mt["sales"]["ex"]), ("ly", mt["ly"]["ex"]), ("budget", mb),
                           ("b_sales", mt["sales"]["ex"] if mb else 0)):
                 t["mtd"][k_] = t["mtd"].get(k_, 0.0) + v
+            if L.get("pm"):
+                pb = (L["pm"]["budget"] or {}).get("sales") or 0
+                for k_, v in (("sales", L["pm"]["sales"]["ex"]), ("ly", L["pm"]["ly"]["ex"]), ("budget", pb),
+                              ("b_sales", L["pm"]["sales"]["ex"] if pb else 0)):
+                    t.setdefault("pm", {})[k_] = t.setdefault("pm", {}).get(k_, 0.0) + v
             for k_ in ("bc", "bc_ly"):
                 if mt.get(k_):
                     for x in ("sales", "food", "labor", "opex"):
@@ -411,6 +427,7 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
             "prev": {"from": prev[0].isoformat(), "to": prev[1].isoformat()} if prev else None,
             "ly": {"from": ly[0].isoformat(), "to": ly[1].isoformat()}, "mtd_from": m_from.isoformat(),
             "cost_to": cost_to.isoformat() if cost_to else None,
+            "pm": {"from": pm[0].isoformat(), "to": pm[1].isoformat()} if pm else None,
             "locations": locs, "totals": totals, "main": main, "other": other, "by_day": by_day,
             "highlights": hl, "errors": errors, "thresholds": th,
             "built_at": datetime.now().isoformat(timespec="seconds")}
@@ -522,10 +539,18 @@ def render(r, extra=""):
         mt = T.get("mtd") or {}
         if mt:
             mf = date.fromisoformat(r["mtd_from"])
-            blocks += h3(f"Month to date · {mf:%d %b} – {b:%d %b}", "Sales from Simphony against the budget for these days and the same dates last year." if r.get("sales_only") else
+            mtitle = f"Month to date · {mf:%d %b}" + (f" – {b:%d %b}" if mf != b else "")
+            if r.get("pm") and (T.get("pm") or {}).get("sales"):
+                mtitle += f" and {date.fromisoformat(r['pm']['from']):%B}"
+            blocks += h3(mtitle, "Sales from Simphony against the budget for these days and the same dates last year." if r.get("sales_only") else
                          "Sales from Simphony; costs as posted in Business Central so far, against the budget for these days and the same dates last year.")
             rows = [f"<tr><td style='{td}'><b>Sales</b> (Simphony, excl. VAT)</td><td style='{tdn}'>{_m(mt.get('sales'))}</td><td style='{tdn};color:{muted}'>{_m(mt.get('budget'))}</td>"
                     f"<td style='{tdn}'>{var(_pct(mt.get('b_sales'), mt.get('budget')))}</td><td style='{tdn};color:{muted}'>{_m(mt.get('ly'))}</td><td style='{tdn}'>{var(_pct(mt.get('sales'), mt.get('ly')))}</td></tr>"]
+            pt = T.get("pm") or {}
+            if r.get("pm") and pt.get("sales"):
+                rows.append(f"<tr><td style='{td}'><b>{date.fromisoformat(r['pm']['from']):%B}</b> (the whole month, closed)</td><td style='{tdn}'>{_m(pt.get('sales'))}</td>"
+                            f"<td style='{tdn};color:{muted}'>{_m(pt.get('budget')) if pt.get('budget') else '–'}</td><td style='{tdn}'>{var(_pct(pt.get('b_sales'), pt.get('budget')) if pt.get('budget') else None)}</td>"
+                            f"<td style='{tdn};color:{muted}'>{_m(pt.get('ly')) if pt.get('ly') else '–'}</td><td style='{tdn}'>{var(_pct(pt.get('sales'), pt.get('ly')) if pt.get('ly') else None)}</td></tr>")
             bc, bl, bb = mt.get("bc") or {}, mt.get("bc_ly") or {}, mt.get("bc_bud") or {}
             ct = f" to {date.fromisoformat(r['cost_to']):%d %b}" if r.get("cost_to") else ""
             for k_, lab in (("food", f"Food & beverage (posted{ct})"), ("labor", f"Labour (posted{ct})"), ("opex", f"Other costs (posted{ct})")):
