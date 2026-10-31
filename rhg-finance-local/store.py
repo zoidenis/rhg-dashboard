@@ -99,6 +99,11 @@ DEFAULT_SETTINGS = {
     # weekly cost control email (inventory exceptions and an action list) for the week before:
     # the day (0 = Monday) and time it goes out, recipients and companies
     "cost_report": {"enabled": False, "to": "", "cc": "", "day": "0", "time": "08:30", "companies": ""},
+    # weekly and monthly performance email of every brand (sales and costs against budget and last
+    # year): one email per brand to its own addresses ("BRAND: emails" lines), finance and operations in Cc;
+    # monthly goes twice: provisional on the first working day, final on final_day
+    "brand_report": {"weekly": False, "monthly": False, "day": "0", "time": "09:00", "final_day": "10",
+                     "cc": "", "recipients": ""},
     # fiscalized purchase invoices (Tax Administration / Self-Care) against BC: daily read and email
     "fiscal": {"enabled": False, "to": "", "cc": "", "time": "07:30", "working_days_only": True,
                "days": "45", "grace_days": "7", "tolerance": "1", "send_empty": False,
@@ -154,6 +159,7 @@ def get_settings():
     merged["executive"].update(s.get("executive", {}))
     merged["arap_notify"].update(s.get("arap_notify", {}))
     merged["cost_report"].update(s.get("cost_report", {}))
+    merged["brand_report"].update(s.get("brand_report", {}))
     merged["fiscal"].update(s.get("fiscal", {}))
     merged["locations"].update(s.get("locations", {}))
     for k in ("exclude_weekends", "updated_at", "period_closed_before"):
@@ -204,6 +210,24 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("cost_report", {})[k] = v
+        for k, v in (patch.get("brand_report") or {}).items():
+            if k in DEFAULT_SETTINGS["brand_report"]:
+                if isinstance(DEFAULT_SETTINGS["brand_report"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "09:00"
+                elif k == "day":
+                    v = str(v) if str(v) in ("0", "1", "2", "3", "4", "5", "6") else "0"
+                elif k == "final_day":
+                    try:
+                        v = str(max(2, min(28, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "10"
+                elif k == "recipients":
+                    v = str(v)[:4000]
+                else:
+                    v = str(v)[:400]
+                current.setdefault("brand_report", {})[k] = v
         for k, v in (patch.get("fiscal") or {}).items():
             if k in DEFAULT_SETTINGS["fiscal"]:
                 if isinstance(DEFAULT_SETTINGS["fiscal"][k], bool):

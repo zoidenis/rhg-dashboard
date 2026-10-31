@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import arap_notify
+import brand_report
 import cost_report
 import assets
 import auth
@@ -57,6 +58,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
+                     "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -1089,6 +1091,21 @@ def cost_report_status():
             "week": [d.isoformat() for d in cost_report.last_week()]}
 
 
+brandrep = brand_report.Reporter(client, _latest, in_parallel_jobs, company_currency)
+
+
+def brand_report_status():
+    br = brand_report.brands()
+    return {"settings": brand_report.settings(), "next_runs": brandrep.next_runs(), "runs": brand_report.recent_runs(),
+            "mail": arap_notify.mail_status(), "simphony": bool(simphony.info().get("configured")),
+            "kinds": brand_report.KINDS,
+            "brands": [{"brand": b, "locations": [r["name"] for r in rows],
+                        "to": brand_report.recipients_of(b)[0]} for b, rows in br.items()],
+            "cc": brand_report.recipients_of("")[1],
+            "week": [d.isoformat() for d in brand_report.last_week()],
+            "month": [d.isoformat() for d in brand_report.last_month()]}
+
+
 def arap_status(user):
     return {"settings": arap.settings(), "companies": arap.companies(), "recipients": arap.recipients(),
             "next_run": arap.next_run(), "runs": arap_notify.recent_runs(), "mail": arap_notify.mail_status(),
@@ -1227,6 +1244,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(pdf)
             elif url.path == "/api/cost-report":
                 self._send(200, cost_report_status())
+            elif url.path == "/api/brand-report":
+                self._send(200, brand_report_status())
+            elif url.path in ("/api/brand-report/job", "/api/brand-report/preview"):
+                job = brandrep.job(q.get("id") or "", user["username"])
+                if not job:
+                    self._send(404, {"error": "This report is no longer held; build it again."})
+                elif url.path.endswith("/job"):
+                    self._send(200, {k: v for k, v in job.items() if k != "html"})
+                elif job.get("html"):
+                    self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
+                else:
+                    msg = ("Reading Simphony (every location, the period, the week before and last year) and the P&L "
+                           "from Business Central… the first read can take several minutes." if job["status"] == "running"
+                           else html.escape(job.get("detail") or ""))
+                    self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
+                                     f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
             elif url.path in ("/api/cost-report/job", "/api/cost-report/preview"):
                 job = costrep.job(q.get("id") or "", user["username"])
                 if not job:
@@ -1518,6 +1551,29 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or costrep.companies()[0]
                 self._send(202, costrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/brand-report/settings", "/api/brand-report/job"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    bad = arap_notify.parse_emails(body.get("cc"))[1]
+                    for line in str(body.get("recipients") or "").splitlines():
+                        bad += arap_notify.parse_emails(line.partition(":")[2])[1]
+                    if bad:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                        return
+                    store.save_settings({"brand_report": body}, actor)
+                    self._send(200, brand_report_status())
+                    return
+                only, bad = arap_notify.parse_emails(body.get("to"))
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                kind, brand = body.get("kind") or "weekly", str(body.get("brand") or "").strip().upper()
+                if kind not in brand_report.KINDS or brand not in brand_report.brands():
+                    self._send(400, {"error": "Choose a brand and a report."})
+                    return
+                self._send(202, brandrep.start_job(kind, brand, actor, only or None))
             elif url.path in ("/api/arap-notify/settings", "/api/arap-notify/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -1663,6 +1719,7 @@ def main():
     threading.Thread(target=_warm_loop, daemon=True).start()
     arap.start()
     costrep.start()
+    brandrep.start()
     fiscal.start_scheduler(client, config.FISK_COMPANY)
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(f"http://{host}:{config.APP_PORT}")).start()

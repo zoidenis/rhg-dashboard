@@ -863,6 +863,36 @@ td.num,th.num{text-align:right}
       <p class="hint" id="crInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="crRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="brCard">
+      <div class="card-head"><div><h2>Brand performance email</h2>
+        <p class="hint">One email per brand, to the brand's own addresses with finance and operations in Cc. <b>Weekly</b>, for the week before: sales of every location (Simphony, excluding VAT) against the budget, the week before and the same weekdays last year; guests, checks and the average check; sales by day; the month to date with the costs posted so far. <b>Monthly</b>, for the month before, twice: <i>provisional</i> on the first working day and <i>final</i> on the day set below, once payroll and stock usage are posted: the P&amp;L of the brand (sales, food &amp; beverage, labour, prime cost, other costs, EBITDA) against budget and last year, the month and the year to date, every location. Brands and locations come from the registry in Location intelligence. Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="brPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">Weekly on<select id="brDay"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select></label>
+        <label class="field">Time<input id="brTime" type="time" value="09:00"></label>
+        <label class="field">Final monthly on day<input id="brFinal" type="number" min="2" max="28" value="10"></label>
+        <label class="field">Cc · finance and operations<input id="brCc" placeholder="finance@rhg.al, operations@rhg.al"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;margin:4px 0 12px">
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" id="brWeekly" style="width:auto"> Send every week</label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0"><input type="checkbox" id="brMonthly" style="width:auto"> Send every month (provisional and final)</label>
+      </div>
+      <p class="hint" style="margin:0 0 6px">To · the addresses of each brand (a brand left blank gets no email)</p>
+      <div class="formgrid" id="brTo"></div>
+      <div class="formgrid" style="margin-top:6px">
+        <label class="field">Test · brand<select id="brBrand"></select></label>
+        <label class="field">Test · report<select id="brKind"><option value="weekly">Weekly</option><option value="monthly">Monthly · provisional</option><option value="final">Monthly · final</option></select></label>
+        <label class="field">Send a test to<input id="brTestTo" placeholder="you@rhg.al"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="brSave">Save</button>
+        <button class="btn" id="brPreview">Preview</button>
+        <button class="btn" id="brTest">Send a test</button>
+        <span class="meta" id="brMsg"></span>
+      </div>
+      <p class="hint" id="brInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="brRuns"></table></div>
+    </div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -988,6 +1018,7 @@ function render(){
   if(!spLoaded) loadSimphony();
   if(!arLoaded) loadArap();
   if(!crLoaded) loadCostReport();
+  if(!brLoaded) loadBrandReport();
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
@@ -3146,6 +3177,77 @@ async function pollCostReport(){
 }
 $("crPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the cost control report…</p>"); startCostReport("", w); };
 $("crTest").onclick = () => { const to = $("crTestTo").value.trim(); if (!to) { $("crMsg").textContent = "Enter an address for the test."; return; } startCostReport(to, null); };
+// ---------- brand performance email (weekly and monthly, one email per brand) ----------
+let brLoaded = false, brJob = null, brTimer = null, brBrands = [];
+async function loadBrandReport(){
+  brLoaded = true;
+  try{ renderBrandReport(await readJSON(await fetch("/api/brand-report"))); }catch(e){ $("brMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function brRecipients(){
+  return brBrands.map((b, i) => `${b.brand}: ${($("brTo" + i) || {}).value || ""}`.trim()).filter(l => !l.endsWith(":")).join("\n");
+}
+function renderBrandReport(st){
+  const s = st.settings || {}, m = st.mail || {}, days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  brBrands = st.brands || [];
+  $("brDay").value = String(s.day ?? "0"); $("brTime").value = s.time || "09:00"; $("brFinal").value = s.final_day || "10";
+  $("brCc").value = s.cc || ""; $("brWeekly").checked = !!s.weekly; $("brMonthly").checked = !!s.monthly;
+  $("brTo").innerHTML = brBrands.map((b, i) => `<label class="field" title="${esc(b.locations.join(", "))}">${esc(b.brand)}
+      <span class="meta" style="font-weight:400">${b.locations.length} location${b.locations.length === 1 ? "" : "s"}</span>
+      <input id="brTo${i}" value="${esc((b.to || []).join(", "))}" placeholder="addresses for ${esc(b.brand)}"></label>`).join("")
+    || `<p class="hint">No brand yet: add the restaurants in Settings → Location intelligence.</p>`;
+  const keep = $("brBrand").value;
+  $("brBrand").innerHTML = brBrands.map(b => `<option>${esc(b.brand)}</option>`).join("");
+  if (keep && brBrands.some(b => b.brand === keep)) $("brBrand").value = keep;
+  if (!$("brTestTo").value) $("brTestTo").value = (st.cc || [])[0] || "";
+  const on = s.weekly || s.monthly, nr = st.next_runs || {}, when = x => x ? x.replace("T", " ") : "–";
+  $("brPill").className = "rhg-pill " + (on ? (m.configured ? "ok" : "warning") : "info");
+  $("brPill").textContent = !on ? "Off" : !m.configured ? "On · mail server not ready" : "On";
+  const sent = brBrands.filter(b => (b.to || []).length).map(b => b.brand);
+  $("brInfo").textContent = (s.weekly ? `Weekly every ${days[+(s.day || 0)]} at ${s.time || "09:00"} (next ${when(nr.weekly)}), for the week before. ` : "Weekly off. ")
+    + (s.monthly ? `Monthly provisional on the first working day (next ${when(nr.monthly)}) and final on day ${s.final_day || 10} (next ${when(nr.final)}). ` : "Monthly off. ")
+    + (sent.length ? `Brands with addresses: ${sent.join(", ")}.` : "No brand has an address yet.")
+    + ((st.cc || []).length ? ` Cc: ${st.cc.join(", ")}.` : "")
+    + (st.simphony ? "" : " Simphony is not set up: sales will be missing.")
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [], kinds = st.kinds || {};
+  $("brRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Brand</th><th>Report</th><th>Period</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 12).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.brand)}</td><td>${esc(kinds[x.kind] || x.kind)}</td>
+      <td class="meta">${esc((x.period || {}).from || "")}${x.period ? " → " + esc(x.period.to) : ""}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc([...(x.to || []), ...(x.cc || []).map(c => "cc " + c)].join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["brSave", "brTest", "brPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "brSave" && !!brJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("brSave").onclick = async () => {
+  $("brMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/brand-report/settings", {weekly: $("brWeekly").checked, monthly: $("brMonthly").checked,
+      day: $("brDay").value, time: $("brTime").value, final_day: $("brFinal").value, cc: $("brCc").value, recipients: brRecipients()});
+    renderBrandReport(st);
+    $("brMsg").textContent = (st.settings.weekly || st.settings.monthly) ? "Saved." : "Saved. Tick weekly or monthly to switch it on.";
+  }catch(e){ $("brMsg").textContent = "Could not save: " + e.message; }
+};
+async function startBrandReport(to, win){
+  $("brMsg").textContent = "Reading Simphony and Business Central… several minutes the first time.";
+  try{
+    const job = await simphonyPost("/api/brand-report/job", {brand: $("brBrand").value, kind: $("brKind").value, to});
+    brJob = job; ["brTest", "brPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/brand-report/preview?id=" + encodeURIComponent(job.id);
+    pollBrandReport();
+  }catch(e){ $("brMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollBrandReport(){
+  clearTimeout(brTimer);
+  if (!brJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/brand-report/job?id=" + encodeURIComponent(brJob.id)));
+    if (j.status === "running") { brTimer = setTimeout(pollBrandReport, 5000); return; }
+    $("brMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("brMsg").textContent = "Lost track of the report: " + e.message; }
+  brJob = null; loadBrandReport();
+}
+$("brPreview").onclick = () => { if (!$("brBrand").value) { $("brMsg").textContent = "No brand in the registry yet."; return; }
+  const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the brand performance report…</p>"); startBrandReport("", w); };
+$("brTest").onclick = () => { const to = $("brTestTo").value.trim(); if (!to) { $("brMsg").textContent = "Enter an address for the test."; return; } startBrandReport(to, null); };
 // ---------------------------------------------------------------- Budget & forecast → Location intelligence
 // Every location (BC department) as a square: revenue (class 7), expenses (class 6) and the result
 // against the G/L budget, for the month chosen or the year to date. A click opens the location's
