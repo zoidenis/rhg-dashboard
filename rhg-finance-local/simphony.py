@@ -393,6 +393,57 @@ def tender_totals(loc_ref, bus_dt, latest=None):
     return t
 
 
+_mi_cache = {}
+
+
+def menu_dims(loc_ref, max_age=6 * 3600):
+    """{menu item number: (major group, family group)} of one location (getMenuItemDimensions); items
+    marked "do not include in sales" are left out."""
+    hit = _mi_cache.get(loc_ref)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    rows = (call("getMenuItemDimensions", {"locRef": loc_ref}) or {}).get("menuItems") or []
+    value = {}
+    for m in rows:
+        if m.get("num") is None or m.get("doNotIncludeInSales") in (True, 1, "true", "Y"):
+            continue
+        value[int(m["num"])] = ((m.get("majGrpName") or m.get("majGrpMstrName") or "").strip() or "Other",
+                                (m.get("famGrpName") or m.get("famGrpMstrName") or "").strip() or "Other")
+    _mi_cache[loc_ref] = (time.time(), value)
+    return value
+
+
+def category_totals(loc_ref, bus_dt, latest=None):
+    """{"major|family": [sales excluding VAT before discounts, items sold]} of one location and business
+    date (getMenuItemDailyTotals grouped by the menu items' major and family groups); kept with the
+    daily totals, final days are not read again."""
+    key = f"C|{loc_ref}|{bus_dt}"
+    with _days_lock:
+        hit = _days().get(key)
+    final_before = (date.fromisoformat(latest) - timedelta(days=2)).isoformat() if latest else None
+    if hit and (hit.get("final") or time.time() - hit.get("at", 0) < 900):
+        return hit["c"]
+    j = call("getMenuItemDailyTotals", {"locRef": loc_ref, "busDt": bus_dt}) or {}
+    dims, c = menu_dims(loc_ref), {}
+    for rvc in j.get("revenueCenters") or []:
+        for m in rvc.get("menuItems") or []:
+            if m.get("miNum") is None:
+                continue
+            g = dims.get(int(m["miNum"]))
+            if not g:
+                continue
+            tax = float(m.get("vatTtl") or 0) or float(m.get("inclTaxTtl") or 0)
+            x = c.setdefault(f"{g[0]}|{g[1]}", [0.0, 0])
+            x[0] += float(m.get("slsTtl") or 0) - tax
+            x[1] += int(m.get("slsCnt") or 0)
+    row = {"at": time.time(), "c": c, "final": bool(final_before and bus_dt <= final_before)}
+    with _days_lock:
+        _days()[key] = row
+        _days_mem["dirty"] += 1
+        _save_days()
+    return c
+
+
 def _sum(rvcs, field):
     return sum(float(r.get(field) or 0) for r in rvcs)
 

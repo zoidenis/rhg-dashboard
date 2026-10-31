@@ -9,6 +9,8 @@ Every Monday (the day and time are in Finance → Settings → Sales weekly emai
   * one email per restaurant that has people of its own in Email recipients (unit manager, head chef ...),
     with that restaurant only, day by day.
 The figures are those of the brand performance email (brand_report.build), restaurant by restaurant.
+Both also show the categories (Simphony major groups; family groups in a restaurant's email) against
+the same weekdays last year and four weeks before.
 Read-only: Simphony and Business Central are only read; the mail goes through Purchasing.
 """
 import html
@@ -22,6 +24,7 @@ from datetime import date, datetime, timedelta
 import arap_notify
 import brand_report
 import config
+import simphony
 import locintel
 import recipients
 import store
@@ -65,6 +68,160 @@ def registry():
 
 
 # ---------------------------------------------------------------- the figures
+# ---------------------------------------------------------------- categories
+# Sales by category (Simphony major group, family groups under it) of the week against the same weekdays
+# last year and the same weekdays a month (four weeks) before. Simphony gives the menu items' sales; each
+# day they are scaled to that day's sales excluding VAT, so the categories add up to the restaurant's sales
+# (discounts fall pro rata). A day with sales but no menu item totals stays "Not split".
+NOT_SPLIT = "Not split by category"
+
+
+def category_periods(a, b):
+    return {"cur": (a, b), "m1": (a - timedelta(days=28), b - timedelta(days=28)),
+            "ly": (a - timedelta(days=364), b - timedelta(days=364))}
+
+
+def categories(refs, a, b, latest_fn, parallel_fn):
+    """{ref: {period: {major: {"ex", "cnt", "fam": {family: {"ex", "cnt"}}}}}}, errors"""
+    per = category_periods(a, b)
+    days = sorted({x for p in per.values() for x in brand_report._days(*p)})
+    if not refs or not simphony.info().get("configured"):
+        return {}, []
+    ops = brand_report._simphony_days(refs, days, latest_fn, parallel_fn)
+    latest = {r: (v if not e else None) for r, (v, e) in parallel_fn({r: (lambda x=r: latest_fn(x)) for r in refs}).items()}
+    jobs = {}
+    for ref in refs:
+        for d in days:
+            iso = d.isoformat()
+            if (ops.get(ref) or {}).get(iso) and not (latest.get(ref) and iso > latest[ref]):
+                jobs[(ref, iso)] = (lambda r=ref, dd=iso, lt=latest.get(ref): simphony.category_totals(r, dd, lt))
+    res = parallel_fn(jobs, workers=4)
+    simphony.flush_days()
+    errors = sorted({f"Categories: {str(e)[:160]}" for v, e in res.values() if e})[:2]
+    out = {}
+    for ref in refs:
+        for pk, (pa, pb) in per.items():
+            P = out.setdefault(ref, {}).setdefault(pk, {})
+            for d in brand_report._days(pa, pb):
+                iso = d.isoformat()
+                f = (ops.get(ref) or {}).get(iso)
+                if not f:
+                    continue
+                ex = f["net"] - (f.get("tax") or 0)
+                c = (res.get((ref, iso)) or (None, None))[0] or {}
+                w = sum(v[0] for v in c.values() if v[0] > 0)
+                if not w:
+                    if ex:
+                        M = P.setdefault(NOT_SPLIT, {"ex": 0.0, "cnt": 0, "fam": {}})
+                        M["ex"] += ex
+                    continue
+                for k, (v, n) in c.items():
+                    maj, _, fam = k.partition("|")
+                    M = P.setdefault(maj, {"ex": 0.0, "cnt": 0, "fam": {}})
+                    F = M["fam"].setdefault(fam, {"ex": 0.0, "cnt": 0})
+                    part = ex * max(v, 0) / w
+                    M["ex"] += part
+                    F["ex"] += part
+                    M["cnt"] += n
+                    F["cnt"] += n
+    return out, errors
+
+
+def merge_categories(parts):
+    """The categories of several restaurants added together (by name)."""
+    out = {}
+    for one in parts:
+        for pk, P in (one or {}).items():
+            O = out.setdefault(pk, {})
+            for maj, M in P.items():
+                X = O.setdefault(maj, {"ex": 0.0, "cnt": 0, "fam": {}})
+                X["ex"] += M["ex"]
+                X["cnt"] += M["cnt"]
+                for fam, F in M["fam"].items():
+                    Y = X["fam"].setdefault(fam, {"ex": 0.0, "cnt": 0})
+                    Y["ex"] += F["ex"]
+                    Y["cnt"] += F["cnt"]
+    return out
+
+
+def category_rows(C, families=False):
+    """[(level, name, cur, m1, ly)] sorted by this week's sales; level 0 = category, 1 = family."""
+    cur, m1, ly = (C.get(k) or {} for k in ("cur", "m1", "ly"))
+    rows = []
+    for maj in sorted(set(cur) | set(ly) | set(m1), key=lambda k: (k == NOT_SPLIT, -(cur.get(k) or {}).get("ex", 0))):
+        z = {"ex": 0.0, "cnt": 0, "fam": {}}
+        rows.append((0, maj, cur.get(maj) or z, m1.get(maj) or z, ly.get(maj) or z))
+        if families and maj != NOT_SPLIT:
+            fc, f1, fl = ((P.get(maj) or z)["fam"] for P in (cur, m1, ly))
+            for fam in sorted(set(fc) | set(fl) | set(f1), key=lambda k: -(fc.get(k) or {}).get("ex", 0)):
+                y = {"ex": 0.0, "cnt": 0}
+                rows.append((1, fam, fc.get(fam) or y, f1.get(fam) or y, fl.get(fam) or y))
+    return rows
+
+
+def category_highlight(C):
+    rows = [x for x in category_rows(C) if x[1] != NOT_SPLIT and x[2]["ex"] and x[4]["ex"]]
+    if len(rows) < 2:
+        return None
+    g = sorted(rows, key=lambda x: _pct(x[2]["ex"], x[4]["ex"]))
+    lo, hi = g[0], g[-1]
+    return ("info", f"Categories against last year: {hi[1]} {_p(_pct(hi[2]['ex'], hi[4]['ex']))} "
+                    f"(best), {lo[1]} {_p(_pct(lo[2]['ex'], lo[4]['ex']))} (weakest).")
+
+
+def render_categories(C, title, note, families=False, brands=None):
+    """The categories table for an email; brands = [(brand, C)] adds a block per brand."""
+    e = html.escape
+    ink, muted, line, sky, red, green = "#0e2733", "#5c7482", "#d9dcdd", "#e4f3f9", "#c0392b", "#0e8a57"
+    th = f"text-align:left;padding:6px 8px;background:{sky};color:{ink};font-size:11.5px;font-weight:600;white-space:nowrap"
+    thn = th.replace("text-align:left", "text-align:right")
+    td = f"padding:5px 8px;border-bottom:1px solid #f0f1f2;font-size:12px;color:{ink};vertical-align:top"
+    tdn = td + ";text-align:right;white-space:nowrap"
+
+    def var(v):
+        if v is None:
+            return f"<span style='color:{muted}'>–</span>"
+        return f"<span style='color:{green if v >= 0 else red}'>{_p(v)}</span>"
+
+    def body(C_, fam, header=None):
+        rows = category_rows(C_, fam)
+        tot = sum(x[2]["ex"] for x in rows if x[0] == 0) or 0
+        out = []
+        if header and rows:
+            out.append(f"<tr><td colspan='9' style='{td};background:#f6f8f9;font-weight:700'>{e(header)}</td></tr>")
+        for lvl, name, c, m1, ly in rows:
+            bold = "font-weight:600;" if lvl == 0 and fam else ""
+            pad = "padding-left:22px;color:#33505e;" if lvl else ""
+            sh = f"{c['ex'] / tot * 100:.1f}%" if lvl == 0 and tot else ""
+            out.append(f"<tr><td style='{td};{bold}{pad}'>{e(name)}</td><td style='{tdn};{bold}'>{_m(c['ex'])}</td>"
+                       f"<td style='{tdn};color:{muted}'>{sh}</td>"
+                       f"<td style='{tdn};color:{muted}'>{_m(ly['ex']) if ly['ex'] else '–'}</td><td style='{tdn}'>{var(_pct(c['ex'], ly['ex']) if ly['ex'] else None)}</td>"
+                       f"<td style='{tdn};color:{muted}'>{_m(m1['ex']) if m1['ex'] else '–'}</td><td style='{tdn}'>{var(_pct(c['ex'], m1['ex']) if m1['ex'] else None)}</td>"
+                       f"<td style='{tdn}'>{c['cnt']:,}</td><td style='{tdn}'>{var(_pct(c['cnt'], ly['cnt']) if ly['cnt'] else None)}</td></tr>")
+        return out
+
+    head = [("Category", 0), ("Sales", 1), ("Share", 1), ("Last year", 1), ("vs LY", 1), ("Month before", 1),
+            ("vs month before", 1), ("Items sold", 1), ("Items vs LY", 1)]
+    hs = "".join(f"<th style='{thn if n else th}'>{e(h)}</th>" for h, n in head)
+    rows = body(C, families)
+    for name, Cb in brands or []:
+        rows += body(Cb, False, name)
+    if not rows:
+        return ""
+    return (f"<h3 style='font-size:14px;color:{ink};margin:22px 0 4px'>{e(title)}</h3>"
+            f"<div style='font-size:12px;color:{muted};margin-bottom:6px'>{note}</div>"
+            f"<div style='overflow-x:auto'><table role='presentation' cellspacing='0' cellpadding='0' style='width:100%;"
+            f"border-collapse:collapse;border:1px solid {line}'><tr>{hs}</tr>{''.join(rows)}</table></div>")
+
+
+def category_note(r):
+    per = category_periods(date.fromisoformat(r["period"]["from"]), date.fromisoformat(r["period"]["to"]))
+    f = lambda p: f"{p[0]:%d %b} – {p[1]:%d %b %Y}"
+    return html.escape(f"Simphony major groups, sales excluding VAT. Last year = {f(per['ly'])}; "
+                       f"month before = the same weekdays four weeks earlier, {f(per['m1'])}. Each day's menu item sales "
+                       f"are scaled to that day's sales, so the categories add up to the total.")
+
+
 def build_all(client, latest_fn, parallel_fn, currency_of, today=None):
     out, errors, period = [], [], None
     for brand in brand_report.brands():
@@ -117,7 +274,24 @@ def build_all(client, latest_fn, parallel_fn, currency_of, today=None):
                                f"highest: {g[-1]['name']} {_p(_pct(g[-1]['sales']['ex'], g[-1]['ly']['ex']))}."))
     if not period:
         raise RuntimeError("No brand in the restaurant registry (Settings → Location intelligence) could be read.")
-    return {"brands": out, "totals": totals, "main": main, "other": [c for c in totals if c != main],
+    # categories: the restaurants in the main currency, all together and brand by brand
+    cats, cats_brands = {}, []
+    try:
+        pa, pb = date.fromisoformat(period["period"]["from"]), date.fromisoformat(period["period"]["to"])
+        per_ref, cerr = categories([L["ref"] for L in locs], pa, pb, latest_fn, parallel_fn)
+        errors += cerr
+        cats = merge_categories(per_ref.get(L["ref"]) for L in locs if L["currency"] == main)
+        for br in out:
+            Cb = merge_categories(per_ref.get(L["ref"]) for L in br["locations"] if L["currency"] == br["main"])
+            if Cb.get("cur"):
+                cats_brands.append((br["brand"] + (f" ({br['main']})" if br["main"] != main else ""), Cb))
+        h = category_highlight(cats)
+        if h:
+            hl.append(h)
+    except Exception as exc:                                        # noqa: BLE001
+        traceback.print_exc()
+        errors.append(f"Categories: {str(exc)[:200]}")
+    return {"cats": cats, "cats_brands": cats_brands, "brands": out, "totals": totals, "main": main, "other": [c for c in totals if c != main],
             "period": period["period"], "prev": period["prev"], "ly": period["ly"], "mtd_from": period["mtd_from"],
             "highlights": hl, "errors": errors, "locations": len(locs), "built_at": datetime.now().isoformat(timespec="seconds")}
 
@@ -208,6 +382,7 @@ def render_all(r):
 <h3 style="font-size:14px;color:{ink};margin:22px 0 4px">By brand and restaurant</h3>
 <div style="font-size:12px;color:{muted};margin-bottom:6px">Sales excluding VAT from Simphony; budget = the G/L budget of the restaurant's department for these days; month to date from {e(r['mtd_from'])}.</div>
 {table}{other}
+{render_categories(r.get("cats") or {}, "Categories", category_note(r) + " By brand below.", brands=r.get("cats_brands")) if (r.get("cats") or {}).get("cur") else ""}
 {f"<p style='margin:20px 0 0'><a href='{e(public)}/finance/#sales' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>Open Sales in the Finance tower</a></p>" if public else ''}
 <p style="color:{muted};font-size:11px;margin:22px 0 0;border-top:1px solid {line};padding-top:12px">Sent every week by RHG Control Towers from Simphony and Business Central; nothing was changed there. Recipients are in Finance → Settings → Email recipients by company ("Sales against last year and budget"); the day and time in Sales weekly email.</p>
 </td></tr></table></td></tr></table></body></html>"""
@@ -247,15 +422,30 @@ class Reporter:
 
     @staticmethod
     def render_location(r):
-        body, text = brand_report.render(r)
+        C = r.get("cats") or {}
+        extra = render_categories(C, "Categories", category_note(r) + " Family groups under each category.", families=True) if C.get("cur") else ""
+        body, text = brand_report.render(r, extra)
         return body.replace("Recipients and schedule are in Finance → Settings → Brand performance email.",
                             "Sent every week to the people of this restaurant in Finance → Settings → Email recipients "
                             "(\"Sales against last year and budget\"); the day and time in Sales weekly email."), text
 
     def build_location(self, row):
         brand = (row.get("brand") or row.get("name") or row["ref"]).strip().upper()
-        return brand_report.build("weekly", brand, self.client, self.latest_fn, self.parallel_fn, self.currency_of,
-                                  only_ref=row["ref"], label=row.get("name") or row["ref"], sales_only=True)
+        r = brand_report.build("weekly", brand, self.client, self.latest_fn, self.parallel_fn, self.currency_of,
+                               only_ref=row["ref"], label=row.get("name") or row["ref"], sales_only=True)
+        if r["locations"]:
+            try:
+                per = category_periods(date.fromisoformat(r["period"]["from"]), date.fromisoformat(r["period"]["to"]))
+                per_ref, cerr = categories([row["ref"]], per["cur"][0], per["cur"][1], self.latest_fn, self.parallel_fn)
+                r["cats"] = per_ref.get(row["ref"]) or {}
+                r["errors"] = (r.get("errors") or []) + cerr
+                h = category_highlight(r["cats"])
+                if h:
+                    r["highlights"].append(h)
+            except Exception as exc:                                # noqa: BLE001
+                traceback.print_exc()
+                r["errors"] = (r.get("errors") or []) + [f"Categories: {str(exc)[:200]}"]
+        return r
 
     def _send(self, kind, label, to, cc, body, text, subj, actor, test, period):
         entry = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": kind, "target": label, "actor": actor,

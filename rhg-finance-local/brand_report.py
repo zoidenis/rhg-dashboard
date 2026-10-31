@@ -429,7 +429,8 @@ def subject(r, test=False):
     return (("[Test] " if test else "") + f"[RHG] {r['brand']} · {KINDS[r['kind']]} performance · {when}{tail}")
 
 
-def render(r):
+def render(r, extra=""):
+    """extra: more HTML after the blocks (the categories of the weekly sales email)."""
     e = html.escape
     navy, primary, ink, muted, line, sky = "#08303f", "#0c475e", "#0e2733", "#5c7482", "#d9dcdd", "#e4f3f9"
     red, amber, green = "#c0392b", "#b26a00", "#0e8a57"
@@ -572,7 +573,7 @@ def render(r):
 <tr><td style="background:#fff;padding:20px 22px;border-radius:0 0 12px 12px">
 {errs}{tiles}
 <h3 style="font-size:14px;color:{ink};margin:18px 0 6px">Highlights</h3>{hl}
-{blocks}
+{blocks}{extra}
 {f"<p style='margin:20px 0 0'><a href='{e(public)}{"/finance/#sales" if r.get("sales_only") else "/executive?tab=locations"}' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>{"Open Sales in the Finance tower" if r.get("sales_only") else "Open Location intelligence"}</a></p>" if public else ''}
 <p style="color:{muted};font-size:11px;margin:22px 0 0;border-top:1px solid {line};padding-top:12px">Sent by RHG Control Towers from Simphony and Business Central; nothing was changed there. Recipients and schedule are in Finance → Settings → Brand performance email.</p>
 </td></tr></table></td></tr></table></body></html>"""
