@@ -705,6 +705,22 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-assets">
+    <div class="ov-tabs" id="faTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Fixed assets</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="faLocView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>Fixed assets by location</h2>
+          <p class="hint">Every location as a square with its fixed assets: cost, accumulated depreciation and net book value at the end of the period chosen above, additions, depreciation and disposals of the period and the year, assets fully depreciated. Click a location for its classes and assets.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="faSort">Order</label><select id="faSort"><option value="nbv">by net book value</option><option value="cost">by cost</option><option value="additions">by additions this year</option><option value="dep">by depreciation this year</option><option value="pct">by share depreciated</option><option value="name">by name</option></select>
+            <button class="mini dark" id="faRead">Read again</button></div></div>
+        <p class="meta" id="faStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="faTotals"></div>
+      <div id="faGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="faDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="faMain">
     <div class="money" id="faKpis"></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Fixed assets and CAPEX</h2><p class="hint" id="faNote"></p></div>
       <div style="display:flex;gap:8px"><button class="mini dark" id="faLoad">Read</button>
@@ -712,6 +728,7 @@ td.num,th.num{text-align:right}
       <div class="scroll"><table id="faTypes"></table></div></div>
     <div class="card"><h2>Assets touched in the period</h2><p class="hint">Acquisitions and depreciation per asset</p>
       <div class="scroll"><table id="faAssets"></table></div></div>
+    </div>
   </section>
 
   <section class="view" id="v-budget">
@@ -937,6 +954,7 @@ td.num,th.num{text-align:right}
   <div class="foot" id="foot"></div>
 </main>
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
+<div class="pl-bd" id="faBd"><div class="pl-pop" id="faPop" role="dialog" aria-modal="true" aria-label="Location fixed assets"></div></div>
 <div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
@@ -1062,6 +1080,7 @@ function render(){
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
+  if($("v-assets").classList.contains("on") && faTab === "loc" && faKey !== faQuery()) loadFa(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
@@ -2664,6 +2683,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="inventory" && ilTab === "loc" && (!ilData || ilKey !== ilQuery())) loadIl(false);
   if(b.dataset.view==="overview" && flTab === "loc" && (!flData || flKey !== flQuery())) loadFl(false);
   if(b.dataset.view==="cash" && clTab === "loc" && (!clData || clKey !== flQuery())) loadCl(false);
+  if(b.dataset.view==="assets" && faTab === "loc" && (!faData || faKey !== faQuery())) loadFa(false);
   if(b.dataset.view==="budget" && blTab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
@@ -3508,6 +3528,135 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("clBd").classList.contains("show")) { $("clBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.clloc != null && e.target.closest("#clGrid")) { e.preventDefault(); clOpen(e.target.dataset.clloc); }
+});
+// ---------------------------------------------------------------- Fixed assets → Location intelligence
+// Per FA location: cost, accumulated depreciation and book value at the end of the period, the movements
+// of the period and the year, classes and the largest assets; built on the server from a summary of the
+// FA ledger (/api/assets/locations), read once in full and then topped up.
+let faTab = "main", faData = null, faKey = "", faTimer = null, faSort = "nbv";
+function faQuery(){
+  const p = new URLSearchParams();
+  if ($("company").value) p.set("company", $("company").value);
+  if ($("anchor").value) p.set("period", $("anchor").value);
+  p.set("mode", $("mode").value || "month");
+  return p.toString();
+}
+function faShowTab(tab){
+  faTab = tab;
+  document.querySelectorAll("#faTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("faMain").style.display = tab === "loc" ? "none" : "";
+  $("faLocView").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { if (!faData || faKey !== faQuery()) loadFa(false); else faRender(); }
+}
+document.querySelectorAll("#faTabs button").forEach(b => b.onclick = () => faShowTab(b.dataset.t));
+$("faSort").onchange = () => { faSort = $("faSort").value; faRender(); };
+$("faRead").onclick = () => loadFa(true);
+async function loadFa(refresh){
+  clearTimeout(faTimer);
+  const q = faQuery();
+  if (faKey !== q) { faData = null; faKey = q; }
+  if (!faData) $("faGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  $("faRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/assets/locations?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (faKey !== q) return;
+    if (j.pending) {
+      $("faStatus").textContent = `Reading the FA ledger: ${j.stage || "starting"}… the first read goes through every entry since the start and takes a few minutes; later reads only add the new ones.`;
+      if (faTab === "loc") faTimer = setTimeout(() => loadFa(false), 5000);
+      return;
+    }
+    faData = j; faRender();
+    if (j.refreshing && faTab === "loc") faTimer = setTimeout(() => loadFa(false), 8000);
+  }catch(e){ $("faStatus").textContent = "Could not read: " + e.message; }
+  finally{ $("faRead").disabled = false; }
+}
+function faBar(L){
+  if (!(L.cost > 0)) return `<div class="fl-split"></div>`;
+  return `<div class="fl-split" role="img" aria-label="Depreciated ${Math.round(L.dep_pct || 0)}%"><i class="cl-c4" style="flex:${Math.max(0, L.dep)}" title="Accumulated depreciation ${flM(L.dep)}"></i><i class="cl-c1" style="flex:${Math.max(0, L.nbv)}" title="Net book value ${flM(L.nbv)}"></i></div>`;
+}
+function faSquare(code, L){
+  const a = (L.alerts || []).find(x => x[0] !== "info") || (L.alerts || [])[0] || ["good", "Depreciation posted"];
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  return `<div class="pl-sq" role="button" tabindex="0" data-faloc="${esc(code)}" aria-label="${esc(L.name || code)}: fixed assets">
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "No FA location")}</b><span>${esc([L.name && L.name !== code ? code : "", L.seasonal ? "seasonal" : ""].filter(Boolean).join(" · "))}</span></div></div>
+    <div class="big"><span class="v">${flM(L.nbv)}</span><span class="cmp">net book value · cost ${flM(L.cost)} · ${L.dep_pct != null ? Math.round(L.dep_pct) + "% depreciated" : "–"}</span></div>
+    ${faBar(L)}
+    <div class="st">${stat("Assets", fmt(L.assets), "", `${L.fully} fully depreciated`)}${stat("Fully depr.", fmt(L.fully), L.assets && L.fully / L.assets > 0.5 ? "warn" : "", `cost ${flM(L.fully_cost)}`)}
+      ${stat("Added YTD", L.y_add ? flM(L.y_add) : "–", "", `In the period ${flM(L.p_add)}`)}${stat("Depr. YTD", L.y_dep ? flM(L.y_dep) : "–", "", `In the period ${flM(L.p_dep)} · month ${flM(L.dep_month)}`)}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function faRender(){
+  if (faTab !== "loc" || !$("faGrid")) return;
+  const d = faData;
+  if (!d) { $("faGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const B = d.locations || {}, codes = Object.keys(B), C = d.currency || "";
+  $("faStatus").innerHTML = `End of ${esc(d.period.months[1])}${d.period.months[0] !== d.period.months[1] ? ` · movements ${esc(d.period.months[0])} → ${esc(d.period.months[1])}` : ""} · depreciation book ${esc(d.book || "–")} · ${fmt(d.entries)} FA entries summed${d.read_at ? ", read " + new Date(d.read_at * 1000).toLocaleString("en-GB", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"}) : ""}${d.refreshing ? ` · <span class="warn">topping up: ${esc(d.refreshing)}</span>` : ""} · ${esc(C)}`;
+  const sum = f => codes.reduce((a, c) => a + (B[c][f] || 0), 0);
+  const cost = sum("cost"), dep = sum("dep"), nbv = sum("nbv"), n = sum("assets"), fully = sum("fully");
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("faTotals").innerHTML =
+    k("Net book value", flM(nbv), `${C} · cost ${flM(cost)} · ${cost ? Math.round(dep / cost * 100) : 0}% depreciated`) +
+    k("Additions this year", flM(sum("y_add")), `in the period ${flM(sum("p_add"))}`) +
+    k("Depreciation this year", flM(sum("y_dep")), `in the period ${flM(sum("p_dep"))}${sum("y_disp") ? ` · disposals ${flM(sum("y_disp"))}` : ""}`) +
+    k("Assets in use", fmt(n), `${fmt(fully)} fully depreciated and still on the books`, n && fully / n > 0.5 ? "warn" : "");
+  const key = {nbv: c => -B[c].nbv, cost: c => -B[c].cost, additions: c => -B[c].y_add, dep: c => -B[c].y_dep, pct: c => -(B[c].dep_pct ?? -1), name: c => 0}[faSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (B[a].name || a).localeCompare(B[b].name || b));
+  const rest = codes.filter(c => B[c].group === "restaurant"), by = {};
+  rest.forEach(c => { const b = (B[c].brand || c).toUpperCase(); (by[b] = by[b] || []).push(c); });
+  const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((B[c].brand || c).toUpperCase()));
+  const groups = [];
+  if (singles.length) groups.push({t: "Restaurants", c: singles});
+  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  const sup = codes.filter(c => B[c].group === "support"), none = codes.filter(c => B[c].group === "unassigned");
+  if (sup.length) groups.push({t: "Head office, central and warehouses", c: sup, hint: "FA locations that are not restaurants in the registry"});
+  if (none.length) groups.push({t: "No FA location", c: none, hint: "assets whose latest entry names no FA location"});
+  $("faGrid").innerHTML = codes.length ? `<div class="cl-leg"><span><i class="cl-c1"></i>Net book value</span><span><i class="cl-c4"></i>Depreciated</span></div>` + groups.map(g => {
+      const v = g.c.reduce((a, c) => a + B[c].nbv, 0), na = g.c.reduce((a, c) => a + B[c].assets, 0);
+      return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${fmt(na)} assets · book value ${flM(v)} ${esc(C)}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+        <div class="pl-grid">${sorted(g.c).map(c => faSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">No fixed asset on the books at the end of this period.</p>`;
+  $("faDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
+    `<p style="margin:0">Alerts: no depreciation posted in a closed month on a location with book value; assets with no FA location; more than half the assets fully depreciated; additions in the period.</p>`;
+  if ($("faBd").classList.contains("show") && $("faPop").dataset.code != null) faDraw($("faPop").dataset.code);
+}
+function faOpen(code){ $("faPop").dataset.code = code; faDraw(code); $("faBd").classList.add("show"); }
+function faDraw(code){
+  const L = (faData && faData.locations || {})[code]; if (!L) return;
+  const C = faData.currency || "", M = faData.months || [];
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const mx = Math.max(1, ...L.m_add, ...L.m_dep);
+  const chart = M.length ? `<div class="scroll"><table class="fl-tab" data-nosort><tr><th>Month</th><th class="num">Additions</th><th class="num">Depreciation</th><th style="width:45%"></th></tr>${M.map((m, i) => `<tr><td>${esc(flMon(m))}</td><td class="num">${fmt(L.m_add[i])}</td><td class="num">${fmt(L.m_dep[i])}</td>
+      <td><div class="fl-split" style="height:6px"><i class="cl-c1" style="flex:${L.m_add[i]}"></i><i style="flex:${mx - L.m_add[i]};background:transparent"></i></div><div class="fl-split" style="height:6px;margin-top:2px"><i class="cl-c4" style="flex:${L.m_dep[i]}"></i><i style="flex:${mx - L.m_dep[i]};background:transparent"></i></div></td></tr>`).join("")}</table></div>` : "";
+  const cls = L.by_class.length ? `<table data-nosort><tr><th>Class</th><th class="num">Assets</th><th class="num">Cost</th><th class="num">Book value</th></tr>${L.by_class.map(c => `<tr><td>${esc(c[0])}</td><td class="num">${fmt(c[1])}</td><td class="num">${fmt(c[2])}</td><td class="num"><b>${fmt(c[3])}</b></td></tr>`).join("")}</table>` : `<p class="hint">No asset in use.</p>`;
+  const top = L.top.length ? `<table><tr><th>Asset</th><th>Class</th><th class="num">Cost</th><th class="num">Book value</th><th class="num">Depr. YTD</th></tr>${L.top.map(x => `<tr><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="num">${fmt(x[3])}</td><td class="num"><b>${fmt(x[4])}</b></td><td class="num">${fmt(x[5])}</td></tr>`).join("")}</table>` : `<p class="hint">No asset in use.</p>`;
+  const added = L.added.length ? `<table><tr><th>Asset</th><th>Class</th><th>Month</th><th class="num">Cost</th></tr>${L.added.map(x => `<tr><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="meta">${esc(flMon(x[3]))}</td><td class="num">${fmt(x[4])}</td></tr>`).join("")}</table>` : `<p class="hint">Nothing added this year.</p>`;
+  $("faPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph(L)}</div>
+      <div><h2>${esc(L.name || code || "No FA location")}</h2><div class="sub">${esc(code || "no FA location")} · end of ${esc(faData.period.months[1])} · book ${esc(faData.book || "")} · ${esc(C)}</div></div><div class="sp"></div>
+      <button class="close" data-faclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div style="margin-bottom:10px">${L.alerts.map(x => `<div class="meta" style="margin:2px 0"><span class="pl-sev ${esc(x[0])}"></span>${esc(x[1])}</div>`).join("")}</div>` : ""}
+      <div class="pl-tiles">${tile("Net book value", flM(L.nbv), `cost ${flM(L.cost)} · depreciated ${flM(L.dep)} (${L.dep_pct != null ? Math.round(L.dep_pct) : "–"}%)`)}${tile("Assets in use", fmt(L.assets), `${fmt(L.fully)} fully depreciated · cost ${flM(L.fully_cost)}`, L.assets && L.fully / L.assets > 0.5 ? "warn" : "")}${tile("This year", flM(L.y_add), `added · depreciation ${flM(L.y_dep)}${L.y_disp ? ` · disposals ${flM(L.y_disp)}` : ""}`)}${tile("The period", flM(L.p_add), `added · depreciation ${flM(L.p_dep)}${L.p_disp ? ` · disposals ${flM(L.p_disp)}, proceeds ${flM(L.p_proc)}` : ""}`)}</div>
+      <div class="pl-cols" style="margin-bottom:12px">
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">By class</h3>${cls}</div>
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Additions and depreciation by month</h3>${chart}</div>
+      </div>
+      <div class="pl-cols">
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Largest assets by book value</h3><div class="scroll">${top}</div></div>
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Added this year</h3><div class="scroll">${added}</div></div>
+      </div>
+    </div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-faclose]") || t === $("faBd")) { $("faBd").classList.remove("show"); return; }
+  const s = t.closest("[data-faloc]"); if (s) faOpen(s.dataset.faloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("faBd").classList.contains("show")) { $("faBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.faloc != null && e.target.closest("#faGrid")) { e.preventDefault(); faOpen(e.target.dataset.faloc); }
 });
 // ---------------------------------------------------------------- Budget & forecast → Location intelligence
 // Every location (BC department) as a square: revenue (class 7), expenses (class 6) and the result
