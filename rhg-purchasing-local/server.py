@@ -1347,6 +1347,10 @@ class Handler(BaseHTTPRequestHandler):
         given = self.headers.get("X-Service-Token") or ""
         return bool(token) and hmac.compare_digest(given.encode(), token.encode())
 
+    # what another tower may attach: content type -> (file extension, first bytes of the file)
+    ATTACHMENT_TYPES = {"application/pdf": (".pdf", b"%PDF"), "text/csv": (".csv", b""),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (".xlsx", b"PK\x03\x04")}
+
     def _internal_mail(self, body):
         """Sends one email for another tower (Finance) through the mail server set up here,
         so the password is entered once. Recipients are given by the calling tower."""
@@ -1365,13 +1369,17 @@ class Handler(BaseHTTPRequestHandler):
         for a in (body.get("attachments") or [])[:5]:
             name = re.sub(r"[^A-Za-z0-9._ -]", "_", str(a.get("filename") or "attachment"))[:120]
             ctype = str(a.get("content_type") or "application/octet-stream")
-            if ctype not in ("application/pdf", "text/csv"):
-                self._send(400, {"error": "Only PDF and CSV attachments are accepted."})
+            if ctype not in self.ATTACHMENT_TYPES:
+                self._send(400, {"error": "Only PDF, CSV and Excel (.xlsx) attachments are accepted."})
                 return
             try:
                 data = base64.b64decode(a.get("data") or "", validate=True)
             except (ValueError, TypeError):
                 self._send(400, {"error": "An attachment could not be read."})
+                return
+            ext, magic = self.ATTACHMENT_TYPES[ctype]
+            if not name.lower().endswith(ext) or (magic and not data.startswith(magic)):
+                self._send(400, {"error": f"The attachment {name} is not a {ext} file."})
                 return
             if len(data) > 10_000_000:
                 self._send(400, {"error": "An attachment is larger than 10 MB."})
