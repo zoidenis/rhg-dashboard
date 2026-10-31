@@ -16,6 +16,7 @@ import traceback
 from datetime import date, datetime, timedelta
 
 import notify
+import recipients as recipients_dir
 import savings
 import smtp_config
 import store
@@ -396,16 +397,20 @@ def subject(r, test=False):
             f"{r['period']['from']} to {r['period']['to']} · {word} {_m(abs(s['net']))}")
 
 
-def recipients(settings=None):
+def recipients(settings=None, company=None):
     n = (settings or store.get_settings()).get("notifications") or {}
     to = notify.parse_emails(n.get("manager", ""))[0] + notify.parse_emails(n.get("coordinator", ""))[0]
     cc = [c for c in notify.parse_emails(n.get("cost_controller", ""))[0] if c not in to]
-    return list(dict.fromkeys(to)), cc
+    to = list(dict.fromkeys(to))
+    if company:                     # the company's own people (Settings → Email recipients by company)
+        r = recipients_dir.resolve("savings_monthly", [company], to, cc)
+        return r["to"], r["cc"]
+    return to, cc
 
 
 def send(r, currency, to=None, cc=None, actor="", test=False, note=""):
     if to is None:
-        to, cc = recipients()
+        to, cc = recipients(company=r.get("company"))
     if not to:
         raise RuntimeError("No Purchasing Manager or Coordinator email is set in Settings → Email notifications.")
     body, text = render_email(r, currency, note)

@@ -481,6 +481,9 @@ class Notifier:
             try:
                 s = self.settings()
                 rec = {"to": only_to, "cc": []} if only_to else self.recipients(s)
+                if not only_to:              # the company's people (Settings → Email recipients by company)
+                    import recipients
+                    rec = recipients.resolve("arap_daily", [company], rec["to"], rec["cc"])
                 d = self.digest(company)
                 entry.update(exceptions=d["exceptions"], new=d["new"], to=rec["to"], cc=rec["cc"])
                 if not rec["to"]:

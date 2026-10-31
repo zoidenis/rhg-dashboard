@@ -40,6 +40,7 @@ from datetime import date, datetime, timedelta
 import arap_notify
 import cis_client
 import config
+import recipients
 import store
 
 DB_PATH = store.DATA_DIR / "fiscal.db"
@@ -762,6 +763,9 @@ def send(client, company, test=False, only_to=None, actor="scheduler"):
             cc, _ = arap_notify.parse_emails(s.get("cc"))
             if only_to:
                 to, cc = only_to, []
+            else:                            # the company's people (Settings → Email recipients by company)
+                rec = recipients.resolve("fiscal_daily", [company], to, cc)
+                to, cc = rec["to"], rec["cc"]
             r = result_now(client, company)
             if r.get("available") is False or r.get("pending"):
                 raise RuntimeError(r.get("error") or "The report is not ready.")

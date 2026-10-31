@@ -798,6 +798,7 @@ td.num,th.num{text-align:right}
       <p class="meta" id="ntNext" style="margin-top:10px"></p>
       <div class="scroll" style="margin-top:8px"><table id="ntRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:16px" id="rcCard" data-header="RHG-Purchasing"></div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action assignment, status change, comment and threshold change made in this app.</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -1695,7 +1696,7 @@ function renderSettings(){
     <label class="field" style="grid-column:1/-1">Single G/L account to purchase type<input id="cl-svc" value="${esc((s.classification||{}).service_accounts||"")}" placeholder="636=Recurring Contracts, 6271=Services"></label>`;
   $("setWeekends").checked = !!s.exclude_weekends;
   settingsRendered = true;
-  loadAudit(); loadNotify();
+  loadAudit(); loadNotify(); if (window.rcLoad) rcLoad();
 }
 $("saveSettings").onclick = async () => {
   const thresholds = {}, owners = {};
@@ -3122,5 +3123,6 @@ $("wkTest").onclick = () => {
 };
 </script>
 <script src="tables.js"></script>
+<script src="recipients.js"></script>
 </body>
 </html>

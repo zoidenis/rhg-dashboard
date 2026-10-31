@@ -30,6 +30,7 @@ import config
 import executive
 import finloc
 import locintel
+import recipients
 import simphony
 import store
 
@@ -96,7 +97,9 @@ def brands(s=None):
     return out
 
 
-def recipients_of(brand, s=None):
+def recipients_of(brand, s=None, rows=None):
+    """The brand's own addresses in To; in Cc the people of its companies in the roles set for this
+    report (Settings → Email recipients by company: finance and operations by default), else the Cc here."""
     s = s or settings()
     to = []
     for line in (s.get("recipients") or "").splitlines():
@@ -104,6 +107,11 @@ def recipients_of(brand, s=None):
         if name.strip().upper() == brand:
             to = arap_notify.parse_emails(emails)[0]
     cc = [c for c in arap_notify.parse_emails(s.get("cc"))[0] if c not in to]
+    if brand and to:
+        companies = sorted({r.get("company") for r in (rows if rows is not None else brands().get(brand, [])) if r.get("company")})
+        rec = recipients.resolve("brand_performance", companies, to, cc, promote_cc=False)
+        to = list(dict.fromkeys(to + rec["to"]))
+        cc = [c for c in rec["cc"] if c not in to]
     return to, cc
 
 

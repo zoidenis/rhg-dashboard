@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta
 import arap_notify
 import config
 import movement
+import recipients
 import recipes
 import store
 import typology
@@ -554,6 +555,8 @@ class Reporter:
         entry = {"ts": datetime.now().isoformat(timespec="seconds"), "company": company, "actor": actor, "test": test}
         try:
             rec = {"to": only_to, "cc": []} if only_to else self.recipients()
+            if not only_to:                  # the company's people (Settings → Email recipients by company)
+                rec = recipients.resolve("cost_weekly", [company], rec["to"], rec["cc"])
             if not rec["to"]:
                 raise RuntimeError("No recipient is set in Settings → Cost control weekly email.")
             r = r or self.build(company)

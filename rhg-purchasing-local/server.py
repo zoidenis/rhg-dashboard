@@ -44,6 +44,7 @@ import history
 import invoices
 import operations
 import quality
+import recipients
 import reports
 import smtp_config
 import store
@@ -56,6 +57,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "manifest.webmanifest": "application/manifest+json",
                 "sw.js": "application/javascript; charset=utf-8",
                 "select.js": "application/javascript; charset=utf-8",
+                "recipients.js": "application/javascript; charset=utf-8",
                 "select.css": "text/css; charset=utf-8",
                 "tables.js": "application/javascript; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}
@@ -1074,7 +1076,7 @@ def drill(kind, key):
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
                      "/api/notify/test": "settings", "/api/notify/smtp": "settings",
-                     "/api/savings/send": "export", "/api/weekly/job": "settings",
+                     "/api/savings/send": "export", "/api/weekly/job": "settings", "/api/recipients": "settings",
                      "/api/users": "users", "/api/password": "view"}
 
 
@@ -1131,6 +1133,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == "/internal/recipients":
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, recipients.public())
+            return
         if url.path == "/internal/mail/status":
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})
@@ -1228,7 +1236,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if url.path == "/api/savings":
                     r["currency"] = company_currency(company)
-                    r["recipients"] = dict(zip(("to", "cc"), savings_report.recipients()))
+                    r["recipients"] = dict(zip(("to", "cc"), savings_report.recipients(company=company)))
                     r["next_monthly"] = savings_report.next_monthly()
                     r["runs"] = savings_report.recent_runs()
                     self._send(200, r)
@@ -1301,7 +1309,7 @@ class Handler(BaseHTTPRequestHandler):
                         "error": "Email test not found. The server may have restarted. "
                                  "Check email history and your inbox before sending again."})
             elif url.path == "/api/weekly/status":
-                to, cc = weekly_report.recipients()
+                to, cc = weekly_report.recipients(company=(notifier.companies() or [None])[0])
                 self._send(200, {"next_run": weekly_report.next_run(), "runs": weekly_report.recent_runs(),
                                  "to": to, "cc": cc, "companies": notifier.companies(),
                                  "week": [d.isoformat() for d in weekly_report.last_week()]})
@@ -1328,6 +1336,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"audit": store.get_audit()})
             elif url.path == "/api/companies":
                 self._send(200, {"companies": client.list_companies(), "default": config.BC_COMPANY})
+            elif url.path == "/api/recipients":
+                try:
+                    companies = client.list_companies()
+                except Exception:                                # noqa: BLE001
+                    companies = []
+                self._send(200, dict(recipients.public(), companies=companies, tower="Purchasing"))
             elif url.path == "/api/health":
                 self._send(200, {"ok": True, "bc": config.BC_BASE_URL, "company": config.BC_COMPANY})
             else:
@@ -1400,6 +1414,15 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
         if url.path == "/internal/mail":
             self._internal_mail(body)
+            return
+        if url.path == "/internal/recipients":           # Finance saving the directory for its user
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            try:
+                self._send(200, recipients.save(body.get("data") or {}, f"{str(body.get('actor') or 'finance')[:60]} (Finance)"))
+            except ValueError as exc:
+                self._send(400, {"error": str(exc)})
             return
         user = self._user()
         if url.path == "/api/login":
@@ -1481,6 +1504,11 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or notifier.companies()[0]
                 self._send(202, weekly.start_job(company, actor, to or None))
+            elif url.path == "/api/recipients":
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                self._send(200, dict(recipients.save(body, actor), companies=client.list_companies(), tower="Purchasing"))
             elif url.path == "/api/notify/smtp":
                 if self.headers.get("X-Requested-With") != "RHG-Purchasing":
                     self._send(403, {"error": "This request must come from Purchasing."})

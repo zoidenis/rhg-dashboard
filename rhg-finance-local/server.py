@@ -18,6 +18,8 @@ from urllib.parse import parse_qs, urlparse
 
 import arap_notify
 import brand_report
+import recipients
+import requests
 import cost_report
 import assets
 import auth
@@ -52,6 +54,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "select.js": "application/javascript; charset=utf-8",
                 "select.css": "text/css; charset=utf-8",
                 "tables.js": "application/javascript; charset=utf-8",
+                "recipients.js": "application/javascript; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
@@ -59,6 +62,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
+                     "/api/recipients": "settings",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -1435,6 +1439,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, consolidation_screen(q.get("period"), q.get("mode", "month")))
             elif url.path == "/api/drill":
                 self._send(200, drill(q.get("kind", "pl"), q.get("key", "")))
+            elif url.path == "/api/recipients":
+                d = recipients.directory(max_age=0)
+                try:
+                    companies = client.companies()
+                except Exception:                                # noqa: BLE001
+                    companies = []
+                self._send(200, dict(d or {}, companies=companies, tower="Finance",
+                                     error="" if d else ("Purchasing could not be reached: " + recipients.last_error())))
             elif url.path == "/api/companies":
                 self._send(200, {"companies": client.companies(), "default": config.BC_COMPANY,
                                  "dimensions": client.dimension_values(q.get("company") or config.BC_COMPANY)})
@@ -1557,6 +1569,16 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or costrep.companies()[0]
                 self._send(202, costrep.start_job(company, actor, only or None))
+            elif url.path == "/api/recipients":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                try:
+                    d = recipients.save(body, actor)
+                except (ValueError, requests.RequestException) as exc:
+                    self._send(400, {"error": str(exc)[:300]})
+                    return
+                self._send(200, dict(d, companies=client.companies(), tower="Finance"))
             elif url.path in ("/api/brand-report/settings", "/api/brand-report/job"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

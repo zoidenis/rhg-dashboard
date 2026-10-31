@@ -893,6 +893,7 @@ td.num,th.num{text-align:right}
       <p class="hint" id="brInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="brRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="rcCard" data-header="RHG-Finance"></div>
     <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
@@ -1019,6 +1020,7 @@ function render(){
   if(!arLoaded) loadArap();
   if(!crLoaded) loadCostReport();
   if(!brLoaded) loadBrandReport();
+  if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
@@ -3555,5 +3557,6 @@ document.addEventListener("keydown", e => {
 });
 </script>
 <script src="tables.js"></script>
+<script src="recipients.js"></script>
 </body>
 </html>

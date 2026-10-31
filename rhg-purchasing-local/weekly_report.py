@@ -24,6 +24,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 import notify
+import recipients as recipients_dir
 import operations
 import savings
 import smtp_config
@@ -475,17 +476,25 @@ def render_xlsx(r):
 
 
 # ---------------------------------------------------------------- sending, history, schedule
-def recipients(settings=None):
+def recipients(settings=None, company=None):
     n = (settings or store.get_settings()).get("notifications") or {}
     to = (notify.parse_emails(n.get("manager", ""))[0] + notify.parse_emails(n.get("coordinator", ""))[0]
           + notify.parse_emails(n.get("weekly_to", ""))[0])
     cc = [c for c in notify.parse_emails(n.get("cost_controller", ""))[0] if c not in to]
-    return list(dict.fromkeys(to)), cc
+    to = list(dict.fromkeys(to))
+    if company:                     # the company's own people (Settings → Email recipients by company)
+        r = recipients_dir.resolve("purchasing_weekly", [company], to, cc)
+        if r["source"] == "company":    # "Also send to" stays on every company's email
+            extra = notify.parse_emails(n.get("weekly_to", ""))[0]
+            to = list(dict.fromkeys(r["to"] + extra))
+            return to, [c for c in r["cc"] if c not in to]
+        return r["to"], r["cc"]
+    return to, cc
 
 
 def send(r, to=None, cc=None, actor="scheduler", test=False):
     if to is None:
-        to, cc = recipients()
+        to, cc = recipients(company=r["company"])
     if not to:
         raise RuntimeError("No Purchasing Manager, Coordinator or weekly report address is set in Settings → Email notifications.")
     body, text = render_email(r)

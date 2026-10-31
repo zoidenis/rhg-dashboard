@@ -28,6 +28,7 @@ from email.utils import formatdate, make_msgid
 
 import config
 import currency
+import recipients as recipients_dir
 import smtp_config
 import store
 
@@ -422,6 +423,10 @@ class Notifier:
             try:
                 s = self.settings()
                 rec = self.recipients(s)
+                # the company's people from Settings → Email recipients by company, when it has any
+                r_ = recipients_dir.resolve("purchasing_daily", [company], rec["to"], rec["cc"])
+                if r_["source"] == "company":
+                    rec = dict(rec, to=r_["to"], cc=r_["cc"], roles=[f"the {company} contacts"])
                 if only_to:
                     rec = {"to": only_to, "cc": [], "roles": ["a test recipient"], "invalid": []}
                 d = self.digest(company, test=test)
