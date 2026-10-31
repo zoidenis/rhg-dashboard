@@ -389,6 +389,16 @@ def render_xlsx(r):
     wb = Workbook()
     fill, font = PatternFill("solid", fgColor="E4F3F9"), Font(bold=True, color="0E2733")
     money, unit, pct = '#,##0;[Red]-#,##0', '#,##0.00', '0.0'
+    # price effects: dearer (a positive change, an extra cost) in red, cheaper (a saving) in green. The
+    # colour is set on the cell, not in the number format, so Excel and LibreOffice show the same.
+    effect, effect_pct = '+#,##0;-#,##0;0', '+0.0;-0.0;0.0'
+    red_font, green_font = Font(name="Calibri", size=11, color="C0392B"), Font(name="Calibri", size=11, color="0E8A57")
+
+    def colour_by_sign(ws, cols):
+        for col in cols:
+            for (cell,) in ws.iter_rows(min_row=2, min_col=col, max_col=col):
+                if isinstance(cell.value, (int, float)) and cell.value:
+                    cell.font = red_font if cell.value > 0 else green_font
 
     def sheet(title, header, rows, formats, widths, first=False):
         ws = wb.active if first else wb.create_sheet()
@@ -419,11 +429,13 @@ def render_xlsx(r):
     sheet("Received not invoiced", ["Order", "Location", "Supplier", "Days open", "Received, not invoiced", "Order amount"],
           [[x["no"], x["location"], x["supplier"], x["days"], round(x["received_not_invoiced"], 2), round(x["amount"], 2)]
            for x in r["to_invoice"]], [None, None, None, None, money, money], [12, 16, 32, 10, 18, 14])
-    sheet("Price changes", ["Item", "Description", "Locations", "Unit cost week before", "Unit cost last week", "Change %",
-                            "Quantity", "Impact"],
+    ws_ = sheet("Price changes", ["Item", "Description", "Locations", "Unit cost week before", "Unit cost last week", "Change %",
+                            "Quantity", "Impact", "Result"],
           [[m["item_no"], m["desc"], ", ".join(m.get("locations") or []), round(m["prev_avg"], 4), round(m["cur_avg"], 4),
-            round(m["pct"], 1), round(m.get("cur_qty") or 0, 3), round(m["impact"], 0)] for m in r["ups"] + r["downs"]],
-          [None, None, None, unit, unit, pct, unit, money], [12, 34, 26, 14, 14, 10, 12, 14])
+            round(m["pct"], 1), round(m.get("cur_qty") or 0, 3), round(m["impact"], 0),
+            "Extra cost" if m["impact"] > 0 else "Saving"] for m in r["ups"] + r["downs"]],
+          [None, None, None, unit, unit, effect_pct, unit, effect, None], [12, 34, 26, 14, 14, 10, 12, 14, 12])
+    colour_by_sign(ws_, (6, 8))
     ct = r["contracts"]
     sheet("Paid above contract", ["Item", "Description", "Supplier", "Agreed price", "Paid", "Gap %", "Quantity", "Overpaid"],
           [[x.get("item_no"), x.get("desc"), x.get("vendor"), round(_f(x.get("contract")), 4), round(_f(x.get("paid")), 4),
@@ -432,13 +444,18 @@ def render_xlsx(r):
     sheet("No agreed price", ["Item", "Description", "Supplier", "Category", "Spend"],
           [[x["item"], x["description"], x.get("vendor"), x.get("category"), round(x["cost"], 0)] for x in ct["uncovered"]],
           [None, None, None, None, money], [12, 34, 26, 20, 14])
-    for key, title in (("week", "Savings last week"), ("month", "Savings month to date")):
+    for key, title in (("week", "Savings & extra last week"), ("month", "Savings & extra month to date")):
         x = r["savings"].get(key)
         if not x:
             continue
-        sheet(title, ["Item", "Description", "Suppliers", "Unit cost last year", "Unit cost now", "Change %", "Effect"],
-              [[i["item"], i["desc"], ", ".join(i["vendors"][:3]), i["ly_avg"], i["cur_avg"], i["pct"], i["effect"]]
-               for i in x["extra"] + x["save"]], [None, None, None, unit, unit, pct, money], [12, 34, 30, 14, 14, 10, 14])
+        # savings first (largest first), then the extra costs; effect = (now - last year) x quantity now,
+        # so a saving is negative and shows green, an extra cost positive and red
+        ws_ = sheet(title, ["Item", "Description", "Suppliers", "Unit cost last year", "Unit cost now", "Change %",
+                            "Effect", "Result"],
+              [[i["item"], i["desc"], ", ".join(i["vendors"][:3]), i["ly_avg"], i["cur_avg"], i["pct"], i["effect"],
+                "Saving" if i["effect"] < 0 else "Extra cost"] for i in x["save"] + x["extra"]],
+              [None, None, None, unit, unit, effect_pct, effect, None], [12, 34, 30, 14, 14, 10, 14, 12])
+        colour_by_sign(ws_, (6, 7))
     sheet("Location price spread", ["Item", "Description", "Cheapest location", "Cost", "Dearest location", "Cost",
                                     "Spread %", "Extra paid"],
           [[x["item_no"], x["desc"], x["low_loc"], round(x["low"], 4), x["high_loc"], round(x["high"], 4),
