@@ -25,6 +25,7 @@ import memuse
 import movement
 import typology
 import locintel
+import invloc
 import executive
 import fiscal
 import cis_client
@@ -1325,6 +1326,12 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path == "/api/inventory/locations":
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                self._send(200, invloc.build(client, q.get("company") or config.BC_COMPANY, q.get("period"),
+                                             q.get("mode", "month"), stock_summary, q.get("refresh") == "1"))
             elif url.path == "/api/simphony/status":
                 self._send(200, simphony.info())
             elif url.path == "/api/inventory":

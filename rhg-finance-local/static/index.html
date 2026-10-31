@@ -135,6 +135,82 @@ td.num,th.num{text-align:right}
 .ty-callout{border-left:3px solid var(--up);background:var(--up-bg);padding:10px 14px;border-radius:6px;font-size:12.5px;margin-top:12px}
 #tyTip{position:fixed;pointer-events:none;background:#0e2733;color:#fff;font-size:12px;padding:8px 10px;border-radius:8px;opacity:0;transition:opacity .1s;max-width:300px;z-index:50;line-height:1.5}
 #tyTip b{color:#a0d8ea}
+/* Inventory → Location intelligence (same pattern as Purchasing) */
+.ov-tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px;width:max-content;max-width:100%}
+.ov-tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;cursor:pointer;color:var(--sub);font-weight:600;font:inherit}
+.ov-tabs button.on{background:var(--accent);color:#fff}
+.pl-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.pl-grp{display:flex;align-items:baseline;gap:10px;margin:14px 0 8px;font-size:13px}
+.pl-grp span{font-size:11.5px;color:var(--sub)}
+.pl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.pl-sq{box-sizing:border-box;display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;cursor:pointer;min-width:0}
+.pl-sq:hover,.pl-sq:focus-visible{border-color:var(--accent);box-shadow:0 4px 14px rgba(8,48,63,.12);outline:none}
+.pl-sq .hd{display:flex;align-items:center;gap:8px}
+.pl-sq .ic{flex-shrink:0;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line);background:#fff}
+.pl-sq .ic svg{width:16px;height:16px}
+.pl-sq .nm{min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.pl-sq .nm b{font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pl-sq .nm span{font-size:10.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-sq .big{display:flex;flex-direction:column}
+.pl-sq .big .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.pl-sq .big .cmp{font-size:10.5px;color:var(--sub)}
+.pl-sq .sp svg{width:100%;height:22px;display:block}
+.pl-sq .st{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:var(--sub)}
+.pl-sq .st div{display:flex;flex-direction:column;line-height:1.25}
+.pl-sq .st b{font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.pl-sq .st b.up{color:var(--up)}
+.pl-sq .sup{font-size:10.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-sq .sup b{color:var(--ink)}
+.pl-sq .al{margin-top:auto;display:flex;align-items:center;gap:5px;font-size:10.5px;border-radius:7px;padding:4px 6px;background:var(--bg);min-width:0}
+.pl-sq .al i{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:var(--down)}
+.pl-sq .al span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-sq .al.crit{background:var(--up-bg)} .pl-sq .al.crit i{background:var(--up)}
+.pl-sq .al.warn{background:var(--warn-bg)} .pl-sq .al.warn i{background:var(--warn)}
+.pl-sq .al.info i{background:var(--accent)}
+.pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
+.pl-bd.show{display:flex}
+.pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.pl-pop .ph{background:var(--side,#08303f);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pl-pop .ph .ic{flex-shrink:0;width:48px;height:48px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.pl-pop .ph .ic svg{width:26px;height:26px}
+.pl-pop .ph h2{font-size:20px;color:#fff;margin:0}
+.pl-pop .ph .sub{color:#a0d8ea;font-size:12.5px}
+.pl-pop .ph .sp{flex:1}
+.pl-pop .ph .close{background:transparent;border:1px solid #2b5a6c;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}
+.pl-body{padding:16px 18px 18px}
+.pl-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.pl-tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+.pl-tile .l{font-size:11px;color:var(--sub)} .pl-tile .v{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.pl-tile .v.up{color:var(--up)} .pl-tile .v.warn{color:var(--warn)} .pl-tile .s{font-size:11px;color:var(--sub);overflow-wrap:anywhere}
+.pl-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.pl-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;overflow-x:auto}
+.pl-panel .ttl{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.pl-panel .ttl h3{margin:0;font-size:13.5px}
+.pl-panel table{width:100%;border-collapse:collapse;font-size:12.5px}
+.pl-panel td,.pl-panel th{padding:6px 6px}
+.pl-span2{grid-column:span 2}
+.pl-sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px}
+.pl-ex{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+@media (max-width:1000px){.pl-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pl-cols{grid-template-columns:minmax(0,1fr)}.pl-span2{grid-column:auto}}
+@media (max-width:600px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.il-mini{display:flex;align-items:stretch;gap:2px;height:7px;flex:0 0 7px;border-radius:4px;overflow:hidden;background:var(--bg)}
+.il-mini i,.il-bar i{display:block;min-width:2px}
+.pl-sq .st b small{font-size:10.5px;font-weight:600;color:var(--sub);margin-left:3px}
+.pl-sq .st b{white-space:nowrap}
+.il-bar{display:flex;align-items:stretch;gap:2px;height:14px;border-radius:5px;overflow:hidden;background:var(--bg);margin:4px 0 10px}
+.il-c-mov{background:var(--accent)}.il-c-mon{background:var(--prev)}.il-c-slow{background:var(--warn)}.il-c-dead{background:var(--up)}
+.il-lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--sub)}
+.il-lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.il-age{display:grid;grid-template-columns:110px 1fr 70px;gap:6px 8px;align-items:center;font-size:12px}
+.il-age .t{height:10px;border-radius:0 4px 4px 0;background:var(--accent)}
+.il-age .t.late{background:var(--warn)}.il-age .t.dead{background:var(--up)}
+.il-parts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.il-part{font-size:11.5px;border-radius:999px;padding:3px 9px;background:var(--bg);color:var(--sub)}
+.il-part.ready{background:var(--down-bg);color:var(--down)}.il-part.pending{background:var(--warn-bg);color:var(--warn)}.il-part.failed{background:var(--up-bg);color:var(--up)}
+.pl-sq .st b.warn{color:var(--warn)}
+.pl-sq .al.good{background:var(--down-bg)} .pl-sq .al.good i{background:var(--down)}
+.pl-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--accent)}
+.pl-sev.crit{background:var(--up)}.pl-sev.warn{background:var(--warn)}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -448,6 +524,22 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="ilView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>Location intelligence</h2>
+          <p class="hint" id="ilNote">Every location as a square: its stock, days of cover, stock that does not move, recipes and adjustments. Click a location for the detail. Business Central is read only.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="ilSort">Order</label><select id="ilSort"><option value="stock">by stock</option><option value="change">by change</option><option value="slow">by slow stock</option><option value="cover">by days of cover</option><option value="recipes">by recipe coverage</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
+            <button class="mini dark" id="ilRead">Read again</button></div></div>
+        <p class="meta" id="ilStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="ilTotals"></div>
+      <div id="ilGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="ilDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="invMain">
     <p class="hint" id="ssNote" style="margin:0 0 12px">Company-wide, at the end of the selected period.</p>
     <div class="kpis three" id="ssKpis"></div>
     <div class="card" id="ssInsight" style="display:none"></div>
@@ -473,6 +565,7 @@ td.num,th.num{text-align:right}
     <div class="card" id="invRecCard"><h2>General ledger reconciliation</h2>
       <p class="rhg-caution" id="invRecLine" style="margin:12px 0 0;font-size:13px"></p>
       <p class="hint" id="invRecNote" style="margin:12px 0 0"></p></div>
+    </div>
   </section>
 
   <section class="view" id="v-typology">
@@ -653,6 +746,8 @@ td.num,th.num{text-align:right}
         <label class="field">Discounts, alert from (% of gross)<input id="liThDisc" type="number" step="any" placeholder="8"></label>
         <label class="field">Voids, alert from (% of gross)<input id="liThVoid" type="number" step="any" placeholder="2"></label>
         <label class="field">Sales drop vs last year, alert from (%)<input id="liThDrop" type="number" step="any" placeholder="15"></label>
+        <label class="field">Inventory: slow or not moving stock, alert from (% of stock)<input id="liThSlow" type="number" step="any" placeholder="15"></label>
+        <label class="field">Inventory: recipe coverage, alert below (%)<input id="liThRc" type="number" step="any" placeholder="90"></label>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="liRegSave">Save</button><span class="meta" id="liRegMsg"></span></div>
     </div>
@@ -687,6 +782,7 @@ td.num,th.num{text-align:right}
 
   <div class="foot" id="foot"></div>
 </main>
+<div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
 
 <div class="modal-bg" id="modalBg"><div class="modal">
@@ -803,6 +899,7 @@ function render(){
   if(!spLoaded) loadSimphony();
   if(!arLoaded) loadArap();
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
+  if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
     if (!(data.inventory||{}).loaded) loadInventory();
@@ -1676,6 +1773,8 @@ function renderMovement(){
       : `<tr><td colspan="6" class="meta">No adjustments in the history read.</td></tr>`);
   const locs = d.locations.map(L => L.location);
   $("mvFLoc").innerHTML = `<option value="">All</option>` + locs.map(l => `<option>${esc(l)}</option>`).join("");
+  if (mvWantLoc && locs.includes(mvWantLoc)) $("mvFLoc").value = mvWantLoc;
+  mvWantLoc = "";
   $("mvFClass").innerHTML = `<option value="">All</option>` + MV_CLASSES.map(x => `<option value="${x}">${x.toLowerCase()}</option>`).join("");
   $("mvDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
     `<p class="meta">Thresholds (days): monitor ${lim[0]}, slow ${lim[1]}, non-moving ${lim[2]}, dead ${lim[3]}; perishable ${d.rules.perishable_limits.join(", ")} for ${esc((d.rules.perishable || []).join(", ") || "no category set")}. Distribution locations: ${esc((d.rules.distribution || []).join(", "))}. Negative adjustments count as consumption: ${d.rules.count_negative_adjustments ? "yes" : "no"}.</p>`;
@@ -1983,7 +2082,7 @@ async function loadTypology(refresh){
     const keepL = $("tyLoc").value, keepN = $("tyNat").value;
     $("tyLoc").innerHTML = `<option value="">All locations</option>` + Object.entries(locs).sort((a, b) => b[1] - a[1]).map(([l]) => `<option>${esc(l)}</option>`).join("");
     $("tyNat").innerHTML = `<option value="">All natures</option>` + TY_NAT.filter(n => j.rows.some(r => r[3] === n)).map(n => `<option value="${n}">${esc(j.natures[n] || n)}</option>`).join("");
-    $("tyLoc").value = keepL in locs ? keepL : ""; $("tyNat").value = keepN;
+    $("tyLoc").value = tyWantLoc && tyWantLoc in locs ? tyWantLoc : keepL in locs ? keepL : ""; $("tyNat").value = keepN; tyWantLoc = "";
     renderTypology();
   }catch(e){ $("tyStatus").textContent = "Could not read: " + e.message; }
 }
@@ -2372,12 +2471,13 @@ async function liSettings(){
     const s = await readJSON(await fetch("/api/settings"));
     const L = s.locations || {};
     $("liReg").value = L.registry || s.locations_registry_default || "";
-    [["food_cost_target", "liThFc"], ["cover_days", "liThCover"], ["error_corrects_pct", "liThErr"], ["discounts_pct", "liThDisc"], ["voids_pct", "liThVoid"], ["sales_drop_pct", "liThDrop"]].forEach(([k, id]) => $(id).value = L[k] ?? "");
+    [["food_cost_target", "liThFc"], ["cover_days", "liThCover"], ["error_corrects_pct", "liThErr"], ["discounts_pct", "liThDisc"], ["voids_pct", "liThVoid"], ["sales_drop_pct", "liThDrop"], ["slow_stock_pct", "liThSlow"], ["recipe_coverage_pct", "liThRc"]].forEach(([k, id]) => $(id).value = L[k] ?? "");
   }catch(e){ $("liRegMsg").textContent = "Could not read the settings: " + e.message; }
 }
 $("liRegSave").onclick = async () => {
   const body = {locations: {registry: $("liReg").value, food_cost_target: $("liThFc").value, cover_days: $("liThCover").value,
-    error_corrects_pct: $("liThErr").value, discounts_pct: $("liThDisc").value, voids_pct: $("liThVoid").value, sales_drop_pct: $("liThDrop").value}};
+    error_corrects_pct: $("liThErr").value, discounts_pct: $("liThDisc").value, voids_pct: $("liThVoid").value, sales_drop_pct: $("liThDrop").value,
+    slow_stock_pct: $("liThSlow").value, recipe_coverage_pct: $("liThRc").value}};
   try{
     const r = await fetch("/api/settings", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "HTTP " + r.status);
@@ -2397,6 +2497,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
+  if(b.dataset.view==="inventory" && ilTab === "loc" && (!ilData || ilKey !== ilQuery())) loadIl(false);
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
@@ -2482,6 +2583,200 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
   openFromHash();
   load();
 })();
+// ---------------------------------------------------------------- Inventory → Location intelligence
+// Every stock location as a small square: stock at the period end and its change, days of cover of
+// the food, beverage and resale stock against target, stock that does not move, recipe coverage of
+// the items sold and the adjustments. A click opens the location in detail. The parts load on their
+// own on the server (stock position, movement, recipes); the screen asks again until all are ready.
+let ilTab = "overview", ilSort = "stock", ilData = null, ilTimer = null, ilKey = "", ilBusy = false;
+let mvWantLoc = "", tyWantLoc = "";
+const IL_GLYPH = {
+  OPA: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M5 9h14M6 9v10M10 9v10M14 9v10M18 9v10M4 21h16M8 3h8"/></svg>',
+  WH: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linejoin="round"><path d="M3 10l9-6 9 6v10H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>',
+  BOX: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>',
+  DOT: '<svg viewBox="0 0 24 24" fill="none" stroke="#0c475e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v8a3 3 0 006 0V3M9 3v18M17 3c-2 2-2 6 0 8v10"/></svg>'
+};
+const ilGlyph = L => L.group === "warehouse" ? IL_GLYPH.WH : L.group === "other" ? IL_GLYPH.BOX : /^OPA/i.test(L.brand || "") ? IL_GLYPH.OPA : IL_GLYPH.DOT;
+const ilM = v => v == null || !isFinite(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3).toLocaleString("en-US") + " k" : fmt(v);
+const ilSigned = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + ilM(Math.abs(v));
+const ilPct = v => v == null || !isFinite(v) ? "–" : Math.abs(v) < 0.5 ? "0%" : (v > 0 ? "+" : "") + v.toFixed(0) + "%";
+const ilDays = d => d == null ? "–" : d > 999 ? "999+" : fmt(d);
+const ilCur = () => (data && data.meta && data.meta.currency) || "";
+// moving / monitor / slow / not moving, the four segments of a location's stock
+function ilSegs(L){
+  const c = L.classes || {}, v = k => (c[k] || [0, 0])[1];
+  return [["mov", "Moving", v("ACTIVE") + v("NEW ITEM") + v("SEASONAL")], ["mon", "Monitor", v("MONITOR")],
+          ["slow", "Slow moving", v("SLOW MOVING")], ["dead", "Not moving", v("NON-MOVING") + v("DEAD STOCK")]];
+}
+function ilBar(L, cls){
+  const s = ilSegs(L), t = s.reduce((a, x) => a + Math.max(0, x[2]), 0);
+  if (!t) return `<div class="${cls}"></div>`;
+  return `<div class="${cls}" role="img" aria-label="${s.map(x => `${x[1]} ${Math.round(x[2] / t * 100)}%`).join(", ")}">` +
+    s.filter(x => x[2] > 0).map(x => `<i class="il-c-${x[0]}" style="flex:${x[2]}" title="${x[1]}: ${ilM(x[2])} (${Math.round(x[2] / t * 100)}%)"></i>`).join("") + `</div>`;
+}
+function ilShowTab(tab){
+  ilTab = tab;
+  document.querySelectorAll("#invTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("invMain").style.display = tab === "loc" ? "none" : "";
+  $("ilView").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { if (!ilData || ilKey !== ilQuery()) loadIl(false); else ilRender(); }
+}
+document.querySelectorAll("#invTabs button").forEach(b => b.onclick = () => ilShowTab(b.dataset.t));
+$("ilSort").onchange = () => { ilSort = $("ilSort").value; ilRender(); };
+$("ilRead").onclick = () => loadIl(true);
+function ilQuery(){
+  const p = new URLSearchParams();
+  if ($("company").value) p.set("company", $("company").value);
+  if ($("anchor").value) p.set("period", $("anchor").value);
+  p.set("mode", $("mode").value);
+  return p.toString();
+}
+async function loadIl(refresh){
+  clearTimeout(ilTimer);
+  const q = ilQuery();
+  if (ilKey !== q) { ilData = null; ilKey = q; }
+  if (!ilData) $("ilGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  ilBusy = true; $("ilRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/inventory/locations?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (ilKey !== q) return;                    // the company or the period changed meanwhile
+    ilData = j; ilRender();
+    if (j.pending && ilTab === "loc") ilTimer = setTimeout(() => loadIl(false), 5000);
+  }catch(e){ $("ilStatus").textContent = "Could not read: " + e.message; }
+  finally{ ilBusy = false; $("ilRead").disabled = false; }
+}
+function ilGroups(codes){
+  const L = ilData.locations, out = [];
+  const rest = codes.filter(c => L[c].group === "restaurant"), wh = codes.filter(c => L[c].group === "warehouse"),
+        other = codes.filter(c => L[c].group === "other");
+  const by = {}; rest.forEach(c => { const k = (L[c].brand || c).toUpperCase(); (by[k] = by[k] || []).push(c); });
+  const multi = Object.keys(by).filter(k => by[k].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((L[c].brand || c).toUpperCase()));
+  if (singles.length) out.push({t: "Restaurants", c: singles});
+  multi.forEach(k => out.push({t: k, c: by[k]}));
+  if (wh.length) out.push({t: "Warehouses, central and production", c: wh});
+  if (other.length) out.push({t: "Other locations", c: other, hint: "not in the restaurant registry of Settings"});
+  return out;
+}
+const ilStock = L => L.closing ?? L.on_hand ?? 0;
+function ilSquare(code, L){
+  const th = ilData.thresholds || {}, a = (L.alerts || [])[0] || ["good", "No exception"];
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const rc = L.recipes || {}, adj = L.adjustments || {};
+  const coverCls = L.doh == null || !L.target ? "" : L.doh > 2 * L.target ? "up" : L.doh > L.target ? "warn" : "";
+  const slowCls = L.slow_pct == null ? "" : L.slow_pct >= th.slow_pct ? "up" : L.slow_pct >= th.slow_pct / 2 ? "warn" : "";
+  const rcCls = rc.coverage == null ? "" : rc.coverage < th.recipe_coverage - 20 ? "up" : rc.coverage < th.recipe_coverage ? "warn" : "";
+  const neg = (L.negative || [0])[0] || L.negative_items || 0;
+  const chg = L.closing != null ? `vs start <b class="${L.change_pct == null ? "" : L.change_pct > 15 ? "up" : ""}">${ilPct(L.change_pct)}</b> · ${ilM(L.opening)}`
+    : L.on_hand != null ? "on hand yesterday" : "";
+  return `<div class="pl-sq" role="button" tabindex="0" data-illoc="${esc(code)}" aria-label="${esc(L.name || code)}: stock in detail">
+    <div class="hd"><div class="ic">${ilGlyph(L)}</div><div class="nm"><b>${esc(L.name || code)}</b><span>${esc(L.name && L.name !== code ? code : "")}</span></div></div>
+    <div class="big"><span class="v">${ilM(ilStock(L))}</span><span class="cmp">${chg}</span></div>
+    ${ilBar(L, "il-mini")}
+    <div class="st">${stat("Days of cover", L.doh != null ? `${ilDays(L.doh)}${L.target ? ` / ${L.target}` : ""}` : "–", coverCls, "Food, beverage and resale stock, days of use it covers / target")}
+      ${stat("Slow stock", L.slow_value != null ? `${ilM(L.slow_value)}${L.slow_pct != null ? `<small>${fmt(L.slow_pct, 0)}%</small>` : ""}` : "–", slowCls, "Slow moving, non-moving and dead stock, and its share of the stock on hand")}
+      ${stat("Never used", L.rnc && L.rnc[0] ? ilM(L.rnc[1]) : "–", L.rnc && L.rnc[0] ? "warn" : "", "Received in the history and never used")}
+      ${stat("Below zero", neg ? fmt(neg) + " items" : "–", neg ? "up" : "")}
+      ${stat("Recipes", rc.coverage != null ? fmt(rc.coverage, 0) + "%" : rc.sold ? "–" : "no sales", rcCls, "Items sold in the last 30 days that need a recipe and have a valid one")}
+      ${stat("Adjustments", adj.positive || adj.negative ? ilSigned(adj.net) : "–", "", adj.positive || adj.negative ? `+${ilM(adj.positive)} / ${ilSigned(adj.negative)} in the history` : "")}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function ilRender(){
+  if (ilTab !== "loc" || !$("ilGrid")) return;
+  const d = ilData;
+  if (!d) { $("ilGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const P = d.parts || {}, label = {stock: "Stock position", movement: "Movement & dead stock", turnover: "Typology & turnover", recipes: "Recipe integrity"};
+  $("ilStatus").innerHTML = `<span class="il-parts">${Object.entries(label).map(([k, l]) => { const p = P[k] || {};
+    return `<span class="il-part ${esc(p.state || "")}" title="${esc(p.note || "")}">${l}: ${p.state === "ready" ? "ready" + (k === "movement" && p.as_of ? ` (as of ${esc(p.as_of)})` : k === "stock" && p.as_of ? ` (at ${esc(p.as_of)})` : k === "recipes" && p.period ? ` (${esc(p.period.from)} → ${esc(p.period.to)})` : "")
+      : p.state === "pending" ? esc(p.note || "reading…") : p.state === "partial" ? "partly ready" : esc(p.note || p.state || "–")}</span>`; }).join("")}</span>`;
+  const B = d.locations || {}, codes = Object.keys(B);
+  const th = d.thresholds || {};
+  const alertScore = c => (B[c].alerts || []).reduce((a, x) => a + (x[0] === "crit" ? 100 : x[0] === "warn" ? 10 : 1), 0);
+  const key = {stock: c => -ilStock(B[c]), change: c => -(B[c].change ?? -1e15), slow: c => -(B[c].slow_value || 0),
+    cover: c => -((B[c].doh ?? -1) / (B[c].target || 1)), recipes: c => B[c].recipes && B[c].recipes.coverage != null ? B[c].recipes.coverage : 1e9,
+    alerts: c => -alertScore(c), name: c => 0}[ilSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (ilSort === "name" ? (B[a].name || a).localeCompare(B[b].name || b) : ilStock(B[b]) - ilStock(B[a])));
+  const C = ilCur(), sum = f => codes.reduce((a, c) => a + (f(B[c]) || 0), 0);
+  const close = sum(L => L.closing), open = sum(L => L.opening), onh = sum(L => L.on_hand), slow = sum(L => L.slow_value);
+  const fb = sum(L => L.fb_stock), use = sum(L => L.fb_use), hd = (P.movement || {}).history_days || 90;
+  const req = sum(L => (L.recipes || {}).required), valid = sum(L => (L.recipes || {}).valid);
+  const neg = sum(L => (L.negative || [0])[0] || L.negative_items || 0);
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("ilTotals").innerHTML =
+    k("Stock at the period end", close ? ilM(close) : onh ? ilM(onh) : "–", (close ? `${C} · ${ilPct(open ? (close / open - 1) * 100 : null)} vs the start · ${codes.length} locations` : `${C} · on hand yesterday`) + (neg ? ` · ${fmt(neg)} items below zero` : ""), neg ? "" : "") +
+    k("Slow or not moving", ilM(slow), `${C} · ${onh ? fmt(slow / onh * 100, 0) + "% of the stock on hand" : "–"}`, onh && slow / onh * 100 >= th.slow_pct ? "up" : "") +
+    k("Days of cover, F&B", use > 0 ? fmt(fb / (use / hd), 0) + " days" : "–", `food, beverage and resale stock ${ilM(fb)} ${C}`) +
+    k("Recipe coverage", req ? fmt(valid / req * 100, 0) + "%" : "–", `${fmt(valid)} of ${fmt(req)} items sold in 30 days that need one`, req && valid / req * 100 < th.recipe_coverage ? "up" : "");
+  $("ilGrid").innerHTML = codes.length ? ilGroups(codes).map(g => {
+    const s = g.c.reduce((a, c) => a + ilStock(B[c]), 0);
+    return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${ilM(s)} ${esc(C)}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(c => ilSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">${d.pending ? "The first read of this company takes a few minutes; the squares appear as the parts arrive." : "No stock, movement or sales for this company."}</p>`;
+  $("ilDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
+    `<p style="margin:0">Alerts: items below zero; recipe coverage under ${fmt(th.recipe_coverage)}% (Settings → Location intelligence); slow or not moving stock from ${fmt(th.slow_pct)}% of the stock on hand; days of cover over twice the target; stock received and never used; fresh lines to count.</p>`;
+  if ($("ilBd").classList.contains("show") && $("ilPop").dataset.code) ilDraw($("ilPop").dataset.code);
+}
+// ---- the popup: everything the parts hold for one location
+function ilOpen(code){ $("ilPop").dataset.code = code; ilDraw(code); $("ilBd").classList.add("show"); }
+function ilDraw(code){
+  const L = (ilData && ilData.locations || {})[code]; if (!L) return;
+  const P = ilData.parts || {}, th = ilData.thresholds || {}, C = ilCur(), mv = P.movement || {};
+  const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
+  const rows = (arr, head, fn, empty) => arr && arr.length ? `<table><tr>${head}</tr>${arr.map(fn).join("")}</table>` : `<p class="hint">${empty}</p>`;
+  const wait = k => (P[k] || {}).state === "pending" ? `Still being read: ${esc((P[k] || {}).note || "")}` : "";
+  const rc = L.recipes || {}, adj = L.adjustments || {}, neg = (L.negative || [0])[0] || L.negative_items || 0;
+  const segs = ilSegs(L), segT = segs.reduce((a, x) => a + x[2], 0);
+  const buckets = mv.buckets || [], ag = L.aging || {}, agMax = Math.max(1, ...buckets.map(b => ag[b] || 0));
+  const ageRows = buckets.map((b, i) => `<span>${esc(/^\d/.test(b) ? b + " days" : b)}</span><div><div class="t ${i >= buckets.length - 3 ? "dead" : i >= 2 ? "late" : ""}" style="width:${((ag[b] || 0) / agMax * 100).toFixed(1)}%"></div></div><span class="num">${ilM(ag[b] || 0)}</span>`).join("");
+  const cls = c => ({"ACTIVE": "active", "MONITOR": "monitor", "SLOW MOVING": "slow", "NON-MOVING": "non-moving", "DEAD STOCK": "dead", "NEW ITEM": "new", "SEASONAL": "seasonal", "NEGATIVE": "negative"}[c] || c);
+  const item = x => `<td>${esc(x[0])}<div class="meta">${esc(x[1])}${x[4] ? " · " + esc(cls(x[4])) : ""}${x[5] != null ? ` · ${x[5]} days without use` : ""}${x[6] ? " · never used" : ""}</div></td>`;
+  $("ilPop").innerHTML = `<div class="ph"><div class="ic">${ilGlyph(L)}</div>
+      <div><h2>${esc(L.name || code)}</h2><div class="sub">${esc(code)} · ${esc(ilData.company || "")} · stock at ${esc((P.stock || {}).as_of || "–")}, movement as of ${esc(mv.as_of || "–")} on ${fmt(mv.history_days || 90)} days</div></div><div class="sp"></div>
+      <button class="close" data-ilgo="movement" data-code="${esc(code)}">Movement ›</button><button class="close" data-ilgo="typology" data-code="${esc(code)}">Typology ›</button><button class="close" data-ilgo="recipes">Recipes ›</button><button class="close" data-ilclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="pl-ex">${L.alerts.map(a => `<div><span class="pl-sev ${a[0]}"></span>${esc(a[1])}</div>`).join("")}</div></div>` : ""}
+      <div class="pl-tiles">
+        ${tile("Stock at the period end", L.closing != null ? ilM(L.closing) : "–", L.closing != null ? `${C} · ${ilSigned(L.change)} (${ilPct(L.change_pct)}) since ${esc((P.stock || {}).opening_date || "the start")}${L.no_cost_items ? ` · ${fmt(L.no_cost_items)} at zero cost` : ""}` : wait("stock"))}
+        ${tile("On hand yesterday", L.on_hand != null ? ilM(L.on_hand) : "–", L.on_hand != null ? `${fmt(L.items || 0)} item lines · ${segT ? fmt(segs[0][2] / segT * 100, 0) + "% moving" : ""}` : wait("movement"))}
+        ${tile("Slow or not moving", L.slow_value != null ? ilM(L.slow_value) : "–", L.slow_pct != null ? `${fmt(L.slow_pct, 1)}% of the stock · not moving ${ilM(L.dead_value)}` : "", L.slow_pct >= th.slow_pct ? "up" : "")}
+        ${tile("Received, never used", L.rnc ? ilM(L.rnc[1]) : "–", L.rnc ? `${fmt(L.rnc[0])} item lines` : "", L.rnc && L.rnc[0] ? "warn" : "")}
+        ${tile("Days of cover, F&B", L.doh != null ? ilDays(L.doh) + " days" : "–", L.fb_stock != null ? `target ${L.target ?? "–"} · ${ilM(L.fb_stock)} ${C} · ${ilM(L.above_target)} above target` : wait("turnover"), L.doh != null && L.target && L.doh > 2 * L.target ? "up" : L.doh != null && L.target && L.doh > L.target ? "warn" : "")}
+        ${tile("Below zero", fmt(neg), neg ? `items · ${ilM((L.negative || [0, 0])[1])} ${C}` : "items", neg ? "up" : "")}
+        ${tile("Recipe coverage", rc.coverage != null ? fmt(rc.coverage, 0) + "%" : "–", rc.sold != null ? `${fmt(rc.valid)} of ${fmt(rc.required)} · ${fmt(rc.missing)} missing, ${fmt((rc.incomplete || 0) + (rc.inactive || 0))} incomplete` : wait("recipes"), rc.coverage != null && rc.coverage < th.recipe_coverage ? "up" : "")}
+        ${tile("Adjustments", adj.positive || adj.negative ? ilSigned(adj.net) : "–", adj.positive || adj.negative ? `+${ilM(adj.positive)} / ${ilSigned(adj.negative)} ${C} in ${fmt(mv.history_days || 90)} days` : "none in the history")}
+      </div>
+      <div class="pl-cols">
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>Stock on hand by movement</h3><span class="hint" style="margin:0">days since the last use, as of ${esc(mv.as_of || "–")}</span></div>
+          ${ilBar(L, "il-bar")}<div class="il-lg">${segs.map(x => `<span><i class="il-c-${x[0]}"></i>${x[1]} ${ilM(x[2])}${segT ? ` (${fmt(x[2] / segT * 100, 0)}%)` : ""}</span>`).join("")}</div></div>
+        <div class="pl-panel"><div class="ttl"><h3>Age since the last use</h3></div>${buckets.length && Object.keys(ag).length ? `<div class="il-age">${ageRows}</div>` : `<p class="hint">${wait("movement") || "No stock on hand."}</p>`}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Families against their target</h3><span class="hint" style="margin:0">food, beverage, resale</span></div>${rows(L.families, `<th>Family</th><th class="num">Stock</th><th class="num">Days</th><th class="num">Target</th><th class="num">Above</th>`, f => `<tr><td>${esc(f[0])}</td><td class="num">${ilM(f[1])}</td><td class="num ${f[2] != null && f[3] && f[2] > 2 * f[3] ? "up" : f[2] != null && f[3] && f[2] > f[3] ? "warn" : ""}">${ilDays(f[2])}</td><td class="num meta">${f[3] ?? "–"}</td><td class="num">${f[4] ? ilM(f[4]) : "–"}</td></tr>`, wait("turnover") || "No food, beverage or resale stock.")}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Largest items on hand</h3></div>${rows(L.top_items, `<th>Item</th><th class="num">Qty</th><th class="num">Value</th>`, x => `<tr>${item(x)}<td class="num">${fmt(x[2], 2)}</td><td class="num">${ilM(x[3])}</td></tr>`, wait("movement") || "No stock on hand.")}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Not moving, or never used</h3></div>${rows(L.idle_items, `<th>Item</th><th class="num">Qty</th><th class="num">Value</th>`, x => `<tr>${item(x)}<td class="num">${fmt(x[2], 2)}</td><td class="num up">${ilM(x[3])}</td></tr>`, wait("movement") || "Everything on hand has moved recently.")}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Recipes missing or incomplete</h3><span class="hint" style="margin:0">items sold, most sales first</span></div>${rows(rc.gaps, `<th>Item</th><th>State</th><th class="num">Sold</th>`, x => `<tr><td>${esc(x[0])}<div class="meta">${esc(x[1])}</div></td><td class="${x[2] === "MISSING" ? "up" : "warn"}">${esc(x[2].toLowerCase())}</td><td class="num">${fmt(x[3], 0)}</td></tr>`, wait("recipes") || (rc.sold ? "Every item sold that needs a recipe has a valid one." : "Nothing sold here in the period."))}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Below zero, and fresh lines to count</h3></div>
+          ${rows(L.negative_list, `<th>Below zero</th><th class="num">Qty</th><th class="num">Value</th>`, x => `<tr><td>${esc(x[0])}<div class="meta">${esc(x[1])}</div></td><td class="num up">${fmt(x[2], 2)}</td><td class="num">${ilM(x[3])}</td></tr>`, "No item below zero.")}
+          ${L.count_items && L.count_items.length ? `<table style="margin-top:10px"><tr><th>Count it</th><th class="num">Qty</th><th class="num">Days</th></tr>${L.count_items.map(x => `<tr><td>${esc(x[0])}<div class="meta">${esc(x[1])} · ${ilM(x[4])} ${C}</div></td><td class="num">${fmt(x[2], 2)} ${esc(x[3] || "")}</td><td class="num warn">${ilDays(x[5])}</td></tr>`).join("")}</table>` : ""}</div>
+      </div></div>`;
+}
+function ilGo(view, code){
+  $("ilBd").classList.remove("show");
+  if (view === "movement") { if (mvData) { $("mvFLoc").value = code; loadMvRows(); } else mvWantLoc = code; }
+  if (view === "typology") { if (tyData && [...$("tyLoc").options].some(o => o.value === code)) { $("tyLoc").value = code; renderTypology(); } else tyWantLoc = code; }
+  const b = document.querySelector(`#nav button[data-view="${view}"]`); if (b) b.click();
+  if (view === "movement" && mvData) setTimeout(() => { const el = $("mvItemsTitle"); if (el) el.scrollIntoView({block: "start"}); }, 50);
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-ilclose]"); if (c) { $("ilBd").classList.remove("show"); return; }
+  const g = e.target.closest("[data-ilgo]"); if (g) { ilGo(g.dataset.ilgo, g.dataset.code || ""); return; }
+  const s = e.target.closest("[data-illoc]"); if (s) { ilOpen(s.dataset.illoc); return; }
+  if (e.target === $("ilBd")) $("ilBd").classList.remove("show");
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("ilBd").classList.contains("show")) { $("ilBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.illoc) { e.preventDefault(); ilOpen(e.target.dataset.illoc); }
+});
 </script>
 </body>
 </html>

@@ -106,7 +106,10 @@ DEFAULT_SETTINGS = {
     # POS customer, area, map position) is empty here, which means the built-in list in
     # locintel.py; the thresholds that raise a restaurant's alerts
     "locations": {"registry": "", "food_cost_target": "30", "cover_days": "30", "error_corrects_pct": "5",
-                  "discounts_pct": "8", "voids_pct": "2", "sales_drop_pct": "15"},
+                  "discounts_pct": "8", "voids_pct": "2", "sales_drop_pct": "15",
+                  # Inventory → Location intelligence: slow / non-moving / dead stock as a share of the
+                  # stock on hand, and the recipe coverage of the items sold, that raise an alert
+                  "slow_stock_pct": "15", "recipe_coverage_pct": "90"},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,
