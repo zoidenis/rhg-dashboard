@@ -264,7 +264,7 @@ td.num,th.num{text-align:right}
     <div class="grp">Overview</div>
     <button class="on" data-view="overview">Executive overview</button>
     <button data-view="group">Group view</button>
-    <button data-view="sales">Sales · Simphony</button>
+    <button data-view="sales">Sales</button>
 
     <div class="grp">Statements</div>
     <button data-view="pl" data-tab="Profit &amp; loss" data-group="Statements">Financial statements</button>
@@ -765,6 +765,20 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-sales">
+    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="slLocView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>Sales by location</h2>
+          <p class="hint">Every restaurant as a square: net sales of the period chosen above against the comparison, day by day, checks, guests and the average check, and the control signals (discounts, voids, error corrects, checks still open) against the limits of Settings → Location intelligence. Click a restaurant for its days.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="slSort">Order</label><select id="slSort"><option value="net">by net sales</option><option value="change">by change</option><option value="avg">by average check</option><option value="disc">by discounts</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
+            <button class="mini dark" id="slRead">Read again</button></div></div>
+        <p class="meta" id="slStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="slTotals"></div>
+      <div id="slGrid"></div>
+    </div>
+    <div id="slMain">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Sales from Simphony</h2>
       <p class="hint" id="slNote">Net sales, checks and guests by restaurant, read from Simphony Reporting and Analytics.</p></div>
       <button class="mini dark" id="slLoad">Refresh sales</button></div>
@@ -776,6 +790,7 @@ td.num,th.num{text-align:right}
       <div class="card"><h2>Net sales by day</h2><p class="hint" id="slDayNote"></p><div id="slDays" class="rhg-bars"></div></div>
       <div class="card"><h2>Control signals</h2><p class="hint">Voids, returns, discounts and checks still open, by restaurant. Large values here are worth a question to the manager.</p>
         <div class="scroll"><table id="slCtl"></table></div></div>
+    </div>
     </div>
     <details class="card" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
   </section>
@@ -954,6 +969,7 @@ td.num,th.num{text-align:right}
   <div class="foot" id="foot"></div>
 </main>
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
+<div class="pl-bd" id="slBd"><div class="pl-pop" id="slPop" role="dialog" aria-modal="true" aria-label="Restaurant sales"></div></div>
 <div class="pl-bd" id="faBd"><div class="pl-pop" id="faPop" role="dialog" aria-modal="true" aria-label="Location fixed assets"></div></div>
 <div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
@@ -1661,8 +1677,126 @@ function renderSales(){
       <td class="num ${l.cur.open_checks?"warn":""}">${fmt(l.cur.open_checks)}${l.cur.open_value?` <span class="meta">· ${fmt(l.cur.open_value)}</span>`:""}</td></tr>`).join("");
   $("slDefs").innerHTML = Object.values(d.definitions||{}).map(x => `<p>${esc(x)}</p>`).join("") +
     `<p>${fmt(d.calls)} daily totals checked in ${fmt(d.ms/1000,1)} s. ${d.errors.map(esc).join(" · ")}</p>`;
+  if (slTab === "loc") slRender();
 }
 
+// ---------- Sales → Location intelligence ----------
+// Every restaurant as a square, from the same Simphony read as the Sales tab (/api/sales).
+var slTab = "main", slSort = "net";
+function slShowTab(tab){
+  slTab = tab;
+  document.querySelectorAll("#slTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("slMain").style.display = tab === "loc" ? "none" : "";
+  $("slLocView").style.display = tab === "loc" ? "" : "none";
+  if (currentView().id === "sales") setHeader();
+  if (tab === "loc") { if (!salesData || salesData._q !== params()) loadSales(); else slRender(); }
+}
+document.querySelectorAll("#slTabs button").forEach(b => b.onclick = () => slShowTab(b.dataset.t));
+$("slSort").onchange = () => { slSort = $("slSort").value; slRender(); };
+$("slRead").onclick = () => loadSales(true);
+const slPctOf = (a, b) => b ? a / b * 100 : null;
+function slSignals(l, lim){
+  const c = l.cur || {}, al = [];
+  const disc = slPctOf(c.discounts, c.gross), voids = slPctOf(c.voids, c.gross), ec = slPctOf(c.error_corrects, c.gross);
+  if (l.change_pct != null && l.change_pct < -(lim.sales_drop || 15)) al.push(["crit", `Net sales ${flPct(l.change_pct)} against ${salesData.prior.label}`]);
+  if (disc != null && disc > (lim.discounts || 8)) al.push(["warn", `Discounts ${fmt(disc, 1)}% of gross`]);
+  if (voids != null && voids > (lim.voids || 2)) al.push(["warn", `Voids ${fmt(voids, 1)}% of gross`]);
+  if (ec != null && ec > (lim.error_corrects || 5)) al.push(["warn", `Error corrects ${fmt(ec, 1)}% of gross`]);
+  if (c.open_checks) al.push(["info", `${fmt(c.open_checks)} check${c.open_checks > 1 ? "s" : ""} still open (${flM(c.open_value)})`]);
+  if (l.days_missing) al.push(["info", `${l.days_missing} day${l.days_missing > 1 ? "s" : ""} could not be read`]);
+  return {disc, voids, ec, al};
+}
+function slSpark(l){
+  const days = Object.keys(l.daily || {}).sort(), prev = Object.keys(l.daily_prev || {}).sort();
+  if (days.length < 2) return "";
+  const v = days.map(d => l.daily[d]), w = prev.map(d => l.daily_prev[d]);
+  const mx = Math.max(1, ...v, ...w), W = 200, H = 26, n = Math.max(v.length, w.length, 2);
+  const line = (arr, col, dash) => arr.length > 1 ? `<polyline points="${arr.map((x, i) => `${(i / (n - 1) * W).toFixed(1)},${(H - 2 - x / mx * (H - 4)).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${dash ? 1.4 : 2}" ${dash ? 'stroke-dasharray="3 3"' : ""} vector-effect="non-scaling-stroke"/>` : "";
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:22px;display:block" aria-hidden="true">${line(w, "var(--sub)", true)}${line(v, "var(--accent)")}</svg>`;
+}
+function slSquare(i, l, lim){
+  const c = l.cur || {}, p = l.prev || {}, sg = slSignals(l, lim), a = sg.al[0] || ["good", "Within the limits"];
+  const stat = (lb, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${lb}</span><b class="${cls || ""}">${v}</b></div>`;
+  const avgp = p.checks ? p.net / p.checks : null, ck = l.change_pct;
+  const L = {group: "restaurant", brand: l.brand || ""};
+  return `<div class="pl-sq" role="button" tabindex="0" data-slloc="${i}" aria-label="${esc(l.reg_name || l.name)}: sales">
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(l.reg_name || l.name)}</b><span>${esc([l.locRef, l.currency, l.seasonal ? "seasonal" : ""].filter(Boolean).join(" · "))}</span></div></div>
+    <div class="big"><span class="v">${flM(c.net)}</span><span class="cmp">net · vs comparison <b class="${ck == null ? "" : ck < -(lim.sales_drop || 15) ? "up" : ck > 0 ? "down" : ""}">${flPct(ck)}</b> · ${flM(p.net)}</span></div>
+    <div class="sp">${slSpark(l)}</div>
+    <div class="st">${stat("Checks", `${fmt(c.checks)}<small> ${flPct(flVar(c.checks, p.checks))}</small>`)}${stat("Avg check", `${flM(l.avg_check)}<small> ${flPct(flVar(l.avg_check, avgp))}</small>`)}
+      ${stat("Guests", c.guests ? fmt(c.guests) : "–", "", "Covers entered at the POS")}${stat("Discounts", sg.disc == null ? "–" : fmt(sg.disc, 1) + "%", sg.disc > (lim.discounts || 8) ? "warn" : "", `${flM(c.discounts)} of ${flM(c.gross)} gross`)}</div>
+    <div class="al ${a[0]}" title="${esc(sg.al.map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${sg.al.length > 1 ? ` · +${sg.al.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function slRender(){
+  if (slTab !== "loc" || !$("slGrid")) return;
+  const d = salesData;
+  if (!d) { $("slGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  if (!d.available) { $("slGrid").innerHTML = `<p class="hint">${esc(d.error || "Sales unavailable.")}</p>`; $("slTotals").innerHTML = ""; return; }
+  const lim = d.limits || {}, rows = d.locations || [], C = d.currency || "ALL", t = (d.totals || {})[C] || {cur: {}, prev: {}};
+  $("slStatus").textContent = `${d.period.from} → ${d.period.to}${d.period.running ? " (to the last closed day)" : ""} · against ${d.prior.label} ${d.prior.from} → ${d.prior.to} · each restaurant in its own currency`;
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const alerts = rows.map(l => slSignals(l, lim).al), crit = alerts.filter(a => a.some(x => x[0] === "crit")).length;
+  $("slTotals").innerHTML =
+    k(`Net sales · ${esc(C)}`, flM(t.cur.net), `${flPct(t.change_pct)} against ${esc(d.prior.label)} · ${t.locations || 0} restaurants`, t.change_pct != null && t.change_pct < -(lim.sales_drop || 15) ? "up" : "") +
+    k("Checks · average", fmt(t.cur.checks), `average check ${flM(t.avg_check)} ${esc(C)}`) +
+    k("Discounts", t.cur.gross ? fmt(t.cur.discounts / t.cur.gross * 100, 1) + "%" : "–", `${flM(t.cur.discounts)} of ${flM(t.cur.gross)} gross · limit ${fmt(lim.discounts || 8)}%`) +
+    k("Restaurants falling", fmt(crit), `more than ${fmt(lim.sales_drop || 15)}% under ${esc(d.prior.label)}`, crit ? "up" : "");
+  const score = i => alerts[i].reduce((a, x) => a + (x[0] === "crit" ? 100 : x[0] === "warn" ? 10 : 1), 0);
+  const idx = rows.map((_, i) => i);
+  const key = {net: i => -(rows[i].cur.net || 0), change: i => rows[i].change_pct ?? 1e9, avg: i => -(rows[i].avg_check || 0),
+    disc: i => -(slPctOf(rows[i].cur.discounts, rows[i].cur.gross) || 0), alerts: i => -score(i), name: i => 0}[slSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (rows[a].reg_name || rows[a].name).localeCompare(rows[b].reg_name || rows[b].name));
+  const reg = idx.filter(i => rows[i].in_registry), other = idx.filter(i => !rows[i].in_registry), by = {};
+  reg.forEach(i => { const b = (rows[i].brand || rows[i].locRef).toUpperCase(); (by[b] = by[b] || []).push(i); });
+  const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = reg.filter(i => !multi.includes((rows[i].brand || rows[i].locRef).toUpperCase()));
+  const groups = [];
+  if (singles.length) groups.push({t: "Restaurants", c: singles});
+  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  if (other.length) groups.push({t: "Other Simphony locations", c: other, hint: "not in the restaurant registry of Settings"});
+  $("slGrid").innerHTML = rows.length ? groups.map(g => {
+      const cur = {}; g.c.forEach(i => cur[rows[i].currency] = (cur[rows[i].currency] || 0) + (rows[i].cur.net || 0));
+      return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${Object.entries(cur).map(([c, v]) => `${flM(v)} ${esc(c)}`).join(" · ")}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+        <div class="pl-grid">${sorted(g.c).map(i => slSquare(i, rows[i], lim)).join("")}</div>`; }).join("")
+    : `<p class="hint">No sales in this period.</p>`;
+  if ($("slBd").classList.contains("show") && $("slPop").dataset.i != null) slDraw(+$("slPop").dataset.i);
+}
+function slOpen(i){ $("slPop").dataset.i = i; slDraw(i); $("slBd").classList.add("show"); }
+function slDraw(i){
+  const d = salesData, l = (d.locations || [])[i]; if (!l) return;
+  const lim = d.limits || {}, c = l.cur || {}, p = l.prev || {}, sg = slSignals(l, lim), C = l.currency;
+  const tile = (lb, v, sub, cls) => `<div class="pl-tile"><div class="l">${lb}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const days = Object.keys(l.daily || {}).sort(), prev = Object.keys(l.daily_prev || {}).sort();
+  const mx = Math.max(1, ...Object.values(l.daily || {}), ...Object.values(l.daily_prev || {}));
+  const dayRows = days.map((dd, k) => { const v = l.daily[dd], pv = prev[k] != null ? l.daily_prev[prev[k]] : null;
+    return `<tr><td>${esc(new Date(dd + "T00:00:00").toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "short"}))}</td><td class="num">${fmt(v)}</td><td class="num meta">${pv == null ? "–" : fmt(pv)}</td>
+      <td class="num ${pv && v < pv * (1 - (lim.sales_drop || 15) / 100) ? "fl-bad" : ""}">${flPct(flVar(v, pv))}</td>
+      <td style="width:40%"><div class="fl-split" style="height:6px"><i class="cl-c1" style="flex:${v}"></i><i style="flex:${mx - v};background:transparent"></i></div>
+        ${pv != null ? `<div class="fl-split" style="height:4px;margin-top:2px"><i style="flex:${pv};background:var(--prev)"></i><i style="flex:${mx - pv};background:transparent"></i></div>` : ""}</td></tr>`; }).join("");
+  const ctl = [["Gross", c.gross, p.gross], ["Discounts", c.discounts, p.discounts], ["Voids", c.voids, p.voids], ["Returns", c.returns, p.returns], ["Error corrects", c.error_corrects, p.error_corrects], ["Service charges", c.service, p.service], ["Tax collected", c.tax, p.tax], ["Checks still open", c.open_value, p.open_value]];
+  $("slPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph({group: "restaurant", brand: l.brand || ""})}</div>
+      <div><h2>${esc(l.reg_name || l.name)}</h2><div class="sub">${esc(l.locRef)}${l.bc ? " · BC " + esc(l.bc) : ""} · ${esc(d.period.from)} → ${esc(d.period.to)} · against ${esc(d.prior.label)} · ${esc(C)}</div></div><div class="sp"></div>
+      <button class="close" data-slclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${sg.al.length ? `<div style="margin-bottom:10px">${sg.al.map(x => `<div class="meta" style="margin:2px 0"><span class="pl-sev ${esc(x[0])}"></span>${esc(x[1])}</div>`).join("")}</div>` : ""}
+      <div class="pl-tiles">${tile("Net sales", flM(c.net), `${flPct(l.change_pct)} · ${flM(p.net)} before`, l.change_pct != null && l.change_pct < -(lim.sales_drop || 15) ? "up" : "")}${tile("Checks", fmt(c.checks), `${flPct(flVar(c.checks, p.checks))} · ${fmt(p.checks)} before`)}${tile("Average check", flM(l.avg_check), `${flPct(flVar(l.avg_check, p.checks ? p.net / p.checks : null))} against before`)}${tile("Guests", c.guests ? fmt(c.guests) : "–", l.avg_guest ? `${flM(l.avg_guest)} a guest` : "covers entered at the POS")}</div>
+      <div class="pl-cols">
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Day by day</h3><div class="scroll"><table class="fl-tab" data-nosort><tr><th>Day</th><th class="num">Net</th><th class="num">Before</th><th class="num">Change</th><th></th></tr>${dayRows}</table></div></div>
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Control signals</h3><table class="fl-tab" data-nosort><tr><th></th><th class="num">Period</th><th class="num">% gross</th><th class="num">Before</th></tr>${ctl.map(x => `<tr><td>${x[0]}</td><td class="num">${fmt(x[1])}</td><td class="num meta">${x[0] === "Gross" || !c.gross ? "" : fmt(x[1] / c.gross * 100, 1) + "%"}</td><td class="num meta">${fmt(x[2])}</td></tr>`).join("")}</table>
+          <p class="hint" style="margin:8px 0 0">Limits (Settings → Location intelligence): discounts ${fmt(lim.discounts || 8)}%, voids ${fmt(lim.voids || 2)}%, error corrects ${fmt(lim.error_corrects || 5)}% of gross; a fall of ${fmt(lim.sales_drop || 15)}%.</p></div>
+      </div>
+    </div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-slclose]") || t === $("slBd")) { $("slBd").classList.remove("show"); return; }
+  const s = t.closest("[data-slloc]"); if (s) slOpen(+s.dataset.slloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("slBd").classList.contains("show")) { $("slBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.slloc != null) { e.preventDefault(); slOpen(+e.target.dataset.slloc); }
+});
 // ---------- Simphony connection (Settings) ----------
 let spLoaded = false;
 async function loadSimphony(){
@@ -2736,7 +2870,7 @@ function setHeader(){
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){
-    $("title").textContent = "Sales · Simphony · all restaurants";
+    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : "Sales") + " · all restaurants";
     $("period").textContent = salesData && salesData.available
       ? `${salesData.period.label} · ${salesData.period.from} → ${salesData.period.to} · against ${salesData.prior.from} → ${salesData.prior.to}`
       : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";

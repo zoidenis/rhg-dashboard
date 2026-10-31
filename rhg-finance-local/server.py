@@ -514,6 +514,7 @@ def sales_screen(anchor, mode, compare="prior"):
         cur = dict.fromkeys(keys, 0)
         prev = dict.fromkeys(keys, 0)
         read = missing = 0
+        daily_cur, daily_prev = {}, {}                       # for Location intelligence's lines
         for d in cur_days + prev_days:
             value, err = results.get((l["locRef"], d), (None, None))
             if value is None:
@@ -524,6 +525,7 @@ def sales_screen(anchor, mode, compare="prior"):
             target = cur if d in cur_days else prev
             for k in keys:
                 target[k] += fig[k]
+            (daily_cur if d in cur_days else daily_prev)[d] = round(fig["net"])
             if d in cur_days:
                 read += 1
                 day = by_day.setdefault(d, {"date": d, "net": {}, "checks": 0, "guests": 0})
@@ -532,7 +534,11 @@ def sales_screen(anchor, mode, compare="prior"):
                 day["guests"] += fig["guests"]
         if not read and not cur["net"] and not prev["net"]:
             continue                             # a location that sold nothing in either period
+        rg = reg.get(l["locRef"]) or {}
         rows.append({"locRef": l["locRef"], "name": l["name"], "currency": l["currency"],
+                     "reg_name": rg.get("name") or "", "brand": rg.get("brand") or "", "seasonal": bool(rg.get("seasonal")),
+                     "company": rg.get("company") or "", "in_registry": bool(rg),
+                     "daily": daily_cur, "daily_prev": daily_prev,
                      "bc": mapping.get(l["locRef"], ""), "latest": latest.get(l["locRef"]),
                      "days_read": read, "days_missing": missing, "cur": cur, "prev": prev,
                      "change_pct": ((cur["net"] - prev["net"]) / abs(prev["net"]) * 100) if prev["net"] else None,
@@ -559,7 +565,7 @@ def sales_screen(anchor, mode, compare="prior"):
         "period": {"from": c_from.isoformat(), "to": c_to.isoformat(), "label": label, "running": running},
         "prior": {"from": p_from.isoformat(), "to": p_to.isoformat(), "method": method,
                   "label": "same dates last year" if compare == "last_year" else "the period before"},
-        "locations": rows, "totals": totals, "currency": main_currency,
+        "locations": rows, "totals": totals, "currency": main_currency, "limits": locintel.thresholds(),
         "days": sorted(by_day.values(), key=lambda d: d["date"]),
         "errors": errors, "calls": len(jobs), "ms": int((time.time() - t0) * 1000),
         "definitions": {
