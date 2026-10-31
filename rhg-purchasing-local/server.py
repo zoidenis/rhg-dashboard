@@ -268,10 +268,17 @@ def _dashboard_build(company, week, location, mode="week"):
         if data.get("by_location") is not None:
             # suppliers and open orders of every location, for the location squares
             from collections import defaultdict as _dd
+            # Only invoice and credit-memo lines name a supplier (receipt lines carry the
+            # receipt number, which the vendor ledger does not know), and on those the
+            # actual cost is the purchase: the expected cost there is the receipt's reversal.
             loc_sup = _dd(lambda: _dd(float))
             for r in ve_cur:
-                sup = (suppliers.get(r.get("Document_No")) or {}).get("vendor") or "?"
-                loc_sup[r.get("Location_Code") or "?"][sup] += analytics._cost(r)
+                if r.get("Document_Type") not in (operations.INV, operations.CM):
+                    continue
+                sup = (suppliers.get(str(r.get("Document_No"))) or {}).get("vendor")
+                if not sup:
+                    continue
+                loc_sup[r.get("Location_Code") or "?"][sup] += float(r.get("Cost_Amount_Actual") or 0)
             for loc, sups in loc_sup.items():
                 tot = sum(v for v in sups.values() if v > 0)
                 best = max(sups.items(), key=lambda kv: kv[1]) if sups else ("", 0)

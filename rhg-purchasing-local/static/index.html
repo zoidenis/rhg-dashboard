@@ -2711,7 +2711,9 @@ function plSpark(daily){
 }
 function plSquare(code, x){
   const ex = x.exceptions || {}, o = x.orders || {}, ts = x.top_supplier || [];
-  const flag = ex.critical ? ["crit", `${ex.critical} critical exception${ex.critical > 1 ? "s" : ""}`] :
+  // counted on the group read: an item whose price rose across the group counts at every location
+  // that bought it, so the square says "involve"; the detail reads the location on its own
+  const flag = ex.critical ? ["crit", `${ex.critical} critical exception${ex.critical > 1 ? "s" : ""} involve it`] :
     ex.warning ? ["warn", `${ex.warning} exception${ex.warning > 1 ? "s" : ""} to review`] :
     (x.price_up && x.price_up[1] > 0) ? ["warn", `Prices up on ${x.price_up[0]} item${x.price_up[0] > 1 ? "s" : ""}: +${plM(x.price_up[1])}`] :
     o.awaiting > 0 ? ["info", `${plM(o.awaiting)} received, not invoiced`] : ["good", "No exception"];
@@ -2724,15 +2726,17 @@ function plSquare(code, x){
     <div class="st">${stat("Documents", fmt(x.documents || 0))}${stat("Suppliers", x.suppliers != null ? fmt(x.suppliers) : "–")}
       ${stat("Price rises", x.price_up && x.price_up[0] ? `+${plM(x.price_up[1])}` : "–", x.price_up && x.price_up[1] > 0 ? "up" : "")}
       ${stat("Open orders", o.open ? `${fmt(o.open)} · ${plM(o.value)}` : "–")}</div>
-    <div class="sup" title="${esc(ts[0] || "")}">${ts[0] ? `Top: <b>${esc(ts[0])}</b> ${ts[2] != null ? Math.round(ts[2]) + "%" : ""}` : "&nbsp;"}</div>
-    <div class="al ${flag[0]}" title="${esc(flag[1])}"><i></i><span>${esc(flag[1])}</span></div>
+    <div class="sup" title="${esc(ts[0] ? ts[0] + " — share of the invoiced spend with a named supplier" : "")}">${ts[0] ? `Top: <b>${esc(ts[0])}</b> ${ts[2] != null ? Math.round(ts[2]) + "%" : ""}` : "&nbsp;"}</div>
+    <div class="al ${flag[0]}" title="${esc(flag[1] + (ex.critical || ex.warning ? " — counted across the group: an item that rose everywhere counts at each location that bought it. Click for this location's own." : ""))}"><i></i><span>${esc(flag[1])}</span></div>
   </div>`;
 }
 function plGroups(codes){
   const wh = codes.filter(plIsWh), rest = codes.filter(c => !plIsWh(c));
-  const by = {}; rest.forEach(c => { const k = c.split(/[\s_]/)[0].toUpperCase(); (by[k] = by[k] || []).push(c); });
+  // the brand is the leading letters of the code: OPA1, OPA3 and OPA TIA are all OPA
+  const brand = c => ((c.match(/^[A-Za-z]+/) || [c])[0]).toUpperCase();
+  const by = {}; rest.forEach(c => { const k = brand(c); (by[k] = by[k] || []).push(c); });
   const multi = Object.keys(by).filter(k => by[k].length > 1).sort((a, b) => by[b].length - by[a].length);
-  const singles = rest.filter(c => !multi.includes(c.split(/[\s_]/)[0].toUpperCase()));
+  const singles = rest.filter(c => !multi.includes(brand(c)));
   const out = [];
   if (singles.length) out.push({t: multi.length ? "Restaurants" : "Locations", c: singles});
   multi.forEach(k => out.push({t: k, c: by[k]}));
