@@ -43,6 +43,7 @@ import currency
 import history
 import invoices
 import operations
+import todayloc
 import quality
 import recipients
 import reports
@@ -1203,6 +1204,9 @@ class Handler(BaseHTTPRequestHandler):
                                  "note": "Ledger entries never change once posted, so every period read "
                                          "is kept in a local file and only newer entries are fetched. "
                                          "Deleting the file changes nothing except the next read's speed."})
+            elif url.path == "/api/today/locations":
+                company = q.get("company") or config.BC_COMPANY
+                self._send(200, todayloc.request(client, company, q.get("refresh") == "1"))
             elif url.path == "/api/locations":
                 company = q.get("company") or config.BC_COMPANY
                 try:

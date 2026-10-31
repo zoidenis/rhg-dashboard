@@ -22,6 +22,7 @@ import sales_report
 import pl_memo
 import cashloc
 import kartloc
+import today as todayloc
 import faloc
 import recipients
 import requests
@@ -1285,6 +1286,11 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = q.get("company") or config.BC_COMPANY
                 self._send(200, faloc.request(client, company, period, company_currency(company), q.get("refresh") == "1"))
+            elif url.path == "/api/today/locations":
+                company = q.get("company") or config.BC_COMPANY
+                scope = "all" if q.get("scope") == "all" else "company"
+                self._send(200, todayloc.request(client, company, scope, company_currency, _latest, in_parallel_jobs,
+                                              q.get("refresh") == "1"))
             elif url.path == "/api/kartela/locations":
                 try:
                     period = periods(q.get("period"), "month")[:8]

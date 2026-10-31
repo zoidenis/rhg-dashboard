@@ -231,6 +231,8 @@ td.num,th.num{text-align:right}
 .kl-a0{background:var(--kl-a0)}.kl-a1{background:var(--kl-a1)}.kl-a2{background:var(--kl-a2)}.kl-a3{background:var(--kl-a3)}.kl-a4{background:var(--kl-a4)}
 .kl-age{display:flex;height:9px;border-radius:4px;overflow:hidden;gap:2px;background:var(--line)}
 .kl-age i{display:block;min-width:2px}
+.td-host.td-on>:not(.ov-tabs):not(.td-view){display:none!important}
+.td-view{display:none}.td-host.td-on>.td-view{display:block}
 .kl-row{display:grid;grid-template-columns:24px 1fr;gap:4px 6px;align-items:center;font-size:10px;color:var(--sub)}
 .fl-tab th.grp{text-align:center;border-bottom:1px solid var(--line)}
 .fl-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
@@ -1051,6 +1053,7 @@ td.num,th.num{text-align:right}
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
 <div class="pl-bd" id="slBd"><div class="pl-pop" id="slPop" role="dialog" aria-modal="true" aria-label="Restaurant sales"></div></div>
 <div class="pl-bd" id="faBd"><div class="pl-pop" id="faPop" role="dialog" aria-modal="true" aria-label="Location fixed assets"></div></div>
+<div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="klBd"><div class="pl-pop" id="klPop" role="dialog" aria-modal="true" aria-label="Location payables and receivables"></div></div>
 <div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
@@ -1180,6 +1183,7 @@ function render(){
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
   if($("v-kartela").classList.contains("on") && kaTab === "loc" && klKey !== flQuery()) loadKl(false);
+  if(typeof tdState !== "undefined" && tdState.bar){ tdRender(); if (!tdCur()) tdLoad(false); }
   if($("v-assets").classList.contains("on") && faTab === "loc" && faKey !== faQuery()) loadFa(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
   if($("v-inventory").classList.contains("on")){
@@ -4442,6 +4446,225 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("blBd").classList.contains("show")) { $("blBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.blloc != null) { e.preventDefault(); blOpen(e.target.dataset.blloc); }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.blg != null) { e.preventDefault(); e.target.click(); }
+});
+// ---------------------------------------------------------------- Location intelligence → Today
+// One "Today" tab next to every Location intelligence: what each location did today so far — Simphony's
+// business day against the same weekday last week and last year, the budget of the day, and what
+// Business Central holds posted today on the restaurant's department or location. Each screen leads with
+// its own side (sales, cash, payables, stock, assets); the popup shows the whole day. /api/today/locations.
+var TD_TABS = {ovFTabs: "all", clTabs: "cash", kaTabs: "kartela", invTabs: "stock", faTabs: "assets", bgTabs: "budget", slTabs: "sales"};
+var TD_TITLE = {all: "Today at every location", cash: "Takings and receipts today", kartela: "Payables and receivables posted today",
+  stock: "Stock movements today", assets: "Fixed assets posted today", budget: "Sales today against the budget of the day", sales: "Sales today"};
+var tdState = {bar: null, focus: "", data: {}, key: "", timer: null, auto: null};
+function tdScope(){ return tdState.focus === "sales" ? "all" : "company"; }
+function tdQuery(){
+  const p = new URLSearchParams();
+  if ($("company").value) p.set("company", $("company").value);
+  if (tdScope() === "all") p.set("scope", "all");
+  return p.toString();
+}
+function tdView(){ const bar = $(tdState.bar); return bar && bar.parentNode ? bar.parentNode.querySelector(":scope > .td-view") : null; }
+function tdOn(barId){
+  const bar = $(barId); if (!bar) return;
+  if (barId === "invTabs" && !$("v-inventory").classList.contains("on")) { navTo("inventory"); setTimeout(() => tdOn(barId), 60); return; }
+  tdOff();
+  tdState.bar = barId; tdState.focus = TD_TABS[barId];
+  const host = bar.parentNode;
+  let v = host.querySelector(":scope > .td-view");
+  if (!v) {
+    v = document.createElement("div"); v.className = "td-view";
+    v.innerHTML = `<div class="card"><div class="card-head"><div><h2 data-td="title"></h2>
+        <p class="hint">Each location as a square, today so far: Simphony's business day (refreshed every 15 minutes) against the same weekday last week and last year — whole days, so the gap closes as the day goes on — and what Business Central holds posted today on the restaurant's department or location. Click a location for its whole day.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="mini dark" data-td="read">Read again</button></div></div>
+        <p class="meta" data-td="status" style="margin:6px 0 0"></p></div>
+      <div class="kpis" data-td="kpis"></div><div data-td="grid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" data-td="defs" style="margin-top:12px;line-height:1.55"></div></details></div>`;
+    bar.insertAdjacentElement("afterend", v);
+    v.querySelector('[data-td="read"]').onclick = () => tdLoad(true);
+  }
+  host.classList.add("td-host", "td-on");
+  bar.querySelectorAll("button").forEach(b => { const on = b.dataset.t === "today"; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  v.querySelector('[data-td="title"]').textContent = TD_TITLE[tdState.focus];
+  tdRender(); tdLoad(false);
+  clearInterval(tdState.auto); tdState.auto = setInterval(() => { if (tdState.bar && !document.hidden) tdLoad(false); }, 300000);
+}
+function tdOff(){
+  document.querySelectorAll(".td-on").forEach(h => h.classList.remove("td-on"));
+  clearInterval(tdState.auto); clearTimeout(tdState.timer);
+  tdState.bar = null;
+}
+async function tdLoad(refresh){
+  clearTimeout(tdState.timer);
+  const v = tdView(); if (!v) return;
+  const q = tdQuery(), st = v.querySelector('[data-td="status"]'), btn = v.querySelector('[data-td="read"]');
+  btn.disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/today/locations?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (tdQuery() !== q || !tdState.bar) return;
+    if (j.pending) {
+      if (j.previous) { tdState.data[q] = j.previous; tdRender(); }
+      st.textContent = `Reading: ${j.stage || "starting"}…`;
+      tdState.timer = setTimeout(() => tdLoad(false), 4000);
+      return;
+    }
+    tdState.data[q] = j; tdRender();
+  }catch(e){ st.textContent = "Could not read: " + e.message; }
+  finally{ btn.disabled = false; }
+}
+const tdSum = (L, k, f) => ((L[k] || {})[f]) || 0;
+const tdTake = L => tdSum(L, "tenders", "cash") + tdSum(L, "tenders", "card");
+const tdPct = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null;
+function tdHead(L, f){
+  const P = L.pos, C = L.currency || "";
+  if (f === "cash") return [tdTake(L), `taken · BC received ${flM(tdSum(L, "bank", "received"))}`];
+  if (f === "kartela") return [tdSum(L, "ap", "invoiced"), `supplier invoices · paid ${flM(tdSum(L, "ap", "paid"))} · customers ${flM(tdSum(L, "ar", "invoiced"))}`];
+  if (f === "stock") { const S = L.stock || {}; return [S.receipts || 0, `received · ${fmt(S.n || 0)} movement${S.n === 1 ? "" : "s"}`]; }
+  if (f === "assets") { const F = L.fa || {}; return [F.acquisition || 0, `acquired · ${fmt(F.n || 0)} posting${F.n === 1 ? "" : "s"}`]; }
+  if (!P) return [null, L.latest ? `no sales yet · Simphony up to ${L.latest}` : (L.ref ? "no sales read" : "no till")];
+  if (f === "budget") return [P.ex, L.budget ? `excl. VAT · ${Math.round(P.ex / L.budget * 100)}% of the day's budget ${flM(L.budget)}` : "excl. VAT · no budget on the department"];
+  return [P.ex, `excl. VAT so far · last week ${flM((L.lw || {}).ex)} · last year ${flM((L.ly || {}).ex)} ${esc(C)}`];
+}
+function tdStats(L, f){
+  const P = L.pos || {}, S = L.stock || {}, F = L.fa || {}, T = L.tenders || {}, B = L.bank || {};
+  const s = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const vs = (a, b) => { const p = tdPct(a, b); return p == null ? "–" : flPct(p); };
+  if (f === "cash") return s("Cash", flM(T.cash)) + s("Cards", flM(T.card)) + s("Paid out", flM(T.paid_out)) + s("BC cash boxes", flM(B.cash), "", "Received in the cash boxes today in BC");
+  if (f === "kartela") return s("AP invoices", fmt(tdSum(L, "ap", "inv_n"))) + s("AP paid", flM(tdSum(L, "ap", "paid"))) + s("AR invoiced", flM(tdSum(L, "ar", "invoiced"))) + s("AR received", flM(tdSum(L, "ar", "paid")));
+  if (f === "stock") return s("Sales + use", flM((S.sales || 0) + (S.consumption || 0))) + s("Adjust in", flM(S.adj_in)) + s("Adjust out", flM(S.adj_out), S.adj_out ? "warn" : "") + s("Transfers", flM(S.transfer));
+  if (f === "assets") return s("Acquired", flM(F.acquisition)) + s("Depreciation", flM(F.depreciation)) + s("Disposals", flM(F.disposal)) + s("Postings", fmt(F.n || 0));
+  const disc = P.gross ? P.discounts / P.gross * 100 : null;
+  const lim = (tdCur() || {}).limits || {};
+  return s("Checks", fmt(P.checks || 0)) + s("Avg check", P.checks ? flM(P.net / P.checks) : "–") +
+    (f === "budget" ? s("vs last week", vs(P.ex, (L.lw || {}).ex), "", "Against the whole day last week") + s("vs last year", vs(P.ex, (L.ly || {}).ex), "", "Against the whole day last year")
+      : s("Discounts", disc == null ? "–" : disc.toFixed(1) + "%", disc != null && disc > (lim.discounts || 8) ? "warn" : "") + s("Open checks", fmt(P.open_checks || 0), P.open_checks ? "warn" : "", P.open_checks ? `${fmt(P.open_value)} still open` : ""));
+}
+function tdCur(){ return tdState.data[tdQuery()]; }
+function tdActive(L, f){
+  if (f === "cash") return tdTake(L) || tdSum(L, "bank", "received");
+  if (f === "kartela") return L.ap || L.ar;
+  if (f === "stock") return L.stock;
+  if (f === "assets") return L.fa;
+  return L.group === "restaurant" || L.pos;
+}
+function tdSquare(code, L, f){
+  const [v, sub] = tdHead(L, f), a = (L.alerts || [])[0] || (L.pos ? ["good", "Nothing unusual so far"] : ["info", "Nothing in Simphony yet"]);
+  const showA = f === "sales" || f === "all" || f === "budget" || f === "cash";
+  return `<div class="pl-sq" role="button" tabindex="0" data-tdloc="${esc(code)}" aria-label="${esc(L.name || code)}: today">
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "Not on a location")}</b><span>${esc([L.name && L.name !== code ? code : "", f === "sales" && L.company ? L.company : ""].filter(Boolean).join(" · "))}</span></div></div>
+    <div class="big"><span class="v">${v == null ? "–" : flM(v)}</span><span class="cmp">${sub}</span></div>
+    ${f === "budget" && L.budget && L.pos ? `<div class="kl-age" title="${Math.round(L.pos.ex / L.budget * 100)}% of the budget of the day"><i class="kl-a0" style="flex:${Math.min(L.pos.ex, L.budget)}"></i><i style="flex:${Math.max(0, L.budget - L.pos.ex)};background:transparent"></i></div>` : ""}
+    <div class="st">${tdStats(L, f)}</div>
+    ${showA ? `<div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>` : ""}
+  </div>`;
+}
+function tdRender(){
+  const v = tdView(); if (!v || !tdState.bar) return;
+  const d = tdCur(), f = tdState.focus;
+  const grid = v.querySelector('[data-td="grid"]'), st = v.querySelector('[data-td="status"]');
+  if (!d) { grid.innerHTML = `<p class="hint">Reading today…</p>`; v.querySelector('[data-td="kpis"]').innerHTML = ""; return; }
+  const B = d.locations || {}, all = Object.keys(B), C = d.currency || "";
+  const codes = all.filter(c => tdActive(B[c], f));
+  const other = [...new Set(all.map(c => B[c].currency).filter(x => x && x !== C))];
+  const day = new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long"});
+  st.innerHTML = `${esc(day)} · read at ${esc(d.read_at)} · against ${esc(d.last_week)} and ${esc(d.last_year)} (whole days)${f === "sales" ? " · every restaurant" : " · " + esc(d.company) + " · " + esc(C)}`
+    + (!d.simphony ? " · Simphony is not set up" : "") + (other.length ? ` · totals in ${esc(C)}; ${esc(other.join(", "))} restaurants are in the squares only` : "") + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
+  // totals in the company's currency only (Sales covers restaurants in lek and in euro)
+  const sum = fn => all.filter(c => !B[c].currency || B[c].currency === C).reduce((a, c) => a + (fn(B[c]) || 0), 0);
+  const k = (l, val, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const ex = sum(L => (L.pos || {}).ex), lw = sum(L => L.pos ? (L.lw || {}).ex : 0), ly = sum(L => L.pos ? (L.ly || {}).ex : 0), bud = sum(L => L.pos ? L.budget : 0);
+  const kp = {
+    cash: () => k("Taken so far", flM(sum(tdTake)), `cash ${flM(sum(L => tdSum(L, "tenders", "cash")))} · cards ${flM(sum(L => tdSum(L, "tenders", "card")))}`) +
+      k("Received in BC today", flM(sum(L => tdSum(L, "bank", "received"))), `cash boxes ${flM(sum(L => tdSum(L, "bank", "cash")))} · banks ${flM(sum(L => tdSum(L, "bank", "bank")))} · online ${flM(sum(L => tdSum(L, "bank", "online")))}`) +
+      k("Paid out at the till", flM(sum(L => tdSum(L, "tenders", "paid_out"))), "pickups so far") + k("Out of the banks", flM(sum(L => tdSum(L, "bank", "out"))), "credits posted today"),
+    kartela: () => k("Supplier invoices", flM(sum(L => tdSum(L, "ap", "invoiced"))), `${fmt(sum(L => tdSum(L, "ap", "inv_n")))} posted today`) +
+      k("Paid to suppliers", flM(sum(L => tdSum(L, "ap", "paid"))), `${fmt(sum(L => tdSum(L, "ap", "pay_n")))} payments`) +
+      k("Customer invoices", flM(sum(L => tdSum(L, "ar", "invoiced"))), `${fmt(sum(L => tdSum(L, "ar", "inv_n")))} posted today`) +
+      k("Received from customers", flM(sum(L => tdSum(L, "ar", "paid"))), `${fmt(sum(L => tdSum(L, "ar", "pay_n")))} receipts`),
+    stock: () => k("Received", flM(sum(L => tdSum(L, "stock", "receipts"))), "purchase receipts at cost") +
+      k("Sold and used", flM(sum(L => tdSum(L, "stock", "sales") + tdSum(L, "stock", "consumption"))), "sales and consumption at cost") +
+      k("Adjustments", `${flM(sum(L => tdSum(L, "stock", "adj_in")))} / ${flM(sum(L => tdSum(L, "stock", "adj_out")))}`, "in / out at cost") +
+      k("Movements", fmt(sum(L => tdSum(L, "stock", "n"))), `transfers ${flM(sum(L => tdSum(L, "stock", "transfer")))}`),
+    assets: () => k("Acquired", flM(sum(L => tdSum(L, "fa", "acquisition"))), "") + k("Depreciation", flM(sum(L => tdSum(L, "fa", "depreciation"))), "") +
+      k("Disposals", flM(sum(L => tdSum(L, "fa", "disposal"))), "") + k("Postings", fmt(sum(L => tdSum(L, "fa", "n"))), "fixed-asset entries today"),
+  }[f];
+  v.querySelector('[data-td="kpis"]').innerHTML = kp ? kp() :
+    k("Sales so far", flM(ex), `${C} excl. VAT · ${fmt(sum(L => (L.pos || {}).checks))} checks`) +
+    (f === "budget" ? k("Budget of the day", flM(bud), bud ? `${Math.round(ex / bud * 100)}% reached so far` : "no budget on these departments", bud && ex < bud ? "" : "") :
+      k("Last week, whole day", flM(lw), lw ? `${Math.round(ex / lw * 100)}% reached so far` : "")) +
+    k("Last year, whole day", flM(ly), ly ? `${Math.round(ex / ly * 100)}% reached so far` : "") +
+    k("Open checks", fmt(sum(L => (L.pos || {}).open_checks)), `${flM(sum(L => (L.pos || {}).open_value))} still open`, sum(L => (L.pos || {}).open_checks) ? "warn" : "");
+  const val = c => { const h = tdHead(B[c], f)[0]; return h == null ? -1 : h; };
+  const sorted = list => [...list].sort((a, b) => val(b) - val(a) || (B[a].name || a).localeCompare(B[b].name || b));
+  const rest = codes.filter(c => B[c].group === "restaurant");
+  const by = {}; rest.forEach(c => { const b = (B[c].brand || c).toUpperCase(); (by[b] = by[b] || []).push(c); });
+  const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((B[c].brand || c).toUpperCase()));
+  const groups = [];
+  if (singles.length) groups.push({t: "Restaurants", c: singles});
+  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  const sup = codes.filter(c => B[c].group === "support"), none = codes.filter(c => B[c].group === "unassigned");
+  if (sup.length) groups.push({t: "Head office, central and warehouses", c: sup});
+  if (none.length) groups.push({t: "Not on a location", c: none, hint: "posted today with no department"});
+  grid.innerHTML = codes.length ? groups.map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(c => tdSquare(c, B[c], f)).join("")}</div>`).join("")
+    : `<p class="hint">${{kartela: "No supplier or customer entry posted today yet.", stock: "No stock movement posted today yet.", assets: "No fixed-asset entry posted today.", cash: "Nothing taken or received yet today."}[f] || "No location yet."}</p>`;
+  v.querySelector('[data-td="defs"]').innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("");
+  if ($("tdBd").classList.contains("show") && $("tdPop").dataset.code != null) tdDraw($("tdPop").dataset.code);
+}
+function tdOpen(code){ $("tdPop").dataset.code = code; tdDraw(code); $("tdBd").classList.add("show"); }
+function tdDraw(code){
+  const d = tdCur(), L = (d && d.locations || {})[code]; if (!L) return;
+  const f = tdState.focus, C = L.currency || "";
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const panel = (t, body) => `<div class="pl-panel" style="margin-bottom:12px"><h3 style="margin:0 0 8px;font-size:15px">${t}</h3>${body}</div>`;
+  const P = L.pos, W = L.lw || {}, Y = L.ly || {};
+  const rowv = (l, k, money) => `<tr><td>${l}</td><td class="num">${money ? fmt(P[k]) : fmt(P[k])}</td><td class="num">${fmt(W[k])}</td><td class="num">${fmt(Y[k])}</td></tr>`;
+  const sales = P ? panel("Simphony · the business day so far",
+      `<div class="pl-tiles">${tile("Sales excl. VAT", flM(P.ex), `${C} · with VAT ${flM(P.net)}`)}${tile("Last week, whole day", flM(W.ex), W.ex ? `${Math.round(P.ex / W.ex * 100)}% reached` : "")}${tile("Last year, whole day", flM(Y.ex), Y.ex ? `${Math.round(P.ex / Y.ex * 100)}% reached` : "")}${tile("Budget of the day", flM(L.budget), L.budget ? `${Math.round(P.ex / L.budget * 100)}% reached` : "no budget on the department")}</div>
+      <div class="scroll"><table data-nosort><tr><th></th><th class="num">Today so far</th><th class="num">${esc(d.last_week)}</th><th class="num">${esc(d.last_year)}</th></tr>
+      ${rowv("Net sales with VAT", "net", 1)}${rowv("Sales excl. VAT", "ex", 1)}${rowv("Checks", "checks")}${rowv("Guests", "guests")}${rowv("Discounts", "discounts", 1)}${rowv("Voids", "voids", 1)}${rowv("Error corrects", "error_corrects", 1)}${rowv("Returns", "returns", 1)}
+      <tr><td>Checks still open</td><td class="num ${P.open_checks ? "warn" : ""}">${fmt(P.open_checks)} · ${fmt(P.open_value)}</td><td class="num">–</td><td class="num">–</td></tr></table></div>`)
+    : (L.ref ? panel("Simphony", `<p class="hint">No sales yet today${L.latest ? ` (Simphony holds days up to ${esc(L.latest)})` : ""}.</p>`) : "");
+  const T = L.tenders, B = L.bank;
+  const cash = (T || B) ? panel("Takings and receipts", `<div class="pl-tiles">${T ? tile("Cash taken", flM(T.cash), "Simphony") + tile("Cards", flM(T.card), "Simphony") : ""}
+      ${B ? tile("Cash boxes in BC", flM(B.cash), `banks ${flM(B.bank)} · online ${flM(B.online)}`) + tile("Out", flM(B.out), `${fmt(B.n)} bank entries today`) : tile("BC", "–", "nothing posted on the department today")}</div>`) : "";
+  const docs = (S, who) => S && S.docs.length ? `<div class="scroll"><table data-nosort><tr><th>Document</th><th>${who}</th><th>Type</th><th class="num">Amount</th></tr>${S.docs.map(x => `<tr><td>${esc(x[0])}</td><td>${esc(x[1])}</td><td class="meta">${esc(x[2])}</td><td class="num">${fmt(x[3])}</td></tr>`).join("")}</table></div>` : "";
+  const ledgers = (L.ap || L.ar) ? panel("Payables and receivables posted today", `<div class="pl-tiles">${tile("Supplier invoices", flM(tdSum(L, "ap", "invoiced")), `${fmt(tdSum(L, "ap", "inv_n"))} invoices`)}${tile("Paid to suppliers", flM(tdSum(L, "ap", "paid")), `${fmt(tdSum(L, "ap", "pay_n"))} payments`)}${tile("Customer invoices", flM(tdSum(L, "ar", "invoiced")), `${fmt(tdSum(L, "ar", "inv_n"))} invoices`)}${tile("Received", flM(tdSum(L, "ar", "paid")), `${fmt(tdSum(L, "ar", "pay_n"))} receipts`)}</div>
+      <div class="pl-cols">${L.ap ? `<div><h4 style="margin:0 0 6px;font-size:13px">Suppliers</h4>${docs(L.ap, "Supplier")}</div>` : ""}${L.ar ? `<div><h4 style="margin:0 0 6px;font-size:13px">Customers</h4>${docs(L.ar, "Customer")}</div>` : ""}</div>`) : "";
+  const S = L.stock;
+  const stock = S ? panel("Stock movements posted today", `<div class="pl-tiles" style="grid-template-columns:repeat(auto-fit,minmax(118px,1fr))">${tile("Received", flM(S.receipts), "purchase receipts")}${tile("Sold", flM(S.sales), "")}${tile("Consumption", flM(S.consumption), "")}${tile("Adjust in", flM(S.adj_in), "")}${tile("Adjust out", flM(S.adj_out), "", S.adj_out ? "warn" : "")}${tile("Transfers", flM(S.transfer), "")}${S.output ? tile("Output", flM(S.output), "") : ""}</div><p class="meta" style="margin:0">${fmt(S.n)} movements at cost, on location code ${esc(code || "–")}.</p>`) : "";
+  const F = L.fa;
+  const fa = F ? panel("Fixed assets posted today", `<div class="pl-tiles">${tile("Acquired", flM(F.acquisition), "")}${tile("Depreciation", flM(F.depreciation), "")}${tile("Disposals", flM(F.disposal), "")}${tile("Other", flM(F.other), `${fmt(F.n)} entries`)}</div>
+      ${F.assets.length ? `<div class="scroll"><table data-nosort><tr><th>Asset</th><th>Type</th><th class="num">Amount</th></tr>${F.assets.map(x => `<tr><td>${esc(x[1])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="num">${fmt(x[3])}</td></tr>`).join("")}</table></div>` : ""}`) : "";
+  const order = {cash: [cash, sales, ledgers, stock, fa], kartela: [ledgers, sales, cash, stock, fa], stock: [stock, sales, cash, ledgers, fa], assets: [fa, sales, cash, ledgers, stock]}[f] || [sales, cash, ledgers, stock, fa];
+  $("tdPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph(L)}</div>
+      <div><h2>${esc(L.name || code || "Not on a location")}</h2><div class="sub">${esc(code || "no department")} · today ${esc(d.date)}, read at ${esc(d.read_at)} · ${esc(C)}</div></div><div class="sp"></div>
+      <button class="close" data-tdclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div style="margin-bottom:10px">${L.alerts.map(x => `<div class="meta" style="margin:2px 0"><span class="pl-sev ${esc(x[0])}"></span>${esc(x[1])}</div>`).join("")}</div>` : ""}
+      ${order.join("") || `<p class="hint">Nothing today yet.</p>`}
+    </div>`;
+}
+Object.keys(TD_TABS).forEach(id => {
+  const bar = $(id); if (!bar) return;
+  const b = document.createElement("button");
+  b.dataset.t = "today"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", "false"); b.textContent = "Today";
+  const after = bar.querySelector('button[data-t="loc"]');
+  if (after) after.insertAdjacentElement("afterend", b); else bar.appendChild(b);
+  b.onclick = () => tdOn(id);
+  bar.addEventListener("click", e => { const t = e.target.closest("button"); if (t && t.dataset.t !== "today") tdOff(); }, true);
+});
+$("nav").addEventListener("click", () => tdOff(), true);
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-tdclose]") || t === $("tdBd")) { $("tdBd").classList.remove("show"); return; }
+  const s = t.closest("[data-tdloc]"); if (s) tdOpen(s.dataset.tdloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("tdBd").classList.contains("show")) { $("tdBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.tdloc != null) { e.preventDefault(); tdOpen(e.target.dataset.tdloc); }
 });
 </script>
 <script src="tables.js"></script>

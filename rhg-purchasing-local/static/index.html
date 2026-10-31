@@ -221,6 +221,9 @@ td.num,th.num{text-align:right}
 .pl-sq .al.crit{background:var(--up-bg)} .pl-sq .al.crit i{background:var(--up)}
 .pl-sq .al.warn{background:var(--warn-bg)} .pl-sq .al.warn i{background:var(--warn)}
 .pl-sq .al.info i{background:var(--accent)}
+.td-host.td-on>:not(.ov-tabs):not(.td-view){display:none!important}
+.td-view{display:none}.td-host.td-on>.td-view{display:block}
+.pl-sq .big .v.up{color:var(--up)}
 .pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
 .pl-bd.show{display:flex}
 .pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
@@ -864,6 +867,7 @@ td.num,th.num{text-align:right}
 </main>
 </div>
 
+<div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
 <div class="pl-bd" id="plBd"><div class="pl-pop" id="plPop" role="dialog" aria-modal="true"></div></div>
 <div class="modal-bg" id="modalBg">
@@ -3281,6 +3285,132 @@ $("wkTest").onclick = () => {
   if (!to) { $("wkMsg").textContent = "Enter an address for the test."; return; }
   startWeekly(to, null);
 };
+// ---------------------------------------------------------------- Location intelligence → Today
+// A "Today" tab next to each Location intelligence: what every location received, was invoiced and ordered
+// today so far, and its requisitions due. /api/today/locations; refreshed every 5 minutes while open.
+var TD_TABS = {ovTabs: "purchasing", exTabs: "exceptions"};
+var tdState = {bar: null, focus: "", data: {}, timer: null, auto: null};
+const tdQ = () => "company=" + encodeURIComponent($("company").value || "");
+function tdView(){ const bar = $(tdState.bar); return bar && bar.parentNode ? bar.parentNode.querySelector(":scope > .td-view") : null; }
+function tdOn(barId){
+  const bar = $(barId); if (!bar) return;
+  tdOff();
+  tdState.bar = barId; tdState.focus = TD_TABS[barId];
+  const host = bar.parentNode;
+  let v = host.querySelector(":scope > .td-view");
+  if (!v) {
+    v = document.createElement("div"); v.className = "td-view";
+    v.innerHTML = `<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><h2 style="margin:0 0 4px">${barId === "exTabs" ? "Exceptions raised today" : "Purchasing today"}</h2>
+        <p class="hint" style="margin:0">Each location as a square, today so far in Business Central: purchase receipts and invoices posted, invoices without a purchase order, orders dated today and requisition lines due. Click a location for its documents.</p></div>
+        <button class="mini dark" data-td="read">Read again</button></div><p class="meta" data-td="status" style="margin:8px 0 0"></p></div>
+      <div class="kpis" data-td="kpis"></div><div data-td="grid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:15px;font-weight:600">How these figures are built</summary><div class="hint" data-td="defs" style="margin-top:10px;line-height:1.55"></div></details></div>`;
+    bar.insertAdjacentElement("afterend", v);
+    v.querySelector('[data-td="read"]').onclick = () => tdLoad(true);
+  }
+  host.classList.add("td-host", "td-on");
+  bar.querySelectorAll("button").forEach(b => { const on = b.dataset.t === "today"; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  tdRender(); tdLoad(false);
+  clearInterval(tdState.auto); tdState.auto = setInterval(() => { if (tdState.bar && !document.hidden) tdLoad(false); }, 300000);
+}
+function tdOff(){ document.querySelectorAll(".td-on").forEach(h => h.classList.remove("td-on")); clearInterval(tdState.auto); clearTimeout(tdState.timer); tdState.bar = null; }
+async function tdLoad(refresh){
+  clearTimeout(tdState.timer);
+  const v = tdView(); if (!v) return;
+  const q = tdQ(), st = v.querySelector('[data-td="status"]'), btn = v.querySelector('[data-td="read"]');
+  btn.disabled = true;
+  try{
+    const r = await fetch("/api/today/locations?" + q + (refresh ? "&refresh=1" : "")), j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.status);
+    if (tdQ() !== q || !tdState.bar) return;
+    if (j.pending) {
+      if (j.previous) { tdState.data[q] = j.previous; tdRender(); }
+      st.textContent = `Reading: ${j.stage || "starting"}…`;
+      tdState.timer = setTimeout(() => tdLoad(false), 4000); return;
+    }
+    tdState.data[q] = j; tdRender();
+  }catch(e){ st.textContent = "Could not read: " + e.message; }
+  finally{ btn.disabled = false; }
+}
+const tdG = (L, k, f) => ((L[k] || {})[f]) || 0;
+function tdSquare(code, L, f){
+  const s = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const a = (L.alerts || [])[0] || ["good", "Nothing unusual today"];
+  const big = f === "exceptions"
+    ? `<span class="v ${tdG(L, "invoices", "no_po") ? "up" : ""}">${fmt(tdG(L, "invoices", "no_po"))}</span><span class="cmp">invoice${tdG(L, "invoices", "no_po") === 1 ? "" : "s"} without a PO today · ${plM(tdG(L, "invoices", "no_po_value"))}</span>`
+    : `<span class="v">${plM(tdG(L, "receipts", "value"))}</span><span class="cmp">received · ${fmt(tdG(L, "receipts", "n"))} receipt${tdG(L, "receipts", "n") === 1 ? "" : "s"} · invoiced ${plM(tdG(L, "invoices", "value"))}</span>`;
+  return `<div class="pl-sq" role="button" tabindex="0" data-tdloc="${esc(code)}" aria-label="${esc(L.name || code)}: today">
+    <div class="hd"><div class="ic">${plGlyph(code)}</div><div class="nm"><b>${esc(L.name || code || "No location")}</b><span>${esc(L.name !== code ? code : "")}</span></div></div>
+    <div class="big">${big}</div>
+    <div class="st">${s("Invoices", fmt(tdG(L, "invoices", "n")), "", `${plM(tdG(L, "invoices", "value"))} posted today`) + s("No PO", fmt(tdG(L, "invoices", "no_po")), tdG(L, "invoices", "no_po") ? "up" : "") +
+      s("Orders today", fmt(tdG(L, "orders", "n")), "", `${plM(tdG(L, "orders", "value"))}`) + s("Reqs due / late", `${fmt(tdG(L, "reqs", "today"))} / ${fmt(tdG(L, "reqs", "late"))}`, tdG(L, "reqs", "late") ? "up" : "")}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function tdRender(){
+  const v = tdView(); if (!v || !tdState.bar) return;
+  const d = tdState.data[tdQ()], f = tdState.focus, grid = v.querySelector('[data-td="grid"]');
+  if (!d) { grid.innerHTML = `<p class="hint">Reading today…</p>`; v.querySelector('[data-td="kpis"]').innerHTML = ""; return; }
+  const B = d.locations || {}, all = Object.keys(B);
+  const codes = all.filter(c => f === "exceptions" ? (B[c].alerts || []).length : (B[c].receipts || B[c].invoices || B[c].orders || B[c].credits || B[c].reqs));
+  const day = new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long"});
+  v.querySelector('[data-td="status"]').innerHTML = `${esc(day)} · read at ${esc(d.read_at)} · ${esc(d.company)}` + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
+  const sum = fn => all.reduce((a, c) => a + (fn(B[c]) || 0), 0);
+  const k = (l, val, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const nopo = sum(L => tdG(L, "invoices", "no_po"));
+  v.querySelector('[data-td="kpis"]').innerHTML =
+    k("Received", plM(sum(L => tdG(L, "receipts", "value"))), `${fmt(sum(L => tdG(L, "receipts", "n")))} purchase receipts posted`) +
+    k("Invoiced", plM(sum(L => tdG(L, "invoices", "value"))), `${fmt(sum(L => tdG(L, "invoices", "n")))} invoices · credit memos ${plM(sum(L => tdG(L, "credits", "value")))}`) +
+    k("Without a purchase order", fmt(nopo), `${plM(sum(L => tdG(L, "invoices", "no_po_value")))} posted today`, nopo ? "up" : "") +
+    k("Orders dated today", fmt(sum(L => tdG(L, "orders", "n"))), `${plM(sum(L => tdG(L, "orders", "value")))} · requisition lines due ${fmt(sum(L => tdG(L, "reqs", "today")))}, late ${fmt(sum(L => tdG(L, "reqs", "late")))}`);
+  const val = c => f === "exceptions" ? tdG(B[c], "invoices", "no_po") * 1e6 + tdG(B[c], "reqs", "late") : tdG(B[c], "receipts", "value") + tdG(B[c], "invoices", "value");
+  const sorted = list => [...list].sort((a, b) => val(b) - val(a) || (B[a].name || a).localeCompare(B[b].name || b));
+  const wh = codes.filter(c => plIsWh(c)), none = codes.filter(c => !c), rest = codes.filter(c => c && !plIsWh(c));
+  const groups = [rest.length && {t: "Restaurants and other locations", c: rest}, wh.length && {t: "Warehouses and central kitchen", c: wh}, none.length && {t: "No location", c: none}].filter(Boolean);
+  grid.innerHTML = codes.length ? groups.map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}</span></div><div class="pl-grid">${sorted(g.c).map(c => tdSquare(c, B[c], f)).join("")}</div>`).join("")
+    : `<p class="hint">${f === "exceptions" ? "No exception raised today." : "Nothing received, invoiced or ordered yet today."}</p>`;
+  v.querySelector('[data-td="defs"]').innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("");
+  if ($("tdBd").classList.contains("show") && $("tdPop").dataset.code != null) tdDraw($("tdPop").dataset.code);
+}
+function tdOpen(code){ $("tdPop").dataset.code = code; tdDraw(code); $("tdBd").classList.add("show"); }
+function tdDraw(code){
+  const d = tdState.data[tdQ()], L = (d && d.locations || {})[code]; if (!L) return;
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const panel = (t, body) => `<div class="pl-panel" style="margin-bottom:12px"><div class="ttl"><h3>${t}</h3></div>${body}</div>`;
+  const tbl = (head, rows) => `<table data-nosort><tr>${head.map(h => `<th${h[1] ? ' class="num"' : ""}>${h[0]}</th>`).join("")}</tr>${rows.join("")}</table>`;
+  const I = L.invoices, R = L.receipts, O = L.orders, Q = L.reqs, CM = L.credits;
+  const inv = I ? panel("Invoices posted today", tbl([["Invoice"], ["Supplier"], ["Order"], ["Amount", 1]], I.docs.map(x => `<tr><td>${esc(x[0])}<div class="meta">${esc(x[4])}</div></td><td>${esc(x[1])}</td><td class="${x[3] ? "" : "up"}">${esc(x[3] || "no PO")}</td><td class="num">${fmt(x[2])}</td></tr>`))) : "";
+  const rec = R ? panel("Receipts posted today", tbl([["Receipt"], ["Items", 1], ["Value", 1]], R.docs.map(x => `<tr><td>${esc(x[0])}</td><td class="num">${fmt(x[3])}</td><td class="num">${fmt(x[2])}</td></tr>`))) : "";
+  const ord = O ? panel("Orders dated today", tbl([["Order"], ["Supplier"], ["Status"], ["Receipt date"], ["Amount", 1]], O.docs.map(x => `<tr><td>${esc(x[0])}</td><td>${esc(x[1])}</td><td class="meta">${esc(x[3])}</td><td class="meta">${esc(x[4])}</td><td class="num">${fmt(x[2])}</td></tr>`))) : "";
+  const req = Q ? panel("Requisition lines due", tbl([["Item"], ["Quantity", 1], ["Due"], ["Supplier"]], Q.lines.map(x => `<tr><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="num">${fmt(x[2])} ${esc(x[3])}</td><td class="meta ${x[4] < d.date ? "up" : ""}">${esc(x[4])}</td><td>${esc(x[5])}</td></tr>`))) : "";
+  const order = tdState.focus === "exceptions" ? [inv, req, rec, ord] : [rec, inv, ord, req];
+  $("tdPop").innerHTML = `<div class="ph"><div class="ic">${plGlyph(code)}</div><div><h2>${esc(L.name || code || "No location")}</h2><div class="sub">${esc(code || "no location code")} · today ${esc(d.date)}, read at ${esc(d.read_at)}</div></div><div class="sp"></div><button class="close" data-tdclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div style="margin-bottom:10px">${L.alerts.map(x => `<div class="meta" style="margin:2px 0">• ${esc(x[1])}</div>`).join("")}</div>` : ""}
+      <div class="pl-tiles">${tile("Received", plM(R ? R.value : 0), `${fmt(R ? R.n : 0)} receipts`)}${tile("Invoiced", plM(I ? I.value : 0), `${fmt(I ? I.n : 0)} invoices${CM ? ` · credit memos ${plM(CM.value)}` : ""}`)}${tile("Without a PO", fmt(I ? I.no_po : 0), plM(I ? I.no_po_value : 0), I && I.no_po ? "up" : "")}${tile("Orders today", fmt(O ? O.n : 0), `${plM(O ? O.value : 0)}${O && O.open ? ` · ${O.open} not released` : ""}`)}</div>
+      ${order.join("")}
+    </div>`;
+}
+Object.keys(TD_TABS).forEach(id => {
+  const bar = $(id); if (!bar) return;
+  const b = document.createElement("button");
+  b.dataset.t = "today"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", "false"); b.textContent = "Today";
+  const after = bar.querySelector('button[data-t="loc"]');
+  if (after) after.insertAdjacentElement("afterend", b); else bar.appendChild(b);
+  b.onclick = () => tdOn(id);
+  bar.addEventListener("click", e => { const t = e.target.closest("button"); if (t && t.dataset.t !== "today") tdOff(); }, true);
+});
+$("nav").addEventListener("click", () => tdOff(), true);
+$("company").addEventListener("change", () => { if (tdState.bar) { tdRender(); tdLoad(false); } });
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-tdclose]") || t === $("tdBd")) { $("tdBd").classList.remove("show"); return; }
+  const s = t.closest("[data-tdloc]"); if (s) tdOpen(s.dataset.tdloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("tdBd").classList.contains("show")) { $("tdBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.tdloc != null) { e.preventDefault(); tdOpen(e.target.dataset.tdloc); }
+});
 </script>
 <script src="tables.js"></script>
 <script src="recipients.js"></script>
