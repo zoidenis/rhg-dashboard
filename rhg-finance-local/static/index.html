@@ -25,7 +25,9 @@ nav .grp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppe
 nav .grp:first-child{margin-top:0}
 nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center;font-size:13.5px}
 nav button:hover{background:rgba(160,216,234,.09)}
-nav button.on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
+nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
+#invTabs{overflow-x:auto;scrollbar-width:thin}
+#invTabs button{white-space:nowrap}
 nav .count{background:rgba(160,216,234,.2);color:var(--prev);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
 .side-foot{margin-top:auto;font-size:11.5px;color:#7e9daa;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 26px 60px}
@@ -269,10 +271,11 @@ td.num,th.num{text-align:right}
     <button data-view="fiscal">Fiscal purchases vs BC</button>
     <button data-view="fsales">Fiscal sales vs BC</button>
     <button data-view="inventory">Inventory</button>
-    <button data-view="typology">Typology &amp; turnover</button>
-    <button data-view="recipes">Recipe integrity</button>
-    <button data-view="itemmaster">Item master control</button>
-    <button data-view="movement">Movement &amp; dead stock</button>
+    <!-- tabs of Inventory: kept as views (addresses #typology, #recipes ... and their loading), not listed -->
+    <button data-view="typology" data-parent="inventory" style="display:none">Typology &amp; turnover</button>
+    <button data-view="recipes" data-parent="inventory" style="display:none">Recipe integrity</button>
+    <button data-view="itemmaster" data-parent="inventory" style="display:none">Item master control</button>
+    <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
 
     <div class="grp">Planning</div>
     <button data-view="treasury">Cash flow &amp; treasury</button>
@@ -570,7 +573,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -2614,7 +2617,7 @@ $("liRegSave").onclick = async () => {
 };
 document.querySelectorAll("[data-drill]").forEach(el=>el.onclick=()=>openDrill(el.dataset.drill,""));
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll("#nav button").forEach(x=>{ x.classList.toggle("on",x===b); x.classList.toggle("sub-on", x.dataset.view===b.dataset.parent); });
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
   if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
@@ -2637,6 +2640,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   // the open screen is part of the address, so the control center can link straight to it
   if (history.replaceState) history.replaceState(null, "", b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view);
   if (b.dataset.view === "kartela") kaShow(kaTab);
+  invTabsSync(b.dataset.view);
   setHeader();
 });
 function currentView(){
@@ -2644,6 +2648,7 @@ function currentView(){
   const id = (b && b.dataset.view) || "overview";
   let label = (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"");
   if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : "Accounts payable");
+  if (b && b.dataset.parent === "inventory") label = "Inventory · " + label;
   return {id, label};
 }
 // ---- Kartela: accounts payable and accounts receivable as two tabs of one screen. The old addresses
@@ -2666,9 +2671,9 @@ function navTo(view){
 }
 function setHeader(){
   const v = currentView();
-  const inv = v.id === "inventory";
-  $("towerFinance").classList.toggle("on", !inv); $("towerInventory").classList.toggle("on", inv);
-  $("towerFinance").toggleAttribute("aria-current", !inv); $("towerInventory").toggleAttribute("aria-current", inv);
+  const inv = v.id === "inventory", invTower = inv || INV_TABS.has(v.id);
+  $("towerFinance").classList.toggle("on", !invTower); $("towerInventory").classList.toggle("on", invTower);
+  $("towerFinance").toggleAttribute("aria-current", !invTower); $("towerInventory").toggleAttribute("aria-current", invTower);
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){
@@ -2767,8 +2772,22 @@ function ilBar(L, cls){
   return `<div class="${cls}" role="img" aria-label="${s.map(x => `${x[1]} ${Math.round(x[2] / t * 100)}%`).join(", ")}">` +
     s.filter(x => x[2] > 0).map(x => `<i class="il-c-${x[0]}" style="flex:${x[2]}" title="${x[1]}: ${ilM(x[2])} (${Math.round(x[2] / t * 100)}%)"></i>`).join("") + `</div>`;
 }
+// Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
+// Typology & turnover, Recipe integrity, Item master control and Movement & dead stock, which stay views
+// of their own (their addresses and loading do not change) with the same tab bar on top.
+var INV_TABS = new Set(["typology", "recipes", "itemmaster", "movement"]);
+function invTabsSync(view){
+  const bar = $("invTabs"), sec = $("v-" + view);
+  if (!bar || !sec || !(view === "inventory" || INV_TABS.has(view))) return;
+  if (bar.parentNode !== sec) sec.insertBefore(bar, sec.firstChild);
+  const t = view === "inventory" ? ilTab : view;
+  bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
+  const on = bar.querySelector("button.on"); if (on && on.scrollIntoView && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
+}
 function ilShowTab(tab){
+  if (INV_TABS.has(tab)) { navTo(tab); return; }
   ilTab = tab;
+  if (!$("v-inventory").classList.contains("on")) { navTo("inventory"); return; }
   document.querySelectorAll("#invTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
   $("invMain").style.display = tab === "loc" ? "none" : "";
   $("ilView").style.display = tab === "loc" ? "" : "none";
