@@ -784,8 +784,65 @@ def streams(company, week, location, mode="week"):
     capex = [r for r in gl_rows if r["type"] == "CAPEX"]
     gl_source = next((x for x in sources if x["source"].startswith("Purchase postings")), {})
 
+    # ---- Buying → Location intelligence: everything above by location. Item lines carry their location;
+    # postings in the general ledger take the location (else the department) of their posted invoice.
+    heads = _read("Posted purchase invoices", lambda: client.posted_invoices(company, c_from.isoformat(),
+                                                                             c_to.isoformat()), [], critical=False)
+    head_loc = {str(h.get("No") or ""): (h.get("Location_Code") or h.get("Shortcut_Dimension_1_Code") or "").strip()
+                for h in heads}
+    by_loc = {}
+
+    def bl(code):
+        return by_loc.setdefault(code or "", {"types": {}, "item_value": 0.0, "services": 0.0, "capex": 0.0,
+                                              "prepay": 0.0, "svc_accounts": {}, "capex_docs": [], "invoices": 0,
+                                              "invoiced": 0.0, "no_po": 0, "no_po_value": 0.0, "credit_memos": 0,
+                                              "suppliers": {}, "nopo_docs": []})
+    for r in item_rows:
+        L = bl(r["location"])
+        L["types"][r["type"]] = L["types"].get(r["type"], 0.0) + r["value"]
+        L["item_value"] += r["value"]
+    for r in gl_rows:
+        L = bl(head_loc.get(str(r["document"]), ""))
+        if r["type"] == "CAPEX":
+            L["capex"] += r["value"]
+            if len(L["capex_docs"]) < 10:
+                L["capex_docs"].append([r["document"], r["supplier"], f"{r['account']} {r['account_name']}", round(r["value"])])
+        elif r["type"] == "Prepayments and advances":
+            L["prepay"] += r["value"]
+        elif r["type"] == "Unclassified":
+            pass
+        else:
+            L["services"] += r["value"]
+            k = f"{r['account']} {r['account_name']}"
+            L["svc_accounts"][k] = L["svc_accounts"].get(k, 0.0) + r["value"]
+        L["types"][r["type"]] = L["types"].get(r["type"], 0.0) + r["value"]
+    for h in heads:
+        if h.get("Cancelled"):
+            continue
+        L = bl((h.get("Location_Code") or h.get("Shortcut_Dimension_1_Code") or "").strip())
+        amt = float(h.get("Amount") or 0)
+        if h.get("Corrective") or amt < 0:
+            L["credit_memos"] += 1
+            continue
+        L["invoices"] += 1
+        L["invoiced"] += amt
+        v = (h.get("Buy_from_Vendor_Name") or "").strip()
+        L["suppliers"][v] = L["suppliers"].get(v, 0.0) + amt
+        if not (h.get("Order_No") or "").strip():
+            L["no_po"] += 1
+            L["no_po_value"] += amt
+            L["nopo_docs"].append([str(h.get("No") or ""), v, str(h.get("Posting_Date") or "")[:10], round(amt)])
+    for L in by_loc.values():
+        for k in ("item_value", "services", "capex", "prepay", "invoiced", "no_po_value"):
+            L[k] = round(L[k])
+        L["types"] = {k: round(v) for k, v in sorted(L["types"].items(), key=lambda kv: -kv[1]) if round(v)}
+        L["svc_accounts"] = sorted(([k, round(v)] for k, v in L["svc_accounts"].items()), key=lambda kv: -kv[1])[:8]
+        L["suppliers"] = sorted(([k, round(v)] for k, v in L["suppliers"].items()), key=lambda kv: -kv[1])[:6]
+        L["nopo_docs"] = sorted(L["nopo_docs"], key=lambda x: -x[3])[:10]
+
     critical_missing = [x for x in sources if x["status"] == "unavailable" and x.get("critical")]
     out = {
+        "by_location": by_loc,
         "period": [c_from.isoformat(), c_to.isoformat()], "label": label, "mode": mode,
         "company": company, "location": location or "", "summary": summary,
         "item_rows": item_rows[:600], "gl_rows": gl_rows[:600],

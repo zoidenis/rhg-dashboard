@@ -224,6 +224,11 @@ td.num,th.num{text-align:right}
 .td-host.td-on>:not(.ov-tabs):not(.td-view){display:none!important}
 .td-view{display:none}.td-host.td-on>.td-view{display:block}
 .pl-sq .big .v.up{color:var(--up)}
+.by-types{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;background:var(--line)}
+.by-types i{display:block;min-width:2px}
+.by-t0{background:#1e78a6}.by-t1{background:#2e9a6e}.by-t2{background:#c47f1f}.by-t3{background:#7a5bbf}.by-t4{background:#c0392b}.by-t5{background:#7f8e96}
+.by-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--sub);margin:2px 0 8px}.by-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.by-trow{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:4px 0}.by-trow span{width:150px;flex-shrink:0}.by-trow b{width:70px;text-align:right}
 .pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
 .pl-bd.show{display:flex}
 .pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
@@ -278,6 +283,7 @@ td.num,th.num{text-align:right}
     <button data-view="invoices" data-parent="reqs" data-tab="Invoices" style="display:none">Invoices</button>
     <button data-view="streams" data-parent="reqs" data-tab="Purchase types" style="display:none">Purchase types</button>
     <button data-view="services" data-parent="reqs" data-tab="Services &amp; CAPEX" style="display:none">Services &amp; CAPEX</button>
+    <button data-view="buyloc" data-parent="reqs" data-tab="Location intelligence" style="display:none">Location intelligence</button>
     <!-- Prices & contracts: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
     <button data-view="compare" data-tab="Comparisons" data-group="Prices &amp; contracts">Prices &amp; contracts</button>
     <button data-view="contracts" data-parent="compare" data-tab="Contract prices" style="display:none">Contract prices</button>
@@ -616,7 +622,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-reqs">
-    <div class="ov-tabs" id="byTabs" role="tablist"><button data-t="reqs" class="on" role="tab" aria-selected="true">Requisitions <span class="count" id="reqCount">0</span></button><button data-t="po" role="tab" aria-selected="false">Purchase orders <span class="count" id="poCount">0</span></button><button data-t="invoices" role="tab" aria-selected="false">Invoices</button><button data-t="streams" role="tab" aria-selected="false">Purchase types</button><button data-t="services" role="tab" aria-selected="false">Services &amp; CAPEX</button></div>
+    <div class="ov-tabs" id="byTabs" role="tablist"><button data-t="reqs" class="on" role="tab" aria-selected="true">Requisitions <span class="count" id="reqCount">0</span></button><button data-t="po" role="tab" aria-selected="false">Purchase orders <span class="count" id="poCount">0</span></button><button data-t="invoices" role="tab" aria-selected="false">Invoices</button><button data-t="streams" role="tab" aria-selected="false">Purchase types</button><button data-t="services" role="tab" aria-selected="false">Services &amp; CAPEX</button><button data-t="buyloc" role="tab" aria-selected="false">Location intelligence</button></div>
     <div id="reqSetup"></div>
     <div id="reqBody">
       <div class="kpis five" id="reqKpis"></div>
@@ -636,6 +642,19 @@ td.num,th.num{text-align:right}
           <p class="hint" id="reqQuality"></p></div>
       </div>
     </div>
+  </section>
+
+  <section class="view" id="v-buyloc">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Buying by location</h2>
+        <p class="hint">Every location as a square with the five Buying tabs together, for the period chosen above: item purchases against the period before, requisition lines waiting and at supply risk, open purchase orders and what was received but not invoiced, invoices posted and those without an order, spend by purchase type, services and CAPEX. Click a location for the detail of each.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <label class="meta" for="bySort">Order</label><select id="bySort"><option value="spend">by purchases</option><option value="reqs">by requisitions at risk</option><option value="pos">by open orders</option><option value="nopo">by invoices without a PO</option><option value="services">by services and CAPEX</option><option value="name">by name</option></select>
+          <button class="mini dark" id="byRead">Read again</button></div></div>
+      <p class="meta" id="byStatus" style="margin:6px 0 0"></p>
+    </div>
+    <div class="kpis" id="byKpis"></div>
+    <div id="byGrid"></div>
   </section>
 
   <section class="view" id="v-po">
@@ -867,6 +886,7 @@ td.num,th.num{text-align:right}
 </main>
 </div>
 
+<div class="pl-bd" id="byBd"><div class="pl-pop" id="byPop" role="dialog" aria-modal="true" aria-label="Buying at a location"></div></div>
 <div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
 <div class="pl-bd" id="plBd"><div class="pl-pop" id="plPop" role="dialog" aria-modal="true"></div></div>
@@ -986,6 +1006,7 @@ function render(){
   renderMovers(); renderSpreads(); renderExceptions(); renderPostings(); renderContracts(); renderInvoices(); renderUsers();
   renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
   plRender();
+  if ($("v-buyloc").classList.contains("on")) { byRender(); if (!streams) loadStreams(false); }
 
   const t = new Date(m.checked_at);
   setPill(m.serving ? "load" : "", m.serving
@@ -2540,7 +2561,7 @@ async function loadStreams(force){
     const r = await fetch("/api/streams?" + params());
     const j = await r.json();
     if(!r.ok) throw new Error(j.error || "failed");
-    streams = j; renderStreams();
+    streams = j; renderStreams(); byRender();
   }catch(e){ $("strNote").textContent = "Could not read: " + e.message; }
 }
 $("strLoad").onclick = () => loadStreams(true);
@@ -2999,7 +3020,7 @@ document.addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.plloc) { e.preventDefault(); plOpen(e.target.dataset.plloc); }
 });
 // Buying and Prices & contracts: views under one menu item each, with one tab bar on top of the open one
-var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services"],
+var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services", "buyloc"],
                 pcTabs: ["compare", "contracts", "savings", "prices", "locations"]};
 function pcTabsSync(view){
   for (const [id, views] of Object.entries(TAB_BARS)) {
@@ -3016,7 +3037,7 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   if ($("v-exdetail").classList.contains("on")) exCurrent = null;
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.view));
   if (b.dataset.view === "compare") loadComparisons(false);
-  if ((b.dataset.view === "streams" || b.dataset.view === "services") && data) loadStreams(false);
+  if ((b.dataset.view === "streams" || b.dataset.view === "services" || b.dataset.view === "buyloc") && data) loadStreams(false);
   if (b.dataset.view === "stock") fillStockControls();
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
   if (b.dataset.view === "savings" && !svData) svQuick("lastmonth");
@@ -3285,6 +3306,105 @@ $("wkTest").onclick = () => {
   if (!to) { $("wkMsg").textContent = "Enter an address for the test."; return; }
   startWeekly(to, null);
 };
+// ---------------------------------------------------------------- Buying → Location intelligence
+// Every location as a square with the five Buying tabs together: requisition lines waiting, open purchase
+// orders, invoices posted (and those without an order), spend by purchase type, services and CAPEX.
+// From the screen's data (requisitions, orders, purchases by location) and /api/streams (by_location).
+var bySort = "spend";
+function byLocs(){
+  const U = c => String(c || "").toUpperCase(), out = {};
+  const L = c => { const k = U(c); return out[k] = out[k] || {code: c || "", spend: null, prev: null, pct: null, uninvoiced: 0, credits: 0, documents: 0, reqs: null, pos: [], st: null}; };
+  Object.entries((data && data.by_location) || {}).forEach(([c, v]) => { if (c === "?") c = ""; const x = L(c); x.spend = v.cur; x.prev = v.prev; x.pct = v.pct; x.uninvoiced = v.uninvoiced; x.credits = v.credits; x.documents = v.documents; x.top = v.top_items; });
+  (((data && data.requisitions) || {}).locations || []).forEach(r => { L(r.location).reqs = r; });
+  (((data && data.operations) || {}).purchase_orders || []).forEach(p => L(p.location).pos.push(p));
+  Object.entries((streams && streams.by_location) || {}).forEach(([c, v]) => { L(c).st = v; });
+  return out;
+}
+function bySq(k, x){
+  const nm = plName(x.code) || x.code || "No location", S = x.st || {}, R = x.reqs || {};
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const open = x.pos.length, rni = x.pos.reduce((a, p) => a + (p.received_not_invoiced || 0), 0), due = x.pos.filter(p => p.flag).length;
+  const al = [];
+  if (S.no_po) al.push(["warn", `${S.no_po} invoice${S.no_po > 1 ? "s" : ""} without a PO`]);
+  if (R.risk) al.push(["crit", `${R.risk} requisition line${R.risk > 1 ? "s" : ""} at supply risk`]);
+  if (due) al.push(["warn", `${due} order${due > 1 ? "s" : ""} to follow up`]);
+  if (rni) al.push(["info", `${plM(rni)} received, not invoiced`]);
+  const a = al[0] || ["good", "Nothing waiting"];
+  const T = Object.entries(S.types || {}), tt = T.reduce((s, t) => s + Math.max(0, t[1]), 0);
+  const bar = tt ? `<div class="by-types">${T.map(([t, v], i) => v > 0 ? `<i class="by-t${Math.min(i, 5)}" style="flex:${v}" title="${esc(t)}: ${plM(v)}"></i>` : "").join("")}</div>` : "";
+  return `<div class="pl-sq" role="button" tabindex="0" data-byloc="${esc(k)}" aria-label="${esc(nm)}: buying">
+    <div class="hd"><div class="ic">${plGlyph(x.code)}</div><div class="nm"><b>${esc(nm)}</b><span>${esc(nm !== x.code ? x.code : "")}</span></div></div>
+    <div class="big"><span class="v">${plM(x.spend || 0)}</span><span class="cmp">item purchases · ${x.pct == null ? "no comparison" : plPct(x.pct) + " vs before"}</span></div>
+    ${bar}
+    <div class="st">${stat("Requisitions", R.open != null ? `${fmt(R.open)}${R.risk ? ` · <span class="up">${fmt(R.risk)}</span>` : ""}` : "–", "", "Open lines · at supply risk") +
+      stat("Open orders", `${fmt(open)}`, due ? "up" : "", `${plM(x.pos.reduce((a, p) => a + (p.amount || 0), 0))} · ${due} to follow up`) +
+      stat("Invoices", S.invoices != null ? `${fmt(S.invoices)}${S.no_po ? ` · <span class="up">${fmt(S.no_po)}</span>` : ""}` : "–", "", "Posted in the period · without a PO") +
+      stat("Services · CAPEX", S.services != null ? `${plM(S.services)} · ${plM(S.capex)}` : "–")}</div>
+    <div class="al ${a[0]}" title="${esc(al.map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${al.length > 1 ? ` · +${al.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function byRender(){
+  if (!$("v-buyloc").classList.contains("on")) return;
+  if (!data) { $("byGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  plLoadNames();
+  const B = byLocs(), keys = Object.keys(B).filter(k => { const x = B[k]; return x.spend || x.reqs || x.pos.length || (x.st && (x.st.invoices || x.st.services || x.st.capex || x.st.item_value)); });
+  $("byStatus").innerHTML = esc([data.meta.label, data.meta.company].filter(Boolean).join(" · ")) + (streams ? "" : ` · <span class="meta">reading purchase types, services and invoices…</span>`)
+    + (streams && streams.gl_status !== "verified" ? ` · <span class="up">purchase postings not read: services and CAPEX are missing</span>` : "");
+  const sum = f => keys.reduce((a, k) => a + (f(B[k]) || 0), 0);
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const nopo = sum(x => (x.st || {}).no_po), risk = sum(x => (x.reqs || {}).risk);
+  $("byKpis").innerHTML = k("Item purchases", plM(sum(x => x.spend)), `${CUR} · ${fmt(keys.length)} locations`) +
+    k("Requisition lines open", fmt(sum(x => (x.reqs || {}).open)), `${fmt(risk)} at supply risk`, risk ? "up" : "") +
+    k("Open purchase orders", fmt(sum(x => x.pos.length)), `${plM(sum(x => x.pos.reduce((a, p) => a + (p.amount || 0), 0)))} · received not invoiced ${plM(sum(x => x.pos.reduce((a, p) => a + (p.received_not_invoiced || 0), 0)))}`) +
+    k("Invoices without a PO", fmt(nopo), `${plM(sum(x => (x.st || {}).no_po_value))} of ${fmt(sum(x => (x.st || {}).invoices))} invoices`, nopo ? "up" : "") +
+    k("Services · CAPEX", `${plM(sum(x => (x.st || {}).services))} · ${plM(sum(x => (x.st || {}).capex))}`, "non-item purchase postings");
+  const key = {spend: k2 => -(B[k2].spend || 0), reqs: k2 => -(((B[k2].reqs || {}).risk || 0) * 1e6 + ((B[k2].reqs || {}).open || 0)), pos: k2 => -B[k2].pos.length,
+    nopo: k2 => -((B[k2].st || {}).no_po || 0), services: k2 => -(((B[k2].st || {}).services || 0) + ((B[k2].st || {}).capex || 0)), name: k2 => 0}[bySort];
+  const sorted = l => [...l].sort((a, b) => key(a) - key(b) || (plName(B[a].code) || a).localeCompare(plName(B[b].code) || b));
+  const wh = keys.filter(k2 => B[k2].code && plIsWh(B[k2].code)), none = keys.filter(k2 => !B[k2].code), rest = keys.filter(k2 => B[k2].code && !plIsWh(B[k2].code));
+  const groups = [rest.length && {t: "Restaurants and other locations", c: rest}, wh.length && {t: "Warehouses and central kitchen", c: wh}, none.length && {t: "No location", c: none, hint: "documents with no location or department"}].filter(Boolean);
+  const types = [...new Set(keys.flatMap(k2 => Object.keys((B[k2].st || {}).types || {})))];
+  $("byGrid").innerHTML = keys.length ? (types.length ? `<div class="by-leg">${types.slice(0, 6).map((t, i) => `<span><i class="by-t${Math.min(i, 5)}"></i>${esc(t)}</span>`).join("")}</div>` : "") +
+    groups.map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}${g.hint ? " · " + esc(g.hint) : ""}</span></div><div class="pl-grid">${sorted(g.c).map(k2 => bySq(k2, B[k2])).join("")}</div>`).join("")
+    : `<p class="hint">Nothing bought, ordered or requested in this period.</p>`;
+  if ($("byBd").classList.contains("show") && $("byPop").dataset.k != null) byDraw($("byPop").dataset.k);
+}
+function byOpen(k){ $("byPop").dataset.k = k; byDraw(k); $("byBd").classList.add("show"); }
+function byDraw(k){
+  const x = byLocs()[k]; if (!x) return;
+  const nm = plName(x.code) || x.code || "No location", S = x.st || {}, R = x.reqs;
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const panel = (t, go, body) => `<div class="pl-panel" style="margin-bottom:12px"><div class="ttl"><h3>${t}</h3>${go ? `<button class="mini" data-bygo="${go}">Open the tab ›</button>` : ""}</div>${body}</div>`;
+  const tbl = (head, rows, empty) => rows.length ? `<table data-nosort><tr>${head.map(h => `<th${h[1] ? ' class="num"' : ""}>${h[0]}</th>`).join("")}</tr>${rows.join("")}</table>` : `<p class="hint">${empty}</p>`;
+  const pos = [...x.pos].sort((a, b) => (b.received_not_invoiced || 0) - (a.received_not_invoiced || 0) || (b.amount || 0) - (a.amount || 0));
+  const T = Object.entries(S.types || {}), tt = T.reduce((s, t) => s + Math.max(0, t[1]), 0);
+  $("byPop").innerHTML = `<div class="ph"><div class="ic">${plGlyph(x.code)}</div><div><h2>${esc(nm)}</h2><div class="sub">${esc([x.code || "no location", data.meta.label].filter(Boolean).join(" · "))}</div></div><div class="sp"></div><button class="close" data-byclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      <div class="pl-tiles">${tile("Item purchases", plM(x.spend || 0), `${x.pct == null ? "no comparison" : plPct(x.pct) + " vs before"} · ${fmt(x.documents)} documents`)}${tile("Requisition lines", R ? fmt(R.open) : "–", R ? `${fmt(R.risk)} at supply risk · oldest ${R.oldest_days == null ? "–" : fmt(R.oldest_days) + " d"}` : "nothing waiting", R && R.risk ? "up" : "")}
+        ${tile("Open orders", fmt(x.pos.length), `${plM(x.pos.reduce((a, p) => a + (p.amount || 0), 0))} · received not invoiced ${plM(x.pos.reduce((a, p) => a + (p.received_not_invoiced || 0), 0))}`)}${tile("Invoices", fmt(S.invoices || 0), `${plM(S.invoiced || 0)} · without a PO ${fmt(S.no_po || 0)}${S.credit_memos ? ` · credit memos ${fmt(S.credit_memos)}` : ""}`, S.no_po ? "up" : "")}</div>
+      <div class="pl-cols">
+        ${panel("Requisitions", "reqs", R ? `<p class="hint" style="margin:0 0 6px">${fmt(R.open)} open of ${fmt(R.lines)} lines · ${fmt(R.issues)} with data issues · value ${plM(R.value)}</p><p style="margin:0 0 4px"><b>Main reason:</b> ${esc(R.main_reason || "–")}</p><p style="margin:0"><b>Next:</b> ${esc(R.next_action || "–")}</p>` : `<p class="hint">No worksheet line is open.</p>`)}
+        ${panel("Purchase orders", "po", tbl([["Order"], ["Supplier"], ["Status"], ["Amount", 1], ["Not invoiced", 1]], pos.slice(0, 10).map(p => `<tr><td>${esc(p.no)}<div class="meta">${esc(p.document_date || "")}${p.flag ? ` · <span class="up">${p.flag === "invoice_due" ? "invoice missing" : "open too long"}</span>` : ""}</div></td><td>${esc(p.supplier || "–")}</td><td class="meta">${esc(p.status)}</td><td class="num">${fmt(p.amount)}</td><td class="num ${p.received_not_invoiced > 0 ? "up" : ""}">${fmt(p.received_not_invoiced)}</td></tr>`), "No open purchase order."))}
+        ${panel("Invoices", "invoices", `${(S.suppliers || []).length ? `<p class="hint" style="margin:0 0 6px">Largest suppliers: ${S.suppliers.map(s => `${esc(s[0])} ${plM(s[1])}`).join(" · ")}</p>` : ""}` +
+          tbl([["Without a PO"], ["Supplier"], ["Posted"], ["Amount", 1]], (S.nopo_docs || []).map(d => `<tr><td>${esc(d[0])}</td><td>${esc(d[1])}</td><td class="meta">${esc(d[2])}</td><td class="num">${fmt(d[3])}</td></tr>`), streams ? "Every invoice of the period has its purchase order." : "Reading…"))}
+        ${panel("Purchase types", "streams", tt ? T.map(([t, v], i) => `<div class="by-trow"><span>${esc(t)}</span><div class="by-types" style="flex:1"><i class="by-t${Math.min(i, 5)}" style="flex:${Math.max(0, v)}"></i><i style="flex:${tt - Math.max(0, v)};background:transparent"></i></div><b>${plM(v)}</b></div>`).join("") : `<p class="hint">${streams ? "No purchases in the period." : "Reading…"}</p>`)}
+        ${panel("Services & CAPEX", "services", tbl([["Services · account"], ["Value", 1]], (S.svc_accounts || []).map(a => `<tr><td>${esc(a[0])}</td><td class="num">${fmt(a[1])}</td></tr>`), "No services posted on this location.") +
+          ((S.capex_docs || []).length ? `<div style="margin-top:8px">` + tbl([["CAPEX · document"], ["Supplier"], ["Account"], ["Value", 1]], S.capex_docs.map(d => `<tr><td>${esc(d[0])}</td><td>${esc(d[1])}</td><td class="meta">${esc(d[2])}</td><td class="num">${fmt(d[3])}</td></tr>`), "") + "</div>" : ""))}
+      </div>
+    </div>`;
+}
+$("bySort").onchange = () => { bySort = $("bySort").value; byRender(); };
+$("byRead").onclick = () => { if (data) loadStreams(true); };
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-byclose]") || t === $("byBd")) { $("byBd").classList.remove("show"); return; }
+  const g = t.closest("[data-bygo]"); if (g) { $("byBd").classList.remove("show"); const n = document.querySelector(`#nav button[data-view="${g.dataset.bygo}"]`); if (n) n.click(); return; }
+  const s = t.closest("[data-byloc]"); if (s) byOpen(s.dataset.byloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("byBd").classList.contains("show")) { $("byBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.byloc != null) { e.preventDefault(); byOpen(e.target.dataset.byloc); }
+});
 // ---------------------------------------------------------------- Location intelligence → Today
 // A "Today" tab next to each Location intelligence: what every location received, was invoiced and ordered
 // today so far, and its requisitions due. /api/today/locations; refreshed every 5 minutes while open.
