@@ -26,6 +26,7 @@ import movement
 import typology
 import locintel
 import invloc
+import finloc
 import executive
 import fiscal
 import cis_client
@@ -1182,6 +1183,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, locintel.request(client, q.get("company") or config.BC_COMPANY,
                                                  (c_from, c_to, p_from, p_to, ly_from, ly_to, running, label),
                                                  _latest, in_parallel_jobs, rights, q.get("refresh") == "1"))
+            elif url.path == "/api/finance/locations":
+                try:
+                    period = periods(q.get("period"), "month")[:8]
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                rights = {"pl": auth.can(user, "finance.pl.view"), "ap": auth.can(user, "finance.ap.view"),
+                          "ar": auth.can(user, "finance.ar.view")}
+                self._send(200, finloc.build(client, company, period, company_currency(company), _latest,
+                                             in_parallel_jobs, rights, q.get("refresh") == "1"))
             elif url.path == "/api/executive":
                 company = q.get("company") or config.BC_COMPANY
                 try:

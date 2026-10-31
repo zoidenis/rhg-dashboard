@@ -109,7 +109,10 @@ DEFAULT_SETTINGS = {
                   "discounts_pct": "8", "voids_pct": "2", "sales_drop_pct": "15",
                   # Inventory → Location intelligence: slow / non-moving / dead stock as a share of the
                   # stock on hand, and the recipe coverage of the items sold, that raise an alert
-                  "slow_stock_pct": "15", "recipe_coverage_pct": "90"},
+                  "slow_stock_pct": "15", "recipe_coverage_pct": "90",
+                  # Finance → Location intelligence: prime cost (food + labour) as a share of sales, EBITDA
+                  # below budget, and the gap between Simphony and the sales posted in BC, that raise an alert
+                  "prime_cost_pct": "65", "budget_gap_pct": "10", "posting_gap_pct": "3"},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,

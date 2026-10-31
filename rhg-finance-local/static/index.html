@@ -211,6 +211,16 @@ td.num,th.num{text-align:right}
 .pl-sq .al.good{background:var(--down-bg)} .pl-sq .al.good i{background:var(--down)}
 .pl-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--accent)}
 .pl-sev.crit{background:var(--up)}.pl-sev.warn{background:var(--warn)}
+.fl-split{display:flex;gap:2px;height:7px;flex:0 0 7px;border-radius:4px;overflow:hidden;background:var(--bg)}
+.fl-split.big{height:14px;flex-basis:14px;margin:4px 0 10px}
+.fl-split i{display:block;min-width:2px}
+:root{--fl-c1:#1e78a6;--fl-c2:#c47f1f;--fl-c3:#7a5bbf;--fl-c4:#2e9a6e}
+@media (prefers-color-scheme: dark){:root{--fl-c1:#3a95c6;--fl-c2:#c4832a;--fl-c3:#9479d6;--fl-c4:#3aa87a}}
+.fl-c1{background:var(--fl-c1)}.fl-c2{background:var(--fl-c2)}.fl-c3{background:var(--fl-c3)}.fl-c4{background:var(--fl-c4)}
+.fl-tab .fl-bad{color:var(--up)} .fl-tab .fl-good{color:var(--down)}
+.fl-tab th.grp{text-align:center;border-bottom:1px solid var(--line)}
+.fl-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.fl-days span{font-size:11px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:2px 6px}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -302,6 +312,22 @@ td.num,th.num{text-align:right}
   <div class="banner" id="sourceBanner" style="background:var(--warn-bg);color:var(--warn)"></div>
 
   <section class="view on" id="v-overview">
+    <div class="ov-tabs" id="ovFTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="flView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>Location intelligence</h2>
+          <p class="hint" id="flNote">Every location as a square with its finances: the P&amp;L of the latest closed month against last year and the budget, the forecast of the year, the sales of the month against what is posted in BC, payables and receivables. Click a location for the detail. Business Central is read only.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="flSort">Order</label><select id="flSort"><option value="sales">by sales</option><option value="ebitda">by EBITDA</option><option value="margin">by EBITDA margin</option><option value="budget">by gap to budget</option><option value="prime">by prime cost</option><option value="payables">by payables overdue</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
+            <button class="mini dark" id="flRead">Read again</button></div></div>
+        <p class="meta" id="flStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="flTotals"></div>
+      <div id="flGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="flDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="ovFMain">
     <div class="brief" id="brief"></div>
     <div class="kpis six" id="ovKpis">
       <div class="card kpi clickable" data-drill="pl"><div class="l">Revenue</div><div class="v" id="kRev">–</div><div class="s" id="kRevS"></div></div>
@@ -322,6 +348,7 @@ td.num,th.num{text-align:right}
         <p class="hint" id="arAgeHint">Share of the outstanding balance by due date</p><div id="arAge"></div></div>
     </div>
     <div class="card"><h2>Focus next</h2><p class="hint" id="focusNext" style="margin:12px 0 0;font-size:13px"></p></div>
+    </div>
   </section>
 
   <section class="view" id="v-pl">
@@ -748,6 +775,9 @@ td.num,th.num{text-align:right}
         <label class="field">Sales drop vs last year, alert from (%)<input id="liThDrop" type="number" step="any" placeholder="15"></label>
         <label class="field">Inventory: slow or not moving stock, alert from (% of stock)<input id="liThSlow" type="number" step="any" placeholder="15"></label>
         <label class="field">Inventory: recipe coverage, alert below (%)<input id="liThRc" type="number" step="any" placeholder="90"></label>
+        <label class="field">Finance: prime cost, alert from (% of sales)<input id="liThPrime" type="number" step="any" placeholder="65"></label>
+        <label class="field">Finance: EBITDA under budget, alert from (%)<input id="liThBud" type="number" step="any" placeholder="10"></label>
+        <label class="field">Finance: BC posted against Simphony, alert from (%)<input id="liThPost" type="number" step="any" placeholder="3"></label>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="liRegSave">Save</button><span class="meta" id="liRegMsg"></span></div>
     </div>
@@ -782,6 +812,7 @@ td.num,th.num{text-align:right}
 
   <div class="foot" id="foot"></div>
 </main>
+<div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
 
@@ -900,6 +931,7 @@ function render(){
   if(!arLoaded) loadArap();
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
+  if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
     if (!(data.inventory||{}).loaded) loadInventory();
@@ -2471,13 +2503,14 @@ async function liSettings(){
     const s = await readJSON(await fetch("/api/settings"));
     const L = s.locations || {};
     $("liReg").value = L.registry || s.locations_registry_default || "";
-    [["food_cost_target", "liThFc"], ["cover_days", "liThCover"], ["error_corrects_pct", "liThErr"], ["discounts_pct", "liThDisc"], ["voids_pct", "liThVoid"], ["sales_drop_pct", "liThDrop"], ["slow_stock_pct", "liThSlow"], ["recipe_coverage_pct", "liThRc"]].forEach(([k, id]) => $(id).value = L[k] ?? "");
+    [["food_cost_target", "liThFc"], ["cover_days", "liThCover"], ["error_corrects_pct", "liThErr"], ["discounts_pct", "liThDisc"], ["voids_pct", "liThVoid"], ["sales_drop_pct", "liThDrop"], ["slow_stock_pct", "liThSlow"], ["recipe_coverage_pct", "liThRc"], ["prime_cost_pct", "liThPrime"], ["budget_gap_pct", "liThBud"], ["posting_gap_pct", "liThPost"]].forEach(([k, id]) => $(id).value = L[k] ?? "");
   }catch(e){ $("liRegMsg").textContent = "Could not read the settings: " + e.message; }
 }
 $("liRegSave").onclick = async () => {
   const body = {locations: {registry: $("liReg").value, food_cost_target: $("liThFc").value, cover_days: $("liThCover").value,
     error_corrects_pct: $("liThErr").value, discounts_pct: $("liThDisc").value, voids_pct: $("liThVoid").value, sales_drop_pct: $("liThDrop").value,
-    slow_stock_pct: $("liThSlow").value, recipe_coverage_pct: $("liThRc").value}};
+    slow_stock_pct: $("liThSlow").value, recipe_coverage_pct: $("liThRc").value,
+    prime_cost_pct: $("liThPrime").value, budget_gap_pct: $("liThBud").value, posting_gap_pct: $("liThPost").value}};
   try{
     const r = await fetch("/api/settings", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "HTTP " + r.status);
@@ -2498,6 +2531,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="inventory" && ilTab === "loc" && (!ilData || ilKey !== ilQuery())) loadIl(false);
+  if(b.dataset.view==="overview" && flTab === "loc" && (!flData || flKey !== flQuery())) loadFl(false);
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
@@ -2776,6 +2810,226 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("ilBd").classList.contains("show")) { $("ilBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.illoc) { e.preventDefault(); ilOpen(e.target.dataset.illoc); }
+});
+// ---------------------------------------------------------------- Executive overview → Location intelligence
+// Every location as a square with its finances: P&L of the latest closed month (against last year
+// and budget), the forecast of the year, the sales of the month against BC posted, payables and
+// receivables. A click opens the location in detail. Parts load on their own on the server.
+let flTab = "overview", flSort = "sales", flData = null, flTimer = null, flKey = "";
+const flM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(Math.abs(v) / 1e3).toLocaleString("en-US") + " k" : fmt(Math.abs(v)));
+const flPct = v => v == null || !isFinite(v) ? "–" : Math.abs(v) < 0.5 ? "0%" : (v > 0 ? "+" : "−") + Math.abs(v).toFixed(0) + "%";
+const flVar = (a, b) => a == null || b == null || !b ? null : (a - b) / Math.abs(b) * 100;
+const flMon = k => k ? new Date(k + "-01T00:00:00").toLocaleDateString("en-GB", {month: "short", year: "numeric"}) : "";
+const flMonS = k => k ? new Date(k + "-01T00:00:00").toLocaleDateString("en-GB", {month: "short"}) : "";
+const flGlyph = L => L.group === "unassigned" ? IL_GLYPH.BOX : L.group === "support" ? IL_GLYPH.WH : /^OPA/i.test(L.brand || "") ? IL_GLYPH.OPA : IL_GLYPH.DOT;
+function flShowTab(tab){
+  flTab = tab;
+  document.querySelectorAll("#ovFTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("ovFMain").style.display = tab === "loc" ? "none" : "";
+  $("flView").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { if (!flData || flKey !== flQuery()) loadFl(false); else flRender(); }
+}
+document.querySelectorAll("#ovFTabs button").forEach(b => b.onclick = () => flShowTab(b.dataset.t));
+$("flSort").onchange = () => { flSort = $("flSort").value; flRender(); };
+$("flRead").onclick = () => loadFl(true);
+function flQuery(){
+  const p = new URLSearchParams();
+  if ($("company").value) p.set("company", $("company").value);
+  if ($("anchor").value) p.set("period", $("anchor").value.slice(0, 7) + "-01");
+  return p.toString();
+}
+async function loadFl(refresh){
+  clearTimeout(flTimer);
+  const q = flQuery();
+  if (flKey !== q) { flData = null; flKey = q; }
+  if (!flData) $("flGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  $("flRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/finance/locations?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (flKey !== q) return;
+    flData = j; flRender();
+    if (j.pending && flTab === "loc") flTimer = setTimeout(() => loadFl(false), 6000);
+  }catch(e){ $("flStatus").textContent = "Could not read: " + e.message; }
+  finally{ $("flRead").disabled = false; }
+}
+// food / labour / other costs / EBITDA as shares of sales
+function flSplit(cur, cls){
+  if (!cur || !cur.sales) return `<div class="${cls}"></div>`;
+  const parts = [["fl-c1", "Food & beverage", cur.food], ["fl-c2", "Labour", cur.labor], ["fl-c3", "Other costs", cur.opex], ["fl-c4", "EBITDA", cur.ebitda]]
+    .map(p => [p[0], p[1], Math.max(0, p[2] || 0)]);
+  return `<div class="${cls}" role="img" aria-label="${parts.map(p => `${p[1]} ${Math.round(p[2] / cur.sales * 100)}%`).join(", ")}">` +
+    parts.filter(p => p[2] > 0).map(p => `<i class="${p[0]}" style="flex:${p[2]}" title="${p[1]}: ${flM(p[2])} (${Math.round(p[2] / cur.sales * 100)}% of sales)"></i>`).join("") + `</div>`;
+}
+function flGroups(codes){
+  const L = flData.locations, out = [];
+  const rest = codes.filter(c => L[c].group === "restaurant");
+  const by = {}; rest.forEach(c => { const k = (L[c].brand || c).toUpperCase(); (by[k] = by[k] || []).push(c); });
+  const multi = Object.keys(by).filter(k => by[k].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((L[c].brand || c).toUpperCase()));
+  if (singles.length) out.push({t: "Restaurants", c: singles});
+  multi.forEach(k => out.push({t: k, c: by[k]}));
+  const sup = codes.filter(c => L[c].group === "support"), un = codes.filter(c => L[c].group === "unassigned");
+  if (sup.length) out.push({t: "Head office, central and warehouses", c: sup, hint: "departments that are not restaurants"});
+  if (un.length) out.push({t: "Not on a location", c: un, hint: "entries with no department"});
+  return out;
+}
+const flSales = L => ((L.pl || {}).cur || {}).sales ?? (L.sales || {}).net ?? 0;
+function flSquare(code, L){
+  const p = L.pl || {}, c = p.cur || {}, b = p.bud, s = L.sales || {}, ap = L.ap || {}, ar = L.ar || {}, th = flData.thresholds || {};
+  const P = flData.parts || {}, mon = (P.pl || {}).month;
+  const a = (L.alerts || [])[0] || ["good", "No exception"];
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const vly = flVar(c.sales, (p.ly || {}).sales), vb = b ? flVar(c.ebitda, b.ebitda) : null;
+  const costs = (c.food || 0) + (c.labor || 0) + (c.opex || 0);
+  const big = p.cur && !c.sales && costs ? `<span class="v">${flM(costs)}</span><span class="cmp">costs ${esc(flMonS(mon))} · vs LY ${(() => { const v = flVar(costs, ((p.ly || {}).food || 0) + ((p.ly || {}).labor || 0) + ((p.ly || {}).opex || 0)); return `<b class="${v == null ? "" : v > 5 ? "up" : v < -5 ? "down" : ""}">${flPct(v)}</b>`; })()}</span>`
+    : p.cur ? `<span class="v">${flM(c.sales)}</span><span class="cmp">sales ${esc(flMonS(mon))} · vs LY <b class="${vly == null ? "" : vly < -5 ? "up" : vly > 5 ? "down" : ""}">${flPct(vly)}</b>${b ? ` · budget ${flM(b.sales)}` : ""}</span>`
+    : s.net != null ? `<span class="v">${flM(s.net)}</span><span class="cmp">Simphony, month to date</span>` : `<span class="v">–</span><span class="cmp">&nbsp;</span>`;
+  const fy = (p.forecast || {}).ebitda, fyb = (p.fy_bud || {}).ebitda;
+  return `<div class="pl-sq" role="button" tabindex="0" data-flloc="${esc(code)}" aria-label="${esc(L.name || code)}: finances in detail">
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "Not on a location")}</b><span>${esc(L.name && L.name !== code ? code : "")}</span></div></div>
+    <div class="big">${big}</div>
+    ${flSplit(c, "fl-split")}
+    <div class="st">${stat("EBITDA", c.ebitda != null && p.cur ? `${flM(c.ebitda)}${c.ebitda_pct != null ? `<small>${fmt(c.ebitda_pct, 0)}%</small>` : ""}` : "–", c.ebitda < 0 ? "up" : "")}
+      ${stat("Prime cost", c.prime_pct != null ? fmt(c.prime_pct, 0) + "%" : "–", c.prime_pct > th.prime ? "up" : c.food_pct > th.food_cost ? "warn" : "", "Food and labour as a share of sales")}
+      ${stat("vs budget", vb != null ? flPct(vb) : "–", vb == null ? "" : vb < -th.budget_gap ? "up" : vb < 0 ? "warn" : "", b ? `Budget ${flM(b.ebitda)}` : "No budget on this department")}
+      ${stat("Forecast FY", fy != null ? flM(fy) : "–", fyb != null && fy < fyb ? "warn" : "", `EBITDA of the year: ${(p.forecast || {}).method || ""}${fyb != null ? ` · budget ${flM(fyb)}` : ""}`)}
+      ${stat("Sales MTD", s.net != null ? `${flM(s.net)}${s.gap_pct != null ? `<small>BC ${flPct(-s.gap_pct)}</small>` : ""}` : "–", s.unposted_n ? "warn" : "", "Simphony net sales of the month, whole days; BC = posted against Simphony")}
+      ${stat("AP · AR", ap.open != null || ar.open != null ? `${flM(ap.open)}<small>${flM(ar.open)}</small>` : "–", ap.overdue_60 > 0 ? "warn" : "", `Payables open ${flM(ap.open)}, overdue ${flM(ap.overdue)} · receivables open ${flM(ar.open)}`)}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function flRender(){
+  if (flTab !== "loc" || !$("flGrid")) return;
+  const d = flData;
+  if (!d) { $("flGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const P = d.parts || {}, pl = P.pl || {}, sa = P.sales || {};
+  const label = {pl: "P&L", sales: "Sales", ledgers: "Payables & receivables"};
+  $("flStatus").innerHTML = `<span class="il-parts">${Object.entries(label).map(([k, l]) => { const p = P[k] || {};
+    const what = k === "pl" && p.month ? ` (${flMon(p.month)}${p.provisional ? ", provisional" : ""})` : k === "sales" && p.from ? ` (${esc(p.from)} → ${esc(p.to)})` : "";
+    return `<span class="il-part ${esc(p.state === "hidden" ? "" : p.state || "")}" title="${esc(p.note || "")}">${l}: ${p.state === "ready" ? "ready" + what : p.state === "pending" ? esc(p.note || "reading…") + (what ? " · " + what : "") : esc(p.note || p.state || "–")}</span>`; }).join("")}</span>`;
+  const B = d.locations || {}, codes = Object.keys(B), th = d.thresholds || {}, C = d.currency || "";
+  const alertScore = c => (B[c].alerts || []).reduce((a, x) => a + (x[0] === "crit" ? 100 : x[0] === "warn" ? 10 : 1), 0);
+  const cur = c => ((B[c].pl || {}).cur || {});
+  const key = {sales: c => -flSales(B[c]), ebitda: c => -(cur(c).ebitda ?? -1e15), margin: c => -(cur(c).ebitda_pct ?? -1e9),
+    budget: c => { const b = (B[c].pl || {}).bud; return b ? (flVar(cur(c).ebitda, b.ebitda) ?? 1e9) : 1e9; },
+    prime: c => -(cur(c).prime_pct ?? -1), payables: c => -((B[c].ap || {}).overdue || 0), alerts: c => -alertScore(c), name: c => 0}[flSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (flSort === "name" ? (B[a].name || a).localeCompare(B[b].name || b) : flSales(B[b]) - flSales(B[a])));
+  const co = pl.company || {}, cc = co.cur || {}, cb = co.bud, cf = co.forecast || {};
+  const sum = f => codes.reduce((a, c) => a + (f(B[c]) || 0), 0);
+  const simNet = sum(L => (L.sales || {}).net), posted = sum(L => (L.sales || {}).posted);
+  const apOpen = sum(L => (L.ap || {}).open), apOver = sum(L => (L.ap || {}).overdue), arOpen = sum(L => (L.ar || {}).open);
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("flTotals").innerHTML =
+    k(`Sales · ${esc(flMon(pl.month) || "latest closed month")}`, cc.sales != null ? flM(cc.sales) : "–", cc.sales != null ? `${C} · ${flPct(flVar(cc.sales, (co.ly || {}).sales))} vs last year${cb ? ` · ${flPct(flVar(cc.sales, cb.sales))} vs budget` : ""}` : esc(pl.note || "")) +
+    k("EBITDA", cc.ebitda != null ? flM(cc.ebitda) : "–", cc.ebitda != null ? `${fmt(cc.ebitda_pct, 1)}% of sales${cb ? ` · budget ${flM(cb.ebitda)}` : ""} · forecast ${pl.month ? pl.month.slice(0, 4) : ""} ${flM(cf.ebitda)}` : "", cc.ebitda < 0 ? "up" : "") +
+    k("Sales to date", simNet ? flM(simNet) : "–", simNet ? `Simphony · BC posted ${flM(posted)} (${flPct(flVar(posted, simNet))})` : esc(sa.note || ""), simNet && Math.abs(flVar(posted, simNet)) > th.posting_gap ? "warn" : "") +
+    k("Payables · receivables", flM(apOpen) + ` <small style="font-size:14px;color:var(--sub)">· ${flM(arOpen)}</small>`, `${C} open · ${flM(apOver)} payables overdue`, "");
+  $("flGrid").innerHTML = codes.length ? flGroups(codes).map(g => {
+    const s = g.c.reduce((a, c) => a + flSales(B[c]), 0);
+    return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}${s ? ` · sales ${flM(s)} ${esc(C)}` : ""}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(c => flSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">${d.pending ? "The first read of a year takes a few minutes; the squares appear as the parts arrive." : "Nothing to show for this company."}</p>`;
+  $("flDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
+    `<p style="margin:0">Alerts: EBITDA negative; EBITDA more than ${fmt(th.budget_gap)}% under budget; prime cost over ${fmt(th.prime)}% of sales (or food cost over ${fmt(th.food_cost)}%); days of sales not posted in BC, or posted sales more than ${fmt(th.posting_gap)}% away from Simphony; more than ${fmt(th.overdue_60)}% of payables overdue beyond 60 days; receivables overdue beyond 60 days. The limits are in Settings → Location intelligence.</p>`;
+  if ($("flBd").classList.contains("show") && $("flPop").dataset.code != null) flDraw($("flPop").dataset.code);
+}
+// ---- the popup
+function flOpen(code){ $("flPop").dataset.code = code; flDraw(code); $("flBd").classList.add("show"); }
+function flDraw(code){
+  const L = (flData && flData.locations || {})[code]; if (!L) return;
+  const P = flData.parts || {}, th = flData.thresholds || {}, C = flData.currency || "", mon = (P.pl || {}).month;
+  const p = L.pl || {}, c = p.cur || {}, ly = p.ly || {}, b = p.bud, y = p.ytd || {}, yly = p.ytd_ly || {}, yb = p.ytd_bud, fy = p.fy_bud, fc = p.forecast || {};
+  const s = L.sales || {}, ap = L.ap || {}, ar = L.ar || {};
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const rows = (arr, head, fn, empty) => arr && arr.length ? `<table><tr>${head}</tr>${arr.map(fn).join("")}</table>` : `<p class="hint">${empty}</p>`;
+  const wait = k => (P[k] || {}).state === "pending" ? `Still being read: ${esc((P[k] || {}).note || "")}` : (P[k] || {}).state === "hidden" ? esc((P[k] || {}).note || "") : "";
+  const costUp = k => k !== "sales" && k !== "ebitda";
+  const vcell = (a, z, k) => { const v = flVar(a, z); if (v == null) return `<td class="num meta">–</td>`; const bad = costUp(k) ? v > 0 : v < 0;
+    return `<td class="num ${Math.abs(v) < 0.5 ? "" : bad ? "fl-bad" : "fl-good"}">${flPct(v)}</td>`; };
+  const lines = [["sales", "Sales"], ["food", "Food & beverage cost"], ["labor", "Labour"], ["prime", "Prime cost"], ["opex", "Other costs"], ["ebitda", "EBITDA"]];
+  const plTable = p.cur ? `<table class="fl-tab"><tr><th></th><th class="num">${esc(flMonS(mon))}</th><th class="num">% sales</th><th class="num">Last year</th><th class="num">vs LY</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">YTD</th><th class="num">YTD LY</th><th class="num">YTD budget</th></tr>` +
+    lines.map(([k, l]) => `<tr${k === "ebitda" || k === "prime" ? ` style="font-weight:700"` : ""}><td>${l}</td><td class="num ${k === "ebitda" && c[k] < 0 ? "fl-bad" : ""}">${flM(c[k])}</td><td class="num meta">${k === "sales" ? "100%" : c[k + "_pct"] != null ? fmt(c[k + "_pct"], 1) + "%" : "–"}</td>
+      <td class="num meta">${flM(ly[k])}</td>${vcell(c[k], ly[k], k)}<td class="num meta">${b ? flM(b[k]) : "–"}</td>${b ? vcell(c[k], b[k], k) : `<td class="num meta">–</td>`}
+      <td class="num">${flM(y[k])}</td><td class="num meta">${flM(yly[k])}</td><td class="num meta">${yb ? flM(yb[k]) : "–"}</td></tr>`).join("") + `</table>`
+    : `<p class="hint">${wait("pl") || "No P&L on this department in the year."}</p>`;
+  // sales and EBITDA by month: actual bars against last year, budget as a tick
+  const tr = (p.trend || []).filter(t => t[1] != null || t[3] != null || t[4] != null);
+  let chart = "";
+  if (tr.length) {
+    const W = 1100, H = 150, n = tr.length, gw = (W - 40) / n, bw = Math.min(22, gw / 3);
+    const max = Math.max(1, ...tr.map(t => Math.max(t[1] || 0, t[3] || 0, t[4] || 0)));
+    chart = `<div class="scroll"><svg viewBox="0 0 ${W} ${H + 24}" width="100%" style="min-width:620px;display:block" role="img" aria-label="Sales by month against last year and budget">`;
+    tr.forEach((t, i) => {
+      const x = 40 + i * gw + gw / 2, h = v => Math.max(0, v || 0) / max * H;
+      chart += `<rect x="${x - bw - 1}" y="${H - h(t[3])}" width="${bw}" height="${h(t[3])}" rx="3" fill="var(--prev)"><title>${esc(flMon(t[0]))} last year: ${fmt(t[3])}</title></rect>`;
+      chart += `<rect x="${x + 1}" y="${H - h(t[1])}" width="${bw}" height="${h(t[1])}" rx="3" fill="var(--accent)" opacity="${t[5] ? 0.45 : 1}"><title>${esc(flMon(t[0]))}${t[5] ? " (running, to yesterday)" : ""}: sales ${fmt(t[1])}, EBITDA ${fmt(t[2])}</title></rect>`;
+      if (t[4]) chart += `<line x1="${x - bw - 3}" x2="${x + bw + 3}" y1="${H - h(t[4])}" y2="${H - h(t[4])}" stroke="var(--ink)" stroke-width="2"><title>${esc(flMon(t[0]))} budget: ${fmt(t[4])}</title></line>`;
+      chart += `<text x="${x}" y="${H + 16}" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(flMonS(t[0]))}</text>`;
+    });
+    chart += `<line x1="40" y1="${H}" x2="${W}" y2="${H}" stroke="var(--line)"/><text x="0" y="10" font-size="11" fill="var(--sub)">${flM(max)}</text></svg></div>`;
+  }
+  // the month of sales: Simphony per day against the days posted in BC
+  let daily = "";
+  if (s.daily && s.days && s.daily.length) {
+    const W = 640, H = 90, n = s.daily.length, gw = (W - 34) / n, bw = Math.max(2, Math.min(14, gw * 0.6));
+    const pd = s.posted_daily || [], max = Math.max(1, ...s.daily, ...pd);
+    daily = `<svg viewBox="0 0 ${W} ${H + 20}" width="100%" role="img" aria-label="Sales by day, Simphony against BC posted">`;
+    s.daily.forEach((v, i) => {
+      const x = 34 + i * gw + (gw - bw) / 2, miss = v > 0 && !(pd[i]);
+      daily += `<rect x="${x}" y="${H - v / max * H}" width="${bw}" height="${v / max * H}" rx="2" fill="${miss ? "var(--warn)" : "var(--accent)"}"><title>${esc(s.days[i])}: Simphony ${fmt(v)} · BC posted ${fmt(pd[i] || 0)}${miss ? " · not posted" : ""}</title></rect>`;
+      if (pd[i]) daily += `<circle cx="${x + bw / 2}" cy="${H - pd[i] / max * H}" r="2.6" fill="var(--card)" stroke="var(--ink)" stroke-width="1.5"><title>${esc(s.days[i])}: BC posted ${fmt(pd[i])}</title></circle>`;
+      if (n <= 16 || i % Math.ceil(n / 10) === 0) daily += `<text x="${x + bw / 2}" y="${H + 14}" text-anchor="middle" font-size="10" fill="var(--sub)">${new Date(s.days[i] + "T00:00:00").getDate()}</text>`;
+    });
+    daily += `<line x1="34" y1="${H}" x2="${W}" y2="${H}" stroke="var(--line)"/><text x="0" y="10" font-size="10" fill="var(--sub)">${flM(max)}</text></svg>`;
+  }
+  const fyRow = (l, k) => `<tr><td>${l}</td><td class="num">${flM(y[k])}</td><td class="num meta">${yb ? flM(yb[k]) : "–"}</td><td class="num meta">${fy ? flM(fy[k]) : "–"}</td><td class="num"><b class="${fy && fc[k] < fy[k] ? "fl-bad" : ""}">${flM(fc[k])}</b></td>${fy ? vcell(fc[k], fy[k], k) : `<td class="num meta">–</td>`}</tr>`;
+  $("flPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph(L)}</div>
+      <div><h2>${esc(L.name || code || "Not on a location")}</h2><div class="sub">${esc(code || "no department")} · ${esc(flData.company || "")} · P&amp;L ${esc(flMon(mon) || "–")}${(P.pl || {}).provisional ? " (provisional)" : ""} · sales ${esc((P.sales || {}).from || "")} → ${esc((P.sales || {}).to || "")}</div></div><div class="sp"></div>
+      ${code ? `<button class="close" data-flgo="pl" data-code="${esc(code)}" title="Profit and loss filtered to this department">P&amp;L ›</button>` : ""}<button class="close" data-flgo="ap">Payables ›</button><button class="close" data-flgo="exec">Executive dashboard ›</button><button class="close" data-flclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="pl-ex">${L.alerts.map(a => `<div><span class="pl-sev ${a[0]}"></span>${esc(a[1])}</div>`).join("")}</div></div>` : ""}
+      <div class="pl-tiles">
+        ${tile(`Sales · ${esc(flMonS(mon))}`, p.cur ? flM(c.sales) : "–", p.cur ? `${C} · ${flPct(flVar(c.sales, ly.sales))} vs LY${b ? ` · ${flPct(flVar(c.sales, b.sales))} vs budget` : ""}` : wait("pl"))}
+        ${tile("EBITDA", p.cur ? flM(c.ebitda) : "–", p.cur ? `${fmt(c.ebitda_pct, 1)}% · LY ${flM(ly.ebitda)}${b ? ` · budget ${flM(b.ebitda)}` : ""}` : "", c.ebitda < 0 ? "up" : "")}
+        ${tile("Prime cost", c.prime_pct != null ? fmt(c.prime_pct, 1) + "%" : "–", c.prime_pct != null ? `food ${fmt(c.food_pct, 1)}% · labour ${fmt(c.labor_pct, 1)}%` : "", c.prime_pct > th.prime ? "up" : "")}
+        ${tile(`Year to date · ${esc(flMonS(p.ytd ? (P.pl || {}).ytd_from : ""))}–${esc(flMonS(mon))}`, p.ytd ? flM(y.ebitda) : "–", p.ytd ? `EBITDA · sales ${flM(y.sales)} (${flPct(flVar(y.sales, yly.sales))} vs LY)` : "")}
+        ${tile(`Forecast ${mon ? mon.slice(0, 4) : ""}`, fc.ebitda != null ? flM(fc.ebitda) : "–", fc.ebitda != null ? `EBITDA${fy ? ` · budget ${flM(fy.ebitda)}` : " · no budget"} · sales ${flM(fc.sales)}` : "", fy && fc.ebitda < fy.ebitda ? "warn" : "")}
+        ${tile("Sales to date", s.net != null ? flM(s.net) : "–", s.net != null ? `Simphony · ${flPct(flVar(s.net, s.ly))} vs LY · ${fmt(s.checks || 0)} checks${s.avg_check ? ` · ${fmt(s.avg_check)} avg` : ""}` : wait("sales") || "No Simphony location for this department")}
+        ${tile("Posted in BC", s.posted != null ? flM(s.posted) : "–", s.posted != null ? `${s.gap_pct != null ? flPct(-s.gap_pct) + " vs Simphony" : ""}${s.unposted_n ? ` · ${s.unposted_n} days not posted` : ""}` : "", s.unposted_n ? "warn" : "")}
+        ${tile("Payables · receivables", ap.open != null || ar.open != null ? `${flM(ap.open)} · ${flM(ar.open)}` : "–", ap.open != null ? `overdue ${flM(ap.overdue)} (>60 d ${flM(ap.overdue_60)}) · purchases ${flM(ap.purchases)}` : wait("ledgers"), ap.overdue_60 > 0 ? "warn" : "")}
+      </div>
+      <div class="pl-cols">
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>P&amp;L · ${esc(flMon(mon) || "")}</h3><span class="hint" style="margin:0">${(P.pl || {}).budget ? esc((P.pl || {}).budget_name || "budget") : "no budget loaded"}</span></div>
+          ${flSplit(c, "fl-split big")}<div class="il-lg" style="margin-bottom:8px"><span><i class="fl-c1"></i>Food &amp; beverage</span><span><i class="fl-c2"></i>Labour</span><span><i class="fl-c3"></i>Other costs</span><span><i class="fl-c4"></i>EBITDA</span></div>
+          <div class="scroll">${plTable}</div></div>
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>Sales by month</h3><span class="hint" style="margin:0">this year <i class="pl-sw" style="background:var(--accent)"></i> · last year <i class="pl-sw" style="background:var(--prev)"></i> · budget <i class="pl-sw" style="background:var(--ink);height:3px;vertical-align:3px"></i></span></div>${chart || `<p class="hint">${wait("pl") || "No months held."}</p>`}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Budget and forecast ${esc(mon ? mon.slice(0, 4) : "")}</h3></div>
+          ${p.ytd ? `<table class="fl-tab"><tr><th></th><th class="num">YTD</th><th class="num">YTD budget</th><th class="num">Budget year</th><th class="num">Forecast</th><th class="num">vs budget</th></tr>${fyRow("Sales", "sales")}${fyRow("EBITDA", "ebitda")}</table><p class="hint" style="margin:8px 0 0">Forecast: ${esc(fc.method || "")}.</p>` : `<p class="hint">${wait("pl") || "No P&L on this department."}</p>`}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Sales this month, by day</h3><span class="hint" style="margin:0">Simphony <i class="pl-sw" style="background:var(--accent)"></i> · not posted <i class="pl-sw" style="background:var(--warn)"></i> · BC ○</span></div>${daily || `<p class="hint">${wait("sales") || "No Simphony sales for this department."}</p>`}
+          ${s.unposted && s.unposted.length ? `<div class="fl-days">${s.unposted.map(x => `<span>${esc(x)}</span>`).join("")}${s.unposted_n > s.unposted.length ? `<span>+${s.unposted_n - s.unposted.length}</span>` : ""}</div>` : ""}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Payables</h3><span class="hint" style="margin:0">open, largest suppliers</span></div>${rows(ap.top, `<th>Supplier</th><th class="num">Open</th>`, x => `<tr><td>${esc(x[0])}</td><td class="num">${flM(x[1])}</td></tr>`, wait("ledgers") || "No open supplier entry on this department.")}
+          ${ap.purch_top && ap.purch_top.length ? `<table style="margin-top:10px"><tr><th>Invoiced in ${esc(flMonS(((P.sales || {}).from || "").slice(0, 7)) || "the period")}</th><th class="num">${flM(ap.purchases)}</th></tr>${ap.purch_top.map(x => `<tr><td>${esc(x[0])}</td><td class="num">${flM(x[1])}</td></tr>`).join("")}</table>` : ""}</div>
+        <div class="pl-panel"><div class="ttl"><h3>Receivables</h3><span class="hint" style="margin:0">open, largest customers</span></div>${rows(ar.top, `<th>Customer</th><th class="num">Open</th>`, x => `<tr><td>${esc(x[0])}</td><td class="num">${flM(x[1])}</td></tr>`, wait("ledgers") || "No open customer entry on this department.")}
+          ${ar.pos_balance != null ? `<p class="hint" style="margin:8px 0 0">POS customer ${esc(L.customer || "")}: open ${flM(ar.pos_balance)} ${esc(C)}</p>` : ""}
+          ${ar.open != null ? `<p class="hint" style="margin:6px 0 0">Overdue ${flM(ar.overdue)} · beyond 60 days ${flM(ar.overdue_60)}</p>` : ""}</div>
+      </div></div>`;
+}
+function flGo(view, code){
+  $("flBd").classList.remove("show");
+  if (view === "exec") { location.href = "/executive?tab=locations"; return; }
+  if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; load(); }
+  const b = document.querySelector(`#nav button[data-view="${view}"]`); if (b) b.click();
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-flclose]"); if (c) { $("flBd").classList.remove("show"); return; }
+  const g = e.target.closest("[data-flgo]"); if (g) { flGo(g.dataset.flgo, g.dataset.code || ""); return; }
+  const s = e.target.closest("[data-flloc]"); if (s) { flOpen(s.dataset.flloc); return; }
+  if (e.target === $("flBd")) $("flBd").classList.remove("show");
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("flBd").classList.contains("show")) { $("flBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.flloc != null) { e.preventDefault(); flOpen(e.target.dataset.flloc); }
 });
 </script>
 </body>
