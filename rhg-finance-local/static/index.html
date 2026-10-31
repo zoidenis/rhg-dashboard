@@ -233,6 +233,9 @@ td.num,th.num{text-align:right}
 .bl-tab tr.grp td:first-child{cursor:pointer}
 .bl-tab tr.acc td:first-child{padding-left:26px;white-space:normal;min-width:220px}
 .bl-tab tr.acc.hide{display:none}
+.bl-caret{display:inline-block;width:14px;color:var(--sub)}
+.bl-tab tr.grp:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.bl-tools{margin:0}
 .bl-tab .bad{color:var(--up)}.bl-tab .good{color:var(--down)}
 .bl-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px}
 </style>
@@ -3149,6 +3152,8 @@ $("crTest").onclick = () => { const to = $("crTestTo").value.trim(); if (!to) { 
 // accounts, grouped as the chart of accounts groups them. Built on the Executive dashboard's cube
 // (/api/executive): net change and budget by department, account and month.
 let blTab = "budget", blData = null, blKey = "", blTimer = null, blSpan = "month", blSort = "result", blOnlyOff = false;
+// the popup's accounts: grouped by the first two digits (groups folded until opened) or one flat list
+let blMode = "grouped", blExpanded = new Set();
 const BL_INCOME = new Set(["sales", "other_income"]);
 // a group of accounts (the first two digits) is named after its own account when the chart has one
 // (69, 75, 76, 77 …), otherwise after the accounts in it
@@ -3333,7 +3338,7 @@ function blRender(){
   if ($("blBd").classList.contains("show") && $("blPop").dataset.code != null) blDraw($("blPop").dataset.code);
 }
 // ---- the popup: the location's accounts, grouped by class and by the first two digits
-function blOpen(code){ $("blPop").dataset.code = code; blDraw(code); $("blBd").classList.add("show"); }
+function blOpen(code){ $("blPop").dataset.code = code; blExpanded = new Set(); blDraw(code); $("blBd").classList.add("show"); }
 function blDraw(code){
   const m = blModel(), x = m.L[code]; if (!x) return;
   const d = blData, acc = d.accounts || {}, C = d.currency || "", t = x.t, tol = blTol();
@@ -3352,22 +3357,34 @@ function blDraw(code){
   };
   const used = (no) => fyB[no] ? `${Math.round((yA[no] || 0) / fyB[no] * 100)}%` : "–";
   const sumOf = (obj, list) => list.reduce((s, no) => s + (obj[no] || 0), 0);
-  let body = "";
-  for (const [cls, label, cost] of [["7", "Revenue · class 7", false], ["6", "Expenses · class 6", true]]) {
-    const list = rowsOf(cls); if (!list.length) continue;
-    body += `<tr class="cls"><td>${label}</td>${cell(sumOf(x.act, list), sumOf(x.bud, list), cost)}<td class="num">${blM(sumOf(fyB, list))}</td><td class="num">${sumOf(fyB, list) ? Math.round(sumOf(yA, list) / sumOf(fyB, list) * 100) + "%" : "–"}</td></tr>`;
-    const groups = {};
-    list.forEach(no => (groups[no.slice(0, 2)] = groups[no.slice(0, 2)] || []).push(no));
-    for (const g of Object.keys(groups).sort()) {
-      const gl = groups[g], gOff = gl.some(no => offSet.has(no));
-      body += `<tr class="grp" data-blg="${esc(code)}|${g}"><td>${g} · ${esc(blGroupName(g, gl, acc))} <span class="meta">${gl.length}</span></td>${cell(sumOf(x.act, gl), sumOf(x.bud, gl), cost)}<td class="num">${blM(sumOf(fyB, gl))}</td><td class="num">${sumOf(fyB, gl) ? Math.round(sumOf(yA, gl) / sumOf(fyB, gl) * 100) + "%" : "–"}</td></tr>`;
-      gl.forEach(no => {
-        const off = offSet.has(no), quiet = !(x.act[no] || x.bud[no]);
-        body += `<tr class="acc${(blOnlyOff && !off) || quiet && blOnlyOff ? " hide" : ""}" data-blgrp="${esc(code)}|${g}" data-off="${off ? 1 : 0}"><td>${off ? '<span class="pl-sev crit"></span>' : ""}<a href="#" data-blacc="${esc(no)}">${esc(no)}</a> ${esc((acc[no] || [""])[0])}</td>${cell(x.act[no] || 0, x.bud[no] || 0, cost)}<td class="num meta">${fyB[no] ? blM(fyB[no]) : "–"}</td><td class="num meta">${used(no)}</td></tr>`;
-      });
+  const accRow = (no, cost, g, flat) => {
+    const off = offSet.has(no);
+    return `<tr class="acc"${g ? ` data-blgrp="${esc(code)}|${g}"` : ""}><td>${off ? '<span class="pl-sev crit"></span>' : ""}<a href="#" data-blacc="${esc(no)}">${esc(no)}</a> ${esc((acc[no] || [""])[0])}</td>`
+      + (flat ? `<td class="meta">${no[0] === "7" ? "Revenue" : "Expense"} · ${esc(no.slice(0, 2))}</td>` : "")
+      + `${cell(x.act[no] || 0, x.bud[no] || 0, cost)}<td class="num meta">${fyB[no] ? blM(fyB[no]) : "–"}</td><td class="num meta">${used(no)}</td></tr>`;
+  };
+  const shown = no => !blOnlyOff || offSet.has(no);
+  const classes = [["7", "Revenue · class 7", false], ["6", "Expenses · class 6", true]];
+  const groupsOf = list => { const g = {}; list.forEach(no => (g[no.slice(0, 2)] = g[no.slice(0, 2)] || []).push(no)); return g; };
+  const allGroups = classes.flatMap(([cls]) => Object.keys(groupsOf(rowsOf(cls))).map(g => `${code}|${g}`));
+  let body = "", nShown = 0;
+  if (blMode === "flat") {
+    // one list of accounts: the table sorts by any column and filters, like the other tables
+    for (const [cls, , cost] of classes) rowsOf(cls).filter(shown).forEach(no => { body += accRow(no, cost, "", true); nShown++; });
+  } else {
+    for (const [cls, label, cost] of classes) {
+      const list = rowsOf(cls); if (!list.length) continue;
+      body += `<tr class="cls"><td>${label}</td>${cell(sumOf(x.act, list), sumOf(x.bud, list), cost)}<td class="num">${blM(sumOf(fyB, list))}</td><td class="num">${sumOf(fyB, list) ? Math.round(sumOf(yA, list) / sumOf(fyB, list) * 100) + "%" : "–"}</td></tr>`;
+      const groups = groupsOf(list);
+      for (const g of Object.keys(groups).sort()) {
+        const gl = groups[g], key = `${code}|${g}`, open = blExpanded.has(key), nOff = gl.filter(no => offSet.has(no)).length;
+        if (blOnlyOff && !nOff) continue;
+        body += `<tr class="grp" data-blg="${esc(key)}" tabindex="0" aria-expanded="${open}"><td><span class="bl-caret">${open ? "▾" : "▸"}</span>${g} · ${esc(blGroupName(g, gl, acc))} <span class="meta">${gl.length} account${gl.length > 1 ? "s" : ""}${nOff ? ` · <span class="bad">${nOff} off budget</span>` : ""}</span></td>${cell(sumOf(x.act, gl), sumOf(x.bud, gl), cost)}<td class="num">${blM(sumOf(fyB, gl))}</td><td class="num">${sumOf(fyB, gl) ? Math.round(sumOf(yA, gl) / sumOf(fyB, gl) * 100) + "%" : "–"}</td></tr>`;
+        if (open) gl.filter(shown).forEach(no => { body += accRow(no, cost, g, false); nShown++; });
+      }
     }
   }
-  body += `<tr class="cls"><td>Result</td><td class="num">${blM(t.res)}</td><td class="num meta">${blM(t.bres)}</td><td class="num ${t.res < t.bres ? "bad" : "good"}">${blS(t.res - t.bres)}</td><td class="num"></td><td class="num">${blM(sumOf(fyB, rowsOf("7")) - sumOf(fyB, rowsOf("6")))}</td><td></td></tr>`;
+  body += `<tr class="${blMode === "flat" ? "total" : "cls"}"><td>Result</td>${blMode === "flat" ? "<td></td>" : ""}<td class="num">${blM(t.res)}</td><td class="num meta">${blM(t.bres)}</td><td class="num ${t.res < t.bres ? "bad" : "good"}">${blS(t.res - t.bres)}</td><td class="num"></td><td class="num">${blM(sumOf(fyB, rowsOf("7")) - sumOf(fyB, rowsOf("6")))}</td><td></td></tr>`;
   const span = blSpan === "ytd" ? `Year to date ${blMon(m.keys[0])} – ${blMon(m.month)}` : blMon(m.month);
   const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
   const pr = blPct(t.rev, t.brev), pe = blPct(t.exp, t.bexp);
@@ -3384,11 +3401,17 @@ function blDraw(code){
       </div>
       ${top.length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="ttl"><h3>Furthest off budget</h3></div><div class="pl-ex">${top.map(o => `<div><span class="pl-sev ${o.no[0] === "6" ? "crit" : "warn"}"></span><b>${esc(o.no)} ${esc((acc[o.no] || [""])[0])}</b> <span class="meta">${o.no[0] === "6" ? "spent" : "earned"} ${blM(o.a)} against ${blM(o.b)} budget (${blS(o.gap)})</span></div>`).join("")}</div></div>` : ""}
       <div class="pl-panel"><div class="ttl"><h3>Accounts · ${esc(span)}</h3>
-        <label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="blOnlyOff" ${blOnlyOff ? "checked" : ""}> Only accounts off budget</label></div>
-        <div class="scroll"><table class="bl-tab" data-nosort><tr><th>Account</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">%</th><th class="num">Budget ${esc(String(d.year))}</th><th class="num" title="Year to date actual as a share of the year's budget">Used YTD</th></tr>${body}</table></div>
-        <p class="hint" style="margin:8px 0 0">Click a group to fold it; click an account for its ledger entries. Red: an expense above or revenue below budget by more than ${fmt(tol)}%; green: the other way.</p></div>
+        <div class="bl-tools">
+          <div class="ov-tabs" style="margin:0" role="tablist" aria-label="How the accounts are shown"><button data-blmode="grouped" class="${blMode === "grouped" ? "on" : ""}" aria-selected="${blMode === "grouped"}">Grouped</button><button data-blmode="flat" class="${blMode === "flat" ? "on" : ""}" aria-selected="${blMode === "flat"}">Ungrouped</button></div>
+          ${blMode === "grouped" ? `<button class="mini" data-blexpand="${allGroups.every(k => blExpanded.has(k)) ? "0" : "1"}">${allGroups.every(k => blExpanded.has(k)) ? "Collapse all" : "Expand all"}</button>` : ""}
+          <label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="blOnlyOff" ${blOnlyOff ? "checked" : ""}> Only accounts off budget</label></div></div>
+        <div class="scroll"><table class="bl-tab"${blMode === "grouped" ? " data-nosort" : ""}><tr><th>Account</th>${blMode === "flat" ? "<th>Class · group</th>" : ""}<th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">%</th><th class="num">Budget ${esc(String(d.year))}</th><th class="num" title="Year to date actual as a share of the year's budget">Used YTD</th></tr>${body}</table></div>
+        <p class="hint" style="margin:8px 0 0">${blMode === "grouped" ? "Click a group to open its accounts. " : "Click a column title to sort; type above the table to filter. "}Click an account for its ledger entries. Red: an expense above or revenue below budget by more than ${fmt(tol)}%; green: the other way.</p></div>
     </div>`;
-  $("blOnlyOff").onchange = e => { blOnlyOff = e.target.checked; blDraw(code); };
+  $("blOnlyOff").onchange = e => { blOnlyOff = e.target.checked; if (blOnlyOff) x.off.forEach(o => blExpanded.add(`${code}|${o.no.slice(0, 2)}`)); blDraw(code); };
+  $("blPop").querySelectorAll("[data-blmode]").forEach(b => b.onclick = () => { blMode = b.dataset.blmode; blDraw(code); });
+  const ex = $("blPop").querySelector("[data-blexpand]");
+  if (ex) ex.onclick = () => { blExpanded = ex.dataset.blexpand === "1" ? new Set(allGroups) : new Set(); blDraw(code); };
 }
 function blGo(view, code){
   $("blBd").classList.remove("show");
@@ -3400,13 +3423,14 @@ document.addEventListener("click", e => {
   const g = e.target.closest("[data-blgo]"); if (g) { blGo(g.dataset.blgo, g.dataset.code || ""); return; }
   const a = e.target.closest("[data-blacc]"); if (a) { e.preventDefault(); $("blBd").classList.remove("show"); openDrill("account", a.dataset.blacc); return; }
   const gr = e.target.closest("tr.grp[data-blg]");
-  if (gr) { const k = gr.dataset.blg; gr.parentElement.querySelectorAll(`tr.acc[data-blgrp="${CSS.escape(k)}"]`).forEach(r => r.classList.toggle("hide")); return; }
+  if (gr) { const k = gr.dataset.blg; blExpanded.has(k) ? blExpanded.delete(k) : blExpanded.add(k); blDraw($("blPop").dataset.code); return; }
   const s = e.target.closest("[data-blloc]"); if (s) { blOpen(s.dataset.blloc); return; }
   if (e.target === $("blBd")) $("blBd").classList.remove("show");
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("blBd").classList.contains("show")) { $("blBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.blloc != null) { e.preventDefault(); blOpen(e.target.dataset.blloc); }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.blg != null) { e.preventDefault(); e.target.click(); }
 });
 </script>
 <script src="tables.js"></script>
