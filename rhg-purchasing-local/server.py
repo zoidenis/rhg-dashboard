@@ -31,6 +31,7 @@ import notify
 import savings
 import savings_report
 import weekly_report
+import unicorn_facts
 import contracts
 import comparisons
 import config
@@ -1483,6 +1484,19 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
         if url.path == "/internal/mail":
             self._internal_mail(body)
+            return
+        if url.path == "/internal/unicorn/facts":       # Unicorn (identity) asking for its morning figures
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            try:
+                day = date.fromisoformat(str(body.get("date"))[:10]) if body.get("date") else None
+                companies = [str(c).strip().upper() for c in (body.get("companies") or []) if str(c).strip()] \
+                    or [config.BC_COMPANY]
+                self._send(200, unicorn_facts.request(companies, dashboard, nopo_window, company_currency,
+                                                      day, bool(body.get("refresh"))))
+            except ValueError:
+                self._send(400, {"error": "Bad date."})
             return
         if url.path == "/internal/recipients":           # Finance saving the directory for its user
             if not self._service_call():

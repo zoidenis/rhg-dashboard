@@ -19,6 +19,7 @@ import config
 import layouts
 import permissions
 import store
+import unicorn
 
 STATIC = config.BASE_DIR / "static"
 STATIC_FILES = {
@@ -129,6 +130,11 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(200, (STATIC / "executive.html").read_bytes(), "text/html; charset=utf-8")
                 return
+            if url.path in ("/unicorn", "/unicorn.html"):
+                u = self._user()
+                page = "unicorn.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
             if url.path in ("/admin", "/admin.html"):
                 self._send(200, (STATIC / "admin.html").read_bytes(), "text/html; charset=utf-8")
                 return
@@ -153,6 +159,22 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"users": auth.list_users(),
                                  "roles": [dict(r) for r in store.q("SELECT * FROM roles ORDER BY name")],
                                  "permissions": permissions.PERMISSIONS})
+            elif url.path == "/api/unicorn/status":
+                # For the menus: may this person talk to Unicorn, and how many briefs are unread.
+                ok = auth.can(user, "unicorn.use")
+                self._send(200, {"allowed": ok, "unread": unicorn.unread(user["username"]) if ok else 0,
+                                 "enabled": unicorn.enabled()})
+            elif url.path == "/api/unicorn":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                qs = parse_qs(url.query)
+                before = (qs.get("before") or [""])[0]
+                rows = unicorn.messages(user["username"], int(before) if before.isdigit() else None)
+                unread = unicorn.unread(user["username"])
+                if rows and not before:
+                    unicorn.mark_seen(user["username"], rows[-1]["id"])
+                self._send(200, {"state": unicorn.state(), "messages": rows, "unread": unread,
+                                 "more": len(rows) >= 60})
             elif url.path == "/api/layout":
                 # The towers' layout (order and hidden sections) for the signed-in person.
                 qs = parse_qs(url.query)
@@ -255,6 +277,20 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     updated, err = auth.update_user(target, body, user["username"], ip)
                     self._send(200 if updated else 400, updated or {"error": err})
+            elif url.path == "/api/unicorn/chat":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                try:
+                    self._send(200, {"messages": unicorn.ask(user, body.get("text"))})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/unicorn/brief":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                try:
+                    self._send(200, unicorn.run_now(user["username"]))
+                except RuntimeError as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path == "/api/layout":
                 status, answer = layouts.save(user, body, ip)
                 self._send(status, answer)
@@ -309,6 +345,9 @@ def main():
             except Exception:                                           # noqa: BLE001
                 pass
     threading.Thread(target=sweeper, daemon=True).start()
+    unicorn.start()
+    if not unicorn.enabled():
+        print("Unicorn: no ANTHROPIC_API_KEY in .env - the business analyst stays off until one is set.")
 
     srv = ThreadingHTTPServer((config.APP_HOST, config.APP_PORT), Handler)
     print(f"RHG identity service on http://{config.APP_HOST}:{config.APP_PORT}")

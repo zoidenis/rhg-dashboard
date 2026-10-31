@@ -134,6 +134,26 @@ Pastaj `docker compose up -d finance` (rikrijon kontejnerin, që të lexojë `.e
 "Connection to the Tax Administration" tregon nëse certifikata u hap dhe deri kur vlen.
 `/opt/rhg/secrets` është jashtë dosjeve që deploy-i i zëvendëson, kështu që nuk preket.
 
+## Unicorn (analisti i biznesit brenda pulse)
+
+Unicorn shkruan çdo ditë në 08:00 brief-in e mëngjesit (shifrat e djeshme nga Finance dhe Purchasing) dhe u
+përgjigjet pyetjeve në `/unicorn`, vetëm për rolet me të drejtën **unicorn.use** (Admin → Roles & permissions).
+
+1. Krijo një API key në console.anthropic.com (organizata e RHG) dhe vendose **vetëm në server**:
+   ```
+   nano /opt/rhg/rhg-identity/.env
+   ANTHROPIC_API_KEY=sk-ant-...
+   UNICORN_MODEL=claude-sonnet-5-5      # opsionale
+   UNICORN_TIME=08:00                    # opsionale (ora e serverit, Europe/Tirane)
+   ```
+   Mos e vendos kurrë në repo.
+2. `cd /opt/rhg/deploy && docker compose up -d identity` (rinis identity që të lexojë çelësin).
+3. Hap `/unicorn` → "Write today's brief now" për provën e parë (disa minuta, lexon Finance dhe Purchasing).
+
+Çfarë del nga serveri: vetëm shifrat përmbledhëse të brief-it (shitje, P&L, cash, AP/AR, blerje, emrat e
+furnitorëve/klientëve më të mëdhenj) drejt Anthropic API. Prompt-i kryesor është `rhg-identity/unicorn_prompt.md`;
+një kopje në `identity-data` si `data/unicorn_prompt.md` e zëvendëson pa deploy.
+
 ## Vendime të zbatuara
 
 **TLS self-signed.** Let's Encrypt nuk lëshon certifikata për IP, pra pa domain

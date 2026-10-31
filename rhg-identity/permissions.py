@@ -41,6 +41,9 @@ PERMISSIONS = {
     "layout.personal":       "Rearrange and hide sections for yourself",
     "layout.roles.manage":   "Set the sections each role sees, and their order",
 
+    # --- Unicorn, the business analyst (morning brief and chat; for management)
+    "unicorn.use":           "Talk to Unicorn, the business analyst: the morning brief and the chat",
+
     # --- Platform
     "admin.users.manage":    "Create, edit and disable accounts",
     "admin.roles.manage":    "Change what roles are allowed to do",
@@ -63,7 +66,7 @@ DEFAULT_ROLES = {
     },
     "CFO": {
         "description": "Both towers in full, closing sign-off and thresholds; cannot manage accounts.",
-        "permissions": _FINANCE_ALL + _PURCHASING_READ + ["admin.audit.view", "layout.personal"],
+        "permissions": _FINANCE_ALL + _PURCHASING_READ + ["admin.audit.view", "layout.personal", "unicorn.use"],
         "system": False,
     },
     "Finance director": {

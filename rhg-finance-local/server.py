@@ -4,6 +4,7 @@ Business Central is read only. Actions, thresholds and the audit trail are the
 application's own and live under ./data.
 """
 import base64
+import hmac
 import html
 import json
 import re
@@ -25,6 +26,7 @@ import cashloc
 import kartloc
 import supstock
 import today as todayloc
+import unicorn_facts
 import faloc
 import recipients
 import requests
@@ -1206,6 +1208,12 @@ class Handler(BaseHTTPRequestHandler):
     def _user(self):
         return auth.session(self._cookie())
 
+    def _service_call(self):
+        """Another RHG service on the internal network (identity asking for Unicorn's facts)."""
+        token = auth.SERVICE_TOKEN
+        given = self.headers.get("X-Service-Token") or ""
+        return bool(token) and hmac.compare_digest(given.encode(), token.encode())
+
     def _send(self, status, body, ctype="application/json; charset=utf-8"):
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
         self.send_response(status)
@@ -1652,6 +1660,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         url = urlparse(self.path)
         body = self._body()
+        if url.path == "/internal/unicorn/facts":
+            # Unicorn (identity) asks for the figures of its morning brief; answered from a background read.
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            try:
+                day = date.fromisoformat(str(body.get("date"))[:10]) if body.get("date") else None
+                self._send(200, unicorn_facts.request(
+                    client, _latest, in_parallel_jobs, company_currency,
+                    lambda co: dashboard(co, "", "month", ""), arap.digest, day, bool(body.get("refresh"))))
+            except ValueError:
+                self._send(400, {"error": "Bad date."})
+            return
         user = self._user()
         if url.path == "/api/login":
             self._send(410, {"error": "Sign in at the site root; this tower no longer holds accounts."})

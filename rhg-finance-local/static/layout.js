@@ -505,6 +505,18 @@ body.lay-edit main{padding-bottom:190px}
     document.head.appendChild(st);
   }
 
+  // The pulse shell also links Unicorn, the business analyst (identity, /unicorn), for those allowed to use it,
+  // with the number of morning briefs they have not read.
+  function unicornLink() {
+    const t = document.querySelector("aside .towers");
+    if (!t || !(L.me.permissions || []).includes("unicorn.use") || document.getElementById("uniLink")) return;
+    t.insertAdjacentHTML("beforeend", '<a href="/' + 'unicorn" id="uniLink">Unicorn</a>');
+    fetch(ROOT_API + "unicorn/status", { credentials: "same-origin" }).then(r => r.json()).then(u => {
+      if (u.unread) document.getElementById("uniLink").insertAdjacentHTML("beforeend",
+        `<span class="uni-dot" title="Unread morning briefs">${+u.unread}</span>`);
+    }).catch(() => {});
+  }
+
   /* ------------------------------------------------------------------ start */
   async function start() {
     addStyle();
@@ -517,6 +529,7 @@ body.lay-edit main{padding-bottom:190px}
       const s = await call("session");
       L.me = s.user;
       if (!L.me) return;
+      unicornLink();
       await refresh();
       apply(effective(L.info));
       addButton();

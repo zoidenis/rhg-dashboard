@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>Unicorn · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* Unicorn, the business analyst: the morning brief and the chat. Shell as the Control center; the look from brand.css. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between}
+.adminlink{margin-top:auto;padding-top:16px}
+.adminlink a{color:var(--rhg-blue);font-size:11px;text-decoration:none}
+
+.uni{display:flex;flex-direction:column;flex:1;min-height:0;max-width:880px;width:100%}
+.notice{border-left:3px solid var(--warn);margin-bottom:14px}
+.feed{display:flex;flex-direction:column;gap:14px;padding:4px 0 18px}
+.more{align-self:center}
+.msg{display:flex;gap:12px;align-items:flex-start;max-width:100%}
+.msg .av{flex:none;width:34px;height:34px;border-radius:50%;background:var(--pulse-graphite);display:grid;place-items:center;position:relative}
+.msg .av b{color:#fff;font-family:var(--rhg-font-display);font-weight:800;font-size:16px;line-height:1;margin-top:-1px}
+.msg .av i{position:absolute;right:2px;bottom:3px;width:8px;height:8px;border-radius:50%;background:var(--pulse-green);border:2px solid var(--pulse-graphite)}
+.bubble{background:var(--card);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:12px 16px;min-width:0;max-width:calc(100% - 46px);line-height:1.55;font-size:14px}
+.bubble .who{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:11.5px;color:var(--sub);margin-bottom:4px}
+.bubble .who b{color:var(--ink);font-size:12.5px}
+.bubble h3{font-family:var(--rhg-font-display);font-size:15px;font-weight:700;margin:14px 0 4px;text-transform:none;letter-spacing:-.01em;color:inherit}
+.bubble h3:first-child{margin-top:2px}
+.bubble p{margin:6px 0}
+.bubble ul,.bubble ol{margin:4px 0 6px;padding-left:20px}
+.bubble li{margin:2px 0}
+.bubble .tbl{overflow-x:auto;margin:8px 0}
+.bubble table{border-collapse:collapse;font-size:12.5px;min-width:100%}
+.bubble th{text-align:left;font-weight:600;color:var(--sub);border-bottom:1px solid var(--line);padding:5px 10px 5px 0;white-space:nowrap}
+.bubble td{border-bottom:1px solid var(--line);padding:5px 10px 5px 0;font-variant-numeric:tabular-nums}
+.msg.is-brief .bubble{border-color:var(--rhg-line);box-shadow:0 1px 2px rgba(22,24,29,.04),0 6px 18px rgba(22,24,29,.05)}
+.msg.is-brief .btag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--pulse-deep);background:var(--rhg-greenbg);border-radius:6px;padding:2px 7px}
+.msg.note .bubble{border-style:dashed;color:var(--sub)}
+.msg.me{flex-direction:row-reverse}
+.msg.me .bubble{background:var(--rhg-primary);border-color:var(--rhg-primary);color:#fff;border-radius:14px 4px 14px 14px}
+.msg.me .bubble .who{color:rgba(255,255,255,.7)}
+.msg.me .bubble .who b{color:#fff}
+.thinking .bubble{color:var(--sub)}
+.thinking .dots span{display:inline-block;width:6px;height:6px;margin-right:4px;border-radius:50%;background:var(--sub);animation:blink 1.2s infinite}
+.thinking .dots span:nth-child(2){animation-delay:.2s}.thinking .dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.thinking .dots span{animation:none}}
+.composer{position:sticky;bottom:0;padding:12px 0 16px;background:linear-gradient(to top,var(--bg) 75%,transparent)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.chips button:hover{border-color:var(--rhg-primary)}
+.box{display:flex;gap:10px;align-items:flex-end;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 14px}
+.box:focus-within{border-color:var(--rhg-primary)}
+.box textarea{flex:1;border:0;outline:0;resize:none;background:transparent;min-height:24px;max-height:180px;padding:6px 0;font-size:14px;line-height:1.5}
+.box .btn{flex:none}
+.hint2{font-size:11.5px;color:var(--sub);margin:8px 2px 0}
+.empty-state{text-align:center;color:var(--sub);padding:36px 12px}
+.empty-state .av{margin:0 auto 12px;width:56px;height:56px}
+.empty-state .av b{font-size:26px}
+@media(max-width:760px){aside{display:none}.bubble{max-width:calc(100% - 40px)}.chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.chips button{flex:none}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/executive">Executive dashboard</a>
+    <a href="/unicorn" class="on" aria-current="page">Unicorn</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">pulse · Business analyst</div>
+      <h1>Unicorn</h1>
+      <div class="period" id="sub">Loading your data…</div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn dark" id="briefBtn">Write today's brief now</button></div>
+      <div class="hdr-meta">
+        <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Loading your data…</span></span>
+        <span class="sep">|</span>
+        <span id="whoami"></span>
+        <button class="linkbtn" id="logoutBtn">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="uni">
+    <div class="card notice" id="notice" hidden></div>
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <div class="composer">
+      <div class="chips" id="chips">
+        <button type="button">Pse ndryshuan shitjet dje?</button>
+        <button type="button">Cilët restorante janë nën buxhet këtë muaj?</button>
+        <button type="button">Cilat detyrime kanë kaluar afatin kritik?</button>
+        <button type="button">Ku po rriten çmimet e blerjeve?</button>
+      </div>
+      <div class="box">
+        <textarea id="q" rows="1" placeholder="Pyesni Unicorn për shitjet, P&amp;L, cash, detyrimet ose blerjet…" aria-label="Your question to Unicorn"></textarea>
+        <button class="btn dark" id="send">Send</button>
+      </div>
+      <p class="hint2" id="hint2">Unicorn answers from the figures of its latest morning brief (Simphony and Business Central). Enter sends, Shift+Enter starts a new line.</p>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let me = null, CSRF = null, oldest = null, poll = null, busy = false;
+const can = p => (me && me.permissions || []).includes(p);
+
+async function get(u){ const r = await fetch(u, {credentials:"same-origin"}); const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+async function post(u, body){ const r = await fetch(u, {method:"POST", credentials:"same-origin",
+  headers:{"Content-Type":"application/json","X-CSRF-Token":CSRF || ""}, body: JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+
+// Markdown of the answers: headings, lists, bold, paragraphs (escaped first).
+function md(t){
+  const lines = esc(t).split(/\r?\n/), out = [];
+  let list = null;
+  const inline = s => s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<i>$2</i>");
+  const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  let table = null;
+  const flush = () => { if (table) { const [h, ...rows] = table.filter(r => !/^\s*\|?\s*:?-{2,}/.test(r.join("|")));
+    out.push(`<div class="tbl"><table><tr>${h.map(c => `<th>${inline(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</table></div>`); table = null; } };
+  for (const raw of lines) {
+    const l = raw.trimEnd();
+    let m;
+    if (/^\s*\|.*\|\s*$/.test(l)) { close(); (table = table || []).push(l.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim())); continue; }
+    flush();
+    if (!l.trim()) { close(); continue; }
+    if ((m = l.match(/^#{1,4}\s+(.*)$/))) { close(); out.push(`<h3>${inline(m[1])}</h3>`); continue; }
+    if ((m = l.match(/^\s*[-*•]\s+(.*)$/))) { if (list !== "ul") { close(); out.push("<ul>"); list = "ul"; } out.push(`<li>${inline(m[1])}</li>`); continue; }
+    if ((m = l.match(/^\s*\d+[.)]\s+(.*)$/))) { if (list !== "ol") { close(); out.push("<ol>"); list = "ol"; } out.push(`<li>${inline(m[1])}</li>`); continue; }
+    close(); out.push(`<p>${inline(l)}</p>`);
+  }
+  flush(); close();
+  return out.join("");
+}
+const AV = '<div class="av" aria-hidden="true"><b>U</b><i></i></div>';
+function when(at){
+  const d = new Date(at.replace(" ", "T"));
+  if (isNaN(d)) return at;
+  const today = new Date(); const same = d.toDateString() === today.toDateString();
+  return (same ? "Today" : d.toLocaleDateString("en-GB", {weekday:"short", day:"numeric", month:"short"})) + " · " + d.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"});
+}
+function dayName(iso){ const d = new Date(iso + "T12:00:00"); return isNaN(d) ? iso : d.toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long"}); }
+function bubble(m){
+  if (m.author === "user") return `<div class="msg me" data-id="${m.id}"><div class="bubble"><div class="who"><b>${esc(me.name || me.username)}</b><span>${esc(when(m.at))}</span></div>${esc(m.text).replace(/\n/g, "<br>")}</div></div>`;
+  const brief = m.kind === "brief";
+  return `<div class="msg ${brief ? "is-brief" : m.kind === "note" ? "note" : ""}" data-id="${m.id}">${AV}<div class="bubble">
+    <div class="who"><b>Unicorn</b>${brief ? `<span class="btag">Morning brief · ${esc(dayName(m.day))}</span>` : ""}<span>${esc(when(m.at))}</span></div>${md(m.text)}</div></div>`;
+}
+function emptyState(){
+  return `<div class="empty-state">${AV}<b style="color:var(--ink);font-size:15px">Unicorn has not written its first brief yet.</b>
+    <p style="margin:6px 0 0">Every day at ${esc((window.__state || {}).time || "08:00")} Unicorn reads yesterday's sales, the P&amp;L, cash, payables and receivables, purchases and stock, and writes here. You can also ask it now.</p></div>`;
+}
+function atBottom(){ return innerHeight + scrollY >= document.body.scrollHeight - 80; }
+function scrollEnd(){ scrollTo({top: document.body.scrollHeight, behavior: "smooth"}); }
+
+function paintState(s){
+  window.__state = s;
+  const n = $("notice");
+  if (!s.enabled) {
+    n.hidden = false;
+    n.innerHTML = `<b>Unicorn is not switched on yet.</b><p class="hint" style="margin:6px 0 0">An administrator adds <code>ANTHROPIC_API_KEY</code> to identity's <code>.env</code> on the server and restarts identity. Until then there is no morning brief and no answers.</p>`;
+  } else n.hidden = true;
+  $("briefBtn").disabled = !s.enabled || !!s.running;
+  $("send").disabled = !s.enabled;
+  const lr = s.last_run;
+  let sub = `Morning brief every day at ${s.time}`;
+  if (lr && lr.state === "done") sub += ` · latest on the figures of ${dayName(lr.day)}`;
+  $("sub").textContent = sub;
+  const pill = $("pill");
+  if (s.running) { pill.className = "pill load"; $("pillText").textContent = `Writing the brief · ${s.running.stage || "starting"}`; }
+  else if (lr && lr.state === "failed") { pill.className = "pill err"; $("pillText").textContent = `Last brief failed · ${lr.error || ""}`.slice(0, 120); }
+  else if (!s.enabled) { pill.className = "pill err"; $("pillText").textContent = "Not switched on"; }
+  else { pill.className = "pill"; $("pillText").textContent = `LIVE · ${s.model}`; }
+}
+
+async function load(){
+  const j = await get("/api/unicorn");
+  paintState(j.state);
+  const feed = $("feed");
+  feed.innerHTML = (j.more ? `<button class="btn more" id="more">Earlier messages</button>` : "") + (j.messages.length ? j.messages.map(bubble).join("") : emptyState());
+  oldest = j.messages.length ? j.messages[0].id : null;
+  if ($("more")) $("more").onclick = earlier;
+  scrollTo({top: document.body.scrollHeight});
+  watch(j.state);
+}
+async function earlier(){
+  if (!oldest) return;
+  const j = await get("/api/unicorn?before=" + oldest);
+  const h = document.body.scrollHeight;
+  $("more").remove();
+  $("feed").insertAdjacentHTML("afterbegin", (j.more ? `<button class="btn more" id="more">Earlier messages</button>` : "") + j.messages.map(bubble).join(""));
+  if (j.messages.length) oldest = j.messages[0].id;
+  if ($("more")) $("more").onclick = earlier;
+  scrollTo({top: document.body.scrollHeight - h});
+}
+// while a brief is being written: ask again every 10 seconds, show it when it lands
+function watch(s){
+  clearTimeout(poll);
+  if (!s || !s.running) return;
+  poll = setTimeout(async () => {
+    try {
+      const last = [...document.querySelectorAll("#feed .msg")].pop();
+      const j = await get("/api/unicorn");
+      paintState(j.state);
+      const lastId = last ? +last.dataset.id : 0;
+      const fresh = j.messages.filter(m => m.id > lastId);
+      if (fresh.length) { const es = document.querySelector(".empty-state"); if (es) es.remove();
+        $("feed").insertAdjacentHTML("beforeend", fresh.map(bubble).join("")); scrollEnd(); }
+      watch(j.state);
+    } catch (e) { watch(s); }
+  }, 10000);
+}
+
+async function send(text){
+  text = (text || "").trim();
+  if (!text || busy) return;
+  busy = true; $("send").disabled = true;
+  const es = document.querySelector(".empty-state"); if (es) es.remove();
+  const tmp = {id: 0, at: new Date().toISOString(), author: "user", text};
+  $("feed").insertAdjacentHTML("beforeend", bubble(tmp) + `<div class="msg thinking" id="thinking">${AV}<div class="bubble"><span class="dots"><span></span><span></span><span></span></span> Unicorn is thinking…</div></div>`);
+  $("q").value = ""; grow(); scrollEnd();
+  try {
+    const j = await post("/api/unicorn/chat", {text});
+    $("thinking").remove();
+    const mine = [...document.querySelectorAll('#feed .msg.me[data-id="0"]')].pop(); if (mine) mine.remove();
+    $("feed").insertAdjacentHTML("beforeend", j.messages.map(bubble).join(""));
+  } catch (e) {
+    $("thinking").outerHTML = `<div class="msg note">${AV}<div class="bubble"><div class="who"><b>Unicorn</b></div><p>${esc(e.message)}</p></div></div>`;
+  } finally { busy = false; $("send").disabled = !(window.__state || {}).enabled; scrollEnd(); $("q").focus(); }
+}
+function grow(){ const t = $("q"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 180) + "px"; }
+
+$("q").addEventListener("input", grow);
+$("q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send($("q").value); } });
+$("send").onclick = () => send($("q").value);
+$("chips").addEventListener("click", e => { const b = e.target.closest("button"); if (b) send(b.textContent); });
+$("briefBtn").onclick = async () => {
+  if (!confirm("Unicorn reads yesterday's figures from Finance and Purchasing and writes a new brief. It can take a few minutes. Go ahead?")) return;
+  $("briefBtn").disabled = true;
+  try { await post("/api/unicorn/brief", {}); const j = await get("/api/unicorn"); paintState(j.state); watch(j.state); }
+  catch (e) { $("pill").className = "pill err"; $("pillText").textContent = e.message; $("briefBtn").disabled = false; }
+};
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":CSRF || ""}, body:"{}"}); } catch (e) {}
+  location.href = "/login?signedout=1";
+};
+
+(async () => {
+  let s;
+  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"]].filter(([p]) => can(p));
+  $("towers").insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
+  if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
+  if (!can("unicorn.use")) {
+    $("feed").innerHTML = `<div class="empty-state">${AV}<b style="color:var(--ink)">Unicorn is for management.</b><p>Your role does not include “Talk to Unicorn”. Ask an administrator if you need it.</p></div>`;
+    document.querySelector(".composer").hidden = true; $("briefBtn").hidden = true; $("pill").hidden = true; $("sub").textContent = "";
+    return;
+  }
+  try { await load(); } catch (e) { $("pill").className = "pill err"; $("pillText").textContent = e.message; }
+  $("q").focus();
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

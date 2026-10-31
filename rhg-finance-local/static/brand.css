@@ -69,6 +69,7 @@
   background: var(--pulse-green); margin-left: .06em; vertical-align: baseline; }
 .powered{ display: flex; align-items: baseline; gap: 5px; font-size: 11px; color: rgba(255,255,255,.62); margin-top: 10px; }
 .powered .pulse-mark{ font-size: 15px; color: #fff; }
+.towers .uni-dot{ display:inline-block; min-width:16px; height:16px; padding:0 5px; margin-left:6px; border-radius:8px; background:var(--pulse-green); color:#fff; font-size:10px; font-weight:700; line-height:16px; text-align:center; vertical-align:1px; }
 .by-t0{ background: var(--pulse-graphite) !important; } .by-t1{ background: var(--pulse-blue) !important; } .by-t2{ background: var(--pulse-green) !important; }
 .by-t3{ background: var(--pulse-prev) !important; } .by-t4{ background: #9a978c !important; } .by-t5{ background: #c9c7bf !important; }
 

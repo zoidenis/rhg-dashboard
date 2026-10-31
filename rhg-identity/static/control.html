@@ -124,6 +124,12 @@ function shell(){
   const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],
                  ["finance.inventory.view","/finance/#inventory","Inventory"]].filter(([p]) => can(p));
   t.insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
+  if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs
+    t.insertAdjacentHTML("beforeend", `<a href="/unicorn" id="uniLink">Unicorn</a>`);
+    fetch("/api/unicorn/status", {credentials: "same-origin"}).then(r => r.json()).then(u => {
+      if (u.unread) $("uniLink").insertAdjacentHTML("beforeend", `<span class="uni-dot" title="Unread morning briefs">${u.unread}</span>`);
+    }).catch(() => {});
+  }
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   if (can("admin.users.manage") || can("admin.audit.view"))
     $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
