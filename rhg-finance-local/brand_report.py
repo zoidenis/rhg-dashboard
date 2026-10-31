@@ -197,8 +197,10 @@ def _cube(client, company, year, currency_of):
 
 
 # ---------------------------------------------------------------- the figures of one brand
-def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, only_ref=None, label=None):
-    """only_ref: one location of the brand (the weekly sales email of a location); label names it."""
+def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, only_ref=None, label=None,
+          sales_only=False):
+    """only_ref: one location of the brand (the weekly sales email of a location); label names it.
+    sales_only: sales against budget and last year only, no costs (the weekly sales email)."""
     today = today or date.today()
     rows = brands().get(brand)
     if not rows:
@@ -360,6 +362,14 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
             ly_ = sum(_sales(sim.get(L["ref"], {}), [ld])["ex"] for L in locs if L["currency"] == main)
             by_day.append([d.isoformat(), cur_, ly_])
 
+    if sales_only:                                              # the weekly sales email: no costs
+        for m_ in [L.get("mtd") or {} for L in locs] + [t.get("mtd") or {} for t in totals.values()]:
+            for k_ in ("bc", "bc_ly", "bc_bud", "bc_budget"):
+                m_.pop(k_, None)
+        for t in totals.values():
+            t["pl"] = {}
+        cost_to = None
+
     # ---- highlights, in sentences
     hl = []
     T = totals.get(main) or {}
@@ -397,7 +407,7 @@ def build(kind, brand, client, latest_fn, parallel_fn, currency_of, today=None, 
             hl.append(("info", "Costs posted so far this month are partial: payroll and stock usage are posted at "
                                "month end, so the weekly email shows them only as a running indication."))
     other = [c for c in totals if c != main]
-    return {"kind": kind, "brand": label or brand, "brand_key": brand, "period": {"from": a.isoformat(), "to": b.isoformat()},
+    return {"kind": kind, "brand": label or brand, "brand_key": brand, "sales_only": sales_only, "period": {"from": a.isoformat(), "to": b.isoformat()},
             "prev": {"from": prev[0].isoformat(), "to": prev[1].isoformat()} if prev else None,
             "ly": {"from": ly[0].isoformat(), "to": ly[1].isoformat()}, "mtd_from": m_from.isoformat(),
             "cost_to": cost_to.isoformat() if cost_to else None,
@@ -413,6 +423,9 @@ def subject(r, test=False):
     T = r["totals"].get(r["main"]) or {}
     vb = _pct(T.get("b_sales"), T.get("budget")) if T.get("has_budget") else None
     tail = f" · sales {_p(vb)} vs budget" if vb is not None else ""
+    if r.get("sales_only"):
+        vl = _pct(T.get("sales"), T.get("ly"))
+        return (("[Test] " if test else "") + f"[RHG] {r['brand']} · Sales {when}{tail}" + (f" · {_p(vl)} vs last year" if vl is not None else ""))
     return (("[Test] " if test else "") + f"[RHG] {r['brand']} · {KINDS[r['kind']]} performance · {when}{tail}")
 
 
@@ -508,7 +521,8 @@ def render(r):
         mt = T.get("mtd") or {}
         if mt:
             mf = date.fromisoformat(r["mtd_from"])
-            blocks += h3(f"Month to date · {mf:%d %b} – {b:%d %b}", f"Sales from Simphony; costs as posted in Business Central so far, against the budget for these days and the same dates last year.")
+            blocks += h3(f"Month to date · {mf:%d %b} – {b:%d %b}", "Sales from Simphony against the budget for these days and the same dates last year." if r.get("sales_only") else
+                         "Sales from Simphony; costs as posted in Business Central so far, against the budget for these days and the same dates last year.")
             rows = [f"<tr><td style='{td}'><b>Sales</b> (Simphony, excl. VAT)</td><td style='{tdn}'>{_m(mt.get('sales'))}</td><td style='{tdn};color:{muted}'>{_m(mt.get('budget'))}</td>"
                     f"<td style='{tdn}'>{var(_pct(mt.get('b_sales'), mt.get('budget')))}</td><td style='{tdn};color:{muted}'>{_m(mt.get('ly'))}</td><td style='{tdn}'>{var(_pct(mt.get('sales'), mt.get('ly')))}</td></tr>"]
             bc, bl, bb = mt.get("bc") or {}, mt.get("bc_ly") or {}, mt.get("bc_bud") or {}
@@ -553,13 +567,13 @@ def render(r):
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:900px">
 <tr><td style="background:{navy};color:#fff;padding:18px 22px;border-radius:12px 12px 0 0">
 <div style="font-size:11px;letter-spacing:.12em;color:#a0d8ea">REVO HOSPITALITY GROUP · {e(r['brand'])}</div>
-<div style="font-size:20px;font-weight:700;margin-top:4px">{e(KINDS[r['kind']])} performance · {e(r['brand'])}</div>
+<div style="font-size:20px;font-weight:700;margin-top:4px">{"Sales of the week" if r.get("sales_only") else e(KINDS[r['kind']]) + " performance"} · {e(r['brand'])}</div>
 <div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(period)} · {len(r['locations'])} location{'' if len(r['locations']) == 1 else 's'} · {e(comp)}</div></td></tr>
 <tr><td style="background:#fff;padding:20px 22px;border-radius:0 0 12px 12px">
 {errs}{tiles}
 <h3 style="font-size:14px;color:{ink};margin:18px 0 6px">Highlights</h3>{hl}
 {blocks}
-{f"<p style='margin:20px 0 0'><a href='{e(public)}/executive?tab=locations' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>Open Location intelligence</a></p>" if public else ''}
+{f"<p style='margin:20px 0 0'><a href='{e(public)}{"/finance/#sales" if r.get("sales_only") else "/executive?tab=locations"}' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>{"Open Sales in the Finance tower" if r.get("sales_only") else "Open Location intelligence"}</a></p>" if public else ''}
 <p style="color:{muted};font-size:11px;margin:22px 0 0;border-top:1px solid {line};padding-top:12px">Sent by RHG Control Towers from Simphony and Business Central; nothing was changed there. Recipients and schedule are in Finance → Settings → Brand performance email.</p>
 </td></tr></table></td></tr></table></body></html>"""
     text = f"RHG · {r['brand']} · {KINDS[r['kind']]} performance · {period}\n\n" + "\n".join(f"- {t}" for _, t in r["highlights"])

@@ -69,7 +69,7 @@ def build_all(client, latest_fn, parallel_fn, currency_of, today=None):
     out, errors, period = [], [], None
     for brand in brand_report.brands():
         try:
-            r = brand_report.build("weekly", brand, client, latest_fn, parallel_fn, currency_of, today)
+            r = brand_report.build("weekly", brand, client, latest_fn, parallel_fn, currency_of, today, sales_only=True)
         except Exception as exc:                                    # noqa: BLE001
             traceback.print_exc()
             errors.append(f"{brand}: {str(exc)[:200]}")
@@ -255,7 +255,7 @@ class Reporter:
     def build_location(self, row):
         brand = (row.get("brand") or row.get("name") or row["ref"]).strip().upper()
         return brand_report.build("weekly", brand, self.client, self.latest_fn, self.parallel_fn, self.currency_of,
-                                  only_ref=row["ref"], label=row.get("name") or row["ref"])
+                                  only_ref=row["ref"], label=row.get("name") or row["ref"], sales_only=True)
 
     def _send(self, kind, label, to, cc, body, text, subj, actor, test, period):
         entry = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": kind, "target": label, "actor": actor,
