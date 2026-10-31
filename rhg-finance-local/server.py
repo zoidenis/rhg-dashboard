@@ -20,6 +20,7 @@ import arap_notify
 import brand_report
 import sales_report
 import cashloc
+import kartloc
 import faloc
 import recipients
 import requests
@@ -1266,6 +1267,19 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = q.get("company") or config.BC_COMPANY
                 self._send(200, faloc.request(client, company, period, company_currency(company), q.get("refresh") == "1"))
+            elif url.path == "/api/kartela/locations":
+                try:
+                    period = periods(q.get("period"), "month")[:8]
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                rights = {"ap": auth.can(user, "finance.ap.view"), "ar": auth.can(user, "finance.ar.view")}
+                if not (rights["ap"] or rights["ar"]):
+                    self._send(403, {"error": "Your role includes neither Payables nor Receivables."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                self._send(200, kartloc.request(client, company, period, company_currency(company), rights,
+                                                q.get("refresh") == "1"))
             elif url.path == "/api/cash/locations":
                 try:
                     period = periods(q.get("period"), "month")[:8]

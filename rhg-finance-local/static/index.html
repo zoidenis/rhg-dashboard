@@ -226,6 +226,12 @@ td.num,th.num{text-align:right}
 .cl-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--sub);margin:2px 0 8px}
 .cl-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .cl-day td{white-space:nowrap}
+:root{--kl-a0:#2e9a6e;--kl-a1:#d6b24a;--kl-a2:#c47f1f;--kl-a3:#d0613d;--kl-a4:#b0302a}
+@media (prefers-color-scheme: dark){:root{--kl-a0:#3aa87a;--kl-a1:#d9b95a;--kl-a2:#c4832a;--kl-a3:#d97352;--kl-a4:#d2493f}}
+.kl-a0{background:var(--kl-a0)}.kl-a1{background:var(--kl-a1)}.kl-a2{background:var(--kl-a2)}.kl-a3{background:var(--kl-a3)}.kl-a4{background:var(--kl-a4)}
+.kl-age{display:flex;height:9px;border-radius:4px;overflow:hidden;gap:2px;background:var(--line)}
+.kl-age i{display:block;min-width:2px}
+.kl-row{display:grid;grid-template-columns:24px 1fr;gap:4px 6px;align-items:center;font-size:10px;color:var(--sub)}
 .fl-tab th.grp{text-align:center;border-bottom:1px solid var(--line)}
 .fl-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .fl-days span{font-size:11px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:2px 6px}
@@ -419,7 +425,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-kartela">
-    <div class="ov-tabs" id="kaTabs" role="tablist"><button data-t="ap" class="on" role="tab" aria-selected="true" aria-controls="kaAp">Accounts payable</button><button data-t="ar" role="tab" aria-selected="false" aria-controls="kaAr">Accounts receivable</button></div>
+    <div class="ov-tabs" id="kaTabs" role="tablist"><button data-t="ap" class="on" role="tab" aria-selected="true" aria-controls="kaAp">Accounts payable</button><button data-t="ar" role="tab" aria-selected="false" aria-controls="kaAr">Accounts receivable</button><button data-t="loc" role="tab" aria-selected="false" aria-controls="kaLoc">Location intelligence</button></div>
     <div id="kaAp" role="tabpanel"><div class="card"><div class="card-head"><div><h2>Accounts payable</h2><p class="hint" id="apHint"></p></div>
     <button class="mini" data-drill="ap">Open entries</button></div>
     <div class="money" id="apTotals"></div><div id="apBuckets"></div>
@@ -428,6 +434,20 @@ td.num,th.num{text-align:right}
     <button class="mini" data-drill="ar">Open entries</button></div>
     <div class="money" id="arTotals"></div><div id="arBuckets"></div>
     <div class="scroll" style="margin-top:12px"><table id="arTable"></table></div></div></div>
+    <div id="kaLoc" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-head"><div><h2>Payables and receivables by location</h2>
+          <p class="hint">Every location as a square: what is owed to the suppliers and by the customers today on the restaurant's department, by age past the due date, and what was invoiced and paid in the month chosen above. Click a location for its suppliers, customers and the largest overdue entries.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="klSort">Order</label><select id="klSort"><option value="ap">by payables</option><option value="apover">by payables overdue</option><option value="ar">by receivables</option><option value="arover">by receivables overdue</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
+            <button class="mini dark" id="klRead">Read again</button></div></div>
+        <p class="meta" id="klStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="klTotals"></div>
+      <div id="klGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="klDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
   </section>
 
   <section class="view" id="v-fiscal">
@@ -999,6 +1019,7 @@ td.num,th.num{text-align:right}
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
 <div class="pl-bd" id="slBd"><div class="pl-pop" id="slPop" role="dialog" aria-modal="true" aria-label="Restaurant sales"></div></div>
 <div class="pl-bd" id="faBd"><div class="pl-pop" id="faPop" role="dialog" aria-modal="true" aria-label="Location fixed assets"></div></div>
+<div class="pl-bd" id="klBd"><div class="pl-pop" id="klPop" role="dialog" aria-modal="true" aria-label="Location payables and receivables"></div></div>
 <div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
@@ -1125,6 +1146,7 @@ function render(){
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
+  if($("v-kartela").classList.contains("on") && kaTab === "loc" && klKey !== flQuery()) loadKl(false);
   if($("v-assets").classList.contains("on") && faTab === "loc" && faKey !== faQuery()) loadFa(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
   if($("v-inventory").classList.contains("on")){
@@ -2865,7 +2887,7 @@ function currentView(){
   const b = document.querySelector("#nav button.on");
   const id = (b && b.dataset.view) || "overview";
   let label = (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"");
-  if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : "Accounts payable");
+  if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : kaTab === "loc" ? "Location intelligence" : "Accounts payable");
   if (b && b.dataset.parent === "inventory") label = "Inventory · " + label;
   if (b && b.dataset.tab) {           // a tab of a menu item: "<item> · <tab>"
     const head = b.dataset.group || (document.querySelector(`#nav button[data-view="${b.dataset.parent}"]`) || {dataset: {}}).dataset.group || "";
@@ -2877,12 +2899,13 @@ function currentView(){
 // (#ap, #ar, links and buttons that open "ap" or "ar") land on the matching tab.
 var kaTab = "ap";
 function kaShow(tab){
-  kaTab = tab === "ar" ? "ar" : "ap";
+  kaTab = tab === "ar" || tab === "loc" ? tab : "ap";
   document.querySelectorAll("#kaTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === kaTab); b.setAttribute("aria-selected", b.dataset.t === kaTab); });
-  $("kaAp").hidden = kaTab !== "ap"; $("kaAr").hidden = kaTab !== "ar";
+  $("kaAp").hidden = kaTab !== "ap"; $("kaAr").hidden = kaTab !== "ar"; $("kaLoc").hidden = kaTab !== "loc";
   if ($("v-kartela").classList.contains("on")) {
-    if (history.replaceState) history.replaceState(null, "", "#" + kaTab);
+    if (history.replaceState) history.replaceState(null, "", "#" + (kaTab === "loc" ? "kartela" : kaTab));
     setHeader();
+    if (kaTab === "loc") { if (!klData || klKey !== flQuery()) loadKl(false); else klRender(); }
   }
 }
 document.querySelectorAll("#kaTabs button").forEach(b => b.onclick = () => kaShow(b.dataset.t));
@@ -3606,6 +3629,135 @@ $("srPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.d
 $("srTest").onclick = () => { const to = $("srTestTo").value.trim(); if (!to) { $("srMsg").textContent = "Enter an address for the test."; return; } startSalesReport(to, null); };
 $("srPeople").onclick = () => { const c = $("rcCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); };
 $("slEmail").onclick = () => { navTo("settings"); setTimeout(() => { const c = $("srCard"); if (c) c.scrollIntoView({behavior: "smooth", block: "start"}); }, 150); };
+// ---------------------------------------------------------------- Kartela → Location intelligence
+// Per location: payables and receivables open today on the restaurant's department, by age past the due
+// date, with the month's invoices and payments; built on the server (/api/kartela/locations).
+var klData = null, klKey = "", klTimer = null, klSort = "ap";
+var KL_AGES = ["not_due", "d30", "d60", "d90", "over90"];
+$("klSort").onchange = () => { klSort = $("klSort").value; klRender(); };
+$("klRead").onclick = () => loadKl(true);
+async function loadKl(refresh){
+  clearTimeout(klTimer);
+  const q = flQuery();
+  if (klKey !== q) { klData = null; klKey = q; }
+  if (!klData) $("klGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  $("klRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/kartela/locations?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (klKey !== q) return;
+    if (j.pending) {
+      $("klStatus").textContent = `Reading: ${j.stage || "starting"}…`;
+      if (!klData) $("klGrid").innerHTML = `<p class="hint">Reading the supplier and customer ledgers…</p>`;
+      if (kaTab === "loc") klTimer = setTimeout(() => loadKl(false), 4000);
+      return;
+    }
+    klData = j; klRender();
+  }catch(e){ $("klStatus").textContent = "Could not read: " + e.message; if (!klData) $("klGrid").innerHTML = ""; }
+  finally{ $("klRead").disabled = false; }
+}
+function klAge(S, h){
+  const A = (S || {}).ages || {}, tot = KL_AGES.reduce((a, k) => a + Math.max(0, A[k] || 0), 0), G = (klData || {}).ages || {};
+  if (!tot) return `<div class="kl-age" style="${h ? "height:" + h + "px" : ""}"></div>`;
+  return `<div class="kl-age" style="${h ? "height:" + h + "px" : ""}">${KL_AGES.map((k, i) => A[k] > 0 ? `<i class="kl-a${i}" style="flex:${A[k]}" title="${esc(G[k] || k)}: ${flM(A[k])}"></i>` : "").join("")}</div>`;
+}
+const klOver = S => S ? S.overdue || 0 : 0;
+function klSquare(code, L){
+  const P = L.ap, R = L.ar, a = (L.alerts || [])[0] || ["good", "Nothing overdue beyond 60 days"];
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const pc = (x, S) => S && S.owed ? Math.round(x / S.owed * 100) : null;
+  const big = P ? `<span class="v">${flM(P.owed)}</span><span class="cmp">owed to ${fmt(P.parties)} supplier${P.parties === 1 ? "" : "s"}${R ? ` · receivables ${flM(R.owed)}` : ""}</span>`
+    : `<span class="v">${flM((R || {}).owed)}</span><span class="cmp">receivables · ${fmt((R || {}).parties)} customer${(R || {}).parties === 1 ? "" : "s"}</span>`;
+  return `<div class="pl-sq" role="button" tabindex="0" data-klloc="${esc(code)}" aria-label="${esc(L.name || code)}: payables and receivables">
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "Not on a location")}</b><span>${esc([L.name && L.name !== code ? code : "", L.seasonal ? "seasonal" : ""].filter(Boolean).join(" · "))}</span></div></div>
+    <div class="big">${big}</div>
+    <div class="kl-row">${P ? `<span>AP</span>${klAge(P)}` : ""}${R ? `<span>AR</span>${klAge(R)}` : ""}</div>
+    <div class="st">${P ? stat("AP overdue", flM(P.overdue), pc(P.overdue, P) > 50 ? "warn" : "", `${pc(P.overdue, P) ?? 0}% of payables past the due date`) +
+        stat("AP > 60 d", flM(P.overdue_60), P.overdue_60 > 0 && pc(P.overdue_60, P) > ((klData.thresholds || {}).overdue_60 || 30) ? "up" : "", "Overdue more than 60 days") : ""}
+      ${R ? stat("AR overdue", flM(R.overdue), R.overdue > 0 ? "warn" : "", `${pc(R.overdue, R) ?? 0}% of receivables past the due date`) +
+        stat("AR > 60 d", flM(R.overdue_60), R.overdue_60 > 0 ? "up" : "", "Overdue more than 60 days") : ""}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function klRender(){
+  if (kaTab !== "loc" || !$("klGrid")) return;
+  const d = klData;
+  if (!d) { $("klGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const B = d.locations || {}, codes = Object.keys(B), C = d.currency || "", G = d.ages || {};
+  $("klStatus").innerHTML = `Open today (${esc(d.as_of)}) · invoiced and paid ${esc(d.period.from)} → ${esc(d.period.to)} · ${esc(C)}`
+    + (!d.rights.ap ? " · your role does not include Payables" : "") + (!d.rights.ar ? " · your role does not include Receivables" : "")
+    + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
+  const sum = (s, f) => codes.reduce((a, c) => a + ((B[c][s] || {})[f] || 0), 0);
+  const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  const apO = sum("ap", "owed"), apL = sum("ap", "overdue"), ap60 = sum("ap", "overdue_60"), arO = sum("ar", "owed"), arL = sum("ar", "overdue"), ar60 = sum("ar", "overdue_60");
+  const pc = (a, b) => b ? Math.round(a / b * 100) + "%" : "–";
+  $("klTotals").innerHTML = (d.rights.ap ? k("Payables open", flM(apO), `${C} · advances ${flM(sum("ap", "advance"))} · invoiced this month ${flM(sum("ap", "invoiced"))}`) +
+      k("Payables overdue", flM(apL), `${pc(apL, apO)} of payables · beyond 60 days ${flM(ap60)}`, ap60 > apO * 0.3 ? "up" : apL ? "warn" : "") : "") +
+    (d.rights.ar ? k("Receivables open", flM(arO), `${C} · credit balances ${flM(sum("ar", "advance"))} · invoiced this month ${flM(sum("ar", "invoiced"))}`) +
+      k("Receivables overdue", flM(arL), `${pc(arL, arO)} of receivables · beyond 60 days ${flM(ar60)}`, ar60 ? "up" : arL ? "warn" : "") : "");
+  const score = c => (B[c].alerts || []).reduce((a, x) => a + (x[0] === "crit" ? 100 : x[0] === "warn" ? 10 : 1), 0);
+  const key = {ap: c => -((B[c].ap || {}).owed || 0), apover: c => -klOver(B[c].ap), ar: c => -((B[c].ar || {}).owed || 0),
+    arover: c => -klOver(B[c].ar), alerts: c => -score(c), name: c => 0}[klSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (B[a].name || a).localeCompare(B[b].name || b));
+  const rest = codes.filter(c => B[c].group === "restaurant");
+  const by = {}; rest.forEach(c => { const b = (B[c].brand || c).toUpperCase(); (by[b] = by[b] || []).push(c); });
+  const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((B[c].brand || c).toUpperCase()));
+  const groups = [];
+  if (singles.length) groups.push({t: "Restaurants", c: singles});
+  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  const sup = codes.filter(c => B[c].group === "support"), none = codes.filter(c => B[c].group === "unassigned");
+  if (sup.length) groups.push({t: "Head office, central and warehouses", c: sup, hint: "departments that are not restaurants"});
+  if (none.length) groups.push({t: "Not on a location", c: none, hint: "entries with no department: often payments and group suppliers"});
+  $("klGrid").innerHTML = codes.length ? `<div class="cl-leg">${KL_AGES.map((a, i) => `<span><i class="kl-a${i}"></i>${esc(G[a] || a)}</span>`).join("")}</div>` + groups.map(g => {
+      const a = g.c.reduce((x, c) => x + ((B[c].ap || {}).owed || 0), 0), r = g.c.reduce((x, c) => x + ((B[c].ar || {}).owed || 0), 0);
+      return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}${d.rights.ap ? ` · payables ${flM(a)}` : ""}${d.rights.ar ? ` · receivables ${flM(r)}` : ""} ${esc(C)}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+        <div class="pl-grid">${sorted(g.c).map(c => klSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">Nothing open or posted on the suppliers and customers of this company.</p>`;
+  $("klDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("");
+  if ($("klBd").classList.contains("show") && $("klPop").dataset.code != null) klDraw($("klPop").dataset.code);
+}
+function klOpen(code){ $("klPop").dataset.code = code; klDraw(code); $("klBd").classList.add("show"); }
+function klDraw(code){
+  const L = (klData && klData.locations || {})[code]; if (!L) return;
+  const C = klData.currency || "", G = klData.ages || {};
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const dd = x => x ? new Date(x + "T00:00:00").toLocaleDateString("en-GB", {day: "2-digit", month: "short", year: "2-digit"}) : "–";
+  const side = (k, S, who, flow) => {
+    if (!S) return "";
+    const ages = `<div class="pl-tiles" style="margin:6px 0 0;grid-template-columns:repeat(auto-fit,minmax(118px,1fr))">${KL_AGES.map((a, i) => tile(`<i class="kl-a${i}" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px"></i>${esc(G[a] || a)}`, flM(S.ages[a]), S.owed ? Math.round((S.ages[a] || 0) / S.owed * 100) + "%" : "")).join("")}</div>`;
+    const top = S.top.length ? `<div class="scroll"><table data-nosort><tr><th>${who}</th><th class="num">Open</th><th class="num">Overdue</th><th class="num">Entries</th><th>Oldest due</th></tr>${S.top.map(t => `<tr><td>${esc(t[0])}<div class="meta">${esc(t[1])}</div></td><td class="num">${fmt(t[2])}</td><td class="num ${t[3] ? "up" : ""}">${fmt(t[3])}</td><td class="num">${fmt(t[4])}</td><td class="meta">${dd(t[5])}</td></tr>`).join("")}</table></div>` : `<p class="hint">Nothing open.</p>`;
+    const late = S.late.length ? `<div class="scroll"><table data-nosort><tr><th>Document</th><th>${who}</th><th>Due</th><th class="num">Days late</th><th class="num">Amount</th></tr>${S.late.map(x => `<tr><td>${esc(x[0])}<div class="meta">${esc(x[5])}</div></td><td>${esc(x[1])}</td><td class="meta">${dd(x[2])}</td><td class="num ${x[3] > 60 ? "up" : x[3] > 30 ? "warn" : ""}">${fmt(x[3])}</td><td class="num">${fmt(x[4])}</td></tr>`).join("")}</table></div>` : `<p class="hint">Nothing overdue.</p>`;
+    return `<div class="pl-panel" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0;font-size:15px">${k === "ap" ? "Payables" : "Receivables"}</h3>
+        <button class="mini" data-klgo="${k}">${k === "ap" ? "Accounts payable" : "Accounts receivable"} ›</button></div>
+      <div class="pl-tiles" style="margin:8px 0 0">${tile("Open today", flM(S.owed), `${fmt(S.n)} entries · ${fmt(S.parties)} ${who.toLowerCase()}s`) +
+        tile("Overdue", flM(S.overdue), `${S.owed ? Math.round(S.overdue / S.owed * 100) : 0}% · beyond 60 days ${flM(S.overdue_60)}`, S.overdue_60 ? "up" : S.overdue ? "warn" : "") +
+        tile(k === "ap" ? "Advances paid" : "Credit balances", flM(S.advance), k === "ap" ? "debit balances with suppliers" : "customers paid ahead or credits not applied") +
+        tile(`${flow[0]} this month`, flM(S.invoiced), `${fmt(S.docs)} invoices · ${flow[1]} ${flM(S.paid)}`)}</div>
+      <div style="margin:10px 0 2px">${klAge(S, 12)}</div>${ages}
+      <div class="pl-cols" style="margin-top:12px">
+        <div><h4 style="margin:0 0 6px;font-size:13px">${who}s with the most open</h4>${top}</div>
+        <div><h4 style="margin:0 0 6px;font-size:13px">Largest overdue entries</h4>${late}</div>
+      </div></div>`;
+  };
+  $("klPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph(L)}</div>
+      <div><h2>${esc(L.name || code || "Not on a location")}</h2><div class="sub">${esc(code || "no department")} · open today ${esc(klData.as_of)} · month ${esc(klData.period.from)} → ${esc(klData.period.to)} · ${esc(C)}</div></div><div class="sp"></div>
+      <button class="close" data-klclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div style="margin-bottom:10px">${L.alerts.map(x => `<div class="meta" style="margin:2px 0"><span class="pl-sev ${esc(x[0])}"></span>${esc(x[1])}</div>`).join("")}</div>` : ""}
+      ${side("ap", L.ap, "Supplier", ["Invoiced", "paid"])}${side("ar", L.ar, "Customer", ["Invoiced", "received"])}
+    </div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-klclose]") || t === $("klBd")) { $("klBd").classList.remove("show"); return; }
+  const g = t.closest("[data-klgo]"); if (g) { $("klBd").classList.remove("show"); kaShow(g.dataset.klgo); return; }
+  const s = t.closest("[data-klloc]"); if (s) klOpen(s.dataset.klloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("klBd").classList.contains("show")) { $("klBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.klloc != null && e.target.closest("#klGrid")) { e.preventDefault(); klOpen(e.target.dataset.klloc); }
+});
 // ---------------------------------------------------------------- Cash & bank → Location intelligence
 // Per location: the till's takings by tender (Simphony) against the receipts in BC's cash boxes, banks
 // and online accounts on the restaurant's department; built on the server (/api/cash/locations).

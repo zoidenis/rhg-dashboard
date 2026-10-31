@@ -226,6 +226,12 @@ class BCClient:
             {"$filter": f"Posting_Date ge {date_from} and Posting_Date le {date_to}",
              "$select": ",".join(VENDOR_FIELDS)}))
 
+    def customer_entries(self, company, date_from, date_to, max_age=300):
+        return self._cached(("armov", company, date_from, date_to), max_age, lambda: self._get_all(
+            self._url(company, config.E_CUSTOMER),
+            {"$filter": f"Posting_Date ge {date_from} and Posting_Date le {date_to}",
+             "$select": ",".join(CUSTOMER_FIELDS)}))
+
     def bank_entries(self, company, date_from, date_to, max_age=300):
         """Bank movements. Posted entries never change, so they are kept in the local file
         and only newer entry numbers are fetched."""
