@@ -220,6 +220,12 @@ td.num,th.num{text-align:right}
 @media (prefers-color-scheme: dark){:root{--fl-c1:#3a95c6;--fl-c2:#c4832a;--fl-c3:#9479d6;--fl-c4:#3aa87a}}
 .fl-c1{background:var(--fl-c1)}.fl-c2{background:var(--fl-c2)}.fl-c3{background:var(--fl-c3)}.fl-c4{background:var(--fl-c4)}
 .fl-tab .fl-bad{color:var(--up)} .fl-tab .fl-good{color:var(--down)}
+.cl-c1{background:var(--fl-c1)}.cl-c2{background:var(--fl-c4)}.cl-c3{background:var(--fl-c3)}.cl-c4{background:var(--fl-c2)}
+.cl-bars{display:grid;grid-template-columns:34px 1fr;gap:3px 6px;align-items:center;font-size:10px;color:var(--sub)}
+.cl-bars .fl-split{margin:0}
+.cl-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--sub);margin:2px 0 8px}
+.cl-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.cl-day td{white-space:nowrap}
 .fl-tab th.grp{text-align:center;border-bottom:1px solid var(--line)}
 .fl-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .fl-days span{font-size:11px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:2px 6px}
@@ -389,10 +395,27 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-cash">
+    <div class="ov-tabs" id="clTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Cash &amp; bank</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="clMain">
     <div class="card" style="margin-bottom:15px"><h2>Cash and bank</h2><p class="hint" id="cashNote"></p>
       <div class="scroll"><table id="cashTable"></table></div></div>
     <div class="card"><h2>Bank movements in the period</h2><p class="hint">From the bank ledger entries</p>
       <div class="scroll"><table id="bankTable"></table></div></div>
+    </div>
+    <div id="clView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>Takings and receipts by location</h2>
+          <p class="hint">Every location as a square: what the till took (Simphony, by tender: cash, cards, on account, other) next to what reached the cash boxes, the banks and the online accounts in Business Central on the restaurant's department, for the month chosen above. Click a location for its days.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="clSort">Order</label><select id="clSort"><option value="taken">by takings</option><option value="cashgap">by cash gap</option><option value="cardgap">by card gap</option><option value="unposted">by days not posted</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
+            <button class="mini dark" id="clRead">Read again</button></div></div>
+        <p class="meta" id="clStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="clTotals"></div>
+      <div id="clGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="clDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
   </section>
 
   <section class="view" id="v-kartela">
@@ -914,6 +937,7 @@ td.num,th.num{text-align:right}
   <div class="foot" id="foot"></div>
 </main>
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
+<div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
@@ -1037,6 +1061,7 @@ function render(){
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
+  if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
@@ -2638,6 +2663,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="inventory" && ilTab === "loc" && (!ilData || ilKey !== ilQuery())) loadIl(false);
   if(b.dataset.view==="overview" && flTab === "loc" && (!flData || flKey !== flQuery())) loadFl(false);
+  if(b.dataset.view==="cash" && clTab === "loc" && (!clData || clKey !== flQuery())) loadCl(false);
   if(b.dataset.view==="budget" && blTab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
@@ -3331,6 +3357,158 @@ async function pollBrandReport(){
 $("brPreview").onclick = () => { if (!$("brBrand").value) { $("brMsg").textContent = "No brand in the registry yet."; return; }
   const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the brand performance report…</p>"); startBrandReport("", w); };
 $("brTest").onclick = () => { const to = $("brTestTo").value.trim(); if (!to) { $("brMsg").textContent = "Enter an address for the test."; return; } startBrandReport(to, null); };
+// ---------------------------------------------------------------- Cash & bank → Location intelligence
+// Per location: the till's takings by tender (Simphony) against the receipts in BC's cash boxes, banks
+// and online accounts on the restaurant's department; built on the server (/api/cash/locations).
+let clTab = "main", clData = null, clKey = "", clTimer = null, clSort = "taken";
+function clShowTab(tab){
+  clTab = tab;
+  document.querySelectorAll("#clTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("clMain").style.display = tab === "loc" ? "none" : "";
+  $("clView").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { if (!clData || clKey !== flQuery()) loadCl(false); else clRender(); }
+}
+document.querySelectorAll("#clTabs button").forEach(b => b.onclick = () => clShowTab(b.dataset.t));
+$("clSort").onchange = () => { clSort = $("clSort").value; clRender(); };
+$("clRead").onclick = () => loadCl(true);
+async function loadCl(refresh){
+  clearTimeout(clTimer);
+  const q = flQuery();
+  if (clKey !== q) { clData = null; clKey = q; }
+  if (!clData) $("clGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  $("clRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/cash/locations?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (clKey !== q) return;
+    if (j.pending) {
+      $("clStatus").textContent = `Reading: ${j.stage || "starting"}… the first read of a month is one Simphony call per location and day, a few minutes.`;
+      if (!clData) $("clGrid").innerHTML = `<p class="hint">Reading Simphony and Business Central…</p>`;
+      if (clTab === "loc") clTimer = setTimeout(() => loadCl(false), 5000);
+      return;
+    }
+    clData = j; clRender();
+  }catch(e){ $("clStatus").textContent = "Could not read: " + e.message; }
+  finally{ $("clRead").disabled = false; }
+}
+const clTaken = L => (L.pos || {}).taken || 0;
+function clBars(L){
+  const P = L.pos || {}, B = L.bc || {}, mx = Math.max(1, (P.cash || 0) + (P.card || 0) + (P.account || 0) + (P.voucher || 0) + (P.other || 0), B.received || 0);
+  const seg = (cls, label, v) => v > 0 ? `<i class="${cls}" style="flex:${v}" title="${label}: ${flM(v)}"></i>` : "";
+  const pad = v => v < mx ? `<i style="flex:${mx - v};background:transparent"></i>` : "";
+  const pt = (P.cash || 0) + (P.card || 0) + (P.account || 0) + (P.voucher || 0) + (P.other || 0);
+  return `<div class="cl-bars"><span>Till</span><div class="fl-split">${seg("cl-c1", "Cash", P.cash)}${seg("cl-c2", "Cards", P.card)}${seg("cl-c3", "On account", P.account)}${seg("cl-c4", "Vouchers and other", (P.voucher || 0) + (P.other || 0))}${pad(pt)}</div>
+    <span>BC</span><div class="fl-split">${seg("cl-c1", "Cash boxes", B.cash)}${seg("cl-c2", "Banks", B.bank)}${seg("cl-c3", "Online and wallets", B.online)}${pad(B.received || 0)}</div></div>`;
+}
+function clSquare(code, L){
+  const P = L.pos, B = L.bc, r = L.rec || {}, a = (L.alerts || [])[0] || (P ? ["good", "Takings and receipts agree"] : ["info", "No till: BC movements only"]);
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const tol = (clData || {}).tolerance || 3;
+  const gcls = p => p == null ? "" : p < -tol ? "up" : Math.abs(p) > tol ? "warn" : "";
+  const big = P ? `<span class="v">${flM(P.taken)}</span><span class="cmp">taken · BC received ${flM((B || {}).received)} · <b class="${gcls(r.total_gap_pct)}">${flPct(r.total_gap_pct)}</b></span>`
+    : `<span class="v">${flM((B || {}).received)}</span><span class="cmp">received in BC · out ${flM((B || {}).out)}</span>`;
+  return `<div class="pl-sq" role="button" tabindex="0" data-clloc="${esc(code)}" aria-label="${esc(L.name || code)}: takings and receipts">
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "Not on a location")}</b><span>${esc([L.name && L.name !== code ? code : "", L.seasonal ? "seasonal" : ""].filter(Boolean).join(" · "))}</span></div></div>
+    <div class="big">${big}</div>
+    ${clBars(L)}
+    <div class="st">${P ? stat("Cash gap", r.cash_gap != null ? `${r.cash_gap > 0 ? "+" : ""}${flM(r.cash_gap)}` : "–", gcls(r.cash_gap_pct), `Cash boxes ${flM((B || {}).cash)} against cash taken ${flM(P.cash)}`) +
+        stat("Card gap", r.card_gap != null ? `${r.card_gap > 0 ? "+" : ""}${flM(r.card_gap)}` : "–", r.card_gap_pct != null && Math.abs(r.card_gap_pct) > tol * 2 ? "warn" : "", `Banks and online ${flM(((B || {}).bank || 0) + ((B || {}).online || 0))} against cards ${flM(P.card)}`) +
+        stat("Not posted", `${(r.unposted || []).length} d`, (r.unposted || []).length > 2 ? "warn" : "", "Days with takings and no receipt on the department") +
+        stat("Paid out", flM(P.paid_out), "", "Pickups at the till")
+      : stat("Received", flM((B || {}).received)) + stat("Out", flM((B || {}).out)) + stat("Cash boxes", flM((B || {}).cash)) + stat("Banks", flM(((B || {}).bank || 0) + ((B || {}).online || 0)))}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function clRender(){
+  if (clTab !== "loc" || !$("clGrid")) return;
+  const d = clData;
+  if (!d) { $("clGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const B = d.locations || {}, codes = Object.keys(B), C = d.currency || "", tol = d.tolerance || 3;
+  $("clStatus").innerHTML = `${esc(d.period.from)} → ${esc(d.period.to)}${d.period.running ? " (running month: to yesterday)" : ""} · ${esc(C)}`
+    + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
+  const sum = f => codes.reduce((a, c) => a + (f(B[c]) || 0), 0);
+  const taken = sum(L => (L.pos || {}).taken), cash = sum(L => (L.pos || {}).cash), card = sum(L => (L.pos || {}).card);
+  const rest = codes.filter(c => B[c].group === "restaurant");
+  const rcash = rest.reduce((a, c) => a + ((B[c].bc || {}).cash || 0), 0), rnon = rest.reduce((a, c) => a + ((B[c].bc || {}).bank || 0) + ((B[c].bc || {}).online || 0), 0);
+  const unp = rest.reduce((a, c) => a + ((B[c].rec || {}).unposted || []).length, 0);
+  const cg = rcash - cash, cgp = cash ? cg / cash * 100 : null, kg = rnon - card, kgp = card ? kg / card * 100 : null;
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("clTotals").innerHTML =
+    k("Taken at the till", flM(taken), `${C} · cash ${flM(cash)} · cards ${flM(card)}`) +
+    k("Cash received in BC", flM(rcash), `cash boxes on the restaurants · ${cg > 0 ? "+" : ""}${flM(cg)} (${flPct(cgp)}) against cash taken`, cgp != null && cgp < -tol ? "up" : "") +
+    k("Bank and online in BC", flM(rnon), `${kg > 0 ? "+" : ""}${flM(kg)} (${flPct(kgp)}) against cards`, kgp != null && Math.abs(kgp) > tol * 2 ? "warn" : "") +
+    k("Days not posted", fmt(unp), "location-days with takings and no receipt in BC", unp ? "warn" : "");
+  const score = c => (B[c].alerts || []).reduce((a, x) => a + (x[0] === "crit" ? 100 : x[0] === "warn" ? 10 : 1), 0);
+  const key = {taken: c => -clTaken(B[c]) || -(((B[c].bc || {}).received) || 0) / 1e9, cashgap: c => ((B[c].rec || {}).cash_gap_pct ?? 1e9),
+    cardgap: c => -Math.abs((B[c].rec || {}).card_gap_pct ?? -1), unposted: c => -(((B[c].rec || {}).unposted || []).length), alerts: c => -score(c), name: c => 0}[clSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (B[a].name || a).localeCompare(B[b].name || b));
+  // grouped as the other location screens: brands with several places on their own, then the rest
+  const by = {}; rest.forEach(c => { const b = (B[c].brand || c).toUpperCase(); (by[b] = by[b] || []).push(c); });
+  const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((B[c].brand || c).toUpperCase()));
+  const groups = [];
+  if (singles.length) groups.push({t: "Restaurants", c: singles});
+  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  const sup = codes.filter(c => B[c].group === "support"), none = codes.filter(c => B[c].group === "unassigned");
+  if (sup.length) groups.push({t: "Head office, central and warehouses", c: sup, hint: "BC movements on departments that are not restaurants"});
+  if (none.length) groups.push({t: "Not on a location", c: none, hint: "bank movements with no department: transfers, suppliers, salaries"});
+  $("clGrid").innerHTML = codes.length ? `<div class="cl-leg"><span><i class="cl-c1"></i>Cash</span><span><i class="cl-c2"></i>Cards · banks</span><span><i class="cl-c3"></i>On account · online and wallets</span><span><i class="cl-c4"></i>Vouchers and other</span></div>` + groups.map(g => {
+      const t = g.c.reduce((a, c) => a + clTaken(B[c]), 0), rv = g.c.reduce((a, c) => a + ((B[c].bc || {}).received || 0), 0);
+      return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}${t ? ` · taken ${flM(t)}` : ""} · received in BC ${flM(rv)} ${esc(C)}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+        <div class="pl-grid">${sorted(g.c).map(c => clSquare(c, B[c])).join("")}</div>`; }).join("")
+    : `<p class="hint">Nothing taken or received in this period.</p>`;
+  $("clDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
+    `<p style="margin:0">Alerts: cash received more than ${fmt(tol)}% under (critical) or over the cash taken; bank and online receipts more than ${fmt(tol * 2)}% away from cards; more than two days with takings and nothing posted; paid out over 5% of takings. The limit is "Posting gap" in Settings → Location intelligence.</p>`;
+  if ($("clBd").classList.contains("show") && $("clPop").dataset.code != null) clDraw($("clPop").dataset.code);
+}
+function clOpen(code){ $("clPop").dataset.code = code; clDraw(code); $("clBd").classList.add("show"); }
+function clDraw(code){
+  const L = (clData && clData.locations || {})[code]; if (!L) return;
+  const P = L.pos, B = L.bc || {}, r = L.rec || {}, C = clData.currency || "", G = clData.groups || {}, tol = clData.tolerance || 3;
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const gp = (v, p, bad) => `${v > 0 ? "+" : ""}${flM(v)} <small>${flPct(p)}</small>`;
+  const tiles = P ? tile("Taken at the till", flM(P.taken), `cash ${flM(P.cash)} · cards ${flM(P.card)} · net sales ${flM(P.net)}`) +
+      tile("Cash gap", gp(r.cash_gap, r.cash_gap_pct), `cash boxes ${flM(B.cash)} against ${flM(P.cash)}`, r.cash_gap_pct != null && r.cash_gap_pct < -tol ? "up" : "") +
+      tile("Card gap", gp(r.card_gap, r.card_gap_pct), `banks ${flM(B.bank)} + online ${flM(B.online)} against ${flM(P.card)}`, r.card_gap_pct != null && Math.abs(r.card_gap_pct) > tol * 2 ? "warn" : "") +
+      tile("Days not posted", fmt((r.unposted || []).length), `of ${fmt(P.days)} trading days`, (r.unposted || []).length > 2 ? "warn" : "")
+    : tile("Received in BC", flM(B.received), `cash boxes ${flM(B.cash)} · banks ${flM(B.bank)} · online ${flM(B.online)}`) + tile("Out", flM(B.out), "credits on this department") + tile("Entries", fmt(B.entries), "") + tile("Till", "–", "no Simphony location on this department");
+  const tend = P && P.tenders.length ? `<table data-nosort><tr><th>Tender</th><th>Group</th><th class="num">Total</th><th class="num">Uses</th></tr>${P.tenders.map(t => `<tr><td>${esc(t[0])}</td><td class="meta">${esc(G[t[1]] || (t[1] === "paid_out" ? "Paid out" : t[1] === "paid_in" ? "Paid in" : t[1]))}</td><td class="num">${fmt(t[2])}</td><td class="num">${fmt(t[3])}</td></tr>`).join("")}</table>` : `<p class="hint">${P ? "No tender read for this period." : "No till here."}</p>`;
+  const acc = (B.accounts || []).length ? `<table data-nosort><tr><th>Account</th><th>Kind</th><th class="num">In</th><th class="num">Out</th></tr>${B.accounts.map(a => `<tr><td>${esc(a[0])}</td><td class="meta">${esc({cash: "Cash box", bank: "Bank", online: "Online / wallet"}[a[1]] || a[1])}</td><td class="num">${fmt(a[2])}</td><td class="num">${fmt(a[3])}</td></tr>`).join("")}</table>` : `<p class="hint">Nothing posted on this department in the period.</p>`;
+  const days = [...new Set([...Object.keys((P || {}).daily || {}), ...Object.keys(B.daily || {})])].sort();
+  const mx = Math.max(1, ...days.map(d => Math.max((((P || {}).daily || {})[d] || {}).cash + (((P || {}).daily || {})[d] || {}).card || 0, ((B.daily || {})[d] || {}).cash + ((B.daily || {})[d] || {}).bank + ((B.daily || {})[d] || {}).online || 0)));
+  const dayRows = days.map(d => { const p = ((P || {}).daily || {})[d] || {cash: 0, card: 0, other: 0, net: 0}, b = (B.daily || {})[d] || {cash: 0, bank: 0, online: 0};
+    const tk = p.cash + p.card, rv = b.cash + b.bank + b.online, miss = tk > 0 && !rv;
+    return `<tr class="cl-day"><td>${esc(new Date(d + "T00:00:00").toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "short"}))}</td>
+      <td class="num">${fmt(p.cash)}</td><td class="num">${fmt(b.cash)}</td><td class="num ${b.cash - p.cash < -1 ? "fl-bad" : ""}">${fmt(b.cash - p.cash)}</td>
+      <td class="num">${fmt(p.card)}</td><td class="num">${fmt(b.bank + b.online)}</td><td class="num">${fmt(b.bank + b.online - p.card)}</td>
+      <td style="width:28%;min-width:120px"><div class="fl-split" style="height:6px" title="Till ${fmt(tk)}"><i class="cl-c1" style="flex:${p.cash}"></i><i class="cl-c2" style="flex:${p.card}"></i><i style="flex:${Math.max(0, mx - tk)};background:transparent"></i></div>
+        <div class="fl-split" style="height:6px;margin-top:2px" title="BC ${fmt(rv)}"><i class="cl-c1" style="flex:${b.cash}"></i><i class="cl-c2" style="flex:${b.bank + b.online}"></i><i style="flex:${Math.max(0, mx - rv)};background:transparent"></i></div>
+        ${miss ? `<span class="meta up">not posted</span>` : ""}</td></tr>`; }).join("");
+  $("clPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph(L)}</div>
+      <div><h2>${esc(L.name || code || "Not on a location")}</h2><div class="sub">${esc(code || "no department")} · ${esc(clData.period.from)} → ${esc(clData.period.to)} · ${esc(C)}</div></div><div class="sp"></div>
+      <button class="close" data-clgo="cash">Cash &amp; bank ›</button><button class="close" data-clclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div style="margin-bottom:10px">${L.alerts.map(x => `<div class="meta" style="margin:2px 0"><span class="pl-sev ${esc(x[0])}"></span>${esc(x[1])}</div>`).join("")}</div>` : ""}
+      <div class="pl-tiles">${tiles}</div>
+      ${P ? `<div class="pl-panel" style="margin-bottom:12px"><h3 style="margin:0 0 6px;font-size:14px">The till by group</h3><div class="pl-tiles" style="margin:0">${["cash", "card", "account", "voucher", "comp", "other"].filter(g => P[g]).map(g => tile(esc(G[g] || g), flM(P[g]), P.taken ? `${Math.round(P[g] / (P.cash + P.card + P.account + P.voucher + P.comp + P.other || 1) * 100)}% of payments` : "")).join("")}${P.paid_out ? tile("Paid out", flM(P.paid_out), "pickups at the till") : ""}</div></div>` : ""}
+      <div class="pl-cols" style="margin-bottom:12px">
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Simphony tenders</h3>${tend}</div>
+        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Business Central accounts on ${esc(code || "no department")}</h3>${acc}</div>
+      </div>
+      ${days.length ? `<div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Day by day</h3><p class="hint" style="margin:0 0 6px">Settlements and deposits can post a day or two later: a gap on one day and its opposite on the next is timing.</p>
+        <div class="scroll"><table class="fl-tab" data-nosort><tr><th>Day</th><th class="num">Cash taken</th><th class="num">Cash in BC</th><th class="num">Gap</th><th class="num">Cards</th><th class="num">Bank + online</th><th class="num">Gap</th><th>Till / BC</th></tr>${dayRows}</table></div></div>` : ""}
+    </div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-clclose]") || t === $("clBd")) { $("clBd").classList.remove("show"); return; }
+  if (t.closest("[data-clgo]")) { $("clBd").classList.remove("show"); clShowTab("main"); return; }
+  const s = t.closest("[data-clloc]"); if (s) clOpen(s.dataset.clloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("clBd").classList.contains("show")) { $("clBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.clloc != null && e.target.closest("#clGrid")) { e.preventDefault(); clOpen(e.target.dataset.clloc); }
+});
 // ---------------------------------------------------------------- Budget & forecast → Location intelligence
 // Every location (BC department) as a square: revenue (class 7), expenses (class 6) and the result
 // against the G/L budget, for the month chosen or the year to date. A click opens the location's

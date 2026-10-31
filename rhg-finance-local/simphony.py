@@ -352,6 +352,47 @@ def daily_totals(loc_ref, bus_dt, latest=None):
     return row
 
 
+_tmed_cache = {}
+
+
+def tender_dims(loc_ref, max_age=6 * 3600):
+    """{tender number: {name, type, subType, cat, mstrName}} of one location (getTenderMediaDimensions)."""
+    hit = _tmed_cache.get(loc_ref)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    rows = (call("getTenderMediaDimensions", {"locRef": loc_ref}) or {}).get("tenderMedias") or []
+    value = {int(t["num"]): {k: t.get(k) for k in ("name", "type", "subType", "cat", "mstrName")}
+             for t in rows if t.get("num") is not None}
+    _tmed_cache[loc_ref] = (time.time(), value)
+    return value
+
+
+def tender_totals(loc_ref, bus_dt, latest=None):
+    """{tender number: [total, count]} of one location and business date (getTenderMediaDailyTotals),
+    every revenue centre together; kept with the daily totals, final days are not read again."""
+    key = f"T|{loc_ref}|{bus_dt}"
+    with _days_lock:
+        hit = _days().get(key)
+    final_before = (date.fromisoformat(latest) - timedelta(days=2)).isoformat() if latest else None
+    if hit and (hit.get("final") or time.time() - hit.get("at", 0) < 900):
+        return hit["t"]
+    j = call("getTenderMediaDailyTotals", {"locRef": loc_ref, "busDt": bus_dt}) or {}
+    t = {}
+    for rvc in j.get("revenueCenters") or []:
+        for m in rvc.get("tenderMedias") or []:
+            if m.get("tmedNum") is None:
+                continue
+            x = t.setdefault(str(int(m["tmedNum"])), [0.0, 0])
+            x[0] += float(m.get("ttl") or 0)
+            x[1] += int(m.get("cnt") or 0)
+    row = {"at": time.time(), "t": t, "final": bool(final_before and bus_dt <= final_before)}
+    with _days_lock:
+        _days()[key] = row
+        _days_mem["dirty"] += 1
+        _save_days()
+    return t
+
+
 def _sum(rvcs, field):
     return sum(float(r.get(field) or 0) for r in rvcs)
 

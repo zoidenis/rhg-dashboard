@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 
 import arap_notify
 import brand_report
+import cashloc
 import recipients
 import requests
 import cost_report
@@ -1215,6 +1216,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, locintel.request(client, q.get("company") or config.BC_COMPANY,
                                                  (c_from, c_to, p_from, p_to, ly_from, ly_to, running, label),
                                                  _latest, in_parallel_jobs, rights, q.get("refresh") == "1"))
+            elif url.path == "/api/cash/locations":
+                try:
+                    period = periods(q.get("period"), "month")[:8]
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                self._send(200, cashloc.request(client, company, period, company_currency(company), _latest,
+                                                in_parallel_jobs, q.get("refresh") == "1"))
             elif url.path == "/api/finance/locations":
                 try:
                     period = periods(q.get("period"), "month")[:8]

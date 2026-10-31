@@ -237,6 +237,18 @@ class BCClient:
                                  {"$filter": flt, "$select": ",".join(BANK_FIELDS)})
         return self._cached_immutable("bank", company, date_from, date_to, go)
 
+    def bank_entries_dim(self, company, date_from, date_to):
+        """Bank and cash-box movements with their dimension set and debit/credit, for Cash & bank →
+        Location intelligence (the restaurant's receipts are posted on its department)."""
+        fields = BANK_FIELDS + ["Dimension_Set_ID", "Debit_Amount_LCY", "Credit_Amount_LCY"]
+
+        def go(after):
+            flt = f"Posting_Date ge {date_from} and Posting_Date le {date_to}"
+            if after:
+                flt += f" and Entry_No gt {after}"
+            return self._get_all(self._url(company, config.E_BANK), {"$filter": flt, "$select": ",".join(fields)})
+        return self._cached_immutable("bankdim", company, date_from, date_to, go)
+
     def material_gl_entries(self, company, date_from, date_to, threshold, limit=400, max_age=300):
         """Only entries at or above the materiality threshold: the ledger itself is far too
         large to read in full (tens of thousands of entries a day)."""
