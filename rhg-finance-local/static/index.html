@@ -26,8 +26,8 @@ nav .grp:first-child{margin-top:0}
 nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:flex;justify-content:space-between;align-items:center;font-size:13.5px}
 nav button:hover{background:rgba(160,216,234,.09)}
 nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
-#invTabs,#fbTabs{overflow-x:auto;scrollbar-width:thin}
-#invTabs button,#fbTabs button{white-space:nowrap}
+#invTabs,#fbTabs,#stTabs{overflow-x:auto;scrollbar-width:thin}
+#invTabs button,#fbTabs button,#stTabs button{white-space:nowrap}
 nav .count{background:rgba(160,216,234,.2);color:var(--prev);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
 .side-foot{margin-top:auto;font-size:11.5px;color:#7e9daa;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 26px 60px}
@@ -261,14 +261,15 @@ td.num,th.num{text-align:right}
     <button data-view="sales">Sales · Simphony</button>
 
     <div class="grp">Statements</div>
-    <button data-view="pl">Profit &amp; loss</button>
-    <button data-view="bs">Balance sheet</button>
+    <button data-view="pl" data-tab="Profit &amp; loss" data-group="Statements">Financial statements</button>
+    <button data-view="bs" data-parent="pl" data-tab="Balance sheet" style="display:none">Balance sheet</button>
+    <button data-view="treasury" data-parent="pl" data-tab="Cash flow &amp; treasury" style="display:none">Cash flow &amp; treasury</button>
     <button data-view="gl">G/L entries</button>
 
     <div class="grp">Working capital</div>
     <button data-view="cash">Cash &amp; bank</button>
     <button data-view="kartela">Kartela</button>
-    <button data-view="fiscal" data-tab="Fiscal purchases vs BC">Fiscal vs BC</button>
+    <button data-view="fiscal" data-tab="Fiscal purchases vs BC" data-group="Fiscal vs BC">Fiscal vs BC</button>
     <button data-view="fsales" data-parent="fiscal" data-tab="Fiscal sales vs BC" style="display:none">Fiscal sales vs BC</button>
     <button data-view="inventory">Inventory</button>
     <!-- tabs of Inventory: kept as views (addresses #typology, #recipes ... and their loading), not listed -->
@@ -278,7 +279,6 @@ td.num,th.num{text-align:right}
     <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
 
     <div class="grp">Planning</div>
-    <button data-view="treasury">Cash flow &amp; treasury</button>
     <button data-view="budget">Budget &amp; forecast</button>
     <button data-view="assets">Fixed assets</button>
 
@@ -371,6 +371,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-pl">
+    <div class="ov-tabs" id="stTabs" role="tablist"><button data-t="pl" class="on" role="tab" aria-selected="true">Profit &amp; loss</button><button data-t="bs" role="tab" aria-selected="false">Balance sheet</button><button data-t="treasury" role="tab" aria-selected="false">Cash flow &amp; treasury</button></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plNote"></p></div>
       <button class="mini" data-drill="pl">Open by account</button></div>
       <div class="scroll"><table id="plTable"></table></div></div>
@@ -2650,7 +2651,10 @@ function currentView(){
   let label = (b ? b.textContent : "Executive overview").trim().replace(/\s*\d+$/,"");
   if (id === "kartela") label += " · " + (kaTab === "ar" ? "Accounts receivable" : "Accounts payable");
   if (b && b.dataset.parent === "inventory") label = "Inventory · " + label;
-  if (id === "fiscal" || id === "fsales") label = "Fiscal vs BC · " + b.dataset.tab;
+  if (b && b.dataset.tab) {           // a tab of a menu item: "<item> · <tab>"
+    const head = b.dataset.group || (document.querySelector(`#nav button[data-view="${b.dataset.parent}"]`) || {dataset: {}}).dataset.group || "";
+    label = (head ? head + " · " : "") + b.dataset.tab;
+  }
   return {id, label};
 }
 // ---- Kartela: accounts payable and accounts receivable as two tabs of one screen. The old addresses
@@ -2786,14 +2790,19 @@ function invTabsSync(view){
   bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
   const on = bar.querySelector("button.on"); if (on && on.scrollIntoView && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
 }
-// Fiscal vs BC: purchases and sales, two views under one menu item, with one tab bar on top of the open one
+// Views shown as tabs of one menu item: Fiscal vs BC (purchases, sales) and Financial statements (P&L,
+// balance sheet, cash flow & treasury). Each stays a view of its own (address, loading); the tab bar
+// moves on top of the open one.
+var TAB_BARS = {fbTabs: ["fiscal", "fsales"], stTabs: ["pl", "bs", "treasury"]};
 function fbTabsSync(view){
-  const bar = $("fbTabs"), sec = $("v-" + view);
-  if (!bar || !sec || (view !== "fiscal" && view !== "fsales")) return;
-  if (bar.parentNode !== sec) sec.insertBefore(bar, sec.firstChild);
-  bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === view); b.setAttribute("aria-selected", b.dataset.t === view); });
+  for (const [id, views] of Object.entries(TAB_BARS)) {
+    const bar = $(id), sec = $("v-" + view);
+    if (!bar || !sec || !views.includes(view)) continue;
+    if (bar.parentNode !== sec) sec.insertBefore(bar, sec.firstChild);
+    bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === view); b.setAttribute("aria-selected", b.dataset.t === view); });
+  }
 }
-document.querySelectorAll("#fbTabs button").forEach(b => b.onclick = () => navTo(b.dataset.t));
+document.querySelectorAll("#fbTabs button, #stTabs button").forEach(b => b.onclick = () => navTo(b.dataset.t));
 function ilShowTab(tab){
   if (INV_TABS.has(tab)) { navTo(tab); return; }
   ilTab = tab;
