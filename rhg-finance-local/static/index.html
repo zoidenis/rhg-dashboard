@@ -221,6 +221,20 @@ td.num,th.num{text-align:right}
 .fl-tab th.grp{text-align:center;border-bottom:1px solid var(--line)}
 .fl-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .fl-days span{font-size:11px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:2px 6px}
+.bl-att{display:grid;grid-template-columns:62px 1fr 42px;gap:4px 6px;align-items:center;font-size:10.5px;color:var(--sub)}
+.bl-att .tr{position:relative;height:7px;border-radius:4px;background:var(--bg);overflow:hidden}
+.bl-att .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.bl-att .tr b{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink);left:calc(100% / 1.3 - 1px)}
+.bl-att .v{text-align:right;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.bl-good{background:var(--down)}.bl-bad{background:var(--up)}.bl-mid{background:var(--accent)}
+.bl-tab td,.bl-tab th{white-space:nowrap}
+.bl-tab tr.cls td{font-weight:800;background:var(--bg)}
+.bl-tab tr.grp td{font-weight:700}
+.bl-tab tr.grp td:first-child{cursor:pointer}
+.bl-tab tr.acc td:first-child{padding-left:26px;white-space:normal;min-width:220px}
+.bl-tab tr.acc.hide{display:none}
+.bl-tab .bad{color:var(--up)}.bl-tab .good{color:var(--down)}
+.bl-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -662,11 +676,29 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-budget">
+    <div class="ov-tabs" id="bgTabs" role="tablist"><button data-t="budget" class="on" role="tab" aria-selected="true">Budget &amp; forecast</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div id="blView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>Actual against budget, by location</h2>
+          <p class="hint" id="blNote">Every location as a square: revenue (class 7), expenses (class 6) and the result against the budget, account by account as the chart of accounts in Business Central holds them. Click a location for its accounts.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <select id="blSpan"><option value="month">Month</option><option value="ytd">Year to date</option></select>
+            <label class="meta" for="blSort">Order</label><select id="blSort"><option value="result">by result against budget</option><option value="expenses">by expenses over budget</option><option value="revenue">by revenue under budget</option><option value="over">by accounts over budget</option><option value="actual">by revenue</option><option value="name">by name</option></select>
+            <button class="mini dark" id="blRead">Read again</button></div></div>
+        <p class="meta" id="blStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="blTotals"></div>
+      <div id="blGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="blDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="bgMain">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Budget and forecast</h2><p class="hint" id="bgNote"></p></div>
       <button class="mini dark" id="bgLoad">Read</button></div>
       <div class="scroll"><table id="bgStatement"></table></div></div>
     <div class="card"><h2>By account, year to date</h2><p class="hint">Actual against budget, with a straight run-rate year end</p>
       <div class="scroll"><table id="bgLines"></table></div></div>
+    </div>
   </section>
 
   <section class="view" id="v-group">
@@ -834,6 +866,7 @@ td.num,th.num{text-align:right}
 
   <div class="foot" id="foot"></div>
 </main>
+<div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
@@ -955,6 +988,7 @@ function render(){
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
+  if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
     if (!(data.inventory||{}).loaded) loadInventory();
@@ -2555,6 +2589,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="inventory" && ilTab === "loc" && (!ilData || ilKey !== ilQuery())) loadIl(false);
   if(b.dataset.view==="overview" && flTab === "loc" && (!flData || flKey !== flQuery())) loadFl(false);
+  if(b.dataset.view==="budget" && blTab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
@@ -3108,6 +3143,271 @@ async function pollCostReport(){
 }
 $("crPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the cost control report…</p>"); startCostReport("", w); };
 $("crTest").onclick = () => { const to = $("crTestTo").value.trim(); if (!to) { $("crMsg").textContent = "Enter an address for the test."; return; } startCostReport(to, null); };
+// ---------------------------------------------------------------- Budget & forecast → Location intelligence
+// Every location (BC department) as a square: revenue (class 7), expenses (class 6) and the result
+// against the G/L budget, for the month chosen or the year to date. A click opens the location's
+// accounts, grouped as the chart of accounts groups them. Built on the Executive dashboard's cube
+// (/api/executive): net change and budget by department, account and month.
+let blTab = "budget", blData = null, blKey = "", blTimer = null, blSpan = "month", blSort = "result", blOnlyOff = false;
+const BL_INCOME = new Set(["sales", "other_income"]);
+// a group of accounts (the first two digits) is named after its own account when the chart has one
+// (69, 75, 76, 77 …), otherwise after the accounts in it
+const blGroupName = (g, list, acc) => acc[g] ? acc[g][0]
+  : list.slice(0, 2).map(no => (acc[no] || [""])[0]).filter(Boolean).join(" · ") + (list.length > 2 ? " …" : "");
+const blM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(Math.abs(v) / 1e3).toLocaleString("en-US") + " k" : fmt(Math.abs(v)));
+const blS = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : "") + blM(v);
+const blPct = (a, b) => b ? a / b * 100 : null;
+const blMon = k => new Date(k + "-01T00:00:00").toLocaleDateString("en-GB", {month: "short", year: "numeric"});
+function blShowTab(tab){
+  blTab = tab;
+  document.querySelectorAll("#bgTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("bgMain").style.display = tab === "loc" ? "none" : "";
+  $("blView").style.display = tab === "loc" ? "" : "none";
+  if (tab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
+}
+document.querySelectorAll("#bgTabs button").forEach(b => b.onclick = () => blShowTab(b.dataset.t));
+$("blSpan").onchange = () => { blSpan = $("blSpan").value; blRender(); };
+$("blSort").onchange = () => { blSort = $("blSort").value; blRender(); };
+$("blRead").onclick = () => loadBl(true);
+function blQuery(){
+  const p = new URLSearchParams();
+  if ($("company").value) p.set("company", $("company").value);
+  p.set("year", ($("anchor").value || new Date().toISOString()).slice(0, 4));
+  return p.toString();
+}
+async function loadBl(refresh){
+  clearTimeout(blTimer);
+  const q = blQuery();
+  if (blKey !== q) { blData = null; blKey = q; }
+  if (!blData) $("blGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  $("blRead").disabled = true;
+  try{
+    const j = await readJSON(await fetch("/api/executive?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (blKey !== q) return;
+    blData = j; blRender();
+    if (j.pending && blTab === "loc") blTimer = setTimeout(() => loadBl(false), 6000);
+  }catch(e){ $("blStatus").textContent = "Could not read: " + e.message; }
+  finally{ $("blRead").disabled = false; }
+}
+// the months of the span, the month chosen in the header (never past the last month held)
+function blKeys(){
+  const d = blData, held = (d.months || []).filter(k => k.slice(0, 4) === String(d.year));
+  if (!held.length) return {keys: [], month: null};
+  const want = ($("anchor").value || "").slice(0, 7);
+  const month = held.includes(want) ? want : held[held.length - 1];
+  return {month, keys: blSpan === "ytd" ? held.filter(k => k <= month) : [month]};
+}
+// the budget of a running month counts only the days already gone
+function blScale(keys){
+  const run = blData.running, sc = {};
+  if (run && keys.includes(run.month)) {
+    const [y, m] = run.month.split("-").map(Number);
+    sc[run.month] = new Date(run.to + "T00:00:00").getDate() / new Date(y, m, 0).getDate();
+  }
+  return sc;
+}
+// {account: amount}: revenue (7) and expenses (6) both as positive amounts, as the chart reads them
+function blSum(src, dept, keys, scale){
+  const out = {}, acc = blData.accounts || {};
+  for (const k of keys) {
+    const c = src && src[dept] && src[dept][k];
+    if (!c) continue;
+    const f = scale && scale[k] != null ? scale[k] : 1;
+    for (const no in c) {
+      if (no[0] !== "6" && no[0] !== "7") continue;
+      const b = (acc[no] || [])[1];
+      const net = BL_INCOME.has(b) ? -c[no] : c[no];           // undo the management sign: the G/L net change
+      out[no] = (out[no] || 0) + (no[0] === "7" ? -net : net) * f;
+    }
+  }
+  return out;
+}
+function blTotals(act, bud){
+  const t = {rev: 0, exp: 0, brev: 0, bexp: 0};
+  for (const no in act) t[no[0] === "7" ? "rev" : "exp"] += act[no];
+  for (const no in bud) t[no[0] === "7" ? "brev" : "bexp"] += bud[no];
+  t.res = t.rev - t.exp; t.bres = t.brev - t.bexp;
+  return t;
+}
+const blTol = () => +(((data && data.settings && data.settings.locations) || {}).budget_gap_pct || 10);
+// accounts off budget: expenses above, revenue below, by more than the tolerance and 1% of the location's spend
+function blOff(act, bud, t){
+  const tol = blTol() / 100, floor = Math.max(1000, (t.exp + t.rev) * 0.005), out = [];
+  const nos = new Set([...Object.keys(act), ...Object.keys(bud)]);
+  for (const no of nos) {
+    const a = act[no] || 0, b = bud[no] || 0, gap = a - b, cost = no[0] === "6";
+    const bad = cost ? gap : -gap;
+    if (bad > floor && (b === 0 || bad > Math.abs(b) * tol)) out.push({no, a, b, gap, bad});
+  }
+  return out.sort((x, y) => y.bad - x.bad);
+}
+function blModel(){
+  const d = blData, {keys, month} = blKeys();
+  const bud = d.budget && d.budget.available ? d.budget.cells : null, sc = blScale(keys);
+  const depts = (d.departments || []).map(x => ({code: x.code, name: x.name}));
+  const L = {};
+  const one = (code, name, act, b) => {
+    const t = blTotals(act, b || {});
+    L[code] = {code, name, act, bud: b || {}, t, off: bud ? blOff(act, b || {}, t) : []};
+  };
+  let sumA = {}, sumB = {};
+  for (const x of depts) {
+    const a = blSum(d.actual, x.code, keys), b = bud ? blSum(bud, x.code, keys, sc) : null;
+    if (!Object.keys(a).length && !(b && Object.keys(b).length)) continue;
+    one(x.code, x.name, a, b);
+    for (const no in a) sumA[no] = (sumA[no] || 0) + a[no];
+    if (b) for (const no in b) sumB[no] = (sumB[no] || 0) + b[no];
+  }
+  // what the company posted without a department
+  const ca = blSum(d.actual, "*", keys), cb = bud ? blSum(bud, "*", keys, sc) : null;
+  const ua = {}, ub = {};
+  for (const no in ca) { const v = ca[no] - (sumA[no] || 0); if (Math.abs(v) >= 1) ua[no] = v; }
+  if (cb) for (const no in cb) { const v = cb[no] - (sumB[no] || 0); if (Math.abs(v) >= 1) ub[no] = v; }
+  if (Object.keys(ua).length || Object.keys(ub).length) one("", "Not on a location", ua, cb ? ub : null);
+  return {keys, month, L, company: blTotals(ca, cb || {}), hasBudget: !!bud, running: d.running && keys.includes(d.running.month)};
+}
+function blAtt(label, a, b, cost){
+  const p = blPct(a, b);
+  if (p == null) return `<span>${label}</span><div class="tr"></div><span class="v">–</span>`;
+  const cls = cost ? (p > 100 + blTol() ? "bl-bad" : p > 100 ? "bl-mid" : "bl-good") : (p < 100 - blTol() ? "bl-bad" : p < 100 ? "bl-mid" : "bl-good");
+  return `<span>${label}</span><div class="tr" title="${label}: ${blM(a)} of ${blM(b)} budget"><i class="${cls}" style="width:${Math.min(130, Math.max(0, p)) / 1.3}%"></i><b></b></div><span class="v">${Math.round(p)}%</span>`;
+}
+function blAlert(x, hasBudget){
+  if (!hasBudget) return ["info", "No budget loaded for this year"];
+  const t = x.t;
+  if (!t.brev && !t.bexp) return ["warn", "No budget on this location"];
+  const pe = blPct(t.exp, t.bexp), pr = blPct(t.rev, t.brev), tol = blTol();
+  if (t.bexp && pe > 100 + tol) return ["crit", `Expenses ${Math.round(pe - 100)}% over budget`];
+  if (t.brev && pr < 100 - tol) return ["crit", `Revenue ${Math.round(100 - pr)}% under budget`];
+  if (x.off.length) return ["warn", `${x.off.length} account${x.off.length > 1 ? "s" : ""} off budget`];
+  return ["good", "On budget"];
+}
+function blSquare(x, m){
+  const t = x.t, acc = blData.accounts || {}, a = blAlert(x, m.hasBudget), top = x.off[0];
+  const stat = (l, v, cls, tt) => `<div${tt ? ` title="${esc(tt)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const gap = t.res - t.bres;
+  return `<div class="pl-sq" role="button" tabindex="0" data-blloc="${esc(x.code)}" aria-label="${esc(x.name)}: accounts against budget">
+    <div class="hd"><div class="ic">${x.code ? IL_GLYPH.DOT : IL_GLYPH.BOX}</div><div class="nm"><b>${esc(x.name || x.code)}</b><span>${esc(x.code && x.name !== x.code ? x.code : "")}</span></div></div>
+    <div class="big"><span class="v">${blM(t.res)}</span><span class="cmp">result · budget ${blM(t.bres)} · <b class="${!m.hasBudget ? "" : gap < 0 ? "up" : "down"}">${m.hasBudget ? blS(gap) : "–"}</b></span></div>
+    <div class="bl-att">${blAtt("Revenue", t.rev, t.brev, false)}${blAtt("Expenses", t.exp, t.bexp, true)}</div>
+    <div class="st">${stat("Revenue gap", m.hasBudget && (t.rev || t.brev) ? blS(t.rev - t.brev) : "–", t.rev < t.brev ? "up" : "", `${blM(t.rev)} against ${blM(t.brev)}`)}${stat("Expense gap", m.hasBudget && (t.exp || t.bexp) ? blS(t.exp - t.bexp) : "–", t.exp > t.bexp ? "up" : "", `${blM(t.exp)} against ${blM(t.bexp)}`)}
+      ${stat("Off budget", m.hasBudget ? `${x.off.length} acc.` : "–", x.off.length ? "warn" : "")}
+      ${stat("Largest", top ? blS(top.gap) : "–", top ? "up" : "", top ? `${top.no} ${(acc[top.no] || [""])[0]}: ${blM(top.a)} against ${blM(top.b)}` : "")}</div>
+    <div class="sup" title="${esc(top ? top.no + " " + ((acc[top.no] || [""])[0]) : "")}">${top ? `<b>${esc(top.no)}</b> ${esc(((acc[top.no] || [""])[0]).slice(0, 40))}` : "&nbsp;"}</div>
+    <div class="al ${a[0]}"><i></i><span>${esc(a[1])}</span></div>
+  </div>`;
+}
+function blRender(){
+  if (blTab !== "loc" || !$("blGrid")) return;
+  const d = blData;
+  if (!d) { $("blGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
+  const m = blModel(), C = d.currency || "";
+  const g = d.progress || {};
+  $("blStatus").textContent = (d.pending ? `Reading Business Central: ${g.stage || "starting"}${g.total ? ` ${fmt(g.done)} of ${fmt(g.total)}` : ""}. The squares fill in as the months arrive. ` : "")
+    + (m.month ? `${blSpan === "ytd" ? "Year to date " + blMon(m.keys[0]) + " – " + blMon(m.month) : blMon(m.month)}${m.running ? " (running month: actual to " + d.running.to + ", budget for the same days)" : ""} · ` : "")
+    + (m.hasBudget ? `budget ${d.budget.name}` : `no budget ${(d.budget || {}).name || ""} found for ${d.year}: set its name in Settings`) + ` · ${C}`;
+  const B = m.L, codes = Object.keys(B);
+  if (!codes.length) { $("blGrid").innerHTML = `<p class="hint">${d.pending ? "Reading…" : "Nothing posted or budgeted in this period."}</p>`; $("blTotals").innerHTML = ""; return; }
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const c = m.company, tol = blTol();
+  const pr = blPct(c.rev, c.brev), pe = blPct(c.exp, c.bexp);
+  const offN = codes.reduce((a, x) => a + B[x].off.length, 0);
+  $("blTotals").innerHTML =
+    k("Revenue (class 7)", blM(c.rev), m.hasBudget ? `${pr == null ? "–" : Math.round(pr) + "%"} of budget ${blM(c.brev)}` : "no budget", pr != null && pr < 100 - tol ? "up" : "") +
+    k("Expenses (class 6)", blM(c.exp), m.hasBudget ? `${pe == null ? "–" : Math.round(pe) + "%"} of budget ${blM(c.bexp)}` : "no budget", pe != null && pe > 100 + tol ? "up" : "") +
+    k("Result", blM(c.res), m.hasBudget ? `budget ${blM(c.bres)} · ${blS(c.res - c.bres)}` : "", m.hasBudget && c.res < c.bres ? "up" : "") +
+    k("Accounts off budget", fmt(offN), `beyond ${fmt(tol)}%, across ${codes.length} locations`, offN ? "warn" : "");
+  const key = {result: x => (B[x].t.res - B[x].t.bres), expenses: x => -((B[x].t.exp - B[x].t.bexp)), revenue: x => (B[x].t.rev - B[x].t.brev),
+    over: x => -B[x].off.length, actual: x => -B[x].t.rev, name: x => 0}[blSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (B[a].name || a).localeCompare(B[b].name || b));
+  const rev = codes.filter(x => x && (B[x].t.rev || B[x].t.brev)), cc = codes.filter(x => x && !(B[x].t.rev || B[x].t.brev)), none = codes.filter(x => !x);
+  const grp = (t, list, hint) => list.length ? `<div class="pl-grp"><b>${t}</b><span>${list.length} location${list.length > 1 ? "s" : ""}${hint ? " · " + hint : ""}</span></div><div class="pl-grid">${sorted(list).map(x => blSquare(B[x], m)).join("")}</div>` : "";
+  $("blGrid").innerHTML = grp("Locations with revenue", rev, "restaurants and other revenue centres") + grp("Cost centres", cc, "head office, central kitchen, warehouses") + grp("Not on a location", none, "posted with no department");
+  $("blDefs").innerHTML = [
+    "Actual = net change of every posting account of class 6 (expenses) and class 7 (revenue) in Business Central, by department (global dimension 1). Revenue and expenses are both shown as positive amounts; result = revenue − expenses.",
+    `Budget = the G/L budget ${esc((d.budget || {}).name || "")} placed on the department through its dimension set. In a running month the budget counts only the days already gone, like the actual.`,
+    `Off budget: an expense account above its budget, or a revenue account below it, by more than ${fmt(tol)}% (Settings → Location intelligence → EBITDA under budget) and by more than 0.5% of the location's revenue and expenses.`,
+    "Not on a location = what the company posted or budgeted with no department: the company total less the departments.",
+    "Accounts are grouped by their first two digits; a group carries the name of its own account in the chart when there is one, otherwise the names of the accounts in it."].map(x => `<p style="margin:0 0 8px">${x}</p>`).join("");
+  if ($("blBd").classList.contains("show") && $("blPop").dataset.code != null) blDraw($("blPop").dataset.code);
+}
+// ---- the popup: the location's accounts, grouped by class and by the first two digits
+function blOpen(code){ $("blPop").dataset.code = code; blDraw(code); $("blBd").classList.add("show"); }
+function blDraw(code){
+  const m = blModel(), x = m.L[code]; if (!x) return;
+  const d = blData, acc = d.accounts || {}, C = d.currency || "", t = x.t, tol = blTol();
+  // the whole year's budget and the year to date, for how much of the year is used
+  const held = (d.months || []).filter(k => k.slice(0, 4) === String(d.year));
+  const ytdKeys = held.filter(k => k <= m.month), full = Array.from({length: 12}, (_, i) => `${d.year}-${String(i + 1).padStart(2, "0")}`);
+  const bud = d.budget && d.budget.available ? d.budget.cells : null;
+  const yA = code ? blSum(d.actual, code, ytdKeys) : x.act, fyB = bud ? (code ? blSum(bud, code, full) : {}) : {};
+  const offSet = new Set(x.off.map(o => o.no));
+  const nos = [...new Set([...Object.keys(x.act), ...Object.keys(x.bud), ...Object.keys(fyB)])].sort();
+  const rowsOf = cls => nos.filter(no => no[0] === cls);
+  const cell = (a, b, cost) => {
+    const gap = a - b, bad = cost ? gap > 0 : gap < 0, p = b ? gap / Math.abs(b) * 100 : null;
+    const cl = !b && !a ? "" : Math.abs(p ?? 100) <= tol ? "" : bad ? "bad" : "good";
+    return `<td class="num">${blM(a)}</td><td class="num meta">${b ? blM(b) : "–"}</td><td class="num ${cl}">${b || a ? blS(gap) : "–"}</td><td class="num ${cl}">${p == null ? "–" : (p > 0 ? "+" : "") + p.toFixed(0) + "%"}</td>`;
+  };
+  const used = (no) => fyB[no] ? `${Math.round((yA[no] || 0) / fyB[no] * 100)}%` : "–";
+  const sumOf = (obj, list) => list.reduce((s, no) => s + (obj[no] || 0), 0);
+  let body = "";
+  for (const [cls, label, cost] of [["7", "Revenue · class 7", false], ["6", "Expenses · class 6", true]]) {
+    const list = rowsOf(cls); if (!list.length) continue;
+    body += `<tr class="cls"><td>${label}</td>${cell(sumOf(x.act, list), sumOf(x.bud, list), cost)}<td class="num">${blM(sumOf(fyB, list))}</td><td class="num">${sumOf(fyB, list) ? Math.round(sumOf(yA, list) / sumOf(fyB, list) * 100) + "%" : "–"}</td></tr>`;
+    const groups = {};
+    list.forEach(no => (groups[no.slice(0, 2)] = groups[no.slice(0, 2)] || []).push(no));
+    for (const g of Object.keys(groups).sort()) {
+      const gl = groups[g], gOff = gl.some(no => offSet.has(no));
+      body += `<tr class="grp" data-blg="${esc(code)}|${g}"><td>${g} · ${esc(blGroupName(g, gl, acc))} <span class="meta">${gl.length}</span></td>${cell(sumOf(x.act, gl), sumOf(x.bud, gl), cost)}<td class="num">${blM(sumOf(fyB, gl))}</td><td class="num">${sumOf(fyB, gl) ? Math.round(sumOf(yA, gl) / sumOf(fyB, gl) * 100) + "%" : "–"}</td></tr>`;
+      gl.forEach(no => {
+        const off = offSet.has(no), quiet = !(x.act[no] || x.bud[no]);
+        body += `<tr class="acc${(blOnlyOff && !off) || quiet && blOnlyOff ? " hide" : ""}" data-blgrp="${esc(code)}|${g}" data-off="${off ? 1 : 0}"><td>${off ? '<span class="pl-sev crit"></span>' : ""}<a href="#" data-blacc="${esc(no)}">${esc(no)}</a> ${esc((acc[no] || [""])[0])}</td>${cell(x.act[no] || 0, x.bud[no] || 0, cost)}<td class="num meta">${fyB[no] ? blM(fyB[no]) : "–"}</td><td class="num meta">${used(no)}</td></tr>`;
+      });
+    }
+  }
+  body += `<tr class="cls"><td>Result</td><td class="num">${blM(t.res)}</td><td class="num meta">${blM(t.bres)}</td><td class="num ${t.res < t.bres ? "bad" : "good"}">${blS(t.res - t.bres)}</td><td class="num"></td><td class="num">${blM(sumOf(fyB, rowsOf("7")) - sumOf(fyB, rowsOf("6")))}</td><td></td></tr>`;
+  const span = blSpan === "ytd" ? `Year to date ${blMon(m.keys[0])} – ${blMon(m.month)}` : blMon(m.month);
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const pr = blPct(t.rev, t.brev), pe = blPct(t.exp, t.bexp);
+  const top = x.off.slice(0, 6);
+  $("blPop").innerHTML = `<div class="ph"><div class="ic">${code ? IL_GLYPH.DOT : IL_GLYPH.BOX}</div>
+      <div><h2>${esc(x.name || code)}</h2><div class="sub">${esc(code || "no department")} · ${esc(d.company || "")} · ${esc(span)}${m.running ? " (running month, budget for the days gone)" : ""} · ${esc(m.hasBudget ? d.budget.name : "no budget")} · ${esc(C)}</div></div><div class="sp"></div>
+      ${code ? `<button class="close" data-blgo="pl" data-code="${esc(code)}">P&amp;L ›</button>` : ""}<button class="close" data-blclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      <div class="pl-tiles">
+        ${tile("Revenue", blM(t.rev), m.hasBudget ? `${pr == null ? "–" : Math.round(pr) + "%"} of ${blM(t.brev)} · ${blS(t.rev - t.brev)}` : "", pr != null && pr < 100 - tol ? "up" : "")}
+        ${tile("Expenses", blM(t.exp), m.hasBudget ? `${pe == null ? "–" : Math.round(pe) + "%"} of ${blM(t.bexp)} · ${blS(t.exp - t.bexp)}` : "", pe != null && pe > 100 + tol ? "up" : "")}
+        ${tile("Result", blM(t.res), m.hasBudget ? `budget ${blM(t.bres)} · ${blS(t.res - t.bres)}` : "", m.hasBudget && t.res < t.bres ? "up" : "")}
+        ${tile("Accounts off budget", fmt(x.off.length), x.off.length ? `${blS(x.off.reduce((s, o) => s + o.bad, 0))} against the result` : `within ${fmt(tol)}%`, x.off.length ? "warn" : "")}
+      </div>
+      ${top.length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="ttl"><h3>Furthest off budget</h3></div><div class="pl-ex">${top.map(o => `<div><span class="pl-sev ${o.no[0] === "6" ? "crit" : "warn"}"></span><b>${esc(o.no)} ${esc((acc[o.no] || [""])[0])}</b> <span class="meta">${o.no[0] === "6" ? "spent" : "earned"} ${blM(o.a)} against ${blM(o.b)} budget (${blS(o.gap)})</span></div>`).join("")}</div></div>` : ""}
+      <div class="pl-panel"><div class="ttl"><h3>Accounts · ${esc(span)}</h3>
+        <label class="meta" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="blOnlyOff" ${blOnlyOff ? "checked" : ""}> Only accounts off budget</label></div>
+        <div class="scroll"><table class="bl-tab" data-nosort><tr><th>Account</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">%</th><th class="num">Budget ${esc(String(d.year))}</th><th class="num" title="Year to date actual as a share of the year's budget">Used YTD</th></tr>${body}</table></div>
+        <p class="hint" style="margin:8px 0 0">Click a group to fold it; click an account for its ledger entries. Red: an expense above or revenue below budget by more than ${fmt(tol)}%; green: the other way.</p></div>
+    </div>`;
+  $("blOnlyOff").onchange = e => { blOnlyOff = e.target.checked; blDraw(code); };
+}
+function blGo(view, code){
+  $("blBd").classList.remove("show");
+  if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; load(); }
+  const b = document.querySelector(`#nav button[data-view="${view}"]`); if (b) b.click();
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-blclose]"); if (c) { $("blBd").classList.remove("show"); return; }
+  const g = e.target.closest("[data-blgo]"); if (g) { blGo(g.dataset.blgo, g.dataset.code || ""); return; }
+  const a = e.target.closest("[data-blacc]"); if (a) { e.preventDefault(); $("blBd").classList.remove("show"); openDrill("account", a.dataset.blacc); return; }
+  const gr = e.target.closest("tr.grp[data-blg]");
+  if (gr) { const k = gr.dataset.blg; gr.parentElement.querySelectorAll(`tr.acc[data-blgrp="${CSS.escape(k)}"]`).forEach(r => r.classList.toggle("hide")); return; }
+  const s = e.target.closest("[data-blloc]"); if (s) { blOpen(s.dataset.blloc); return; }
+  if (e.target === $("blBd")) $("blBd").classList.remove("show");
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("blBd").classList.contains("show")) { $("blBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.blloc != null) { e.preventDefault(); blOpen(e.target.dataset.blloc); }
+});
 </script>
 <script src="tables.js"></script>
 </body>
