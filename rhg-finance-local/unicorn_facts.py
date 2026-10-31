@@ -68,6 +68,8 @@ def sales(day, client, latest_fn, parallel_fn, currency_of, errors, progress):
         y = f.get(day.isoformat())
         if not y and not any(f.get(d.isoformat()) for d in mtd):
             continue                                                # closed or not read
+        if brand_report._sales(f, mtd)["ex"] < 1 and not (y and y["net"]):
+            continue                                                # no sales this month (closed for the season)
         cur = _cur(r, currency_of)
         ex = lambda d: (d["net"] - (d.get("tax") or 0)) if d else None   # noqa: E731
         s_y, s_lw, s_ly = ex(y), ex(f.get(lw.isoformat())), ex(f.get(lyw.isoformat()))
@@ -103,19 +105,29 @@ def sales(day, client, latest_fn, parallel_fn, currency_of, errors, progress):
                       "error_corrects_pct_of_gross": _share(y["error_corrects"], y["gross"]),
                       "open_checks": y["open_checks"]})
         out.append(L)
-        t = totals.setdefault(cur, {"yesterday": 0, "same_weekday_last_week": 0, "same_weekday_last_year": 0,
-                                    "budget_of_the_day": 0, "month_to_date": 0, "month_to_date_last_year": 0,
-                                    "month_to_date_budget": 0, "restaurants": 0})
+        t = totals.setdefault(cur, {"restaurants": 0, "yesterday": 0, "month_to_date": 0, "_pairs": {}})
         t["restaurants"] += 1
-        for k in ("yesterday", "same_weekday_last_week", "same_weekday_last_year", "budget_of_the_day",
-                  "month_to_date", "month_to_date_last_year", "month_to_date_budget"):
-            t[k] += L.get(k) or 0
+        t["yesterday"] += L["yesterday"] or 0
+        t["month_to_date"] += L["month_to_date"] or 0
+        # comparisons like for like: only restaurants that have both figures (never a missing figure as zero)
+        for name, cur_k, cmp_k in (("vs_last_week", "yesterday", "same_weekday_last_week"),
+                                   ("vs_last_year", "yesterday", "same_weekday_last_year"),
+                                   ("vs_budget", "yesterday", "budget_of_the_day"),
+                                   ("mtd_vs_last_year", "month_to_date", "month_to_date_last_year"),
+                                   ("mtd_vs_budget", "month_to_date", "month_to_date_budget")):
+            if L.get(cur_k) is not None and L.get(cmp_k):
+                pr = t["_pairs"].setdefault(name, {"current": 0, "comparison": 0, "restaurants": 0})
+                pr["current"] += L[cur_k]
+                pr["comparison"] += L[cmp_k]
+                pr["restaurants"] += 1
     for t in totals.values():
-        t["vs_last_week_pct"] = _pct(t["yesterday"], t["same_weekday_last_week"])
-        t["vs_last_year_pct"] = _pct(t["yesterday"], t["same_weekday_last_year"])
-        t["vs_budget_pct"] = _pct(t["yesterday"], t["budget_of_the_day"])
-        t["mtd_vs_last_year_pct"] = _pct(t["month_to_date"], t["month_to_date_last_year"])
-        t["mtd_vs_budget_pct"] = _pct(t["month_to_date"], t["month_to_date_budget"])
+        pairs = t.pop("_pairs")
+        t["comparisons"] = {}
+        for name in ("vs_last_week", "vs_last_year", "vs_budget", "mtd_vs_last_year", "mtd_vs_budget"):
+            pr = pairs.get(name)
+            t["comparisons"][name] = ({**pr, "pct": _pct(pr["current"], pr["comparison"]),
+                                       "note": f"like for like: {pr['restaurants']} of {t['restaurants']} restaurants have both figures"}
+                                      if pr else "UNAVAILABLE: no restaurant has this comparison")
     out.sort(key=lambda L: (L["currency"], -(L["yesterday"] or 0)))
     return {"day": day.isoformat(), "weekday": day.strftime("%A"), "last_week_day": lw.isoformat(),
             "last_year_day": lyw.isoformat(), "month_from": m1.isoformat(),
