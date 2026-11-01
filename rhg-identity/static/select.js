@@ -41,7 +41,16 @@
 
     function paint() {
       list.innerHTML = "";
+      let group = null;
       Array.from(sel.options).forEach((o, i) => {
+        const g = o.parentNode && o.parentNode.tagName === "OPTGROUP" ? o.parentNode : null;
+        if (g && g !== group) {             // the heading of an <optgroup>
+          const h = document.createElement("div");
+          h.className = "rsel-grp";
+          h.textContent = g.label;
+          list.appendChild(h);
+        }
+        group = g;
         const item = document.createElement("div");
         item.className = "rsel-opt" + (i === sel.selectedIndex ? " on" : "");
         item.setAttribute("role", "option");

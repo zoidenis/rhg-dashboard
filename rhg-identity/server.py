@@ -18,6 +18,7 @@ import auth
 import config
 import layouts
 import permissions
+import screens
 import store
 import unicorn
 
@@ -55,6 +56,19 @@ def rate_limited(ip):
             for k in [k for k, v in _hits.items() if not v or now - v[-1] > RATE_WINDOW]:
                 _hits.pop(k, None)
         return len(hits) > RATE_MAX
+
+
+def scope_options():
+    """(status, body): the companies and their locations, from Finance (/internal/scope-options)."""
+    import urllib.error
+    import urllib.request
+    base = config.get("FINANCE_URL", "http://finance:8766").rstrip("/")
+    req = urllib.request.Request(base + "/internal/scope-options", headers={"X-Service-Token": config.SERVICE_TOKEN})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return 200, json.loads(r.read() or b"{}")
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        return 502, {"error": f"Finance could not list the companies and locations: {str(exc)[:160]}"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -157,8 +171,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.can(user, "admin.users.manage"):
                     self._send(403, {"error": "Your role cannot manage accounts."}); return
                 self._send(200, {"users": auth.list_users(),
-                                 "roles": [dict(r) for r in store.q("SELECT * FROM roles ORDER BY name")],
+                                 "roles": [{"name": r["name"], "department": r["department"] or "Other",
+                                            "description": r["description"], "system": bool(r["system"])}
+                                           for r in store.q("SELECT * FROM roles ORDER BY name")],
                                  "permissions": permissions.PERMISSIONS})
+            elif url.path == "/api/screens":
+                # The screens of pulse (menus and tabs) for the towers' menus: what the signed-in person may open.
+                self._send(200, {"catalogue": screens.catalogue(), "held": [p for p in user["permissions"] if ".s." in p],
+                                 "scope": user.get("scope")})
+            elif url.path == "/api/admin/scope-options":
+                # Companies and their locations to choose an account's access from (read by Finance from BC).
+                if not auth.can(user, "admin.users.manage"):
+                    self._send(403, {"error": "Your role cannot manage accounts."}); return
+                self._send(*scope_options())
             elif url.path == "/api/unicorn/status":
                 # For the menus: may this person talk to Unicorn, and how many briefs are unread.
                 ok = auth.can(user, "unicorn.use")
@@ -185,10 +210,16 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/roles":
                 if not auth.can(user, "admin.roles.manage"):
                     self._send(403, {"error": "Your role cannot manage roles."}); return
-                rows = [{"name": r["name"], "description": r["description"],
-                         "permissions": json.loads(r["permissions"]), "system": bool(r["system"])}
+                users_by = {}
+                for u in store.q("SELECT role FROM users"):
+                    users_by[u["role"]] = users_by.get(u["role"], 0) + 1
+                rows = [{"name": r["name"], "description": r["description"], "department": r["department"] or "Other",
+                         "permissions": json.loads(r["permissions"]), "system": bool(r["system"]),
+                         "users": users_by.get(r["name"], 0)}
                         for r in store.q("SELECT * FROM roles ORDER BY name")]
-                self._send(200, {"roles": rows, "permissions": permissions.PERMISSIONS})
+                self._send(200, {"roles": rows, "permissions": permissions.PERMISSIONS,
+                                 "catalogue": screens.catalogue(), "actions": permissions.ACTIONS,
+                                 "departments": permissions.DEPARTMENTS})
             elif url.path == "/api/audit":
                 if not auth.can(user, "admin.audit.view"):
                     self._send(403, {"error": "Your role cannot read the audit trail."}); return
@@ -266,6 +297,9 @@ class Handler(BaseHTTPRequestHandler):
                 created, err = auth.create_user(body.get("username"), body.get("name"),
                                                 body.get("email"), body.get("role"),
                                                 body.get("password"), user["username"], ip)
+                if created and body.get("scope"):
+                    created, err = auth.update_user(created["username"], {"scope": body["scope"]},
+                                                    user["username"], ip)
                 self._send(200 if created else 400, created or {"error": err})
             elif url.path.startswith("/api/users/"):
                 if not auth.can(user, "admin.users.manage"):
@@ -297,17 +331,28 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/roles":
                 if not auth.can(user, "admin.roles.manage"):
                     self._send(403, {"error": "Your role cannot manage roles."}); return
-                name = (body.get("name") or "").strip()
+                name = (body.get("name") or "").strip()[:60]
                 perms = [p for p in (body.get("permissions") or []) if permissions.valid(p)]
                 if not name:
                     self._send(400, {"error": "A role name is required."}); return
                 existing = store.one("SELECT * FROM roles WHERE name=?", (name,))
+                if body.get("_delete"):
+                    if not existing or existing["system"]:
+                        self._send(400, {"error": "This role cannot be deleted."}); return
+                    n = store.one("SELECT COUNT(*) n FROM users WHERE role=?", (name,))["n"]
+                    if n:
+                        self._send(400, {"error": f"{n} account(s) still have this role; move them first."}); return
+                    store.run("DELETE FROM roles WHERE name=?", (name,))
+                    store.audit("role deleted", user["username"], name, {}, ip)
+                    self._send(200, {"ok": True}); return
                 if existing and existing["system"] and set(perms) != set(json.loads(existing["permissions"])):
                     self._send(400, {"error": "The Administrator role cannot be narrowed."}); return
-                store.run("""INSERT INTO roles(name,description,permissions,system) VALUES(?,?,?,0)
+                dep = (body.get("department") or (existing["department"] if existing else "") or "Other")[:40]
+                store.run("""INSERT INTO roles(name,description,permissions,system,department) VALUES(?,?,?,0,?)
                              ON CONFLICT(name) DO UPDATE SET description=excluded.description,
-                                                             permissions=excluded.permissions""",
-                          (name, (body.get("description") or "")[:200], json.dumps(perms)))
+                                                             permissions=excluded.permissions,
+                                                             department=excluded.department""",
+                          (name, (body.get("description") or "")[:200], json.dumps(perms), dep))
                 store.audit("role saved", user["username"], name, {"count": len(perms)}, ip)
                 self._send(200, {"ok": True})
             elif url.path == "/api/sessions/revoke":

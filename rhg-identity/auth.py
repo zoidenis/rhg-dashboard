@@ -42,12 +42,55 @@ def password_problem(password):
 
 
 # ---------------------------------------------------------------- accounts
+ALL_SCOPE = {"companies": "*", "locations": {}}
+
+
+def clean_scope(scope):
+    """{"companies": "*" | [company], "locations": {company: "*" | [BC location code]}}; None = everything.
+    A company missing from "locations" means all its locations."""
+    if not scope:
+        return dict(ALL_SCOPE)
+    if not isinstance(scope, dict):
+        raise ValueError("The access must be an object.")
+    comps = scope.get("companies", "*")
+    if comps != "*":
+        if not isinstance(comps, list) or not comps:
+            raise ValueError("Choose at least one company, or all companies.")
+        comps = sorted({str(c).strip()[:80] for c in comps if str(c).strip()})[:50]
+    locs = {}
+    for c, v in (scope.get("locations") or {}).items():
+        c = str(c).strip()[:80]
+        if not c or (comps != "*" and c not in comps):
+            continue
+        if v == "*" or v is None:
+            continue
+        if not isinstance(v, list) or not v:
+            raise ValueError(f"Choose at least one location of {c}, or all its locations.")
+        locs[c] = sorted({str(x).strip()[:40] for x in v if str(x).strip()})[:200]
+    return {"companies": comps, "locations": locs}
+
+
+def scope_of(row):
+    try:
+        raw = row["scope"]
+    except (IndexError, KeyError):
+        raw = None
+    try:
+        return clean_scope(json.loads(raw)) if raw else dict(ALL_SCOPE)
+    except ValueError:
+        return dict(ALL_SCOPE)
+
+
 def public(row):
-    perms = store.role_permissions(row["role"])
+    perms = permissions.effective(store.role_permissions(row["role"]))
+    scope = scope_of(row)
+    if scope != ALL_SCOPE:
+        # Unicorn reads the whole group: not for an account limited to some companies or locations.
+        perms = [p for p in perms if p != "unicorn.use"]
     return {"username": row["username"], "name": row["name"], "email": row["email"],
             "role": row["role"], "active": bool(row["active"]),
             "must_change": bool(row["must_change"]), "last_login": row["last_login"],
-            "permissions": perms}
+            "permissions": perms, "scope": scope}
 
 
 def find(username):
@@ -108,6 +151,12 @@ def update_user(username, patch, actor, ip=""):
         args += [salt, digest, store.now()]
     if patch.get("unlock"):
         sets += ["failures=0", "locked_until=NULL"]
+    if "scope" in patch:
+        try:
+            sc = clean_scope(patch["scope"])
+        except ValueError as exc:
+            return None, str(exc)
+        sets.append("scope=?"); args.append(None if sc == ALL_SCOPE else json.dumps(sc))
 
     if not sets:
         return public(row), None

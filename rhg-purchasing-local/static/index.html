@@ -926,7 +926,27 @@ function mondayOf(d){
   return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
 }
 
+// Access (Admin → Accounts → Access): the locations of the company in view this person is limited to, or null for
+// all of them. A limited person reads one of their locations at a time: "All locations" is not offered.
+function myLocs(){
+  const L = (me && me.scope && me.scope.locations) || {}, co = ($("company").value || "").toUpperCase();
+  const k = Object.keys(L).find(x => x.toUpperCase() === co);
+  return k && Array.isArray(L[k]) && L[k].length ? L[k] : null;
+}
+function fitLocation(sel){
+  if (!sel) return;
+  const mine = myLocs();
+  if (!mine) {                 // all locations of this company: "All locations" comes back after another company
+    if (!sel.querySelector('option[value=""]')) sel.innerHTML = '<option value="">All locations</option>';
+    return;
+  }
+  const cur = sel.value;
+  if (sel.options.length !== mine.length || !mine.includes(cur))
+    sel.innerHTML = mine.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+  sel.value = mine.includes(cur) ? cur : mine[0];
+}
 function params(){
+  fitLocation($("location"));
   const p = new URLSearchParams();
   if ($("company").value) p.set("company", $("company").value);
   if ($("location").value) p.set("location", $("location").value);
@@ -982,7 +1002,8 @@ function render(){
   if (m.mode !== "week" && $("banner").textContent.startsWith("Loading a longer period")) $("banner").style.display = "none";
 
   const locSel = $("location"), cur = locSel.value;
-  locSel.innerHTML = '<option value="">All locations</option>' + data.all_locations.map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
+  const mine = myLocs();
+  locSel.innerHTML = (mine ? "" : '<option value="">All locations</option>') + (mine || data.all_locations).map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
 
   const ops = data.operations || {}, po = ops.po_summary || {}, sla = ops.sla || [];
   const per = {week:"this week", month:"this month", ytd:"this year"}[m.mode] || "this period";
@@ -3072,6 +3093,7 @@ function svQuick(kind){
 }
 document.querySelectorAll("[data-svq]").forEach(b => b.onclick = () => svQuick(b.dataset.svq));
 function svParams(){
+  fitLocation($("svLoc"));
   const p = new URLSearchParams({company: $("company").value || "", from: $("svFrom").value, to: $("svTo").value,
     location: $("svLoc").value, vendor: $("svVendor").value, category: $("svCat").value, stream: $("svStream").value, q: $("svQ").value.trim()});
   return p;
@@ -3117,7 +3139,7 @@ function svFill(sel, list, label, cur){
 function renderSavings(){
   const d = svData; if (!d) return;
   const C = d.currency || CUR, s = d.summary, o = d.options;
-  svFill($("svLoc"), o.locations, "All locations"); svFill($("svVendor"), o.vendors, "All suppliers");
+  svFill($("svLoc"), o.locations, "All locations"); fitLocation($("svLoc")); svFill($("svVendor"), o.vendors, "All suppliers");
   svFill($("svCat"), o.categories, "All categories"); svFill($("svStream"), o.streams, "All types");
   const rc = d.recipients || {};
   $("svRecip").textContent = `Send goes to ${(rc.to || []).join(", ") || "nobody yet: set the Purchasing Manager and Coordinator in Settings → Email notifications"}${(rc.cc || []).length ? " · Cc " + rc.cc.join(", ") : ""}. `
@@ -3249,7 +3271,7 @@ if (EMBED) document.documentElement.classList.add("embed");
   try {
     const r = await fetch("/api/companies"); const j = await r.json();
     const want = new URLSearchParams(location.search).get("company");
-    const pickCo = want && j.companies.includes(want) ? want : j.default;
+    const pickCo = want && j.companies.includes(want) ? want : j.companies.includes(j.default) ? j.default : j.companies[0];
     if (r.ok) $("company").innerHTML = j.companies.map(c => `<option ${c===pickCo?"selected":""}>${esc(c)}</option>`).join("");
     else throw new Error(j.error);
   } catch(e) { $("company").innerHTML = `<option>SALT</option>`; }

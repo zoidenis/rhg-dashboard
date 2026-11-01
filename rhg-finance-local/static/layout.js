@@ -452,6 +452,14 @@
   /* ------------------------------------------------------------------ look (pulse tokens from brand.css) */
   const CSS = `
 .lay-off{display:none!important}
+.scr-off{display:none!important}
+.no-export #exportBtn,.no-export #pdfBtn,.no-export #fsXlsx,.no-export #fxXlsx,.no-export #imXlsx,.no-export #mvXlsx,
+.no-export #rcXlsx,.no-export #skXlsx,.no-export #tyXlsx,.no-export #svPdf,.no-export #svXlsx,.no-export #svSend,
+.no-export a[href*="supplier-stock/statement"]{display:none!important}
+body.scr-empty main section.view{display:none!important}
+.scr-none{margin:24px 0;padding:22px;max-width:620px}
+.scr-none h2{font-size:17px;margin:0 0 6px}
+.scr-none p{margin:0;color:var(--sub,#5b6b73);font-size:13.5px;line-height:1.5}
 .lay-open{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;margin:10px 6px 0;padding:8px 10px;
   border-radius:9px;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
 .lay-open:hover,.lay-open:focus-visible{background:rgba(255,255,255,.16)}
@@ -517,6 +525,116 @@ body.lay-edit main{padding-bottom:190px}
     }).catch(() => {});
   }
 
+  /* ------------------------------------------------------------------ screens */
+  // What the person may open: the screens their role holds (Admin → Roles: menu items and tabs) and their access
+  // (Admin → Accounts → Access: companies and locations). Menu items and tabs not held are hidden, and so are the
+  // screens of the whole company when the person is limited to some locations of the company in view. The towers'
+  // servers refuse the same; this keeps the menus to what can be opened.
+  const S = { cat: null, held: null, scope: null, co: null, busy: 0 };
+
+  function companyNow() { const c = document.getElementById("company"); return c ? c.value || "" : ""; }
+  function locLimited() {
+    const L2 = (S.scope && S.scope.locations) || {}, co = companyNow().toUpperCase();
+    return Object.keys(L2).some(k => k.toUpperCase() === co && Array.isArray(L2[k]));
+  }
+  function keyOk(key, kind) { return S.held.has(key) && !(kind === "company" && locLimited()); }
+  function menuOk(m) { return m.tabs.length ? m.tabs.some(t => keyOk(t.key, t.kind)) : keyOk(m.key, m.kind); }
+  function navBtn(view) { return document.querySelector('#nav button[data-view="' + window.CSS.escape(view) + '"]'); }
+  function heldUnder(prefix) { for (const k of S.held) if (k.startsWith(prefix)) return true; return false; }
+
+  function paintScreens() {
+    if (!S.cat) return;
+    S.co = companyNow();
+    S.cat.menus.forEach(m => {
+      const b = navBtn(m.view);
+      if (b) b.classList.toggle("scr-off", !menuOk(m));
+      const bar = m.bar && document.getElementById(m.bar);
+      m.tabs.forEach(t => {
+        const ok = keyOk(t.key, t.kind);
+        if (bar) bar.querySelectorAll('button[data-t="' + t.tab + '"]').forEach(x => x.classList.toggle("scr-off", !ok));
+        const child = document.querySelector('#nav button[data-view="' + t.tab + '"][data-parent="' + m.view + '"]');
+        if (child) child.classList.toggle("scr-off", !ok);
+      });
+    });
+    // A heading of the menu with nothing left under it goes too.
+    const nav = document.getElementById("nav");
+    if (nav) {
+      let head = null, any = false;
+      const close = () => { if (head) head.classList.toggle("scr-off", !any); };
+      [...nav.children].forEach(el => {
+        if (el.classList.contains("grp")) { close(); head = el; any = false; return; }
+        if (el.tagName === "BUTTON" && !el.dataset.parent && !el.classList.contains("scr-off") && el.style.display !== "none") any = true;
+      });
+      close();
+    }
+    // The other towers in the side menu.
+    document.querySelectorAll("aside .towers a[href]").forEach(a => {
+      const h = a.getAttribute("href");
+      const need = h === "/" ? "platform.s.control" : h.startsWith("/executive") ? "platform.s.executive."
+        : h.startsWith("/finance/#inventory") ? "finance.s.inventory." : h.startsWith("/finance") ? "finance.s."
+        : h.startsWith("/purchasing") ? "purchasing.s." : null;
+      if (need) a.classList.toggle("scr-off", !heldUnder(need));
+    });
+    const none = !S.cat.menus.some(menuOk);
+    document.body.classList.toggle("scr-empty", none);
+    let box = document.getElementById("scrNone");
+    if (none && !box) {
+      const main = document.querySelector("main");
+      if (main) {
+        main.insertAdjacentHTML("beforeend", '<div class="card scr-none" id="scrNone"><h2></h2><p></p></div>');
+        box = document.getElementById("scrNone");
+      }
+    }
+    if (box) {
+      box.hidden = !none;
+      box.querySelector("h2").textContent = locLimited() ? "Nothing here for your locations" : "No screen of this tower in your role";
+      box.querySelector("p").textContent = locLimited()
+        ? "Your access covers some locations of " + companyNow() + ", and your role holds no location screen here. Choose another company, or ask the administrator."
+        : "Your role does not hold any screen of " + S.cat.label + ". Ask the administrator (Administration → Roles & permissions).";
+    }
+    fixActive();
+  }
+
+  // The screen in view must be one the person may open: else the first one they may.
+  function fixActive() {
+    if (!S.cat || S.busy > 6) return;
+    const on = document.querySelector("#nav button.on");
+    const view = on && (on.dataset.parent || on.dataset.view);
+    const m = view && S.cat.menus.find(x => x.view === view);
+    if (!m) return;                                     // a screen outside the catalogue (Users)
+    if (!menuOk(m)) {
+      const f = S.cat.menus.find(x => menuOk(x) && navBtn(x.view));
+      if (f) { S.busy++; navBtn(f.view).click(); }
+    } else if (m.bar) {
+      const bar = document.getElementById(m.bar);
+      const cur = bar && bar.querySelector("button.on");
+      if (cur && cur.classList.contains("scr-off")) {
+        const f = [...bar.querySelectorAll("button")].find(x => !x.classList.contains("scr-off"));
+        if (f) { S.busy++; f.click(); }
+      }
+    }
+    clearTimeout(S.t); S.t = setTimeout(() => { S.busy = 0; }, 800);
+  }
+
+  async function loadScreens() {
+    const j = await call("screens");
+    S.cat = (j.catalogue || []).find(t => t.app === APP) || null;
+    if (!S.cat) return;
+    S.held = new Set(j.held || []);
+    S.scope = j.scope || null;
+    window.RhgScreens = { held: S.held, scope: S.scope, locLimited, keyOk };
+    // A hidden button is never opened, even from a link of the page; the click goes to an allowed screen instead.
+    document.addEventListener("click", e => {
+      const b = e.target.closest && e.target.closest("#nav button, .ov-tabs button");
+      if (!b) return;
+      if (b.classList.contains("scr-off")) { e.preventDefault(); e.stopImmediatePropagation(); }
+      setTimeout(fixActive, 0);
+    }, true);
+    window.addEventListener("hashchange", () => setTimeout(fixActive, 0));
+    setInterval(() => { if (companyNow() !== S.co) paintScreens(); }, 700);
+    paintScreens();
+  }
+
   /* ------------------------------------------------------------------ start */
   async function start() {
     addStyle();
@@ -530,11 +648,14 @@ body.lay-edit main{padding-bottom:190px}
       L.me = s.user;
       if (!L.me) return;
       unicornLink();
+      // Exports (CSV, PDF, Excel) are an action of the role: without it the export buttons go.
+      document.body.classList.toggle("no-export", !(L.me.permissions || []).includes(APP + ".export"));
+      loadScreens().catch(() => {});
       await refresh();
       apply(effective(L.info));
       addButton();
     } catch (e) { /* identity not reachable: the page as served */ }
   }
-  window.RhgLayout = { snapshot: () => snapshot(), edit: () => startEdit(), state: L };
+  window.RhgLayout = { snapshot: () => snapshot(), edit: () => startEdit(), state: L, screens: S };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

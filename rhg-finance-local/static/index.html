@@ -1146,12 +1146,29 @@ function params(){
 }
 function setPill(state,text){ $("pill").className="pill "+state; $("pillText").textContent=text; }
 
+// Access (Admin → Accounts → Access): the locations of the company in view this person is limited to, or null.
+// A limited person gets the location screens only; the company-wide figures are not read for them.
+function myLocs(){
+  const L = (me && me.scope && me.scope.locations) || {}, co = ($("company").value || "").toUpperCase();
+  const k = Object.keys(L).find(x => x.toUpperCase() === co);
+  return k && Array.isArray(L[k]) && L[k].length ? L[k] : null;
+}
+function accessNote(j){
+  const mine = myLocs();
+  $("banner").style.display = "none";
+  setPill("", mine ? `Your access: ${mine.join(", ")} of ${$("company").value}` : (j && j.error) || "Your access does not cover this screen.");
+  data = null; setHeader();
+  $("period").textContent = mine ? `The screens of your locations: ${mine.join(", ")}` : "";
+}
 async function load(){
-  if(busy) return; busy = true; setPill("load","Reading Business Central…");
+  if(busy) return;
+  if(myLocs()){ accessNote(); return; }
+  busy = true; setPill("load","Reading Business Central…");
   try{
     const r = await fetch("/api/dashboard?"+params());
     if (r.status === 401) { location.href = "/login"; return; }
     const j = await r.json();
+    if(r.status === 403 && j.access){ accessNote(j); return; }
     if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
     // the inventory reads are heavy and on demand: keep them across refreshes of the same scope
     const prev = data, same = prev && ["company","dimension","mode"].every(k => prev.meta[k] === j.meta[k]) && prev.meta.current[0] === j.meta.current[0];

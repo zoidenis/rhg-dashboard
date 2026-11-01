@@ -160,6 +160,28 @@ const mlabel = k => { const [y,m] = k.split("-"); return MON[+m-1] + " " + y; };
 const mshort = k => MON[+k.split("-")[1]-1];
 let me = null, CSRF = null;
 const can = p => !!me && (me.permissions||[]).includes(p);
+// Screens (Admin → Roles & permissions: a tab each) and access (Admin → Accounts → Access). A person limited to some
+// locations of the company gets Location intelligence only: the other tabs show the whole company.
+const holds = prefix => !!me && (me.permissions||[]).some(p => p.startsWith(prefix));
+function myLocs(co){
+  const L = (me && me.scope && me.scope.locations) || {}, k = Object.keys(L).find(x => x.toUpperCase() === String(co||"").toUpperCase());
+  return k && Array.isArray(L[k]) && L[k].length ? L[k] : null;
+}
+const tabOk = t => can("platform.s.executive." + t) && (t === "locations" || !myLocs(F.company));
+function paintTabs(){
+  const bs = [...document.querySelectorAll("#tabs button[data-tab]")];
+  bs.forEach(b => { b.style.display = tabOk(b.dataset.tab) ? "" : "none"; });
+  if (!tabOk(F.tab)) { const f = bs.find(b => tabOk(b.dataset.tab)); if (f) F.tab = f.dataset.tab; }
+  bs.forEach(x => x.classList.toggle("on", x.dataset.tab === F.tab));
+  return bs.some(b => tabOk(b.dataset.tab));
+}
+function noTabs(){
+  const mine = myLocs(F.company);
+  $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">${mine
+    ? `Your access covers ${esc(mine.join(", "))} of ${esc(F.company)}, and your role does not hold Location intelligence here. Choose another company, or ask the administrator.`
+    : "Your role does not hold any tab of the executive dashboard. Ask the administrator (Administration → Roles &amp; permissions)."}</p></div>`;
+  $("banner").innerHTML = ""; $("foot").innerHTML = "";
+}
 
 const S = {fin: null, pur: null, finErr: null, purErr: null, timer: null};
 const F = {company: "", year: new Date().getFullYear(), mode: "month", end: "", dept: "*", compare: "ly", tab: "overview"};
@@ -788,6 +810,7 @@ function viewLocations(){
 }
 function render(){
   CHARTS.clear(); hideTip();
+  if (!paintTabs()) { noTabs(); return; }
   syncUrl();
   const keys = rangeKeys();
   const how = F.tab === "budget" ? "budget" : F.tab === "purchasing" && F.compare === "budget" ? "ly" : F.compare;
@@ -854,6 +877,10 @@ async function load(refresh){
   clearTimeout(S.timer);
   const co = encodeURIComponent(F.company), yr = F.year, r = refresh ? "&refresh=1" : "";
   const jobs = [];
+  if (myLocs(F.company)) {      // the whole-company figures are not read for a person limited to some locations
+    S.fin = S.pur = null; S.finErr = S.purErr = "Your access covers some locations of " + F.company + ".";
+    fillEnd(); fillDepts(); render(); return;
+  }
   if (can("finance.view")) jobs.push(get(`/finance/api/executive?company=${co}&year=${yr}${r}`).then(j => { S.fin = j; S.finErr = null; }).catch(e => { S.finErr = e.message; }));
   else S.finErr = "Your role does not include the Finance tower.";
   if (can("purchasing.view")) jobs.push(get(`/purchasing/api/executive?company=${co}&year=${yr}${r}`).then(j => { S.pur = j; S.purErr = null; }).catch(e => { S.purErr = e.message; }));
@@ -887,8 +914,9 @@ $("logoutBtn").onclick = async () => {
   if (!can("finance.view")) $("tabLocations").style.display = "none";
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   const t = $("towers");
-  [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"]]
-    .filter(([p]) => can(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
+  if (!holds("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],["finance.s.inventory.","/finance/#inventory","Inventory"]]
+    .filter(([p]) => holds(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs
     t.insertAdjacentHTML("beforeend", `<a href="/unicorn" id="uniLink">Unicorn</a>`);
     fetch("/api/unicorn/status", {credentials: "same-origin"}).then(r => r.json()).then(u => {
@@ -902,7 +930,7 @@ $("logoutBtn").onclick = async () => {
   let companies = [], def = "SALT";
   try {
     const c = await get(can("finance.view") ? "/finance/api/companies" : "/purchasing/api/companies");
-    companies = c.companies || []; def = c.default || def;
+    companies = c.companies || []; def = companies.includes(c.default) ? c.default : companies[0] || def;
   } catch (e) {}
   if (!companies.length) companies = [def];
   $("fCompany").innerHTML = companies.map(x => `<option>${esc(x)}</option>`).join("");

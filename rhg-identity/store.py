@@ -87,13 +87,33 @@ def connect():
         return _conn
 
 
+def _columns(conn, table):
+    return {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
 def _seed_roles(conn):
+    # columns added after the first release: the department of a role, the access scope of an account
+    # (companies and locations; NULL = everything)
+    if "department" not in _columns(conn, "roles"):
+        conn.execute("ALTER TABLE roles ADD COLUMN department TEXT")
+    if "scope" not in _columns(conn, "users"):
+        conn.execute("ALTER TABLE users ADD COLUMN scope TEXT")
     have = {r["name"] for r in conn.execute("SELECT name FROM roles")}
     for name, spec in permissions.DEFAULT_ROLES.items():
         if name not in have:
-            conn.execute("INSERT INTO roles(name,description,permissions,system) VALUES(?,?,?,?)",
+            conn.execute("INSERT INTO roles(name,description,permissions,system,department) VALUES(?,?,?,?,?)",
                          (name, spec["description"], json.dumps(spec["permissions"]),
-                          1 if spec["system"] else 0))
+                          1 if spec["system"] else 0, spec.get("department") or "Other"))
+    # roles stored before screens existed: they get the screens their data rights allowed, and a department
+    for r in conn.execute("SELECT name, permissions, department FROM roles").fetchall():
+        held = json.loads(r["permissions"] or "[]")
+        if not any(".s." in p for p in held):
+            add = [p for p in permissions.screens_for_rights(held) if p not in held]
+            if add:
+                conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + add), r["name"]))
+        if not r["department"]:
+            dep = (permissions.DEFAULT_ROLES.get(r["name"]) or {}).get("department") or "Other"
+            conn.execute("UPDATE roles SET department=? WHERE name=?", (dep, r["name"]))
     # A system role (Administrator) holds every permission, including ones added to the
     # catalogue after it was stored.
     for r in conn.execute("SELECT name, permissions FROM roles WHERE system=1").fetchall():

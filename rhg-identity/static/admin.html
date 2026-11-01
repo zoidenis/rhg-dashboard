@@ -44,7 +44,54 @@ tr:last-child td{border-bottom:0}
 .modal .card{width:100%;max-width:460px;max-height:90dvh;overflow:auto;padding:22px}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 .cardlist{display:none}
+/* Roles: the list of roles by department, and the editor of the chosen one. */
+.rl{display:grid;grid-template-columns:250px minmax(0,1fr);gap:14px;align-items:start}
+.rlist{padding:10px;position:sticky;top:12px;max-height:calc(100dvh - 40px);overflow:auto}
+.rdep{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);padding:12px 8px 4px}
+.ritem{display:flex;justify-content:space-between;gap:8px;width:100%;appearance:none;border:0;background:none;
+  font:inherit;color:inherit;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13.5px}
+.ritem:hover{background:var(--bg)}
+.ritem.on{background:var(--bg);font-weight:700;box-shadow:inset 3px 0 0 var(--accent)}
+.ritem small{color:var(--sub);font-weight:400}
+.rhead{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:0 14px}
+.rhead .full{grid-column:1/-1}
+.rsum{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
+.legend{font-size:12px;color:var(--sub);margin:4px 0 10px;line-height:1.5}
+.tower{border:1px solid var(--line);border-radius:10px;margin-top:10px}
+.tower>summary{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;list-style:none;font-weight:700}
+.tower>summary::-webkit-details-marker{display:none}
+.tower>summary .cnt{margin-left:auto;font-weight:400;font-size:12.5px;color:var(--sub)}
+.tbody{padding:2px 14px 12px}
+.mgroup{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 2px}
+.mrow{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);gap:6px 12px;padding:7px 0;
+  border-top:1px solid var(--line);align-items:start}
+.mrow:first-of-type{border-top:0}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;margin:0}
+.chk input,.chip input,.perm input,.tower>summary input{width:auto;min-height:auto;margin:0;flex:none;accent-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;gap:6px;align-items:center;padding:4px 9px;border:1px solid var(--line);
+  border-radius:999px;font-size:12.5px;cursor:pointer;margin:0;user-select:none}
+.chip:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.co-tag{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);
+  border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.dirty{color:var(--warning);font-size:12.5px}
+/* Access of an account: companies, and the locations of each. */
+.modal .card.wide{max-width:680px}
+.acomp{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}
+.acomp .top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.acomp .top select{width:auto;min-width:170px;padding:7px 10px}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 10px;margin-top:8px;
+  max-height:240px;overflow:auto;padding:2px}
+.lgrid .chk{font-size:12.5px;align-items:flex-start}
+.lgrid .chk small{display:block;color:var(--sub)}
+.lbar{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.lbar input{flex:1;min-width:160px;padding:7px 10px}
+.scope{font-size:12.5px;line-height:1.45}
+.rsel-grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);padding:10px 10px 3px}
+@media(max-width:1000px){ .rl{grid-template-columns:1fr} .rlist{position:static;max-height:none} }
 @media(max-width:860px){
+  .rhead{grid-template-columns:1fr}
+  .mrow{grid-template-columns:1fr}
   aside{position:fixed;inset:0 auto 0 0;z-index:30;transform:translateX(-100%);
     transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.3)}
   aside.open{transform:none}
@@ -118,16 +165,18 @@ async function renderUsers(){
   $("view").innerHTML = `
     <div class="card">
       <div class="tablewrap"><table>
-        <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+        <thead><tr><th>User</th><th>Role</th><th>Access</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
         <tbody>${rows.map(u => `
           <tr>
             <td><b>${esc(u.name)}</b><div class="muted" style="font-size:12px">${esc(u.username)}</div></td>
-            <td>${esc(u.role)}</td>
+            <td>${esc(u.role)}<div class="muted" style="font-size:12px">${esc(depOf(u.role))}</div></td>
+            <td class="scope">${scopeText(u.scope)}</td>
             <td>${u.active ? '<span class="pill">Active</span>' : '<span class="pill off">Disabled</span>'}
                 ${u.must_change ? '<span class="pill off">Must change</span>' : ''}</td>
             <td class="muted">${u.last_login ? esc(u.last_login).replace("T"," ") : "never"}</td>
             <td><div class="actions">
               <button class="btn sm" data-edit="${esc(u.username)}">Edit</button>
+              <button class="btn sm" data-access="${esc(u.username)}">Access</button>
               <button class="btn sm" data-reset="${esc(u.username)}">Reset password</button>
             </div></td>
           </tr>`).join("")}</tbody>
@@ -136,26 +185,46 @@ async function renderUsers(){
         <div class="card urow">
           <div><b>${esc(u.name)}</b><div class="muted" style="font-size:12px">${esc(u.username)}</div></div>
           <div class="line"><span>Role</span><span>${esc(u.role)}</span></div>
+          <div class="line"><span>Access</span><span class="scope" style="text-align:right">${scopeText(u.scope)}</span></div>
           <div class="line"><span>Status</span><span>${u.active ? "Active":"Disabled"}</span></div>
           <div class="line"><span>Last sign-in</span><span>${u.last_login ? esc(u.last_login).replace("T"," ") : "never"}</span></div>
           <div class="actions">
             <button class="btn sm" data-edit="${esc(u.username)}">Edit</button>
+            <button class="btn sm" data-access="${esc(u.username)}">Access</button>
             <button class="btn sm" data-reset="${esc(u.username)}">Reset password</button>
           </div>
         </div>`).join("")}</div>
     </div>`;
   $("view").querySelectorAll("[data-edit]").forEach(b =>
     b.onclick = () => userModal(rows.find(x => x.username === b.dataset.edit)));
+  $("view").querySelectorAll("[data-access]").forEach(b =>
+    b.onclick = () => accessModal(rows.find(x => x.username === b.dataset.access)));
   $("view").querySelectorAll("[data-reset]").forEach(b =>
     b.onclick = () => resetModal(b.dataset.reset));
 }
 
+const depOf = name => (ROLES.find(r => r.name === name) || {}).department || "";
+
 function roleOptions(sel){
-  return ROLES.map(r => `<option value="${esc(r.name)}"${r.name===sel?" selected":""}>${esc(r.name)}</option>`).join("");
+  const deps = [...new Set(ROLES.map(r => r.department || "Other"))];
+  return deps.map(d => `<optgroup label="${esc(d)}">${ROLES.filter(r => (r.department || "Other") === d).map(r =>
+    `<option value="${esc(r.name)}"${r.name===sel?" selected":""}>${esc(r.name)}</option>`).join("")}</optgroup>`).join("");
 }
 
-function modal(html){
-  $("modalHost").innerHTML = `<div class="modal" id="mod"><div class="card">${html}</div></div>`;
+/* The access of an account in words: "All companies", or each company with its locations. */
+function scopeText(sc){
+  sc = sc || {companies:"*", locations:{}};
+  const L = sc.locations || {};
+  const loc = c => L[c] ? `<span class="muted">${esc(L[c].join(", "))}</span>` : '<span class="muted">all locations</span>';
+  if(sc.companies === "*"){
+    const lim = Object.keys(L);
+    return lim.length ? "All companies; " + lim.map(c => `<b>${esc(c)}</b>: ${loc(c)}`).join("; ") : "All companies";
+  }
+  return sc.companies.map(c => `<b>${esc(c)}</b>: ${loc(c)}`).join("<br>");
+}
+
+function modal(html, wide){
+  $("modalHost").innerHTML = `<div class="modal" id="mod"><div class="card${wide?" wide":""}">${html}</div></div>`;
   $("mod").onclick = e => { if(e.target.id === "mod") close(); };
 }
 function close(){ $("modalHost").innerHTML = ""; }
@@ -211,36 +280,241 @@ function resetModal(username){
   };
 }
 
-/* ---------------------------------------------------------- roles */
-async function renderRoles(){
-  const j = await api("/api/roles");
-  PERMS = j.permissions;
-  $("view").innerHTML = j.roles.map(r => `
-    <div class="card pad">
-      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
-        <div><b>${esc(r.name)}</b>${r.system?' <span class="pill">system</span>':""}
-          <div class="muted" style="font-size:12.5px">${esc(r.description||"")}</div></div>
-        <div class="muted" style="font-size:12.5px">${r.permissions.length} of ${Object.keys(PERMS).length} permissions</div>
-      </div>
-      <div class="perms">${Object.entries(PERMS).map(([p,label]) => `
-        <label class="perm"><input type="checkbox" data-role="${esc(r.name)}" value="${esc(p)}"
-          ${r.permissions.includes(p)?"checked":""} ${r.system?"disabled":""}>
-          <span><b style="font-weight:600">${esc(label)}</b>
-            <div class="muted" style="font-size:11px">${esc(p)}</div></span></label>`).join("")}</div>
-      ${r.system ? '<p class="muted" style="font-size:12px;margin:12px 0 0">The Administrator role always holds every permission.</p>'
-        : `<div class="actions" style="margin-top:14px;justify-content:flex-end">
-             <button class="btn primary sm" data-save="${esc(r.name)}"
-               data-desc="${esc(r.description||"")}">Save ${esc(r.name)}</button></div>`}
-    </div>`).join("");
-  $("view").querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
-    const name = b.dataset.save;
-    const perms = [...$("view").querySelectorAll(`input[data-role="${CSS.escape(name)}"]:checked`)].map(i=>i.value);
-    b.disabled = true;
-    try{ await api("/api/roles", {name, description:b.dataset.desc, permissions:perms});
-      say(`${name} saved.`, "ok"); }
-    catch(e){ say(e.message, "err"); }
-    finally{ b.disabled = false; }
+/* ---------------------------------------------------------- access of an account */
+let SCOPE_OPTS = null;
+
+async function accessModal(u){
+  modal(`<h3 style="margin-bottom:6px">Access of ${esc(u.name)}</h3>
+    <p class="muted" style="margin:0 0 6px;font-size:13px">Which companies, and which locations of each, ${esc(u.username)}
+      sees. The role (${esc(u.role)}) decides the screens; limited to some locations of a company, the account gets only
+      the location screens of that company. Unicorn reads the whole group, so it is only for accounts with all companies
+      and all locations.</p>
+    <div id="acBody"><p class="muted">Reading the companies and locations from Business Central…</p></div>
+    <div class="msg err" id="mmsg"></div>
+    <div class="actions" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="close()">Cancel</button>
+      <button class="btn primary" id="asave" disabled>Save access</button></div>`, true);
+  try{ SCOPE_OPTS = SCOPE_OPTS || await api("/api/admin/scope-options"); }
+  catch(e){ $("acBody").innerHTML = ""; $("mmsg").textContent = e.message; return; }
+  if(!$("acBody")) return;                       // closed while reading
+  const sc = u.scope || {companies:"*", locations:{}};
+  const L = sc.locations || {};
+  const comps = SCOPE_OPTS.companies.map(c => ({...c}));
+  // A company of the access that Business Central no longer lists stays visible, so it can be removed.
+  (sc.companies === "*" ? [] : sc.companies).forEach(n => {
+    if(!comps.some(c => c.company === n)) comps.push({company:n, locations:[], missing:true});
   });
+  const inScope = n => sc.companies === "*" || sc.companies.includes(n);
+  $("acBody").innerHTML = `
+    <label class="chk" style="margin:10px 0 4px;font-weight:700"><input type="checkbox" id="allc"
+      ${sc.companies === "*" ? "checked" : ""}> All companies, also the ones added later</label>
+    ${(SCOPE_OPTS.errors||[]).length ? `<p class="muted" style="font-size:12px">Not read: ${esc(SCOPE_OPTS.errors.join("; "))}</p>` : ""}
+    <div id="clist">${comps.map((c, i) => {
+      const chosen = L[c.company] || null;
+      return `<div class="acomp" data-i="${i}">
+        <div class="top">
+          <label class="chk"><input type="checkbox" class="cin" ${inScope(c.company) ? "checked" : ""}>
+            <b>${esc(c.company)}</b>${c.missing ? ' <span class="pill off">not in Business Central</span>' : ""}</label>
+          <select class="cmode" aria-label="Locations of ${esc(c.company)}">
+            <option value="*"${chosen ? "" : " selected"}>All locations</option>
+            <option value="some"${chosen ? " selected" : ""}>Chosen locations</option></select>
+        </div>
+        <div class="locs" ${chosen ? "" : "hidden"}>
+          <div class="lbar"><input class="lf" placeholder="Filter by code or restaurant" aria-label="Filter locations">
+            <button class="btn sm" data-all="1" type="button">Tick shown</button>
+            <button class="btn sm" data-all="0" type="button">Clear</button>
+            <span class="muted lcount" style="font-size:12px"></span></div>
+          <div class="lgrid">${c.locations.map(l => `
+            <label class="chk" data-txt="${esc((l.code+" "+l.name+" "+l.brand).toLowerCase())}">
+              <input type="checkbox" value="${esc(l.code)}" ${chosen && chosen.includes(l.code) ? "checked" : ""}>
+              <span><b style="font-weight:600">${esc(l.code)}</b>${l.name ? `<small>${esc(l.name)}${l.brand ? " · "+esc(l.brand) : ""}</small>` : ""}</span></label>`).join("")
+            || '<span class="muted" style="font-size:12.5px">Business Central lists no location for this company.</span>'}</div>
+        </div></div>`;}).join("")}</div>`;
+  const box = $("acBody");
+  const paint = () => {
+    const all = $("allc").checked;
+    box.querySelectorAll(".acomp").forEach(el => {
+      const cin = el.querySelector(".cin");
+      cin.disabled = all; if(all) cin.checked = true;
+      const on = cin.checked, some = el.querySelector(".cmode").value === "some";
+      el.querySelector(".cmode").disabled = !on;
+      el.querySelector(".locs").hidden = !(on && some);
+      el.style.opacity = on ? "" : ".55";
+      const n = el.querySelectorAll(".lgrid input:checked").length;
+      const c = el.querySelector(".lcount"); if(c) c.textContent = `${n} chosen`;
+    });
+    $("asave").disabled = false;
+  };
+  box.addEventListener("change", paint);
+  box.querySelectorAll(".lf").forEach(f => f.oninput = () => {
+    const q = f.value.trim().toLowerCase();
+    f.closest(".locs").querySelectorAll(".lgrid .chk").forEach(l => l.hidden = q && !l.dataset.txt.includes(q));
+  });
+  box.querySelectorAll("[data-all]").forEach(b => b.onclick = () => {
+    b.closest(".locs").querySelectorAll(".lgrid .chk").forEach(l => {
+      if(!l.hidden) l.querySelector("input").checked = b.dataset.all === "1"; });
+    paint();
+  });
+  paint();
+  $("asave").onclick = async () => {
+    const all = $("allc").checked, out = {companies: all ? "*" : [], locations: {}};
+    box.querySelectorAll(".acomp").forEach(el => {
+      const name = comps[+el.dataset.i].company;
+      if(!el.querySelector(".cin").checked) return;
+      if(!all) out.companies.push(name);
+      if(el.querySelector(".cmode").value === "some")
+        out.locations[name] = [...el.querySelectorAll(".lgrid input:checked")].map(i => i.value);
+    });
+    $("mmsg").textContent = "";
+    if(!all && !out.companies.length){ $("mmsg").textContent = "Choose at least one company, or all companies."; return; }
+    const empty = Object.entries(out.locations).find(([, v]) => !v.length);
+    if(empty){ $("mmsg").textContent = `Choose at least one location of ${empty[0]}, or all its locations.`; return; }
+    $("asave").disabled = true;
+    try{ await api("/api/users/"+encodeURIComponent(u.username), {scope: out});
+      close(); say(`Access of ${u.username} saved. It applies from their next page load.`, "ok"); renderUsers(); }
+    catch(e){ $("mmsg").textContent = e.message; $("asave").disabled = false; }
+  };
+}
+
+/* ---------------------------------------------------------- roles */
+/* A role is built from screens (tower → menu → tab) and actions; the data rights follow from the screens. */
+let RD = null, RSEL = null, RDIRTY = false;
+
+async function renderRoles(){
+  RD = await api("/api/roles");
+  PERMS = RD.permissions;
+  if(!RSEL || !RD.roles.some(r => r.name === RSEL.name)) RSEL = RD.roles.find(r => !r.system) || RD.roles[0];
+  else RSEL = RD.roles.find(r => r.name === RSEL.name);
+  RDIRTY = false;
+  $("view").innerHTML = `<div class="rl"><div class="card rlist" id="rlist"></div>
+    <div class="card pad" id="redit"></div></div>`;
+  paintRoleList(); paintRole();
+}
+
+function paintRoleList(){
+  const deps = [...RD.departments];
+  RD.roles.forEach(r => { if(!deps.includes(r.department)) deps.push(r.department); });
+  $("rlist").innerHTML = `<button class="btn sm primary" id="rnew" style="width:100%">New role</button>` +
+    deps.filter(d => RD.roles.some(r => r.department === d)).map(d => `<div class="rdep">${esc(d)}</div>` +
+      RD.roles.filter(r => r.department === d).map(r => `<button class="ritem${RSEL && RSEL.name === r.name ? " on" : ""}"
+        data-r="${esc(r.name)}"><span>${esc(r.name)}</span><small>${r.users ? r.users + (r.users === 1 ? " account" : " accounts") : ""}</small></button>`).join("")
+    ).join("");
+  $("rlist").querySelectorAll("[data-r]").forEach(b => b.onclick = () => {
+    if(RDIRTY && !confirm("Leave this role without saving the changes?")) return;
+    RSEL = RD.roles.find(r => r.name === b.dataset.r); RDIRTY = false; paintRoleList(); paintRole();
+    if(matchMedia("(max-width:1000px)").matches) $("redit").scrollIntoView({behavior:"smooth", block:"start"});
+  });
+  $("rnew").onclick = () => newRole(null);
+}
+
+function newRole(from){
+  if(RDIRTY && !confirm("Leave this role without saving the changes?")) return;
+  RSEL = {name:"", department: from ? from.department : "Other", description: from ? from.description : "",
+          permissions: from ? [...from.permissions] : [], system:false, users:0, isNew:true};
+  RDIRTY = !!from; paintRoleList(); paintRole(); $("rname").focus();
+}
+
+function leafKeys(menu){ return menu.tabs.length ? menu.tabs.map(t => t.key) : [menu.key]; }
+const coTag = k => k === "company" ? ' <span class="co-tag" title="Shows the whole company">company</span>' : "";
+
+function paintRole(){
+  const r = RSEL, sys = r.system, held = new Set(r.permissions);
+  const dis = sys ? "disabled" : "";
+  const groups = {};
+  Object.keys(RD.actions).forEach(a => {
+    const app = a.split(".")[0];
+    const g = {finance:"Finance & Inventory", purchasing:"Purchasing", admin:"Administration"}[app] || "pulse";
+    (groups[g] = groups[g] || []).push(a);
+  });
+  $("redit").innerHTML = `
+    <div class="rhead">
+      <div><label for="rname">Role</label><input id="rname" value="${esc(r.name)}" ${r.isNew ? "" : "disabled"}
+        placeholder="e.g. Unit manager"></div>
+      <div><label for="rdept">Department</label><select id="rdept" ${dis}>${RD.departments.concat(
+        RD.departments.includes(r.department) ? [] : [r.department]).map(d =>
+        `<option${d === r.department ? " selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
+      <div class="full"><label for="rdesc">Description</label><input id="rdesc" value="${esc(r.description || "")}" ${dis}
+        placeholder="What this position does in pulse"></div>
+    </div>
+    <div class="rsum" id="rsum"></div>
+    ${sys ? '<p class="muted" style="font-size:12.5px">The Administrator role always holds every screen and action.</p>' : ""}
+    <h3 style="margin-top:18px;font-size:15px">Screens</h3>
+    <p class="legend">Tick a menu item to give all its tabs, or the tabs one by one. <span class="co-tag">company</span> marks a
+      screen of the whole company: an account limited to some locations of a company does not get it, even when the
+      role holds it.</p>
+    ${RD.catalogue.map(t => `<details class="tower" open data-app="${esc(t.app)}">
+      <summary><input type="checkbox" class="tw" aria-label="All of ${esc(t.label)}" ${dis}
+        onclick="event.stopPropagation()"> ${esc(t.label)}<span class="cnt"></span></summary>
+      <div class="tbody">${[...new Set(t.menus.map(m => m.group))].map(g => `<div class="mgroup">${esc(g)}</div>` +
+        t.menus.filter(m => m.group === g).map(m => `<div class="mrow">
+          <label class="chk"><input type="checkbox" class="${m.tabs.length ? "mn" : "mn leaf"}" value="${esc(m.key)}" ${dis}
+            ${!m.tabs.length && held.has(m.key) ? "checked" : ""}> <span><b style="font-weight:600">${esc(m.label)}</b>${m.tabs.length ? "" : coTag(m.kind)}</span></label>
+          <div class="chips">${m.tabs.map(tb => `<label class="chip"><input type="checkbox" class="leaf" value="${esc(tb.key)}"
+            ${held.has(tb.key) ? "checked" : ""} ${dis}>${esc(tb.label)}${coTag(tb.kind)}</label>`).join("")}</div>
+        </div>`).join("")).join("")}</div></details>`).join("")}
+    <h3 style="margin-top:22px;font-size:15px">Actions</h3>
+    <p class="legend">What the role may do on the screens it holds.</p>
+    ${Object.entries(groups).map(([g, list]) => `<div class="mgroup">${esc(g)}</div><div class="perms" style="margin-top:4px">${list.map(a => `
+      <label class="perm"><input type="checkbox" class="act" value="${esc(a)}" ${held.has(a) ? "checked" : ""} ${dis}>
+        <span><b style="font-weight:600">${esc(RD.actions[a])}</b></span></label>`).join("")}</div>`).join("")}
+    ${sys ? "" : `<div class="actions" style="margin-top:20px;justify-content:flex-end;align-items:center">
+      <span class="dirty" id="rdirty"></span>
+      ${r.isNew ? "" : `<button class="btn sm danger" id="rdel">Delete</button><button class="btn sm" id="rdup">Duplicate</button>`}
+      <button class="btn primary" id="rsave">${r.isNew ? "Create role" : "Save " + esc(r.name)}</button></div>`}`;
+  const ed = $("redit");
+  const sync = () => {
+    ed.querySelectorAll(".mrow").forEach(row => {
+      const mn = row.querySelector(".mn");
+      if(mn.classList.contains("leaf")) return;
+      const tabs = [...row.querySelectorAll(".chips .leaf")], n = tabs.filter(x => x.checked).length;
+      mn.checked = n === tabs.length; mn.indeterminate = n > 0 && n < tabs.length;
+    });
+    let total = 0, all = 0;
+    ed.querySelectorAll(".tower").forEach(t => {
+      const leaves = [...t.querySelectorAll(".leaf")], n = leaves.filter(x => x.checked).length;
+      const tw = t.querySelector(".tw");
+      tw.checked = n === leaves.length; tw.indeterminate = n > 0 && n < leaves.length;
+      t.querySelector(".cnt").textContent = `${n} of ${leaves.length} screens`;
+      total += n; all += leaves.length;
+    });
+    const acts = ed.querySelectorAll(".act:checked").length;
+    $("rsum").innerHTML = `<span class="pill">${total} of ${all} screens</span><span class="pill">${acts} actions</span>` +
+      (r.isNew ? "" : `<span class="pill off">${r.users} ${r.users === 1 ? "account" : "accounts"}</span>`);
+    if($("rdirty")) $("rdirty").textContent = RDIRTY ? "Unsaved changes" : "";
+  };
+  ed.addEventListener("change", e => {
+    const el = e.target;
+    if(el.classList.contains("tw")) el.closest(".tower").querySelectorAll(".leaf").forEach(x => x.checked = el.checked);
+    else if(el.classList.contains("mn") && !el.classList.contains("leaf"))
+      el.closest(".mrow").querySelectorAll(".chips .leaf").forEach(x => x.checked = el.checked);
+    RDIRTY = true; sync();
+  });
+  ed.addEventListener("input", e => { if(e.target.matches("input:not([type=checkbox])")){ RDIRTY = true; sync(); } });
+  sync();
+  if(sys) return;
+  $("rsave").onclick = async () => {
+    const name = $("rname").value.trim();
+    if(!name){ say("A role name is required.", "err"); $("rname").focus(); return; }
+    if(r.isNew && RD.roles.some(x => x.name.toLowerCase() === name.toLowerCase())){ say(`A role named ${name} already exists.`, "err"); return; }
+    const perms = [...ed.querySelectorAll(".leaf:checked, .act:checked")].map(i => i.value);
+    $("rsave").disabled = true;
+    try{
+      await api("/api/roles", {name, department:$("rdept").value, description:$("rdesc").value.trim(), permissions:perms});
+      say(`${name} saved. Accounts with this role get it from their next page load.`, "ok");
+      RSEL = {name}; RDIRTY = false; await renderRoles();
+    }catch(e){ say(e.message, "err"); $("rsave").disabled = false; }
+  };
+  if($("rdup")) $("rdup").onclick = () => {
+    const perms = [...ed.querySelectorAll(".leaf:checked, .act:checked")].map(i => i.value);
+    newRole({department:$("rdept").value, description:$("rdesc").value, permissions:perms});
+    $("rname").value = r.name + " (copy)"; $("rname").select();
+  };
+  if($("rdel")) $("rdel").onclick = async () => {
+    if(r.users){ say(`${r.users} account(s) still have ${r.name}; give them another role first.`, "err"); return; }
+    if(!confirm(`Delete the role ${r.name}?`)) return;
+    try{ await api("/api/roles", {name:r.name, _delete:true}); say(`${r.name} deleted.`, "ok"); RSEL = null; await renderRoles(); }
+    catch(e){ say(e.message, "err"); }
+  };
 }
 
 /* ---------------------------------------------------------- sessions */

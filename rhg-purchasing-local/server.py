@@ -6,6 +6,7 @@ app are stored locally under ./data and never written back to BC.
 Run:  python server.py     then open http://127.0.0.1:8765
 """
 import base64
+import access
 import hmac
 import html
 import json
@@ -1140,6 +1141,18 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
                      "/api/users": "users", "/api/password": "view"}
 
 
+# ---------------------------------------------------------------- access scope (access.py)
+# downloads: the export action of the role (Admin → Roles & permissions → Actions)
+EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx"}
+ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/users", "/api/cache",
+               "/api/notify/status", "/api/weekly/status"}
+# read for one location (the "location" parameter) by a person limited to some locations of the company
+ACCESS_ONE_LOCATION = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/savings", "/api/savings/pdf",
+                       "/api/savings/xlsx", "/api/stock", "/api/report"}
+# answered cut to the locations in scope
+ACCESS_FILTERED = {"/api/today/locations", "/api/locations", "/api/recipients/locations"}
+
+
 class Handler(BaseHTTPRequestHandler):
     def _redirect(self, to):
         self.send_response(302)
@@ -1173,6 +1186,8 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _send(self, status, body, ctype="application/json; charset=utf-8"):
+        if status == 200 and getattr(self, "_scope_filter", None) and isinstance(body, dict):
+            body = self._scope_filter(body)
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", ctype)
@@ -1193,6 +1208,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        self._scope_filter = None
         if url.path == "/internal/recipients":
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})
@@ -1226,6 +1242,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Your role does not have access to this application."})
                 else:
                     self._redirect("/")
+            elif url.path.startswith("/api/") and (refusal := self._access(url.path, q, user)):
+                self._send(403, refusal)
+            elif url.path in EXPORT_PATHS and not auth.can(user, "export"):
+                self._send(403, {"error": "Your role cannot export."})
             elif url.path == "/api/users":
                 if not auth.can(user, "users"):
                     self._send(403, {"error": "Your role cannot manage accounts."})
@@ -1425,6 +1445,36 @@ class Handler(BaseHTTPRequestHandler):
             traceback.print_exc()
             self._send(500, {"error": f"Unexpected error: {exc}"})
 
+    def _access(self, path, q, user, body=None):
+        """The company and location scope of the person (access.py): a refusal to send, or None. A person limited to
+        some locations of a company reads each screen for one of them (the location filter) and the location
+        lists cut to them; the screens of the whole company are refused."""
+        if not access.limited(user) or path in ACCESS_FREE:
+            return None
+        if body is not None and not body.get("company"):
+            return None                     # a change that names no company (an action, a setting): the role decides
+        company = q.get("company") or (body or {}).get("company") or config.BC_COMPANY
+        if path == "/api/companies":
+            self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
+            return None
+        if not access.company_ok(user, company):
+            return access.refuse_company(company)
+        L = access.locations(user, company)
+        if L is not None:
+            if body is not None:
+                return access.refuse_company_wide(user, company)
+            if path in ACCESS_ONE_LOCATION:
+                if (q.get("location") or "").upper() not in L:
+                    return {"error": f"Choose one of your locations: {access.describe(user, company)}.",
+                            "access": "location", "scope": access.describe(user, company)}
+            elif path not in ACCESS_FILTERED:
+                return access.refuse_company_wide(user, company)
+        if L is not None and path in ACCESS_ONE_LOCATION:     # read for one location of the scope: keep it whole
+            self._scope_filter = lambda b: access.filter_payload(b, user, company, None, ("all_locations",), False)
+        else:
+            self._scope_filter = lambda b: access.filter_payload(b, user, company)
+        return None
+
     def _service_call(self):
         """Another RHG service on the internal network, proven by the shared service token."""
         token = auth.SERVICE_TOKEN
@@ -1516,6 +1566,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not auth.can(user, "view"):
             self._send(403, {"error": "Your role does not have access to this application."})
+            return
+        self._scope_filter = None
+        refusal = self._access(url.path, {}, user, body) if url.path.startswith("/api/") else None
+        if refusal:
+            self._send(403, refusal)
             return
         if url.path == "/api/password":
             ok, err = auth.change_own_password(user["username"], body.get("current"), body.get("new"))

@@ -110,6 +110,17 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const day = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : "";
 let me = null, CSRF = null, busy = false;
 const can = p => !!me && (me.permissions||[]).includes(p);
+// Screens (Admin → Roles & permissions) and access (Admin → Accounts → Access).
+const holds = prefix => !!me && (me.permissions||[]).some(p => p.startsWith(prefix));
+function myLocs(co){
+  const L = (me && me.scope && me.scope.locations) || {}, k = Object.keys(L).find(x => x.toUpperCase() === String(co||"").toUpperCase());
+  return k && Array.isArray(L[k]) && L[k].length ? L[k] : null;
+}
+// Where a person without the control center goes instead: the first screen their role holds.
+function elsewhere(){
+  return holds("finance.s.") ? "/finance/" : holds("purchasing.s.") ? "/purchasing/" : holds("platform.s.executive.") ? "/executive"
+    : can("unicorn.use") ? "/unicorn" : can("admin.users.manage") ? "/admin" : null;
+}
 
 async function get(path){
   const r = await fetch(path, {credentials: "same-origin"});
@@ -121,8 +132,9 @@ async function get(path){
 
 function shell(){
   const t = $("towers");
-  const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],
-                 ["finance.inventory.view","/finance/#inventory","Inventory"]].filter(([p]) => can(p));
+  const links = [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],
+                 ["finance.s.inventory.","/finance/#inventory","Inventory"]].filter(([p]) => holds(p));
+  const ex = t.querySelector('a[href="/executive"]'); if (ex && !holds("platform.s.executive.")) ex.remove();
   t.insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
   if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs
     t.insertAdjacentHTML("beforeend", `<a href="/unicorn" id="uniLink">Unicorn</a>`);
@@ -146,6 +158,12 @@ async function load(){
   if (busy) return; busy = true;
   $("pill").className = "pill load"; $("pillText").textContent = "Reading the towers…";
   const co = encodeURIComponent($("company").value || "SALT");
+  const mine = myLocs($("company").value || "SALT");
+  if (mine) {                  // the control center shows whole companies
+    busy = false;
+    $("pill").className = "pill"; $("pillText").textContent = `Your access covers ${mine.join(", ")} of ${$("company").value}: the control center shows whole companies.`;
+    return;
+  }
   const [p, f] = await Promise.all([
     can("purchasing.view") ? get(`/purchasing/api/dashboard?company=${co}`).catch(e => ({error: e.message})) : null,
     can("finance.view") ? get(`/finance/api/dashboard?company=${co}`).catch(e => ({error: e.message})) : null,
@@ -246,10 +264,11 @@ function renderPeriods(){
 
 $("refreshBtn").onclick = () => load();
 $("company").onchange = () => load();
-$("logoutBtn").onclick = async () => {
+async function signOut(){
   try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
   location.href = "/login?signedout=1";
-};
+}
+$("logoutBtn").onclick = signOut;
 
 (async () => {
   $("today").textContent = new Date().toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long", year:"numeric"}) + " · Group priorities and tower access";
@@ -257,6 +276,17 @@ $("logoutBtn").onclick = async () => {
   try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
   if (!s.user || s.user.must_change) { location.href = "/login"; return; }
   me = s.user; CSRF = s.user.csrf;
+  if (!can("platform.s.control")) {
+    const to = elsewhere();
+    if (to) { location.replace(to); return; }
+    document.querySelector("main").innerHTML = `<div class="card" style="padding:22px;max-width:620px;margin:40px auto">
+      <h2 style="font-size:17px;margin:0 0 6px">No screen in your role yet</h2>
+      <p class="muted" style="margin:0">Your account is signed in, but its role does not hold any screen of pulse. Ask the administrator
+      to give your role the screens you need (Administration → Roles &amp; permissions).</p>
+      <p style="margin:14px 0 0"><button class="btn" id="out2">Sign out</button></p></div>`;
+    $("out2").onclick = signOut;
+    return;
+  }
   shell();
   if (can("purchasing.view")) {
     try {
