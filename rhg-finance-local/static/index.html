@@ -3774,7 +3774,7 @@ async function loadSs(refresh){
     if (j.error) throw new Error(j.error);
     if (ssKey !== q) return;
     if (j.pending) {
-      $("ssStatus").textContent = `Reading: ${j.stage || "starting"}… the first read holds a year and a half of purchase invoices and takes a few minutes.`;
+      $("ssStatus").textContent = `Reading for ${Math.floor((j.elapsed || 0) / 60)}:${String((j.elapsed || 0) % 60).padStart(2, "0")} · ${j.stage || "starting"}… The very first read takes a year and a half of purchase invoices, month by month (several minutes); after that the months are kept and a read takes seconds. You can leave this tab: the read goes on.`;
       if (kaTab === "sup") ssTimer = setTimeout(() => loadSs(false), 5000);
       return;
     }

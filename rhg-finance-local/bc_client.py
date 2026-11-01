@@ -356,7 +356,7 @@ class BCClient:
                                              "Unit_of_Measure_Code"})
         return self._cached(("openile", company), max_age, go)
 
-    def hold_purchase_invoice_values(self, company, date_from, date_to, top_up_after=900):
+    def hold_purchase_invoice_values(self, company, date_from, date_to, top_up_after=900, progress=None):
         """Makes sure the local file holds the value entries of purchase invoices of the window (the item
         ledger entry each invoice line valued), month by month as hold_item_ledger does; returns the store
         kind to read them from with localdb.iter_rows. Nothing is kept in memory."""
@@ -375,6 +375,8 @@ class BCClient:
                 continue
             if marker:
                 flt += f" and Entry_No gt {localdb.max_entry(kind, company, m_from, m_to) or 0}"
+            elif progress:
+                progress(cursor.strftime("%B %Y"))
             added = [0]
 
             def keep(page, k=kind, c=company):
