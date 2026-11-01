@@ -77,3 +77,4 @@ E_PINV = get("E_PINV", "PostedPurchaseInvoices")
 E_VALUE = get("E_VALUE", "ValueEntries")
 E_VENDOR_CARD = get("E_VENDOR_CARD", "VendorCard")
 E_PO = get("E_PO", "PurchaseOrder")
+E_SKU = get("E_SKU", "StockkeepingUnitCard")      # SKU cards: planning parameters per item and location

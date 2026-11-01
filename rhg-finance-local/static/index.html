@@ -196,6 +196,18 @@ td.num,th.num{text-align:right}
 .pl-ex{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
 @media (max-width:1000px){.pl-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pl-cols{grid-template-columns:minmax(0,1fr)}.pl-span2{grid-column:auto}}
 @media (max-width:600px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sk-mini{display:flex;gap:2px;height:7px;border-radius:4px;overflow:hidden;background:var(--bg)}
+.sk-mini i{display:block;min-width:2px}
+.sk-c-missing{background:var(--up)}.sk-c-empty,.sk-c-incomplete{background:var(--warn)}.sk-c-off{background:#dcc07a}
+.sk-c-unused{background:var(--prev)}.sk-c-ok{background:var(--down)}.sk-c-low_use{background:var(--line)}
+.sk-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.sk-chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+.sk-chips button.on{border-color:var(--ink);font-weight:600}
+.sk-chips i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+.sk-st{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:1px 7px;white-space:nowrap}
+.sk-st.missing{background:var(--up-bg);color:var(--up)}.sk-st.empty,.sk-st.incomplete,.sk-st.off{background:var(--warn-bg);color:var(--warn)}
+.sk-st.ok{background:var(--down-bg);color:var(--down)}.sk-st.unused,.sk-st.low_use{background:var(--bg);color:var(--sub)}
+.sk-tab td{vertical-align:top}.sk-tab .meta{white-space:normal}
 .il-mini{display:flex;align-items:stretch;gap:2px;height:7px;flex:0 0 7px;border-radius:4px;overflow:hidden;background:var(--bg)}
 .il-mini i,.il-bar i{display:block;min-width:2px}
 .pl-sq .st b small{font-size:10.5px;font-weight:600;color:var(--sub);margin-left:3px}
@@ -454,7 +466,7 @@ td.num,th.num{text-align:right}
             <button class="mini dark" id="ssRead">Read again</button></div></div>
         <p class="meta" id="ssStatus" style="margin:6px 0 0"></p>
       </div>
-      <div class="kpis" id="ssKpis"></div>
+      <div class="kpis" id="supKpis"></div>
       <div class="card"><div class="scroll"><table id="ssTable" data-nosort></table></div></div>
       <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
         <div class="hint" id="ssDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
@@ -644,7 +656,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -658,6 +670,21 @@ td.num,th.num{text-align:right}
       <div id="ilGrid"></div>
       <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
         <div class="hint" id="ilDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="skView" style="display:none">
+      <div class="card">
+        <div class="card-head"><div><h2>SKU planning</h2>
+          <p class="hint" id="skNote">Every location as a square: its SKU cards in Business Central against what it actually used in the last weeks (sales and recipe consumption; transfers out at the warehouses). For each item a recommendation for the card: reordering policy, reorder point, maximum, safety stock, replenishment and transfer-from. Click a location for its items; the Excel holds the lines to create or update, in the columns of the SKU list, to check and import. Business Central is read only.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="meta" for="skSort">Order</label><select id="skSort"><option value="fix">by cards to fix</option><option value="cover">by lowest coverage</option><option value="value">by value used</option><option value="name">by name</option></select>
+            <a class="mini" id="skXlsx" href="#" download>Excel · all locations</a>
+            <button class="mini dark" id="skRead">Read again</button></div></div>
+        <p class="meta" id="skStatus" style="margin:6px 0 0"></p>
+      </div>
+      <div class="kpis" id="skTotals"></div>
+      <div id="skGrid"></div>
+      <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the recommendations are built</summary>
+        <div class="hint" id="skDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
     <div id="invMain">
     <p class="hint" id="ssNote" style="margin:0 0 12px">Company-wide, at the end of the selected period.</p>
@@ -1081,6 +1108,7 @@ td.num,th.num{text-align:right}
 <div class="pl-bd" id="klBd"><div class="pl-pop" id="klPop" role="dialog" aria-modal="true" aria-label="Location payables and receivables"></div></div>
 <div class="pl-bd" id="clBd"><div class="pl-pop" id="clPop" role="dialog" aria-modal="true" aria-label="Location takings and receipts"></div></div>
 <div class="pl-bd" id="flBd"><div class="pl-pop" id="flPop" role="dialog" aria-modal="true" aria-label="Location finances in detail"></div></div>
+<div class="pl-bd" id="skBd"><div class="pl-pop" id="skPop" role="dialog" aria-modal="true" aria-label="SKU cards of a location"></div></div>
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
 
@@ -1208,6 +1236,7 @@ function render(){
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
   if($("v-kartela").classList.contains("on") && kaTab === "loc" && klKey !== flQuery()) loadKl(false);
   if($("v-kartela").classList.contains("on") && kaTab === "sup" && ssKey !== ssQuery()) loadSs(false);
+  if($("v-inventory").classList.contains("on") && ilTab === "sku" && skData && skKey !== skQuery()) loadSk(false);
   if(typeof tdState !== "undefined" && tdState.bar){ tdRender(); if (!tdCur()) tdLoad(false); }
   if($("v-assets").classList.contains("on") && faTab === "loc" && faKey !== faQuery()) loadFa(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
@@ -1487,6 +1516,13 @@ function renderSettings(){
     <label class="field">Turnover: negative adjustments count as use for operating supplies (yes/no)<input id="inv-tyadj" value="${esc((s.inventory||{}).turnover_supplies_adjustments||"")}" placeholder="yes"></label>
     <label class="field">Turnover: fresh families checked for a count<input id="inv-tyfresh" value="${esc((s.inventory||{}).turnover_fresh_families||"")}" placeholder="PERIME&amp;FRUTE, MISH&amp;SHPENDE"></label>
     <label class="field">Turnover: count when fresh cover exceeds (days)<input id="inv-tyfd" value="${esc((s.inventory||{}).turnover_fresh_check_days||"")}" placeholder="30"></label>
+    <label class="field">SKU planning: window of use (days)<input id="inv-skw" value="${esc((s.inventory||{}).sku_window_days||"")}" placeholder="60"></label>
+    <label class="field">SKU planning: service level of the safety stock (%)<input id="inv-sksl" value="${esc((s.inventory||{}).sku_service_level||"")}" placeholder="95"></label>
+    <label class="field">SKU planning: lead time in days (default, then LOCATION=days)<input id="inv-sklt" value="${esc((s.inventory||{}).sku_lead_days||"")}" placeholder="2, MAGAZINE=45"></label>
+    <label class="field">SKU planning: delivery cycle when none is seen (days)<input id="inv-skrv" value="${esc((s.inventory||{}).sku_review_days||"")}" placeholder="3"></label>
+    <label class="field">SKU planning: most days of use for fresh families<input id="inv-skfr" value="${esc((s.inventory||{}).sku_fresh_max_days||"")}" placeholder="4"></label>
+    <label class="field">SKU planning: tolerance before a card is off (%)<input id="inv-sktol" value="${esc((s.inventory||{}).sku_tolerance_pct||"")}" placeholder="50"></label>
+    <label class="field">SKU planning: fewest days of use worth planning<input id="inv-skmin" value="${esc((s.inventory||{}).sku_min_use_days||"")}" placeholder="5"></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
@@ -1517,7 +1553,10 @@ $("saveSettings").onclick = async ()=>{
                    movement_exclude_locations:$("inv-exloc").value, movement_exclude_categories:$("inv-excat").value,
                    turnover_natures:$("inv-tynat").value, turnover_targets:$("inv-tytg").value,
                    turnover_safety_days:$("inv-tysafe").value, turnover_supplies_adjustments:$("inv-tyadj").value,
-                   turnover_fresh_families:$("inv-tyfresh").value, turnover_fresh_check_days:$("inv-tyfd").value},
+                   turnover_fresh_families:$("inv-tyfresh").value, turnover_fresh_check_days:$("inv-tyfd").value,
+                   sku_window_days:$("inv-skw").value, sku_service_level:$("inv-sksl").value, sku_lead_days:$("inv-sklt").value,
+                   sku_review_days:$("inv-skrv").value, sku_fresh_max_days:$("inv-skfr").value,
+                   sku_tolerance_pct:$("inv-sktol").value, sku_min_use_days:$("inv-skmin").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -3121,9 +3160,11 @@ function ilShowTab(tab){
   ilTab = tab;
   if (!$("v-inventory").classList.contains("on")) { navTo("inventory"); return; }
   document.querySelectorAll("#invTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("invMain").style.display = tab === "loc" ? "none" : "";
+  $("invMain").style.display = tab === "loc" || tab === "sku" ? "none" : "";
   $("ilView").style.display = tab === "loc" ? "" : "none";
+  $("skView").style.display = tab === "sku" ? "" : "none";
   if (tab === "loc") { if (!ilData || ilKey !== ilQuery()) loadIl(false); else ilRender(); }
+  if (tab === "sku") { if (!skData || skKey !== skQuery()) loadSk(false); else skRender(); }
 }
 document.querySelectorAll("#invTabs button").forEach(b => b.onclick = () => ilShowTab(b.dataset.t));
 $("ilSort").onchange = () => { ilSort = $("ilSort").value; ilRender(); };
@@ -3280,6 +3321,154 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("ilBd").classList.contains("show")) { $("ilBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.illoc) { e.preventDefault(); ilOpen(e.target.dataset.illoc); }
+});
+// ---------------------------------------------------------------- Inventory → SKU planning
+// Every location's SKU cards in BC against its use over the window (server: skuplan.py, /api/inventory/sku);
+// the popup lists the items with the recommendation; the Excel holds the lines to create or update.
+var skData = null, skKey = "", skTimer = null, skSort = "fix", skFilter = "", skRows = {};
+const SK_ORDER = ["missing", "empty", "incomplete", "off", "unused", "ok", "low_use"];
+function skQuery(){ const p = new URLSearchParams(); if ($("company").value) p.set("company", $("company").value); return p.toString(); }
+async function loadSk(refresh){
+  clearTimeout(skTimer);
+  const q = skQuery();
+  if (skKey !== q) { skData = null; skKey = q; skRows = {}; }
+  if (!skData) $("skGrid").innerHTML = `<p class="hint">Reading…</p>`;
+  $("skRead").disabled = true;
+  try {
+    const j = await readJSON(await fetch("/api/inventory/sku?" + q + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (skKey !== q) return;
+    if (j.pending) {
+      const e = j.elapsed || 0;
+      $("skStatus").textContent = `Reading for ${Math.floor(e / 60)}:${String(e % 60).padStart(2, "0")} · ${j.stage || "starting"}… The first read takes the SKU cards (tens of thousands) and the item ledger of the window; a few minutes. You can leave this tab: the read goes on.`;
+      if (ilTab === "sku") skTimer = setTimeout(() => loadSk(false), 5000);
+      return;
+    }
+    skData = j; skRows = {}; skRender();
+  } catch (e) { $("skStatus").textContent = "Could not read: " + e.message; }
+  finally { $("skRead").disabled = false; }
+}
+function skCount(L, ks){ return ks.reduce((a, k) => a + ((L.counts || {})[k] || 0), 0); }
+const skFix = L => skCount(L, ["missing", "empty", "incomplete", "off"]);
+function skMini(L){
+  const tot = SK_ORDER.reduce((a, k) => a + (L.counts[k] || 0), 0) || 1;
+  return `<div class="sk-mini" title="${SK_ORDER.filter(k => L.counts[k]).map(k => `${skData.statuses[k]} ${L.counts[k]}`).join(" · ")}">${SK_ORDER.filter(k => L.counts[k]).map(k => `<i class="sk-c-${k}" style="flex:${L.counts[k] / tot}"></i>`).join("")}</div>`;
+}
+function skGroups(codes){
+  const L = skData.locations, out = [], by = {};
+  const rest = codes.filter(c => L[c].group === "restaurant"), wh = codes.filter(c => L[c].group === "warehouse"), other = codes.filter(c => L[c].group === "other");
+  rest.forEach(c => { const k = (L[c].brand || c).toUpperCase(); (by[k] = by[k] || []).push(c); });
+  const multi = Object.keys(by).filter(k => by[k].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(c => !multi.includes((L[c].brand || c).toUpperCase()));
+  if (wh.length) out.push({t: "Warehouses, central and production", c: wh});
+  if (singles.length) out.push({t: "Restaurants", c: singles});
+  multi.forEach(k => out.push({t: k, c: by[k]}));
+  if (other.length) out.push({t: "Other locations", c: other, hint: "not in the restaurant registry of Settings"});
+  return out;
+}
+function skSquare(code, L){
+  const a = (L.alerts || [])[0] || ["good", "Cards in line with the use"];
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const cov = L.coverage;
+  return `<div class="pl-sq" role="button" tabindex="0" data-skloc="${esc(code)}" aria-label="${esc(L.name || code)}: SKU cards in detail">
+    <div class="hd"><div class="ic">${ilGlyph(L)}</div><div class="nm"><b>${esc(L.name || code)}</b><span>${esc(L.name && L.name !== code ? code : "")}</span></div></div>
+    <div class="big"><span class="v ${cov == null ? "" : cov < 30 ? "up" : cov < 70 ? "warn" : ""}">${cov == null ? "–" : fmt(cov, 0) + "%"}</span><span class="cmp">of ${fmt(L.moving - (L.counts.low_use || 0))} items used have a card in line</span></div>
+    ${skMini(L)}
+    <div class="st">${stat("Items used", fmt(L.moving), "", `Items with use in the last ${skData.window.days} days`)}
+      ${stat("SKU cards", `${fmt(L.cards)}<small>${fmt(L.with_parameters)} set</small>`, "", "SKU cards at this location, and how many carry planning parameters")}
+      ${stat("No card", fmt(L.counts.missing || 0), L.counts.missing ? "up" : "", "Items used here without an SKU card")}
+      ${stat("Empty · incomplete", fmt(skCount(L, ["empty", "incomplete"])), skCount(L, ["empty", "incomplete"]) ? "warn" : "")}
+      ${stat("Off the use", fmt(L.counts.off || 0), L.counts.off ? "warn" : "", "Reorder point, maximum or reorder quantity away from the recommendation")}
+      ${stat("Set, unused", fmt(L.counts.unused || 0), "", "Parameters on cards with no use in the window")}</div>
+    <div class="al ${a[0]}" title="${esc((L.alerts || []).map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${(L.alerts || []).length > 1 ? ` · +${L.alerts.length - 1}` : ""}</span></div>
+  </div>`;
+}
+function skRender(){
+  if (ilTab !== "sku" || !skData) return;
+  const d = skData, B = d.locations || {}, codes = Object.keys(B);
+  $("skXlsx").href = "/api/inventory/sku/xlsx?" + skQuery();
+  $("skStatus").innerHTML = `Use of ${esc(d.window.from)} → ${esc(d.window.to)} (${d.window.days} days) · ${fmt(d.cards_total)} SKU cards read ${esc((d.cards_read_at || "").replace("T", " ").slice(0, 16))} · lead time ${esc(d.params.lead_text)} days · service level ${fmt(d.params.service)}% · read ${esc(d.read_at)}`
+    + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
+  const sum = f => codes.reduce((a, c) => a + (f(B[c]) || 0), 0);
+  const cards = sum(L => L.cards), set = sum(L => L.with_parameters), moving = sum(L => L.moving), low = sum(L => L.counts.low_use);
+  const ok = sum(L => L.counts.ok), miss = sum(L => L.counts.missing), fix = sum(L => skCount(L, ["empty", "incomplete", "off"])), unused = sum(L => L.counts.unused);
+  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("skTotals").innerHTML = k("Items used with a card in line", moving - low ? fmt(ok / (moving - low) * 100, 0) + "%" : "–", `${fmt(ok)} of ${fmt(moving - low)} items used on ${d.params.min_days}+ days · ${codes.length} locations`) +
+    k("Cards to create", fmt(miss), "items used at a location without an SKU card", miss ? "up" : "") +
+    k("Cards to fill or correct", fmt(fix), "empty, incomplete, or off the actual use", fix ? "warn" : "") +
+    k("SKU cards in Business Central", fmt(cards), `${fmt(set)} with parameters · ${fmt(unused)} set but unused in ${d.window.days} days`);
+  const key = {fix: c => -skFix(B[c]), cover: c => B[c].coverage ?? 1e9, value: c => -(B[c].use_value || 0), name: c => 0}[skSort];
+  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (B[a].name || a).localeCompare(B[b].name || b));
+  $("skGrid").innerHTML = codes.length ? skGroups(codes).map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${fmt(g.c.reduce((a, c) => a + skFix(B[c]), 0))} cards to create or fix${g.hint ? " · " + esc(g.hint) : ""}</span></div>
+      <div class="pl-grid">${sorted(g.c).map(c => skSquare(c, B[c])).join("")}</div>`).join("")
+    : `<p class="hint">No item was used and no SKU card carries parameters.</p>`;
+  $("skDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("");
+  if ($("skBd").classList.contains("show") && $("skPop").dataset.code) skDraw($("skPop").dataset.code);
+}
+async function skOpen(code){
+  $("skPop").dataset.code = code; skFilter = "";
+  $("skBd").classList.add("show");
+  if (!skRows[code]) {
+    $("skPop").innerHTML = `<div class="pl-body"><p class="hint">Reading the items of ${esc(code)}…</p></div>`;
+    try { skRows[code] = await readJSON(await fetch(`/api/inventory/sku/location?${skQuery()}&code=${encodeURIComponent(code)}`)); }
+    catch (e) { $("skPop").innerHTML = `<div class="pl-body"><p class="hint up">${esc(e.message)}</p></div>`; return; }
+  }
+  skDraw(code);
+}
+const skNum = (v, uom) => v == null ? "–" : fmt(v, v && Math.abs(v) < 10 && v % 1 ? 1 : 0);
+function skCard(c, uom, rec){
+  if (!c) return `<span class="hint">no card</span>`;
+  if (!c.policy && !c.rop && !c.max && !c.ss && !c.rq) return `<span class="hint">empty${c.repl ? " · " + esc(c.repl) : ""}</span>`;
+  const q = [c.rop || rec ? `ROP ${skNum(c.rop)}` : "", c.policy === "Fixed Reorder Qty." || c.rq ? `qty ${skNum(c.rq)}` : `max ${skNum(c.max)}`, c.ss ? `SS ${skNum(c.ss)}` : ""].filter(Boolean).join(" · ");
+  return `${esc(c.policy || "no policy")}<div class="meta">${q}${c.repl ? " · " + esc(c.repl) + (c.from ? " " + esc(c.from) : "") : ""}${c.modified && c.modified > "0001" ? " · " + esc(c.modified) : ""}</div>`;
+}
+function skDraw(code){
+  const L = (skData && skData.locations || {})[code], R = skRows[code]; if (!L || !R) return;
+  const st = skData.statuses, rows = R.rows || [];
+  const q = ($("skFind") && $("skFind").value || "").trim().toLowerCase();
+  const shown = rows.filter(x => (!skFilter || x[12] === skFilter) && (!q || (x[0] + " " + x[1] + " " + x[2]).toLowerCase().includes(q)));
+  const chips = SK_ORDER.filter(k => L.counts[k]).map(k => `<button class="${skFilter === k ? "on" : ""}" data-skf="${k}"><i class="sk-c-${k}"></i>${esc(st[k])} ${fmt(L.counts[k])}</button>`).join("");
+  const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
+  $("skPop").innerHTML = `<div class="ph"><div class="ic">${ilGlyph(L)}</div>
+      <div><h2>${esc(L.name || code)}</h2><div class="sub">${esc(code)} · SKU cards against the use of ${esc(skData.window.from)} → ${esc(skData.window.to)} · lead time ${fmt(L.lead)} days</div></div><div class="sp"></div>
+      <a class="close" href="/api/inventory/sku/xlsx?${skQuery()}&code=${encodeURIComponent(code)}" style="text-decoration:none" download>Excel · this location</a>
+      <button class="close" data-skclose>Close ×</button></div>
+    <div class="pl-body">
+      ${(L.alerts || []).length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="pl-ex">${L.alerts.map(a => `<div><span class="pl-sev ${a[0]}"></span>${esc(a[1])}</div>`).join("")}</div></div>` : ""}
+      <div class="pl-tiles">
+        ${tile("Items used with a card in line", L.coverage == null ? "–" : fmt(L.coverage, 0) + "%", `${fmt(L.counts.ok || 0)} of ${fmt(L.moving - (L.counts.low_use || 0))} items used on ${skData.params.min_days}+ days`, L.coverage != null && L.coverage < 70 ? "warn" : "")}
+        ${tile("Cards to create", fmt(L.counts.missing || 0), "items used without an SKU card", L.counts.missing ? "up" : "")}
+        ${tile("Cards to fill or correct", fmt(skCount(L, ["empty", "incomplete", "off"])), `empty ${fmt(L.counts.empty || 0)} · incomplete ${fmt(L.counts.incomplete || 0)} · off ${fmt(L.counts.off || 0)}`, skCount(L, ["empty", "incomplete", "off"]) ? "warn" : "")}
+        ${tile("Use to plan, 30 days", ilM(L.fix_value), `at cost, of ${ilM(L.use_value)} used: the share whose card needs work`)}
+      </div>
+      <div class="pl-panel">
+        <div class="sk-chips"><button class="${skFilter ? "" : "on"}" data-skf="">All ${fmt(rows.length)}</button>${chips}
+          <input id="skFind" placeholder="Find an item" value="${esc(q)}" style="margin-left:auto;padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit;font-size:12.5px;width:160px"></div>
+        <div class="scroll"><table class="sk-tab" data-nosort><tr><th>Item</th><th class="num">Use / day</th><th>Card in BC</th><th>Recommended</th><th class="num">On hand · days</th><th>Status</th></tr>
+        ${shown.slice(0, 400).map(x => { const r = x[11], c = x[10];
+          const recQ = r.policy === "Fixed Reorder Qty." ? `ROP ${skNum(r.rop)} · qty ${skNum(r.rq)}` : `ROP ${skNum(r.rop)} · max ${skNum(r.max)}`;
+          return `<tr><td><b>${esc(x[1] || x[0])}</b><div class="meta">${esc(x[0])} · ${esc(x[2] || "")} · ${esc(x[3])}${x[16] ? " · fresh" : ""}</div></td>
+            <td class="num">${fmt(x[4], x[4] < 10 ? 2 : 0)}<div class="meta">${fmt(x[6])} days used · ${fmt(x[7])} deliveries</div></td>
+            <td>${skCard(c, x[3])}</td>
+            <td>${x[12] === "low_use" ? `<span class="hint">too little use to plan</span>` : x[12] === "unused" ? `<span class="hint">no use in ${skData.window.days} days: review, clear the policy</span>` : `${esc(r.policy)}<div class="meta">${recQ} · SS ${skNum(r.ss)} · ${esc(r.repl)}${r.from ? " from " + esc(r.from) : ""} · ${esc(r.lead)}</div>`}</td>
+            <td class="num">${x[13] == null ? "–" : fmt(x[13], x[13] && Math.abs(x[13]) < 10 && x[13] % 1 ? 1 : 0)}<div class="meta">${x[14] == null ? "" : fmt(x[14], 0) + " days"}</div></td>
+            <td><span class="sk-st ${x[12]}">${esc(st[x[12]])}</span></td></tr>`; }).join("")}
+        </table></div>
+        ${shown.length > 400 ? `<p class="hint">${fmt(shown.length - 400)} more in the Excel.</p>` : ""}
+      </div>
+    </div>`;
+  const f = $("skFind"); if (f) { f.oninput = () => { const pos = f.selectionStart; skDraw(code); const g = $("skFind"); g.focus(); g.setSelectionRange(pos, pos); }; }
+}
+$("skSort").onchange = () => { skSort = $("skSort").value; skRender(); };
+$("skRead").onclick = () => loadSk(true);
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-skclose]") || e.target === $("skBd")) { $("skBd").classList.remove("show"); return; }
+  const f = e.target.closest("[data-skf]"); if (f) { skFilter = f.dataset.skf; skDraw($("skPop").dataset.code); return; }
+  const s = e.target.closest("[data-skloc]"); if (s) skOpen(s.dataset.skloc);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("skBd").classList.contains("show")) { $("skBd").classList.remove("show"); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.skloc) { e.preventDefault(); skOpen(e.target.dataset.skloc); }
 });
 // ---------------------------------------------------------------- Executive overview → Location intelligence
 // Every location as a square with its finances: P&L of the latest closed month (against last year
@@ -3808,7 +3997,7 @@ function ssRender(){
   const sum = f => rows.reduce((a, x) => a + (x[f] || 0), 0);
   const lateStock = rows.filter(x => x.overdue > 0).reduce((a, x) => a + x.stock, 0);
   const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
-  $("ssKpis").innerHTML = k("Owed to these suppliers", flM(sum("owed")), `${C} · overdue ${flM(sum("overdue"))} · beyond 60 days ${flM(sum("overdue_60"))}`, sum("overdue_60") ? "up" : "") +
+  $("supKpis").innerHTML = k("Owed to these suppliers", flM(sum("owed")), `${C} · overdue ${flM(sum("overdue"))} · beyond 60 days ${flM(sum("overdue_60"))}`, sum("overdue_60") ? "up" : "") +
     k("Their stock on hand", flM(sum("stock")), `${cat ? esc(cat) + " · " : ""}at cost · from their own receipts ${flM(sum("exact"))}`) +
     k("Stock of suppliers we pay late", flM(lateStock), `held from ${fmt(rows.filter(x => x.overdue > 0 && x.stock > 0).length)} suppliers with overdue invoices`, lateStock ? "warn" : "") +
     k("Not moved or slow", flM(sum("dead") + sum("slow")), `no sale in 90 days ${flM(sum("dead"))} · over 90 days of cover ${flM(sum("slow"))}`);

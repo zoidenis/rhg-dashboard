@@ -25,6 +25,7 @@ import pl_memo
 import cashloc
 import kartloc
 import supstock
+import skuplan
 import today as todayloc
 import unicorn_facts
 import faloc
@@ -1487,6 +1488,33 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path in ("/api/inventory/sku", "/api/inventory/sku/location", "/api/inventory/sku/xlsx"):
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                if url.path == "/api/inventory/sku":
+                    self._send(200, skuplan.request(client, company, q.get("refresh") == "1"))
+                    return
+                r = skuplan.held(company)
+                if not r:
+                    self._send(409, {"error": "Open SKU planning first."})
+                elif url.path == "/api/inventory/sku/location":
+                    rows = skuplan.location_rows(r, q.get("code") or "")
+                    self._send(200 if rows else 404, rows or {"error": "No such location in SKU planning."})
+                else:
+                    sts = [x for x in (q.get("statuses") or "").split(",") if x in skuplan.STATUS_LABEL] or None
+                    body = skuplan.render_xlsx(r, q.get("code") or None, sts)
+                    name = f'RHG_{company.replace(" ", "_")}_SKU_{(q.get("code") or "all").replace(" ", "_")}_{r["window"]["to"]}.xlsx'
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="{re.sub(r"[^A-Za-z0-9._-]+", "_", name)}"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    store.audit("export", "SKU planning", user["username"], {}, {"location": q.get("code") or "all"}, company)
             elif url.path.startswith("/api/fiscal"):
                 if not auth.can(user, "finance.ap.view"):
                     self._send(403, {"error": "Your role does not include Payables."})

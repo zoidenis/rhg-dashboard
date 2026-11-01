@@ -82,7 +82,14 @@ DEFAULT_SETTINGS = {
                   "turnover_supplies_adjustments": "yes",
                   "turnover_fresh_families": "PERIME&FRUTE, MISH&SHPENDE, PESHK&PROD.DETI, BULMET&DJATHE, "
                                              "PROD BUKE&FURRE",
-                  "turnover_fresh_check_days": "30"},
+                  "turnover_fresh_check_days": "30",
+                  # SKU planning: the window of use (days), the service level of the safety stock (%), lead time
+                  # in days (a default, then LOCATION=days), the delivery cycle when none is seen, the most days of
+                  # use a fresh family may hold, how far a card may be from the recommendation (%) before it is
+                  # "off", and the fewest days of use worth planning
+                  "sku_window_days": "60", "sku_service_level": "95", "sku_lead_days": "2, MAGAZINE=45",
+                  "sku_review_days": "3", "sku_fresh_max_days": "4", "sku_tolerance_pct": "50",
+                  "sku_min_use_days": "5"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses
