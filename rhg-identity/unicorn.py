@@ -33,6 +33,11 @@ FINANCE_URL = config.get("FINANCE_URL", "http://finance:8766").rstrip("/")
 PURCHASING_URL = config.get("PURCHASING_URL", "http://purchasing:8765").rstrip("/")
 WAIT_MINUTES = int(config.get("UNICORN_WAIT_MINUTES", "45"))
 TRIES, RETRY_MINUTES = 3, 20
+# Sonnet 5.5 thinks before it writes (adaptive thinking, on by default) and the thinking counts against
+# max_tokens: the budgets below leave room for both. UNICORN_EFFORT: low, medium, high (the API default), xhigh, max.
+EFFORT = config.get("UNICORN_EFFORT", "medium")
+BRIEF_TOKENS = int(config.get("UNICORN_BRIEF_TOKENS", "16000"))
+CHAT_TOKENS = int(config.get("UNICORN_CHAT_TOKENS", "8000"))
 MAX_QUESTION = 2000
 HISTORY = 16
 
@@ -162,12 +167,14 @@ say exactly which. Write the briefing itself now, starting with the first line."
 def _claude_once(messages, max_tokens, system):
     if not API_KEY:
         raise RuntimeError("Unicorn has no Anthropic API key (ANTHROPIC_API_KEY in identity's .env).")
-    body = json.dumps({"model": MODEL, "max_tokens": max_tokens, "system": system or system_prompt(),
-                       "messages": messages}).encode("utf-8")
+    payload = {"model": MODEL, "max_tokens": max_tokens, "system": system or system_prompt(), "messages": messages}
+    if EFFORT:
+        payload["output_config"] = {"effort": EFFORT}
+    body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(API_URL, data=body, method="POST", headers={
         "content-type": "application/json", "x-api-key": API_KEY, "anthropic-version": "2023-06-01"})
     try:
-        with urllib.request.urlopen(req, timeout=150) as r:
+        with urllib.request.urlopen(req, timeout=280) as r:
             j = json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as exc:
         detail = ""
@@ -179,8 +186,11 @@ def _claude_once(messages, max_tokens, system):
     except (urllib.error.URLError, OSError) as exc:
         raise RuntimeError(f"The Anthropic API could not be reached: {exc}") from None
     text = "".join(b.get("text", "") for b in j.get("content") or [] if b.get("type") == "text").strip()
+    kinds = ",".join(b.get("type") or "?" for b in j.get("content") or []) or "none"
+    if j.get("stop_reason") == "max_tokens":
+        # never post a cut-off answer: thinking and text ran out of room
+        raise CutOff(f"The answer was cut off at {max_tokens} tokens (blocks {kinds}).")
     if not text:
-        kinds = ",".join(b.get("type") or "?" for b in j.get("content") or []) or "none"
         raise EmptyAnswer(f"The Anthropic API gave an empty answer (stop_reason {j.get('stop_reason')}, blocks {kinds}).")
     return text, j.get("usage") or {}
 
@@ -189,13 +199,21 @@ class EmptyAnswer(RuntimeError):
     pass
 
 
-def claude(messages, max_tokens=1800, system=None):
-    """One call to the Messages API; an empty answer is asked once more before it counts as a failure."""
+class CutOff(RuntimeError):
+    pass
+
+
+def claude(messages, max_tokens=None, system=None):
+    """One call to the Messages API. An empty answer is asked once more; an answer cut off at max_tokens is asked
+    once more with twice the room. Only a whole answer is returned."""
+    max_tokens = max_tokens or CHAT_TOKENS
     try:
         return _claude_once(messages, max_tokens, system)
     except EmptyAnswer:
         time.sleep(3)
         return _claude_once(messages, max_tokens, system)
+    except CutOff:
+        return _claude_once(messages, min(max_tokens * 2, 64000), system)
 
 
 # ---------------------------------------------------------------- the towers' facts
@@ -311,7 +329,7 @@ def run(day, actor="scheduler"):
                 day=day.isoformat(), weekday=day.strftime("%A"), language=LANGUAGE,
                 prev_day=prev["day"] if prev else "none",
                 previous=prev["text"] if prev else "(this is the first briefing)")}],
-            max_tokens=4000)
+            max_tokens=BRIEF_TOKENS)
         mid = _post("*", "unicorn", "brief", text, day.isoformat(),
                     {"model": MODEL, "usage": usage, "actor": actor})
         store.run("UPDATE unicorn_runs SET state='done', at=?, message_id=? WHERE day=?",
@@ -439,7 +457,7 @@ def ask(user, text):
         else:
             msgs.append({"role": "user", "content": q})
         try:
-            answer, usage = claude(msgs, max_tokens=2000)
+            answer, usage = claude(msgs, max_tokens=CHAT_TOKENS)
         except Exception as exc:                                    # noqa: BLE001
             nid = _post(who, "unicorn", "note", f"I could not answer just now: {exc}")
             return [_row(store.one("SELECT * FROM unicorn_messages WHERE id=?", (i,))) for i in (qid, nid)]
