@@ -66,16 +66,30 @@ class BCClient:
 
     MISSING_FIELD = re.compile(r"Could not find a property named '([^']+)'")
 
-    def _get_all(self, url, params=None, limit=None, _dropped=None, on_page=None):
+    def _get_all(self, url, params=None, limit=None, _dropped=None, on_page=None, page_size=None, progress=None):
         """Reads every page. If a company publishes a page without one of the selected
         columns, BC answers 400 naming that column; the field is dropped and the call is
-        retried, so one missing column never takes the whole screen down."""
-        rows, next_url, next_params = [], url, params
+        retried, so one missing column never takes the whole screen down.
+
+        page_size asks BC for smaller pages (Prefer: odata.maxpagesize): a page of entries with
+        calculated fields (cost amounts) is summed row by row on the server, and 20,000 of them can
+        outlast the timeout when BC is busy. A page that times out or loses the connection is asked
+        again twice (a read changes nothing). progress(rows so far) is called after each page."""
+        rows, next_url, next_params, got = [], url, params, 0
+        headers = {"Prefer": f"odata.maxpagesize={int(page_size)}"} if page_size else None
         while next_url:
-            try:
-                resp = self.session.get(next_url, params=next_params, timeout=config.BC_TIMEOUT)
-            except requests.RequestException as exc:
-                raise BCError(f"Could not reach Business Central at {config.BC_BASE_URL}: {exc}") from exc
+            for attempt in range(3):
+                try:
+                    resp = self.session.get(next_url, params=next_params, timeout=config.BC_TIMEOUT, headers=headers)
+                    break
+                except (requests.Timeout, requests.ConnectionError) as exc:
+                    if attempt == 2:
+                        raise BCError(f"Could not reach Business Central at {config.BC_BASE_URL} (tried 3 times): "
+                                      f"{exc}") from exc
+                    print(f"Business Central did not answer ({str(exc)[:120]}); asking again.")
+                    time.sleep(10 * (attempt + 1))
+                except requests.RequestException as exc:
+                    raise BCError(f"Could not reach Business Central at {config.BC_BASE_URL}: {exc}") from exc
             if resp.status_code == 401:
                 raise BCError("Business Central rejected the login (HTTP 401). Check the credentials in .env.")
             if resp.status_code == 400 and params and params.get("$select"):
@@ -87,14 +101,17 @@ class BCClient:
                         retry = dict(params, **{"$select": ",".join(kept)})
                         dropped = (_dropped or []) + [field]
                         print(f"Business Central does not publish '{field}' on this page; continuing without it.")
-                        return self._get_all(url, retry, limit, dropped, on_page)
+                        return self._get_all(url, retry, limit, dropped, on_page, page_size, progress)
             if resp.status_code >= 400:
                 raise BCError(f"Business Central returned HTTP {resp.status_code}: {resp.text[:300]}")
             data = resp.json()
+            got += len(data.get("value", []))
             if on_page is not None:
                 on_page(data.get("value", []))      # handed on and not kept: long ledgers
             else:
                 rows.extend(data.get("value", []))
+            if progress:
+                progress(got)
             if limit and len(rows) >= limit:
                 return rows[:limit]
             next_url, next_params = data.get("@odata.nextLink"), None
@@ -213,7 +230,7 @@ class BCClient:
     def open_vendor_entries(self, company, max_age=300):
         return self._cached(("ap", company), max_age, lambda: self._get_all(
             self._url(company, config.E_VENDOR),
-            {"$filter": "Open eq true", "$select": ",".join(VENDOR_FIELDS)}))
+            {"$filter": "Open eq true", "$select": ",".join(VENDOR_FIELDS)}, page_size=5000))
 
     def open_customer_entries(self, company, max_age=300):
         return self._cached(("ar", company), max_age, lambda: self._get_all(
@@ -344,11 +361,12 @@ class BCClient:
                                  {"$filter": flt, "$select": ",".join(self.FA_FIELDS)})
         return self._cached_immutable("fa", company, date_from, date_to, go)
 
-    def open_item_entries(self, company, max_age=1800):
+    def open_item_entries(self, company, max_age=1800, progress=None):
         """Item ledger entries still holding stock (Open, Remaining Quantity above zero): what is on hand,
-        entry by entry, with the receipt or transfer that brought it in."""
+        entry by entry, with the receipt or transfer that brought it in. Read 2,000 at a time: each entry's
+        cost is calculated by BC from its value entries."""
         def go():
-            return self._get_all(self._url(company, config.E_ILE),
+            return self._get_all(self._url(company, config.E_ILE), page_size=2000, progress=progress, params=
                                  {"$filter": "Open eq true and Remaining_Quantity gt 0",
                                   "$select": "Entry_No,Entry_Type,Item_No,Item_Description,Item_Category_Code,"
                                              "Location_Code,Posting_Date,Document_No,Document_Type,Quantity,"
@@ -361,6 +379,7 @@ class BCClient:
         ledger entry each invoice line valued), month by month as hold_item_ledger does; returns the store
         kind to read them from with localdb.iter_rows. Nothing is kept in memory."""
         kind = "pve"
+        self.pve_errors = []
         cursor = date.fromisoformat(date_from).replace(day=1)
         end = date.fromisoformat(date_to)
         while cursor <= end:
@@ -381,10 +400,17 @@ class BCClient:
 
             def keep(page, k=kind, c=company):
                 added[0] += localdb.store(k, c, page)
-            self._get_all(self._url(company, config.E_VALUE),
-                          {"$filter": flt, "$select": "Entry_No,Item_Ledger_Entry_No,Item_No,Document_No,"
-                                                      "Posting_Date,Cost_Amount_Actual,Invoiced_Quantity"},
-                          on_page=keep)
+            try:
+                self._get_all(self._url(company, config.E_VALUE),
+                              {"$filter": flt, "$select": "Entry_No,Item_Ledger_Entry_No,Item_No,Document_No,"
+                                                          "Posting_Date,Cost_Amount_Actual,Invoiced_Quantity"},
+                              on_page=keep, page_size=5000)
+            except BCError as exc:
+                # a month that cannot be read now: what is held is used, and it is not marked as read, so the
+                # next read asks again (from the highest entry held when part of it arrived)
+                self.pve_errors.append(f"{cursor:%B %Y}: {str(exc)[:160]}")
+                cursor = nxt
+                continue
             localdb.mark_period(kind, company, m_from, m_to, (marker["rows"] if marker else 0) + added[0])
             cursor = nxt
         return kind
@@ -394,7 +420,8 @@ class BCClient:
         them), so the small ledger cache is not pushed out."""
         return self._get_all(self._url(company, config.E_PINV),
                              {"$filter": f"Posting_Date ge {date_from} and Posting_Date le {date_to}",
-                              "$select": "No,Buy_from_Vendor_No,Buy_from_Vendor_Name,Posting_Date,Due_Date"})
+                              "$select": "No,Buy_from_Vendor_No,Buy_from_Vendor_Name,Posting_Date,Due_Date"},
+                             page_size=5000)
 
     ITEM_FIELDS = ["No", "Description", "InventorybyDate", "InventoryField", "Unit_Cost", "Last_Direct_Cost",
                    "Item_Category_Code", "Base_Unit_of_Measure", "Costing_Method", "Blocked", "Vendor_No",

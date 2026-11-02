@@ -116,11 +116,15 @@ def build(client, company, months, progress):
 
     # ---- stock on hand, entry by entry
     progress("Business Central: stock on hand (open item ledger entries)")
-    open_rows = client.open_item_entries(company)
+    open_rows = client.open_item_entries(
+        company, progress=lambda n: progress(f"Business Central: stock on hand, {n:,} open item ledger entries read"))
     purchase_ile = {int(r["Entry_No"]) for r in open_rows if r.get("Entry_Type") == "Purchase" and r.get("Entry_No") is not None}
     progress("Business Central: purchase invoices of the window")
     kind = client.hold_purchase_invoice_values(
         company, a, b, progress=lambda m: progress(f"Business Central: purchase invoices of {m} (read once, then kept)"))
+    for err in getattr(client, "pve_errors", []):
+        errors.append(f"Purchase invoices of {err} — not read this time; that month's suppliers come from "
+                      f"what was read before, and the next read tries again.")
     heads = _headers(client, company, a, b)
     ile_vendor, item_share = {}, {}
     for v in localdb.iter_rows(kind, company, a, b):
