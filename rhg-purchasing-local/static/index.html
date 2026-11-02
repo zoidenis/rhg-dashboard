@@ -256,6 +256,30 @@ td.num,th.num{text-align:right}
 @media (max-width:1000px){.pl-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pl-cols{grid-template-columns:minmax(0,1fr)}.pl-span2{grid-column:auto}}
 @media (max-width:600px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .wk-box{border-top:1px solid var(--line);margin:12px 0;padding-top:12px}
+/* Purchaser performance */
+.pr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-bottom:18px}
+.pr-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;text-align:left;font:inherit;color:inherit;display:flex;flex-direction:column;gap:10px;min-width:0}
+.pr-card:hover,.pr-card:focus-visible{border-color:var(--accent);outline:none;box-shadow:0 4px 18px rgba(8,48,63,.08)}
+.pr-card.none{border-style:dashed;background:transparent}
+.pr-card .hd{display:flex;align-items:center;gap:10px}
+.pr-card .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:var(--bg);border:1px solid var(--line);flex-shrink:0}
+.pr-card .nm{font-weight:800;font-size:15px;line-height:1.2}
+.pr-card .cd{font-size:11.5px;color:var(--sub)}
+.pr-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pr-row .l{font-size:11px;color:var(--sub)} .pr-row .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums} .pr-row .s{font-size:11px;color:var(--sub)}
+.pr-row .v.up,.pr-flag.up{color:var(--up)} .pr-row .v.down{color:var(--down,#0e8a57)}
+.pr-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;display:flex}
+.pr-bar i{display:block;height:100%}
+.pr-steps{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;background:var(--line);min-width:120px}
+.pr-steps i{display:block;min-width:3px}
+.pr-flags{display:flex;flex-wrap:wrap;gap:6px;font-size:11.5px}
+.pr-flag{border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--sub)}
+.pr-flag.up{border-color:currentColor}
+.pr-q{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.pr-q div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card)}
+.pr-q b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.pr-q span{font-size:12px;color:var(--sub)}
+tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 </style>
 <!-- brand layer last, so the Revo tokens override the built-in defaults -->
 <link rel="stylesheet" href="/brand.css">
@@ -301,6 +325,7 @@ td.num,th.num{text-align:right}
 
     <div class="grp">Performance</div>
     <button data-view="suppliers">Supplier performance</button>
+    <button data-view="purchasers">Purchaser performance</button>
     <button data-view="users">User performance</button>
     <button data-view="reports">Reports</button>
 
@@ -666,6 +691,26 @@ td.num,th.num{text-align:right}
     </div>
   </section>
 
+  <section class="view" id="v-purchasers">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Purchaser performance</h2>
+        <p class="hint">Each purchaser of Business Central (the Purchaser Code) with the suppliers, invoices, prices, open orders and payables that are theirs. A document belongs to the Purchaser Code on it, else to the one on the supplier's card.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mini" data-prq="lastmonth">Last month</button><button class="mini" data-prq="month">This month</button>
+          <button class="mini" data-prq="quarter">Quarter to date</button><button class="mini" data-prq="ytd">Year to date</button></div></div>
+      <div class="filters" style="margin:6px 0 10px">
+        <label>From<input type="date" id="prFrom"></label>
+        <label>To<input type="date" id="prTo"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="mini dark" id="prRead">Read</button>
+        <button class="mini" id="prXlsx">Excel</button>
+        <span class="meta" id="prMsg"></span>
+      </div>
+    </div>
+    <div id="prBody"><div class="empty">Choose a period.</div></div>
+  </section>
+
   <section class="view" id="v-suppliers">
     <div class="card">
       <h2>Supplier performance</h2>
@@ -762,6 +807,18 @@ td.num,th.num{text-align:right}
         <input type="checkbox" id="setWeekends" style="width:auto"> Count working days only (exclude weekends)</label>
       <button class="btn dark" id="saveSettings">Save thresholds</button>
       <span class="meta" id="settingsSaved" style="margin-left:10px"></span>
+    </div>
+    <div class="card" style="margin-bottom:16px" id="prSetCard">
+      <h2>Purchasers</h2><p class="hint">Who each Purchaser Code of Business Central is, for Purchaser performance, and how many days an open order may stay at each step before it counts as late.</p>
+      <div class="formgrid">
+        <label class="field" style="grid-column:1/-1">Names (code=name, comma separated)<input id="prsNames" placeholder="PM-BESNIK=Besnik, PM-ERJON=Erjon"></label>
+        <label class="field" style="grid-column:1/-1">Emails (code=email, comma separated)<input id="prsEmails" placeholder="PM-BESNIK=besnik@rhg.al"></label>
+        <label class="field">Not released after (days)<input id="prsRelease" type="number" min="0" max="365"></label>
+        <label class="field">Not received, no expected date, after (days)<input id="prsReceive" type="number" min="0" max="365"></label>
+        <label class="field">Received, not invoiced, after a further (days)<input id="prsInvoice" type="number" min="0" max="365"></label>
+      </div>
+      <button class="btn dark" id="prsSave">Save purchasers</button>
+      <span class="meta" id="prsSaved" style="margin-left:10px"></span>
     </div>
     <div class="card" style="margin-bottom:16px" id="ntCard">
       <div class="card-head"><div><h2>Email notifications</h2>
@@ -887,6 +944,7 @@ td.num,th.num{text-align:right}
 </main>
 </div>
 
+<div class="pl-bd" id="prBd"><div class="pl-pop" id="prPop" role="dialog" aria-modal="true" aria-label="Purchaser"></div></div>
 <div class="pl-bd" id="byBd"><div class="pl-pop" id="byPop" role="dialog" aria-modal="true" aria-label="Buying at a location"></div></div>
 <div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
@@ -1875,6 +1933,10 @@ function renderSettings(){
     <label class="field" style="grid-column:1/-1">Goods accounts to exclude from services (already counted as items)<input id="cl-goods" value="${esc((s.classification||{}).goods_prefixes||"")}" placeholder="60,605,6051,65801,65802,65803"></label>
     <label class="field" style="grid-column:1/-1">Single G/L account to purchase type<input id="cl-svc" value="${esc((s.classification||{}).service_accounts||"")}" placeholder="636=Recurring Contracts, 6271=Services"></label>`;
   $("setWeekends").checked = !!s.exclude_weekends;
+  const ps = s.purchasers || {};
+  $("prsNames").value = ps.names || ""; $("prsEmails").value = ps.emails || "";
+  $("prsRelease").value = ps.release_days ?? 2; $("prsReceive").value = ps.receive_days ?? 7; $("prsInvoice").value = ps.invoice_days ?? 3;
+  ["prsSave"].forEach(id => { $(id).disabled = !can("settings"); if (!can("settings")) $(id).title = "Your role cannot change settings."; });
   settingsRendered = true;
   loadAudit(); loadNotify(); if (window.rcLoad) rcLoad();
 }
@@ -1897,6 +1959,15 @@ $("saveSettings").onclick = async () => {
     $("settingsSaved").textContent = "Saved. Applied on the next refresh.";
     await load(true); loadAudit();
   }catch(e){ $("settingsSaved").textContent = "Could not save: " + e.message; }
+};
+$("prsSave").onclick = async () => {
+  try{
+    const r = await fetch("/api/settings", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({purchasers: {names: $("prsNames").value, emails: $("prsEmails").value,
+        release_days: $("prsRelease").value, receive_days: $("prsReceive").value, invoice_days: $("prsInvoice").value}})});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "save failed");
+    $("prsSaved").textContent = "Saved."; prData = null;
+  }catch(e){ $("prsSaved").textContent = "Could not save: " + e.message; }
 };
 // ---------- email notifications ----------
 let ntStatus = null;
@@ -3554,6 +3625,154 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("tdBd").classList.contains("show")) { $("tdBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.tdloc != null) { e.preventDefault(); tdOpen(e.target.dataset.tdloc); }
 });
+</script>
+<script>
+// ---------- Purchaser performance (purchasers.py) ----------
+// Every purchaser of Business Central with what is theirs: spend and invoices of the period, orders first, price
+// effect against last year, open orders today by step, and what their suppliers are owed. A card per purchaser,
+// a table to compare them, and the purchaser in full on a click.
+let prData = null, prTimer = null, prBusy = false;
+const PR_STEP_COL = {open: "#1e78a6", released: "#7a5bbf", partial: "#c47f1f", to_invoice: "#2e9a6e", to_close: "#7f8e96"};
+const prIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function prQuick(kind){
+  const t = new Date(); let a, b = t;
+  if (kind === "lastmonth") { a = new Date(t.getFullYear(), t.getMonth() - 1, 1); b = new Date(t.getFullYear(), t.getMonth(), 0); }
+  else if (kind === "month") a = new Date(t.getFullYear(), t.getMonth(), 1);
+  else if (kind === "quarter") a = new Date(t.getFullYear(), Math.floor(t.getMonth() / 3) * 3, 1);
+  else a = new Date(t.getFullYear(), 0, 1);
+  $("prFrom").value = prIso(a); $("prTo").value = prIso(b);
+  document.querySelectorAll("[data-prq]").forEach(x => x.classList.toggle("dark", x.dataset.prq === kind));
+  prLoad();
+}
+document.querySelectorAll("[data-prq]").forEach(b => b.onclick = () => prQuick(b.dataset.prq));
+const prQs = () => new URLSearchParams({company: $("company").value || "", from: $("prFrom").value, to: $("prTo").value}).toString();
+$("prRead").onclick = () => prLoad();
+$("prXlsx").onclick = () => { location.href = "/api/purchasers/xlsx?" + prQs(); };
+async function prLoad(quiet){
+  clearTimeout(prTimer);
+  if (prBusy) return;
+  if (!$("prFrom").value) { prQuick("lastmonth"); return; }
+  prBusy = true;
+  if (!quiet) { $("prMsg").textContent = "Reading the suppliers, open orders and invoices from Business Central…"; if (!prData) $("prBody").innerHTML = '<div class="empty">Reading…</div>'; }
+  try {
+    const r = await fetch("/api/purchasers?" + prQs());
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+    prData = j; prRender();
+    const P = j.prices || {};
+    if (!P.ready) {
+      $("prMsg").textContent = `Prices: reading invoice lines ${P.progress ? `(${P.progress.done} of ${P.progress.total} months)` : ""}… the rest is ready.`;
+      prTimer = setTimeout(() => { if ($("v-purchasers").classList.contains("on")) prLoad(true); }, 6000);
+    } else $("prMsg").textContent = `Read ${new Date().toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}.`;
+  } catch (e) { $("prMsg").textContent = "Could not read: " + e.message; if (!prData) $("prBody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  finally { prBusy = false; }
+}
+const prInit = n => String(n || "?").replace(/^PM-/i, "").split(/[\s._-]+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
+const prEff = v => v == null ? "–" : (v > 0 ? "+" : "") + plM(v);
+const prEffCls = v => v == null || Math.abs(v) < 1 ? "" : v > 0 ? "up" : "down";
+const prFcy = m => Object.entries(m || {}).filter(([, v]) => Math.abs(v) >= 1).map(([c, v]) => `${esc(c)} ${plM(v)}`).join(" · ");
+function prSteps(st, total){
+  const n = Object.values(st || {}).reduce((a, b) => a + b, 0);
+  if (!n) return '<span class="meta">no open orders</span>';
+  return `<div class="pr-steps" title="${(prData.stages || []).map(x => `${x.label}: ${st[x.key] || 0}`).join(" · ")}">${(prData.stages || []).filter(x => st[x.key]).map(x => `<i style="flex:${st[x.key]};background:${PR_STEP_COL[x.key]}"></i>`).join("")}</div>`;
+}
+function prCard(p){
+  const C = prData.currency || CUR, share = p.po_share;
+  return `<button class="pr-card${p.code ? "" : " none"}" data-pr="${esc(p.code)}">
+    <div class="hd"><div class="av">${p.code ? esc(prInit(p.name)) : "?"}</div><div style="min-width:0"><div class="nm">${esc(p.name)}</div>
+      <div class="cd">${p.code ? esc(p.code) + " · " : ""}${fmt(p.vendors_active)} suppliers active${p.code ? ` of ${fmt(p.vendors_assigned)} on cards` : ""}</div></div></div>
+    <div class="pr-row">
+      <div><div class="l">Spend</div><div class="v">${plM(p.spend)}</div><div class="s">${p.spend_share == null ? C : fmt(p.spend_share, 0) + "% of all"} · ${fmt(p.invoices)} inv.</div></div>
+      <div><div class="l">With a PO</div><div class="v ${share != null && share < 80 ? "up" : ""}">${share == null ? "–" : fmt(share, 0) + "%"}</div><div class="s">${p.without_po ? plM(p.without_po) + " without" : "all with a PO"}</div></div>
+      <div><div class="l">Price effect</div><div class="v ${prEffCls(p.net)}">${prData.prices.ready ? prEff(p.net) : "…"}</div><div class="s">${prData.prices.ready ? `${fmt(p.price_items)} items vs LY` : "reading"}</div></div>
+    </div>
+    ${p.spend > 0 ? `<div class="pr-bar" title="With a PO ${fmt(share, 0)}%"><i style="width:${Math.max(0, Math.min(100, share || 0))}%;background:var(--accent)"></i></div>` : ""}
+    <div class="pr-row">
+      <div><div class="l">Open orders</div><div class="v">${fmt(p.orders)}</div><div class="s">${plM(p.orders_value)}${prFcy(p.orders_fcy) ? " · " + prFcy(p.orders_fcy) : ""}</div></div>
+      <div><div class="l">Late</div><div class="v ${p.late ? "up" : ""}">${fmt(p.late)}</div><div class="s">${p.oldest == null ? "–" : "oldest " + fmt(p.oldest) + " days"}</div></div>
+      <div><div class="l">Owed · due</div><div class="v">${plM(p.owed)}</div><div class="s">${plM(p.due)} due</div></div>
+    </div>
+    ${prSteps(p.stages)}
+    <div class="pr-flags">${p.rni > 0 ? `<span class="pr-flag">${plM(p.rni)} received, not invoiced</span>` : ""}${p.no_expected ? `<span class="pr-flag">${fmt(p.no_expected)} without expected date</span>` : ""}${prFcy(p.spend_fcy) ? `<span class="pr-flag">also ${prFcy(p.spend_fcy)}</span>` : ""}</div>
+  </button>`;
+}
+function prRender(){
+  const d = prData; if (!d) return;
+  const C = d.currency || CUR, T = d.total, Q = d.quality || {}, P = d.purchasers || [];
+  const legend = `<div class="by-leg">${(d.stages || []).map(x => `<span><i style="background:${PR_STEP_COL[x.key]}"></i>${esc(x.label)}</span>`).join("")}</div>`;
+  const row = (p, tot) => `<tr${tot ? ' style="font-weight:800"' : ` data-pr="${esc(p.code)}" style="cursor:pointer"`}>
+      <td>${esc(p.name)}${p.code && !tot ? `<div class="meta">${esc(p.code)}</div>` : ""}</td>
+      <td class="num">${fmt(p.vendors_active)}</td><td class="num">${fmt(p.spend)}</td><td class="num">${p.spend_share == null ? "–" : fmt(p.spend_share, 1) + "%"}</td>
+      <td class="num">${fmt(p.invoices)}</td><td class="num ${p.po_share != null && p.po_share < 80 ? "up" : ""}">${p.po_share == null ? "–" : fmt(p.po_share, 1) + "%"}</td>
+      <td class="num">${fmt(p.without_po)}</td>
+      <td class="num">${d.prices.ready ? fmt(p.save) : "…"}</td><td class="num">${d.prices.ready ? fmt(p.extra) : "…"}</td><td class="num ${prEffCls(p.net)}">${d.prices.ready ? fmt(p.net) : "…"}</td>
+      <td class="num">${fmt(p.orders)}</td><td class="num">${fmt(p.orders_value)}</td><td class="num ${p.late ? "up" : ""}">${fmt(p.late)}</td>
+      <td class="num">${p.avg_age == null ? "–" : fmt(p.avg_age)}</td><td class="num">${fmt(p.rni)}</td>
+      <td class="num">${fmt(p.owed)}</td><td class="num">${fmt(p.due)}</td><td>${tot ? "" : prSteps(p.stages)}</td></tr>`;
+  $("prBody").innerHTML = `
+    ${(d.errors || []).length ? `<div class="banner" style="display:block;margin-bottom:14px">${d.errors.map(esc).join("<br>")}</div>` : ""}
+    <div class="kpis five">
+      <div class="card kpi"><div class="l">Spend ${esc(d.period.from)} → ${esc(d.period.to)}</div><div class="v">${plM(T.spend)}</div><div class="s">${C} excl. VAT · ${fmt(T.invoices)} invoices</div></div>
+      <div class="card kpi"><div class="l">Invoiced with a PO</div><div class="v ${T.po_share != null && T.po_share < 80 ? "up" : ""}">${T.po_share == null ? "–" : fmt(T.po_share, 1) + "%"}</div><div class="s">${plM(T.without_po)} in ${fmt(T.without_po_n)} invoices without a PO</div></div>
+      <div class="card kpi"><div class="l">Price effect against last year</div><div class="v ${prEffCls(T.net)}">${d.prices.ready ? prEff(T.net) : "…"}</div><div class="s">${d.prices.ready ? `${plM(T.save)} saved · ${plM(T.extra)} paid more` : esc(d.prices.note || "reading")}</div></div>
+      <div class="card kpi"><div class="l">Open orders today</div><div class="v">${fmt(T.orders)}</div><div class="s">${plM(T.orders_value)} · <span class="${T.late ? "up" : ""}">${fmt(T.late)} late</span> · ${plM(T.rni)} received, not invoiced</div></div>
+      <div class="card kpi"><div class="l">Owed to suppliers</div><div class="v">${plM(T.owed)}</div><div class="s">${plM(T.due)} due today</div></div>
+    </div>
+    <div class="pr-grid">${P.map(prCard).join("")}</div>
+    <div class="card" style="margin-bottom:16px"><h2>Purchasers side by side</h2>
+      <p class="hint">Spend and prices for ${esc(d.period.from)} to ${esc(d.period.to)} (prices against ${esc(d.last_year.from)} to ${esc(d.last_year.to)}); orders and payables today. ${C}, excluding VAT. Click a row for the purchaser.</p>
+      ${legend}
+      <div class="scroll"><table id="prTable"><thead><tr><th>Purchaser</th><th class="num">Suppliers</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Invoices</th><th class="num">With PO</th><th class="num">Without PO</th><th class="num">Saved</th><th class="num">Paid more</th><th class="num">Price effect</th><th class="num">Open orders</th><th class="num">Value</th><th class="num">Late</th><th class="num">Avg age</th><th class="num">Rec. not inv.</th><th class="num">Owed</th><th class="num">Due</th><th>Steps</th></tr></thead>
+        <tbody>${P.map(p => row(p)).join("")}</tbody><tfoot>${row(T, true)}</tfoot></table></div></div>
+    <div class="card" style="margin-bottom:16px"><h2>Purchaser on the records</h2>
+      <p class="hint">What to set in Business Central so every document has its purchaser. Business Central stays read-only from here.</p>
+      <div class="pr-q">
+        <div><b>${fmt(Q.vendors_with_code)} / ${fmt(Q.vendors_total)}</b><span>suppliers with a Purchaser Code on the card</span></div>
+        <div><b class="${Q.vendors_uncoded_active ? "up" : ""}">${fmt(Q.vendors_uncoded_active)}</b><span>suppliers active in the period or with open orders and no Purchaser Code · ${plM(Q.vendors_uncoded_spend)} spend</span></div>
+        <div><b>${fmt(Q.orders_from_vendor)}</b><span>open orders with no Purchaser Code of their own (taken from the supplier)</span></div>
+        <div><b class="${Q.orders_mismatch ? "up" : ""}">${fmt(Q.orders_mismatch)}</b><span>open orders whose Purchaser Code differs from the supplier's</span></div>
+        <div><b class="${Q.orders_no_expected ? "up" : ""}">${fmt(Q.orders_no_expected)}</b><span>orders waiting for goods without an expected receipt date</span></div>
+        ${(Q.unknown_codes || []).length ? `<div><b class="up">${fmt(Q.unknown_codes.length)}</b><span>codes without a name in Settings: ${Q.unknown_codes.map(esc).join(", ")}</span></div>` : ""}
+      </div></div>
+    <div class="card"><details><summary><b>How these figures are built</b></summary>
+      <p class="hint" style="line-height:1.7;margin:10px 0 0">${Object.values(d.definitions || {}).map(esc).join("<br>")}<br>Late: not released after ${d.settings.release_days} days; not received by the expected date (or after ${d.settings.receive_days} days without one); not invoiced after ${d.settings.receive_days + d.settings.invoice_days} days. Change these and the purchasers' names in Settings → Purchasers.</p></details></div>`;
+  if (prPopCode != null && $("prBd").classList.contains("show")) prDraw(prPopCode);
+}
+let prPopCode = null;
+function prOpen(code){ prPopCode = code; prDraw(code); $("prBd").classList.add("show"); }
+function prDraw(code){
+  const d = prData, p = (d.purchasers || []).find(x => x.code === code); if (!p) return;
+  const C = d.currency || CUR, stage = Object.fromEntries((d.stages || []).map(x => [x.key, x.label]));
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const panel = (t, body, span) => `<div class="pl-panel${span ? " pl-span2" : ""}" style="margin-bottom:12px"><div class="ttl"><h3>${t}</h3></div>${body}</div>`;
+  const tbl = (head, rows, empty) => rows.length ? `<table data-nosort><tr>${head.map(h => `<th${h[1] ? ' class="num"' : ""}>${h[0]}</th>`).join("")}</tr>${rows.join("")}</table>` : `<p class="hint">${empty}</p>`;
+  const O = d.orders.filter(o => o.owner === code), V = d.vendors.filter(v => v.owner === code);
+  const N = d.nopo.filter(n => n.owner === code), M = (d.movers || {})[code] || [];
+  $("prPop").innerHTML = `<div class="ph"><div class="ic" style="font-weight:800;color:#08303f">${p.code ? esc(prInit(p.name)) : "?"}</div><div><h2>${esc(p.name)}</h2><div class="sub">${esc([p.code, p.email, `${d.period.from} → ${d.period.to}`, d.company].filter(Boolean).join(" · "))}</div></div><div class="sp"></div><button class="close" data-prclose="1">Close ✕</button></div>
+    <div class="pl-body">
+      <div class="pl-tiles">
+        ${tile("Spend", plM(p.spend), `${C} · ${fmt(p.invoices)} invoices · ${p.spend_share == null ? "–" : fmt(p.spend_share, 1) + "% of all"}${prFcy(p.spend_fcy) ? " · also " + prFcy(p.spend_fcy) : ""}`)}
+        ${tile("Invoiced with a PO", p.po_share == null ? "–" : fmt(p.po_share, 1) + "%", `${plM(p.without_po)} in ${fmt(p.without_po_n)} invoices without`, p.po_share != null && p.po_share < 80 ? "up" : "")}
+        ${tile("Price effect vs last year", d.prices.ready ? prEff(p.net) : "…", d.prices.ready ? `${plM(p.save)} saved · ${plM(p.extra)} paid more · ${fmt(p.price_items)} items` : "reading", prEffCls(p.net) === "up" ? "up" : "")}
+        ${tile("Open orders", fmt(p.orders), `${plM(p.orders_value)} · ${fmt(p.late)} late · ${plM(p.rni)} received, not invoiced`, p.late ? "warn" : "")}
+      </div>
+      <div class="pl-cols">
+        ${panel(`Open orders · ${fmt(O.length)}`, `<div class="by-leg">${(d.stages || []).map(x => `<span><i style="background:${PR_STEP_COL[x.key]}"></i>${esc(x.label)} ${fmt(p.stages[x.key] || 0)}</span>`).join("")}</div>` +
+          `<div class="scroll" style="max-height:340px">` + tbl([["Order"], ["Supplier"], ["Step"], ["Age", 1], ["Expected"], ["Amount", 1], ["Still to receive", 1]], O.map(o => `<tr class="${o.late ? "pr-late" : ""}"><td>${esc(o.no)}<div class="meta">${esc(o.order_date)}${o.location ? " · " + esc(o.location) : ""}${o.source === "vendor" ? " · code from supplier" : ""}</div></td><td>${esc(o.vendor)}${o.late ? `<div class="meta up">${esc(o.late)}</div>` : ""}</td><td><span class="pl-sw" style="background:${PR_STEP_COL[o.stage]}"></span> ${esc(stage[o.stage] || o.stage)}</td><td class="num">${o.age == null ? "–" : fmt(o.age)}</td><td class="meta">${esc(o.expected || "–")}</td><td class="num">${fmt(o.amount)}${o.currency ? " " + esc(o.currency) : ""}</td><td class="num">${fmt(o.outstanding)}</td></tr>`), "No open orders.") + `</div>`, true)}
+        ${panel(`Suppliers · ${fmt(V.length)} · owed ${plM(p.owed)}, ${plM(p.due)} due`, `<div class="scroll" style="max-height:340px">` + tbl([["Supplier"], ["Spend", 1], ["Without PO", 1], ["Orders", 1], ["Price effect", 1], ["Owed", 1], ["Due", 1]], V.map(v => `<tr><td>${esc(v.name)}<div class="meta">${esc(v.no)}${v.card_code ? "" : " · no code on the card"}</div></td><td class="num">${fmt(v.spend)}${prFcy(v.spend_fcy) ? `<div class="meta">${prFcy(v.spend_fcy)}</div>` : ""}</td><td class="num ${v.without_po ? "up" : ""}">${fmt(v.without_po)}</td><td class="num">${fmt(v.orders)}${v.late ? ` <span class="up">(${fmt(v.late)} late)</span>` : ""}</td><td class="num ${prEffCls(v.net)}">${v.net == null ? "–" : fmt(v.net)}</td><td class="num">${fmt(v.owed)}</td><td class="num">${fmt(v.due)}</td></tr>`), "No supplier with activity.") + `</div>`)}
+        ${panel("Price changes against last year", d.prices.ready ? tbl([["Item"], ["Now", 1], ["Last year", 1], ["Change", 1], ["Effect", 1]], M.slice(0, 15).map(m => `<tr><td>${esc(m.desc || m.item)}<div class="meta">${esc(m.item)} · qty ${fmt(m.qty, 1)}</div></td><td class="num">${fmt(m.now, 2)}</td><td class="num">${fmt(m.ly, 2)}</td><td class="num ${prEffCls(m.pct)}">${m.pct == null ? "–" : (m.pct > 0 ? "+" : "") + fmt(m.pct, 1) + "%"}</td><td class="num ${prEffCls(m.effect)}">${fmt(m.effect)}</td></tr>`), "No item bought in both periods.") : `<p class="hint">${esc(d.prices.note || "Reading…")}</p>`)}
+        ${panel(`Invoices without a PO · ${fmt(p.without_po_n)}`, `<div class="scroll" style="max-height:340px">` + tbl([["Invoice"], ["Supplier"], ["Posted"], ["Amount", 1]], N.map(n => `<tr><td>${esc(n.no)}<div class="meta">${esc(n.vendor_invoice)}${n.location ? " · " + esc(n.location) : ""}</div></td><td>${esc(n.vendor)}</td><td class="meta">${esc(n.date)}</td><td class="num">${fmt(n.amount)}</td></tr>`), "Every invoice of the period carries an order number.") + `</div>`, true)}
+      </div>
+    </div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-prclose]") || t === $("prBd")) { $("prBd").classList.remove("show"); prPopCode = null; return; }
+  const c = t.closest("[data-pr]"); if (c && $("v-purchasers").contains(c)) prOpen(c.dataset.pr);
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("prBd").classList.contains("show")) { $("prBd").classList.remove("show"); prPopCode = null; } });
+document.querySelector('#nav button[data-view="purchasers"]').addEventListener("click", () => { if (!prData) prLoad(); });
+$("company").addEventListener("change", () => { prData = null; if ($("v-purchasers").classList.contains("on")) prLoad(); });
 </script>
 <script src="tables.js"></script>
 <script src="layout.js" data-app="purchasing"></script>

@@ -34,6 +34,76 @@ PO_FIELDS = [
 ]
 
 
+def _num(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _day(v):
+    v = str(v or "")[:10]
+    return v if v and not v.startswith("0001") else ""
+
+
+def order_from_card(r, vat):
+    """One purchase order of page 50 with its lines (see BCClient.purchase_order_cards)."""
+    incl = bool(r.get("Prices_Including_VAT"))
+    bus = r.get("VAT_Bus_Posting_Group") or ""
+    amount = amount_vat = received = invoiced = outstanding = rni = 0.0
+    lines, expected = [], []
+    for l in r.get(config.BC_PO_LINES_PART) or []:
+        qty = _num(l.get("Quantity"))
+        la = _num(l.get("Line_Amount"))
+        pct = vat.get((bus, l.get("VAT_Prod_Posting_Group") or ""), 0.0)
+        pct = pct if 0 < pct <= 30 else 0.0          # full-VAT setups (100%) carry no price
+        excl = la / (1 + pct / 100) if incl else la
+        with_vat = la if incl else la * (1 + pct / 100)
+        rec, inv = _num(l.get("Quantity_Received")), _num(l.get("Quantity_Invoiced"))
+        unit = excl / qty if qty else 0.0
+        amount += excl
+        amount_vat += with_vat
+        received += unit * rec
+        invoiced += unit * inv
+        rni += unit * max(0.0, rec - inv)
+        left = max(0.0, qty - rec)
+        outstanding += unit * left
+        if left > 0 and _day(l.get("Expected_Receipt_Date")):
+            expected.append(_day(l.get("Expected_Receipt_Date")))
+        if l.get("Type") or l.get("No"):
+            lines.append({"type": l.get("Type") or "", "no": l.get("No") or "", "description": l.get("Description") or "",
+                          "location": l.get("Location_Code") or "", "uom": l.get("Unit_of_Measure_Code") or "",
+                          "qty": qty, "received": rec, "invoiced": inv, "amount": round(excl, 2),
+                          "expected": _day(l.get("Expected_Receipt_Date"))})
+    head_expected = _day(r.get("Expected_Receipt_Date")) or _day(r.get("Promised_Receipt_Date")) \
+        or _day(r.get("Requested_Receipt_Date"))
+    order = {
+        "no": r.get("No") or "", "vendor_no": r.get("Buy_from_Vendor_No") or "",
+        "vendor": r.get("Buy_from_Vendor_Name") or r.get("Buy_from_Vendor_No") or "",
+        "status": r.get("Status") or "", "purchaser": r.get("Purchaser_Code") or "",
+        "assigned_user": r.get("Assigned_User_ID") or "", "location": r.get("Location_Code") or "",
+        "order_date": _day(r.get("Order_Date")) or _day(r.get("Document_Date")),
+        "document_date": _day(r.get("Document_Date")), "currency": r.get("Currency_Code") or "",
+        "prices_incl_vat": incl, "amount": round(amount, 2), "amount_vat": round(amount_vat, 2),
+        "received": round(received, 2), "invoiced": round(invoiced, 2), "outstanding": round(outstanding, 2),
+        "received_not_invoiced": round(rni, 2), "expected": min(expected) if expected else head_expected,
+        "lines": lines, "line_count": len(lines),
+        "qty": sum(x["qty"] for x in lines), "qty_received": sum(x["received"] for x in lines),
+        "qty_invoiced": sum(x["invoiced"] for x in lines),
+    }
+    order["list_row"] = {
+        "No": order["no"], "Document_Type": r.get("Document_Type") or "Order",
+        "Buy_from_Vendor_No": order["vendor_no"], "Buy_from_Vendor_Name": order["vendor"],
+        "Posting_Date": r.get("Posting_Date"), "Document_Date": r.get("Document_Date"),
+        "Location_Code": order["location"], "Status": order["status"], "Purchaser_Code": order["purchaser"],
+        "Assigned_User_ID": order["assigned_user"], "Currency_Code": order["currency"],
+        "Amount": order["amount"], "Amount_Including_VAT": order["amount_vat"],
+        "Amount_Received_Not_Invoiced_excl_VAT_LCY": order["received_not_invoiced"],
+        "Requested_Receipt_Date": r.get("Requested_Receipt_Date"),
+    }
+    return order
+
+
 def _norm(name):
     return "".join(ch for ch in name.lower() if ch.isalnum())
 
@@ -129,11 +199,64 @@ class BCClient:
     _po_cache = {}
 
     def purchase_order_list(self, company, max_age=300):
+        """Open purchase orders with their amounts. The published Purchase Order List answers with no rows
+        for the service user since Nov 2026 while page 50 (Purchase Order) still lists every order; when the
+        list is empty the orders are built from the cards and their lines, with the same fields."""
         cached = self._po_cache.get(company)
         if cached and time.time() - cached[0] < max_age:
             return cached[1]
-        rows = self._get_all(self._url(company, config.BC_PO_ENTITY), {"$select": ",".join(PO_FIELDS)})
+        rows = []
+        if config.BC_PO_ENTITY:
+            try:
+                rows = self._get_all(self._url(company, config.BC_PO_ENTITY), {"$select": ",".join(PO_FIELDS)})
+            except BCError:
+                if not config.BC_PO_CARD_ENTITY:
+                    raise
+        if not rows and config.BC_PO_CARD_ENTITY:
+            rows = [po["list_row"] for po in self.purchase_order_cards(company, max_age)]
         self._po_cache[company] = (time.time(), rows)
+        return rows
+
+    _po_cards_cache = {}
+
+    def purchase_order_cards(self, company, max_age=600):
+        """Every purchase order (page 50) with its lines: header, the amounts excluding VAT (prices entered
+        including VAT are taken back to excluding with the VAT Posting Setup), what was received and invoiced,
+        and the earliest expected receipt of what is still to come. Each also carries "list_row", the fields of
+        the Purchase Order List the other screens read."""
+        cached = self._po_cards_cache.get(company)
+        if cached and time.time() - cached[0] < max_age:
+            return cached[1]
+        rows = self._get_all(self._url(company, config.BC_PO_CARD_ENTITY),
+                             {"$filter": "Document_Type eq 'Order'", "$expand": config.BC_PO_LINES_PART})
+        vat = self.vat_rates(company)
+        out = [order_from_card(r, vat) for r in rows]
+        self._po_cards_cache[company] = (time.time(), out)
+        return out
+
+    def vat_rates(self, company, max_age=86400):
+        """{(VAT business group, VAT product group): percent} from the VAT Posting Setup; {} when not published."""
+        def go():
+            try:
+                rows = self._get_all(self._url(company, config.BC_VAT_SETUP_ENTITY),
+                                     {"$select": "VAT_Bus_Posting_Group,VAT_Prod_Posting_Group,VAT_Percent"})
+            except BCError:
+                return {}
+            return {(r.get("VAT_Bus_Posting_Group") or "", r.get("VAT_Prod_Posting_Group") or ""):
+                    float(r.get("VAT_Percent") or 0) for r in rows}
+        return self._cached_value(("vat", company), max_age, go)
+
+    _vendor_cache = {}
+
+    def vendor_cards(self, company, max_age=1800):
+        """The vendor cards: name, purchaser, blocked, balance and balance due (local currency)."""
+        cached = self._vendor_cache.get(company)
+        if cached and time.time() - cached[0] < max_age:
+            return cached[1]
+        rows = self._get_all(self._url(company, config.BC_VENDOR_CARD_ENTITY),
+                             {"$select": "No,Name,Purchaser_Code,Blocked,Balance_LCY,Balance_Due_LCY,"
+                                         "Payment_Terms_Code,Currency_Code"})
+        self._vendor_cache[company] = (time.time(), rows)
         return rows
 
     # ---- Budget and general ledger (for the budget benchmark) ----

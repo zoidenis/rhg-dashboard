@@ -33,6 +33,13 @@ BC_COMPANY = get("BC_COMPANY", "SALT")
 BC_ENTITY = get("BC_ENTITY", "ValueEntries")
 BC_VENDOR_ENTITY = get("BC_VENDOR_ENTITY", "VendorLedgerEntries")
 BC_PO_ENTITY = get("BC_PO_ENTITY", "PurchaseOrderList")
+# Purchase Order card (page 50) with its lines part: read when the list above answers with no rows, and for the
+# purchaser performance (amounts, received, invoiced and expected dates per line). Blank disables.
+BC_PO_CARD_ENTITY = get("BC_PO_CARD_ENTITY", "PurchaseOrder")
+BC_PO_LINES_PART = get("BC_PO_LINES_PART", "PurchaseOrderPurchLines")
+BC_VAT_SETUP_ENTITY = get("BC_VAT_SETUP_ENTITY", "VATPostingSetup")
+# Vendor Card (page 26): the Purchaser Code of each supplier, and its balance
+BC_VENDOR_CARD_ENTITY = get("BC_VENDOR_CARD_ENTITY", "VendorCard")
 # Requisition Worksheet published as a web service (see README); blank disables the feature
 BC_REQ_ENTITY = get("BC_REQ_ENTITY", "RequisitionLines")
 BC_LINE_ENTITY = get("BC_LINE_ENTITY", "PurchaseLineBI")

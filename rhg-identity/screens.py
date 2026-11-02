@@ -95,6 +95,7 @@ PURCHASING = [
     ("compliance", "Invoices without PO", "Control", None, [], "company", ["purchasing.invoices.view"]),
     ("feed", "Posting follow-up", "Control", None, [], "location", ["purchasing.invoices.view"]),
     ("suppliers", "Supplier performance", "Performance", None, [], "location", ["purchasing.spend.view"]),
+    ("purchasers", "Purchaser performance", "Performance", None, [], "company", ["purchasing.spend.view"]),
     ("users", "User performance", "Performance", None, [], "company", []),
     ("reports", "Reports", "Performance", None, [], "company", []),
     ("quality", "Data quality", "System", None, [], "location", ["purchasing.quality.view"]),

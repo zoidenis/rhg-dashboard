@@ -91,6 +91,25 @@ def _columns(conn, table):
     return {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
 
 
+def _added_path():
+    return config.DB_PATH.parent / "screens_added.json"
+
+
+def _added_read():
+    try:
+        return list(json.loads(_added_path().read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return []
+
+
+def _added_write(given):
+    try:
+        _added_path().parent.mkdir(parents=True, exist_ok=True)
+        _added_path().write_text(json.dumps(sorted(set(given))), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _seed_roles(conn):
     # columns added after the first release: the department of a role, the access scope of an account
     # (companies and locations; NULL = everything)
@@ -114,6 +133,18 @@ def _seed_roles(conn):
         if not r["department"]:
             dep = (permissions.DEFAULT_ROLES.get(r["name"]) or {}).get("department") or "Other"
             conn.execute("UPDATE roles SET department=? WHERE name=?", (dep, r["name"]))
+    # screens added to the catalogue later: given once to the roles that held the screen they grew out of
+    # (data/screens_added.json remembers what was given, so a screen taken away later stays away)
+    given = _added_read()
+    for new, like in permissions.ADDED_SCREENS.items():
+        if new in given:
+            continue
+        for r in conn.execute("SELECT name, permissions FROM roles WHERE system=0").fetchall():
+            held = json.loads(r["permissions"] or "[]")
+            if like in held and new not in held:
+                conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + [new]), r["name"]))
+        given.append(new)
+        _added_write(given)
     # A system role (Administrator) holds every permission, including ones added to the
     # catalogue after it was stored.
     for r in conn.execute("SELECT name, permissions FROM roles WHERE system=1").fetchall():

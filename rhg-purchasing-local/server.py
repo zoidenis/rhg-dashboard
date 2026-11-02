@@ -31,6 +31,7 @@ import executive
 import notify
 import savings
 import savings_report
+import purchasers
 import weekly_report
 import unicorn_facts
 import contracts
@@ -1143,7 +1144,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx"}
+EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx", "/api/purchasers/xlsx"}
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/users", "/api/cache",
                "/api/notify/status", "/api/weekly/status"}
 # read for one location (the "location" parameter) by a person limited to some locations of the company
@@ -1339,6 +1340,34 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path in ("/api/purchasers", "/api/purchasers/xlsx"):
+                # Purchaser performance (purchasers.py): suppliers, invoices, prices, open orders and payables by
+                # the Purchaser Code of Business Central.
+                if not auth.can(user, "purchasing.spend.view"):
+                    self._send(403, {"error": "Your role does not include purchase spend."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    r = purchasers.request(client, company, q.get("from"), q.get("to"))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                cur = company_currency(company)
+                if url.path == "/api/purchasers":
+                    r["currency"] = cur
+                    self._send(200, r)
+                else:
+                    body = purchasers.render_xlsx(r, cur)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="Purchasers_{company}_'
+                                                            f'{r["period"]["from"]}_{r["period"]["to"]}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    store.audit("export", "purchaser performance", user["username"], {},
+                                {"from": r["period"]["from"], "to": r["period"]["to"]}, company)
             elif url.path == "/api/compliance":
                 self._send(200, compliance_screen(q.get("company") or config.BC_COMPANY,
                                                   q.get("month") or date.today().strftime("%Y-%m")))

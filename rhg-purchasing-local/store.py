@@ -69,6 +69,9 @@ DEFAULT_SETTINGS = {
                       # Weekly purchasing report for the week before: on/off, the day (0 = Monday) at the
                       # same time, and addresses added to the Manager and Coordinator
                       "weekly_report": False, "weekly_day": "0", "weekly_to": ""},
+    # Purchaser performance: who each Purchaser Code is (code=name, comma separated; the code is shown when
+    # no name is given) and how long an order may stay at each step, in days, before it is flagged.
+    "purchasers": {"names": "", "emails": "", "release_days": 2, "receive_days": 7, "invoice_days": 3},
     "exclude_weekends": True,
     "updated_at": None,
 }
@@ -104,6 +107,7 @@ def get_settings():
     merged["currencies"].update(s.get("currencies", {}))
     merged["stock"].update(s.get("stock", {}))
     merged["notifications"].update(s.get("notifications", {}))
+    merged["purchasers"].update(s.get("purchasers", {}))
     for k in ("exclude_weekends", "updated_at"):
         if k in s:
             merged[k] = s[k]
@@ -153,6 +157,17 @@ def save_settings(patch, actor="director"):
             else:
                 v = str(v)[:600]
             current.setdefault("notifications", {})[k] = v
+        for k, v in (patch.get("purchasers") or {}).items():
+            if k not in DEFAULT_SETTINGS["purchasers"]:
+                continue
+            if isinstance(DEFAULT_SETTINGS["purchasers"][k], int):
+                try:
+                    v = max(0, min(365, int(float(v))))
+                except (TypeError, ValueError):
+                    continue
+            else:
+                v = str(v)[:2000]
+            current.setdefault("purchasers", {})[k] = v
         if "exclude_weekends" in patch:
             current["exclude_weekends"] = bool(patch["exclude_weekends"])
         current["updated_at"] = _now()

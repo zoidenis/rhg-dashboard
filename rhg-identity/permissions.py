@@ -232,6 +232,9 @@ DEFAULT_ROLES = {
                "description": "Read only, both towers, including exports.",
                "permissions": _FIN_ALL + _PUR_ALL + ["finance.export", "purchasing.export"]},
 }
+# Screens added after the roles were stored: {new screen: the screen whose holders get it once}.
+ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users"}
+
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 
 # Old per-app role names -> the merged role they become on import.
