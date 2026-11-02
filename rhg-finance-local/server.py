@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, urlparse
 import arap_notify
 import brand_report
 import sales_report
+import channels
 import pl_memo
 import cashloc
 import kartloc
@@ -1198,7 +1199,7 @@ ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/
 ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/kartela/locations",
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
-                         "/api/sales"}
+                         "/api/sales", "/api/sales/channels"}
 
 
 def scope_expand(company, codes):
@@ -1266,7 +1267,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/companies":
             self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
             return None
-        multi = path == "/api/sales" or (path == "/api/today/locations" and q.get("scope") == "all")
+        multi = path in ("/api/sales", "/api/sales/channels") or (path == "/api/today/locations" and q.get("scope") == "all")
         if not multi and not access.company_ok(user, company):
             return access.refuse_company(company)
         L = access.locations(user, company)
@@ -1365,6 +1366,19 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/gl":
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
+            elif url.path == "/api/sales/channels":
+                # Sales → Location intelligence: channels (order types), revenue centres, day parts and delivery
+                # partners of every restaurant against the period before and last year (channels.py)
+                if not simphony.info()["configured"]:
+                    self._send(200, {"available": False, "error": "The Simphony connection is not set."})
+                    return
+                try:
+                    per = periods(q.get("period"), q.get("mode", "month"))
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                self._send(200, channels.request(per, _latest, (q.get("period") or "", q.get("mode", "month")),
+                                                 q.get("refresh") == "1"))
             elif url.path == "/api/sales":
                 self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1",
                                               q.get("compare") or "prior"))

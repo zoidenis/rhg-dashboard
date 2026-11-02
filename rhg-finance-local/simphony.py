@@ -444,6 +444,63 @@ def category_totals(loc_ref, bus_dt, latest=None):
     return c
 
 
+_dim_cache = {}
+
+
+def _dims(api, key, loc_ref, max_age=6 * 3600):
+    """{number: name} of a dimension of one location (order types, revenue centres); the name given at the
+    location, else the enterprise (master) name."""
+    hit = _dim_cache.get((api, loc_ref))
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    rows = (call(api, {"locRef": loc_ref}) or {}).get(key) or []
+    value = {int(r["num"]): ((r.get("name") or r.get("mstrName") or "").strip() or f"#{r['num']}")
+             for r in rows if r.get("num") is not None}
+    _dim_cache[(api, loc_ref)] = (time.time(), value)
+    return value
+
+
+def order_type_dims(loc_ref):
+    return _dims("getOrderTypeDimensions", "orderTypes", loc_ref)
+
+
+def rvc_dims(loc_ref):
+    return _dims("getRevenueCenterDimensions", "revenueCenters", loc_ref)
+
+
+def order_type_hours(loc_ref, bus_dt, latest=None):
+    """Sales of one location and business date by revenue centre, order type, day part and hour
+    (getOrderTypeQuarterHourTotals summed to the hour): {"rvc|ot|day part|hour": [net, discounts, checks,
+    guests]}; kept with the daily totals, final days are not read again."""
+    key = f"Q|{loc_ref}|{bus_dt}"
+    with _days_lock:
+        hit = _days().get(key)
+    final_before = (date.fromisoformat(latest) - timedelta(days=2)).isoformat() if latest else None
+    if hit and (hit.get("final") or time.time() - hit.get("at", 0) < 900):
+        return hit["q"]
+    j = call("getOrderTypeQuarterHourTotals", {"locRef": loc_ref, "busDt": bus_dt}) or {}
+    q = {}
+    for rvc in j.get("revenueCenters") or []:
+        for qh in rvc.get("quarterHours") or []:
+            hr = qh.get("busHrNum")
+            if hr is None and qh.get("qtrHrNum") is not None:
+                hr = int(float(qh["qtrHrNum"])) // 4
+            dp = (qh.get("dpName") or "").strip()
+            for ot in qh.get("orderTypes") or []:
+                k = f"{rvc.get('rvcNum', '')}|{ot.get('otNum', '')}|{dp}|{'' if hr is None else int(float(hr))}"
+                x = q.setdefault(k, [0.0, 0.0, 0, 0])
+                x[0] += float(ot.get("netSlsTtl") or 0)
+                x[1] += abs(float(ot.get("dscTtl") or 0))
+                x[2] += int(ot.get("chkCnt") or 0)
+                x[3] += int(ot.get("gstCnt") or 0)
+    row = {"at": time.time(), "q": q, "final": bool(final_before and bus_dt <= final_before)}
+    with _days_lock:
+        _days()[key] = row
+        _days_mem["dirty"] += 1
+        _save_days()
+    return q
+
+
 def _sum(rvcs, field):
     return sum(float(r.get(field) or 0) for r in rvcs)
 

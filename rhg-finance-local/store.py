@@ -134,7 +134,11 @@ DEFAULT_SETTINGS = {
                   "slow_stock_pct": "15", "recipe_coverage_pct": "90",
                   # Finance → Location intelligence: prime cost (food + labour) as a share of sales, EBITDA
                   # below budget, and the gap between Simphony and the sales posted in BC, that raise an alert
-                  "prime_cost_pct": "65", "budget_gap_pct": "10", "posting_gap_pct": "3"},
+                  "prime_cost_pct": "65", "budget_gap_pct": "10", "posting_gap_pct": "3",
+                  # Sales → Location intelligence, channels: the order types that are delivery, and the tender
+                  # media that are delivery partners (words found in the names, comma separated)
+                  "delivery_order_types": "deliver, derges, wolt, glovo, bolt, baboon, uber, foodora, online",
+                  "delivery_tenders": "wolt, glovo, bolt, baboon, uber, foodora, deliver"},
     "period_closed_before": "",          # postings before this date are inside a closed period
     "exclude_weekends": True,
     "updated_at": None,
@@ -290,6 +294,8 @@ def save_settings(patch, actor="director"):
             if k in DEFAULT_SETTINGS["locations"]:
                 if k == "registry":
                     v = str(v).replace("\r\n", "\n")[:8000]
+                elif k in ("delivery_order_types", "delivery_tenders"):
+                    v = str(v)[:400]
                 else:
                     try:
                         v = str(max(0.0, min(1000.0, float(v))))

@@ -229,6 +229,17 @@ td.num,th.num{text-align:right}
 .fl-split{display:flex;gap:2px;height:7px;flex:0 0 7px;border-radius:4px;overflow:hidden;background:var(--bg)}
 .fl-split.big{height:14px;flex-basis:14px;margin:4px 0 10px}
 .fl-split i{display:block;min-width:2px}
+/* channels: a categorical palette of their own (checked for colour-blind separation in light and dark); grey is
+   "the rest", never the comparison grey */
+:root{--ch-0:#3b6fd8;--ch-1:#c47f1f;--ch-2:#7a5bbf;--ch-3:#00978b;--ch-4:#9a9ca1}
+@media (prefers-color-scheme: dark){:root{--ch-0:#5b86e0;--ch-1:#b97a22;--ch-2:#8c72d4;--ch-3:#1aa196;--ch-4:#6b6e74}}
+.ch-c0{background:var(--ch-0)}.ch-c1{background:var(--ch-1)}.ch-c2{background:var(--ch-2)}.ch-c3{background:var(--ch-3)}.ch-c4{background:var(--ch-4)}
+.ch-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;border-radius:4px;padding:1px 5px;margin-left:6px;border:1px solid var(--line);color:var(--sub)}
+.ch-sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.pl-sq .chl{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--sub)}
+.pl-sq .chl b{color:var(--ink);font-variant-numeric:tabular-nums}
+.pl-sq .chl b.up{color:var(--up)} .pl-sq .chl b.down{color:var(--down)}
+.ch-hours{width:100%;height:150px;display:block}
 :root{--fl-c1:#1e78a6;--fl-c2:#c47f1f;--fl-c3:#7a5bbf;--fl-c4:#2e9a6e}
 @media (prefers-color-scheme: dark){:root{--fl-c1:#3a95c6;--fl-c2:#c4832a;--fl-c3:#9479d6;--fl-c4:#3aa87a}}
 .fl-c1{background:var(--fl-c1)}.fl-c2{background:var(--fl-c2)}.fl-c3{background:var(--fl-c3)}.fl-c4{background:var(--fl-c4)}
@@ -848,6 +859,14 @@ td.num,th.num{text-align:right}
         <p class="meta" id="slStatus" style="margin:6px 0 0"></p>
       </div>
       <div class="kpis" id="slTotals"></div>
+      <div class="card" id="slCh" style="margin-bottom:16px">
+        <h2>Channels, revenue centres and day parts</h2>
+        <p class="hint">Every restaurant together, from Simphony's order types: how dine in, take away and delivery sold against the period before and the same dates last year, where (revenue centre) and when (day part). Delivery partners are what was paid through Wolt, Glovo and the like.</p>
+          <div class="ov-tabs" id="chTabs" role="tablist" style="margin:4px 0 10px"><button data-ch="channels" class="on" role="tab" aria-selected="true">Channels</button><button data-ch="rvcs" role="tab" aria-selected="false">Revenue centres</button><button data-ch="dayparts" role="tab" aria-selected="false">Day parts</button><button data-ch="partners" role="tab" aria-selected="false">Delivery partners</button></div>
+        <p class="meta" id="chStatus" style="margin:0 0 8px"></p>
+        <div class="kpis" id="chKpis" style="margin-bottom:10px"></div>
+        <div class="scroll"><table id="chTable" data-nosort></table></div>
+      </div>
       <div id="slGrid"></div>
     </div>
     <div id="slMain">
@@ -948,6 +967,8 @@ td.num,th.num{text-align:right}
         <label class="field">Discounts, alert from (% of gross)<input id="liThDisc" type="number" step="any" placeholder="8"></label>
         <label class="field">Voids, alert from (% of gross)<input id="liThVoid" type="number" step="any" placeholder="2"></label>
         <label class="field">Sales drop vs last year, alert from (%)<input id="liThDrop" type="number" step="any" placeholder="15"></label>
+        <label class="field" style="grid-column:1/-1">Delivery order types (words in the Simphony order type name, comma separated)<input id="liDelOt" placeholder="deliver, derges, wolt, glovo"></label>
+        <label class="field" style="grid-column:1/-1">Delivery partners (words in the tender media name, comma separated)<input id="liDelTm" placeholder="wolt, glovo, bolt"></label>
         <label class="field">Inventory: slow or not moving stock, alert from (% of stock)<input id="liThSlow" type="number" step="any" placeholder="15"></label>
         <label class="field">Inventory: recipe coverage, alert below (%)<input id="liThRc" type="number" step="any" placeholder="90"></label>
         <label class="field">Finance: prime cost, alert from (% of sales)<input id="liThPrime" type="number" step="any" placeholder="65"></label>
@@ -1858,11 +1879,11 @@ function slShowTab(tab){
   $("slMain").style.display = tab === "loc" ? "none" : "";
   $("slLocView").style.display = tab === "loc" ? "" : "none";
   if (currentView().id === "sales") setHeader();
-  if (tab === "loc") { if (!salesData || salesData._q !== params()) loadSales(); else slRender(); }
+  if (tab === "loc") { if (!salesData || salesData._q !== params()) loadSales(); else slRender(); if (!chData || chData._q !== chQuery()) loadCh(); else chRender(); }
 }
 document.querySelectorAll("#slTabs button").forEach(b => b.onclick = () => slShowTab(b.dataset.t));
 $("slSort").onchange = () => { slSort = $("slSort").value; slRender(); };
-$("slRead").onclick = () => loadSales(true);
+$("slRead").onclick = () => { loadSales(true); loadCh(true); };
 const slPctOf = (a, b) => b ? a / b * 100 : null;
 function slSignals(l, lim){
   const c = l.cur || {}, al = [];
@@ -1894,6 +1915,7 @@ function slSquare(i, l, lim){
     <div class="sp">${slSpark(l)}</div>
     <div class="st">${stat("Checks", `${fmt(c.checks)}<small> ${flPct(flVar(c.checks, p.checks))}</small>`)}${stat("Avg check", `${flM(l.avg_check)}<small> ${flPct(flVar(l.avg_check, avgp))}</small>`)}
       ${stat("Guests", c.guests ? fmt(c.guests) : "–", "", "Covers entered at the POS")}${stat("Discounts", sg.disc == null ? "–" : fmt(sg.disc, 1) + "%", sg.disc > (lim.discounts || 8) ? "warn" : "", `${flM(c.discounts)} of ${flM(c.gross)} gross`)}</div>
+    ${chSquare(l)}
     <div class="al ${a[0]}" title="${esc(sg.al.map(x => x[1]).join(" · ") || a[1])}"><i></i><span>${esc(a[1])}${sg.al.length > 1 ? ` · +${sg.al.length - 1}` : ""}</span></div>
   </div>`;
 }
@@ -1903,6 +1925,7 @@ function slRender(){
   if (!d) { $("slGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
   if (!d.available) { $("slGrid").innerHTML = `<p class="hint">${esc(d.error || "Sales unavailable.")}</p>`; $("slTotals").innerHTML = ""; return; }
   const lim = d.limits || {}, rows = d.locations || [], C = d.currency || "ALL", t = (d.totals || {})[C] || {cur: {}, prev: {}};
+  if ((!chData || chData._q !== chQuery()) && !chPoll) loadCh(); else chRender();
   $("slStatus").textContent = `${d.period.from} → ${d.period.to}${d.period.running ? " (to the last closed day)" : ""} · against ${d.prior.label} ${d.prior.from} → ${d.prior.to} · each restaurant in its own currency`;
   const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
   const alerts = rows.map(l => slSignals(l, lim).al), crit = alerts.filter(a => a.some(x => x[0] === "crit")).length;
@@ -1931,6 +1954,108 @@ function slRender(){
     : `<p class="hint">No sales in this period.</p>`;
   if ($("slBd").classList.contains("show") && $("slPop").dataset.i != null) slDraw(+$("slPop").dataset.i);
 }
+
+// ---------- Sales → Location intelligence: channels (channels.py, /api/sales/channels) ----------
+// Order types (the channels), revenue centres and day parts of every restaurant, each against the period
+// before and the same dates last year, from one Simphony read per restaurant and day; delivery partners from the
+// tender media. The group table above the squares, a channel bar in each square, the full view in the popup.
+let chData = null, chPoll = null, chView = "channels";
+const chQuery = () => { const p = new URLSearchParams(params()); return new URLSearchParams({period: p.get("period") || "", mode: p.get("mode") || "month"}).toString(); };
+async function loadCh(refresh){
+  const q = chQuery() + (refresh ? "&refresh=1" : "");
+  if (chPoll && chPoll.q === chQuery()) return;
+  const me = chPoll = {q: chQuery(), started: Date.now()};
+  try{
+    let first = true;
+    while (chPoll === me){
+      const r = await fetch("/api/sales/channels?" + (first ? q : chQuery()));
+      first = false;
+      const j = await readJSON(r);
+      if (!r.ok) throw new Error(j.error || "failed");
+      if (!j.pending){ chData = j; chData._q = chQuery(); chRender(); slRender(); break; }
+      $("chStatus").textContent = `Reading the order types from Simphony… ${j.total ? `${fmt(j.done)} of ${fmt(j.total)} reads` : ""} · ${Math.round((Date.now() - me.started) / 1000)}s. The first read of a period is a call per restaurant and day for three periods; closed days are kept and not read again.`;
+      await new Promise(res => setTimeout(res, 4000));
+    }
+  }catch(e){ if (chPoll === me) $("chStatus").textContent = "Could not read the channels: " + e.message; }
+  finally{ if (chPoll === me) chPoll = null; }
+}
+document.querySelectorAll("#chTabs button").forEach(b => b.onclick = () => {
+  chView = b.dataset.ch;
+  document.querySelectorAll("#chTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", x === b); });
+  chRender();
+});
+function chColors(){
+  const d = chData, t = d && (d.totals || {})[d.currency];
+  const names = t ? t.channels.map(c => c.name) : [];
+  return n => { const i = names.indexOf(n); return "ch-c" + (i < 0 || i > 3 ? 4 : i); };
+}
+const chChip = v => v == null ? '<span class="meta">–</span>' : `<span class="chip ${v >= 0 ? "down" : "up"}">${v >= 0 ? "+" : ""}${fmt(v, 1)}%</span>`;
+function chTable(list, total, opts){
+  const col = chColors(), part = opts && opts.partners;
+  if (!list.length) return `<tr><td class="hint">${part ? "No tender medium matches the delivery partner words of Settings → Location intelligence." : "Nothing in this period."}</td></tr>`;
+  const val = (x, p) => part ? x[p].value : x[p].net;
+  const sum = list.reduce((a, x) => a + val(x, "cur"), 0);
+  return `<tr><th>${part ? "Partner (tender)" : opts && opts.label || "Channel"}</th><th class="num">${part ? "Paid through" : "Net sales"}</th><th class="num">Share</th><th class="num">Before</th><th class="num">vs before</th><th class="num">Last year</th><th class="num">vs last year</th><th class="num">${part ? "Payments" : "Checks"}</th><th class="num">${part ? "Average" : "Avg check"}</th>${part ? "" : '<th class="num">Avg check LY</th>'}</tr>` +
+    list.map(x => { const c = val(x, "cur"), pv = val(x, "prev"), ly = val(x, "ly"), n = part ? x.cur.count : x.cur.checks;
+      return `<tr><td>${opts && opts.swatch ? `<span class="ch-sw ${col(x.name)}"></span>` : ""}${esc(x.name)}${x.delivery ? '<span class="ch-tag">delivery</span>' : ""}</td>
+        <td class="num"><b>${fmt(c)}</b></td><td class="num">${sum ? fmt(c / sum * 100, 1) + "%" : "–"}</td>
+        <td class="num meta">${fmt(pv)}</td><td class="num">${chChip(flVar(c, pv))}</td><td class="num meta">${fmt(ly)}</td><td class="num">${chChip(flVar(c, ly))}</td>
+        <td class="num">${fmt(n)}</td><td class="num">${part ? (x.cur.count ? fmt(c / x.cur.count) : "–") : fmt(x.cur.avg)}</td>${part ? "" : `<td class="num meta">${fmt(x.ly.avg)}</td>`}</tr>`; }).join("") +
+    (total ? `<tr class="total"><td>Total</td><td class="num">${fmt(sum)}</td><td class="num">100%</td><td class="num">${fmt(list.reduce((a, x) => a + val(x, "prev"), 0))}</td><td class="num">${chChip(flVar(sum, list.reduce((a, x) => a + val(x, "prev"), 0)))}</td><td class="num">${fmt(list.reduce((a, x) => a + val(x, "ly"), 0))}</td><td class="num">${chChip(flVar(sum, list.reduce((a, x) => a + val(x, "ly"), 0)))}</td><td></td><td></td>${part ? "" : "<td></td>"}</tr>` : "");
+}
+function chRender(){
+  if (!$("chTable")) return;
+  const d = chData;
+  if (!d || d._q !== chQuery()) { $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; if (!chPoll) $("chStatus").textContent = "Reading…"; return; }
+  if (!d.available) { $("chStatus").textContent = d.error || "Channels unavailable."; $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; return; }
+  const C = d.currency, t = (d.totals || {})[C];
+  $("chStatus").textContent = `${d.period.from} → ${d.period.to} · before ${d.prev.from} → ${d.prev.to} · last year ${d.ly.from} → ${d.ly.to} · ${C}, VAT included` + (Object.keys(d.totals).length > 1 ? ` · restaurants in ${Object.keys(d.totals).filter(x => x !== C).join(", ")} only in their squares` : "") + (d.errors.length ? ` · ${d.errors.length} read(s) failed` : "");
+  if (!t) { $("chKpis").innerHTML = ""; $("chTable").innerHTML = `<tr><td class="hint">No sales by order type in this period.</td></tr>`; return; }
+  const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  const D = t.delivery, T = t.total, share = T.cur ? D.cur / T.cur * 100 : null, shareLy = T.ly ? D.ly / T.ly * 100 : null;
+  const P = t.partners.reduce((a, x) => a + x.cur.value, 0), Pl = t.partners.reduce((a, x) => a + x.ly.value, 0);
+  $("chKpis").innerHTML =
+    k(`Delivery · ${esc(C)}`, flM(D.cur), `${flPct(flVar(D.cur, D.prev))} vs before · ${flPct(flVar(D.cur, D.ly))} vs last year`, flVar(D.cur, D.ly) != null && flVar(D.cur, D.ly) < 0 ? "up" : "") +
+    k("Delivery share of sales", share == null ? "–" : fmt(share, 1) + "%", `${shareLy == null ? "–" : fmt(shareLy, 1) + "%"} last year · ${share == null || shareLy == null ? "" : (share - shareLy >= 0 ? "+" : "") + fmt(share - shareLy, 1) + " pts"}`) +
+    k("In the restaurant", flM(T.cur - D.cur), `${flPct(flVar(T.cur - D.cur, T.prev - D.prev))} vs before · ${flPct(flVar(T.cur - D.cur, T.ly - D.ly))} vs last year`) +
+    k("Paid through partners", flM(P), `${t.partners.length} partner${t.partners.length === 1 ? "" : "s"} · ${flPct(flVar(P, Pl))} vs last year · VAT and tips included`);
+  const lists = {channels: [t.channels, {swatch: true, label: "Channel (order type)"}], rvcs: [t.rvcs, {label: "Revenue centre"}],
+    dayparts: [t.dayparts, {label: "Day part"}], partners: [t.partners, {partners: true}]};
+  const [list, opts] = lists[chView];
+  $("chTable").innerHTML = chTable(list, true, opts);
+}
+// one restaurant's channels: the split bar in its square and the panels of its popup
+const chLoc = l => chData && chData._q === chQuery() ? (chData.locations || []).find(x => x.locRef === l.locRef) : null;
+function chSquare(l){
+  const x = chLoc(l); if (!x || !x.total.cur) return "";
+  const col = chColors(), D = x.delivery, sh = D.cur / x.total.cur * 100;
+  return `<div class="fl-split" title="${esc(x.channels.map(c => `${c.name}: ${fmt(c.cur.net)}`).join(" · "))}">${x.channels.filter(c => c.cur.net > 0).map(c => `<i class="${col(c.name)}" style="flex:${c.cur.net}"></i>`).join("")}</div>
+    <div class="chl" title="Delivery ${fmt(D.cur)}: ${flPct(flVar(D.cur, D.prev))} against the period before, ${flPct(flVar(D.cur, D.ly))} against last year"><span>Delivery <b>${fmt(sh, 0)}%</b> · ${flM(D.cur)}</span><span>LY <b class="${flVar(D.cur, D.ly) != null && flVar(D.cur, D.ly) < 0 ? "up" : "down"}">${flPct(flVar(D.cur, D.ly))}</b></span></div>`;
+}
+function chHours(x){
+  const H = x.hours || []; if (!H.length) return "";
+  const W = 560, Hh = 140, pad = 18, mx = Math.max(1, ...H.map(h => Math.max(h.cur, h.prev, h.ly)));
+  const bw = (W - 10) / H.length, y = v => Hh - pad - v / mx * (Hh - pad - 6);
+  const pts = k => H.map((h, i) => `${(5 + i * bw + bw / 2).toFixed(1)},${y(h[k]).toFixed(1)}`).join(" ");
+  return `<svg class="ch-hours" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Net sales by hour">
+    ${H.map((h, i) => `<rect x="${(5 + i * bw + 2).toFixed(1)}" y="${y(h.cur).toFixed(1)}" width="${Math.max(1, bw - 4).toFixed(1)}" height="${(Hh - pad - y(h.cur)).toFixed(1)}" rx="3" fill="var(--data-cur)"><title>${h.h}:00 · ${fmt(h.cur)} now, ${fmt(h.prev)} before, ${fmt(h.ly)} last year</title></rect>
+      <text x="${(5 + i * bw + bw / 2).toFixed(1)}" y="${Hh - 4}" font-size="9" text-anchor="middle" fill="var(--sub)">${h.h}</text>`).join("")}
+    <polyline points="${pts("prev")}" fill="none" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+    <polyline points="${pts("ly")}" fill="none" stroke="var(--ch-1)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+    <div class="by-leg meta" style="display:flex;gap:12px;font-size:11px"><span><span class="ch-sw" style="background:var(--data-cur)"></span>this period</span><span><span class="ch-sw" style="background:var(--sub)"></span>before (dashed)</span><span><span class="ch-sw" style="background:var(--ch-1)"></span>last year</span></div>`;
+}
+function chPanels(l){
+  const x = chLoc(l);
+  if (!x) return `<div class="pl-panel"><p class="hint" style="margin:0">${chPoll ? "Reading the channels from Simphony…" : "Channels not read for this period yet."}</p></div>`;
+  const D = x.delivery, T = x.total;
+  const head = `<p class="hint" style="margin:0 0 6px">Delivery ${fmt(D.cur)} (${T.cur ? fmt(D.cur / T.cur * 100, 1) : "–"}% of sales) · ${flPct(flVar(D.cur, D.prev))} vs before · ${flPct(flVar(D.cur, D.ly))} vs last year · in the restaurant ${flPct(flVar(T.cur - D.cur, T.ly - D.ly))} vs last year</p>`;
+  return `<div class="pl-cols">
+    <div class="pl-panel pl-span2"><h3 style="margin:0 0 6px;font-size:14px">Channels</h3>${head}<div class="scroll"><table class="fl-tab" data-nosort>${chTable(x.channels, true, {swatch: true, label: "Channel (order type)"})}</table></div></div>
+    <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Day parts</h3><div class="scroll"><table class="fl-tab" data-nosort>${chTable(x.dayparts, false, {label: "Day part"})}</table></div>${chHours(x)}</div>
+    <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Revenue centres</h3><div class="scroll"><table class="fl-tab" data-nosort>${chTable(x.rvcs, false, {label: "Revenue centre"})}</table></div>
+      <h3 style="margin:14px 0 6px;font-size:14px">Delivery partners</h3><div class="scroll"><table class="fl-tab" data-nosort>${chTable(x.partners, false, {partners: true})}</table></div></div>
+  </div>`;
+}
 function slOpen(i){ $("slPop").dataset.i = i; slDraw(i); $("slBd").classList.add("show"); }
 function slDraw(i){
   const d = salesData, l = (d.locations || [])[i]; if (!l) return;
@@ -1950,7 +2075,8 @@ function slDraw(i){
     <div class="pl-body">
       ${sg.al.length ? `<div style="margin-bottom:10px">${sg.al.map(x => `<div class="meta" style="margin:2px 0"><span class="pl-sev ${esc(x[0])}"></span>${esc(x[1])}</div>`).join("")}</div>` : ""}
       <div class="pl-tiles">${tile("Net sales", flM(c.net), `${flPct(l.change_pct)} · ${flM(p.net)} before`, l.change_pct != null && l.change_pct < -(lim.sales_drop || 15) ? "up" : "")}${tile("Checks", fmt(c.checks), `${flPct(flVar(c.checks, p.checks))} · ${fmt(p.checks)} before`)}${tile("Average check", flM(l.avg_check), `${flPct(flVar(l.avg_check, p.checks ? p.net / p.checks : null))} against before`)}${tile("Guests", c.guests ? fmt(c.guests) : "–", l.avg_guest ? `${flM(l.avg_guest)} a guest` : "covers entered at the POS")}</div>
-      <div class="pl-cols">
+      ${chPanels(l)}
+      <div class="pl-cols" style="margin-top:12px">
         <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Day by day</h3><div class="scroll"><table class="fl-tab" data-nosort><tr><th>Day</th><th class="num">Net</th><th class="num">Before</th><th class="num">Change</th><th></th></tr>${dayRows}</table></div></div>
         <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">Control signals</h3><table class="fl-tab" data-nosort><tr><th></th><th class="num">Period</th><th class="num">% gross</th><th class="num">Before</th></tr>${ctl.map(x => `<tr><td>${x[0]}</td><td class="num">${fmt(x[1])}</td><td class="num meta">${x[0] === "Gross" || !c.gross ? "" : fmt(x[1] / c.gross * 100, 1) + "%"}</td><td class="num meta">${fmt(x[2])}</td></tr>`).join("")}</table>
           <p class="hint" style="margin:8px 0 0">Limits (Settings → Location intelligence): discounts ${fmt(lim.discounts || 8)}%, voids ${fmt(lim.voids || 2)}%, error corrects ${fmt(lim.error_corrects || 5)}% of gross; a fall of ${fmt(lim.sales_drop || 15)}%.</p></div>
@@ -2956,12 +3082,12 @@ async function liSettings(){
     const s = await readJSON(await fetch("/api/settings"));
     const L = s.locations || {};
     $("liReg").value = L.registry || s.locations_registry_default || "";
-    [["food_cost_target", "liThFc"], ["cover_days", "liThCover"], ["error_corrects_pct", "liThErr"], ["discounts_pct", "liThDisc"], ["voids_pct", "liThVoid"], ["sales_drop_pct", "liThDrop"], ["slow_stock_pct", "liThSlow"], ["recipe_coverage_pct", "liThRc"], ["prime_cost_pct", "liThPrime"], ["budget_gap_pct", "liThBud"], ["posting_gap_pct", "liThPost"]].forEach(([k, id]) => $(id).value = L[k] ?? "");
+    [["food_cost_target", "liThFc"], ["cover_days", "liThCover"], ["error_corrects_pct", "liThErr"], ["discounts_pct", "liThDisc"], ["voids_pct", "liThVoid"], ["sales_drop_pct", "liThDrop"], ["delivery_order_types", "liDelOt"], ["delivery_tenders", "liDelTm"], ["slow_stock_pct", "liThSlow"], ["recipe_coverage_pct", "liThRc"], ["prime_cost_pct", "liThPrime"], ["budget_gap_pct", "liThBud"], ["posting_gap_pct", "liThPost"]].forEach(([k, id]) => $(id).value = L[k] ?? "");
   }catch(e){ $("liRegMsg").textContent = "Could not read the settings: " + e.message; }
 }
 $("liRegSave").onclick = async () => {
   const body = {locations: {registry: $("liReg").value, food_cost_target: $("liThFc").value, cover_days: $("liThCover").value,
-    error_corrects_pct: $("liThErr").value, discounts_pct: $("liThDisc").value, voids_pct: $("liThVoid").value, sales_drop_pct: $("liThDrop").value,
+    error_corrects_pct: $("liThErr").value, discounts_pct: $("liThDisc").value, voids_pct: $("liThVoid").value, sales_drop_pct: $("liThDrop").value, delivery_order_types: $("liDelOt").value, delivery_tenders: $("liDelTm").value,
     slow_stock_pct: $("liThSlow").value, recipe_coverage_pct: $("liThRc").value,
     prime_cost_pct: $("liThPrime").value, budget_gap_pct: $("liThBud").value, posting_gap_pct: $("liThPost").value}};
   try{
