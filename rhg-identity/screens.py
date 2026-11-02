@@ -24,6 +24,7 @@ FINANCE = [
     ("sales", "Sales", "Overview", "slTabs", [
         ("main", "Sales", "company", []),
         ("loc", "Location intelligence", "location", []),
+        ("prices", "Menu prices", "location", []),
         ("today", "Today", "location", [])]),
     ("pl", "Financial statements", "Statements", "stTabs", [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),

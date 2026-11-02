@@ -501,6 +501,44 @@ def order_type_hours(loc_ref, bus_dt, latest=None):
     return q
 
 
+_items_cache, _prices_cache = {}, {}
+
+
+def menu_items(loc_ref, max_age=6 * 3600):
+    """{menu item number: {name, name2, major, family, excluded}} of one location (getMenuItemDimensions), every
+    item, the ones not included in sales marked."""
+    hit = _items_cache.get(loc_ref)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    rows = (call("getMenuItemDimensions", {"locRef": loc_ref}) or {}).get("menuItems") or []
+    value = {}
+    for m in rows:
+        if m.get("num") is None:
+            continue
+        value[int(m["num"])] = {"name": (m.get("name") or m.get("mstrName") or "").strip(),
+                                "name2": (m.get("name2") or "").strip(),
+                                "major": (m.get("majGrpName") or m.get("majGrpMstrName") or "").strip(),
+                                "family": (m.get("famGrpName") or m.get("famGrpMstrName") or "").strip(),
+                                "excluded": m.get("doNotIncludeInSales") in (True, 1, "true", "Y")}
+    _items_cache[loc_ref] = (time.time(), value)
+    return value
+
+
+def menu_item_prices(loc_ref, max_age=3600):
+    """The active prices of one location (getMenuItemPrices): [{num, rvc, level, level_name, price, cost, from,
+    to}]. Active: no "effective to" date, or one still to come."""
+    hit = _prices_cache.get(loc_ref)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    rows = (call("getMenuItemPrices", {"locRef": loc_ref}) or {}).get("menuItemPrices") or []
+    value = [{"num": int(r["num"]), "rvc": r.get("rvcNum"), "level": r.get("prcLvlNum"),
+              "level_name": (r.get("prcLvlName") or "").strip(), "price": r.get("price"), "cost": r.get("cost"),
+              "from": str(r.get("effFrDt") or "")[:10], "to": str(r.get("effToDt") or "")[:10]}
+             for r in rows if r.get("num") is not None]
+    _prices_cache[loc_ref] = (time.time(), value)
+    return value
+
+
 def _sum(rvcs, field):
     return sum(float(r.get(field) or 0) for r in rvcs)
 

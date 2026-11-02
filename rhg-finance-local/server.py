@@ -23,6 +23,7 @@ import arap_notify
 import brand_report
 import sales_report
 import channels
+import pricelist
 import pl_memo
 import cashloc
 import kartloc
@@ -1189,7 +1190,7 @@ def arap_status(user):
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
+EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/simphony/status", "/api/users",
@@ -1199,7 +1200,8 @@ ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/
 ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/kartela/locations",
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
-                         "/api/sales", "/api/sales/channels"}
+                         "/api/sales", "/api/sales/channels", "/api/sales/prices",
+                         "/api/sales/prices/xlsx"}
 
 
 def scope_expand(company, codes):
@@ -1208,6 +1210,24 @@ def scope_expand(company, codes):
     for r in locintel.registry():
         if (r.get("company") or "").upper() == (company or "").upper() and (r.get("bc") or "").upper() in codes:
             out |= {(r.get(k) or "").upper() for k in ("dept", "ref", "bc") if r.get(k)}
+    return out
+
+
+def simphony_refs_in_scope(user):
+    """The Simphony locations (registry references, upper case) a person limited by access may see; None = all.
+    A restaurant counts when its company is in the access and, for a company limited to some locations, its BC
+    location or department is one of them."""
+    if not access.limited(user):
+        return None
+    out = set()
+    for r in locintel.registry():
+        co = r.get("company") or ""
+        if not co or not access.company_ok(user, co):
+            continue
+        L = access.locations(user, co)
+        if L is None or ({(r.get(k) or "").upper() for k in ("bc", "dept", "ref")} & L):
+            out.add((r.get("ref") or "").upper())
+    out.discard("")
     return out
 
 
@@ -1267,7 +1287,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/companies":
             self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
             return None
-        multi = path in ("/api/sales", "/api/sales/channels") or (path == "/api/today/locations" and q.get("scope") == "all")
+        multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx") or (path == "/api/today/locations" and q.get("scope") == "all")
         if not multi and not access.company_ok(user, company):
             return access.refuse_company(company)
         L = access.locations(user, company)
@@ -1366,6 +1386,33 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/gl":
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
+            elif url.path in ("/api/sales/prices", "/api/sales/prices/xlsx"):
+                # Sales → Menu prices: every active Simphony menu item price by location, revenue centre and level
+                if not simphony.info()["configured"]:
+                    self._send(200, {"error": "The Simphony connection is not set."})
+                    return
+                refs = simphony_refs_in_scope(user)
+                xlsx = url.path.endswith("xlsx")
+                try:
+                    r = pricelist.request(refs, (q.get("location") or "")[:40], (q.get("level") or "")[:99],
+                                          (q.get("group") or "")[:99], (q.get("q") or "")[:80],
+                                          0 if xlsx else 600, q.get("refresh") == "1")
+                except simphony.SimphonyError as exc:
+                    self._send(502, {"error": str(exc)})
+                    return
+                if not xlsx:
+                    self._send(200, r)
+                    return
+                body = pricelist.render_xlsx(r)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition",
+                                 f'attachment; filename="Menu_prices_{date.today().isoformat()}.xlsx"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                store.audit("export", "menu prices", user["username"], {}, {"rows": r["count"]}, "")
             elif url.path == "/api/sales/channels":
                 # Sales → Location intelligence: channels (order types), revenue centres, day parts and delivery
                 # partners of every restaurant against the period before and last year (channels.py)

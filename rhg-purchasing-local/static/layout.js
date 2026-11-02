@@ -454,7 +454,7 @@
 .lay-off{display:none!important}
 .scr-off{display:none!important}
 .no-export #exportBtn,.no-export #pdfBtn,.no-export #fsXlsx,.no-export #fxXlsx,.no-export #imXlsx,.no-export #mvXlsx,
-.no-export #rcXlsx,.no-export #skXlsx,.no-export #tyXlsx,.no-export #svPdf,.no-export #svXlsx,.no-export #svSend,
+.no-export #rcXlsx,.no-export #prxXlsx,.no-export #skXlsx,.no-export #tyXlsx,.no-export #svPdf,.no-export #svXlsx,.no-export #svSend,
 .no-export a[href*="supplier-stock/statement"]{display:none!important}
 body.scr-empty main section.view{display:none!important}
 .scr-none{margin:24px 0;padding:22px;max-width:620px}
