@@ -121,9 +121,41 @@ DATA_GAPS = [
 
 
 # ------------------------------------------------------------------ periods
+def parse_range(anchor, today=None):
+    """(from, to) of a chosen range "YYYY-MM-DD..YYYY-MM-DD": in order, never past today, at most three years."""
+    today = today or date.today()
+    a_txt, _, b_txt = (anchor or "").partition("..")
+    a = date.fromisoformat(a_txt.strip()) if a_txt.strip() else today.replace(day=1)
+    b = date.fromisoformat(b_txt.strip()) if b_txt.strip() else today
+    if b < a:
+        a, b = b, a
+    b = min(b, today)
+    a = min(a, b)
+    if (b - a).days > 3 * 366:
+        raise ValueError("A chosen range can be at most three years.")
+    return a, b
+
+
 def periods(anchor, mode, today=None):
     today = today or date.today()
-    a = date.fromisoformat(anchor) if anchor else today
+    if mode == "range":
+        # a chosen range: against the same number of days just before it, and the same dates last year
+        c_from, c_to = parse_range(anchor, today)
+        days = (c_to - c_from).days + 1
+        p_to = c_from - timedelta(days=1)
+        p_from = p_to - timedelta(days=days - 1)
+        running = c_to >= today
+        same_year = c_from.year == c_to.year
+        label = (f"{c_from:%d %b}" + ("" if same_year else f" {c_from.year}") + f" – {c_to:%d %b %Y}"
+                 + (" to date" if running else ""))
+        method = f"Chosen dates ({days} days) against the {days} days just before."
+        try:
+            ly_from, ly_to = c_from.replace(year=c_from.year - 1), c_to.replace(year=c_to.year - 1)
+        except ValueError:
+            ly_from = c_from.replace(year=c_from.year - 1, day=28) if c_from.month == 2 else c_from.replace(year=c_from.year - 1)
+            ly_to = c_to.replace(year=c_to.year - 1, day=28) if c_to.month == 2 else c_to.replace(year=c_to.year - 1)
+        return c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, method
+    a = date.fromisoformat(anchor[:10]) if anchor else today
     if mode == "ytd":
         c_from, running = date(a.year, 1, 1), a.year == today.year
         c_to = today if running else date(a.year, 12, 31)
@@ -1463,7 +1495,7 @@ class Handler(BaseHTTPRequestHandler):
                                               q.get("compare") or "prior"))
             elif url.path == "/api/locations":
                 try:
-                    c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, _ = periods(q.get("period"), "month")
+                    c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, _ = periods(q.get("period"), "range" if q.get("mode") == "range" else "month")
                 except ValueError:
                     self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
                     return
@@ -1515,7 +1547,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, supstock.request(client, company, 18, q.get("refresh") == "1"))
             elif url.path == "/api/kartela/locations":
                 try:
-                    period = periods(q.get("period"), "month")[:8]
+                    period = periods(q.get("period"), "range" if q.get("mode") == "range" else "month")[:8]
                 except ValueError:
                     self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
                     return
@@ -1528,7 +1560,7 @@ class Handler(BaseHTTPRequestHandler):
                                                 q.get("refresh") == "1"))
             elif url.path == "/api/cash/locations":
                 try:
-                    period = periods(q.get("period"), "month")[:8]
+                    period = periods(q.get("period"), "range" if q.get("mode") == "range" else "month")[:8]
                 except ValueError:
                     self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
                     return
@@ -1537,7 +1569,7 @@ class Handler(BaseHTTPRequestHandler):
                                                 in_parallel_jobs, q.get("refresh") == "1"))
             elif url.path == "/api/finance/locations":
                 try:
-                    period = periods(q.get("period"), "month")[:8]
+                    period = periods(q.get("period"), "range" if q.get("mode") == "range" else "month")[:8]
                 except ValueError:
                     self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
                     return

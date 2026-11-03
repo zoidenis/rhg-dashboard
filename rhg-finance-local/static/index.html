@@ -372,9 +372,10 @@ td.num,th.num{text-align:right}
   <div class="filters">
     <label>Company <select id="company"></select></label>
     <label>Period <select id="mode">
-      <option value="month">Month</option><option value="quarter">Quarter</option><option value="ytd">Year to date</option>
+      <option value="month">Month</option><option value="quarter">Quarter</option><option value="ytd">Year to date</option><option value="range">Custom range</option>
     </select></label>
     <label id="anchorLabel">Month starting <input type="date" id="anchor"></label>
+    <label id="toLabel" style="display:none">Until <input type="date" id="anchorTo"></label>
     <label>Department <select id="dimension"><option value="">All departments</option></select></label>
     <label>Compare <select id="cmpMode">
       <option value="prior">Period before</option>
@@ -1227,10 +1228,30 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 const pctChip = p => p==null ? "–" : `<span class="chip ${p>0?"up":"down"}">${p>0?"+":""}${fmt(p,1)}%</span>`;
 let data = null, busy = false;
 
-const MODE_LABEL = {month:"Month starting", quarter:"Quarter starting", ytd:"Year"};
+const MODE_LABEL = {month:"Month starting", quarter:"Quarter starting", ytd:"Year", range:"From"};
+const isoDay = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
+// the period sent to the server: the anchor date, or "from..until" for a custom range
+function periodValue(){
+  const a = $("anchor").value;
+  if ($("mode").value !== "range" || !a) return a;
+  return `${a}..${$("anchorTo").value || a}`;
+}
+function rangeSync(){
+  const on = $("mode").value === "range", today = isoDay(new Date());
+  $("toLabel").style.display = on ? "" : "none";
+  $("anchor").max = on ? today : ""; $("anchorTo").max = today;
+  if (!on) return;
+  if (!$("anchor").value) $("anchor").value = today.slice(0, 8) + "01";
+  if ($("anchor").value > today) $("anchor").value = today;
+  if (!$("anchorTo").value || $("anchorTo").value < $("anchor").value) {
+    const d = new Date($("anchor").value + "T00:00:00"), end = isoDay(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    $("anchorTo").value = end < today ? end : today;
+  }
+}
 function snap(v){
   if(!v) return v;
   const d = new Date(v+"T00:00:00"), m = $("mode").value;
+  if(m==="range") return v;
   const iso = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
   if(m==="ytd") return iso(new Date(d.getFullYear(),0,1));
   if(m==="quarter") return iso(new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1));
@@ -1239,7 +1260,7 @@ function snap(v){
 function params(){
   const p = new URLSearchParams();
   if($("company").value) p.set("company",$("company").value);
-  if($("anchor").value) p.set("period",$("anchor").value);
+  if($("anchor").value) p.set("period",periodValue());
   if($("dimension").value) p.set("dimension",$("dimension").value);
   p.set("mode",$("mode").value);
   p.set("compare",$("cmpMode").value);
@@ -3467,9 +3488,12 @@ window.addEventListener("afterprint", () => document.body.classList.remove("prin
 $("refreshBtn").onclick=()=>load();
 ["company","dimension"].forEach(id=>$(id).onchange=()=>load());
 $("cmpMode").onchange=()=>load();
-$("anchor").onchange=()=>{ if($("anchor").value) $("anchor").value=snap($("anchor").value); load(); };
+$("anchor").onchange=()=>{ if($("anchor").value) $("anchor").value=snap($("anchor").value); rangeSync(); load(); };
+$("anchorTo").onchange=()=>{
+  if ($("anchorTo").value && $("anchorTo").value < $("anchor").value) { const a = $("anchor").value; $("anchor").value = $("anchorTo").value; $("anchorTo").value = a; }
+  rangeSync(); load(); };
 $("mode").onchange=()=>{ $("anchorLabel").firstChild.textContent=MODE_LABEL[$("mode").value]+" ";
-  if($("anchor").value) $("anchor").value=snap($("anchor").value); load(); };
+  if($("anchor").value) $("anchor").value=snap($("anchor").value); rangeSync(); load(); };
 setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRESH||180)*1000);
 
 (async ()=>{
@@ -3569,7 +3593,7 @@ $("ilRead").onclick = () => loadIl(true);
 function ilQuery(){
   const p = new URLSearchParams();
   if ($("company").value) p.set("company", $("company").value);
-  if ($("anchor").value) p.set("period", $("anchor").value);
+  if ($("anchor").value) p.set("period", periodValue());
   p.set("mode", $("mode").value);
   return p.toString();
 }
@@ -3891,7 +3915,8 @@ $("flRead").onclick = () => loadFl(true);
 function flQuery(){
   const p = new URLSearchParams();
   if ($("company").value) p.set("company", $("company").value);
-  if ($("anchor").value) p.set("period", $("anchor").value.slice(0, 7) + "-01");
+  if ($("mode").value === "range") { if ($("anchor").value) p.set("period", periodValue()); p.set("mode", "range"); }
+  else if ($("anchor").value) p.set("period", $("anchor").value.slice(0, 7) + "-01");
   return p.toString();
 }
 async function loadFl(refresh){
@@ -4794,7 +4819,7 @@ let faTab = "main", faData = null, faKey = "", faTimer = null, faSort = "nbv";
 function faQuery(){
   const p = new URLSearchParams();
   if ($("company").value) p.set("company", $("company").value);
-  if ($("anchor").value) p.set("period", $("anchor").value);
+  if ($("anchor").value) p.set("period", periodValue());
   p.set("mode", $("mode").value || "month");
   return p.toString();
 }
