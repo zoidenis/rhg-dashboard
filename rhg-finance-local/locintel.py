@@ -98,6 +98,13 @@ def registry(settings=None):
     return out
 
 
+def restaurant_depts(company, settings=None):
+    """The BC departments of the restaurants of a company (upper case): the dept key of the registry, else bc."""
+    return sorted({(r.get("dept") or r.get("bc") or "").strip().upper() for r in registry(settings)
+                   if (r.get("company") or "").strip().upper() == str(company or "").strip().upper()
+                   and (r.get("dept") or r.get("bc"))})
+
+
 def currency_for(loc_ref, given="", fallback="ALL"):
     """The currency a Simphony location reports in: the registry first, then Simphony, then the
     group currency. 'L' and 'LEK' are lek."""

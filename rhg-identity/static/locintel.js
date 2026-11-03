@@ -23,7 +23,7 @@ const MARKUP = `<div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <div class="li-seg" id="liTabs" role="tablist"><button class="on" data-t="rest" role="tab">Restaurants</button><button data-t="cmp" role="tab" id="liCmpTab">Compare <span class="li-cnt" id="liCmpCnt"></span></button></div>
           <label class="meta" style="display:flex;gap:6px;align-items:center" id="liSortLbl">Order
-            <select id="liSort" style="font-size:12px;padding:5px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health, weakest first</option><option value="alerts">by alerts</option><option value="fc">by food cost</option><option value="ebitda">by EBITDA margin (BC)</option><option value="name">by name</option></select></label>
+            <select id="liSort" style="font-size:12px;padding:5px 8px"><option value="net">by Simphony sales</option><option value="ly">by change vs last year</option><option value="score">by health, weakest first</option><option value="alerts">by alerts</option><option value="fc">by food cost</option><option value="ebitda">by result margin (BC)</option><option value="name">by name</option></select></label>
           <button class="mini" id="liRefresh">Read again</button></div></div>
       <p class="meta" id="liStatus" style="margin:10px 0 0"></p>
     </div>
@@ -253,9 +253,15 @@ function liDerive(){
     if (l.fc != null && l.fc > th.food_cost + 2) al.push(["warn", `Food cost ${l.fc.toFixed(1)}%`, `Above the ${th.food_cost}% target: use at cost ${liM(l.use)} for ${liM(l.exvat)} sales ex VAT.`]);
     const pc = l.pl && l.pl.cur;
     if (pc && pc.sales > 0) {
-      if (pc.ebitda < 0) al.push(["warn", `EBITDA negative in ${FN.label}`, `${liM(pc.ebitda)} on ${liM(pc.sales)} revenue (BC, department ${esc(l.dept)}).`]);
+      if (pc.contribution != null && pc.contribution < 0) al.push(["warn", `Contribution negative in ${FN.label}`, `${liM(pc.contribution)} on ${liM(pc.sales)} revenue, with ${liM(pc.central)} as its share of the central result (BC, department ${esc(l.dept)}).`]);
+      else if (pc.contribution == null && pc.ebitda < 0) al.push(["warn", `Result before central costs negative in ${FN.label}`, `${liM(pc.ebitda)} on ${liM(pc.sales)} revenue (BC, department ${esc(l.dept)}); central costs are not in it yet.`]);
       if (pc.primePct != null && pc.primePct > LI_PRIME) al.push(["warn", `Prime cost ${pc.primePct.toFixed(1)}% in ${FN.label}`, `Food ${pc.foodPct.toFixed(1)}% plus labour ${pc.laborPct.toFixed(1)}% of revenue (BC).`]);
     }
+    const ex = l.exceptions;
+    if (ex && ex.open) al.push([ex.critical ? "crit" : "warn", `${ex.open} open in the Exceptions register`, `${ex.critical} critical, ${ex.overdue} past their due date, ${liM(ex.value)} in all.`]);
+    // New: open now and no sales on the same dates last year; Seasonal: from the registry
+    l.badges = [l.status === "open" && l.sim && l.sim.ly && !l.sim.ly.net ? ["New", "No Simphony sales on the same dates last year"] : null,
+                l.seasonal ? ["Seasonal", "Closes off season (registry)"] : null].filter(Boolean);
     if (!al.length && l.status === "open") al.push(["good", "No exception", "Nothing above the thresholds this month."]);
     const order = ["crit", "warn", "info", "good"];
     l.alerts = al.sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
@@ -319,31 +325,33 @@ function liDrawKpis(){
     $("liBcScope").textContent = `${LI.company} · ${LI.curLab} posted · P&L ${F.label}`;
   }
 }
-// the P&L panel of a restaurant: the posted month against a year before (and budget), and the year to date
+// the P&L panel of a restaurant, with the lines of the KPI library: the posted month against a year before (and
+// budget), and the year to date. A restaurant's result is before central costs (Partial) until Finance approves the
+// rule that spreads them; then its Contribution.
 function liPlPanel(l){
   const F = LI.fin; if (!F) return "";
   if (!l.pl) return `<div class="li-panel li-span2"><div class="ttl"><h3>P&amp;L</h3><span class="li-tag">BC · ${esc(F.label)}</span></div>
     <p class="meta">No P&amp;L for this restaurant: ${l.dept ? `department ${esc(l.dept)} has no postings in ${esc(F.label)}` : "no BC department in the registry"} (Finance → Settings → Location intelligence, key dept).</p></div>`;
-  const c = l.pl.cur, y = l.pl.ly, b = l.pl.bud, Y = l.pl.ytd, YL = l.pl.ytdLy;
+  const c = l.pl.cur, y = l.pl.ly, b = l.pl.bud, Y = l.pl.ytd, YL = l.pl.ytdLy, ok = !!(F.allocation && F.allocation.approved);
   const pct = v => v == null ? "–" : v.toFixed(1) + "%";
   const chg = (a, z, up) => { if (a == null || z == null || !z) return ""; const v = (a / Math.abs(z) - 1) * 100; return `<b class="${(v >= 0) === up ? "down" : v ? "up" : ""}">${liPct(v)}</b>`; };
   const pp = (a, z, up) => { const v = liPP(a, z); return v == null ? "" : `<b class="${v === 0 ? "" : (v > 0) === up ? "down" : "up"}">${liPPf(v)}</b>`; };
-  const vs = (x, lab) => x ? ` · ${lab}` : "";
   const tiles = [
-    liTile("Revenue", liM(c.sales), `LY ${chg(c.sales, y && y.sales, true) || "–"}${b && b.sales ? ` · budget ${chg(c.sales, b.sales, true)}` : ""}`),
-    liTile("Food cost", pct(c.foodPct), `LY ${pp(c.foodPct, y && y.foodPct, false) || "–"} · ${liM(c.food)}`),
+    liTile("Net revenue", liM(c.sales), `LY ${chg(c.sales, y && y.sales, true) || "–"}${b && b.sales ? ` · budget ${chg(c.sales, b.sales, true)}` : ""}`),
+    liTile("Gross margin", pct(c.grossPct), `revenue − cost of goods · LY ${pp(c.grossPct, y && y.grossPct, true) || "–"}`),
     liTile("Labour", pct(c.laborPct), `LY ${pp(c.laborPct, y && y.laborPct, false) || "–"} · ${liM(c.labor)}`),
-    liTile("Prime cost", `<span class="${c.primePct > LI_PRIME ? "warn" : ""}">${pct(c.primePct)}</span>`, `food + labour${y ? ` · LY ${pp(c.primePct, y.primePct, false)}` : ""}`),
-    liTile("Other operating costs", pct(c.opexPct), `${liM(c.opex)}${y ? ` · LY ${pp(c.opexPct, y.opexPct, false)}` : ""}`),
-    liTile("EBITDA", `<span class="${c.ebitda < 0 ? "up" : ""}">${liM(c.ebitda)}</span>`, `${pct(c.ebitdaPct)} of revenue · LY ${pp(c.ebitdaPct, y && y.ebitdaPct, true) || "–"}`),
-    liTile(`Revenue ${esc(F.ytdLabel)}`, liM(Y && Y.sales), `year to date · LY ${chg(Y && Y.sales, YL && YL.sales, true) || "–"}`),
-    liTile(`EBITDA ${esc(F.ytdLabel)}`, liM(Y && Y.ebitda), `${pct(Y && Y.ebitdaPct)} of revenue · LY ${pp(Y && Y.ebitdaPct, YL && YL.ebitdaPct, true) || "–"}`)].join("");
-  // where each 100 lek of revenue went: food, labour, other costs and what is left (EBITDA)
-  const tot = Math.max(c.sales + (c.other_income || 0), 1);
-  const parts = [["Food", c.food, "var(--li-c1)"], ["Labour", c.labor, "var(--li-c2)"], ["Other costs", c.opex, "var(--li-c3)"], ["EBITDA", Math.max(c.ebitda, 0), "var(--li-c4)"]];
+    liTile("Prime cost", `<span class="${c.primePct > LI_PRIME ? "warn" : ""}">${pct(c.primePct)}</span>`, `cost of goods + labour${y ? ` · LY ${pp(c.primePct, y.primePct, false)}` : ""}`),
+    liTile("Occupancy", pct(c.occupancyPct), `rent, utilities · ${liM(c.occupancy)}`),
+    liTile(`Before central costs${ok ? "" : ` <em class="li-badge">Partial</em>`}`, `<span class="${c.ebitda < 0 ? "up" : ""}">${liM(c.ebitda)}</span>`, `${pct(c.ebitdaPct)} of revenue · only what is posted on ${esc(l.dept)}`),
+    liTile("Contribution", ok ? `<span class="${c.contribution < 0 ? "up" : ""}">${liM(c.contribution)}</span>` : "–",
+      ok ? `${pct(c.contributionPct)} · share of the central result ${liM(c.central)}` : "Content required: Finance approves the rule (Settings → Central costs)", ok ? "" : "pending"),
+    liTile(`Year to date ${esc(F.ytdLabel)}`, liM(Y && (ok ? Y.contribution : Y.ebitda)), `${ok ? "Contribution" : "before central costs"} · revenue ${liM(Y && Y.sales)} (LY ${chg(Y && Y.sales, YL && YL.sales, true) || "–"})`)].join("");
+  // where each 100 lek of revenue went: cost of goods, labour, other costs (occupancy included) and the result
+  const tot = Math.max(c.sales + (c.other_income || 0), 1), res = ok ? c.contribution : c.ebitda;
+  const parts = [["Cost of goods", c.food, "var(--li-c1)"], ["Labour", c.labor, "var(--li-c2)"], ["Other costs", c.opex + (ok ? -c.central : 0), "var(--li-c3)"], [ok ? "Contribution" : "Result", Math.max(res, 0), "var(--li-c4)"]];
   const bar = c.sales > 0 ? `<div class="li-split">${parts.map(p => p[1] > 0 ? `<i style="flex:${p[1] / tot};background:${p[2]}" title="${p[0]} ${(p[1] / tot * 100).toFixed(1)}%"></i>` : "").join("")}</div>
-    <div class="li-legend" style="margin-top:6px">${parts.map(p => `<span><span class="li-lg" style="background:${p[2]}"></span>${p[0]} ${(p[1] / tot * 100).toFixed(1)}%</span>`).join("")}${c.ebitda < 0 ? `<span class="up">loss ${liM(-c.ebitda)}</span>` : ""}</div>` : "";
-  return `<div class="li-panel li-span2"><div class="ttl"><h3>P&amp;L · ${esc(F.label)}</h3><span class="li-tag">BC · department ${esc(l.dept)}${F.provisional ? " · provisional until the inventory is posted" : ""}${F.wanted !== F.month ? ` · the latest month with payroll and food cost posted` : ""}</span></div>
+    <div class="li-legend" style="margin-top:6px">${parts.map(p => `<span><span class="li-lg" style="background:${p[2]}"></span>${p[0]} ${(p[1] / tot * 100).toFixed(1)}%</span>`).join("")}${res < 0 ? `<span class="up">loss ${liM(-res)}</span>` : ""}</div>` : "";
+  return `<div class="li-panel li-span2"><div class="ttl"><h3>P&amp;L · ${esc(F.label)}</h3><span class="li-tag">BC · department ${esc(l.dept)} · KPI library lines${F.provisional ? " · provisional until the inventory is posted" : ""}${F.wanted !== F.month ? ` · the latest month with payroll and food cost posted` : ""}</span></div>
     <div class="li-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">${tiles}</div>${bar}</div>`;
 }
 function liDrawMap(){
@@ -379,7 +387,7 @@ function liRestSquare(l){
   const posted = l.bc_posted && l.snet ? (l.bc_posted.total / l.snet - 1) * 100 : null, on = liCmp.includes(l.ref);
   return `<div class="li-rsq${on ? " cmp-on" : ""}" role="button" tabindex="0" draggable="true" data-loc="${esc(l.ref)}" aria-label="${esc(l.name)}: open its KPIs">
     <div class="hd"><div class="ic" style="border-color:${ring}">${liGlyph(l.brand)}</div>
-      <div class="nm"><b>${esc(l.name)}</b><span>${esc([l.area, l.region].filter(Boolean).join(" · "))}</span></div>
+      <div class="nm"><b>${esc(l.name)}</b><span>${esc([l.area, l.region].filter(Boolean).join(" · "))}${(l.badges || []).map(b => ` <em class="li-badge" title="${esc(b[1])}">${esc(b[0])}</em>`).join("")}</span></div>
       <span class="li-score ${l.h}" title="Health score">${l.score ?? "–"}</span></div>
     <div class="big"><span class="v">${liFv(LI_KB.net, l.snet, l)}</span>
       <span class="cmp">LY <b class="${l.lyD == null ? "" : l.lyD <= -LI.th.sales_drop ? "up" : l.lyD >= 5 ? "down" : ""}">${liPct(l.lyD)}</b> · ${LI.prevLab} <b class="${dS != null && dS <= -LI.th.sales_drop ? "up" : ""}">${liPct(dS)}</b></span></div>
@@ -388,7 +396,9 @@ function liRestSquare(l){
       ${stat("Food cost", l.fc != null ? l.fc.toFixed(1) + "%" : "–", l.fc != null && l.fc > LI.th.food_cost + 2 ? "warn" : "")}
       ${l.inv ? stat("Cover", l.inv.doh != null ? l.inv.doh + " d" : "–", l.inv.doh != null && l.inv.doh > LI.th.cover_days ? "up" : "")
               : stat("Posted BC", posted != null ? liPct(posted) : "–", posted != null && posted < -3 ? "up" : "")}
-      ${LI.fin ? stat(`EBITDA ${esc(liMon(LI.fin.month + "-01"))}`, l.pl && l.pl.cur.ebitdaPct != null ? l.pl.cur.ebitdaPct.toFixed(1) + "%" : "–", l.pl && l.pl.cur.ebitda < 0 ? "up" : "")
+      ${LI.fin ? (LI.fin.allocation && LI.fin.allocation.approved
+                ? stat(`Contribution ${esc(liMon(LI.fin.month + "-01"))}`, l.pl && l.pl.cur.contributionPct != null ? l.pl.cur.contributionPct.toFixed(1) + "%" : "–", l.pl && l.pl.cur.contribution < 0 ? "up" : "")
+                : stat(`Result ${esc(liMon(LI.fin.month + "-01"))}`, l.pl && l.pl.cur.ebitdaPct != null ? l.pl.cur.ebitdaPct.toFixed(1) + "%" : "–", l.pl && l.pl.cur.ebitda < 0 ? "up" : ""))
               + stat(`Labour ${esc(liMon(LI.fin.month + "-01"))}`, l.pl && l.pl.cur.laborPct != null ? l.pl.cur.laborPct.toFixed(1) + "%" : "–") : ""}</div>
     <div class="ft"><div class="al ${top ? top[0] : "good"}" title="${esc(top ? top[1] : "No exception")}"><i></i><span>${top ? esc(top[1]) : "No exception"}</span>${n > 1 ? `<em>+${n - 1}</em>` : ""}</div>
       <button class="li-add" data-cmp="${esc(l.ref)}" title="${on ? "Remove from" : "Add to"} Compare" aria-pressed="${on}">${on ? "✓" : "+"}</button></div>
@@ -409,7 +419,7 @@ function liGroups(list){
 function liDrawRest(){
   const by = liSort;
   const key = {net: l => -(l.snet || 0), ly: l => l.lyD ?? 1e9, score: l => l.score ?? 1e9, fc: l => -(l.fc ?? -1), name: l => 0,
-               ebitda: l => -((l.pl && l.pl.cur.ebitdaPct) ?? -1e9),
+               ebitda: l => -((l.pl && (l.pl.cur.contributionPct ?? l.pl.cur.ebitdaPct)) ?? -1e9),
                alerts: l => (l.alerts[0] ? LI_ORDER[l.alerts[0][0]] * 100 : 400) - l.alerts.filter(a => a[0] !== "good").length}[by] || (l => 0);
   const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (by === "name" ? a.name.localeCompare(b.name) : (b.snet || 0) - (a.snet || 0)));
   const groups = liGroups(LI.scope);
@@ -475,15 +485,18 @@ const LI_ROWS = [
   ["Business Central", "Days of cover", l => l.inv ? l.inv.doh : null, liN, -1],
   ["Business Central", "Fresh lines to count", l => l.inv ? l.inv.count : null, liN, -1],
   ["Business Central", "Negative stock lines", l => l.inv ? l.inv.neg_lines : null, liN, -1],
-  ["P&L", "Revenue", l => l.pl && l.pl.cur.sales, v => liM(v), 1],
-  ["P&L", "Food cost, % of revenue", l => l.pl && l.pl.cur.foodPct, liP1, -1],
+  ["P&L", "Net revenue", l => l.pl && l.pl.cur.sales, v => liM(v), 1],
+  ["P&L", "Gross margin", l => l.pl && l.pl.cur.grossPct, liP1, 1],
   ["P&L", "Labour, % of revenue", l => l.pl && l.pl.cur.laborPct, liP1, -1],
   ["P&L", "Prime cost, % of revenue", l => l.pl && l.pl.cur.primePct, liP1, -1],
-  ["P&L", "Other costs, % of revenue", l => l.pl && l.pl.cur.opexPct, liP1, -1],
-  ["P&L", "EBITDA", l => l.pl && l.pl.cur.ebitda, v => liM(v), 1],
-  ["P&L", "EBITDA margin", l => l.pl && l.pl.cur.ebitdaPct, liP1, 1],
-  ["P&L", "Revenue, year to date", l => l.pl && l.pl.ytd && l.pl.ytd.sales, v => liM(v), 1],
-  ["P&L", "EBITDA, year to date", l => l.pl && l.pl.ytd && l.pl.ytd.ebitda, v => liM(v), 1],
+  ["P&L", "Occupancy, % of revenue", l => l.pl && l.pl.cur.occupancyPct, liP1, -1],
+  ["P&L", "Result before central costs", l => l.pl && l.pl.cur.ebitda, v => liM(v), 1],
+  ["P&L", "Result before central costs, % of revenue", l => l.pl && l.pl.cur.ebitdaPct, liP1, 1],
+  ["P&L", "Contribution", l => l.pl && l.pl.cur.contribution, v => liM(v), 1],
+  ["P&L", "Contribution, % of revenue", l => l.pl && l.pl.cur.contributionPct, liP1, 1],
+  ["P&L", "Net revenue, year to date", l => l.pl && l.pl.ytd && l.pl.ytd.sales, v => liM(v), 1],
+  ["P&L", "Result before central costs, year to date", l => l.pl && l.pl.ytd && l.pl.ytd.ebitda, v => liM(v), 1],
+  ["Overall", "Open exceptions", l => l.exceptions ? l.exceptions.open : null, liN, -1],
   ["Overall", "Health score", l => l.score, liN, 1],
   ["Overall", "Alerts", l => l.alerts.filter(a => a[0] !== "good").length, liN, -1]
 ];
@@ -505,7 +518,7 @@ function liDrawCmp(){
   for (const [g, lab, fn, fmt, dir, kind] of LI_ROWS) {
     const vals = sel.map(l => { const v = fn(l); return v == null || !isFinite(v) ? null : v; });
     if (vals.every(v => v == null)) continue;
-    if (g !== grp) { body += `<tr class="li-cg"><td colspan="${sel.length + 1}">${g === "P&L" && LI.fin ? `P&amp;L · ${esc(LI.fin.label)} · Business Central` : g}</td></tr>`; grp = g; }
+    if (g !== grp) { body += `<tr class="li-cg"><td colspan="${sel.length + 1}">${g === "P&L" && LI.fin ? `P&amp;L · ${esc(LI.fin.label)} · Business Central${LI.fin.allocation && LI.fin.allocation.approved ? "" : " · Partial: before central costs"}` : g}</td></tr>`; grp = g; }
     const got = vals.filter(v => v != null), mx = Math.max(...got.map(Math.abs)) || 1;
     let best = null;
     if (got.length > 1 && dir) best = dir === "abs" ? Math.min(...got.map(Math.abs)) : dir > 0 ? Math.max(...got) : Math.min(...got);
@@ -546,7 +559,8 @@ function liOpen(ref){
   const p = l.status === "open" ? "cur" : "prev", C = 2 * Math.PI * 26, mine = l.company === LI.company;
   const ringC = l.h === "h-ok" ? "#3fc08c" : l.h === "h-mid" ? "#e0a44a" : l.h === "h-low" ? "#ef6a5c" : "#5c7482";
   const ring = l.score == null ? "" : `<div style="text-align:right;font-size:11px;color:#a0d8ea;line-height:1.3">Health<br>score</div><div class="li-ring"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#2b5a6c" stroke-width="6"/><circle cx="32" cy="32" r="26" fill="none" stroke="${ringC}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C * l.score / 100} ${C}"/></svg><b>${l.score}</b></div>`;
-  const sub = [l.brand, l.area, l.bc && `BC location ${l.bc}`, `Simphony ${l.ref}`, l.company ? `company ${l.company}` : "not in the registry", l.currency !== LI.ccy && l.currency].filter(Boolean).map(esc).join(" · ");
+  const sub = [l.brand, l.area, l.bc && `BC location ${l.bc}`, `Simphony ${l.ref}`, l.company ? `company ${l.company}` : "not in the registry", l.currency !== LI.ccy && l.currency].filter(Boolean).map(esc).join(" · ")
+    + (l.badges || []).map(b => ` <em class="li-badge" title="${esc(b[1])}">${esc(b[0])}</em>`).join("");
   const ops = l.sim ? `<div class="li-panel li-span2"><div class="ttl"><h3>Operations</h3><span class="li-tag">Simphony · ${p === "cur" ? `${LI.curLab}, against ${LI.lyLab} (LY) and ${LI.prevLab}` : `${LI.prevLab}; closed this period`} · click a tile</span></div>
       <div class="li-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">${liSimTiles(l, p)}</div></div>` : "";
   let fin = "", pur = "", inv = "";
@@ -557,7 +571,8 @@ function liOpen(ref){
         ${liTile("Posted in BC", bp ? liM(bp.total) : "–", bp ? `${bp.days_posted} of ${LI.days} days` : "set the POS customer", bp ? "" : "pending")}
         ${liTile("Simphony, same days", liM(l.snet), bp && l.snet ? `posted ${liPct((bp.total / l.snet - 1) * 100)} against it` : "net sales incl. VAT")}
         ${liTile("Sales ex VAT", liM(l.exvat), "Simphony net − tax")}
-        ${liTile("Food cost (estimated)", l.fc != null ? `<span class="${l.fc > LI.th.food_cost + 2 ? "warn" : ""}">${l.fc.toFixed(1)}%</span>` : "–", l.use != null ? `use at cost ${liM(l.use)} · target ${LI.th.food_cost}%` : "item ledger not read", l.fc == null ? "pending" : "")}</div>
+        ${liTile("Food cost (estimated)", l.fc != null ? `<span class="${l.fc > LI.th.food_cost + 2 ? "warn" : ""}">${l.fc.toFixed(1)}%</span>` : "–", l.use != null ? `use at cost ${liM(l.use)} · target ${LI.th.food_cost}%` : "item ledger not read", l.fc == null ? "pending" : "")}
+        ${l.exceptions ? liTile("Open exceptions", `<a href="${opts.links.register}" class="${l.exceptions.critical ? "up" : ""}" style="color:inherit">${liN(l.exceptions.open)}</a>`, `${l.exceptions.critical} critical · ${l.exceptions.overdue} overdue · Exceptions register`) : ""}</div>
       ${l.daily ? `<div style="display:flex;gap:14px;font-size:11.5px;color:var(--sub);margin-bottom:2px;flex-wrap:wrap"><span><span class="li-lg li-c1"></span>Simphony, net sales a day</span>${bp ? `<span><span class="li-lg li-c2"></span>Posted in BC that day</span>` : ""}</div>
       ${liLine(l.daily.net, bp ? bp.daily : null, {label: "Daily sales", w: 760, h: 170, tip: i => `<b>${liDay(LI.dates[i])} ${liMon(LI.dates[i])}</b><br>Simphony ${liN(l.daily.net[i])}${bp ? `<br>BC ${liN(bp.daily[i])}` : ""}`})}` : ""}</div>`;
     if (l.purch) { const mx = Math.max(1, ...l.purch.suppliers.map(s => s[1]));
@@ -589,7 +604,7 @@ function liOpen(ref){
     <div class="body">${ops}
       <div class="li-panel" style="grid-row:span 3"><div class="ttl"><h3>Alerts</h3><span class="li-tag">${al.filter(a => a[0] !== "good").length}</span></div>
         <div class="li-alerts">${al.map(a => `<div class="li-al ${a[0]}"><b>${a[1]}</b>${a[2]}</div>`).join("")}</div>
-        ${l.parts.length ? `<div class="ttl" style="margin-top:16px"><h3>Health score</h3><span class="li-tag">${l.score}/100${l.parts.length < 4 ? ` · ${l.parts.length} of 4 parts` : ""}</span></div>
+        ${l.parts.length ? `<div class="ttl" style="margin-top:16px"><h3>Health score</h3><span class="li-tag">${l.score ?? "–"}/100${l.parts.length < 4 ? ` · ${l.parts.length} of 4 parts` : ""}</span></div>
         <div class="li-bk">${l.parts.map(p => `<span>${p[0]}</span><div class="tr"><i style="width:${p[1] / 25 * 100}%;background:${p[1] >= 18 ? "var(--down)" : p[1] >= 10 ? "var(--warn)" : "var(--up)"}"></i></div><span class="meta">${Math.round(p[1])}/25</span><span></span><span class="meta" style="grid-column:span 2;margin-top:-4px">${esc(p[2])}</span>`).join("")}</div>` : ""}
         <div class="li-links"><a href="${opts.links.sales}">Finance · Sales · Simphony ›</a>${mine && l.bc ? `<a href="${opts.links.typology}">Finance · Typology &amp; turnover ›</a><a href="${opts.links.movement}">Finance · Movement &amp; dead stock ›</a><a href="${opts.links.fsales}">Finance · Fiscal sales vs BC ›</a>` : ""}</div></div>
       ${mine ? liPlPanel(l) : ""}${fin}${pur}${inv}
@@ -680,7 +695,7 @@ window.LocIntel = {
   mount(el, o){
     clearTimeout(liTimer);
     host = el; opts = Object.assign({api: "/finance/api/locations", links: {sales: "/finance/#sales", typology: "/finance/#typology",
-      movement: "/finance/#movement", fsales: "/finance/#fsales"}}, o || {});
+      movement: "/finance/#movement", fsales: "/finance/#fsales", register: "/finance/#register"}}, o || {});
     el.innerHTML = `<div class="li-wrap">${MARKUP}</div>`;
     bind();
     if (liData && liKey === key()) liRender(); else { liData = null; loadLocations(false); }

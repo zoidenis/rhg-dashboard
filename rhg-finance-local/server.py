@@ -39,6 +39,7 @@ import recipients
 import requests
 import cost_report
 import negstock
+import allocation
 import capital
 import dq
 import kpilib
@@ -89,7 +90,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
-                     "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings",
+                     "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -291,6 +292,13 @@ def _dashboard_build(company, anchor, mode, dimension, compare="prior"):
              **{k: v for k, v in settings["accounts"].items() if v}}
     kmap = kpilib.mapping(company)
     pl = finance.profit_and_loss(cur, prev, ly, budget, rules, mapping=kmap)
+    if dimension:
+        # a department alone: only what is posted on it; central costs are not in it (allocation.py)
+        pl["partial"] = True
+        pl["note"] = ("Partial: only what is posted on " + ", ".join(dimension.split(",")) + ". Head office, "
+                      "marketing, IT, the central kitchen and warehouse are on their own departments, so this is a "
+                      "result before central costs, not the EBITDA of the restaurant; its Contribution needs the rule in "
+                      "Settings → Central costs to the restaurants. " + (pl.get("note") or ""))
     bs = finance.balance_sheet(cur, prev, ly, rules, result_rows=cur)
     today = date.today()
     ap = finance.payables(_safe(sources, "Open supplier entries",
@@ -1223,6 +1231,52 @@ def dq_screen(company, anchor, mode, sync=True):
                     "Nothing is written to Business Central."}
 
 
+def allocation_screen(company):
+    """Finance → Settings → Central costs to the restaurants: the rule and what it gives on the latest closed month
+    held by the Executive dashboard (a preview, whatever the status)."""
+    r = allocation.rule(company)
+    today = date.today()
+    cube = executive.assemble(company, today.year, company_currency(company))
+    if not cube.get("cells_held") and today.month == 1:
+        cube = executive.assemble(company, today.year - 1, company_currency(company))
+    acc = cube.get("accounts") or {}
+    month = finloc._closed_month(cube, acc, f"{today:%Y-%m}") if cube.get("cells_held") else None
+    rest = set(cube.get("restaurants") or [])
+    rows, pool, total = [], None, None
+    if month:
+        tot = finloc._agg(cube["actual"], "*", [month], acc)
+        direct, revenue, names = {}, {}, {}
+        for d in cube.get("departments") or []:
+            if d["code"].upper() not in rest:
+                continue
+            x = finloc._agg(cube["actual"], d["code"], [month], acc)
+            if x["n"]:
+                direct[d["code"]], revenue[d["code"]], names[d["code"]] = x["ebitda"], x["sales"], d["name"]
+        preview = dict(r, status="Approved")
+        pool, alloc, contrib = allocation.apply(preview, tot["ebitda"], direct, revenue)
+        sh = allocation.shares(r, revenue)
+        rows = sorted(({"dept": k, "name": names[k], "revenue": revenue[k], "direct": direct[k],
+                        "share": round(sh.get(k, 0.0) * 100, 2), "fixed": (r.get("shares") or {}).get(k.upper()),
+                        "allocated": round(alloc[k]), "contribution": round(contrib[k])} for k in direct),
+                      key=lambda x: -x["revenue"])
+        total = tot["ebitda"]
+        others = [{"dept": d["code"], "name": d["name"], "result": finloc._agg(cube["actual"], d["code"], [month],
+                                                                                acc)["ebitda"]}
+                  for d in cube.get("departments") or [] if d["code"].upper() not in rest]
+    else:
+        others = []
+    return {"company": company, "rule": r, "public": allocation.public(company), "methods": allocation.METHODS,
+            "month": month, "restaurants": rows, "pool": None if pool is None else round(pool),
+            "pool_departments": sorted([o for o in others if abs(o["result"]) >= 1], key=lambda o: o["result"])[:30],
+            "company_ebitda": total, "registry": sorted(rest),
+            "note": "The pool is everything of the company not on a restaurant department of the Location intelligence "
+                    "registry: head office, marketing, IT, the central kitchen and warehouse, and what is posted "
+                    "without a restaurant. Its result is spread over the restaurants by the rule, so the restaurants' "
+                    "Contributions add up to the company EBITDA. Until Finance approves the rule, every restaurant "
+                    "shows its result before central costs, marked Partial, and its Contribution is Content required. "
+                    "The figures here are a preview on the latest closed month the Executive dashboard holds."}
+
+
 def dq_freeze(company, anchor, action, actor):
     c_from, c_to, *_ = periods(anchor, "month")
     period = f"{c_from:%Y-%m}"
@@ -2050,9 +2104,27 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 rights = {"purchases": auth.can(user, "finance.ap.view"),
                           "inventory": auth.can(user, "finance.inventory.view")}
-                self._send(200, locintel.request(client, q.get("company") or config.BC_COMPANY,
-                                                 (c_from, c_to, p_from, p_to, ly_from, ly_to, running, label),
-                                                 _latest, in_parallel_jobs, rights, q.get("refresh") == "1"))
+                res = locintel.request(client, q.get("company") or config.BC_COMPANY,
+                                       (c_from, c_to, p_from, p_to, ly_from, ly_to, running, label),
+                                       _latest, in_parallel_jobs, rights, q.get("refresh") == "1")
+                if isinstance(res, dict) and res.get("locations") and auth.can(user, "finance.s.register"):
+                    # the open items of the Exceptions register on each restaurant (BC location, department or
+                    # Simphony reference), counted now, not held with the read
+                    res = dict(res, locations=[dict(l) for l in res["locations"]], register=True)
+                    allow = register_allow(user)
+                    by_co = {}
+                    for l in res["locations"]:
+                        co = l.get("company") or ""
+                        if not co or (allow and not allow(co, l.get("bc") or "")):
+                            continue
+                        cnt = by_co.setdefault(co, exreg.counts_by_location(co))
+                        keys = {(l.get(k) or "").upper() for k in ("bc", "dept", "ref") if l.get(k)}
+                        tot = {"open": 0, "critical": 0, "overdue": 0, "value": 0.0}
+                        for k in keys:
+                            for f in tot:
+                                tot[f] += (cnt.get(k) or {}).get(f, 0)
+                        l["exceptions"] = dict(tot, value=round(tot["value"]))
+                self._send(200, res)
             elif url.path == "/api/assets/locations":
                 try:
                     period = periods(q.get("period"), q.get("mode") or "month")[:8]
@@ -2167,6 +2239,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, dict(r, companies=salesrec.companies()) if isinstance(r, dict) else r)
             elif url.path == "/api/kpi/mapping":
                 self._send(200, kpi_mapping_screen(q.get("company") or config.BC_COMPANY))
+            elif url.path == "/api/allocation":
+                self._send(200, allocation_screen(q.get("company") or config.BC_COMPANY))
             elif url.path == "/api/register":
                 if not auth.can(user, "finance.s.register"):
                     self._send(403, {"error": "Your role does not include the Exceptions register."})
@@ -2655,6 +2729,20 @@ class Handler(BaseHTTPRequestHandler):
                 with _dash_lock:
                     _dash_cache.clear()
                 self._send(200, kpi_mapping_screen(company))
+            elif url.path == "/api/allocation":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                company = body.get("company") or config.BC_COMPANY
+                try:
+                    allocation.save(company, body.get("method") or "revenue", body.get("shares") or {},
+                                    user.get("name") or actor, body.get("action") or "save", str(body.get("note") or ""))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                with _dash_lock:
+                    _dash_cache.clear()
+                self._send(200, allocation_screen(company))
             elif url.path == "/api/dq/freeze":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

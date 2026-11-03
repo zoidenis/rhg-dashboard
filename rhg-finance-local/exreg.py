@@ -218,6 +218,22 @@ def update(eid, patch, actor):
     return _row(r)
 
 
+def counts_by_location(company):
+    """{LOCATION: {"open", "critical", "overdue", "value"}} of the active items of a company (location upper case)."""
+    today = date.today().isoformat()
+    with _lock:
+        rows = _db().execute("SELECT location, severity, due, value FROM ex WHERE UPPER(company)=? AND status IN (?,?,?)",
+                             (str(company or "").upper(), *ACTIVE)).fetchall()
+    out = {}
+    for loc, sev, due, value in rows:
+        o = out.setdefault(str(loc or "").upper(), {"open": 0, "critical": 0, "overdue": 0, "value": 0.0})
+        o["open"] += 1
+        o["critical"] += sev == "critical"
+        o["overdue"] += bool(due) and due < today
+        o["value"] += abs(value or 0)
+    return out
+
+
 def query(status="active", owner="", source="", company="", location="", q="", allow=None, limit=500):
     """The items of a filter, the counts and the owners' table. allow(company, location) → bool: what a person
     limited to some companies or locations may see; None = everything."""

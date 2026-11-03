@@ -25,8 +25,10 @@ from calendar import monthrange
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
+import allocation
 import finance
 import kpilib
+import locintel
 import simphony
 import store
 from bc_client import BCError
@@ -435,6 +437,8 @@ def assemble(company, year, currency, today=None, departments=None):
                     "approved_by": (m or {}).get("approved_by") or "", "approved_at": (m or {}).get("approved_at") or "",
                     "unmapped": sorted(no for no, b in buckets.items() if b == "unmapped")},
         "kpi_status": "Approved" if (m or {}).get("status") == "Approved" else ("Pilot" if m else "Content required"),
+        # central costs over the restaurants (allocation.py) and which departments are restaurants
+        "allocation": allocation.public(company), "restaurants": locintel.restaurant_depts(company, settings),
         "definitions": DEFINITIONS,
     }
 

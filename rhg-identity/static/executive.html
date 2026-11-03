@@ -1038,14 +1038,34 @@ function liFinance(){
   }
   if (!month) return null;
   const ytd = (S.fin.months || []).filter(k => k.slice(0, 4) === month.slice(0, 4) && k <= month);
-  const pick = t => t && {sales: t.sales, other_income: t.other_income, food: t.food, labor: t.labor, opex: t.opex, da: t.da,
-    prime: t.prime, ebitda: t.ebitda, foodPct: t.foodPct, laborPct: t.laborPct, primePct: t.primePct, opexPct: t.opexPct, ebitdaPct: t.ebitdaPct, n: t.n};
+  // the lines of the KPI library (the same as Finance → P&L): occupancy apart, gross margin = revenue − COGS. For a
+  // restaurant "ebitda" is its result before central costs (Partial); Contribution once the allocation is approved
+  const pick = t => { if (!t) return t; const L = plLines(t), r = t.sales ? v => v / t.sales * 100 : () => null;
+    return {sales: t.sales, other_income: t.other_income, food: t.food, labor: t.labor, opex: t.opex, da: t.da,
+      prime: t.prime, ebitda: t.ebitda, foodPct: t.foodPct, laborPct: t.laborPct, primePct: t.primePct, opexPct: t.opexPct, ebitdaPct: t.ebitdaPct, n: t.n,
+      occupancy: L.occupancy, occupancyPct: r(L.occupancy), gross: t.sales - t.food, grossPct: r(t.sales - t.food), central: null, contribution: null, contributionPct: null}; };
   const codes = new Set(depts().map(d => d.code));
+  const R = S.fin.allocation || {}, rest = new Set((S.fin.restaurants || []).map(x => String(x).toUpperCase()));
+  const restCodes = depts().map(d => d.code).filter(c => rest.has(String(c).toUpperCase()));
+  // central costs over the restaurants: pool = company EBITDA − Σ restaurants' results before central costs
+  const allocate = ks => {
+    const co = actual("*", ks), dir = {}, rev = {};
+    restCodes.forEach(c => { const t = actual(c, ks); if (t.n) { dir[c] = t.ebitda; rev[c] = t.sales; } });
+    const pool = co.ebitda - Object.values(dir).reduce((a, v) => a + v, 0), sh = {};
+    if (R.method === "fixed") Object.entries(R.shares || {}).forEach(([k, v]) => sh[k] = v / 100);
+    else { const tot = Object.values(rev).filter(v => v > 0).reduce((a, v) => a + v, 0); Object.entries(rev).forEach(([k, v]) => sh[String(k).toUpperCase()] = tot && v > 0 ? v / tot : 0); }
+    const out = {}; Object.keys(dir).forEach(c => { const a = pool * (sh[String(c).toUpperCase()] || 0); out[c] = {central: a, contribution: R.approved ? dir[c] + a : null}; });
+    return {pool, out};
+  };
+  const Am = allocate([month]), Ay = allocate(ytd);
+  const withAlloc = (t, A, dept) => { if (!t || !A.out[dept]) return t; const x = A.out[dept];
+    return Object.assign(t, {central: x.central, contribution: x.contribution, contributionPct: x.contribution != null && t.sales ? x.contribution / t.sales * 100 : null}); };
   return {company: F.company, month, label: mlabel(month), ytdLabel: `${mshort(ytd[0])}–${mlabel(month)}`, wanted: want,
     provisional: (S.fin.provisional || []).includes(month), budget: !!(S.fin.budget && S.fin.budget.available), currency: S.fin.currency,
+    allocation: R, restaurants: rest, pool: Am.pool,
     has: dept => codes.has(dept),
-    get: dept => ({cur: pick(actual(dept, [month])), ly: pick(comparison(dept, [month], "ly")), bud: pick(comparison(dept, [month], "budget")),
-                   ytd: pick(actual(dept, ytd)), ytdLy: pick(comparison(dept, ytd, "ly"))}),
+    get: dept => ({cur: withAlloc(pick(actual(dept, [month])), Am, dept), ly: pick(comparison(dept, [month], "ly")), bud: pick(comparison(dept, [month], "budget")),
+                   ytd: withAlloc(pick(actual(dept, ytd)), Ay, dept), ytdLy: pick(comparison(dept, ytd, "ly"))}),
     total: () => ({cur: pick(actual("*", [month])), ly: pick(comparison("*", [month], "ly"))})};
 }
 function viewLocations(){

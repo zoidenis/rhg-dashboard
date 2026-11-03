@@ -121,6 +121,7 @@ td.num,th.num{text-align:right}
 .modal{background:var(--card);border-radius:14px;max-width:1150px;width:100%;padding:20px 22px;border:1px solid var(--line)}
 .mhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
 #dqTable td.st{white-space:nowrap}#dqTable tr.dq-bad td{background:var(--up-bg)}
+.fl-partial{font-style:normal;font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--warn-bg);color:var(--warn);margin-left:4px;white-space:nowrap}
 .lq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:8px}
 .lq-k{border:1px solid var(--line);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .lq-k .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}.lq-k .f{font-size:11.5px;color:var(--sub)}
@@ -180,6 +181,7 @@ td.num,th.num{text-align:right}
 #rgOwners tr.on td{font-weight:700}#rgOwners tr{cursor:pointer}
 @media (max-width:760px){.rg-panel{grid-template-columns:1fr}}
 /* KPI mapping */
+#acCard table input{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:12.5px;width:80px;text-align:right}
 #kmCard table input{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:12.5px;box-sizing:border-box}
 #kmCo{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit}
 /* Simphony ↔ BC */
@@ -518,7 +520,7 @@ td.num,th.num{text-align:right}
         <div class="card-head"><div><h2>Location intelligence</h2>
           <p class="hint" id="flNote">Every location as a square with its finances: the P&amp;L of the latest closed month against last year and the budget, the forecast of the year, the sales of the month against what is posted in BC, payables and receivables. Click a location for the detail. Business Central is read only.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-            <label class="meta" for="flSort">Order</label><select id="flSort"><option value="sales">by sales</option><option value="ebitda">by EBITDA</option><option value="margin">by EBITDA margin</option><option value="budget">by gap to budget</option><option value="prime">by prime cost</option><option value="payables">by payables overdue</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
+            <label class="meta" for="flSort">Order</label><select id="flSort"><option value="sales">by sales</option><option value="ebitda">by result</option><option value="margin">by result margin</option><option value="budget">by gap to budget</option><option value="prime">by prime cost</option><option value="payables">by payables overdue</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
             <button class="mini dark" id="flRead">Read again</button></div></div>
         <p class="meta" id="flStatus" style="margin:6px 0 0"></p>
       </div>
@@ -1339,6 +1341,20 @@ td.num,th.num{text-align:right}
       <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">KPI definitions (the one formula of each indicator)</summary>
         <div class="scroll" style="margin-top:8px"><table id="kmDefs"></table></div></details>
       <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">History of this mapping</summary><div id="kmHist" class="hint" style="margin-top:8px"></div></details>
+    </div>
+    <div class="card" style="margin-bottom:15px" id="acCard">
+      <div class="card-head"><div><h2>Central costs to the restaurants</h2>
+        <p class="hint" id="acNote">The rule that spreads head office, marketing, IT, the central kitchen and warehouse over the restaurants, so a restaurant can show a Contribution.</p></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="acCo"></select><span class="rhg-pill" id="acPill">–</span></div></div>
+      <div class="formgrid"><label class="field">Method<select id="acMethod"><option value="revenue">By net revenue of the period</option><option value="fixed">Fixed percentages</option></select></label></div>
+      <p class="meta" id="acMeta"></p>
+      <div class="scroll" data-nosort><table id="acTable"></table></div>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600" id="acPoolTitle">What is in the pool</summary><div class="scroll" style="margin-top:8px"><table id="acPool"></table></div></details>
+      <div class="formgrid" style="margin-top:12px"><label class="field" style="grid-column:1/-1">Note for the history (who decided, on what basis)<input id="acNoteIn" placeholder="e.g. by net revenue, agreed with the CFO on 5 November"></label></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="acSave">Save (Reviewed)</button><button class="btn" id="acApprove">Approve</button><button class="btn" id="acReset">Back to the proposal</button>
+        <span class="meta" id="acMsg"></span></div>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">History of this rule</summary><div id="acHist" class="hint" style="margin-top:8px"></div></details>
     </div>
     <div class="card" style="margin-bottom:15px" id="spCard">
       <div class="card-head"><div><h2>Simphony sales</h2>
@@ -4619,6 +4635,53 @@ $("kmSave").onclick = () => kmPost("save");
 $("kmApprove").onclick = () => kmPost("approve");
 $("kmReset").onclick = () => kmPost("reset");
 $("kmCo").onchange = () => loadKm();
+
+// ---------- Central costs to the restaurants (allocation.py) ----------
+let acData = null;
+async function loadAc(){
+  const sel = $("acCo");
+  if (!sel.options.length) { sel.innerHTML = [...$("company").options].map(o => `<option>${esc(o.value)}</option>`).join(""); sel.value = $("company").value; }
+  $("acMsg").textContent = "Reading…";
+  try { acData = await readJSON(await fetch("/api/allocation?company=" + encodeURIComponent(sel.value))); renderAc(); $("acMsg").textContent = ""; }
+  catch (e) { $("acMsg").textContent = "Could not read: " + e.message; }
+}
+function renderAc(){
+  const d = acData, r = d.rule, st = r.status || "Proposed", fixed = $("acMethod").dataset.touched ? $("acMethod").value === "fixed" : r.method === "fixed";
+  if (!$("acMethod").dataset.touched) $("acMethod").value = r.method || "revenue";
+  $("acPill").className = "rhg-pill " + (st === "Approved" ? "ok" : "info");
+  $("acPill").textContent = `Rule: ${st}${r.proposal ? " (proposal)" : ""}`;
+  $("acNote").textContent = d.note;
+  $("acMeta").textContent = d.month ? `${d.company} · ${d.month} · company EBITDA ${fmt(d.company_ebitda)} · pool result ${fmt(d.pool)} spread over ${d.restaurants.length} restaurants (preview).` + (st === "Approved" ? ` Approved by ${r.approved_by} on ${String(r.approved_at).slice(0, 10)}${r.note ? ": " + r.note : ""}.` : " Until it is approved, the restaurants show their result before central costs, marked Partial.")
+    : `${d.company}: the Executive dashboard holds no closed month for this company yet, so there is nothing to preview.`;
+  const sum = d.restaurants.reduce((a, x) => a + (fixed ? (+x.fixed || 0) : x.share), 0);
+  $("acTable").innerHTML = d.restaurants.length ? `<tr><th>Restaurant</th><th class="num">Net revenue</th><th class="num">Result before central costs</th><th class="num">Share %</th><th class="num">Share of the central result</th><th class="num">Contribution</th></tr>` +
+    d.restaurants.map(x => `<tr><td class="name">${esc(x.name)} <span class="meta">${esc(x.dept)}</span></td><td class="num">${fmt(x.revenue)}</td><td class="num">${fmt(x.direct)}</td>
+      <td class="num">${fixed ? `<input data-ac="${esc(x.dept)}" value="${x.fixed ?? ""}" inputmode="decimal" aria-label="Share of ${esc(x.name)}">` : fmt(x.share, 1) + "%"}</td>
+      <td class="num">${fixed ? "–" : fmt(x.allocated)}</td><td class="num"><b class="${x.contribution < 0 ? "up" : ""}">${fixed ? "–" : fmt(x.contribution)}</b></td></tr>`).join("") +
+    `<tr class="total"><td>Total</td><td class="num">${fmt(d.restaurants.reduce((a, x) => a + x.revenue, 0))}</td><td class="num">${fmt(d.restaurants.reduce((a, x) => a + x.direct, 0))}</td>
+      <td class="num">${fmt(sum, 1)}%</td><td class="num">${fixed ? "–" : fmt(d.pool)}</td><td class="num">${fixed ? "–" : fmt(d.company_ebitda)}</td></tr>`
+    : `<tr><td class="empty">No restaurant with postings in the latest closed month.</td></tr>`;
+  $("acPoolTitle").textContent = `What is in the pool: departments that are not restaurants (${d.pool_departments.length}) and what has no department`;
+  $("acPool").innerHTML = `<tr><th>Department</th><th class="num">Result</th></tr>` + d.pool_departments.map(o => `<tr><td>${esc(o.dept)} <span class="meta">${esc(o.name)}</span></td><td class="num">${fmt(o.result)}</td></tr>`).join("");
+  $("acHist").innerHTML = (r.history || []).slice().reverse().map(h => `${esc(String(h.at).replace("T", " "))} · ${esc(h.by)} · ${esc(h.action)} · ${esc(h.method)}${h.note ? " · " + esc(h.note) : ""}`).join("<br>") || "No change saved yet.";
+  ["acSave", "acApprove", "acReset"].forEach(id => { $(id).disabled = !can("settings"); $(id).title = can("settings") ? "" : "Your role cannot change settings."; });
+  $("acApprove").textContent = st === "Approved" ? "Approved" : "Approve";
+}
+async function acPost(action){
+  const shares = {}; document.querySelectorAll("[data-ac]").forEach(i => { if (i.value.trim()) shares[i.dataset.ac] = i.value.trim().replace(",", "."); });
+  if (action === "approve" && !$("acNoteIn").value.trim()) { $("acMsg").textContent = "Write who decided the rule in the note before approving."; return; }
+  $("acMsg").textContent = "Saving…";
+  try {
+    acData = await simphonyPost("/api/allocation", {company: $("acCo").value, method: $("acMethod").value, shares, action, note: $("acNoteIn").value});
+    delete $("acMethod").dataset.touched; renderAc(); $("acNoteIn").value = "";
+    $("acMsg").textContent = action === "approve" ? "Approved: the restaurants show their Contribution from the next read." : action === "reset" ? "Back to the proposal." : "Saved as Reviewed. The restaurants stay Partial until the rule is approved.";
+  } catch (e) { $("acMsg").textContent = "Could not save: " + e.message; }
+}
+$("acSave").onclick = () => acPost("save");
+$("acApprove").onclick = () => acPost("approve");
+$("acReset").onclick = () => acPost("reset");
+$("acCo").onchange = () => { delete $("acMethod").dataset.touched; loadAc(); };
+$("acMethod").onchange = () => { $("acMethod").dataset.touched = "1"; if (acData) renderAc(); };
 // ---- Settings: the registry and the limits
 async function liSettings(){
   try{
@@ -4650,7 +4713,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
-  if(b.dataset.view==="settings") { liSettings(); loadKm(); }
+  if(b.dataset.view==="settings") { liSettings(); loadKm(); loadAc(); }
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
@@ -5228,10 +5291,15 @@ async function loadFl(refresh){
   }catch(e){ $("flStatus").textContent = "Could not read: " + e.message; }
   finally{ $("flRead").disabled = false; }
 }
-// food / labour / other costs / EBITDA as shares of sales
+// what the "ebitda" of a location is: the company's EBITDA, a restaurant's result before central costs (Partial
+// until Finance approves the allocation of central costs), or the result of a department that is not a restaurant
+const flWhat = L => !L || L.group === "restaurant" ? "Result before central costs" : "Result";
+const flAlloc = () => (((flData || {}).parts || {}).pl || {}).allocation || {};
+const flApproved = () => !!((flAlloc().rule || {}).approved);
+// food / labour / other costs / result as shares of sales
 function flSplit(cur, cls){
   if (!cur || !cur.sales) return `<div class="${cls}"></div>`;
-  const parts = [["fl-c1", "Food & beverage", cur.food], ["fl-c2", "Labour", cur.labor], ["fl-c3", "Other costs", cur.opex], ["fl-c4", "EBITDA", cur.ebitda]]
+  const parts = [["fl-c1", "Food & beverage", cur.food], ["fl-c2", "Labour", cur.labor], ["fl-c3", "Other costs", cur.opex], ["fl-c4", "Result", cur.ebitda]]
     .map(p => [p[0], p[1], Math.max(0, p[2] || 0)]);
   return `<div class="${cls}" role="img" aria-label="${parts.map(p => `${p[1]} ${Math.round(p[2] / cur.sales * 100)}%`).join(", ")}">` +
     parts.filter(p => p[2] > 0).map(p => `<i class="${p[0]}" style="flex:${p[2]}" title="${p[1]}: ${flM(p[2])} (${Math.round(p[2] / cur.sales * 100)}% of sales)"></i>`).join("") + `</div>`;
@@ -5262,10 +5330,11 @@ function flSquare(code, L){
     : s.net != null ? `<span class="v">${flM(s.net)}</span><span class="cmp">Simphony, month to date</span>` : `<span class="v">–</span><span class="cmp">&nbsp;</span>`;
   const fy = (p.forecast || {}).ebitda, fyb = (p.fy_bud || {}).ebitda;
   return `<div class="pl-sq" role="button" tabindex="0" data-flloc="${esc(code)}" aria-label="${esc(L.name || code)}: finances in detail">
-    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "Not on a location")}</b><span>${esc(L.name && L.name !== code ? code : "")}</span></div></div>
+    <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(L.name || code || "Not on a location")}</b><span>${esc(L.name && L.name !== code ? code : "")}${L.group === "restaurant" && p.cur && !flApproved() ? ` <em class="fl-partial" title="Result before central costs: head office, marketing, IT, central kitchen and warehouse are not spread over the restaurants until Finance approves the rule">Partial</em>` : ""}</span></div></div>
     <div class="big">${big}</div>
     ${flSplit(c, "fl-split")}
-    <div class="st">${stat("EBITDA", c.ebitda != null && p.cur ? `${flM(c.ebitda)}${c.ebitda_pct != null ? `<small>${fmt(c.ebitda_pct, 0)}%</small>` : ""}` : "–", c.ebitda < 0 ? "up" : "")}
+    <div class="st">${c.contribution != null ? stat("Contribution", `${flM(c.contribution)}${c.contribution_pct != null ? `<small>${fmt(c.contribution_pct, 0)}%</small>` : ""}`, c.contribution < 0 ? "up" : "", `Share of the central result ${flM(c.central)}; before it ${flM(c.ebitda)}`)
+      : stat(L.group === "restaurant" ? "Before central" : "Result", c.ebitda != null && p.cur ? `${flM(c.ebitda)}${c.ebitda_pct != null ? `<small>${fmt(c.ebitda_pct, 0)}%</small>` : ""}` : "–", c.ebitda < 0 ? "up" : "", flWhat(L))}
       ${stat("Prime cost", c.prime_pct != null ? fmt(c.prime_pct, 0) + "%" : "–", c.prime_pct > th.prime ? "up" : c.food_pct > th.food_cost ? "warn" : "", "Food and labour as a share of sales")}
       ${stat("vs budget", vb != null ? flPct(vb) : "–", vb == null ? "" : vb < -th.budget_gap ? "up" : vb < 0 ? "warn" : "", b ? `Budget ${flM(b.ebitda)}` : "No budget on this department")}
       ${stat("Forecast FY", fy != null ? flM(fy) : "–", fyb != null && fy < fyb ? "warn" : "", `EBITDA of the year: ${(p.forecast || {}).method || ""}${fyb != null ? ` · budget ${flM(fyb)}` : ""}`)}
@@ -5306,7 +5375,7 @@ function flRender(){
       <div class="pl-grid">${sorted(g.c).map(c => flSquare(c, B[c])).join("")}</div>`; }).join("")
     : `<p class="hint">${d.pending ? "The first read of a year takes a few minutes; the squares appear as the parts arrive." : "Nothing to show for this company."}</p>`;
   $("flDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
-    `<p style="margin:0">Alerts: EBITDA negative; EBITDA more than ${fmt(th.budget_gap)}% under budget; prime cost over ${fmt(th.prime)}% of sales (or food cost over ${fmt(th.food_cost)}%); days of sales not posted in BC, or posted sales more than ${fmt(th.posting_gap)}% away from Simphony; more than ${fmt(th.overdue_60)}% of payables overdue beyond 60 days; receivables overdue beyond 60 days. The limits are in Settings → Location intelligence.</p>`;
+    `<p style="margin:0">Alerts: result (or Contribution) negative; result more than ${fmt(th.budget_gap)}% under budget; prime cost over ${fmt(th.prime)}% of sales (or food cost over ${fmt(th.food_cost)}%); days of sales not posted in BC, or posted sales more than ${fmt(th.posting_gap)}% away from Simphony; more than ${fmt(th.overdue_60)}% of payables overdue beyond 60 days; receivables overdue beyond 60 days. The limits are in Settings → Location intelligence.</p>`;
   if ($("flBd").classList.contains("show") && $("flPop").dataset.code != null) flDraw($("flPop").dataset.code);
 }
 // ---- the popup
@@ -5319,12 +5388,13 @@ function flDraw(code){
   const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
   const rows = (arr, head, fn, empty) => arr && arr.length ? `<table><tr>${head}</tr>${arr.map(fn).join("")}</table>` : `<p class="hint">${empty}</p>`;
   const wait = k => (P[k] || {}).state === "pending" ? `Still being read: ${esc((P[k] || {}).note || "")}` : (P[k] || {}).state === "hidden" ? esc((P[k] || {}).note || "") : "";
-  const costUp = k => k !== "sales" && k !== "ebitda";
+  const costUp = k => !["sales", "ebitda", "gross", "contribution"].includes(k);
   const vcell = (a, z, k) => { const v = flVar(a, z); if (v == null) return `<td class="num meta">–</td>`; const bad = costUp(k) ? v > 0 : v < 0;
     return `<td class="num ${Math.abs(v) < 0.5 ? "" : bad ? "fl-bad" : "fl-good"}">${flPct(v)}</td>`; };
-  const lines = [["sales", "Sales"], ["food", "Food & beverage cost"], ["labor", "Labour"], ["prime", "Prime cost"], ["opex", "Other costs"], ["ebitda", "EBITDA"]];
+  const lines = [["sales", "Sales"], ["food", "Food & beverage cost"], ["gross", "Gross margin"], ["labor", "Labour"], ["prime", "Prime cost"], ["occupancy", "Occupancy"], ["opex", "Other costs, occupancy included"], ["ebitda", flWhat(L)]]
+    .concat(c.contribution != null ? [["central", "Share of the central result"], ["contribution", "Contribution"]] : []);
   const plTable = p.cur ? `<table class="fl-tab" data-nosort><tr><th></th><th class="num">${esc(flMonS(mon))}</th><th class="num">% sales</th><th class="num">Last year</th><th class="num">vs LY</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">YTD</th><th class="num">YTD LY</th><th class="num">YTD budget</th></tr>` +
-    lines.map(([k, l]) => `<tr${k === "ebitda" || k === "prime" ? ` style="font-weight:700"` : ""}><td>${l}</td><td class="num ${k === "ebitda" && c[k] < 0 ? "fl-bad" : ""}">${flM(c[k])}</td><td class="num meta">${k === "sales" ? "100%" : c[k + "_pct"] != null ? fmt(c[k + "_pct"], 1) + "%" : "–"}</td>
+    lines.map(([k, l]) => `<tr${k === "ebitda" || k === "prime" || k === "contribution" ? ` style="font-weight:700"` : ""}><td>${l}</td><td class="num ${(k === "ebitda" || k === "contribution") && c[k] < 0 ? "fl-bad" : ""}">${flM(c[k])}</td><td class="num meta">${k === "sales" ? "100%" : c[k + "_pct"] != null ? fmt(c[k + "_pct"], 1) + "%" : "–"}</td>
       <td class="num meta">${flM(ly[k])}</td>${vcell(c[k], ly[k], k)}<td class="num meta">${b ? flM(b[k]) : "–"}</td>${b ? vcell(c[k], b[k], k) : `<td class="num meta">–</td>`}
       <td class="num">${flM(y[k])}</td><td class="num meta">${flM(yly[k])}</td><td class="num meta">${yb ? flM(yb[k]) : "–"}</td></tr>`).join("") + `</table>`
     : `<p class="hint">${wait("pl") || "No P&L on this department in the year."}</p>`;
@@ -5338,7 +5408,7 @@ function flDraw(code){
     tr.forEach((t, i) => {
       const x = 40 + i * gw + gw / 2, h = v => Math.max(0, v || 0) / max * H;
       chart += `<rect x="${x - bw - 1}" y="${H - h(t[3])}" width="${bw}" height="${h(t[3])}" rx="3" fill="var(--prev)"><title>${esc(flMon(t[0]))} last year: ${fmt(t[3])}</title></rect>`;
-      chart += `<rect x="${x + 1}" y="${H - h(t[1])}" width="${bw}" height="${h(t[1])}" rx="3" fill="var(--data-cur)" opacity="${t[5] ? 0.45 : 1}"><title>${esc(flMon(t[0]))}${t[5] ? " (running, to yesterday)" : ""}: sales ${fmt(t[1])}, EBITDA ${fmt(t[2])}</title></rect>`;
+      chart += `<rect x="${x + 1}" y="${H - h(t[1])}" width="${bw}" height="${h(t[1])}" rx="3" fill="var(--data-cur)" opacity="${t[5] ? 0.45 : 1}"><title>${esc(flMon(t[0]))}${t[5] ? " (running, to yesterday)" : ""}: sales ${fmt(t[1])}, ${esc(flWhat(L).toLowerCase())} ${fmt(t[2])}</title></rect>`;
       if (t[4]) chart += `<line x1="${x - bw - 3}" x2="${x + bw + 3}" y1="${H - h(t[4])}" y2="${H - h(t[4])}" stroke="var(--data-3)" stroke-width="2"><title>${esc(flMon(t[0]))} budget: ${fmt(t[4])}</title></line>`;
       chart += `<text x="${x}" y="${H + 16}" text-anchor="middle" font-size="11" fill="var(--sub)">${esc(flMonS(t[0]))}</text>`;
     });
@@ -5366,21 +5436,23 @@ function flDraw(code){
       ${(L.alerts || []).length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="pl-ex">${L.alerts.map(a => `<div><span class="pl-sev ${a[0]}"></span>${esc(a[1])}</div>`).join("")}</div></div>` : ""}
       <div class="pl-tiles">
         ${tile(`Sales · ${esc(flMonS(mon))}`, p.cur ? flM(c.sales) : "–", p.cur ? `${C} · ${flPct(flVar(c.sales, ly.sales))} vs LY${b ? ` · ${flPct(flVar(c.sales, b.sales))} vs budget` : ""}` : wait("pl"))}
-        ${tile("EBITDA", p.cur ? flM(c.ebitda) : "–", p.cur ? `${fmt(c.ebitda_pct, 1)}% · LY ${flM(ly.ebitda)}${b ? ` · budget ${flM(b.ebitda)}` : ""}` : "", c.ebitda < 0 ? "up" : "")}
+        ${tile(flWhat(L) + (L.group === "restaurant" && !flApproved() ? ` <em class="fl-partial">Partial</em>` : ""), p.cur ? flM(c.ebitda) : "–", p.cur ? `${fmt(c.ebitda_pct, 1)}% · LY ${flM(ly.ebitda)}${b ? ` · budget ${flM(b.ebitda)}` : ""}` : "", c.ebitda < 0 ? "up" : "")}
+        ${L.group === "restaurant" ? tile("Contribution", c.contribution != null ? flM(c.contribution) : "–", c.contribution != null ? `${fmt(c.contribution_pct, 1)}% · share of the central result ${flM(c.central)} (${esc((flAlloc().rule || {}).method_label || "")})` : "Content required: Finance approves the rule in Settings → Central costs to the restaurants", c.contribution < 0 ? "up" : c.contribution == null ? "warn" : "") : ""}
+        ${tile("Gross margin", c.gross_pct != null ? fmt(c.gross_pct, 1) + "%" : "–", c.gross != null ? `${flM(c.gross)} · sales − food &amp; beverage cost` : "")}
         ${tile("Prime cost", c.prime_pct != null ? fmt(c.prime_pct, 1) + "%" : "–", c.prime_pct != null ? `food ${fmt(c.food_pct, 1)}% · labour ${fmt(c.labor_pct, 1)}%` : "", c.prime_pct > th.prime ? "up" : "")}
-        ${tile(`Year to date · ${esc(flMonS(p.ytd ? (P.pl || {}).ytd_from : ""))}–${esc(flMonS(mon))}`, p.ytd ? flM(y.ebitda) : "–", p.ytd ? `EBITDA · sales ${flM(y.sales)} (${flPct(flVar(y.sales, yly.sales))} vs LY)` : "")}
-        ${tile(`Forecast ${mon ? mon.slice(0, 4) : ""}`, fc.ebitda != null ? flM(fc.ebitda) : "–", fc.ebitda != null ? `EBITDA${fy ? ` · budget ${flM(fy.ebitda)}` : " · no budget"} · sales ${flM(fc.sales)}` : "", fy && fc.ebitda < fy.ebitda ? "warn" : "")}
+        ${tile(`Year to date · ${esc(flMonS(p.ytd ? (P.pl || {}).ytd_from : ""))}–${esc(flMonS(mon))}`, p.ytd ? flM(y.contribution ?? y.ebitda) : "–", p.ytd ? `${y.contribution != null ? "Contribution" : esc(flWhat(L))} · sales ${flM(y.sales)} (${flPct(flVar(y.sales, yly.sales))} vs LY)` : "")}
+        ${tile(`Forecast ${mon ? mon.slice(0, 4) : ""}`, fc.ebitda != null ? flM(fc.ebitda) : "–", fc.ebitda != null ? `${esc(flWhat(L))}${fy ? ` · budget ${flM(fy.ebitda)}` : " · no budget"} · sales ${flM(fc.sales)}` : "", fy && fc.ebitda < fy.ebitda ? "warn" : "")}
         ${tile("Sales to date", s.net != null ? flM(s.net) : "–", s.net != null ? `Simphony · ${flPct(flVar(s.net, s.ly))} vs LY · ${fmt(s.checks || 0)} checks${s.avg_check ? ` · ${fmt(s.avg_check)} avg` : ""}` : wait("sales") || "No Simphony location for this department")}
         ${tile("Posted in BC", s.posted != null ? flM(s.posted) : "–", s.posted != null ? `${s.gap_pct != null ? flPct(-s.gap_pct) + " vs Simphony" : ""}${s.unposted_n ? ` · ${s.unposted_n} days not posted` : ""}` : "", s.unposted_n ? "warn" : "")}
         ${tile("Payables · receivables", ap.open != null || ar.open != null ? `${flM(ap.open)} · ${flM(ar.open)}` : "–", ap.open != null ? `overdue ${flM(ap.overdue)} (>60 d ${flM(ap.overdue_60)}) · purchases ${flM(ap.purchases)}` : wait("ledgers"), ap.overdue_60 > 0 ? "warn" : "")}
       </div>
       <div class="pl-cols">
         <div class="pl-panel pl-span2"><div class="ttl"><h3>P&amp;L · ${esc(flMon(mon) || "")}</h3><span class="hint" style="margin:0">${(P.pl || {}).budget ? esc((P.pl || {}).budget_name || "budget") : "no budget loaded"}</span></div>
-          ${flSplit(c, "fl-split big")}<div class="il-lg" style="margin-bottom:8px"><span><i class="fl-c1"></i>Food &amp; beverage</span><span><i class="fl-c2"></i>Labour</span><span><i class="fl-c3"></i>Other costs</span><span><i class="fl-c4"></i>EBITDA</span></div>
+          ${flSplit(c, "fl-split big")}<div class="il-lg" style="margin-bottom:8px"><span><i class="fl-c1"></i>Food &amp; beverage</span><span><i class="fl-c2"></i>Labour</span><span><i class="fl-c3"></i>Other costs</span><span><i class="fl-c4"></i>${esc(flWhat(L))}</span></div>
           <div class="scroll">${plTable}</div></div>
         <div class="pl-panel pl-span2"><div class="ttl"><h3>Sales by month</h3><span class="hint" style="margin:0">this year <i class="pl-sw" style="background:var(--data-cur)"></i> · last year <i class="pl-sw" style="background:var(--prev)"></i> · budget <i class="pl-sw" style="background:var(--data-3);height:3px;vertical-align:3px"></i></span></div>${chart || `<p class="hint">${wait("pl") || "No months held."}</p>`}</div>
         <div class="pl-panel"><div class="ttl"><h3>Budget and forecast ${esc(mon ? mon.slice(0, 4) : "")}</h3></div>
-          ${p.ytd ? `<table class="fl-tab"><tr><th></th><th class="num">YTD</th><th class="num">YTD budget</th><th class="num">Budget year</th><th class="num">Forecast</th><th class="num">vs budget</th></tr>${fyRow("Sales", "sales")}${fyRow("EBITDA", "ebitda")}</table><p class="hint" style="margin:8px 0 0">Forecast: ${esc(fc.method || "")}.</p>` : `<p class="hint">${wait("pl") || "No P&L on this department."}</p>`}</div>
+          ${p.ytd ? `<table class="fl-tab"><tr><th></th><th class="num">YTD</th><th class="num">YTD budget</th><th class="num">Budget year</th><th class="num">Forecast</th><th class="num">vs budget</th></tr>${fyRow("Sales", "sales")}${fyRow(flWhat(L), "ebitda")}</table><p class="hint" style="margin:8px 0 0">Forecast: ${esc(fc.method || "")}.</p>` : `<p class="hint">${wait("pl") || "No P&L on this department."}</p>`}</div>
         <div class="pl-panel"><div class="ttl"><h3>Sales this month, by day</h3><span class="hint" style="margin:0">Simphony <i class="pl-sw" style="background:var(--data-cur)"></i> · not posted <i class="pl-sw" style="background:var(--warn)"></i> · BC ○</span></div>${daily || `<p class="hint">${wait("sales") || "No Simphony sales for this department."}</p>`}
           ${s.unposted && s.unposted.length ? `<div class="fl-days">${s.unposted.map(x => `<span>${esc(x)}</span>`).join("")}${s.unposted_n > s.unposted.length ? `<span>+${s.unposted_n - s.unposted.length}</span>` : ""}</div>` : ""}</div>
         <div class="pl-panel"><div class="ttl"><h3>Payables</h3><span class="hint" style="margin:0">open, largest suppliers</span></div>${rows(ap.top, `<th>Supplier</th><th class="num">Open</th>`, x => `<tr><td>${esc(x[0])}</td><td class="num">${flM(x[1])}</td></tr>`, wait("ledgers") || "No open supplier entry on this department.")}

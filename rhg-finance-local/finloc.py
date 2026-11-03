@@ -16,6 +16,7 @@ import time
 import traceback
 from datetime import date, timedelta
 
+import allocation
 import executive
 import locintel
 import store
@@ -44,7 +45,10 @@ def thresholds(settings=None):
 
 # ---------------------------------------------------------------- the P&L cube
 def _agg(src, dept, keys, accounts, scale=None):
-    t = dict.fromkeys(BUCKETS, 0.0)
+    """The P&L of a department over months, with the KPI library's lines: sales = net revenue, food = cost of goods
+    sold, opex = occupancy + other operating costs (occupancy also apart). For a restaurant, "ebitda" is its result
+    before central costs (only what is posted on its department); for the whole company ("*") it is the EBITDA."""
+    t = dict.fromkeys(BUCKETS + ("occupancy",), 0.0)
     n = 0
     for k in keys:
         cell = ((src or {}).get(dept) or {}).get(k)
@@ -57,19 +61,45 @@ def _agg(src, dept, keys, accounts, scale=None):
             b = a[1] if a else ("other_income" if str(no).startswith("7") else "opex")
             if b in t:
                 t[b] += v * f
+            if a and len(a) > 2 and a[2] == "occupancy":
+                t["occupancy"] += v * f
     return _derive(t, n)
 
 
 def _derive(t, n):
     t["labor"] = t["labor_kitchen"] + t["labor_service"] + t["labor_management"] + t["labor_other"]
     t["prime"] = t["food"] + t["labor"]
+    t["gross"] = t["sales"] - t["food"]
     t["ebitda"] = t["sales"] + t["other_income"] - t["food"] - t["labor"] - t["opex"]
     s = t["sales"]
-    out = {k: round(t[k]) for k in ("sales", "other_income", "food", "labor", "opex", "da", "prime", "ebitda")}
-    for k in ("food", "labor", "prime", "opex", "ebitda"):
+    out = {k: round(t[k]) for k in ("sales", "other_income", "food", "labor", "opex", "occupancy", "da", "prime",
+                                    "gross", "ebitda")}
+    for k in ("food", "labor", "prime", "opex", "occupancy", "gross", "ebitda"):
         out[k + "_pct"] = round(t[k] / s * 100, 1) if s else None
     out["n"] = n
     return out
+
+
+def _allocate(out, company, restaurants):
+    """Central costs over the restaurants (allocation.py): every restaurant's P&L of the month and of the year to
+    date gets "central" (its share of the pool) and, once Finance has approved the rule, "contribution"."""
+    r = allocation.rule(company)
+    info = {"rule": allocation.public(company), "pool": {}}
+    rest = [d for d in out if d != "*" and d.upper() in restaurants]
+    for part in ("cur", "ytd"):
+        tot = (out.get("*") or {}).get(part)
+        if not tot:
+            continue
+        direct = {d: out[d][part]["ebitda"] for d in rest if out[d].get(part)}
+        revenue = {d: out[d][part]["sales"] for d in rest if out[d].get(part)}
+        pool, alloc, contrib = allocation.apply(r, tot["ebitda"], direct, revenue)
+        info["pool"][part] = round(pool)
+        for d in direct:
+            x = out[d][part]
+            x["central"] = round(alloc[d])
+            x["contribution"] = round(contrib[d]) if d in contrib else None
+            x["contribution_pct"] = round(contrib[d] / x["sales"] * 100, 1) if d in contrib and x["sales"] else None
+    return info
 
 
 def _shift(key, months):
@@ -146,7 +176,8 @@ def _pl(cube, wanted):
                   "ytd_bud": b_ytd if b_ytd and b_ytd["n"] else None,
                   "fy_bud": b_fy if b_fy and b_fy["n"] else None, "forecast": fc, "trend": trend}
     meta = {"month": month, "ytd_from": ytd[0], "provisional": month in (cube.get("provisional") or []),
-            "budget": bool(bcells), "budget_name": bud.get("name")}
+            "budget": bool(bcells), "budget_name": bud.get("name"),
+            "allocation": _allocate(out, cube.get("company") or "", set(cube.get("restaurants") or []))}
     return out, meta
 
 
@@ -358,11 +389,14 @@ def build(client, company, period, currency, latest_fn, parallel_fn, rights, ref
         al = []
         p = (L.get("pl") or {})
         cur, bud = p.get("cur") or {}, p.get("bud") or {}
-        if cur.get("ebitda") is not None and cur.get("sales") and cur["ebitda"] < 0:
-            al.append(["crit", "EBITDA negative in the month"])
+        what = "Result before central costs" if L.get("group") == "restaurant" else "Result"
+        if cur.get("contribution") is not None and cur.get("sales") and cur["contribution"] < 0:
+            al.append(["crit", "Contribution negative in the month"])
+        elif cur.get("ebitda") is not None and cur.get("sales") and cur["ebitda"] < 0:
+            al.append(["crit", f"{what} negative in the month"])
         if bud and bud.get("ebitda") and cur.get("ebitda") is not None and \
                 cur["ebitda"] < bud["ebitda"] - abs(bud["ebitda"]) * th["budget_gap"] / 100:
-            al.append(["warn", f"EBITDA {round((cur['ebitda'] - bud['ebitda']) / abs(bud['ebitda']) * 100)}% against budget"])
+            al.append(["warn", f"{what} {round((cur['ebitda'] - bud['ebitda']) / abs(bud['ebitda']) * 100)}% against budget"])
         if cur.get("prime_pct") and cur["prime_pct"] > th["prime"]:
             al.append(["warn", f"Prime cost {cur['prime_pct']:.0f}% of sales"])
         elif cur.get("food_pct") and cur["food_pct"] > th["food_cost"]:
@@ -388,8 +422,13 @@ def build(client, company, period, currency, latest_fn, parallel_fn, rights, ref
 
 DEFINITIONS = {
     "pl": "P&L of the latest closed month up to the month chosen: the latest with sales, food cost and payroll "
-          "posted (the running month has neither). Sales, food & beverage cost, labour, other costs and EBITDA "
-          "by department, as on the Executive dashboard; prime cost = food + labour.",
+          "posted (the running month has neither), by department, with the lines of the KPI mapping (Finance → "
+          "Settings → KPI mapping), as on the Executive dashboard and the Finance P&L: sales = net revenue, food & "
+          "beverage = cost of goods sold, gross margin = sales − cost of goods sold, prime cost = cost of goods sold "
+          "+ labour, other costs include occupancy. A restaurant shows its result before central costs: only what "
+          "is posted on its department, so it is Partial. Its Contribution (after its share of head office, "
+          "marketing, IT, central kitchen and warehouse) is shown once Finance approves the rule in Settings → "
+          "Central costs to the restaurants; the Contributions then add up to the company EBITDA.",
     "budget": "Budget = the G/L budget of the year placed on the department through its dimension set. Forecast "
               "of the year = actual to date + the budget of the months left, or, without a budget on the "
               "department, the average of its last three closed months for each month left.",
