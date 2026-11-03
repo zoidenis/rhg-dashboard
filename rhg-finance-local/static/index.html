@@ -166,6 +166,9 @@ td.num,th.num{text-align:right}
 .rg-hist li{padding:5px 0;border-bottom:1px solid var(--line)}.rg-hist li b{font-weight:600}
 #rgOwners tr.on td{font-weight:700}#rgOwners tr{cursor:pointer}
 @media (max-width:760px){.rg-panel{grid-template-columns:1fr}}
+/* KPI mapping */
+#kmCard table input{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:12.5px;box-sizing:border-box}
+#kmCo{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit}
 /* Simphony ↔ BC */
 #sxKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 #sxGrid{border-collapse:separate;border-spacing:3px}
@@ -1267,6 +1270,24 @@ td.num,th.num{text-align:right}
       <div class="formgrid" id="ownerForm"></div>
       <div class="formgrid" id="extraForm"></div>
       <button class="btn dark" id="saveSettings">Save</button> <span class="meta" id="saved"></span></div>
+    <div class="card" style="margin-bottom:15px" id="kmCard">
+      <div class="card-head"><div><h2>KPI library and account mapping</h2>
+        <p class="hint">One mapping per company, account number to reporting line, for every screen: the Executive dashboard, the P&amp;L, the Group view, the P&amp;L memo and Unicorn. An exact number wins over a prefix (641*), a longer prefix over a shorter one. Business Central's Account Category is not used. KPIs stay Pilot until the mapping is approved.</p></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="kmCo"></select><span class="rhg-pill" id="kmPill">–</span></div></div>
+      <div class="kpis five" id="kmChecks"></div>
+      <p class="meta" id="kmMeta"></p>
+      <h3 style="font-size:14px;margin:6px 0">Income statement (year to date)</h3><div class="scroll" data-nosort><table id="kmPl"></table></div>
+      <h3 style="font-size:14px;margin:14px 0 6px">Balance sheet (today)</h3><div class="scroll" data-nosort><table id="kmBs"></table></div>
+      <h3 style="font-size:14px;margin:14px 0 6px" id="kmUnTitle">Accounts not mapped</h3>
+      <div class="scroll"><table id="kmUn"></table></div>
+      <div class="formgrid" style="margin-top:12px"><label class="field" style="grid-column:1/-1">Note for the history (what changed, who agreed)<input id="kmNote" placeholder="e.g. 761 moved to COGS as agreed with the CFO"></label></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="kmSave">Save (Reviewed)</button><button class="btn" id="kmApprove">Approve</button><button class="btn" id="kmReset">Back to the proposal</button>
+        <span class="meta" id="kmMsg"></span></div>
+      <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">KPI definitions (the one formula of each indicator)</summary>
+        <div class="scroll" style="margin-top:8px"><table id="kmDefs"></table></div></details>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">History of this mapping</summary><div id="kmHist" class="hint" style="margin-top:8px"></div></details>
+    </div>
     <div class="card" style="margin-bottom:15px" id="spCard">
       <div class="card-head"><div><h2>Simphony sales</h2>
         <p class="hint">The Business Intelligence API account from Reporting and Analytics (Administration → System → API Accounts). Read-only. The password stays on the server and expires every 60 days in Simphony.</p></div>
@@ -1762,7 +1783,7 @@ function renderBrief(){
 }
 
 function statementRows(lines){
-  return lines.map(l=>`<tr class="${["Gross profit","EBITDA","EBIT"].includes(l.label)?"total":""}">
+  return lines.map(l=>`<tr class="${l.total || ["Gross profit","EBITDA","EBIT"].includes(l.label)?"total":""}">
     <td class="name">${esc(l.label)}</td><td class="num">${fmt(l.current)}</td>
     <td class="num">${l.previous==null?"–":fmt(l.previous)}</td><td class="num">${pctChip(l.vs_previous_pct)}</td>
     <td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td><td class="num">${pctChip(l.vs_last_year_pct)}</td>
@@ -1783,13 +1804,16 @@ function renderPL(){
     : hidden.has(l.label) ? (l.label === "Gross profit" ? "Hidden" : "Review pending") : pending(l) ? "Review pending" : fmt(l.current);
   $("plSumTitle").textContent = `P&L summary · ${data.meta.currency}`;
   $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th><th class="num">${data.meta.compare === "last_year" ? "Comparison" : "Prior"}</th><th class="num">Last year</th><th class="num">Budget</th><th class="num">Variance %${anyBudget?" vs budget":""}</th></tr>` +
-    pl.statement.map(l=>`<tr class="${l.label==="EBIT"?"total":""}"><td class="name">${esc(l.label)}</td>
+    pl.statement.map(l=>`<tr class="${l.total || l.label==="EBIT"?"total":""}"><td class="name">${esc(l.label)}</td>
       <td class="num">${curCell(l)}</td><td class="num">${l.previous==null?"–":fmt(l.previous)}</td>
       <td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td><td class="num">${l.budget?fmt(l.budget):"–"}</td>
       <td class="num">${hidden.has(l.label)||pending(l)||varOf(l)==null||(l.label==="Cost of goods sold"&&credit)?"—":(varOf(l)>0?"+":varOf(l)<0?"−":"")+fmt(Math.abs(varOf(l)),1)+"%"}</td></tr>`).join("");
   const by = pl.classified_by || {};
-  const fallbackCount = Object.entries(by).filter(([k])=>k!=="Account Category").reduce((a,[,v])=>a+v,0);
-  $("plNote").textContent = pl.note + (fallbackCount
+  const fallbackCount = pl.library ? 0 : Object.entries(by).filter(([k])=>k!=="Account Category").reduce((a,[,v])=>a+v,0);
+  const mp = pl.mapping;
+  $("plNote").textContent = (mp ? `KPI mapping: ${mp.status}${mp.approved_by ? ` by ${mp.approved_by}, ${String(mp.approved_at).slice(0, 10)}` : ""} · KPI status ${mp.status === "Approved" ? "Approved" : mp.status === "Content required" ? "Content required" : "Pilot"}`
+      + ((pl.unmapped || []).filter(u => u.value).length ? ` · ${(pl.unmapped || []).filter(u => u.value).length} accounts with postings not mapped (net profit check ${fmt(pl.check)})` : "") + ". " : "")
+    + pl.note + (fallbackCount
     ? ` ${fmt(fallbackCount)} of these accounts have no Account Category in BC, so the account number classified them (${Object.entries(by).map(([k,v])=>`${k}: ${v}`).join(", ")}).`
     : "");
   $("plAccounts").innerHTML = `<tr><th>Account</th><th>Name</th><th>Category</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Last year</th><th class="num">Budget</th></tr>` +
@@ -1999,17 +2023,14 @@ function renderSettings(){
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
-    <label class="field">Exchange rates<input id="gr-rates" value="${esc((s.group||{}).rates||"")}" placeholder="EUR=100"></label>
-    <label class="field">Rate source note<input id="gr-note" value="${esc((s.group||{}).rate_note||"")}" placeholder="e.g. BoA rate, 30 Sept"></label>
+    <input type="hidden" id="gr-rates" value=""><input type="hidden" id="gr-note" value="">
+    <p class="hint" style="grid-column:1/-1;margin:0">Exchange rates are not typed here: the EUR rate will be read from Business Central (Currency Exchange Rates), as Finance decided. Until then the Group view leaves the EUR companies out.</p>
     <label class="field">Income account prefixes<input id="ac-inc" value="${esc((s.accounts||{}).income_prefixes||"")}" placeholder="7"></label>
     <label class="field">Cost-of-goods prefixes<input id="ac-cogs" value="${esc((s.accounts||{}).cogs_prefixes||"")}" placeholder="60"></label>
     <label class="field">Expense prefixes<input id="ac-exp" value="${esc((s.accounts||{}).expense_prefixes||"")}" placeholder="6"></label>
     <label class="field">Equity prefixes<input id="ac-eq" value="${esc((s.accounts||{}).equity_prefixes||"")}" placeholder="1"></label>
-    <label class="field">Executive dashboard · sales accounts<input id="ex-sales" value="${esc((s.executive||{}).sales||"")}" placeholder="70*, 76"></label>
-    <label class="field">Executive dashboard · labour accounts<input id="ex-labor" value="${esc((s.executive||{}).labor||"")}" placeholder="641*, 644*, 648*"></label>
-    <label class="field" style="grid-column:1/-1">Executive dashboard · food cost accounts (COGS)<input id="ex-food" value="${esc((s.executive||{}).food||"")}" placeholder="6011, 60111, 6012, 60121, 6013, 60122, 60123, 601231, 602, 6027, 60271, 6034, 605, 6051, 6581"></label>
-    <label class="field" style="grid-column:1/-1">Executive dashboard · below EBITDA (interest, exchange, tax)<input id="ex-below" value="${esc((s.executive||{}).below||"")}" placeholder="667, 668, 669*, 69, 727, 769*, 77"></label>
-    <p class="hint" style="grid-column:1/-1;margin:0">Account lists for the executive dashboard: exact account numbers, or a number followed by * for every account that starts with it. Leave blank for the default shown.</p>`;
+    <input type="hidden" id="ex-sales" value=""><input type="hidden" id="ex-labor" value=""><input type="hidden" id="ex-food" value=""><input type="hidden" id="ex-below" value="">
+    <p class="hint" style="grid-column:1/-1;margin:0">Which accounts make revenue, cost of goods, labour and the rest is set once for every screen in the KPI mapping card below.</p>`;
   settingsDone = true; loadAudit();
 }
 $("saveSettings").onclick = async ()=>{
@@ -3416,23 +3437,23 @@ function renderBudget(){
 function renderGroup(){
   const g = data.group; if(!g||!g.loaded) return;
   if(g.error){ $("grpNote").textContent = g.error; return; }
-  $("grpNote").textContent = `${g.period[0]} to ${g.period[1]} · ${g.totals.companies} companies in the group total · reporting currency ${g.reporting_currency} · rates: ${g.rates}`;
-  $("grpWarn").textContent = g.note + (g.rate_note ? ` Rate source: ${g.rate_note}.` : "");
-  const rc = g.reporting_currency;
-  $("grpTable").innerHTML = `<tr><th>Company</th><th>Currency</th><th class="num">Rate</th>
-      <th class="num">Revenue</th><th class="num">Gross profit</th><th class="num">Margin</th><th class="num">EBITDA</th>
-      <th class="num">Revenue in ${esc(rc)}</th><th class="num">EBITDA in ${esc(rc)}</th><th class="num">Assets in ${esc(rc)}</th></tr>` +
+  $("grpNote").textContent = `${g.basis || "Combined, not consolidated"} · ${g.period[0]} to ${g.period[1]} · ${g.totals.companies} companies in ${g.reporting_currency} added · exchange rate: ${g.rates}`;
+  $("grpWarn").textContent = g.note;
+  const rc = g.reporting_currency, st = r => `<span class="chip ${r.status === "Approved" ? "down" : r.status === "Pilot" ? "" : "up"}">${esc(r.status)}</span>`;
+  $("grpTable").innerHTML = `<tr><th>Company</th><th>Currency</th><th>KPI status</th>
+      <th class="num">Net revenue</th><th class="num">Gross margin</th><th class="num">EBITDA</th><th class="num">Net profit</th>
+      <th class="num">Assets</th><th class="num">Liabilities</th><th class="num">Equity</th></tr>` +
     g.rows.map(r=>{
       if(!r.available) return `<tr><td class="name">${esc(r.company)}</td><td>${esc(r.currency||"–")}</td><td colspan="8" class="meta">not available with this login</td></tr>`;
-      const c = r.converted||{};
-      return `<tr class="${r.in_total?"":"warnrow"}"><td class="name">${esc(r.company)}</td><td>${esc(r.currency)}</td>
-      <td class="num">${r.rate==null?'<span class="chip up">no rate</span>':fmt(r.rate,2)}</td>
-      <td class="num">${fmt(r.revenue)}</td><td class="num">${fmt(r.gross)}</td>
-      <td class="num">${r.gross_margin==null?"–":fmt(r.gross_margin,1)+"%"}</td><td class="num">${fmt(r.ebitda)}</td>
-      <td class="num"><b>${c.revenue==null?"–":fmt(c.revenue)}</b></td><td class="num">${c.ebitda==null?"–":fmt(c.ebitda)}</td>
-      <td class="num">${c.assets==null?"–":fmt(c.assets)}</td></tr>`;}).join("") +
-    `<tr class="total"><td>Group, in ${esc(rc)}</td><td colspan="5"></td><td class="num">–</td>
-      <td class="num">${fmt(g.totals.revenue)}</td><td class="num">${fmt(g.totals.ebitda)}</td><td class="num">${fmt(g.totals.assets)}</td></tr>`;
+      return `<tr class="${r.in_total?"":"warnrow"}"><td class="name">${esc(r.company)}${r.in_total ? "" : ` <span class="chip up">not in the total: no ${esc(r.currency)} rate from BC</span>`}</td><td>${esc(r.currency)}</td>
+      <td>${st(r)}</td><td class="num">${r.revenue==null?"Content required":fmt(r.revenue)}</td>
+      <td class="num">${r.gross_margin==null?"–":fmt(r.gross_margin,1)+"%"}</td><td class="num">${r.ebitda==null?"–":fmt(r.ebitda)}</td>
+      <td class="num">${fmt(r.net_profit)}</td><td class="num">${r.assets==null?"–":fmt(r.assets)}</td>
+      <td class="num">${r.liabilities==null?"–":fmt(r.liabilities)}</td><td class="num">${r.equity==null?"–":fmt(r.equity)}</td></tr>`;}).join("") +
+    `<tr class="total"><td>Combined, not consolidated (${esc(rc)})</td><td colspan="2"></td>
+      <td class="num">${g.totals.revenue==null?"–":fmt(g.totals.revenue)}</td><td class="num">–</td><td class="num">${g.totals.ebitda==null?"–":fmt(g.totals.ebitda)}</td>
+      <td class="num">${g.totals.net_profit==null?"–":fmt(g.totals.net_profit)}</td><td class="num">${g.totals.assets==null?"–":fmt(g.totals.assets)}</td>
+      <td class="num">${g.totals.liabilities==null?"–":fmt(g.totals.liabilities)}</td><td class="num">${g.totals.equity==null?"–":fmt(g.totals.equity)}</td></tr>`;
 }
 
 let modalRows=[], modalCols=[], modalName="records";
@@ -4241,6 +4262,72 @@ $("fxFetch").onclick = async () => {
     wait(); }
   catch(e){ $("fxMsg").textContent = "Could not start: " + e.message; }
 };
+// ---------- KPI library and account mapping (kpilib.py) ----------
+let kmData = null;
+async function loadKm(){
+  const sel = $("kmCo");
+  if (!sel.options.length) { sel.innerHTML = [...$("company").options].map(o => `<option>${esc(o.value)}</option>`).join(""); sel.value = $("company").value; }
+  $("kmMsg").textContent = "Reading the chart of accounts…";
+  try{ kmData = await readJSON(await fetch("/api/kpi/mapping?company=" + encodeURIComponent(sel.value))); renderKm(); $("kmMsg").textContent = ""; }
+  catch(e){ $("kmMsg").textContent = "Could not read: " + e.message; }
+}
+function renderKm(){
+  const d = kmData, m = d.mapping, defs = d.definitions, rules = (m || {}).rules || {};
+  const status = m ? m.status : "Content required";
+  $("kmPill").className = "rhg-pill " + (status === "Approved" ? "ok" : status === "Content required" ? "warning" : "info");
+  $("kmPill").textContent = `Mapping: ${status}`;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const P = d.pl, B = d.bs;
+  $("kmChecks").innerHTML =
+    card("Net profit, year to date", P ? fmt(P.net_profit) : "–", "the sum of every income-statement account") +
+    card("Lines against net profit", P ? (Math.abs(P.check) < 1 ? "0" : fmt(P.check)) : "–", "nil when every posted account is mapped", P && Math.abs(P.check) >= 1 ? "up" : "down") +
+    card("Assets − liabilities − equity", B ? (Math.abs(B.totals.difference) < 1 ? "0" : fmt(B.totals.difference)) : "–", "today, equity with the result not yet closed", B && Math.abs(B.totals.difference) >= 1 ? "up" : "down") +
+    card("Accounts not mapped", fmt(d.unmapped.length), `of ${fmt(d.accounts.length)} posting accounts`, d.unmapped.length ? "warn" : "down") +
+    card("On the wrong statement", fmt(d.wrong_side.length), "a balance-sheet account in a P&L line or the reverse", d.wrong_side.length ? "up" : "down");
+  $("kmMeta").textContent = !m ? `${d.company} has no mapping and no proposal (its chart differs from SALT's): every KPI shows Content required until the lines are filled in and saved.`
+    : `${d.company} · ${m.proposal ? "the proposal of the SALT chart model, not yet reviewed" : `saved by ${m.updated_by} on ${String(m.updated_at).replace("T", " ")}`}${m.approved_by ? ` · approved by ${m.approved_by} on ${String(m.approved_at).slice(0, 10)}` : ""} · year to date ${d.period[0]} to ${d.period[1]}`;
+  const inp = k => `<input data-km="${k}" value="${esc(rules[k] || "")}" placeholder="${kmPlace(k)}" style="width:100%;min-width:220px">`;
+  const lines = st => defs.lines.filter(l => l.statement === st);
+  $("kmPl").innerHTML = `<tr><th>Line</th><th>Accounts</th><th class="num">Year to date</th></tr>` +
+    lines("pl").map(l => `<tr><td class="name">${esc(l.label)}</td><td>${inp(l.key)}</td><td class="num">${P ? fmt(P.lines[l.key]) : "–"}</td></tr>`).join("") +
+    (P ? `<tr class="total"><td>EBITDA</td><td></td><td class="num">${fmt(P.derived.ebitda)}</td></tr><tr class="total"><td>Net profit from the lines</td><td></td><td class="num">${fmt(P.derived.net_profit_from_lines)}</td></tr>` : "");
+  $("kmBs").innerHTML = `<tr><th>Line</th><th>Accounts</th><th class="num">Today</th></tr>` +
+    lines("bs").map(l => `<tr><td class="name">${esc(l.label)}</td><td>${inp(l.key)}</td><td class="num">${B ? fmt(B.lines[l.key]) : "–"}</td></tr>`).join("") +
+    (B ? `<tr class="total"><td>Assets · Liabilities · Equity</td><td></td><td class="num">${fmt(B.totals.assets)} · ${fmt(B.totals.liabilities)} · ${fmt(B.totals.equity)}</td></tr>` : "");
+  const un = d.unmapped.concat(d.wrong_side);
+  $("kmUnTitle").textContent = un.length ? `Accounts to map (${un.length})` : "Every posting account is mapped";
+  $("kmUn").innerHTML = un.length ? `<tr><th>Account</th><th>Name</th><th>Statement</th><th>Now in</th><th>Category in BC</th><th class="num">Year to date</th><th class="num">Balance</th></tr>` +
+    un.map(x => `<tr><td>${esc(x.no)}</td><td class="name">${esc(x.name)}</td><td>${x.statement === "pl" ? "Income statement" : "Balance sheet"}</td>
+      <td class="${x.wrong_side ? "up" : "meta"}">${x.line ? esc(defs.lines.find(l => l.key === x.line).label) + " (wrong statement)" : "—"}</td><td class="meta">${esc(x.bc_category || "blank")}</td>
+      <td class="num">${fmt(x.ytd)}</td><td class="num">${fmt(x.balance)}</td></tr>`).join("") : "";
+  const kp = d.kpis || {};
+  $("kmDefs").innerHTML = `<tr><th>KPI</th><th>Measures</th><th>Formula</th><th>Status</th><th class="num">Year to date</th></tr>` +
+    defs.kpis.map(k => { const v = kp[k.key] || {}; return `<tr><td class="name">${esc(k.label)}</td><td class="meta">${k.kind === "period" ? "a period" : "a date"}</td><td class="meta">${esc(k.formula)}</td>
+      <td>${esc(v.status || (k.kind === "point" ? (m ? (m.status === "Approved" ? "Approved" : "Pilot") : "Content required") : "–"))}</td>
+      <td class="num">${v.value == null ? "–" : k.unit === "pct" ? fmt(v.value, 1) + "%" : fmt(v.value)}</td></tr>`; }).join("");
+  $("kmHist").innerHTML = ((m || {}).history || []).slice().reverse().map(h => `${esc(String(h.ts).replace("T", " "))} · ${esc(h.by)} · ${esc(h.status)}${(h.changed || []).length ? " · changed " + esc(h.changed.join(", ")) : ""}${h.note ? " · " + esc(h.note) : ""}`).join("<br>") || "No change saved yet.";
+  ["kmSave", "kmApprove", "kmReset"].forEach(id => { $(id).disabled = !can("settings"); $(id).title = can("settings") ? "" : "Your role cannot change settings."; });
+  $("kmApprove").textContent = status === "Approved" ? "Approved" : "Approve";
+}
+const kmPlace = k => ({revenue: "704*, 705*, 707*", cogs: "601*, 6051", labour: "641*, 644*, 648*", cash: "51*, 53*"})[k] || "";
+async function kmPost(action){
+  const rules = {}; document.querySelectorAll("[data-km]").forEach(i => rules[i.dataset.km] = i.value);
+  if (action === "approve" && !confirmKm()) return;
+  $("kmMsg").textContent = "Saving…";
+  try{
+    kmData = await simphonyPost("/api/kpi/mapping", {company: $("kmCo").value, rules: action === "reset" ? null : rules, action, note: $("kmNote").value});
+    renderKm(); $("kmNote").value = "";
+    $("kmMsg").textContent = action === "approve" ? "Approved. Every screen uses it from its next read." : action === "reset" ? "Back to the proposal." : "Saved as Reviewed. Every screen uses it from its next read; the KPIs stay Pilot until it is approved.";
+  }catch(e){ $("kmMsg").textContent = "Could not save: " + e.message; }
+}
+function confirmKm(){
+  if (!$("kmNote").value.trim()) { $("kmMsg").textContent = "Write who agreed the mapping in the note before approving."; return false; }
+  return true;
+}
+$("kmSave").onclick = () => kmPost("save");
+$("kmApprove").onclick = () => kmPost("approve");
+$("kmReset").onclick = () => kmPost("reset");
+$("kmCo").onchange = () => loadKm();
 // ---- Settings: the registry and the limits
 async function liSettings(){
   try{
@@ -4272,7 +4359,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
-  if(b.dataset.view==="settings") liSettings();
+  if(b.dataset.view==="settings") { liSettings(); loadKm(); }
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();

@@ -39,6 +39,7 @@ import recipients
 import requests
 import cost_report
 import negstock
+import kpilib
 import exreg
 import salesrec
 import assets
@@ -85,6 +86,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
+                     "/api/kpi/mapping": "settings",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -279,7 +281,8 @@ def _dashboard_build(company, anchor, mode, dimension, compare="prior"):
 
     rules = {**finance.DEFAULT_ACCOUNT_RULES,
              **{k: v for k, v in settings["accounts"].items() if v}}
-    pl = finance.profit_and_loss(cur, prev, ly, budget, rules)
+    kmap = kpilib.mapping(company)
+    pl = finance.profit_and_loss(cur, prev, ly, budget, rules, mapping=kmap)
     bs = finance.balance_sheet(cur, prev, ly, rules, result_rows=cur)
     today = date.today()
     ap = finance.payables(_safe(sources, "Open supplier entries",
@@ -288,7 +291,7 @@ def _dashboard_build(company, anchor, mode, dimension, compare="prior"):
                                    lambda: client.open_customer_entries(company), []), today, settings)
     bank = _safe(sources, "Bank ledger entries",
                  lambda: client.bank_entries(company, c_from.isoformat(), c_to.isoformat()), [], False)
-    cash = finance.cash_position(cur, bank, settings)
+    cash = finance.cash_position(cur, bank, settings, kmap)
     inv_placeholder = {"loaded": False, "exceptions": [],
                        "note": "Inventory is read when its screen is opened: it needs four snapshots of "
                                "15,000 item cards, which is too slow to do on every refresh."}
@@ -870,8 +873,9 @@ def budget_screen(company, anchor, mode, dimension):
                                          name), [], False)
     acc_rules = {**finance.DEFAULT_ACCOUNT_RULES,
                  **{k: v for k, v in settings["accounts"].items() if v}}
-    period_pl = finance.profit_and_loss(period_acc, None, None, b_period, acc_rules)
-    ytd_pl = finance.profit_and_loss(ytd_acc, None, None, b_year, acc_rules)
+    kmap = kpilib.mapping(company)
+    period_pl = finance.profit_and_loss(period_acc, None, None, b_period, acc_rules, mapping=kmap)
+    ytd_pl = finance.profit_and_loss(ytd_acc, None, None, b_year, acc_rules, mapping=kmap)
     days_done = (c_to - year_from).days + 1
     run_rate = 365 / days_done if days_done else 0
     rows = []
@@ -915,21 +919,46 @@ def _parse_map(text):
     return out
 
 
+def kpi_mapping_screen(company):
+    """The KPI mapping of a company with every posting account of its chart: the line it falls in, its year to
+    date movement and its balance, the accounts not mapped and the two checks (net profit, balance sheet)."""
+    m = kpilib.mapping(company)
+    today = date.today()
+    sources = []
+    acc = _safe(sources, f"Chart of accounts, {company}",
+                lambda: client.accounts(company, date(today.year, 1, 1).isoformat(), today.isoformat(), None, 900), [],
+                False)
+    line_of = kpilib.classifier(m)
+    rows = []
+    for r in acc:
+        if r.get("Account_Type") != "Posting":
+            continue
+        line = line_of(r.get("No"))
+        st = "pl" if r.get("Income_Balance") == "Income Statement" else "bs"
+        rows.append({"no": r.get("No"), "name": r.get("Name"), "statement": st, "line": line,
+                     "wrong_side": bool(line and kpilib.LINE[line]["statement"] != st),
+                     "bc_category": (r.get("Account_Category") or "").strip(),
+                     "ytd": round(float(r.get("Net_Change") or 0), 2),
+                     "balance": round(float(r.get("Balance_at_Date") or 0), 2)})
+    P = kpilib.pl_lines(acc, m) if acc else None
+    B = kpilib.bs_lines(acc, m) if acc else None
+    return {"company": company, "mapping": m, "definitions": kpilib.definitions(), "accounts": rows,
+            "unmapped": [x for x in rows if not x["line"]], "wrong_side": [x for x in rows if x["wrong_side"]],
+            "pl": {"lines": P["lines"], "net_profit": P["net_profit"], "check": P["check"],
+                   "derived": P["derived"]} if P else None,
+            "bs": {"lines": B["lines"], "totals": B["totals"]} if B else None,
+            "kpis": kpilib.pl_kpis(P, m) if P else None,
+            "period": [date(today.year, 1, 1).isoformat(), today.isoformat()], "sources": sources}
+
+
 def consolidation_screen(anchor, mode):
-    """Every company side by side, converted into the reporting currency with the rates
-    from Settings. Business Central publishes no exchange-rate service here, so the rate
-    is stated on screen rather than assumed."""
+    """Every company side by side. Combined, not consolidated: nothing is eliminated between companies, and a
+    company in another currency is left out until Business Central publishes its exchange rates (Finance's
+    decision of 3 November 2026: the EUR rate comes from BC, not from a number typed in Settings)."""
     settings = store.get_settings()
     group = settings["group"]
     reporting = (group.get("reporting_currency") or "ALL").upper()
     currencies = {k.lower(): v.upper() for k, v in _parse_map(group.get("currencies")).items()}
-    rates = {}
-    for k, v in _parse_map(group.get("rates")).items():
-        try:
-            rates[k.strip().upper()] = float(v)
-        except ValueError:
-            continue
-    rates[reporting] = 1.0
     account_rules = {**finance.DEFAULT_ACCOUNT_RULES,
                      **{k: v for k, v in settings["accounts"].items() if v}}
     c_from, c_to, p_from, p_to, *_ = periods(anchor, mode)
@@ -938,7 +967,8 @@ def consolidation_screen(anchor, mode):
         companies = client.companies()
     except BCError as exc:
         return {"error": str(exc), "companies": [], "loaded": True}
-    rows, missing_rates = [], set()
+    rows = []
+    keys = ("revenue", "gross", "opex", "ebitda", "net_profit", "assets", "liabilities", "equity")
     for co in companies:
         acc = _safe(sources, f"Chart of accounts, {co}",
                     lambda c=co: client.accounts(c, c_from.isoformat(), c_to.isoformat(), None, 900), [], False)
@@ -946,39 +976,40 @@ def consolidation_screen(anchor, mode):
         if not acc:
             rows.append({"company": co, "available": False, "currency": currency})
             continue
-        pl = finance.profit_and_loss(acc, rules=account_rules)
-        bs = finance.balance_sheet(acc, rules=account_rules, result_rows=acc)
-        rate = rates.get(currency)
-        if rate is None:
-            missing_rates.add(currency)
-        figures = {"revenue": pl["kpis"]["revenue"], "gross": pl["kpis"]["gross"],
-                   "opex": pl["kpis"]["opex"], "ebitda": pl["kpis"]["ebitda"],
-                   "assets": bs["totals"]["assets"], "liabilities": bs["totals"]["liabilities"],
-                   "equity": bs["totals"]["equity"]}
+        kmap = kpilib.mapping(co)
+        pl = finance.profit_and_loss(acc, rules=account_rules, mapping=kmap)
+        bs = kpilib.bs_lines(acc, kmap) if kmap else None
+        figures = {"revenue": pl["kpis"]["revenue"] if kmap else None, "gross": pl["kpis"]["gross"],
+                   "opex": pl["kpis"]["opex"] if kmap else None, "ebitda": pl["kpis"]["ebitda"],
+                   "net_profit": pl["kpis"]["net_profit"],
+                   "assets": bs["totals"]["assets"] if bs else None,
+                   "liabilities": bs["totals"]["liabilities"] if bs else None,
+                   "equity": bs["totals"]["equity"] if bs else None}
+        rate = 1.0 if currency == reporting else None
         rows.append({"company": co, "available": True, "currency": currency, "rate": rate,
                      "gross_margin": pl["kpis"]["gross_margin"], **figures,
-                     # a withheld figure stays withheld after conversion; it is never zero
+                     "mapping": (kmap or {}).get("status") or "Content required",
+                     "status": "Content required" if not kmap else ("Approved" if kmap.get("status") == "Approved" else "Pilot"),
+                     "bs_difference": bs["totals"]["difference"] if bs else None,
                      "converted": {k: (v * rate if (rate is not None and v is not None) else None)
                                    for k, v in figures.items()},
                      "in_total": rate is not None})
     ok = [r for r in rows if r.get("available") and r.get("in_total")]
     excluded = [r["company"] for r in rows if r.get("available") and not r.get("in_total")]
-    rate_line = ", ".join(f"1 {c} = {rates[c]:,.2f} {reporting}" for c in sorted(rates) if c != reporting) or "none set"
-    return {"loaded": True, "sources": sources, "rows": rows,
+    return {"loaded": True, "sources": sources, "rows": rows, "basis": "Combined, not consolidated",
             "period": [c_from.isoformat(), c_to.isoformat()],
-            "reporting_currency": reporting, "rates": rate_line, "excluded": excluded,
-            "rate_note": group.get("rate_note") or "",
+            "reporting_currency": reporting, "rates": "Content required: the EUR rate from Business Central",
+            "excluded": excluded, "rate_note": "",
             "totals": {k: (sum(r["converted"][k] for r in ok)
-                           if all(r["converted"][k] is not None for r in ok) else None)
-                       for k in ("revenue", "gross", "opex", "ebitda", "assets", "liabilities", "equity")}
-                      | {"companies": len(ok)},
-            "note": f"Figures are converted into {reporting} at the rates set in Settings ({rate_line}), because "
-                    f"Business Central publishes no exchange-rate service here. One rate is applied to both the "
-                    f"result and the balance sheet, which is a management view, not a statutory translation: "
-                    f"that would need the average rate for the result and the closing rate for the balance sheet. "
-                    f"Nothing is eliminated between companies, so intercompany sales, balances and margins are "
-                    f"still counted twice."
-                    + (f" Excluded for want of a rate: {', '.join(excluded)}." if excluded else "")}
+                           if ok and all(r["converted"][k] is not None for r in ok) else None)
+                       for k in keys} | {"companies": len(ok)},
+            "note": f"Combined, not consolidated: the companies in {reporting} are added as they stand. Nothing is "
+                    f"eliminated between companies, so intercompany sales, balances and investments are counted "
+                    f"twice. Companies in another currency are left out until Business Central publishes its "
+                    f"exchange rates (Currency Exchange Rates, page 483) and Finance approves the method (average "
+                    f"rate for the result, closing rate for the balance sheet). Every company follows its own KPI "
+                    f"mapping; one without a mapping shows Content required."
+                    + (f" Left out: {', '.join(excluded)}." if excluded else "")}
 
 
 def _merge_exceptions(key, out):
@@ -1008,7 +1039,17 @@ def _headline(pl, bs, ap, ar, cash, exceptions):
 def _statement_exceptions(pl, bs, cash, settings):
     th = settings["thresholds"]
     out = []
-    fallback = sum(v for k, v in pl.get("classified_by", {}).items() if k != "Account Category")
+    um = [u for u in pl.get("unmapped") or [] if u.get("value")]
+    if um:
+        out.append({"code": "kpi-unmapped", "severity": "warning", "area": "Data quality",
+                    "rule": "Accounts not in the KPI mapping",
+                    "title": f"{len(um)} income-statement accounts with postings are not in the KPI mapping",
+                    "detail": "Their amounts are in the net profit but in no P&L line: "
+                              + ", ".join(f"{u['account']} {u['name']} {u['value']:,.0f}" for u in um[:8]) + ".",
+                    "impact": abs(sum(u["value"] for u in um)), "document": "",
+                    "next_action": "Map them in Finance → Settings → KPI mapping.",
+                    "drill": {"kind": "pl", "key": ""}})
+    fallback = 0 if "library" in pl else sum(v for k, v in pl.get("classified_by", {}).items() if k != "Account Category")
     bs_fallback = sum(v for k, v in bs.get("classified_by", {}).items() if k != "Account Category")
     if fallback or bs_fallback:
         out.append({"code": "coa-category", "severity": "warning", "area": "Data quality",
@@ -1795,6 +1836,8 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
                 self._send(200, dict(r, companies=salesrec.companies()) if isinstance(r, dict) else r)
+            elif url.path == "/api/kpi/mapping":
+                self._send(200, kpi_mapping_screen(q.get("company") or config.BC_COMPANY))
             elif url.path == "/api/register":
                 if not auth.can(user, "finance.s.register"):
                     self._send(403, {"error": "Your role does not include the Exceptions register."})
@@ -2257,6 +2300,20 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or costrep.companies()[0]
                 self._send(202, costrep.start_job(company, actor, only or None))
+            elif url.path == "/api/kpi/mapping":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                action = body.get("action") or "save"
+                if action not in ("save", "approve", "reset"):
+                    self._send(400, {"error": "Unknown action."})
+                    return
+                company = body.get("company") or config.BC_COMPANY
+                rules = body.get("rules") if isinstance(body.get("rules"), dict) else None
+                kpilib.save(company, rules, user.get("name") or actor, action, str(body.get("note") or ""))
+                with _dash_lock:
+                    _dash_cache.clear()
+                self._send(200, kpi_mapping_screen(company))
             elif url.path == "/api/register/update":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

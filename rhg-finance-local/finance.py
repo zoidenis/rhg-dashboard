@@ -7,6 +7,8 @@ the conversion is stated wherever it happens.
 from collections import defaultdict
 from datetime import date, timedelta
 
+import kpilib
+
 DEFAULT_ACCOUNT_RULES = {
     # Used only where Account Category is blank in Business Central. The Albanian and
     # Kosovo charts both number class 7 as income, 60x as cost of goods and the rest of
@@ -79,8 +81,11 @@ def _is_da(acc):
 
 
 # --------------------------------------------------------------------------- P&L
-def profit_and_loss(cur, prev=None, last_year=None, budget_rows=None, rules=None):
-    """cur/prev/last_year: chart-of-accounts rows with Net_Change for the period."""
+def profit_and_loss(cur, prev=None, last_year=None, budget_rows=None, rules=None, mapping=False):
+    """cur/prev/last_year: chart-of-accounts rows with Net_Change for the period. mapping: the company's KPI
+    mapping (kpilib.mapping); given (even None, for a company with none), the statement follows the KPI library."""
+    if mapping is not False:
+        return _pl_mapped(cur, prev, last_year, budget_rows, mapping)
     rules = rules or DEFAULT_ACCOUNT_RULES
     def index(rows):
         return {r["No"]: r for r in (rows or []) if r.get("Account_Type") == "Posting"}
@@ -191,6 +196,120 @@ def profit_and_loss(cur, prev=None, last_year=None, budget_rows=None, rules=None
         "note": "Revenue, cost and expense follow the Account Category in Business Central where it is "
                 "filled in, and the account number where it is blank. Depreciation is separated by "
                 "account name, so review the split before publishing.",
+    }
+
+
+def _pl_mapped(cur, prev, last_year, budget_rows, m):
+    """The P&L of the KPI library: Net revenue → … → Net profit, lines from the account mapping."""
+    P = kpilib.pl_lines(cur, m)
+    Pp = kpilib.pl_lines(prev, m) if prev else None
+    Pl = kpilib.pl_lines(last_year, m) if last_year else None
+    B = None
+    if budget_rows:
+        acc = defaultdict(float)
+        for b in budget_rows:
+            acc[str(b.get("G_L_Account_No"))] += _f(b.get("Amount"))
+        B = kpilib.pl_lines([{"No": no, "Net_Change": v, "Income_Balance": "Income Statement",
+                              "Account_Type": "Posting"} for no, v in acc.items()], m)
+    revenue = P["lines"]["revenue"]
+
+    def get(X, key):
+        if X is None:
+            return None
+        if key in X["lines"]:
+            return X["lines"][key]
+        if key == "net_profit":
+            return X["net_profit"]
+        return X["derived"][key]
+
+    def block(label, key, total=False):
+        cur_v, prev_v, ly_v, bud = get(P, key), get(Pp, key), get(Pl, key), get(B, key)
+        bud = bud if (B is not None and bud) else None
+        return {"label": label, "key": key, "total": total, "current": cur_v, "previous": prev_v,
+                "last_year": ly_v, "budget": bud,
+                "vs_previous": (cur_v - prev_v) if prev_v is not None else None,
+                "vs_previous_pct": ((cur_v - prev_v) / abs(prev_v) * 100) if prev_v else None,
+                "vs_last_year_pct": ((cur_v - ly_v) / abs(ly_v) * 100) if ly_v else None,
+                "vs_budget": (cur_v - bud) if bud else None,
+                "vs_budget_pct": ((cur_v - bud) / abs(bud) * 100) if bud else None,
+                "of_revenue": (cur_v / revenue * 100) if revenue else None}
+    statement = [
+        block("Net revenue", "revenue"), block("Other operating income", "other_income"),
+        block("Cost of goods sold", "cogs"), block("Gross profit", "gross_profit", True),
+        block("Labour", "labour"), block("Occupancy", "occupancy"),
+        block("Other operating expenses", "opex"), block("EBITDA", "ebitda", True),
+        block("Depreciation and amortization", "da"), block("EBIT", "ebit", True),
+        block("Interest and finance costs (net)", "finance"), block("Non-operating items", "nonop"),
+        block("Income tax", "tax"), block("Net profit", "net_profit", True)]
+    lines = []
+    for key in kpilib.PL_LINES:
+        for no, name, v in P["accounts"][key]:
+            lines.append({"account": no, "name": name, "category": kpilib.LINE[key]["label"], "bucket": key,
+                          "classified_by": "KPI mapping", "subcategory": "", "current": v,
+                          "previous": None, "last_year": None, "budget": None})
+    for no, name, net, _line in P["unmapped"]:
+        if net:
+            lines.append({"account": no, "name": name, "category": "Unmapped", "bucket": "unmapped",
+                          "classified_by": "Not in the KPI mapping", "subcategory": "", "current": net,
+                          "previous": None, "last_year": None, "budget": None})
+    if Pp or Pl or B:
+        idx = {(l["account"]): l for l in lines}
+        for X, field in ((Pp, "previous"), (Pl, "last_year"), (B, "budget")):
+            if not X:
+                continue
+            for key in kpilib.PL_LINES:
+                for no, _n, v in X["accounts"][key]:
+                    if no in idx:
+                        idx[no][field] = v
+    lines.sort(key=lambda r: (kpilib.PL_LINES.index(r["bucket"]) if r["bucket"] in kpilib.PL_LINES else 99,
+                              -abs(r["current"])))
+    v, d = P["lines"], P["derived"]
+    validation = []
+    cogs_credit = v["cogs"] < 0
+    margin_ok = revenue > 0 and not cogs_credit and d["gross_profit"] <= revenue
+    if m is None:
+        validation.append({"figure": "Every P&L line", "state": "Content required",
+                           "reason": "This company has no KPI mapping: Finance → Settings → KPI mapping. Net profit is "
+                                     "the sum of every income-statement account and stays right; the lines are empty.",
+                           "owner": "Chief accountant", "suppressed": ["Gross margin", "EBITDA margin"]})
+        margin_ok = False
+    elif cogs_credit:
+        validation.append({
+            "figure": "Cost of goods sold", "state": "Under validation",
+            "reason": f"The cost accounts net to a credit of {abs(v['cogs']):,.0f} in this period. Purchases are "
+                      f"posted to the materials accounts and moved to inventory at period end, so in an unfinished "
+                      f"month the cost can be negative and the gross profit meaningless.",
+            "owner": "Chief accountant", "suppressed": ["Gross profit", "Gross margin", "EBITDA margin"]})
+    if abs(P["check"]) > 1:
+        validation.append({"figure": "Net profit", "state": "Mapping incomplete",
+                           "reason": f"{len([u for u in P['unmapped'] if u[2]])} income-statement accounts with "
+                                     f"{P['check']:+,.0f} are not in the KPI mapping, so the lines do not add up to the "
+                                     f"net profit. Map them in Finance → Settings → KPI mapping.",
+                           "owner": "Chief accountant", "suppressed": []})
+    lib = kpilib.pl_kpis(P, m, Pl)
+    opex_all = v["labour"] + v["occupancy"] + v["opex"]
+    return {
+        "statement": statement, "lines": lines[:300], "validation": validation, "margin_reliable": margin_ok,
+        "kpis": {"revenue": revenue, "cogs": v["cogs"], "gross": d["gross_profit"] if margin_ok else None,
+                 "gross_raw": d["gross_profit"],
+                 "gross_margin": (d["gross_profit"] / revenue * 100) if margin_ok else None,
+                 "opex": opex_all, "labour": v["labour"], "occupancy": v["occupancy"],
+                 "ebitda": d["ebitda"] if margin_ok else None, "ebitda_raw": d["ebitda"],
+                 "ebitda_margin": (d["ebitda"] / revenue * 100) if margin_ok else None,
+                 "da": v["da"], "ebit": d["ebit"], "net_profit": P["net_profit"],
+                 "revenue_prev": get(Pp, "revenue") or 0.0, "gross_prev": get(Pp, "gross_profit") or 0.0,
+                 "revenue_ly": get(Pl, "revenue") or 0.0,
+                 "revenue_budget": get(B, "revenue") if B else None},
+        "library": lib, "check": P["check"],
+        "unmapped": [{"account": no, "name": name, "value": net} for no, name, net, _l in P["unmapped"]][:60],
+        "mapping": {"status": (m or {}).get("status") or "Content required",
+                    "approved_by": (m or {}).get("approved_by") or "", "approved_at": (m or {}).get("approved_at") or ""},
+        "classified_by": {"KPI mapping": sum(len(x) for x in P["accounts"].values()),
+                          "Not in the KPI mapping": len(P["unmapped"])},
+        "note": "Lines follow the KPI mapping (Finance → Settings → KPI mapping), the same one the Executive "
+                "dashboard, the P&L memo and Unicorn use. EBITDA is before interest and finance costs, income tax, "
+                "depreciation and amortisation and non-operating items. Net profit is the sum of every "
+                "income-statement account, whatever the mapping.",
     }
 
 
@@ -378,13 +497,16 @@ def receivables(rows, today, settings):
 CASH_HINTS = ("cash", "bank", "arka", "banka")
 
 
-def cash_position(accounts, bank_rows, settings):
+def cash_position(accounts, bank_rows, settings, mapping=False):
+    """mapping (kpilib): the cash line of the KPI mapping decides; without one, the account names."""
     lines = []
+    line_of = kpilib.classifier(mapping) if mapping else None
     for acc in accounts or []:
         if acc.get("Income_Balance") != "Balance Sheet" or acc.get("Account_Type") != "Posting":
             continue
         text = f"{acc.get('Name','')} {acc.get('Account_Subcategory_Descript','')}".lower()
-        if acc.get("Account_Category") == "Assets" and any(h in text for h in CASH_HINTS):
+        if (line_of(acc.get("No")) == "cash") if line_of else \
+                (acc.get("Account_Category") == "Assets" and any(h in text for h in CASH_HINTS)):
             lines.append({"account": acc["No"], "name": acc.get("Name"),
                           "balance": _f(acc.get("Balance_at_Date")),
                           "movement": _f(acc.get("Net_Change"))})
@@ -401,8 +523,10 @@ def cash_position(accounts, bank_rows, settings):
                        key=lambda x: -abs(x["net"]))
     return {"accounts": lines[:30], "total": sum(l["balance"] for l in lines),
             "movement": sum(l["movement"] for l in lines), "bank_movements": movements[:30],
-            "note": "Cash is read from the balance-sheet accounts whose name or subcategory identifies them "
-                    "as cash or bank. Bank movements come from the bank ledger of the selected period."}
+            "note": ("Cash and bank is the cash line of the KPI mapping (Finance → Settings → KPI mapping): every "
+                     "cash, bank and in-transit account, whatever its category in Business Central. " if line_of else
+                     "Cash is read from the balance-sheet accounts whose name or subcategory identifies them "
+                     "as cash or bank. ") + "Bank movements come from the bank ledger of the selected period."}
 
 
 # --------------------------------------------------------- general ledger control

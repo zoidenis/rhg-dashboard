@@ -28,6 +28,7 @@ from datetime import date, datetime, timedelta
 import arap_notify
 import config
 import executive
+import kpilib
 import finloc
 import locintel
 import recipients
@@ -446,6 +447,21 @@ def subject(r, test=False):
     return (("[Test] " if test else "") + f"[RHG] {r['brand']} · {KINDS[r['kind']]} performance · {when}{tail}")
 
 
+def _kpi_note(r):
+    """The KPI status of the P&L figures: Pilot until Finance approves the account mapping."""
+    if r.get("sales_only"):
+        return ""
+    cos = sorted({L.get("company") for L in r.get("locations") or [] if L.get("company")})
+    maps = [kpilib.mapping(c) for c in cos] or [None]
+    if all(m and m.get("status") == "Approved" for m in maps):
+        return ""
+    km = next((m for m in maps if m and m.get("status") != "Approved"), None) if all(maps) else None
+    return ("<p style='font-size:11.5px;color:#b26a00;margin:0 0 10px'>"
+            + ("KPI status: Pilot. The account mapping is " + html.escape(km.get("status") or "Proposed")
+               + ", not yet approved by Finance; the cost and EBITDA figures are not the official report." if km else
+               "Content required: no KPI account mapping for this company.") + "</p>")
+
+
 def render(r, extra=""):
     """extra: more HTML after the blocks (the categories of the weekly sales email)."""
     e = html.escape
@@ -596,7 +612,7 @@ def render(r, extra=""):
 <div style="font-size:20px;font-weight:700;margin-top:4px">{"Sales of the week" if r.get("sales_only") else e(KINDS[r['kind']]) + " performance"} · {e(r['brand'])}</div>
 <div style="font-size:12px;color:#cfe3ea;margin-top:4px">{e(period)} · {len(r['locations'])} location{'' if len(r['locations']) == 1 else 's'} · {e(comp)}</div></td></tr>
 <tr><td style="background:#fff;padding:20px 22px;border-radius:0 0 12px 12px">
-{errs}{tiles}
+{errs}{_kpi_note(r)}{tiles}
 <h3 style="font-size:14px;color:{ink};margin:18px 0 6px">Highlights</h3>{hl}
 {blocks}{extra}
 {f"<p style='margin:20px 0 0'><a href='{e(public)}{"/finance/#sales" if r.get("sales_only") else "/executive?tab=locations"}' style='background:{primary};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;display:inline-block'>{"Open Sales in the Finance tower" if r.get("sales_only") else "Open Location intelligence"}</a></p>" if public else ''}

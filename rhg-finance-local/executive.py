@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
 import finance
+import kpilib
 import simphony
 import store
 from bc_client import BCError
@@ -70,8 +71,16 @@ def rules_from(settings):
     return raw, {k: _matcher(v) for k, v in raw.items()}
 
 
+def classify_lib(company):
+    """(no, name) → dashboard bucket from the one KPI mapping (kpilib), and the mapping."""
+    m = kpilib.mapping(company)
+    line_of = kpilib.classifier(m)
+    return (lambda no, name: kpilib.exec_bucket(line_of(no), name)), m
+
+
 def classify(no, name, match):
-    """The dashboard bucket of an income-statement account."""
+    """The dashboard bucket of an income-statement account, by the old executive rules (kept for reference;
+    the dashboard now uses the KPI mapping, classify_lib)."""
     if match["food"](no):
         return "food"
     if match["labor"](no):
@@ -364,7 +373,7 @@ def _simphony_fill(company, year, active, job_key, today, errors):
 def assemble(company, year, currency, today=None, departments=None):
     today = today or date.today()
     settings = store.get_settings()
-    raw, match = rules_from(settings)
+    bucket_of, m = classify_lib(company)
     months, extra, running = plan(year, today)
     with _cache_lock:
         d = _data()
@@ -384,7 +393,7 @@ def assemble(company, year, currency, today=None, departments=None):
                 actual.setdefault(dept, {})[key] = cell["n"]
     buckets = {}
     for no, (name, _cat) in names.items():
-        buckets[no] = classify(no, name, match)
+        buckets[no] = bucket_of(no, name)
 
     def signed(cellmap):
         out = {}
@@ -392,7 +401,7 @@ def assemble(company, year, currency, today=None, departments=None):
             for m, nets in by_month.items():
                 row = {}
                 for no, v in nets.items():
-                    b = buckets.get(no) or classify(no, "", match)
+                    b = buckets.get(no) or bucket_of(no, "")
                     row[no] = round(mgmt(b, v), 2)
                 out.setdefault(dept, {})[m] = row
         return out
@@ -418,7 +427,10 @@ def assemble(company, year, currency, today=None, departments=None):
         "budget": budget_out,
         "simphony": simphony_months(company, year, [x["code"] for x in depts]),
         "provisional": provisional,
-        "rules": raw,
+        "mapping": {"status": (m or {}).get("status") or "Content required",
+                    "approved_by": (m or {}).get("approved_by") or "", "approved_at": (m or {}).get("approved_at") or "",
+                    "unmapped": sorted(no for no, b in buckets.items() if b == "unmapped")},
+        "kpi_status": "Approved" if (m or {}).get("status") == "Approved" else ("Pilot" if m else "Content required"),
         "definitions": DEFINITIONS,
     }
 
@@ -456,15 +468,16 @@ def simphony_months(company, year, active):
 
 
 DEFINITIONS = {
-    "sales": "Revenue from the sales accounts (Finance → Settings → Executive dashboard), as posted in "
-             "Business Central. Income is shown positive.",
-    "food": "Food cost is the listed cost-of-goods accounts. It is only final once the monthly inventory "
-            "is posted, so recent months are marked provisional.",
+    "sales": "Net revenue: the revenue accounts of the KPI mapping (Finance → Settings → KPI mapping), as posted "
+             "in Business Central. Income is shown positive. Every screen uses the same mapping.",
+    "food": "Food cost is the cost-of-goods line of the KPI mapping. It is only final once the monthly "
+            "inventory is posted, so recent months are marked provisional.",
     "labor": "Labour is the payroll accounts (salaries, overtime, bonus, social and health insurance, "
              "other staff costs). Kitchen, service and management follow the account names.",
     "prime": "Prime cost is food cost plus labour.",
-    "ebitda": "EBITDA is revenue and other operating income less food, labour and other operating costs. "
-              "Depreciation, interest, exchange differences and profit tax are left out.",
+    "ebitda": "EBITDA is net revenue and other operating income less cost of goods, labour, occupancy and other "
+              "operating costs: before interest and finance costs, income tax, depreciation and amortisation and "
+              "non-operating items (the KPI library's one definition).",
     "budget": "Budget is the G/L budget of the year, placed on a restaurant through its dimension set.",
     "simphony": "Checks and guests are Simphony's daily totals. Guests are only as good as the covers "
                 "entered at the POS.",

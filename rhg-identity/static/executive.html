@@ -841,6 +841,10 @@ function renderBanner(){
   let h = "";
   if (parts.length) h += `<div class="banner"><span class="bar"><i style="width:${total ? Math.round(done / total * 100) : 5}%"></i></span><span>${esc(parts.join(" · "))}. The figures fill in as they arrive; the first read of a year takes several minutes, after that it is quick.</span></div>`;
   if (S.finErr && F.tab !== "purchasing") h += `<div class="banner warn">Finance: ${esc(S.finErr)}</div>`;
+  const ks = f && f.kpi_status, mp = (f && f.mapping) || {};
+  if (ks && ks !== "Approved" && F.tab !== "purchasing" && F.tab !== "locations")
+    h += `<div class="banner warn"><span>${ks === "Content required" ? `Content required: ${esc(F.company)} has no KPI account mapping, so revenue, costs and EBITDA cannot be shown reliably (Finance → Settings → KPI mapping).`
+      : `KPI status: Pilot. The account mapping of ${esc(F.company)} is ${esc(mp.status || "Proposed")}, not yet approved by Finance; these figures are not the official report.`}${(mp.unmapped || []).length ? ` ${mp.unmapped.length} accounts are not mapped.` : ""}</span></div>`;
   if (errs.length) h += `<div class="banner warn"><span>${esc(errs.slice(0, 3).join(" · "))}${errs.length > 3 ? ` · and ${errs.length - 3} more` : ""}</span></div>`;
   $("banner").innerHTML = h;
   const busy = parts.length > 0;

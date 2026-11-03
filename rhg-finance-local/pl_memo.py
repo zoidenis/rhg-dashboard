@@ -27,6 +27,7 @@ import arap_notify
 import brand_report
 import config
 import finloc
+import kpilib
 import locintel
 import recipients
 import store
@@ -362,7 +363,14 @@ def render_section(R):
                       "Effect on EBITDA: a cost over the reference, or sales under it, takes from EBITDA (red); the opposite adds (green).") + \
             table([("Account", 0), ("Actual", 1), ("Budget" if V["against"] == "budget" else "Last year", 1), ("Effect on EBITDA", 1)], vrows)
     title = e(R["company"]) + (f" <span style='color:{MUTED};font-weight:400;font-size:13px'>· {e(R['legal'])}</span>" if R.get("legal") else "")
-    return (f"<h2 style='font-size:18px;color:{INK};margin:4px 0 10px'>{title}</h2>"
+    km = kpilib.mapping(R.get("legal") or R["company"])
+    status = ("" if km and km.get("status") == "Approved" else
+              f"<p style='font-size:11.5px;color:#b26a00;margin:0 0 10px'>"
+              + ("KPI status: Pilot. The account mapping is " + e(km.get("status") or "Proposed")
+                 + ", not yet approved by Finance; these figures are not the official report." if km else
+                 "Content required: this company has no KPI account mapping (Finance → Settings → KPI mapping).")
+              + "</p>")
+    return (f"<h2 style='font-size:18px;color:{INK};margin:4px 0 10px'>{title}</h2>{status}"
             f"<table role='presentation' cellspacing='0' cellpadding='0' style='width:100%'>{memo_html}</table>{pl_html}{dep_html}{var_html}")
 
 

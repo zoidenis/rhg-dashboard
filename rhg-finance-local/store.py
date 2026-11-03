@@ -105,7 +105,7 @@ DEFAULT_SETTINGS = {
     # the rates entered below and always states which rate it used.
     "group": {"reporting_currency": "ALL",
               "currencies": "SALT=ALL, TBM=ALL, RKS Revo Hospitality Group=EUR, Zoi Greece=EUR",
-              "rates": "EUR=100", "rate_note": ""},
+              "rates": "", "rate_note": ""},
     # Executive dashboard (Control center): which accounts make sales, food cost, labour and
     # the items below EBITDA. "641*" means every account starting 641. Blank = the default.
     "executive": {"sales": "", "food": "", "labor": "", "below": ""},

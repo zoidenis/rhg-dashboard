@@ -22,6 +22,7 @@ import brand_report
 import locintel
 import movement
 import pl_memo
+import kpilib
 
 _jobs, _lock = {}, threading.Lock()
 KEEP = 1800
@@ -154,7 +155,26 @@ def pl(company, day, client, currency_of):
             "departments": [{"name": d["name"], "brand": d["brand"], "actual": _pl_short(d["cur"]),
                              "budget": _pl_short(d["bud"]), "last_year": _pl_short(d["ly"])}
                             for d in R["depts"] if d["group"] == "restaurant"][:20],
-            "largest_variances": R["variances"], "memo": R["memo"]}
+            "largest_variances": R["variances"], "memo": R["memo"],
+            # the one KPI library: how each figure is defined, and how far it can be trusted
+            "kpi_status": _kpi_status(company),
+            "definitions": {"sales": "Net revenue: the revenue accounts of the KPI mapping",
+                            "food": "Cost of goods sold: the COGS accounts of the KPI mapping",
+                            "labor": "Labour: the labour accounts of the KPI mapping",
+                            "opex": "Occupancy and other operating expenses of the KPI mapping",
+                            "ebitda": kpilib.KPI["ebitda"]["formula"],
+                            "prime_pct": kpilib.KPI["prime_cost_pct"]["formula"]},
+            "source": "Business Central chart of accounts (net change by month and department) and G/L budget, "
+                      "read only"}
+
+
+def _kpi_status(company):
+    m = kpilib.mapping(company)
+    if not m:
+        return {"status": "Content required", "note": "No KPI mapping for this company: P&L lines are not reliable."}
+    return {"status": "Approved" if m.get("status") == "Approved" else "Pilot", "mapping": m.get("status"),
+            "approved_by": m.get("approved_by") or "", "approved_at": m.get("approved_at") or "",
+            "note": "Pilot = the account mapping is not yet approved by Finance; say so when quoting these figures."}
 
 
 def apar(company, digest_fn):
