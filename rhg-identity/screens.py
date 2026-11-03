@@ -26,6 +26,7 @@ FINANCE = [
         ("loc", "Location intelligence", "location", []),
         ("prices", "Menu prices", "location", []),
         ("menu", "Menu engineering", "location", []),
+        ("chanprofit", "Channel profitability", "location", []),
         ("today", "Today", "location", [])]),
     ("pl", "Financial statements", "Statements", "stTabs", [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),

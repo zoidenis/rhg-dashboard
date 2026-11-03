@@ -63,10 +63,11 @@ def _db():
         DB_PATH.parent.mkdir(exist_ok=True)
         _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         _conn.execute("PRAGMA journal_mode=WAL")
+        # by order type too (the channel), for Channel profitability; the first tables (mi, days) had no order type
         _conn.executescript("""
-            CREATE TABLE IF NOT EXISTS mi (ref TEXT, day TEXT, mi INTEGER, net REAL, qty REAL, disc REAL,
-                                           prep REAL, rtn REAL, PRIMARY KEY (ref, day, mi));
-            CREATE TABLE IF NOT EXISTS days (ref TEXT, day TEXT, final INTEGER, at REAL, PRIMARY KEY (ref, day));
+            CREATE TABLE IF NOT EXISTS mio (ref TEXT, day TEXT, ot INTEGER, mi INTEGER, net REAL, qty REAL, disc REAL,
+                                            prep REAL, rtn REAL, PRIMARY KEY (ref, day, ot, mi));
+            CREATE TABLE IF NOT EXISTS dayso (ref TEXT, day TEXT, final INTEGER, at REAL, PRIMARY KEY (ref, day));
         """)
     return _conn
 
@@ -75,7 +76,7 @@ def read_day(ref, day, latest=None):
     """The menu item totals of one location and business day, read from Simphony unless held: a closed day
     (two days before the last business day) is never read again, a recent one after 15 minutes."""
     with _db_lock:
-        hit = _db().execute("SELECT final, at FROM days WHERE ref=? AND day=?", (ref, day)).fetchone()
+        hit = _db().execute("SELECT final, at FROM dayso WHERE ref=? AND day=?", (ref, day)).fetchone()
     if hit and (hit[0] or time.time() - hit[1] < KEEP_SECONDS):
         return False
     j = simphony.call("getMenuItemDailyTotals", {"locRef": ref, "busDt": day}) or {}
@@ -85,7 +86,7 @@ def read_day(ref, day, latest=None):
             if m.get("miNum") is None:
                 continue
             tax = float(m.get("vatTtl") or 0) or float(m.get("inclTaxTtl") or 0)
-            x = agg.setdefault(int(m["miNum"]), [0.0, 0.0, 0.0, 0.0, 0.0])
+            x = agg.setdefault((int(m.get("otNum") or 0), int(m["miNum"])), [0.0, 0.0, 0.0, 0.0, 0.0])
             x[0] += float(m.get("slsTtl") or 0) - tax
             x[1] += float(m.get("slsCnt") or 0)
             x[2] += abs(float(m.get("dscTtl") or 0)) - abs(float(m.get("dscVatTtl") or 0))
@@ -94,10 +95,11 @@ def read_day(ref, day, latest=None):
     final = bool(latest and day <= (date.fromisoformat(latest) - timedelta(days=2)).isoformat())
     with _db_lock:
         db = _db()
-        db.execute("DELETE FROM mi WHERE ref=? AND day=?", (ref, day))
-        db.executemany("INSERT INTO mi VALUES (?,?,?,?,?,?,?,?)",
-                       [(ref, day, k, round(v[0], 2), v[1], round(v[2], 2), round(v[3], 2), v[4]) for k, v in agg.items()])
-        db.execute("INSERT OR REPLACE INTO days VALUES (?,?,?,?)", (ref, day, int(final), time.time()))
+        db.execute("DELETE FROM mio WHERE ref=? AND day=?", (ref, day))
+        db.executemany("INSERT INTO mio VALUES (?,?,?,?,?,?,?,?,?)",
+                       [(ref, day, k[0], k[1], round(v[0], 2), v[1], round(v[2], 2), round(v[3], 2), v[4])
+                        for k, v in agg.items()])
+        db.execute("INSERT OR REPLACE INTO dayso VALUES (?,?,?,?)", (ref, day, int(final), time.time()))
         db.commit()
     return True
 
@@ -137,6 +139,13 @@ def _coster(m):
         memo[item] = (uc, "Item cost") if uc > 0 else (None, "No recipe, no cost")
         return memo[item]
     return cost
+
+
+def items_by_order_type(ref, a, b):
+    """[(day, ot, mi, net, qty, prep)] of one location between two dates, from the held days."""
+    with _db_lock:
+        return _db().execute("SELECT day, ot, mi, net, qty, prep FROM mio WHERE ref=? AND day>=? AND day<=?",
+                             (ref, a, b)).fetchall()
 
 
 # ---------------------------------------------------------------- the read
@@ -179,7 +188,7 @@ def build(periods, latest_fn, client, refs=None, progress=None):
             if progress and (done % 10 == 0 or done == len(jobs)):
                 progress(done, len(jobs))
     with _db_lock:
-        q = _db().execute("SELECT ref, mi, SUM(net), SUM(qty), SUM(disc), SUM(prep), SUM(rtn) FROM mi "
+        q = _db().execute("SELECT ref, mi, SUM(net), SUM(qty), SUM(disc), SUM(prep), SUM(rtn) FROM mio "
                           "WHERE day>=? AND day<=? GROUP BY ref, mi", (c_from.isoformat(), c_to.isoformat())).fetchall()
     sold = {}
     for ref, mi, net, qty, disc, prep, rtn in q:

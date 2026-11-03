@@ -154,6 +154,21 @@ td.num,th.num{text-align:right}
 .me-par{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:14px 16px;margin:10px 0 6px}
 .me-par h3{margin:0;font-size:14px}
 .me-par .field .meta{font-weight:400;white-space:normal}
+.cp-bars{display:grid;gap:8px}
+.cp-bar{display:grid;grid-template-columns:150px 1fr 120px;gap:10px;align-items:center;font-size:12.5px}
+.cp-bar .t{display:flex;height:16px;border-radius:5px;overflow:hidden;background:var(--bg)}
+.cp-bar .t i{display:block;min-width:0;border-right:2px solid var(--card)}
+.cp-bar .t i:last-child{border-right:0}
+.cp-bar .r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.cp-s-cogs{background:var(--data-cur)}.cp-s-chan{background:var(--up)}.cp-s-var{background:var(--warn)}.cp-s-fix{background:var(--sub)}.cp-s-res{background:var(--down)}
+.cp-lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--sub);margin:0 0 10px}
+.cp-lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#cpTable td.sec{font-weight:700;background:var(--bg);font-size:11.5px;letter-spacing:.04em}
+#cpTable tr.tot td{font-weight:700}#cpTable tr.kpi td{color:var(--sub)}#cpTable tr.kpi td:first-child{color:var(--ink)}
+#cpTable td.neg{color:var(--up)}#cpTable th.ch{cursor:pointer}#cpTable th.ch:hover{text-decoration:underline}
+.cp-src{font-size:10.5px;color:var(--sub);white-space:nowrap}
+.cp-warn{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:12.5px;margin:0 0 14px;line-height:1.5}
+@media (max-width:640px){.cp-bar{grid-template-columns:90px 1fr 70px}}
 .me-quad{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .me-q{border:1px solid var(--line);border-top:3px solid var(--c);border-radius:12px;padding:12px 14px;background:var(--card);min-width:0}
 .me-q h3{margin:0;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
@@ -939,7 +954,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-sales">
-    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button></div>
+    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button></div>
     <div id="slPrView" style="display:none">
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu prices</h2>
@@ -1004,6 +1019,45 @@ td.num,th.num{text-align:right}
         <div class="scroll"><table id="meAcross"></table></div></div>
       <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
         <div class="hint" id="meDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="slCpView" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>Channel profitability</h2>
+          <p class="hint">A profit and loss of every sales channel (Simphony order type: dine in, take away, Wolt, Glovo…), on RHG's Wolt template: net sales, the channel's costs, cost of goods, other variable costs, the contribution, then the result after fixed and shared costs. Sales from Simphony; cost of goods from the recipes in Business Central; the rest from BC accounts or from the parameters. The period is the one chosen above.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="cpParBtn" aria-expanded="false" aria-controls="cpPar">Parameters</button><button class="mini dark" id="cpXlsx">Excel</button><button class="mini" id="cpRead">Read again</button></div></div>
+        <div class="me-par" id="cpPar" hidden>
+          <h3>Channel profitability parameters</h3>
+          <p class="hint" style="margin:2px 0 10px">Per channel, the costs that Simphony does not hold. Amounts per month are per location. Where BC accounts are given, the net change of those accounts on the location's department replaces the amount typed here. Nothing is assumed: an empty commission stays at zero and is flagged.</p>
+          <div class="formgrid">
+            <label class="field">VAT on sales (%)<input id="cpVat" type="number" min="0" max="100" step="0.5"><span class="meta">For a commission charged on sales with VAT.</span></label>
+            <label class="field">Waste on cost of goods (%)<input id="cpWaste" type="number" min="0" max="100" step="0.5"><span class="meta">Added to the recipe cost of every channel.</span></label>
+            <label class="field">Shared costs of the location<select id="cpAlloc"><option value="0">Not allocated</option><option value="1">Allocated by net sales</option></select></label>
+            <label class="field">BC accounts of the shared costs<input id="cpShared" placeholder="613, 615, 641"><span class="meta">Rent, energy, shared labour…: account numbers or prefixes, on the location's department. Not the cost of goods or the channel's own accounts.</span></label>
+          </div>
+          <div class="formgrid" style="margin-top:4px"><label class="field">Channel<select id="cpParCh"></select></label></div>
+          <div class="formgrid" id="cpParFields"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            <button class="btn dark" id="cpParSave">Save and apply</button><button class="btn" id="cpParClose">Close</button><span class="meta" id="cpParMsg"></span></div>
+        </div>
+        <div class="filters" style="margin:6px 0 8px">
+          <label>Level<select id="cpLevel"><option value="all">All RHG</option><option value="brand">Brand</option><option value="location">Location</option></select></label>
+          <label id="cpKeyL" style="display:none"><span id="cpKeyT">Brand</span><select id="cpKey"></select></label>
+          <label>View<select id="cpView"><option value="channel">By channel</option><option value="month">One channel, month by month</option></select></label>
+          <label id="cpChL" style="display:none">Channel<select id="cpCh"></select></label>
+        </div>
+        <p class="meta" id="cpStatus" style="margin:0"></p>
+      </div>
+      <div class="cp-warn" id="cpWarn" style="display:none"></div>
+      <div class="kpis six" id="cpKpis"></div>
+      <div class="card" style="margin-bottom:16px"><h2>Where 100 of net sales goes</h2>
+        <p class="hint" id="cpBarsHint">Each channel's net sales split into cost of goods, the channel's costs, other variable costs, fixed and shared costs, and what is left; the figure on the right is the result after full costs, as a share of net sales.</p>
+        <div class="cp-lg"><span><i class="cp-s-cogs"></i>Cost of goods</span><span><i class="cp-s-chan"></i>Channel costs</span><span><i class="cp-s-var"></i>Packaging, labour, transport, other</span><span><i class="cp-s-fix"></i>Fixed and shared</span><span><i class="cp-s-res"></i>Result</span></div>
+        <div class="cp-bars" id="cpBars"></div></div>
+      <div class="card" style="margin-bottom:16px"><h2 id="cpTitle">Profit and loss</h2>
+        <p class="hint" id="cpTableHint">Without VAT; costs as positive amounts. Click a channel for its months. The source of each line is beside it.</p>
+        <div class="scroll"><table id="cpTable" data-nosort></table></div></div>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="cpDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
     <div id="slLocView" style="display:none">
       <div class="card">
@@ -1518,6 +1572,7 @@ function render(){
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "menu" && meKey !== meQs()) meLoad();
+  if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "chanprofit" && cpKey !== cpQs()) cpLoad();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
@@ -2131,6 +2186,138 @@ function renderSales(){
   if (slTab === "loc") slRender();
 }
 
+// ---------- Sales → Channel profitability ----------
+let cpData = null, cpKey = "", cpTimer = null, cpCfg = null, cpFields = [];
+const cpM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + ilM(Math.abs(v));
+function cpQs(){
+  const p = new URLSearchParams(params()), o = new URLSearchParams();
+  o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
+  o.set("level", $("cpLevel").value); if ($("cpLevel").value !== "all") o.set("key", $("cpKey").value || "");
+  o.set("view", $("cpView").value); if ($("cpView").value === "month") o.set("channel", $("cpCh").value || "");
+  return o.toString();
+}
+async function cpLoad(refresh){
+  clearTimeout(cpTimer);
+  const q = cpQs(); cpKey = q;
+  $("cpStatus").textContent = "Reading the channels from Simphony and Business Central…";
+  try{
+    const j = await readJSON(await fetch("/api/sales/channel-profit?" + q + (refresh ? "&refresh=1" : "")));
+    if (cpKey !== q) return;
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      $("cpStatus").textContent = `Reading the order types and menu items from Simphony, day by day${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)}` : "…"} The first read of a long period takes a few minutes; closed days are kept.`;
+      cpTimer = setTimeout(() => cpLoad(false), 4000); return;
+    }
+    if (j.available === false) throw new Error(j.error || "not available");
+    cpData = j; cpCfg = j.config; cpFields = j.fields; cpFill(); cpRender();
+  }catch(e){ $("cpStatus").textContent = "Could not read: " + e.message; }
+}
+function cpFill(){
+  const d = cpData, lv = $("cpLevel").value, keep = $("cpKey").value || d.key;
+  $("cpKeyL").style.display = lv === "all" ? "none" : "";
+  $("cpKeyT").textContent = lv === "brand" ? "Brand" : "Location";
+  const opts = lv === "brand" ? d.brands.map(b => [b, b]) : d.locations.map(L => [L.ref, L.name]);
+  $("cpKey").innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+  if (opts.some(o => o[0] === keep)) $("cpKey").value = keep;
+  const kc = $("cpCh").value || d.channel;
+  $("cpCh").innerHTML = d.channels.map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join("");
+  if (d.channels.some(c => c.key === kc)) $("cpCh").value = kc;
+  $("cpChL").style.display = $("cpView").value === "month" ? "" : "none";
+}
+$("cpLevel").onchange = () => { if (cpData) cpFill(); $("cpKeyL").style.display = $("cpLevel").value === "all" ? "none" : ""; if ($("cpLevel").value !== "all" && !$("cpKey").value) return; cpLoad(); };
+$("cpKey").onchange = () => cpLoad();
+$("cpView").onchange = () => { $("cpChL").style.display = $("cpView").value === "month" ? "" : "none"; if ($("cpView").value === "month" && !$("cpCh").value && cpData && cpData.channels.length) $("cpCh").value = cpData.channels[0].key; cpLoad(); };
+$("cpCh").onchange = () => cpLoad();
+$("cpRead").onclick = () => cpLoad(true);
+$("cpXlsx").onclick = () => { if (cpData) location.href = "/api/sales/channel-profit/xlsx?" + cpQs(); };
+function cpRender(){
+  const d = cpData, T = d.total, C = d.currency;
+  const card = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const pc = v => v == null ? "–" : fmt(v, 1) + "%";
+  $("cpKpis").innerHTML =
+    card("Net sales", cpM(T.net), `${esc(C)} · ${fmt(T.orders)} orders`) +
+    card("Channel costs", cpM(T.channel_costs), T.net ? `${fmt(T.channel_costs / T.net * 100, 1)}% of net sales` : "") +
+    card("Cost of goods", cpM(T.cogs), `${pc(T.cogs_share)} of net sales · ${T.cogs_coverage != null ? fmt(T.cogs_coverage, 0) + "% costed" : ""}`) +
+    card("Contribution", cpM(T.contribution), `${pc(T.contribution_pct)} · ${cpM(T.contribution_per_order)} per order`, T.contribution < 0 ? "up" : "") +
+    card("Result after full costs", cpM(T.result), pc(T.result_pct), T.result < 0 ? "up" : "") +
+    card("Net sales per order", cpM(T.net_per_order), `commission ${pc(T.commission_share)} of net sales`);
+  $("cpStatus").textContent = `${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"} · ${C}${d.converted ? " (converted at the group rates of Settings)" : ""} · read ${d.read_at}`
+    + (Object.keys(d.bc_accounts).length ? ` · BC accounts: ${Object.entries(d.bc_accounts).map(([k, v]) => `${k} ${v.join(", ")}`).join("; ")}` : "")
+    + (d.errors.length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  $("cpWarn").style.display = d.warnings.length ? "" : "none";
+  $("cpWarn").innerHTML = d.warnings.map(w => `• ${esc(w)}`).join("<br>");
+  const cols = d.columns;
+  $("cpBars").innerHTML = cols.map(c => {
+    const v = c.values, n = v.net || 0;
+    if (n <= 0) return "";
+    const seg = [["cogs", v.cogs], ["chan", v.channel_costs], ["var", v.packaging + v.labour + v.transport + v.other_var], ["fix", v.fixed + v.shared]];
+    const used = seg.reduce((a, s) => a + Math.max(0, s[1]), 0), res = n - used;
+    const scale = Math.max(n, used);
+    const parts = seg.filter(s => s[1] > 0).map(s => `<i class="cp-s-${s[0]}" style="flex:${s[1] / scale}" title="${esc(s[0])} ${fmt(s[1] / n * 100, 1)}%"></i>`).join("")
+      + (res > 0 ? `<i class="cp-s-res" style="flex:${res / scale}"></i>` : "");
+    return `<div class="cp-bar"><span>${esc(c.label)}</span><span class="t">${parts}</span><span class="r ${v.result < 0 ? "up" : "down"}">${v.result_pct != null ? fmt(v.result_pct, 1) + "%" : "–"}</span></div>`;
+  }).join("") || `<p class="hint">No sales in this selection.</p>`;
+  $("cpBarsHint").style.display = cols.length ? "" : "none";
+  $("cpTitle").textContent = d.view === "month" ? `Profit and loss · ${(d.channels.find(c => c.key === d.channel) || {}).label || d.channel}, month by month` : "Profit and loss by channel";
+  const hasTotal = cols.length > 1 || d.view === "month";
+  let sec = null, h = `<thead><tr><th>Line</th><th>Source</th>${cols.map(c => `<th class="num ${d.view === "channel" ? "ch" : ""}" data-ch="${esc(c.key)}">${esc(c.label)}</th>`).join("")}${hasTotal ? `<th class="num">Total</th>` : ""}</tr></thead><tbody>`;
+  const cell = (ln, v) => {
+    if (v == null) return `<td class="num meta">–</td>`;
+    const neg = v < 0 && ["M", "m"].includes(ln.kind);
+    const t = ln.kind === "%" ? fmt(v, 1) + "%" : ln.kind === "n" ? fmt(v) : cpM(v);
+    return `<td class="num ${neg ? "neg" : ""}">${t}</td>`;
+  };
+  for (const ln of d.lines) {
+    if (ln.section !== sec) { sec = ln.section; h += `<tr><td class="sec" colspan="${cols.length + (hasTotal ? 3 : 2)}">${esc(sec.toUpperCase())}</td></tr>`; }
+    h += `<tr class="${ln.kind === "M" ? "tot" : ln.section === "Indicators" ? "kpi" : ""}"><td>${esc(ln.label)}</td><td class="cp-src">${esc(ln.source)}</td>${cols.map(c => cell(ln, c.values[ln.key])).join("")}${hasTotal ? cell(ln, T[ln.key]) : ""}</tr>`;
+  }
+  $("cpTable").innerHTML = h + "</tbody>";
+  $("cpTable").querySelectorAll("th.ch").forEach(th => th.onclick = () => { $("cpView").value = "month"; $("cpChL").style.display = ""; $("cpCh").value = th.dataset.ch; cpLoad(); });
+  $("cpDefs").innerHTML = Object.values(d.definitions).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
+  if (!$("cpPar").hidden) cpParFill();
+}
+// the parameters window
+function cpParFill(){
+  const c = cpCfg || {channels: {}}, chs = (cpData && cpData.channels) || [];
+  $("cpVat").value = c.vat_pct ?? 20; $("cpWaste").value = c.waste_pct ?? 0; $("cpAlloc").value = c.allocate_shared ? "1" : "0"; $("cpShared").value = c.shared_accounts || "";
+  const keep = $("cpParCh").value;
+  const names = [...new Set([...chs.map(x => x.key), ...Object.keys(c.channels || {})])];
+  $("cpParCh").innerHTML = names.map(k => `<option value="${esc(k)}">${esc((chs.find(x => x.key === k) || {}).label || k)}</option>`).join("");
+  if (names.includes(keep)) $("cpParCh").value = keep;
+  cpParChannel();
+  const ok = can("settings");
+  $("cpParSave").disabled = !ok; $("cpParSave").title = ok ? "" : "Your role cannot change Settings (needs finance.settings.manage).";
+}
+function cpParChannel(){
+  const ch = $("cpParCh").value, v = ((cpCfg || {}).channels || {})[ch] || {};
+  $("cpParFields").innerHTML = cpFields.map(f => {
+    const val = v[f.key] ?? (f.unit === "base" ? "vat" : f.unit === "accounts" ? "" : 0);
+    if (f.unit === "base") return `<label class="field">${esc(f.label)}<select data-f="${f.key}"><option value="vat" ${val === "vat" ? "selected" : ""}>Sales with VAT</option><option value="net" ${val === "net" ? "selected" : ""}>Net sales without VAT</option></select></label>`;
+    if (f.unit === "accounts") return `<label class="field">${esc(f.label)}<input data-f="${f.key}" value="${esc(val)}" placeholder="e.g. 6271"><span class="meta">Replaces the amount above when set.</span></label>`;
+    return `<label class="field">${esc(f.label)} (${esc(f.unit)})<input data-f="${f.key}" type="number" min="0" step="any" value="${esc(val)}"></label>`;
+  }).join("");
+}
+function cpParShow(on){ $("cpPar").hidden = !on; $("cpParBtn").setAttribute("aria-expanded", on); if (on) { cpParFill(); $("cpParMsg").textContent = ""; } }
+$("cpParBtn").onclick = async () => {
+  if ($("cpPar").hidden && !cpCfg) { try{ const j = await readJSON(await fetch("/api/sales/channel-profit/params")); cpCfg = j.config; cpFields = j.fields; }catch(e){} }
+  cpParShow($("cpPar").hidden);
+};
+$("cpParClose").onclick = () => cpParShow(false);
+$("cpParCh").onchange = () => cpParChannel();
+$("cpParSave").onclick = async () => {
+  const ch = $("cpParCh").value, vals = {};
+  $("cpParFields").querySelectorAll("[data-f]").forEach(el => vals[el.dataset.f] = el.value);
+  const body = {vat_pct: $("cpVat").value, waste_pct: $("cpWaste").value, allocate_shared: $("cpAlloc").value === "1",
+                shared_accounts: $("cpShared").value, channels: ch ? {[ch]: vals} : {}};
+  $("cpParMsg").textContent = "Saving…";
+  try{
+    const j = await simphonyPost("/api/sales/channel-profit/params", body);
+    cpCfg = j.config; cpFields = j.fields;
+    $("cpParMsg").textContent = "Saved. Working the channels out again…";
+    cpKey = ""; await cpLoad();
+    $("cpParMsg").textContent = "Saved and applied.";
+  }catch(e){ $("cpParMsg").textContent = "Could not save: " + e.message; }
+};
 // ---------- Sales → Menu engineering ----------
 let meData = null, meKey = "", meTimer = null, meCls = "", meHl = null;
 const ME_ORDER = ["star", "plowhorse", "puzzle", "dog", "nocost"];
@@ -2320,7 +2507,9 @@ var slTab = "main", slSort = "net";
 function slShowTab(tab){
   slTab = tab;
   document.querySelectorAll("#slTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" ? "none" : "";
+  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" ? "none" : "";
+  $("slCpView").style.display = tab === "chanprofit" ? "" : "none";
+  if (tab === "chanprofit" && (!cpData || cpKey !== cpQs())) cpLoad();
   $("slLocView").style.display = tab === "loc" ? "" : "none";
   $("slPrView").style.display = tab === "prices" ? "" : "none";
   $("slMeView").style.display = tab === "menu" ? "" : "none";
@@ -3780,7 +3969,7 @@ function setHeader(){
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){
-    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : "Sales") + " · all restaurants";
+    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : "Sales") + " · all restaurants";
     $("period").textContent = salesData && salesData.available
       ? `${salesData.period.label} · ${salesData.period.from} → ${salesData.period.to} · against ${salesData.prior.from} → ${salesData.prior.to}`
       : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";

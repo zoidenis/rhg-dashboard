@@ -31,6 +31,7 @@ import supstock
 import skuplan
 import recipeuse
 import menueng
+import chanprof
 import today as todayloc
 import unicorn_facts
 import faloc
@@ -80,6 +81,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
+                     "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
                      "/api/pl-memo/settings": "settings", "/api/pl-memo/job": "settings",
@@ -1254,7 +1256,7 @@ def arap_status(user):
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
+EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
                 "/api/discharge/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
@@ -1353,7 +1355,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
             return None
         multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
-                        "/api/sales/menu/xlsx") or (path == "/api/today/locations" and q.get("scope") == "all")
+                        "/api/sales/menu/xlsx", "/api/sales/channel-profit", "/api/sales/channel-profit/xlsx",
+                        "/api/sales/channel-profit/params") or (path == "/api/today/locations" and q.get("scope") == "all")
         if not multi and not access.company_ok(user, company):
             return access.refuse_company(company)
         L = access.locations(user, company)
@@ -1452,6 +1455,49 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/gl":
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
+            elif url.path == "/api/sales/channel-profit/params":
+                self._send(200, {"config": chanprof.load_config(),
+                                 "fields": [{"key": k, "label": lb, "unit": u} for k, lb, u in chanprof.CHANNEL_FIELDS]})
+            elif url.path in ("/api/sales/channel-profit", "/api/sales/channel-profit/xlsx"):
+                # Sales → Channel profitability: a P&L of every order type (Simphony) with costs from BC and parameters
+                if not simphony.info()["configured"]:
+                    self._send(200, {"error": "The Simphony connection is not set."})
+                    return
+                try:
+                    per = periods(q.get("period"), q.get("mode", "month"))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                xlsx = url.path.endswith("xlsx")
+                cfg = chanprof.load_config()
+                prefixes = chanprof.bc_prefixes(cfg)
+                refs = simphony_refs_in_scope(user)
+                key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None, prefixes)
+                ds = chanprof.request(per, _latest, client, key, refs, prefixes, q.get("refresh") == "1" and not xlsx)
+                if ds.get("pending") or ds.get("available") is False:
+                    if xlsx:
+                        self._send(409, {"error": "The channels are still being read; try again in a moment."})
+                    else:
+                        self._send(200, ds)
+                    return
+                level = q.get("level") if q.get("level") in ("brand", "location", "all") else "all"
+                view = "month" if q.get("view") == "month" else "channel"
+                r = chanprof.analyse(ds, cfg, level, (q.get("key") or "")[:60], view,
+                                     chanprof.channel_key(q.get("channel") or "")[:60])
+                if not xlsx:
+                    self._send(200, r)
+                    return
+                body = chanprof.render_xlsx(r)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                safe = re.sub(r"[^A-Za-z0-9._-]+", "_", r["title"] + ("_" + r["channel"] if view == "month" else ""))[:50]
+                self.send_header("Content-Disposition", f'attachment; filename="RHG_channel_profitability_{safe}_'
+                                 f'{r["period"]["from"]}_{r["period"]["to"]}.xlsx"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                store.audit("export", f"channel profitability · {r['title']}", user["username"], {}, {}, r["period"]["from"])
             elif url.path in ("/api/sales/menu", "/api/sales/menu/xlsx"):
                 # Sales → Menu engineering: popularity and margin of every menu item (Simphony + BC recipes)
                 if not simphony.info()["configured"]:
@@ -2051,6 +2097,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200 if updated else 404, updated or {"error": "Action not found"})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path == "/api/sales/channel-profit/params":
+                self._send(200, {"config": chanprof.save_config(body or {}, actor),
+                                 "fields": [{"key": k, "label": lb, "unit": u} for k, lb, u in chanprof.CHANNEL_FIELDS]})
             elif url.path in ("/api/simphony/settings", "/api/simphony/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
