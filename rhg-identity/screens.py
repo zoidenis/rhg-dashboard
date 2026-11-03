@@ -69,6 +69,7 @@ FINANCE = [
     ("actions", "Action center", "Control", None, [], "company", []),
     ("exceptions", "Exceptions", "Control", None, [], "company", []),
     ("register", "Exceptions register", "Control", None, [], "location", []),
+    ("salesrec", "Simphony ↔ BC", "Control", None, [], "company", []),
     ("gaps", "Data availability", "System", None, [], "company", []),
     ("settings", "Settings", "System", None, [], "company", []),
 ]

@@ -150,7 +150,8 @@ DEFAULT_ROLES = {
     "Accountant": {"department": "Finance", "system": False,
                    "description": "Statements, G/L, Kartela, fiscal and fixed assets; actions; no closing.",
                    "permissions": _s("finance.s.pl", "finance.s.gl", "finance.s.kartela", "finance.s.fiscal",
-                                     "finance.s.assets", "finance.s.actions", "finance.s.exceptions", "finance.s.gaps")
+                                     "finance.s.assets", "finance.s.actions", "finance.s.exceptions", "finance.s.gaps",
+                                     "finance.s.salesrec", "finance.s.register")
                                   + ["finance.export", "finance.actions.manage"]},
     "AP & AR accountant": {"department": "Finance", "system": False,
                            "description": "Payables and receivables: Kartela AP and AR, suppliers & stock, fiscal "
@@ -159,6 +160,7 @@ DEFAULT_ROLES = {
                                            "finance.s.kartela.loc", "finance.s.kartela.today",
                                            "finance.s.fiscal.fiscal", "finance.s.fiscal.fsales",
                                            "finance.s.sales.main", "finance.s.sales.loc", "finance.s.actions",
+                                           "finance.s.salesrec", "finance.s.register",
                                            "purchasing.s.compliance", "purchasing.s.reqs.invoices",
                                            "finance.export", "finance.actions.manage"]},
     "Treasury": {"department": "Finance", "system": False,
@@ -239,7 +241,9 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.sales.menu": "finance.s.sales.prices",
                  "finance.s.sales.chanprofit": "finance.s.sales.main",
                  # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing
-                 "finance.s.register": ("finance.s.actions", "finance.s.inventory.recipes", "purchasing.s.compare")}
+                 "finance.s.register": ("finance.s.actions", "finance.s.inventory.recipes", "purchasing.s.compare"),
+                 # the sales reconciliation: whoever reads receivables or fiscal sales
+                 "finance.s.salesrec": ("finance.s.kartela.ar", "finance.s.fiscal.fsales")}
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 

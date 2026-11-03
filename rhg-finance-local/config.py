@@ -81,3 +81,4 @@ E_PO_LINES = get("E_PO_LINES", "PurchaseOrderPurchLines")   # the lines part of 
 E_TRANSFER_HEADERS = get("E_TRANSFER_HEADERS", "navtransferheaders")   # open transfer orders
 E_TRANSFER_LINES = get("E_TRANSFER_LINES", "navtransferlines")
 E_SKU = get("E_SKU", "StockkeepingUnitCard")      # SKU cards: planning parameters per item and location
+E_POS_ARCHIVE = get("E_POS_ARCHIVE", "MIDSimphonyArchive")   # the POS import of Simphony sales, by day and menu item

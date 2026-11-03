@@ -166,6 +166,27 @@ td.num,th.num{text-align:right}
 .rg-hist li{padding:5px 0;border-bottom:1px solid var(--line)}.rg-hist li b{font-weight:600}
 #rgOwners tr.on td{font-weight:700}#rgOwners tr{cursor:pointer}
 @media (max-width:760px){.rg-panel{grid-template-columns:1fr}}
+/* Simphony ↔ BC */
+#sxKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#sxGrid{border-collapse:separate;border-spacing:3px}
+#sxGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
+#sxGrid th.loc,#sxGrid td.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px}
+#sxGrid td.loc,#sxGrid th.loc{position:sticky;left:0;background:var(--card);z-index:1}
+#sxGrid td.loc .meta{font-size:11px}
+#sxGrid td.c{width:44px;min-width:44px;height:34px;border-radius:6px;text-align:center;font-size:10.5px;font-weight:600;cursor:pointer;padding:0;
+  background:var(--bg);color:var(--sub);border:2px solid transparent}
+#sxGrid td.c.ok{background:var(--down-bg);color:var(--down)}
+#sxGrid td.c.not_imported,#sxGrid td.c.invoice_diff{background:var(--up-bg);color:var(--up)}
+#sxGrid td.c.import_diff,#sxGrid td.c.not_posted,#sxGrid td.c.unpaid{background:var(--warn-bg);color:var(--warn)}
+#sxGrid td.c.pending{background:var(--card);border:2px dashed var(--line)}
+#sxGrid td.c.no_sales{background:none;color:var(--line)}
+#sxGrid td.c.sel{border-color:var(--ink)}
+.sx-lg i.ok{background:var(--down-bg);border:1px solid var(--down)}.sx-lg i.bad{background:var(--up-bg);border:1px solid var(--up)}
+.sx-lg i.warn{background:var(--warn-bg);border:1px solid var(--warn)}.sx-lg i.pend{background:var(--card);border:1px dashed var(--sub)}
+.sx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}
+.sx-tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sx-tile .l{font-size:12px;color:var(--sub);font-weight:600}.sx-tile .v{font-size:20px;font-weight:800;margin:4px 0 2px}
+.sx-tile .s{font-size:11.5px;color:var(--sub);overflow-wrap:anywhere}
 .pl-sq.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 /* Sales → Menu engineering */
 .me-c-star{--c:var(--down)}.me-c-plowhorse{--c:var(--warn)}.me-c-puzzle{--c:var(--accent)}.me-c-dog{--c:var(--up)}.me-c-nocost,.me-c-noprice{--c:var(--sub)}
@@ -423,6 +444,7 @@ td.num,th.num{text-align:right}
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
     <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
     <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
+    <button data-view="salesrec">Simphony ↔ BC</button>
 
     <div class="grp">System</div>
     <button data-view="gaps">Data availability</button>
@@ -1145,7 +1167,7 @@ td.num,th.num{text-align:right}
       <div class="scroll"><table id="rgItems"></table></div><p class="meta" id="rgMore"></p></div>
     <div class="card" id="rgSetCard" style="display:none">
       <div class="card-head"><div><h2>Daily controls and the owners' email</h2>
-        <p class="hint">At the time set, the controls read every company of the negative stock email (Settings → Negative stock daily email) unless the 07:30 email has already read it that day, and sync the register: negative stock lines and the recipe interventions of Received vs discharged (30 days). Then, if switched on, every owner gets one email with their open items, overdue first; items overdue longer than the escalation days put the roles below (of Email recipients by company) in Cc.</p></div>
+        <p class="hint">At the time set, the controls read every company of the negative stock email (Settings → Negative stock daily email) unless the 07:30 email has already read it that day, and sync the register: negative stock lines and the recipe interventions of Received vs discharged (30 days); and the sales reconciliation Simphony ↔ BC of every company with restaurants. Then, if switched on, every owner gets one email with their open items, overdue first; items overdue longer than the escalation days put the roles below (of Email recipients by company) in Cc.</p></div>
         <span class="rhg-pill" id="rgPill">Off</span></div>
       <div class="formgrid">
         <label class="field">Time<input id="rgTime" type="time" value="08:15"></label>
@@ -1165,6 +1187,40 @@ td.num,th.num{text-align:right}
     </div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the register works</summary>
       <div class="hint" id="rgDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-salesrec">
+    <div class="card">
+      <div class="card-head"><div><h2>Simphony ↔ BC</h2>
+        <p class="hint" id="sxNote">Every restaurant and business day: what Simphony sold, what the POS import brought into Business Central, what was invoiced to the restaurant's customer and what is still open on the invoice. A day that does not meet becomes an exception in the register, with its owner; it closes when the figures meet.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="mini dark" id="sxRead">Read again</button><button class="mini" id="sxReg">Exceptions in the register</button></div></div>
+      <div class="kpis six" id="sxKpis" style="margin-top:14px"></div>
+      <p class="meta" id="sxStatus"></p>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>Every restaurant, every day</h2>
+      <p class="hint">A square per day: green when Simphony, the import and the invoice meet; the gap of the import against Simphony in the square. Click a square for the day.</p></div></div>
+      <div class="il-lg sx-lg" id="sxLegend" style="margin:0 0 8px"></div>
+      <div class="scroll" data-nosort><table id="sxGrid"></table></div></div>
+    <div class="card" id="sxDetCard" style="display:none"><div class="card-head"><div><h2 id="sxDetTitle"></h2><p class="hint" id="sxDetNote"></p></div></div>
+      <div class="sx-tiles" id="sxTiles"></div>
+      <div class="scroll"><table id="sxItems"></table></div><p class="meta" id="sxItemsMore"></p></div>
+    <div class="card"><div class="card-head"><div><h2>Menu items and BC items</h2>
+      <p class="hint">Menu items of the period imported with no BC item, with an item BC does not know or has blocked, with an item that needs a recipe and has none, or sold in Simphony and never imported. Each one is an exception for the cost controller.</p></div></div>
+      <div class="scroll"><table id="sxMap"></table></div></div>
+    <div class="card" id="sxSetCard" style="display:none"><div class="card-head"><div><h2>Lags and tolerance</h2>
+      <p class="hint">A day is pending, not an exception, until its lag has passed. A gap counts above the larger of the amount and the percentage.</p></div></div>
+      <div class="formgrid">
+        <label class="field">Days read (back from yesterday)<input id="sxSDays" type="number" min="3" max="62"></label>
+        <label class="field">Import lag (days)<input id="sxSImp" type="number" min="0" max="30"></label>
+        <label class="field">Posting lag (days)<input id="sxSPost" type="number" min="0" max="30"></label>
+        <label class="field">Settle within (days)<input id="sxSSettle" type="number" min="0" max="90"></label>
+        <label class="field">Tolerance (amount)<input id="sxSAbs" type="number" min="0"></label>
+        <label class="field">Tolerance (%)<input id="sxSPct" type="number" min="0" max="100" step="0.1"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="sxSave">Save</button><span class="meta" id="sxMsg"></span></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
+      <div class="hint" id="sxDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-actions"><div class="card">
@@ -3402,6 +3458,88 @@ $("modalCsv").onclick=()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
+// ---------------------------------------------------------------- Simphony ↔ BC
+let sxData = null, sxTimer = null, sxSel = null;
+const SX_SHORT = {not_imported: "none", import_diff: "", invoice_diff: "inv", not_posted: "post", unpaid: "open", pending: "…", ok: "✓", no_sales: "·"};
+const sxM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
+const sxS = v => (v > 0 ? "+" : v < 0 ? "−" : "") + sxM(Math.abs(v));
+async function loadSalesrec(refresh){
+  clearTimeout(sxTimer);
+  $("sxStatus").textContent = "Reading…";
+  try{
+    const p = new URLSearchParams({company: $("company").value || ""});
+    const j = await readJSON(await fetch("/api/salesrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    if (j.error && j.available !== false) throw new Error(j.error);
+    if (j.pending) { $("sxStatus").textContent = `${j.note} ${j.stage || ""}`; sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
+    if (j.available === false) throw new Error(j.error || "not available");
+    sxData = j; renderSalesrec();
+  }catch(e){ $("sxStatus").textContent = "Could not read: " + e.message; }
+}
+function renderSalesrec(){
+  const d = sxData, k = d.kpis, c = d.currency;
+  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  $("sxKpis").innerHTML =
+    card("Simphony sales", sxM(k.sim), `${c} · VAT included, after discounts`) +
+    card("Imported in BC", sxM(k.imp), `${sxS(k.imp_gap)} against Simphony, the same days`, Math.abs(k.imp_gap) > d.settings.tol_abs ? "warn" : "") +
+    card("Invoiced", sxM(k.inv), `${sxS(k.inv_gap)} against the import, the same days`, Math.abs(k.inv_gap) > d.settings.tol_abs ? "warn" : "") +
+    card("Days reconciled", `${fmt(k.ok)} / ${fmt(k.days)}`, "past their lag", k.ok === k.days ? "down" : "warn") +
+    card("Open on the invoices", sxM(k.remaining), "takings not yet applied", k.remaining ? "warn" : "") +
+    card("Exceptions", fmt(k.issues), `${fmt(k.mapping)} menu items`, k.issues ? "up" : "down");
+  $("sxNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.length} restaurants` + (d.simphony ? "" : " · Simphony is not connected: only the import, the invoices and the takings are checked");
+  $("sxStatus").textContent = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
+    + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  $("sxLegend").innerHTML = `<span><i class="ok"></i>${esc(d.statuses.ok)}</span><span><i class="bad"></i>${esc(d.statuses.not_imported)} · ${esc(d.statuses.invoice_diff)}</span>
+    <span><i class="warn"></i>${esc(d.statuses.import_diff)} · ${esc(d.statuses.not_posted)} · ${esc(d.statuses.unpaid)}</span><span><i class="pend"></i>${esc(d.statuses.pending)}</span>`;
+  const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  $("sxGrid").innerHTML = `<tr><th class="loc"></th>${days.map(x => `<th>${wd[new Date(x + "T12:00:00").getDay()]}<br>${x.slice(8)}</th>`).join("")}</tr>` +
+    d.locations.map((L, li) => `<tr><td class="loc"><b>${esc(L.name)}</b><div class="meta">${esc(L.bc)}${L.issues ? ` · ${fmt(L.issues)} ${L.issues === 1 ? "issue" : "issues"}` : ""}</div></td>` +
+      days.map(x => { const cc = L.cells[x]; const g = cc.sim != null && cc.imp != null ? cc.imp - cc.sim : null;
+        const txt = cc.status === "import_diff" && g != null ? sxS(g) : SX_SHORT[cc.status];
+        return `<td class="c ${cc.status}${sxSel && sxSel[0] === li && sxSel[1] === x ? " sel" : ""}" data-l="${li}" data-d="${x}" title="${esc(L.name)} ${x}: ${esc(cc.issues.map(i => d.statuses[i]).join(", ") || d.statuses[cc.status])}">${txt}</td>`; }).join("") + `</tr>`).join("");
+  $("sxGrid").querySelectorAll("td.c").forEach(td => td.onclick = () => { sxSel = [+td.dataset.l, td.dataset.d]; renderSalesrec(); });
+  renderSrDetail();
+  const maps = d.mapping || [];
+  $("sxMap").innerHTML = maps.length ? `<tr><th>Menu item</th><th>Problem</th><th>BC item</th><th>Where</th><th class="num">Days</th><th class="num">Sold</th><th class="num">Value</th></tr>` +
+    maps.slice(0, 150).map(M => `<tr><td><b>${esc(M.mi)}</b> ${esc(M.name)}</td><td>${esc(M.label)}</td><td>${esc(M.item || "–")}</td><td class="meta">${esc(M.locations.join(", "))}</td>
+      <td class="num">${fmt(M.days)}</td><td class="num">${dcQ(M.qty)}</td><td class="num">${sxM(M.value)}</td></tr>`).join("")
+    : `<tr><td class="meta">Every menu item of the period is imported with a BC item that exists, is not blocked and has its recipe.</td></tr>`;
+  $("sxSetCard").style.display = can("settings") ? "" : "none";
+  const S = d.settings;
+  [["sxSDays", "days"], ["sxSImp", "import_lag"], ["sxSPost", "post_lag"], ["sxSSettle", "settle_days"], ["sxSAbs", "tol_abs"], ["sxSPct", "tol_pct"]].forEach(([id, key]) => { if (document.activeElement !== $(id)) $(id).value = S[key]; });
+  $("sxDefs").innerHTML = `<p><b>Simphony.</b> Menu items sold by business day (Reporting and Analytics), VAT included, after item discounts; items marked not included in sales are left out.</p>
+    <p><b>Imported.</b> The POS import of Business Central (MID Simphony Archive): line totals plus line discounts, by transaction date and the restaurant's customer (Settings → Locations registry).</p>
+    <p><b>Invoiced.</b> Sales invoices less credit memos of that customer on that posting date, in the customer ledger; what is still open on them is the takings not yet applied.</p>
+    <p><b>Exceptions.</b> Not imported after ${S.import_lag} days → Chief accountant. Import ≠ Simphony, beyond ${fmt(S.tol_abs)} or ${S.tol_pct}% → Chief accountant, with the menu items that differ. Not posted after ${S.post_lag} days → Chief accountant. Invoice ≠ import → Chief accountant. Still open after ${S.settle_days} days → Finance. Menu item problems → Cost controller. Owners come from Email recipients by company; every exception closes by itself when the data meets.</p>`;
+}
+function renderSrDetail(){
+  const d = sxData;
+  if (!sxSel || !d.locations[sxSel[0]]) { $("sxDetCard").style.display = "none"; return; }
+  const L = d.locations[sxSel[0]], c = L.cells[sxSel[1]];
+  if (!c) { $("sxDetCard").style.display = "none"; return; }
+  $("sxDetCard").style.display = "";
+  $("sxDetTitle").textContent = `${L.name} · ${sxSel[1]}`;
+  $("sxDetNote").textContent = (c.issues.length ? c.issues.map(i => d.statuses[i]).join(" · ") : d.statuses[c.status]) + ` · ${c.age} days ago`;
+  const tile = (l, v, s) => `<div class="sx-tile"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  $("sxTiles").innerHTML = tile("Simphony", sxM(c.sim), c.sim == null ? "not read: the day is not closed in Simphony, or Simphony is not connected" : "sold at the till") +
+    tile("Imported in BC", sxM(c.imp), c.imp == null ? "nothing in the POS import" : `${fmt(c.rows)} lines${c.unposted ? `, ${fmt(c.unposted)} not in a sales document` : ""} · ${(c.imported_at || "").replace("T", " ")}`) +
+    tile("Invoiced", sxM(c.inv), c.inv == null ? "no sales invoice of " + L.customer : (c.docs || []).join(", ")) +
+    tile("Open on the invoice", sxM(c.remaining), c.remaining ? "takings not yet applied" : c.inv == null ? "–" : "settled");
+  const it = c.items || [];
+  $("sxItems").innerHTML = it.length ? `<tr><th>Menu item</th><th>BC item</th><th class="num">Simphony qty</th><th class="num">Imported qty</th><th class="num">Simphony</th><th class="num">Imported</th><th class="num">Difference</th></tr>` +
+    it.map(x => `<tr><td><b>${esc(x.mi)}</b> ${esc(x.name || "")}</td><td>${esc(x.item || "–")}</td><td class="num">${dcQ(x.sim_qty)}</td><td class="num">${dcQ(x.imp_qty)}</td>
+      <td class="num">${fmt(Math.round(x.sim))}</td><td class="num">${fmt(Math.round(x.imp))}</td><td class="num ${Math.abs(x.diff) >= 1 ? "warn" : ""}">${sxS(x.diff)}</td></tr>`).join("")
+    : `<tr><td class="meta">${c.sim != null && c.imp != null ? "Every menu item meets, quantity and value." : "Menu items are compared when both Simphony and the import have the day."}</td></tr>`;
+  $("sxItemsMore").textContent = c.items_n > it.length ? `${fmt(c.items_n - it.length)} more menu items differ by less.` : "";
+}
+$("sxRead").onclick = () => loadSalesrec(true);
+$("sxReg").onclick = () => { navTo("register"); $("rgSource").innerHTML = `<option value="sales_rec">Simphony ↔ BC</option>`; $("rgSource").value = "sales_rec"; loadRegister(); };
+$("sxSave").onclick = async () => {
+  $("sxMsg").textContent = "Saving…";
+  try{ await simphonyPost("/api/salesrec/settings", {days: $("sxSDays").value, import_lag: $("sxSImp").value, post_lag: $("sxSPost").value,
+      settle_days: $("sxSSettle").value, tol_abs: $("sxSAbs").value, tol_pct: $("sxSPct").value});
+    $("sxMsg").textContent = "Saved. Reading again with the new limits…"; loadSalesrec(true); }
+  catch(e){ $("sxMsg").textContent = "Could not save: " + e.message; }
+};
 // ---------------------------------------------------------------- exceptions register
 let rgData = null, rgStatus = "active", rgOpen = "", rgJobTimer = null, rgSetLoaded = false;
 const RG_CHIPS = [["active", "Active"], ["overdue", "Overdue"], ["Open", "Open"], ["In progress", "In progress"],
@@ -3463,12 +3601,12 @@ function renderRegister(){
   $("rgRun").disabled = !d.can_settings || (d.job && d.job.state === "running");
   $("rgRun").title = d.can_settings ? "Reads Business Central for every company of the negative stock email and syncs the register." : "Your role cannot run the controls (needs finance.settings.manage).";
   if (d.job && d.job.state !== "running") $("rgStatus").textContent += ` · Run by ${d.job.by} at ${rgWhen(d.job.ended)}: ` + (d.job.state === "failed" ? "failed, " + (d.job.error || "")
-    : (d.job.result || []).map(r => `${r.company} ${r.status}` + (r.negative_stock ? ` (${r.negative_stock.found} + ${(r.discharge || {}).found || 0} found, ${r.negative_stock.opened + ((r.discharge || {}).opened || 0)} opened, ${r.negative_stock.closed + ((r.discharge || {}).closed || 0)} closed)` : r.detail ? ` (${r.detail})` : "")).join(" · "));
+    : (d.job.result || []).map(r => `${r.control === "sales_rec" ? "Simphony ↔ BC " : ""}${r.company} ${r.status}` + (r.sales_rec ? ` (${r.sales_rec.found} found, ${r.sales_rec.opened} opened, ${r.sales_rec.closed} closed)` : r.negative_stock ? ` (${r.negative_stock.found} + ${(r.discharge || {}).found || 0} found, ${r.negative_stock.opened + ((r.discharge || {}).opened || 0)} opened, ${r.negative_stock.closed + ((r.discharge || {}).closed || 0)} closed)` : r.detail ? ` (${r.detail})` : "")).join(" · "));
   if (d.job && d.job.state === "running") { $("rgStatus").textContent = `Controls running since ${rgWhen(d.job.started)}… several minutes.`; clearTimeout(rgJobTimer); rgJobTimer = setTimeout(loadRegister, 8000); }
   $("rgSetCard").style.display = d.can_settings ? "" : "none";
   if (d.can_settings) renderRgSettings();
   const sla = d.sla || {};
-  $("rgDefs").innerHTML = `<p><b>Where the items come from.</b> Negative stock: every item below zero at a location at the end of the day before (the same lines as the negative stock email), owned by its likely cause: receipt not posted → Stock manager, recipe wrong → Cost controller, sold without purchase → Purchasing manager. Received vs discharged: every recipe intervention over the last 30 days → Cost controller.</p>
+  $("rgDefs").innerHTML = `<p><b>Where the items come from.</b> Negative stock: every item below zero at a location at the end of the day before (the same lines as the negative stock email), owned by its likely cause: receipt not posted → Stock manager, recipe wrong → Cost controller, sold without purchase → Purchasing manager. Received vs discharged: every recipe intervention over the last 30 days → Cost controller. Simphony ↔ BC: every restaurant and day where Simphony, the POS import and the invoice do not meet → Chief accountant (takings not settled → Finance; menu item problems → Cost controller).</p>
     <p><b>Owner.</b> The people in that role at the item's location in Email recipients by company, else at the company, else in the group row. An owner can hand an item to someone else; it then keeps that owner. Blank hands it back to the role.</p>
     <p><b>Due date.</b> From the day it is found: critical ${sla.critical} days, warning ${sla.warning} days, info ${sla.info} days. A negative stock line below zero for more than 3 days is critical, as are a recipe code not received and a discharge far above what came in.</p>
     <p><b>Statuses.</b> Open → In progress → Fixed – verify (Awaiting verification). Only the data closes an item: the next run that no longer finds it closes it as verified; if it still finds it, it goes back to Open with a note. Dismissed needs a reason and stays out of the counts. A closed item found again is reopened and counted.</p>
@@ -4133,6 +4271,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="register") loadRegister();
+  if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
   if(b.dataset.view==="settings") liSettings();
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);

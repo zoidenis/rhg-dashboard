@@ -40,6 +40,7 @@ import requests
 import cost_report
 import negstock
 import exreg
+import salesrec
 import assets
 import auth
 import brief
@@ -83,7 +84,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
-                     "/api/register/test": "settings",
+                     "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -1198,10 +1199,39 @@ def register_after_negative(company, r, mv, m, excluded):
 negrep.on_built = register_after_negative
 
 
+def register_after_sales(company, r):
+    """After every complete sales reconciliation: its exceptions into the register, for the days it covered."""
+    if not r.get("complete"):
+        return None
+    return exreg.sync("sales_rec", company, salesrec.findings(r), in_scope=salesrec.in_scope(r))
+
+
+salesrec.on_built = register_after_sales
+
+
 def register_controls(actor="scheduler", force=False):
     """The daily control run: every company of the negative stock email, read once a day (the 07:30 email has
-    usually read it already)."""
+    usually read it already), and the sales reconciliation Simphony ↔ BC of every company with restaurants."""
     out = []
+    try:
+        known = {c.upper() for c in client.companies()}
+    except Exception:                                               # noqa: BLE001
+        known = None
+    for c in salesrec.companies():
+        if known is not None and c.upper() not in known:
+            continue
+        if not force and exreg.synced_today("sales_rec", c):
+            out.append({"company": c, "control": "sales_rec", "status": "already read today"})
+            continue
+        try:
+            r = salesrec.build(client, c, _latest)
+            salesrec.remember(c, r)
+            reg = register_after_sales(c, r)
+            out.append({"company": c, "control": "sales_rec", "status": "synced" if reg else "not synced",
+                        "sales_rec": reg, "detail": "" if reg else "; ".join(r.get("errors") or [])[:300]})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "control": "sales_rec", "status": "failed", "detail": str(exc)[:300]})
     for c in negrep.companies():
         if not force and exreg.synced_today("negative_stock", c):
             out.append({"company": c, "status": "already read today"})
@@ -1755,6 +1785,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(pdf)
             elif url.path == "/api/cost-report":
                 self._send(200, cost_report_status())
+            elif url.path == "/api/salesrec":
+                if not auth.can(user, "finance.s.salesrec"):
+                    self._send(403, {"error": "Your role does not include Simphony ↔ BC."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    r = salesrec.request(client, company, _latest, q.get("refresh") == "1")
+                except ValueError as exc:
+                    r = {"available": False, "error": str(exc)}
+                self._send(200, dict(r, companies=salesrec.companies()) if isinstance(r, dict) else r)
             elif url.path == "/api/register":
                 if not auth.can(user, "finance.s.register"):
                     self._send(403, {"error": "Your role does not include the Exceptions register."})
@@ -2240,6 +2280,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"item": exreg.update(body.get("id"), patch, actor)})
                 except (KeyError, ValueError) as exc:
                     self._send(400, {"error": str(exc).strip("'\"")})
+            elif url.path == "/api/salesrec/settings":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                store.save_settings({"sales_rec": body}, actor)
+                self._send(200, {"settings": salesrec.settings_of(store.get_settings())})
             elif url.path in ("/api/register/settings", "/api/register/run", "/api/register/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

@@ -126,6 +126,10 @@ DEFAULT_SETTINGS = {
     # the exceptions register (exreg.py): the controls run every day at time (negative stock and received vs
     # discharged, synced into the register); enabled: the daily email to every owner of open items; items overdue
     # more than escalate_days put the escalate_roles of Email recipients in Cc
+    # the sales reconciliation Simphony ↔ BC (salesrec.py): days read back from yesterday; the days after which a
+    # day not imported, not posted, not settled is an exception; tolerance: the larger of the amount and the %
+    "sales_rec": {"days": "14", "import_lag": "2", "post_lag": "4", "settle_days": "7", "tol_abs": "1000",
+                  "tol_pct": "0.5"},
     "exception_register": {"controls": True, "enabled": False, "time": "08:15", "escalate_days": "3",
                            "escalate_roles": "coo, cfo"},
     # weekly and monthly performance email of every brand (sales and costs against budget and last
@@ -201,6 +205,7 @@ def get_settings():
     merged["cost_report"].update(s.get("cost_report", {}))
     merged["negative_report"].update(s.get("negative_report", {}))
     merged["exception_register"].update(s.get("exception_register", {}))
+    merged["sales_rec"].update(s.get("sales_rec", {}))
     merged["brand_report"].update(s.get("brand_report", {}))
     merged["sales_report"].update(s.get("sales_report", {}))
     merged["pl_memo"].update(s.get("pl_memo", {}))
@@ -270,6 +275,14 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("negative_report", {})[k] = v
+        for k, v in (patch.get("sales_rec") or {}).items():
+            if k in DEFAULT_SETTINGS["sales_rec"]:
+                try:
+                    f = float(v)
+                    v = str(int(f)) if f == int(f) else str(round(f, 2))
+                except (TypeError, ValueError):
+                    v = DEFAULT_SETTINGS["sales_rec"][k]
+                current.setdefault("sales_rec", {})[k] = v
         for k, v in (patch.get("exception_register") or {}).items():
             if k in DEFAULT_SETTINGS["exception_register"]:
                 if isinstance(DEFAULT_SETTINGS["exception_register"][k], bool):

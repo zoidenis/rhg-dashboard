@@ -68,23 +68,34 @@ def _db():
             CREATE TABLE IF NOT EXISTS mio (ref TEXT, day TEXT, ot INTEGER, mi INTEGER, net REAL, qty REAL, disc REAL,
                                             prep REAL, rtn REAL, PRIMARY KEY (ref, day, ot, mi));
             CREATE TABLE IF NOT EXISTS dayso (ref TEXT, day TEXT, final INTEGER, at REAL, PRIMARY KEY (ref, day));
+            -- as Simphony gives them, VAT included and before discounts, every order type together: the sales
+            -- reconciliation against the POS import of Business Central (salesrec.py); dayv: days held so
+            CREATE TABLE IF NOT EXISTS miv (ref TEXT, day TEXT, mi INTEGER, sls REAL, cnt REAL, dsc REAL,
+                                            PRIMARY KEY (ref, day, mi));
+            CREATE TABLE IF NOT EXISTS dayv (ref TEXT, day TEXT, PRIMARY KEY (ref, day));
         """)
     return _conn
 
 
-def read_day(ref, day, latest=None):
+def read_day(ref, day, latest=None, vat=False):
     """The menu item totals of one location and business day, read from Simphony unless held: a closed day
-    (two days before the last business day) is never read again, a recent one after 15 minutes."""
+    (two days before the last business day) is never read again, a recent one after 15 minutes. vat: the day must
+    also be held VAT included (miv), which days read before the sales reconciliation are not."""
     with _db_lock:
         hit = _db().execute("SELECT final, at FROM dayso WHERE ref=? AND day=?", (ref, day)).fetchone()
-    if hit and (hit[0] or time.time() - hit[1] < KEEP_SECONDS):
+        held_v = not vat or _db().execute("SELECT 1 FROM dayv WHERE ref=? AND day=?", (ref, day)).fetchone()
+    if hit and held_v and (hit[0] or time.time() - hit[1] < KEEP_SECONDS):
         return False
     j = simphony.call("getMenuItemDailyTotals", {"locRef": ref, "busDt": day}) or {}
-    agg = {}
+    agg, inc = {}, {}
     for rvc in j.get("revenueCenters") or []:
         for m in rvc.get("menuItems") or []:
             if m.get("miNum") is None:
                 continue
+            v = inc.setdefault(int(m["miNum"]), [0.0, 0.0, 0.0])
+            v[0] += float(m.get("slsTtl") or 0)
+            v[1] += float(m.get("slsCnt") or 0)
+            v[2] += abs(float(m.get("dscTtl") or 0))
             tax = float(m.get("vatTtl") or 0) or float(m.get("inclTaxTtl") or 0)
             x = agg.setdefault((int(m.get("otNum") or 0), int(m["miNum"])), [0.0, 0.0, 0.0, 0.0, 0.0])
             x[0] += float(m.get("slsTtl") or 0) - tax
@@ -100,8 +111,23 @@ def read_day(ref, day, latest=None):
                        [(ref, day, k[0], k[1], round(v[0], 2), v[1], round(v[2], 2), round(v[3], 2), v[4])
                         for k, v in agg.items()])
         db.execute("INSERT OR REPLACE INTO dayso VALUES (?,?,?,?)", (ref, day, int(final), time.time()))
+        db.execute("DELETE FROM miv WHERE ref=? AND day=?", (ref, day))
+        db.executemany("INSERT INTO miv VALUES (?,?,?,?,?,?)",
+                       [(ref, day, mi, round(v[0], 2), v[1], round(v[2], 2)) for mi, v in inc.items()])
+        db.execute("INSERT OR REPLACE INTO dayv VALUES (?,?)", (ref, day))
         db.commit()
     return True
+
+
+def items_vat(ref, a, b):
+    """{day: {menu item: (sales VAT included before discounts, count, discounts)}} of one location, the days held."""
+    with _db_lock:
+        rows = _db().execute("SELECT day, mi, sls, cnt, dsc FROM miv WHERE ref=? AND day>=? AND day<=?", (ref, a, b)).fetchall()
+        held = [d for (d,) in _db().execute("SELECT day FROM dayv WHERE ref=? AND day>=? AND day<=?", (ref, a, b))]
+    out = {d: {} for d in held}
+    for day, mi, sls, cnt, dsc in rows:
+        out.setdefault(day, {})[mi] = (sls or 0.0, cnt or 0.0, dsc or 0.0)
+    return out
 
 
 # ---------------------------------------------------------------- costs from Business Central

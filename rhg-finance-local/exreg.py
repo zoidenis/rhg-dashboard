@@ -33,11 +33,16 @@ ACTIVE = ("Open", "In progress", "Awaiting verification")
 SEVERITY = ("critical", "warning", "info")
 SLA = {"critical": 2, "warning": 5, "info": 10}
 # source → label, and type → the role that owns it (Email recipients roles)
-SOURCES = {"negative_stock": "Negative stock", "discharge": "Received vs discharged"}
+SOURCES = {"negative_stock": "Negative stock", "discharge": "Received vs discharged", "sales_rec": "Simphony ↔ BC"}
 OWNER_ROLE = {
     ("negative_stock", "stock"): "stock_manager", ("negative_stock", "cost"): "cost_controller",
     ("negative_stock", "purchasing"): "purchasing_manager",
     ("discharge", "*"): "cost_controller",
+    # the sales reconciliation: import and posting of the POS sales to the chief accountant, the takings to finance,
+    # the menu item mapping (BC item, recipe) to the cost controller
+    ("sales_rec", "not_imported"): "accounting", ("sales_rec", "import_diff"): "accounting",
+    ("sales_rec", "not_posted"): "accounting", ("sales_rec", "invoice_diff"): "accounting",
+    ("sales_rec", "unpaid"): "finance", ("sales_rec", "*"): "cost_controller",
 }
 ROLE_LABEL = {"stock_manager": "Stock manager", "cost_controller": "Cost controller",
               "purchasing_manager": "Purchasing manager", "finance": "Finance", "accounting": "Chief accountant"}
@@ -93,9 +98,10 @@ def _row(r):
     return x
 
 
-def sync(source, company, findings, locations=None, actor="control run"):
+def sync(source, company, findings, locations=None, actor="control run", in_scope=None):
     """findings: [{"subject", "kind", "title", "detail", "severity", "value", "location"}] of one run. locations: the
-    locations the run read (None = the whole company); only items of that scope are closed when not found."""
+    locations the run read (None = the whole company); in_scope(item) → bool: the items the run covered (its days);
+    only items of that scope are closed when not found."""
     now, today = _now(), date.today()
     opened = closed = reopened = 0
     seen, best = set(), {}
@@ -143,7 +149,8 @@ def sync(source, company, findings, locations=None, actor="control run"):
         q = "SELECT * FROM ex WHERE source=? AND company=? AND status IN ('Open','In progress','Awaiting verification')"
         for r in db.execute(q, (source, company)).fetchall():
             x = _row(r)
-            if x["id"] in seen or (locations is not None and x["location"] not in locations):
+            if x["id"] in seen or (locations is not None and x["location"] not in locations) \
+                    or (in_scope is not None and not in_scope(x)):
                 continue
             x["history"].append({"ts": now, "by": actor, "to": "Closed", "note": "Verified: no longer found in the data"})
             db.execute("UPDATE ex SET status='Closed', closed_at=?, closed_by=?, note=?, history=? WHERE id=?",
