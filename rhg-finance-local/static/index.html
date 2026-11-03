@@ -4616,6 +4616,24 @@ function setHeader(){
     ? `Stock position · company-wide · Opening ${ss.opening_date} → closing ${ss.as_of}`
     : `${m.period_label} · against ${m.compare_label}${m.dimension ? " · " + m.dimension.split(",").join(" + ") : ""} · ${m.currency}`;
 }
+// Filters in the address (the Executive dashboard opens a screen here with its own filters):
+// ?company=SALT&mode=month|quarter|ytd|range&period=2026-10-01 (or 2026-01-01..2026-10-31)&dimension=SALT1,SALT2
+function urlFilters(){
+  const q = new URLSearchParams(location.search);
+  const co = q.get("company");
+  if (co && Array.from($("company").options).some(o => o.value === co)) $("company").value = co;
+  const mode = q.get("mode");
+  if (MODE_LABEL[mode]) { $("mode").value = mode; $("anchorLabel").firstChild.textContent = MODE_LABEL[mode] + " "; }
+  const per = q.get("period") || "";
+  if (/^\d{4}-\d{2}-\d{2}(\.\.\d{4}-\d{2}-\d{2})?$/.test(per)) {
+    const [a, b] = per.split("..");
+    $("anchor").value = $("mode").value === "range" ? a : snap(a);
+    if (b) $("anchorTo").value = b;
+  }
+  const dims = (q.get("dimension") || "").split(",").filter(Boolean);
+  if (dims.length) { Array.from($("dimension").options).forEach(o => { o.selected = dims.includes(o.value); }); dimSync(); }
+  rangeSync();
+}
 function openFromHash(){
   const v = (location.hash || "").slice(1);
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
@@ -4669,6 +4687,7 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
       (j.dimensions||[]).map(([code,name])=>`<option value="${esc(code)}">${esc(code)} — ${esc(name)}</option>`).join("");
     dimSync();
   }catch(e){ $("company").innerHTML = `<option>SALT</option>`; }
+  urlFilters();
   openFromHash();
   load();
 })();

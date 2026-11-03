@@ -406,7 +406,11 @@ def assemble(company, year, currency, today=None, departments=None):
                 out.setdefault(dept, {})[m] = row
         return out
 
-    accounts = {no: [names[no][0], buckets[no]] for no in names}
+    # [name, dashboard bucket, KPI library line]: the line lets the page show the full statement (occupancy,
+    # finance costs, non-operating items and tax apart) with the same mapping as the Finance tower
+    line_of = kpilib.classifier(m)
+    accounts = {no: [names[no][0], buckets[no], line_of(no) if line_of(no) in kpilib.PL_LINES else None]
+                for no in names}
     budget_out = {"available": False, "name": (settings.get("budget") or {}).get("name") or f"BUDGET{year}"}
     if budget:
         budget_out = {"available": bool(budget.get("rows")), "name": budget.get("name"),

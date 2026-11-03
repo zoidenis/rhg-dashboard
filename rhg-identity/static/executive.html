@@ -45,7 +45,8 @@ header{display:flex;justify-content:space-between}
 @media (max-width:1100px){.grid2{grid-template-columns:1fr}}
 .card{margin-bottom:16px}
 .grid2 .card{margin-bottom:0}
-.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:6px 12px;flex-wrap:wrap}
+.chead > div:first-child{flex:1 1 240px;min-width:0}
 .chead h2{font-size:15px}
 .chead .hint{margin:4px 0 0}
 .tgl{all:unset;cursor:pointer;font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap}
@@ -81,6 +82,33 @@ td.mut{color:var(--sub)}
 .empty{color:var(--sub);padding:14px 0}
 .prov{color:var(--rhg-amber);font-weight:600}
 .defs{font-size:11px;color:var(--sub);line-height:1.6}
+/* Financial Health: eight cards, the P&L against budget and last year, the balance sheet against the end of the
+   month before and of last year */
+.fh{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin:10px 0 0}
+.fh-c{border:1px solid var(--line);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:4px;min-width:0;
+  color:inherit;text-decoration:none;background:var(--card)}
+a.fh-c:hover{border-color:var(--accent)}
+.fh-c .top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;color:var(--sub);font-weight:500}
+.fh-c .v{font-family:var(--rhg-font-display);font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.fh-c .v small{font-size:12px;font-weight:600;color:var(--sub);margin-left:4px}
+.fh-r{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--sub);font-variant-numeric:tabular-nums}
+.fh-r b{font-weight:600;color:var(--ink)}
+.st{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--rhg-sky);color:var(--ink);white-space:nowrap}
+.st.ok{background:var(--rhg-greenbg);color:var(--rhg-green)} .st.cr{background:var(--rhg-amberbg);color:var(--rhg-amber)}
+.chg{list-style:none;margin:8px 0 0;padding:0}
+.chg li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--line);font-size:12.5px;line-height:1.45}
+.chg li:first-child{border-top:0}
+.chg .ic{font-weight:700;text-align:center}.chg .ic.good{color:var(--rhg-green)}.chg .ic.bad{color:var(--rhg-red)}
+.chg .amt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.chg a{color:var(--accent);font-weight:600;text-decoration:none;font-size:11.5px}
+.wf{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.wf-r{display:grid;grid-template-columns:minmax(100px,170px) 1fr 104px;gap:8px;align-items:center;font-size:12px}
+.wf-t{position:relative;height:16px}.wf-t i{position:absolute;top:2px;bottom:2px;border-radius:4px;min-width:2px}
+.wf-r .n{text-align:right;font-variant-numeric:tabular-nums}.wf-r.tot{font-weight:700}
+.wf-0{position:absolute;top:0;bottom:0;width:1px;background:var(--sub);opacity:.5}
+.mbar{display:grid;grid-template-columns:minmax(90px,130px) 1fr 110px;gap:10px;align-items:center;padding:5px 0;font-size:12.5px}
+.mbar .tr{height:9px;background:var(--grid);border-radius:5px;overflow:hidden}.mbar .tr i{display:block;height:100%;border-radius:5px;background:var(--c1)}
+.mbar .n{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 .defs b{color:var(--ink);font-weight:600}
 @media(max-width:760px){aside{display:none} main{padding:16px} header{flex-direction:column} .hdr-side{align-items:flex-start}
   .kpis{grid-template-columns:1fr 1fr}}
@@ -137,6 +165,7 @@ td.mut{color:var(--sub)}
     <button data-tab="labor">Labour cost</button>
     <button data-tab="food">Food cost</button>
     <button data-tab="budget">Budget</button>
+    <button data-tab="balance">Balance &amp; capital</button>
     <button data-tab="purchasing">Purchasing</button>
     <button data-tab="locations" id="tabLocations">Location intelligence</button>
   </div>
@@ -456,12 +485,11 @@ function viewOverview(){
   const keys = rangeKeys(), a = actual(F.dept, keys), c = comparison(F.dept, keys);
   const lbl = "vs " + compName(F.compare);
   const p = purAgg(F.dept, keys), pc = purAgg(F.dept, compKeys(keys, F.compare === "budget" ? "ly" : F.compare));
-  let h = `<div class="kpis">` +
-    tile("Revenue", compact(a.sales), C(), `${fmt(a.sales)} ${C()}`, dl(delta(a.sales, c && c.sales), true, lbl)) +
+  loadCap();
+  // Financial Health first (the eight cards and what weighs most), then the operating figures that have their own tabs
+  let h = financialHealth(keys) + `<div class="kpis">` +
     tile("Food cost", pct(a.foodPct), "", `${compact(a.food)} ${C()}`, dl(delta(a.foodPct, c && c.foodPct, "pts"), false, lbl)) +
     tile("Labour cost", pct(a.laborPct), "", `${compact(a.labor)} ${C()}`, dl(delta(a.laborPct, c && c.laborPct, "pts"), false, lbl)) +
-    tile("Prime cost", pct(a.primePct), "", "Food plus labour", dl(delta(a.primePct, c && c.primePct, "pts"), false, lbl)) +
-    tile("EBITDA", compact(a.ebitda), C(), `${pct(a.ebitdaPct)} of revenue`, dl(delta(a.ebitda, c && c.ebitda), true, lbl)) +
     tile("Purchases invoiced", S.pur ? compact(p.amt) : "–", S.pur ? C() : "", S.pur ? `${pct(p.nopoRate)} without a PO` : (S.purErr || "Purchasing not available"),
       S.pur ? dl(delta(p.amt, pc.amt), false, "vs " + compName(F.compare === "budget" ? "ly" : F.compare)) : "") +
     `</div>`;
@@ -633,7 +661,10 @@ function viewBudget(){
     tile("EBITDA", compact(a.ebitda), C(), `Budget ${compact(c.ebitda)}`, dl(delta(a.ebitda, c.ebitda), true, lbl)) + `</div>`;
   h += `<div class="grid2">` + chartCard("chBudMonth", "Revenue against budget by month", `${F.year}, ${esc(deptName(F.dept))}`) +
        chartCard("chBudEbitda", "EBITDA against budget by month", `${F.year}, ${esc(deptName(F.dept))}`) + `</div>`;
-  h += `<div class="card"><div class="chead"><div><h2>Statement against budget</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}, budget ${esc(b.name)}${running() && keys.includes(running().month) ? "; the month in progress takes its budget pro rata to the days elapsed" : ""}</p></div></div><div class="scroll" id="tbBud"></div></div>
+  h += `<div class="card"><div class="chead"><div><h2>Statement against budget and last year</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}, budget ${esc(b.name)}${running() && keys.includes(running().month) ? "; the month in progress takes its budget pro rata to the days elapsed" : ""}. <span>Lines from the KPI mapping, Net revenue to Net profit.</span> <span>Status ${esc(kpiSt())}.</span></p></div>
+    ${finHref("pl") ? `<a class="tgl" href="${esc(finHref("pl"))}">P&amp;L in the Finance tower →</a>` : ""}</div><div class="scroll" id="tbBud"></div></div>
+    <div class="card"><div class="chead"><div><h2>What moved the net profit</h2><p class="hint">From the net profit of the comparison to the actual one: green added, red took away</p></div>
+      <div class="tabs" id="wfHow" style="margin:0"><button data-how="budget">Budget</button><button data-how="ly">Last year</button></div></div><div id="wfBox"></div></div>
         <div class="card"><div class="chead"><div><h2>Restaurants against budget</h2><p class="hint">Click a row to filter</p></div></div><div class="scroll" id="tbBudDept"></div></div>`;
   $("view").innerHTML = h;
   const ms = monthlySeries(x => x.sales, "budget"), me_ = monthlySeries(x => x.ebitda, "budget");
@@ -641,18 +672,233 @@ function viewBudget(){
     onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
   drawChart($("chBudEbitda"), {type: "vbar", cats: me_.cats, series: [{name: "Actual", color: "--c1", values: me_.cur}, {name: "Budget", color: "--c2", values: me_.cmp}],
     onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
-  const lines = [["Revenue","sales",true],["Other operating income","other_income",true],["Food cost","food",false],["Labour","labor",false],["Other operating costs","opex",false],
-                 ["EBITDA","ebitda",true,1],["Depreciation and amortisation","da",false],["Interest, exchange and tax","below",false],["Result","net",true,1]];
-  $("tbBud").innerHTML = `<table><tr><th>Line</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">Variance %</th><th class="num">Actual % of revenue</th><th class="num">Budget % of revenue</th></tr>` +
-    lines.map(([n, k, inc, tot]) => { const v = a[k], bv = c[k], d = v - bv, good = inc ? d >= 0 : d <= 0;
-      return `<tr class="${tot ? "total" : ""}"><td>${esc(n)}</td><td class="num">${fmt(v)}</td><td class="num">${fmt(bv)}</td>
-        <td class="num"><span class="dl ${Math.abs(d) < 0.5 ? "flat" : good ? "good" : "bad"}">${d >= 0 ? "+" : ""}${fmt(d)}</span></td>
-        <td class="num">${dl(delta(v, bv), inc)}</td><td class="num">${a.sales ? pct(v / a.sales * 100) : "–"}</td><td class="num">${c.sales ? pct(bv / c.sales * 100) : "–"}</td></tr>`; }).join("") + `</table>`;
+  $("tbBud").innerHTML = statementBlock(keys);
+  drawWaterfall(keys);
   const rows = depts().map(d => ({code: d.code, name: d.name, a: actual(d.code, keys), c: comparison(d.code, keys, "budget")})).filter(r => r.a.sales || r.c.sales || r.a.ebitda);
   $("tbBudDept").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Revenue</th><th class="num">Budget</th><th class="num">Variance %</th><th class="num">EBITDA</th><th class="num">Budget</th><th class="num">Variance</th></tr>` +
     rows.map(r => `<tr class="click ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.a.sales)}</td><td class="num">${fmt(r.c.sales)}</td>
       <td class="num">${dl(delta(r.a.sales, r.c.sales), true)}</td><td class="num">${fmt(r.a.ebitda)}</td><td class="num">${fmt(r.c.ebitda)}</td>
       <td class="num"><span class="dl ${r.a.ebitda >= r.c.ebitda ? "good" : "bad"}">${r.a.ebitda - r.c.ebitda >= 0 ? "+" : ""}${fmt(r.a.ebitda - r.c.ebitda)}</span></td></tr>`).join("") + `</table>`;
+}
+
+/* ------------------------------------------------------------ Financial Health (one KPI library)
+   The P&L lines come from the KPI mapping of the Finance tower (each account carries its line), so the
+   statement here is the one of Finance → Financial statements. The balance sheet, liquidity and payables
+   are read from the Finance tower (/finance/api/capital) for the legal entity at the end of the "Up to"
+   month: a balance sheet is never cut by restaurant. */
+const PL_ROWS = [["revenue","Net revenue",1],["other_income","Other operating income",1],["cogs","Cost of goods sold",-1],
+  ["gross","Gross profit",0],["labour","Labour",-1],["occupancy","Occupancy",-1],["opex","Other operating expenses",-1],
+  ["ebitda","EBITDA",0],["da","Depreciation and amortization",-1],["ebit","EBIT",0],["finance","Interest and finance costs (net)",-1],
+  ["nonop","Non-operating items",-1],["tax","Income tax",-1],["unmapped","Accounts not in the mapping",-1],["net","Net profit",0]];
+const PL_LINE_KEYS = ["revenue","other_income","cogs","labour","occupancy","opex","da","finance","nonop","tax"];
+function plLines(t){
+  if (!t) return null;
+  const v = {unmapped: 0}; PL_LINE_KEYS.forEach(k => v[k] = 0);
+  for (const no in t.acc){
+    const a = S.fin && S.fin.accounts[no], line = a && a[2];
+    v[line && PL_LINE_KEYS.includes(line) ? line : "unmapped"] += t.acc[no];
+  }
+  v.gross = v.revenue - v.cogs;
+  v.ebitda = v.revenue + v.other_income - v.cogs - v.labour - v.occupancy - v.opex;
+  v.ebit = v.ebitda - v.da;
+  v.net = v.ebit - v.finance - v.nonop - v.tax - v.unmapped;      // = − Σ every income-statement account
+  v.n = t.n; v.missing = t.missing;
+  return v;
+}
+const hasBudget = () => !!(S.fin && S.fin.budget && S.fin.budget.available);
+const plOf = (keys, how) => { const t = how === "actual" ? actual(F.dept, keys) : comparison(F.dept, keys, how); return t && t.n ? plLines(t) : null; };
+const kpiSt = () => (S.fin && S.fin.kpi_status) || "Content required";
+const stChip = s => `<span class="st ${s === "Approved" ? "ok" : s === "Pilot" ? "" : "cr"}">${esc(s || "Content required")}</span>`;
+const lastDay = k => { const run = running(); if (run && k === run.month) return run.to; const [y, m] = k.split("-").map(Number); return `${k}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`; };
+/* the same screen in the Finance tower, with the filters of this page */
+function finHref(view, legal){
+  if (!holds("finance.s.")) return "";
+  const keys = rangeKeys(); if (!keys.length) return "";
+  const q = new URLSearchParams({company: F.company});
+  const first = keys[0], last = keys[keys.length - 1];
+  if (legal || keys.length === 1) { q.set("mode", "month"); q.set("period", (legal ? last : first) + "-01"); }
+  else { q.set("mode", "range"); q.set("period", `${first}-01..${lastDay(last)}`); }
+  if (!legal && F.dept && F.dept !== "*") q.set("dimension", F.dept);
+  return `/finance/?${q.toString()}#${view}`;
+}
+/* the balance sheet, liquidity and payables of the legal entity at the end of the "Up to" month */
+S.cap = null; S.capKey = ""; S.capErr = null; S.capBusy = false;
+const capWanted = () => `${F.company}|${F.end}`;
+async function loadCap(){
+  if (!can("finance.view") || !F.end || S.capBusy) return;
+  const key = capWanted();
+  if (S.capKey === key && (S.cap || S.capErr)) return;
+  S.capBusy = true; S.capKey = key; S.cap = null; S.capErr = null;
+  try {
+    const j = await get(`/finance/api/capital?company=${encodeURIComponent(F.company)}&period=${F.end}-01&mode=month`);
+    if (capWanted() === key) { if (j.available === false) S.capErr = j.error || "The balance sheet could not be read."; else S.cap = j; }
+  } catch (e) { if (capWanted() === key) S.capErr = e.message; }
+  finally { S.capBusy = false; }
+  if (capWanted() === key && ["overview", "balance"].includes(F.tab)) render();
+  else if (capWanted() !== key && ["overview", "balance"].includes(F.tab)) loadCap();
+}
+const dmy = d => d ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}` : "–";
+const capK = key => S.cap && (S.cap.liquidity || []).find(x => x.key === key);
+function capWait(){
+  if (!can("finance.view")) return "Your role does not include the Finance tower.";
+  return S.capErr ? "Balance sheet: " + S.capErr : "Reading the balance sheet from Business Central…";
+}
+function neutral(d){ return d ? `<span class="dl flat">${d.v > 0 ? "▲" : d.v < 0 ? "▼" : "→"} ${esc(d.txt)}</span>` : `<span class="mut">–</span>`; }
+const amtDelta = (a, b) => a == null || b == null ? null : {v: a - b, txt: (a - b >= 0 ? "+" : "−") + compact(Math.abs(a - b))};
+function fhCard(label, value, unit, rows, status, href){
+  const body = `<div class="top"><span>${esc(label)}</span>${stChip(status)}</div><div class="v">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>` +
+    rows.map(r => `<div class="fh-r"><span>${esc(r[0])} <b>${r[1]}</b></span><span>${r[2] || ""}</span></div>`).join("");
+  return href ? `<a class="fh-c" href="${esc(href)}">${body}</a>` : `<div class="fh-c">${body}</div>`;
+}
+function financialHealth(keys){
+  const L = plOf(keys, "actual"), B = hasBudget() ? plOf(keys, "budget") : null, Y = plOf(keys, "ly");
+  const st = kpiSt(), plHref = finHref("pl"), cr = st === "Content required";
+  const pctOf = (x, k) => x && x.revenue > 0 ? x[k] / x.revenue * 100 : null;
+  const prime = x => x && x.revenue > 0 ? (x.cogs + x.labour) / x.revenue * 100 : null;
+  const plCard = (label, get, money, up, sub) => {
+    const v = L && !cr ? get(L) : null, b = B && !cr ? get(B) : null, y = Y && !cr ? get(Y) : null;
+    const d = (c) => money ? delta(v, c) : delta(v, c, "pts");
+    return fhCard(label, cr ? "–" : money ? compact(v) : pct(v), money && !cr ? C() : "",
+      [...(sub && !cr ? [[sub, "", ""]] : []),
+       ["Budget", b == null ? "–" : money ? compact(b) : pct(b), b == null ? (hasBudget() ? "" : `<span class="mut">no budget</span>`) : dl(d(b), up)],
+       ["Last year", y == null ? "–" : money ? compact(y) : pct(y), y == null ? "" : dl(d(y), up)]], st, plHref);
+  };
+  let h = plCard("Net revenue", x => x.revenue, true, true) +
+    plCard("EBITDA", x => x.ebitda, true, true, L && L.revenue > 0 ? `${pct(pctOf(L, "ebitda"))} of revenue` : "") +
+    plCard("Net profit", x => x.net, true, true, L && L.revenue > 0 ? `${pct(pctOf(L, "net"))} of revenue` : "") +
+    plCard("Prime cost %", prime, false, false, L && L.revenue > 0 ? `COGS ${pct(pctOf(L, "cogs"))} · labour ${pct(pctOf(L, "labour"))}` : "");
+  const D = S.cap && S.cap.dates, lqHref = finHref("liquidity", true);
+  const bsCard = (key, label, up) => {
+    const k = capK(key);
+    if (!k) return fhCard(label, "–", "", [[capWait(), "", ""]], S.capErr ? "Content required" : "Pilot", "");
+    const md = amtDelta(k.value, k.month_end), yd = amtDelta(k.value, k.year_end);
+    const mark = d => d == null ? "" : up == null ? neutral(d) : dl({v: d.v, txt: d.txt}, up);
+    return fhCard(label, k.value == null ? "–" : compact(k.value), k.value == null ? "" : C(),
+      [[dmy(D.month_end), k.month_end == null ? "–" : compact(k.month_end), mark(md)],
+       [dmy(D.year_end), k.year_end == null ? "–" : compact(k.year_end), mark(yd)]], k.status, lqHref);
+  };
+  h += bsCard("cash_bank", "Cash and bank", true) + bsCard("net_debt", "Net debt", false) +
+       bsCard("owc", "Operating working capital", null) + bsCard("total_equity", "Total equity", true);
+  const at = D ? ` <span>Balance sheet of ${esc(F.company)} at ${dmy(D.current)}, the legal entity as a whole.</span>${F.dept !== "*" ? " <span>The restaurant filter does not apply to it.</span>" : ""}` : "";
+  return `<div class="card"><div class="chead"><div><h2>Financial Health</h2><p class="hint"><span>${esc(deptName(F.dept))}, ${esc(periodText(keys))}</span>: <span>the P&amp;L against budget and last year.</span>${at} <span>Click a card for the analysis in the Finance tower.</span></p></div></div>
+    <div class="fh">${h}</div>${changesBlock(keys, L)}</div>`;
+}
+/* the three to five changes and risks that weigh most, in money */
+function changesBlock(keys, L){
+  const how = F.compare === "budget" && !hasBudget() ? "ly" : F.compare, Cm = plOf(keys, how), items = [];
+  if (L && Cm && kpiSt() !== "Content required") {
+    for (const [k, label, sg] of PL_ROWS) {
+      if (!sg) continue;
+      const d = (L[k] || 0) - (Cm[k] || 0), eff = sg * d;
+      if (Math.abs(eff) < 1) continue;
+      const rel = Cm[k] ? ` (${d >= 0 ? "+" : ""}${fmt(d / Math.abs(Cm[k]) * 100, 1)}%)` : "";
+      items.push({eff, label, title: `${d >= 0 ? "up" : "down"} ${compact(Math.abs(d))} ${C()} against ${compName(how)}`, rel,
+        text: [eff > 0 ? "added to the net profit" : "took from the net profit"], href: finHref("pl")});
+    }
+  }
+  if (S.cap && S.cap.liquidity) {
+    const D = S.cap.dates, k = capK("cash_bank"), n = capK("net_debt");
+    if (k && k.value != null && k.month_end != null && Math.abs(k.value - k.month_end) >= 1)
+      items.push({eff: k.value - k.month_end, label: "Cash and bank", title: `${k.value >= k.month_end ? "up" : "down"} ${compact(Math.abs(k.value - k.month_end))} ${C()} since ${dmy(D.month_end)}`,
+        text: [`Balance at ${dmy(D.current)}: ${compact(k.value)} ${C()}`], href: finHref("liquidity", true)});
+    if (n && n.value != null && n.month_end != null && Math.abs(n.value - n.month_end) >= 1)
+      items.push({eff: -(n.value - n.month_end), label: "Net debt", title: `${n.value >= n.month_end ? "up" : "down"} ${compact(Math.abs(n.value - n.month_end))} ${C()} since ${dmy(D.month_end)}`,
+        text: [`Balance at ${dmy(D.current)}: ${compact(n.value)} ${C()}`], href: finHref("liquidity", true)});
+    const M = S.cap.maturity, od = M && (M.buckets || []).find(b => b.label === "Overdue");
+    if (od && od.value >= 1)
+      items.push({eff: -od.value, title: `${compact(od.value)} ${C()} owed to suppliers is overdue`,
+        text: [`${M.total ? pct(od.value / M.total * 100) : "–"} of what is owed to suppliers`, `${compact(M.next_30)} ${C()} overdue or due within 30 days`], href: finHref("liquidity", true)});
+    const t = S.cap.totals || {};
+    if (t.difference != null && Math.abs(t.difference) >= 1)
+      items.push({eff: -Math.abs(t.difference), title: `The balance sheet does not balance by ${compact(t.difference)} ${C()}`,
+        text: ["Balance-sheet accounts with a balance are not in the KPI mapping"], href: finHref("bs", true)});
+  }
+  if (!items.length) return `<p class="note">${kpiSt() === "Content required" ? "The changes need the KPI mapping of this company." : "No comparison to rank changes against yet."}</p>`;
+  items.sort((a, b) => Math.abs(b.eff) - Math.abs(a.eff));
+  const top = items.slice(0, 5);
+  return `<h3 style="font-size:13.5px;margin:16px 0 0">What weighs most</h3><p class="hint" style="margin:2px 0 0">The changes against ${esc(compName(how))} and the risks of the balance sheet, largest amount first</p>
+    <ul class="chg">${top.map(x => `<li><span class="ic ${x.eff >= 0 ? "good" : "bad"}">${x.eff >= 0 ? "▲" : "▼"}</span>
+      <span><b>${x.label ? `<span>${esc(x.label)}</span> ` : ""}<span>${esc(x.title)}</span>${x.rel ? `<span>${esc(x.rel)}</span>` : ""}</b><br>${x.text.map(t => `<span class="mut">${esc(t)}</span>`).join(" · ")}${x.href ? ` · <a href="${esc(x.href)}">Open in the Finance tower →</a>` : ""}</span>
+      <span class="amt ${x.eff >= 0 ? "dl good" : "dl bad"}">${x.eff >= 0 ? "+" : "−"}${compact(Math.abs(x.eff))}</span></li>`).join("")}</ul>`;
+}
+/* Budget tab: the full statement Net revenue → Net profit, actual against budget and last year */
+function statementBlock(keys){
+  const L = plOf(keys, "actual"), B = plOf(keys, "budget"), Y = plOf(keys, "ly");
+  if (!L) return `<div class="empty">No postings for this selection.</div>`;
+  const tot = new Set(["gross", "ebitda", "ebit", "net"]);
+  const rows = PL_ROWS.filter(([k]) => k !== "unmapped" || Math.abs(L.unmapped) >= 1 || (B && Math.abs(B.unmapped) >= 1));
+  return `<table data-nosort><tr><th>Line</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">Variance %</th><th class="num">Last year</th><th class="num">vs last year</th><th class="num">% of revenue</th></tr>` +
+    rows.map(([k, label, sg]) => {
+      const v = L[k], b = B ? B[k] : null, y = Y ? Y[k] : null, up = sg >= 0, d = b == null ? null : v - b;
+      return `<tr class="${tot.has(k) ? "total" : ""}"><td>${esc(label)}</td><td class="num">${fmt(v)}</td><td class="num">${b == null ? "–" : fmt(b)}</td>
+        <td class="num">${d == null ? "–" : `<span class="dl ${Math.abs(d) < 0.5 ? "flat" : (d >= 0) === up ? "good" : "bad"}">${d >= 0 ? "+" : ""}${fmt(d)}</span>`}</td>
+        <td class="num">${b == null ? "–" : dl(delta(v, b), up)}</td><td class="num">${y == null ? "–" : fmt(y)}</td><td class="num">${y == null ? "–" : dl(delta(v, y), up)}</td>
+        <td class="num">${L.revenue > 0 ? pct(v / L.revenue * 100) : "–"}</td></tr>`;
+    }).join("") + `</table>`;
+}
+/* from the net profit of the comparison to the actual one, line by line */
+function waterfallHTML(L, Cm, cmpLabel){
+  if (!L || !Cm) return `<div class="empty">Nothing to compare with.</div>`;
+  const steps = [{label: `Net profit, ${cmpLabel}`, a: 0, b: Cm.net, total: true}];
+  let run = Cm.net;
+  for (const [k, label, sg] of PL_ROWS) {
+    if (!sg) continue;
+    const d = sg * ((L[k] || 0) - (Cm[k] || 0));
+    if (Math.abs(d) < 0.5) continue;
+    steps.push({label, a: run, b: run + d, gap: k === "unmapped"}); run += d;
+  }
+  steps.push({label: "Net profit, actual", a: 0, b: L.net, total: true});
+  const vals = steps.flatMap(s => [s.a, s.b]), lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), span = hi - lo || 1, x = v => (v - lo) / span * 100;
+  return `<div class="wf">` + steps.map(s => {
+    const a = Math.min(s.a, s.b), b = Math.max(s.a, s.b), d = s.b - s.a;
+    const col = s.total ? "var(--data-cur)" : s.gap ? "var(--rhg-amber)" : d >= 0 ? "var(--rhg-green)" : "var(--rhg-red)";
+    return `<div class="wf-r ${s.total ? "tot" : ""}" title="${esc(s.label)}: ${s.total ? fmt(s.b) : (d >= 0 ? "+" : "") + fmt(d)}"><div>${esc(s.label)}</div>
+      <div class="wf-t"><span class="wf-0" style="left:${x(0)}%"></span><i style="left:${x(a)}%;width:${Math.max(0.4, x(b) - x(a))}%;background:${col}"></i></div>
+      <div class="n ${s.total ? "" : d >= 0 ? "dl good" : "dl bad"}">${s.total ? compact(s.b) : (d >= 0 ? "+" : "−") + compact(Math.abs(d))}</div></div>`;
+  }).join("") + `</div>`;
+}
+let wfHow = "budget";
+function drawWaterfall(keys){
+  const host = $("wfBox"); if (!host) return;
+  const how = wfHow === "budget" && !hasBudget() ? "ly" : wfHow;
+  host.innerHTML = waterfallHTML(plOf(keys, "actual"), plOf(keys, how), how === "budget" ? "budget" : "last year");
+  document.querySelectorAll("#wfHow button").forEach(b => b.classList.toggle("on", b.dataset.how === how));
+}
+document.addEventListener("click", e => { const b = e.target.closest("#wfHow button"); if (!b) return; wfHow = b.dataset.how; drawWaterfall(rangeKeys()); });
+
+/* Balance & capital: the legal entity at the end of the "Up to" month; the detail stays in the Finance tower */
+function viewBalance(){
+  loadCap();
+  const c = S.cap;
+  if (!c) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">${esc(capWait())}</p></div>`; return; }
+  const D = c.dates, t = c.totals || {}, mp = c.mapping || {}, bsHref = finHref("bs", true), lqHref = finHref("liquidity", true);
+  $("periodLabel").textContent = `Balance sheet of ${F.company} at ${dmy(D.current)} · against ${dmy(D.month_end)} and ${dmy(D.year_end)} · the legal entity as a whole`;
+  const k = key => capK(key) || {};
+  const val = x => x.value == null ? "–" : x.unit === "ratio" ? fmt(x.value, 2) + "×" : compact(x.value);
+  const card = (key, up) => { const x = k(key); const md = x.unit === "ratio" ? null : amtDelta(x.value, x.month_end);
+    return fhCard(x.label || key, val(x), x.value == null || x.unit === "ratio" ? "" : C(),
+      [...(x.value == null && x.month_end == null ? [] : [[dmy(D.month_end), x.month_end == null ? "–" : (x.unit === "ratio" ? fmt(x.month_end, 2) + "×" : compact(x.month_end)), md ? (up == null ? neutral(md) : dl(md, up)) : ""]]),
+       ...(x.note ? [[x.note, "", ""]] : [])], x.status, lqHref); };
+  let h = `<div class="card"><div class="chead"><div><h2>Liquidity and debt</h2><p class="hint"><span>KPI mapping ${esc(mp.status || "")}</span> · <span>status ${esc(c.status || "")}.</span> <span>No status is drawn from one ratio alone.</span></p></div>
+    ${lqHref ? `<a class="tgl" href="${esc(lqHref)}">Liquidity &amp; capital in the Finance tower →</a>` : ""}</div>
+    <div class="fh">${card("cash_bank", true)}${card("owc", null)}${card("gross_debt", false)}${card("net_debt", false)}${card("debt_equity", false)}${card("total_equity", true)}${card("net_debt_ebitda", false)}${card("current_ratio", true)}</div></div>`;
+  const sec = (c.statement || []).map(s => `<tr class="total"><td>${esc(s.section)}</td><td class="num">${fmt(s.current)}</td><td class="num">${fmt(s.month_end)}</td><td class="num">${s.month_end == null || s.current == null ? "–" : neutral(amtDelta(s.current, s.month_end))}</td><td class="num">${fmt(s.year_end)}</td><td class="num">${s.year_end == null || s.current == null ? "–" : neutral(amtDelta(s.current, s.year_end))}</td><td></td></tr>` +
+    s.lines.filter(l => l.current == null || Math.abs(l.current) >= 0.5 || Math.abs(l.year_end || 0) >= 0.5).map(l => `<tr><td style="padding-left:22px">${esc(l.label)}</td><td class="num">${fmt(l.current)}</td><td class="num">${fmt(l.month_end)}</td>
+      <td class="num">${l.vs_month == null ? "–" : neutral(amtDelta(l.current, l.month_end))}</td><td class="num">${fmt(l.year_end)}</td><td class="num">${l.vs_year == null ? "–" : neutral(amtDelta(l.current, l.year_end))}</td><td>${stChip(l.status)}</td></tr>`).join("")).join("");
+  h += `<div class="card"><div class="chead"><div><h2>Balance sheet</h2><p class="hint"><span>${t.difference == null ? "Content required: this company has no KPI mapping." : Math.abs(t.difference) >= 1 ? `Assets − liabilities − equity = ${fmt(t.difference)}: not every account is mapped.` : "Assets = liabilities + equity."}</span> <span>Business Central has never closed the result to equity: it shows as the result of prior years not closed and the profit or loss of the year.</span></p></div>
+    ${bsHref ? `<a class="tgl" href="${esc(bsHref)}">By account in the Finance tower →</a>` : ""}</div>
+    <div class="scroll"><table data-nosort><tr><th>Line</th><th class="num">${dmy(D.current)}</th><th class="num">${dmy(D.month_end)}</th><th class="num">Change</th><th class="num">${dmy(D.year_end)}</th><th class="num">Change</th><th>Status</th></tr>${sec}</table></div></div>`;
+  const E = c.equity_bridge, M = c.maturity || {buckets: []};
+  const er = (l, v, bold, cr) => `<tr class="${bold ? "total" : ""}"><td>${esc(l)}</td><td class="num">${v == null ? (cr ? stChip("Content required") : "–") : bold ? fmt(v) : (v >= 0 ? "+" : "") + fmt(v)}</td></tr>`;
+  const max = Math.max(1, ...M.buckets.map(b => Math.abs(b.value)));
+  const ic = (M.intercompany || []).reduce((a, x) => a + x.total, 0);
+  h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Equity bridge</h2><p class="hint">${E ? `${dmy(D.year_end)} → ${dmy(D.current)}` : ""}</p></div>${E ? stChip(E.status) : ""}</div>
+      ${E ? `<div class="scroll"><table data-nosort><tr><th>Movement</th><th class="num">${esc(C())}</th></tr>${er("Opening equity", E.opening, 1)}${er("Profit or loss of the year", E.profit)}${er("Capital contributions", E.contributions, 0, 1)}${er("Distributions (dividends)", E.distributions, 0, 1)}${er("Other movements", E.other)}${er("Closing equity", E.closing, 1)}</table></div>
+      <p class="note">${(E.notes || []).map(x => `<span>${esc(x)}</span>`).join(" ")}</p>` : `<p class="hint">The end of last year could not be read.</p>`}</div>
+    <div class="card"><div class="chead"><div><h2>What we owe suppliers, by due date</h2><p class="hint">${compact(M.total)} ${esc(C())} open · ${compact(M.next_30)} overdue or due within 30 days${ic ? ` · group companies ${compact(ic)}` : ""}</p></div>
+      ${lqHref ? `<a class="tgl" href="${esc(lqHref)}">By supplier →</a>` : ""}</div>
+      ${M.buckets.map(b => `<div class="mbar"><span>${esc(b.label)}</span><span class="tr"><i style="width:${Math.abs(b.value) / max * 100}%${b.label === "Overdue" ? ";background:var(--rhg-red)" : ""}"></i></span><span class="n">${compact(b.value)}</span></div>`).join("")}</div></div>`;
+  $("view").innerHTML = h;
 }
 
 /* purchasing: S.pur.invoices[dept][month][vendor] = [amount, invoices, without PO, amount without PO] */
@@ -764,7 +1010,7 @@ function drawSavings(keys){
 
 /* ------------------------------------------------------------ render */
 const DEF_LABEL = {sales: "Revenue", food: "Food cost", labor: "Labour", prime: "Prime cost", ebitda: "EBITDA", running: "Month in progress", budget: "Budget", simphony: "Simphony"};
-const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, purchasing: viewPurchasing, locations: viewLocations};
+const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, balance: viewBalance, purchasing: viewPurchasing, locations: viewLocations};
 /* Location intelligence: every restaurant of the company from Simphony and Business Central, read by the
    Finance tower (/finance/api/locations) and drawn by the shared module locintel.js. It follows the
    Company and "Up to" filters (month to date of that month); the other filters do not apply. */
@@ -828,7 +1074,7 @@ function render(){
   try { VIEWS[F.tab](); } catch (e) { console.error(e); $("view").innerHTML = `<div class="card"><p class="hint">This view could not be drawn: ${esc(e.message)}</p></div>`; }
   const defs = (S.fin && S.fin.definitions) || {}, pd = (S.pur && S.pur.definitions) || {};
   const show = {overview: ["sales","food","labor","prime","ebitda","running"], sales: ["sales","simphony","running"], labor: ["labor","running"],
-                food: ["food","running"], budget: ["budget","ebitda"], purchasing: []}[F.tab];
+                food: ["food","running"], budget: ["budget","ebitda"], balance: [], purchasing: []}[F.tab];
   $("foot").innerHTML = `<div class="defs">` + show.filter(k => defs[k]).map(k => `<b>${esc(DEF_LABEL[k] || cap(k))}.</b> ${esc(defs[k])}`).join(" ") +
     (F.tab === "purchasing" ? Object.values(pd).map(esc).join(" ") : "") + ` Every figure is read-only from Business Central${F.tab === "sales" ? " and Simphony" : ""}; the filters re-cut what is loaded and do not run another report.</div>`;
 }

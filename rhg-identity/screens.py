@@ -113,11 +113,13 @@ PURCHASING = [
 PLATFORM = [
     ("control", "Control center", "Platform", None, [], "company", []),
     ("executive", "Executive dashboard", "Platform", "tabs", [
-        ("overview", "Executive KPIs", "company", ["finance.view", "finance.pl.view", "purchasing.view"]),
+        ("overview", "Executive KPIs", "company", ["finance.view", "finance.pl.view", "finance.bs.view",
+                                                   "purchasing.view"]),
         ("sales", "Sales", "company", ["finance.view", "finance.pl.view"]),
         ("labor", "Labour cost", "company", ["finance.view", "finance.pl.view"]),
         ("food", "Food cost", "company", ["finance.view", "finance.pl.view"]),
         ("budget", "Budget", "company", ["finance.view", "finance.pl.view"]),
+        ("balance", "Balance & capital", "company", ["finance.view", "finance.bs.view"]),
         ("purchasing", "Purchasing", "company", ["purchasing.view"]),
         ("locations", "Location intelligence", "location", ["finance.view"])]),
 ]
