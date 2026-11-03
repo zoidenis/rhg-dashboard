@@ -176,6 +176,10 @@ class BCClient:
         return self._cached(("companies",), 3600, lambda: [
             r.get("Name") for r in self._get_all(f"{config.BC_BASE_URL}/Company")])
 
+    def exchange_rates(self, company, max_age=3600):
+        """Currency Exchange Rates of a company (page 483), every row as published; fx.py reads the columns."""
+        return self._cached(("fx", company), max_age, lambda: self._get_all(self._url(company, config.E_FX)))
+
     def dimension_values(self, company, code="DEPARTMENT"):
         def go():
             rows = self._get_all(self._url(company, config.E_DIMSET),

@@ -82,3 +82,4 @@ E_TRANSFER_HEADERS = get("E_TRANSFER_HEADERS", "navtransferheaders")   # open tr
 E_TRANSFER_LINES = get("E_TRANSFER_LINES", "navtransferlines")
 E_SKU = get("E_SKU", "StockkeepingUnitCard")      # SKU cards: planning parameters per item and location
 E_POS_ARCHIVE = get("E_POS_ARCHIVE", "MIDSimphonyArchive")   # the POS import of Simphony sales, by day and menu item
+E_FX = get("E_FX", "CurrencyExchangeRates")   # page 483, published read-only for the group view (3 Nov 2026)

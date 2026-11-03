@@ -40,6 +40,7 @@ import requests
 import cost_report
 import negstock
 import kpilib
+import fx
 import exreg
 import salesrec
 import assets
@@ -969,6 +970,16 @@ def consolidation_screen(anchor, mode):
         return {"error": str(exc), "companies": [], "loaded": True}
     rows = []
     keys = ("revenue", "gross", "opex", "ebitda", "net_profit", "assets", "liabilities", "equity")
+    pl_keys = ("revenue", "gross", "opex", "ebitda", "net_profit")
+    # the exchange rates of the company keeping its books in the reporting currency (SALT, in ALL)
+    src = next((c for c in [config.BC_COMPANY] + list(companies)
+                if currencies.get(c.lower(), reporting) == reporting), None)
+    series, fx_errors = {}, []
+    if src and any(currencies.get(c.lower(), reporting) != reporting for c in companies):
+        fx_rows = _safe(sources, f"Currency Exchange Rates, {src}", lambda: client.exchange_rates(src), [], False)
+        series, _skipped, fx_errors = fx.parse(fx_rows)
+        if not fx_rows:
+            fx_errors.append(f"Currency Exchange Rates of {src} could not be read or holds no rows.")
     for co in companies:
         acc = _safe(sources, f"Chart of accounts, {co}",
                     lambda c=co: client.accounts(c, c_from.isoformat(), c_to.isoformat(), None, 900), [], False)
@@ -985,30 +996,50 @@ def consolidation_screen(anchor, mode):
                    "assets": bs["totals"]["assets"] if bs else None,
                    "liabilities": bs["totals"]["liabilities"] if bs else None,
                    "equity": bs["totals"]["equity"] if bs else None}
-        rate = 1.0 if currency == reporting else None
-        rows.append({"company": co, "available": True, "currency": currency, "rate": rate,
+        if currency == reporting:
+            rate = rate_bs = 1.0
+            fxinfo = None
+        else:
+            ser = series.get(currency)
+            rate = fx.average(ser, c_from, c_to)
+            rate_bs, bs_from = fx.closing(ser, c_to)
+            fxinfo = {"average": rate, "closing": rate_bs, "closing_from": bs_from.isoformat() if bs_from else None,
+                      "source": f"Currency Exchange Rates of {src}",
+                      "missing": None if (rate is not None and rate_bs is not None) else
+                      (f"No {currency} rate in Business Central ({src}) for every day of the period" if ser else
+                       f"No {currency} rate in Business Central ({src})")}
+        ok_fx = rate is not None and rate_bs is not None
+        rows.append({"company": co, "available": True, "currency": currency, "rate": rate, "rate_bs": rate_bs,
+                     "fx": fxinfo,
                      "gross_margin": pl["kpis"]["gross_margin"], **figures,
                      "mapping": (kmap or {}).get("status") or "Content required",
                      "status": "Content required" if not kmap else ("Approved" if kmap.get("status") == "Approved" else "Pilot"),
                      "bs_difference": bs["totals"]["difference"] if bs else None,
-                     "converted": {k: (v * rate if (rate is not None and v is not None) else None)
+                     "converted": {k: (v * (rate if k in pl_keys else rate_bs) if (ok_fx and v is not None) else None)
                                    for k, v in figures.items()},
-                     "in_total": rate is not None})
+                     "in_total": ok_fx})
     ok = [r for r in rows if r.get("available") and r.get("in_total")]
     excluded = [r["company"] for r in rows if r.get("available") and not r.get("in_total")]
+    conv = [r for r in rows if r.get("fx") and r["in_total"]]
+    rate_line = ("; ".join(f"{r['currency']}: average {r['rate']:,.4f}, closing {r['rate_bs']:,.4f} from "
+                           f"{r['fx']['closing_from']}" for r in {x['currency']: x for x in conv}.values())
+                 + f" (Business Central, Currency Exchange Rates of {src}; method Pilot until Finance approves it)"
+                 if conv else ("Content required: " + "; ".join(fx_errors) if fx_errors else "none needed"))
     return {"loaded": True, "sources": sources, "rows": rows, "basis": "Combined, not consolidated",
             "period": [c_from.isoformat(), c_to.isoformat()],
-            "reporting_currency": reporting, "rates": "Content required: the EUR rate from Business Central",
+            "reporting_currency": reporting, "rates": rate_line, "fx_errors": fx_errors,
             "excluded": excluded, "rate_note": "",
             "totals": {k: (sum(r["converted"][k] for r in ok)
                            if ok and all(r["converted"][k] is not None for r in ok) else None)
                        for k in keys} | {"companies": len(ok)},
-            "note": f"Combined, not consolidated: the companies in {reporting} are added as they stand. Nothing is "
-                    f"eliminated between companies, so intercompany sales, balances and investments are counted "
-                    f"twice. Companies in another currency are left out until Business Central publishes its "
-                    f"exchange rates (Currency Exchange Rates, page 483) and Finance approves the method (average "
-                    f"rate for the result, closing rate for the balance sheet). Every company follows its own KPI "
-                    f"mapping; one without a mapping shows Content required."
+            "note": f"Combined, not consolidated: the companies are added as they stand. Nothing is eliminated "
+                    f"between companies, so intercompany sales, balances and investments are counted twice. A company "
+                    f"in another currency is converted with the rates of Business Central (Currency Exchange Rates of "
+                    f"{src}): the result at the average rate of the period (the rate in force on each day), the "
+                    f"balance sheet at the closing rate of the last day. That method is a proposal until Finance "
+                    f"approves it, and the two rates leave a translation difference that is not shown. A company with "
+                    f"no rate for the period is left out. Every company follows its own KPI mapping; one without a "
+                    f"mapping shows Content required."
                     + (f" Left out: {', '.join(excluded)}." if excluded else "")}
 
 

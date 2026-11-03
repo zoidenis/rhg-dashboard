@@ -2024,7 +2024,7 @@ function renderSettings(){
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
     <input type="hidden" id="gr-rates" value=""><input type="hidden" id="gr-note" value="">
-    <p class="hint" style="grid-column:1/-1;margin:0">Exchange rates are not typed here: the EUR rate will be read from Business Central (Currency Exchange Rates), as Finance decided. Until then the Group view leaves the EUR companies out.</p>
+    <p class="hint" style="grid-column:1/-1;margin:0">Exchange rates are not typed here: the Group view reads them from Business Central (Currency Exchange Rates of the company in the reporting currency), as Finance decided.</p>
     <label class="field">Income account prefixes<input id="ac-inc" value="${esc((s.accounts||{}).income_prefixes||"")}" placeholder="7"></label>
     <label class="field">Cost-of-goods prefixes<input id="ac-cogs" value="${esc((s.accounts||{}).cogs_prefixes||"")}" placeholder="60"></label>
     <label class="field">Expense prefixes<input id="ac-exp" value="${esc((s.accounts||{}).expense_prefixes||"")}" placeholder="6"></label>
@@ -3437,7 +3437,7 @@ function renderBudget(){
 function renderGroup(){
   const g = data.group; if(!g||!g.loaded) return;
   if(g.error){ $("grpNote").textContent = g.error; return; }
-  $("grpNote").textContent = `${g.basis || "Combined, not consolidated"} · ${g.period[0]} to ${g.period[1]} · ${g.totals.companies} companies in ${g.reporting_currency} added · exchange rate: ${g.rates}`;
+  $("grpNote").textContent = `${g.basis || "Combined, not consolidated"} · ${g.period[0]} to ${g.period[1]} · ${g.totals.companies} companies added in ${g.reporting_currency} · exchange rates: ${g.rates}`;
   $("grpWarn").textContent = g.note;
   const rc = g.reporting_currency, st = r => `<span class="chip ${r.status === "Approved" ? "down" : r.status === "Pilot" ? "" : "up"}">${esc(r.status)}</span>`;
   $("grpTable").innerHTML = `<tr><th>Company</th><th>Currency</th><th>KPI status</th>
@@ -3445,11 +3445,14 @@ function renderGroup(){
       <th class="num">Assets</th><th class="num">Liabilities</th><th class="num">Equity</th></tr>` +
     g.rows.map(r=>{
       if(!r.available) return `<tr><td class="name">${esc(r.company)}</td><td>${esc(r.currency||"–")}</td><td colspan="8" class="meta">not available with this login</td></tr>`;
-      return `<tr class="${r.in_total?"":"warnrow"}"><td class="name">${esc(r.company)}${r.in_total ? "" : ` <span class="chip up">not in the total: no ${esc(r.currency)} rate from BC</span>`}</td><td>${esc(r.currency)}</td>
+      return `<tr class="${r.in_total?"":"warnrow"}"><td class="name">${esc(r.company)}${r.in_total ? "" : ` <span class="chip up">not in the total: ${esc((r.fx && r.fx.missing) || "no rate from BC")}</span>`}${r.fx && r.in_total ? `<div class="meta">× ${fmt(r.fx.average, 2)} average · × ${fmt(r.fx.closing, 2)} closing from ${esc(r.fx.closing_from)}</div>` : ""}</td><td>${esc(r.currency)}</td>
       <td>${st(r)}</td><td class="num">${r.revenue==null?"Content required":fmt(r.revenue)}</td>
       <td class="num">${r.gross_margin==null?"–":fmt(r.gross_margin,1)+"%"}</td><td class="num">${r.ebitda==null?"–":fmt(r.ebitda)}</td>
       <td class="num">${fmt(r.net_profit)}</td><td class="num">${r.assets==null?"–":fmt(r.assets)}</td>
-      <td class="num">${r.liabilities==null?"–":fmt(r.liabilities)}</td><td class="num">${r.equity==null?"–":fmt(r.equity)}</td></tr>`;}).join("") +
+      <td class="num">${r.liabilities==null?"–":fmt(r.liabilities)}</td><td class="num">${r.equity==null?"–":fmt(r.equity)}</td></tr>`
+      + (r.fx && r.in_total ? `<tr class="meta"><td class="meta" style="padding-left:18px">in ${esc(rc)}</td><td></td><td></td><td class="num">${r.converted.revenue==null?"–":fmt(r.converted.revenue)}</td><td></td>
+      <td class="num">${r.converted.ebitda==null?"–":fmt(r.converted.ebitda)}</td><td class="num">${fmt(r.converted.net_profit)}</td><td class="num">${r.converted.assets==null?"–":fmt(r.converted.assets)}</td>
+      <td class="num">${r.converted.liabilities==null?"–":fmt(r.converted.liabilities)}</td><td class="num">${r.converted.equity==null?"–":fmt(r.converted.equity)}</td></tr>` : "");}).join("") +
     `<tr class="total"><td>Combined, not consolidated (${esc(rc)})</td><td colspan="2"></td>
       <td class="num">${g.totals.revenue==null?"–":fmt(g.totals.revenue)}</td><td class="num">–</td><td class="num">${g.totals.ebitda==null?"–":fmt(g.totals.ebitda)}</td>
       <td class="num">${g.totals.net_profit==null?"–":fmt(g.totals.net_profit)}</td><td class="num">${g.totals.assets==null?"–":fmt(g.totals.assets)}</td>
