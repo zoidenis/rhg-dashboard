@@ -44,8 +44,9 @@
       if (!word) continue;
       const re = new RegExp("^" + lits.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("(.+?)") + "$");
       if (!patterns.has(word)) patterns.set(word, []);
-      patterns.get(word).push([re, D[k]]);
+      patterns.get(word).push([re, D[k], lits.join("").length]);
     }
+    for (const list of patterns.values()) list.sort((a, b) => b[2] - a[2]);   // the most specific first
   }
   const fill = (t, vals) => { let i = 0; return t.replace(/#/g, () => (i < vals.length ? vals[i++] : "#")); };
 

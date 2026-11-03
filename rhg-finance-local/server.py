@@ -29,6 +29,7 @@ import cashloc
 import kartloc
 import supstock
 import skuplan
+import recipeuse
 import today as todayloc
 import unicorn_facts
 import faloc
@@ -1114,6 +1115,25 @@ arap = arap_notify.Notifier(client, company_currency, config.BC_COMPANY)
 costrep = cost_report.Reporter(client, stock_summary, company_currency, config.BC_COMPANY)
 
 
+_dx_cache = {}
+
+
+def discharge_excluded(company, as_of, refresh=False):
+    """The positive adjustments the negative stock email leaves out (Settings), read once an hour."""
+    rules = negstock.exclusion_rules(store.get_settings().get("negative_report", {}).get("exclude_adjustments"))
+    if not rules:
+        return {}
+    key = (company, as_of, tuple(rules))
+    hit = _dx_cache.get(key)
+    if hit and not refresh and time.time() - hit[0] < 3600:
+        return hit[1]
+    ex, errs = negstock.excluded_adjustments(client, company, rules, date.fromisoformat(as_of))
+    if not errs:
+        _dx_cache.clear()
+        _dx_cache[key] = (time.time(), ex)
+    return ex
+
+
 def cost_report_status():
     return {"settings": costrep.settings(), "companies": costrep.companies(), "recipients": costrep.recipients(),
             "next_run": costrep.next_run(), "runs": cost_report.recent_runs(), "mail": arap_notify.mail_status(),
@@ -1202,6 +1222,7 @@ def arap_status(user):
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
 EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
+                "/api/discharge/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/simphony/status", "/api/users",
@@ -1755,6 +1776,41 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path in ("/api/discharge", "/api/discharge/xlsx"):
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    period = int(q.get("days") or 30)
+                except ValueError:
+                    period = 30
+                key = (company, period)
+                if url.path.endswith("/xlsx"):
+                    r = recipeuse.held(key)
+                    if not r:
+                        self._send(409, {"error": "Read the report first."})
+                        return
+                    body = recipeuse.render_xlsx(r)
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                                     f'received_vs_discharged_{r["as_of"]}_{r["period"]}d.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                mv = movement.request(client, company, None, 90, q.get("refresh") == "1")
+                if mv.get("pending") or mv.get("available") is False:
+                    self._send(200, mv)
+                    return
+                m = recipes.master_cached(company) or {}
+                excluded = discharge_excluded(company, mv["as_of"], q.get("refresh") == "1")
+                r = recipeuse.analyse(company, mv, m, store.get_settings(), period, excluded)
+                recipeuse.remember(key, r)
+                self._send(200, r)
             elif url.path in ("/api/recipes", "/api/recipes/xlsx"):
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})

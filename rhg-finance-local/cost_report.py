@@ -23,6 +23,8 @@ from datetime import date, datetime, timedelta
 import arap_notify
 import config
 import movement
+import negstock
+import recipeuse
 import recipients
 import recipes
 import store
@@ -101,8 +103,10 @@ def build(company, client, stock_summary, currency, today=None, location=None, p
     errors = []
     if parts is not None:
         ss, mv, rc, errors = parts["ss"], parts["mv"], parts["rc"], list(parts["errors"])
+        du = parts.get("du")
         if location:
             ss, rc = None, None
+            du = _discharge(company, mv, settings, parts.get("ex"), location, errors) if mv else None
             mv = _mv_at(mv, location) if mv else None
         ty = None
         if mv:
@@ -112,7 +116,7 @@ def build(company, client, stock_summary, currency, today=None, location=None, p
             except Exception as exc:                               # noqa: BLE001
                 traceback.print_exc()
                 errors.append(f"Typology & turnover: {str(exc)[:200]}")
-        return _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, location, parts)
+        return _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, location, parts, du)
     return _read_and_assemble(company, client, stock_summary, currency, a, b, settings, errors, location)
 
 
@@ -141,7 +145,15 @@ def _read_and_assemble(company, client, stock_summary, currency, a, b, settings,
         rc = _wait(lambda: recipes.request(client, company, a.isoformat(), b.isoformat()), "Recipe integrity")
     except Exception as exc:                                       # noqa: BLE001
         errors.append(str(exc)[:200])
-    parts = {"ss": ss, "mv": mv, "rc": rc, "errors": list(errors)}
+    # ---- received vs discharged, the last 30 days of the same read
+    ex, du = {}, None
+    if mv:
+        rules = negstock.exclusion_rules(settings.get("negative_report", {}).get("exclude_adjustments"))
+        if rules:
+            ex, xerr = negstock.excluded_adjustments(client, company, rules, date.fromisoformat(mv["as_of"]))
+            errors += xerr
+        du = _discharge(company, mv, settings, ex, None, errors)
+    parts = {"ss": ss, "mv": mv, "rc": rc, "errors": list(errors), "ex": ex, "du": du}
     if location:
         return build(company, client, stock_summary, currency, b + timedelta(days=7), location, parts)
     if mv:
@@ -151,10 +163,20 @@ def _read_and_assemble(company, client, stock_summary, currency, a, b, settings,
         except Exception as exc:                                   # noqa: BLE001
             traceback.print_exc()
             errors.append(f"Typology & turnover: {str(exc)[:200]}")
-    return _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, None, parts)
+    return _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, None, parts, du)
 
 
-def _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, location, parts):
+def _discharge(company, mv, settings, ex, location, errors):
+    try:
+        m = recipes.master_cached(company) or {}
+        return recipeuse.analyse(company, mv, m, settings, 30, ex, location)
+    except Exception as exc:                                       # noqa: BLE001
+        traceback.print_exc()
+        errors.append(f"Received vs discharged: {str(exc)[:200]}")
+        return None
+
+
+def _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, location, parts, du=None):
     H = {}                                       # the headline numbers, kept for next week's comparison
     acts = []
 
@@ -303,6 +325,35 @@ def _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, locatio
                 "Review costing and posting setup: " + "; ".join(f"{IM_LABEL.get(kk, kk).lower()} {cnt[kk]}" for kk in warn) + ".",
                 None, "itemmaster")
 
+    # ---- received vs discharged: the recipe interventions
+    dux = {}
+    if du:
+        k = du["kpis"]
+        H.update(dc_not_received=k["not_received"][0], dc_not_used=k["not_used"][0], dc_pairs=k["pairs"],
+                 dc_out_of_line=k["over"][0] + k["under"][0])
+        dux = {"kpis": k, "interventions": du["interventions"], "period": [du["from"], du["as_of"]]}
+        nr = [x for x in du["interventions"] if x["status"] == "not_received"]
+        if nr:
+            pr = [x for x in nr if x["pair"]]
+            act("crit", "Recipes", "Cost controller · Chef",
+                f"{len(nr)} {'code' if len(nr) == 1 else 'codes'} discharged by recipes and not received ({_m(k['not_received'][1])})"
+                + (f"; {len(pr)} with the code received instead, e.g. {pr[0]['item']} ↔ {pr[0]['pair']} at {pr[0]['location']}"
+                   if pr else f"; e.g. {nr[0]['item']} {nr[0]['desc']} at {nr[0]['location']}")
+                + ". Change the recipe code or receive it.", k["not_received"][1], "discharge")
+        nu = [x for x in du["interventions"] if x["status"] == "not_used"]
+        if nu:
+            v_nu = sum(abs(x["value"]) for x in nu)
+            act("warn", "Recipes", "Cost controller · Chef",
+                f"{len(nu)} {'code' if len(nu) == 1 else 'codes'} received and not discharged, with no code to pair "
+                f"({_m(v_nu)}): in no recipe or in recipes not sold there. Largest: {nu[0]['item']} {nu[0]['desc']} at "
+                f"{nu[0]['location']}.", v_nu, "discharge")
+        ol = [x for x in du["interventions"] if x["status"] in ("over", "under")]
+        if ol:
+            act("warn", "Recipes", "Cost controller",
+                f"{len(ol)} {'code' if len(ol) == 1 else 'codes'} discharged far more or far less than received: check the "
+                f"quantity per. Largest: "
+                f"{ol[0]['item']} {ol[0]['desc']} at {ol[0]['location']}.", sum(abs(x["value"]) for x in ol), "discharge")
+
     rank = {"crit": 0, "warn": 1, "info": 2}
     acts.sort(key=lambda x: (rank[x["sev"]], -(x["value"] or 0)))
     key = f"{company}|{location}" if location else company
@@ -312,7 +363,7 @@ def _assemble(company, currency, a, b, settings, errors, ss, mv, rc, ty, locatio
             "key": key, "_parts": parts, "currency": currency, "week": {"from": a.isoformat(), "to": b.isoformat()},
             "built_at": datetime.now().isoformat(timespec="seconds"), "errors": errors,
             "headline": H, "previous": prev, "actions": acts,
-            "inventory": inv, "movement": mvx, "typology": tyx, "recipes": rcx, "item_master": imx}
+            "inventory": inv, "movement": mvx, "typology": tyx, "recipes": rcx, "item_master": imx, "discharge": dux}
 
 
 # ---------------------------------------------------------------- the email
@@ -442,6 +493,20 @@ def render(r, public_url=""):
                             [f"<tr><td style='{td}'>{e(i['desc'] or i['item'])} <span style='color:{muted}'>{e(i['item'])}</span></td>"
                              f"<td style='{td}'>{e(i.get('category') or '')}</td><td style='{tdn}'>{i['qty_sold']:,.0f}</td></tr>"
                              for i in rc["missing"][:5]]))
+    du = r.get("discharge") or {}
+    if du:
+        k = du["kpis"]
+        labels = recipeuse.STATUS
+        blocks.append(block("Received vs discharged", "discharge",
+                            e(f"{du['period'][0]} to {du['period'][1]}: {k['not_received'][0]} codes discharged and not received "
+                              f"({_m(k['not_received'][1])}) · {k['not_used'][0]} received and not discharged "
+                              f"({_m(k['not_used'][1])}) · {k['over'][0] + k['under'][0]} out of line · {k['pairs']} suggested swaps"),
+                            [("Location", 0), ("Item", 0), ("What to do", 0), ("Value", 1)],
+                            [f"<tr><td style='{td}'>{e(x['location'])}</td><td style='{td}'>{e(x['item'])} {e(x['desc'])}"
+                             f"<div style='color:{muted};font-size:11px'>{e(labels[x['status']])}"
+                             f"{(' · ↔ ' + e(x['pair'])) if x['pair'] else ''}</div></td>"
+                             f"<td style='{td}'>{e(x['action'])}</td><td style='{tdn}'>{_m(abs(x['value'])) if x['value'] else ''}</td></tr>"
+                             for x in du["interventions"][:5]]))
     if im:
         n = im["counts"]
         rows = [f"<tr><td style='{td}'><span style='color:{dot['crit' if IM_SEV.get(kk) == 'critical' else 'warn' if IM_SEV.get(kk) == 'warning' else 'info']}'>●</span> "
@@ -536,6 +601,12 @@ def render_xlsx(r):
         sheet("Recipes incomplete", ["Item", "Description", "Status", "Issues", "Sold"],
               [[i["item"], i["desc"], i["status"], "; ".join(i.get("issues") or [])[:300] if isinstance(i.get("issues"), list) else str(i.get("issues") or ""), i["qty_sold"]]
                for i in rc["incomplete"]], [None, None, None, None, qty], [11, 34, 12, 70, 10])
+    du = r.get("discharge") or {}
+    if du:
+        sheet("Recipe interventions", ["Location", "Signal", "Item", "Description", "Paired code", "What to do", "Recipes", "Value"],
+              [[x["location"], recipeuse.STATUS[x["status"]], x["item"], x["desc"], x["pair"], x["action"],
+                ", ".join(x["recipes"]), x["value"]] for x in du["interventions"]],
+              [None] * 7 + [money], [14, 26, 11, 32, 11, 80, 34, 12])
     im = r["item_master"]
     if im:
         sheet("Item master", ["Check", "Severity", "Item", "Description", "Note"],

@@ -50,6 +50,7 @@ FINANCE = [
         ("sku", "SKU planning", "location", ["finance.inventory.view"]),
         ("typology", "Typology & turnover", "company", ["finance.inventory.view"]),
         ("recipes", "Recipe integrity", "company", ["finance.inventory.view"]),
+        ("discharge", "Received vs discharged", "company", ["finance.inventory.view"]),
         ("itemmaster", "Item master control", "company", ["finance.inventory.view"]),
         ("movement", "Movement & dead stock", "company", ["finance.inventory.view"]),
         ("stockwc", "Stock & working capital", "company", ["finance.inventory.view", "purchasing.view"]),

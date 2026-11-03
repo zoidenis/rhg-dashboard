@@ -122,6 +122,12 @@ td.num,th.num{text-align:right}
 .ty-st.ok{color:var(--down);background:var(--down-bg)}.ty-st.over{color:var(--warn);background:var(--warn-bg)}
 .ty-st.excess{color:var(--up);background:var(--up-bg)}.ty-st.info,.ty-st.na,.ty-st.nouse{color:var(--sub);background:var(--bg)}
 .ty-st.nouse{color:var(--warn)}
+.dc-st{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sub);background:var(--bg)}
+.dc-st.not_received,.dc-st.over{color:var(--up);background:var(--up-bg)}.dc-st.not_used,.dc-st.under{color:var(--warn);background:var(--warn-bg)}
+.dc-st.ok{color:var(--down);background:var(--down-bg)}
+#dcLoc td.n{cursor:pointer}#dcLoc td.n:hover{text-decoration:underline}
+.dc-pair{font-size:11.5px;color:var(--sub)}
+#dcActs td.w,#dcLines td.w{white-space:normal;min-width:260px;max-width:460px}#dcActs td.it,#dcLines td.it{white-space:normal;min-width:180px}
 .ty-st.count{color:var(--up);background:var(--card);border:1px solid var(--up)}
 #tyTable tr.ty-type td{font-weight:600;cursor:pointer}
 #tyTable tr.ty-type td:first-child::before{content:"▸";display:inline-block;width:14px;color:var(--sub);transition:transform .15s}
@@ -321,6 +327,7 @@ td.num,th.num{text-align:right}
     <button data-view="recipes" data-parent="inventory" style="display:none">Recipe integrity</button>
     <button data-view="itemmaster" data-parent="inventory" style="display:none">Item master control</button>
     <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
+    <button data-view="discharge" data-parent="inventory" style="display:none">Received vs discharged</button>
     <button data-view="stockwc" data-parent="inventory" style="display:none">Stock &amp; working capital</button>
 
     <div class="grp">Planning</div>
@@ -669,7 +676,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -763,6 +770,34 @@ td.num,th.num{text-align:right}
       <p class="hint" id="tyItemsNote"></p></div>
       <div style="display:flex;gap:6px;align-items:center"><label class="meta"><input type="checkbox" id="tyOnlyCount"> Only “count it”</label></div></div>
       <div class="scroll"><table id="tyItems"></table></div></div>
+  </section>
+
+  <section class="view" id="v-discharge">
+    <div class="card">
+      <div class="card-head"><div><h2>Received vs discharged</h2>
+        <p class="hint" id="dcNote">The codes that come into each location against the codes the recipes and the sales take out of it, and where the two do not meet: what to change in the recipes. Built on the Movement &amp; dead stock data; Business Central is read only.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select id="dcLocSel"><option value="">All locations</option></select>
+          <select id="dcDays"><option value="30" selected>Last 30 days</option><option value="60">Last 60 days</option><option value="90">Last 90 days</option></select>
+          <button class="mini dark" id="dcRead">Read again</button><button class="mini" id="dcXlsx">Excel</button></div></div>
+      <div class="kpis six" id="dcKpis" style="margin-top:14px"></div>
+      <p class="meta" id="dcStatus"></p>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>Recipe interventions</h2>
+      <p class="hint">One line per thing to change, the paired codes first (a recipe code with the code the location receives instead), then by value. Value at item unit cost, estimated.</p></div></div>
+      <div class="scroll"><table id="dcActs"></table></div><p class="meta" id="dcActsMore"></p></div>
+    <div class="card"><div class="card-head"><div><h2>By location</h2>
+      <p class="hint">Codes received and discharged in the period, and the signals of each location. Click a number for its lines.</p></div></div>
+      <div class="scroll"><table id="dcLoc"></table></div></div>
+    <div class="card"><div class="card-head"><div><h2>Lines</h2><p class="hint" id="dcLinesNote"></p></div></div>
+      <div class="sk-chips" id="dcChips"></div>
+      <div class="filters" style="margin:0 0 10px"><label>Item<input id="dcQ" placeholder="number or name"></label></div>
+      <div class="scroll"><table id="dcLines"></table></div><p class="meta" id="dcLinesMore"></p></div>
+    <div class="card"><div class="card-head"><div><h2>Company view</h2>
+      <p class="hint">Every location summed, so transfers between locations cancel out: purchases and output against what the recipes and the sales discharge. The cleanest test of a recipe quantity.</p></div></div>
+      <div class="scroll"><table id="dcComp"></table></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" id="dcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-closing">
@@ -1604,6 +1639,10 @@ function renderSettings(){
     <label class="field">SKU planning: most days of use for fresh families<input id="inv-skfr" value="${esc((s.inventory||{}).sku_fresh_max_days||"")}" placeholder="4"></label>
     <label class="field">SKU planning: tolerance before a card is off (%)<input id="inv-sktol" value="${esc((s.inventory||{}).sku_tolerance_pct||"")}" placeholder="50"></label>
     <label class="field">SKU planning: fewest days of use worth planning<input id="inv-skmin" value="${esc((s.inventory||{}).sku_min_use_days||"")}" placeholder="5"></label>
+    <label class="field">Received vs discharged: low ratio (discharged / in)<input id="inv-dclow" value="${esc((s.inventory||{}).discharge_low_ratio||"")}" placeholder="0.5"></label>
+    <label class="field">Received vs discharged: high ratio (discharged / in)<input id="inv-dchigh" value="${esc((s.inventory||{}).discharge_high_ratio||"")}" placeholder="1.5"></label>
+    <label class="field">Received vs discharged: days of cover above which a low ratio counts<input id="inv-dccov" value="${esc((s.inventory||{}).discharge_cover_days||"")}" placeholder="30"></label>
+    <label class="field">Received vs discharged: smallest value of a signal<input id="inv-dcmin" value="${esc((s.inventory||{}).discharge_min_value||"")}" placeholder="1000"></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
@@ -1637,7 +1676,9 @@ $("saveSettings").onclick = async ()=>{
                    turnover_fresh_families:$("inv-tyfresh").value, turnover_fresh_check_days:$("inv-tyfd").value,
                    sku_window_days:$("inv-skw").value, sku_service_level:$("inv-sksl").value, sku_lead_days:$("inv-sklt").value,
                    sku_review_days:$("inv-skrv").value, sku_fresh_max_days:$("inv-skfr").value,
-                   sku_tolerance_pct:$("inv-sktol").value, sku_min_use_days:$("inv-skmin").value},
+                   sku_tolerance_pct:$("inv-sktol").value, sku_min_use_days:$("inv-skmin").value,
+                   discharge_low_ratio:$("inv-dclow").value, discharge_high_ratio:$("inv-dchigh").value,
+                   discharge_cover_days:$("inv-dccov").value, discharge_min_value:$("inv-dcmin").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -2743,6 +2784,95 @@ $("modalCsv").onclick=()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
+// ---------------------------------------------------------------- received vs discharged
+let dcData = null, dcTimer = null, dcSt = "flagged", dcWantLoc = "";
+const DC_ORDER = ["not_received", "not_used", "over", "under", "from_stock", "ok"];
+const dcM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
+const dcQ = v => v == null ? "–" : Math.abs(v) >= 100 ? fmt(Math.round(v)) : (+v).toLocaleString("en-US", {maximumFractionDigits: 2});
+const dcSt1 = (k, d) => `<span class="dc-st ${k}">${esc((d || dcData).statuses[k])}</span>`;
+async function loadDischarge(refresh){
+  clearTimeout(dcTimer);
+  $("dcStatus").textContent = "Reading…";
+  try{
+    const p = new URLSearchParams({company: $("company").value || "", days: $("dcDays").value});
+    const j = await readJSON(await fetch("/api/discharge?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      const g = j.progress || {};
+      $("dcStatus").textContent = `${j.note} ${g.stage || ""}${g.total ? ` · ${g.done} of ${g.total} months` : ""}.`;
+      dcTimer = setTimeout(() => loadDischarge(false), 5000); return;
+    }
+    if (j.available === false) throw new Error(j.error || "not available");
+    dcData = j;
+    const keep = dcWantLoc || $("dcLocSel").value;
+    $("dcLocSel").innerHTML = `<option value="">All locations</option>` + j.locations.map(L => `<option>${esc(L.location)}</option>`).join("");
+    $("dcLocSel").value = j.locations.some(L => L.location === keep) ? keep : ""; dcWantLoc = "";
+    renderDischarge();
+  }catch(e){ $("dcStatus").textContent = "Could not read: " + e.message; }
+}
+$("dcRead").onclick = () => { dcData = null; loadDischarge(true); };
+$("dcDays").onchange = () => { dcData = null; loadDischarge(false); };
+$("dcLocSel").onchange = () => dcData && renderDischarge();
+$("dcQ").oninput = () => dcData && renderDcLines();
+$("dcXlsx").onclick = () => { if (dcData) location.href = "/api/discharge/xlsx?" + new URLSearchParams({company: $("company").value || "", days: $("dcDays").value}); };
+function dcLines(){ const loc = $("dcLocSel").value; return dcData.lines.filter(x => !loc || x.location === loc); }
+function renderDischarge(){
+  const d = dcData, loc = $("dcLocSel").value, L = dcLines();
+  const n = k => L.filter(x => x.status === k), v = a => a.reduce((s, x) => s + Math.abs(x.value || 0), 0);
+  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const nr = n("not_received"), nu = n("not_used"), ov = n("over"), un = n("under");
+  const pairs = L.filter(x => x.pair).length;
+  $("dcKpis").innerHTML =
+    card("Codes received", fmt(L.filter(x => x.received + x.made > 0).length), `came in, ${d.period} days`) +
+    card("Codes discharged", fmt(L.filter(x => x.consumed + x.sold > 0).length), "taken out by recipes or sales") +
+    card(esc(d.statuses.not_received), fmt(nr.length), `${dcM(v(nr))} discharged · recipe code not received`, nr.length ? "up" : "") +
+    card(esc(d.statuses.not_used), fmt(nu.length), `${dcM(v(nu))} received · in no recipe or not sold`, nu.length ? "warn" : "") +
+    card("Out of line", fmt(ov.length + un.length), `${fmt(ov.length)} far more · ${fmt(un.length)} far less than received`, (ov.length + un.length) ? "warn" : "") +
+    card("Suggested swaps", fmt(pairs), "recipe code ↔ the code received instead", pairs ? "up" : "");
+  $("dcNote").textContent = `${d.company} · ${d.from} to ${d.as_of} (${d.period} days)${loc ? " · " + loc : " · all locations"}`;
+  $("dcStatus").textContent = `Checked ${d.checked_at} · Verified: quantities from the item ledger · Estimated: values at item unit cost · Derived: signals, pairs`
+    + (d.excluded_entries ? ` · ${fmt(d.excluded_entries)} positive adjustments left out as in the negative stock email` : "")
+    + ` · limits: below ${Math.round(d.settings.low * 100)}% with over ${d.settings.cover_days} days of cover, above ${Math.round(d.settings.high * 100)}% with the stock run down (Settings → Inventory)`;
+  // interventions
+  const acts = d.interventions.filter(a => !loc || a.location === loc);
+  $("dcActs").innerHTML = acts.length ? `<tr><th>Location</th><th>Signal</th><th>Item</th><th>What to do</th><th>Recipes</th><th class="num">Value</th></tr>` +
+    acts.slice(0, 60).map(a => `<tr><td>${esc(a.location)}</td><td>${dcSt1(a.status)}</td><td class="it"><b>${esc(a.item)}</b> ${esc(a.desc)}${a.pair ? `<div class="dc-pair">↔ ${esc(a.pair)} ${esc((d.lines.find(x => x.item === a.pair && x.location === a.location) || {}).desc || "")}</div>` : ""}</td>
+      <td class="w">${esc(a.action)}</td><td class="meta">${esc(a.recipes.slice(0, 3).join(", "))}${a.recipes.length > 3 ? " …" : ""}</td><td class="num">${a.value ? dcM(Math.abs(a.value)) : ""}</td></tr>`).join("")
+    : `<tr><td class="meta">Nothing to change in the recipes${loc ? " at " + esc(loc) : ""} for this period.</td></tr>`;
+  $("dcActsMore").textContent = acts.length > 60 ? `${fmt(acts.length - 60)} more in the Excel file.` : "";
+  // by location
+  const locs = d.locations.filter(x => !loc || x.location === loc);
+  $("dcLoc").innerHTML = `<tr><th>Location</th><th class="num">Codes in</th><th class="num">Codes discharged</th>` + DC_ORDER.map(k => `<th class="num">${esc(d.statuses[k])}</th>`).join("") + `<th class="num">Value flagged</th></tr>` +
+    locs.map(x => `<tr><td>${esc(x.location)}</td><td class="num">${fmt(x.codes_in)}</td><td class="num">${fmt(x.codes_out)}</td>` +
+      DC_ORDER.map(k => `<td class="num ${x[k] ? "n" : ""}" data-l="${esc(x.location)}" data-s="${k}">${x[k] ? fmt(x[k]) : ""}</td>`).join("") +
+      `<td class="num">${dcM(x.value)}</td></tr>`).join("");
+  $("dcLoc").querySelectorAll("td.n").forEach(td => td.onclick = () => { $("dcLocSel").value = td.dataset.l; dcSt = td.dataset.s; renderDischarge(); $("dcLines").scrollIntoView({behavior: "smooth", block: "start"}); });
+  renderDcLines();
+  // company view
+  const C = d.company_view.filter(c => DC_ORDER.indexOf(c.status) < 4);
+  $("dcComp").innerHTML = C.length ? `<tr><th>Item</th><th>Signal</th><th class="num">Purchased</th><th class="num">Made</th><th class="num">By recipes</th><th class="num">Sold as it is</th><th class="num">Closing</th><th class="num">Discharged / in</th><th class="num">Locations in / out</th><th class="num">Value</th></tr>` +
+    C.slice(0, 40).map(c => `<tr><td><b>${esc(c.item)}</b> ${esc(c.desc)} <span class="meta">${esc(c.unit)}</span></td><td>${dcSt1(c.status)}</td><td class="num">${dcQ(c.purchased)}</td><td class="num">${dcQ(c.made)}</td>
+      <td class="num">${dcQ(c.consumed)}</td><td class="num">${dcQ(c.sold)}</td><td class="num">${dcQ(c.closing)}</td><td class="num">${c.ratio == null ? "–" : Math.round(c.ratio * 100) + "%"}</td>
+      <td class="num">${c.locations_in} / ${c.locations_out}</td><td class="num">${c.value ? dcM(Math.abs(c.value)) : ""}</td></tr>`).join("")
+    : `<tr><td class="meta">Company-wide, every code discharged is received and in line.</td></tr>`;
+  $("dcDefs").innerHTML = Object.values(d.definitions).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
+}
+function renderDcLines(){
+  const d = dcData, L = dcLines(), q = ($("dcQ").value || "").trim().toLowerCase();
+  const cnt = k => k === "flagged" ? L.filter(x => DC_ORDER.indexOf(x.status) < 4).length : k === "all" ? L.length : L.filter(x => x.status === k).length;
+  $("dcChips").innerHTML = ["flagged", ...DC_ORDER, "all"].map(k => `<button data-k="${k}" class="${dcSt === k ? "on" : ""}">${k === "flagged" ? "Signals" : k === "all" ? "All" : esc(d.statuses[k])} · ${fmt(cnt(k))}</button>`).join("");
+  $("dcChips").querySelectorAll("button").forEach(b => b.onclick = () => { dcSt = b.dataset.k; renderDcLines(); });
+  const rows = L.filter(x => (dcSt === "all" || (dcSt === "flagged" ? DC_ORDER.indexOf(x.status) < 4 : x.status === dcSt))
+    && (!q || x.item.toLowerCase().includes(q) || (x.desc || "").toLowerCase().includes(q)));
+  $("dcLinesNote").textContent = `${fmt(rows.length)} lines · received, made, discharged by recipes, sold as it is and shipped out in the period, in the item's base unit.`;
+  $("dcLines").innerHTML = rows.length ? `<tr><th>Location</th><th>Item</th><th>Signal</th><th class="num">Received</th><th class="num">Made</th><th class="num">By recipes</th><th class="num">Sold</th><th class="num">Shipped</th><th class="num">Opening</th><th class="num">Closing</th><th class="num">Discharged / in</th><th>Why</th></tr>` +
+    rows.slice(0, 400).map(x => `<tr><td>${esc(x.location)}</td><td class="it"><b>${esc(x.item)}</b> ${esc(x.desc)} <span class="meta">${esc(x.unit)}</span>${x.pair ? `<div class="dc-pair">↔ ${esc(x.pair.item)} ${esc(x.pair.desc)} · match ${Math.round(x.pair.score * 100)}%</div>` : ""}</td><td>${dcSt1(x.status)}</td>
+      <td class="num">${dcQ(x.received)}</td><td class="num">${x.made ? dcQ(x.made) : ""}</td><td class="num">${x.consumed ? dcQ(x.consumed) : ""}</td><td class="num">${x.sold ? dcQ(x.sold) : ""}</td><td class="num">${x.shipped ? dcQ(x.shipped) : ""}</td>
+      <td class="num">${dcQ(x.opening)}</td><td class="num">${dcQ(x.closing)}</td><td class="num">${x.ratio == null ? "–" : Math.round(x.ratio * 100) + "%"}</td>
+      <td class="w">${esc(x.note)}${x.action ? `<div class="meta">${esc(x.action)}</div>` : ""}</td></tr>`).join("")
+    : `<tr><td class="meta">No line.</td></tr>`;
+  $("dcLinesMore").textContent = rows.length > 400 ? `${fmt(rows.length - 400)} more lines in the Excel file.` : "";
+}
 // ---------------------------------------------------------------- typology & turnover
 let tyData = null, tyTimer = null;
 const TY_NAT = ["ingredients","resale","supplies","equipment","other"];
@@ -3187,6 +3317,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
+  if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="settings") liSettings();
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
@@ -3349,7 +3480,7 @@ function ilBar(L, cls){
 // Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
 // Typology & turnover, Recipe integrity, Item master control and Movement & dead stock, which stay views
 // of their own (their addresses and loading do not change) with the same tab bar on top.
-var INV_TABS = new Set(["typology", "recipes", "itemmaster", "movement", "stockwc"]);
+var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockwc"]);
 // the embedded Purchasing screen: loaded when the tab opens (again when the company changes), sized to its content
 var swCompany = null, swTimer = null;
 function swShow(){
