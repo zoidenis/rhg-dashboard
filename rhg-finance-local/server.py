@@ -30,6 +30,7 @@ import kartloc
 import supstock
 import skuplan
 import recipeuse
+import menueng
 import today as todayloc
 import unicorn_facts
 import faloc
@@ -1253,7 +1254,7 @@ def arap_status(user):
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
+EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
                 "/api/discharge/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
@@ -1265,7 +1266,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
-                         "/api/sales/prices/xlsx"}
+                         "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx"}
 
 
 def scope_expand(company, codes):
@@ -1351,7 +1352,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/companies":
             self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
             return None
-        multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx") or (path == "/api/today/locations" and q.get("scope") == "all")
+        multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
+                        "/api/sales/menu/xlsx") or (path == "/api/today/locations" and q.get("scope") == "all")
         if not multi and not access.company_ok(user, company):
             return access.refuse_company(company)
         L = access.locations(user, company)
@@ -1450,6 +1452,39 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/gl":
                 self._send(200, gl_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month"), q.get("days"), q.get("threshold")))
+            elif url.path in ("/api/sales/menu", "/api/sales/menu/xlsx"):
+                # Sales → Menu engineering: popularity and margin of every menu item (Simphony + BC recipes)
+                if not simphony.info()["configured"]:
+                    self._send(200, {"error": "The Simphony connection is not set."})
+                    return
+                try:
+                    per = periods(q.get("period"), q.get("mode", "month"))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                refs = simphony_refs_in_scope(user)
+                key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
+                ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1" and url.path == "/api/sales/menu")
+                if ds.get("pending") or ds.get("available") is False:
+                    self._send(200 if not url.path.endswith("xlsx") else 409, ds if not url.path.endswith("xlsx")
+                               else {"error": "The menu items are still being read; try again in a moment."})
+                    return
+                level = q.get("level") if q.get("level") in ("brand", "location", "all") else "all"
+                r = menueng.analyse(ds, level, (q.get("key") or "")[:60], q.get("section") or "family")
+                if not url.path.endswith("xlsx"):
+                    self._send(200, r)
+                    return
+                body = menueng.render_xlsx(r)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                safe = re.sub(r"[^A-Za-z0-9._-]+", "_", r["title"])[:40]
+                self.send_header("Content-Disposition", f'attachment; filename="RHG_menu_engineering_{safe}_'
+                                 f'{r["period"]["from"]}_{r["period"]["to"]}.xlsx"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                store.audit("export", f"menu engineering · {r['title']}", user["username"], {}, {}, r["period"]["from"])
             elif url.path in ("/api/sales/prices", "/api/sales/prices/xlsx"):
                 # Sales → Menu prices: every active Simphony menu item price by location, revenue centre and level
                 if not simphony.info()["configured"]:

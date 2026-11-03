@@ -147,6 +147,29 @@ td.num,th.num{text-align:right}
 .dc-st.not_received,.dc-st.over{color:var(--up);background:var(--up-bg)}.dc-st.not_used,.dc-st.under{color:var(--warn);background:var(--warn-bg)}
 .dc-st.ok{color:var(--down);background:var(--down-bg)}
 .pl-sq.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* Sales → Menu engineering */
+.me-c-star{--c:var(--down)}.me-c-plowhorse{--c:var(--warn)}.me-c-puzzle{--c:var(--accent)}.me-c-dog{--c:var(--up)}.me-c-nocost,.me-c-noprice{--c:var(--sub)}
+.me-st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;white-space:nowrap;color:var(--ink)}
+.me-st i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.me-quad{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.me-q{border:1px solid var(--line);border-top:3px solid var(--c);border-radius:12px;padding:12px 14px;background:var(--card);min-width:0}
+.me-q h3{margin:0;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.me-q h3 span{font-size:11.5px;color:var(--sub);font-weight:400}
+.me-q .n{font-size:22px;font-weight:800;margin:4px 0 2px}
+.me-q ul{margin:6px 0 8px;padding-left:16px;font-size:12px;line-height:1.5}
+.me-q .adv{font-size:11.5px;color:var(--sub);line-height:1.45;margin-top:4px}
+.me-q .adv b{color:var(--ink);font-weight:600}
+#meChart{position:relative;overflow-x:auto}
+#meChart svg{width:100%;min-width:620px;height:auto;display:block}
+#meChart .ax{stroke:var(--line)}#meChart .mid{stroke:var(--sub);stroke-dasharray:4 4}
+#meChart text{fill:var(--sub);font-size:11px}#meChart text.ql{font-size:12px;font-weight:700;fill:var(--ink);opacity:.55}
+#meChart circle{fill:var(--c);stroke:var(--card);stroke-width:2;cursor:pointer;opacity:.9}
+#meChart circle:hover{opacity:1;stroke:var(--ink)}
+.me-tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px;
+  box-shadow:0 6px 18px rgba(8,34,45,.16);min-width:180px;z-index:5;display:none}
+.me-lg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 2px}
+#meItems tr.hl td{background:rgba(120,170,190,.18)}
+#meItems td.w,#meActs td.w{white-space:normal;min-width:220px;max-width:420px}
 .dc-c-not_received{background:var(--up)}.dc-c-over{background:var(--up);opacity:.5}.dc-c-not_used{background:var(--warn)}
 .dc-c-under{background:var(--warn);opacity:.5}.dc-c-from_stock{background:var(--prev)}.dc-c-ok{background:var(--down)}
 .dc-pair{font-size:11.5px;color:var(--sub)}
@@ -913,7 +936,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-sales">
-    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button></div>
+    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button></div>
     <div id="slPrView" style="display:none">
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu prices</h2>
@@ -929,6 +952,41 @@ td.num,th.num{text-align:right}
       </div>
       <div class="card" style="margin-bottom:16px"><h2>Prices</h2><p class="hint" id="prxHint"></p><div class="scroll" style="max-height:620px"><table id="prxTable"></table></div></div>
       <div class="card"><h2>Same item, different prices</h2><p class="hint">Items sold at more than one location at a different base price (the lowest price level), in the same currency, widest gap first.</p><div class="scroll"><table id="prxSpread"></table></div></div>
+    </div>
+    <div id="slMeView" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>Menu engineering</h2>
+          <p class="hint">Every menu item by popularity and margin, within its menu section: Stars, Plowhorses, Puzzles and Dogs, with what the kitchen and the floor should do. Items sold and sales from Simphony; the portion cost from the recipes and item cards of Business Central. The period is the one chosen above.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini dark" id="meXlsx">Excel</button><button class="mini" id="meRead">Read again</button></div></div>
+        <div class="filters" style="margin:6px 0 8px">
+          <label>Level<select id="meLevel"><option value="all">All RHG</option><option value="brand">Brand</option><option value="location">Location</option></select></label>
+          <label id="meKeyL" style="display:none"><span id="meKeyT">Brand</span><select id="meKey"></select></label>
+          <label>Menu section<select id="meSec"><option value="family">Family group</option><option value="major">Major group</option></select></label>
+        </div>
+        <p class="meta" id="meStatus" style="margin:0"></p>
+      </div>
+      <div class="kpis six" id="meKpis"></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>The menu matrix</h2>
+        <p class="hint">Each dot is a menu item: to the right, more popular than its section's popularity line; up, a higher margin than its section's average. Size = net sales. Hover for the figures; click a dot for its row.</p></div>
+        <label class="meta">Section <select id="meChartSec"><option value="">All sections</option></select></label></div>
+        <div class="me-lg" id="meLegend"></div>
+        <div id="meChart"></div></div>
+      <div class="me-quad" id="meQuad" style="margin-bottom:16px"></div>
+      <div class="card" style="margin-bottom:16px"><h2>What to do</h2>
+        <p class="hint">Dogs first, then Plowhorses, Puzzles, items with no cost and Stars with a flag; operations (kitchen, recipe, purchasing) and sales (menu, price, staff). By net sales within each class.</p>
+        <div class="scroll" style="max-height:520px"><table id="meActs"></table></div></div>
+      <div class="card" style="margin-bottom:16px"><h2>Menu sections</h2>
+        <p class="hint">Each section is measured on its own: its popularity line (70% of an equal share) and its average margin.</p>
+        <div class="scroll"><table id="meSecs"></table></div></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Menu items</h2><p class="hint" id="meItemsNote"></p></div></div>
+        <div class="sk-chips" id="meChips"></div>
+        <div class="filters" style="margin:0 0 10px"><label>Item<input id="meQ" placeholder="name or number"></label></div>
+        <div class="scroll" style="max-height:640px"><table id="meItems"></table></div></div>
+      <div class="card" id="meAcrossCard" style="margin-bottom:16px;display:none"><h2>Same item, different class by location</h2>
+        <p class="hint">Items whose class changes from one location to another: the recipe and the price are the same, so look at how it is sold, placed and served there.</p>
+        <div class="scroll"><table id="meAcross"></table></div></div>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="meDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
     <div id="slLocView" style="display:none">
       <div class="card">
@@ -1442,6 +1500,7 @@ function render(){
   if(!pmLoaded) loadPlMemo();
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
+  if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "menu" && meKey !== meQs()) meLoad();
   if($("v-inventory").classList.contains("on") && ilTab === "loc" && ilKey !== ilQuery()) loadIl(false);
   if($("v-overview").classList.contains("on") && flTab === "loc" && flKey !== flQuery()) loadFl(false);
   if($("v-cash").classList.contains("on") && clTab === "loc" && clKey !== flQuery()) loadCl(false);
@@ -1738,6 +1797,9 @@ function renderSettings(){
     <label class="field">Received vs discharged: high ratio (discharged / in)<input id="inv-dchigh" value="${esc((s.inventory||{}).discharge_high_ratio||"")}" placeholder="1.5"></label>
     <label class="field">Received vs discharged: days of cover above which a low ratio counts<input id="inv-dccov" value="${esc((s.inventory||{}).discharge_cover_days||"")}" placeholder="30"></label>
     <label class="field">Received vs discharged: smallest value of a signal<input id="inv-dcmin" value="${esc((s.inventory||{}).discharge_min_value||"")}" placeholder="1000"></label>
+    <label class="field">Menu engineering: popularity line (% of an equal share)<input id="inv-mepop" value="${esc((s.inventory||{}).menu_popularity_pct||"")}" placeholder="70"></label>
+    <label class="field">Menu engineering: portion cost target (% of the net price)<input id="inv-metg" value="${esc((s.inventory||{}).menu_cost_target_pct||"")}" placeholder="32"></label>
+    <label class="field">Menu engineering: item discounts flagged above (% of sales)<input id="inv-medc" value="${esc((s.inventory||{}).menu_discount_pct||"")}" placeholder="15"></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
@@ -1773,7 +1835,9 @@ $("saveSettings").onclick = async ()=>{
                    sku_review_days:$("inv-skrv").value, sku_fresh_max_days:$("inv-skfr").value,
                    sku_tolerance_pct:$("inv-sktol").value, sku_min_use_days:$("inv-skmin").value,
                    discharge_low_ratio:$("inv-dclow").value, discharge_high_ratio:$("inv-dchigh").value,
-                   discharge_cover_days:$("inv-dccov").value, discharge_min_value:$("inv-dcmin").value},
+                   discharge_cover_days:$("inv-dccov").value, discharge_min_value:$("inv-dcmin").value,
+                   menu_popularity_pct:$("inv-mepop").value, menu_cost_target_pct:$("inv-metg").value,
+                   menu_discount_pct:$("inv-medc").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -2049,16 +2113,168 @@ function renderSales(){
   if (slTab === "loc") slRender();
 }
 
+// ---------- Sales → Menu engineering ----------
+let meData = null, meKey = "", meTimer = null, meCls = "", meHl = null;
+const ME_ORDER = ["star", "plowhorse", "puzzle", "dog", "nocost"];
+const meLbl = k => (meData && meData.labels[k]) || (k === "noprice" ? "No price" : k);
+const meSt = k => `<span class="me-st me-c-${k}"><i></i>${esc(meLbl(k))}</span>`;
+function meQs(){
+  const p = new URLSearchParams(params()), o = new URLSearchParams();
+  o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
+  o.set("level", $("meLevel").value); if ($("meLevel").value !== "all") o.set("key", $("meKey").value || "");
+  o.set("section", $("meSec").value);
+  return o.toString();
+}
+async function meLoad(refresh){
+  clearTimeout(meTimer);
+  const q = meQs(); meKey = q;
+  $("meStatus").textContent = "Reading the menu items from Simphony…";
+  try{
+    const j = await readJSON(await fetch("/api/sales/menu?" + q + (refresh ? "&refresh=1" : "")));
+    if (meKey !== q) return;
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      $("meStatus").textContent = `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} The first read of a long period takes a few minutes; closed days are kept.`;
+      meTimer = setTimeout(() => meLoad(false), 4000); return;
+    }
+    if (j.available === false) throw new Error(j.error || "not available");
+    meData = j; meFillKeys(); meRender();
+  }catch(e){ $("meStatus").textContent = "Could not read: " + e.message; }
+}
+function meFillKeys(){
+  const d = meData, lv = $("meLevel").value, keep = $("meKey").value || d.key;
+  $("meKeyL").style.display = lv === "all" ? "none" : "";
+  $("meKeyT").textContent = lv === "brand" ? "Brand" : "Location";
+  const opts = lv === "brand" ? d.brands.map(b => [b, b]) : d.locations.map(L => [L.ref, `${L.name}`]);
+  $("meKey").innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+  if (opts.some(o => o[0] === keep)) $("meKey").value = keep;
+}
+$("meLevel").onchange = () => {
+  if (meData) { meFillKeys(); }
+  $("meKeyL").style.display = $("meLevel").value === "all" ? "none" : "";
+  if ($("meLevel").value !== "all" && !$("meKey").value) return;
+  meLoad();
+};
+$("meKey").onchange = () => meLoad();
+$("meSec").onchange = () => meLoad();
+$("meRead").onclick = () => meLoad(true);
+$("meXlsx").onclick = () => { if (meData) location.href = "/api/sales/menu/xlsx?" + meQs(); };
+$("meChartSec").onchange = () => meData && meChart();
+$("meQ").oninput = () => meData && meItems();
+function meRender(){
+  const d = meData, k = d.kpis, C = d.currency, S = d.settings;
+  const card = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("meKpis").innerHTML =
+    card("Menu items", fmt(k.items), `${fmt(k.qty)} sold`) +
+    card("Net sales", ilM(k.net), `${esc(C)}, before discounts`) +
+    card("Contribution margin", ilM(k.cm), k.cm_pct != null ? `${fmt(k.cm_pct, 1)}% of the sales with a cost` : "") +
+    card("Portion cost", k.cost_pct != null ? fmt(k.cost_pct, 1) + "%" : "–", `target ${fmt(S.target)}% · ${k.costed_share != null ? fmt(k.costed_share, 0) + "% of sales costed" : ""}`, k.cost_pct > S.target ? "up" : "") +
+    card("Stars · Plowhorses", `${fmt(d.classes.star.items)} · ${fmt(d.classes.plowhorse.items)}`, `${ilM(d.classes.star.net + d.classes.plowhorse.net)} of sales`) +
+    card("Puzzles · Dogs", `${fmt(d.classes.puzzle.items)} · ${fmt(d.classes.dog.items)}`, `${fmt(d.classes.nocost.items)} with no cost`, d.classes.dog.items ? "warn" : "");
+  $("meStatus").textContent = `${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"}`
+    + ` · ${esc(C)}${d.converted ? " (converted at the group rates of Settings)" : ""}${d.missing_rates.length ? " · no rate for " + d.missing_rates.join(", ") + ", left out" : ""}`
+    + ` · read ${d.read_at}${d.errors.length ? " · " + d.errors.slice(0, 3).join(" · ") : ""}`;
+  const secs = [...new Set(d.items.map(i => i.section))];
+  const keep = $("meChartSec").value;
+  $("meChartSec").innerHTML = `<option value="">All sections</option>` + d.sections.map(s => `<option>${esc(s.section)}</option>`).join("");
+  $("meChartSec").value = secs.includes(keep) ? keep : "";
+  $("meLegend").innerHTML = ME_ORDER.slice(0, 4).map(c => `${meSt(c)}<span class="meta">${esc(d.meaning[c])}</span>`).join("");
+  meChart(); meQuad(); meActs(); meSecs(); meItems(); meAcross();
+  $("meDefs").innerHTML = Object.values(d.definitions).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
+}
+function meChart(){
+  const d = meData, sec = $("meChartSec").value;
+  const pts = d.items.filter(i => i.x != null && i.y != null && (!sec || i.section === sec));
+  const W = 860, H = 430, l = 52, r = 16, t = 14, b = 40;
+  const XM = 3, YMIN = -0.5, YM = 2.5;
+  const X = v => l + Math.min(v, XM) / XM * (W - l - r), Y = v => t + (YM - Math.max(YMIN, Math.min(v, YM))) / (YM - YMIN) * (H - t - b);
+  const maxNet = Math.max(1, ...pts.map(p => p.net));
+  const rad = v => 4 + Math.sqrt(Math.max(0, v) / maxNet) * 12;
+  const ticksX = [0, 0.5, 1, 1.5, 2, 2.5, 3], ticksY = [-0.5, 0, 0.5, 1, 1.5, 2, 2.5];
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Menu matrix: popularity against margin">`;
+  g += ticksX.map(v => `<line class="ax" x1="${X(v)}" x2="${X(v)}" y1="${t}" y2="${H - b}"/><text x="${X(v)}" y="${H - b + 15}" text-anchor="middle">${v === 3 ? "3×+" : v + "×"}</text>`).join("");
+  g += ticksY.map(v => `<line class="ax" x1="${l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${l - 6}" y="${Y(v) + 4}" text-anchor="end">${v === 2.5 ? "2.5×+" : v + "×"}</text>`).join("");
+  g += `<line class="mid" x1="${X(1)}" x2="${X(1)}" y1="${t}" y2="${H - b}"/><line class="mid" x1="${l}" x2="${W - r}" y1="${Y(1)}" y2="${Y(1)}"/>`;
+  g += `<text class="ql" x="${W - r - 6}" y="${t + 16}" text-anchor="end">${esc(meLbl("star"))}</text><text class="ql" x="${l + 6}" y="${t + 16}">${esc(meLbl("puzzle"))}</text>`
+     + `<text class="ql" x="${W - r - 6}" y="${H - b - 8}" text-anchor="end">${esc(meLbl("plowhorse"))}</text><text class="ql" x="${l + 6}" y="${H - b - 8}">${esc(meLbl("dog"))}</text>`;
+  g += `<text x="${(l + W - r) / 2}" y="${H - 6}" text-anchor="middle">Popularity: share of items sold against the section's popularity line</text>`;
+  g += `<text x="14" y="${(t + H - b) / 2}" text-anchor="middle" transform="rotate(-90 14 ${(t + H - b) / 2})">Margin against the section's average</text>`;
+  g += [...pts].sort((a, b) => b.net - a.net).map(p => `<circle class="me-c-${p.cls}" cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${rad(p.net).toFixed(1)}" data-mi="${p.mi}"></circle>`).join("");
+  g += `</svg><div class="me-tip" id="meTip"></div>`;
+  $("meChart").innerHTML = pts.length ? g : `<p class="hint">No item with a price and a cost in this selection.</p>`;
+  const byMi = Object.fromEntries(d.items.map(i => [String(i.mi), i])), tip = $("meTip");
+  $("meChart").querySelectorAll("circle").forEach(c => {
+    c.onmousemove = e => {
+      const i = byMi[c.dataset.mi], box = $("meChart").getBoundingClientRect();
+      tip.innerHTML = `<b>${esc(i.name)}</b> <span class="meta">${esc(i.mi)}</span><div class="meta">${esc(i.section)} · ${meSt(i.cls)}</div>`
+        + `<div>${fmt(i.qty)} sold · menu mix ${fmt(i.mm * 100, 1)}% (line ${fmt(i.mm_threshold * 100, 1)}%)</div>`
+        + `<div>price ${fmt(i.price)} · cost ${fmt(i.cost)} · margin ${fmt(i.cm)} (avg ${fmt(i.cm_avg)})</div>`
+        + `<div>net sales ${ilM(i.net)} ${esc(d.currency)} · cost ${i.cost_pct != null ? fmt(i.cost_pct, 1) + "%" : "–"}</div>`;
+      tip.style.display = "block";
+      const x = e.clientX - box.left + 14, y = e.clientY - box.top + 10;
+      tip.style.left = Math.min(x, box.width - 240) + "px"; tip.style.top = y + "px";
+    };
+    c.onmouseleave = () => { tip.style.display = "none"; };
+    c.onclick = () => { meCls = ""; $("meQ").value = ""; meHl = c.dataset.mi; meItems(); const row = $("meItems").querySelector(`tr[data-mi="${c.dataset.mi}"]`); if (row) row.scrollIntoView({behavior: "smooth", block: "center"}); };
+  });
+}
+function meQuad(){
+  const d = meData, net = d.kpis.net || 1, cm = d.kpis.cm || 1;
+  $("meQuad").innerHTML = ME_ORDER.slice(0, 4).map(c => {
+    const x = d.classes[c], top = d.items.filter(i => i.cls === c).slice(0, 5), a = d.advice[c];
+    return `<div class="me-q me-c-${c}"><h3>${meSt(c)}<span>${esc(d.meaning[c])}</span></h3>
+      <div class="n">${fmt(x.items)}</div><div class="meta">${fmt(x.net / net * 100, 0)}% of sales · ${fmt(x.cm / cm * 100, 0)}% of the margin</div>
+      <ul>${top.map(i => `<li>${esc(i.name)} <span class="meta">${fmt(i.qty)} · ${ilM(i.net)}</span></li>`).join("") || "<li class='meta'>none</li>"}</ul>
+      <div class="adv"><b>Operations:</b> ${esc(a[0])}</div><div class="adv"><b>Sales:</b> ${esc(a[1])}</div></div>`;
+  }).join("");
+}
+function meActs(){
+  const d = meData, A = d.actions;
+  $("meActs").innerHTML = A.length ? `<tr><th>Class</th><th>Item</th><th>Section</th><th>Operations</th><th>Sales</th><th>Flags</th><th class="num">Net sales</th></tr>` +
+    A.slice(0, 120).map(a => `<tr><td>${meSt(a.cls)}</td><td class="w" style="min-width:160px"><b>${esc(a.name)}</b> <span class="meta">${esc(a.mi)}</span></td><td>${esc(a.section)}</td>
+      <td class="w">${esc(a.ops)}</td><td class="w">${esc(a.sales)}</td><td class="w meta">${esc(a.flags.join(" · "))}</td><td class="num">${ilM(a.net)}</td></tr>`).join("")
+    : `<tr><td class="meta">Nothing to change: every item is a Star with no flag.</td></tr>`;
+}
+function meSecs(){
+  const d = meData;
+  $("meSecs").innerHTML = `<tr><th>Section</th><th class="num">Items</th><th class="num">Sold</th><th class="num">Net sales</th><th class="num">Margin</th><th class="num">Cost %</th><th class="num">Avg margin</th><th class="num">Popularity line</th>` + ME_ORDER.map(c => `<th class="num">${esc(meLbl(c))}</th>`).join("") + `</tr>` +
+    d.sections.map(s => `<tr><td><b>${esc(s.section)}</b></td><td class="num">${fmt(s.items)}</td><td class="num">${fmt(s.qty)}</td><td class="num">${ilM(s.net)}</td><td class="num">${s.cm != null ? ilM(s.cm) : "–"}</td>
+      <td class="num ${s.cost_pct > d.settings.target ? "up" : ""}">${s.cost_pct != null ? fmt(s.cost_pct, 1) + "%" : "–"}</td><td class="num">${s.avg_cm != null ? fmt(s.avg_cm) : "–"}</td><td class="num">${fmt(s.threshold_pct, 1)}%</td>`
+      + ME_ORDER.map(c => `<td class="num">${s[c] || ""}</td>`).join("") + `</tr>`).join("");
+}
+function meItems(){
+  const d = meData, q = ($("meQ").value || "").trim().toLowerCase();
+  const all = d.items, cnt = c => c ? all.filter(i => i.cls === c).length : all.length;
+  $("meChips").innerHTML = ["", ...ME_ORDER, "noprice"].filter(c => !c || cnt(c)).map(c => `<button data-c="${c}" class="${meCls === c ? "on" : ""}">${c ? `<i class="me-c-${c}" style="background:var(--c)"></i>${esc(meLbl(c))}` : "All"} · ${fmt(cnt(c))}</button>`).join("");
+  $("meChips").querySelectorAll("button").forEach(b => b.onclick = () => { meCls = b.dataset.c; meHl = null; meItems(); });
+  const rows = all.filter(i => (!meCls || i.cls === meCls) && (!q || i.name.toLowerCase().includes(q) || String(i.mi).includes(q)));
+  $("meItemsNote").textContent = `${fmt(rows.length)} items · amounts in ${d.currency}; price and margin per portion, net of VAT, before discounts.`;
+  $("meItems").innerHTML = `<tr><th>Item</th><th>Section</th><th>Class</th><th class="num">Sold</th><th class="num">Menu mix</th><th class="num">Price</th><th class="num">Cost</th><th>Cost basis</th><th class="num">Cost %</th><th class="num">Margin</th><th class="num">Total margin</th><th class="num">Net sales</th><th>Flags</th></tr>` +
+    rows.slice(0, 500).map(i => `<tr data-mi="${i.mi}" class="${String(i.mi) === meHl ? "hl" : ""}"><td><b>${esc(i.name)}</b> <span class="meta">${esc(i.mi)}</span></td><td>${esc(i.section)}</td><td>${meSt(i.cls)}</td>
+      <td class="num">${fmt(i.qty)}</td><td class="num">${i.mm != null ? fmt(i.mm * 100, 1) + "%" : "–"}</td><td class="num">${fmt(i.price)}</td><td class="num">${i.cost != null ? fmt(i.cost) : "–"}</td><td class="meta">${esc(i.basis)}</td>
+      <td class="num ${i.cost_pct > d.settings.target ? "up" : ""}">${i.cost_pct != null ? fmt(i.cost_pct, 1) + "%" : "–"}</td><td class="num">${i.cm != null ? fmt(i.cm) : "–"}</td><td class="num">${i.cm_total != null ? ilM(i.cm_total) : "–"}</td><td class="num">${ilM(i.net)}</td>
+      <td class="w meta">${esc(i.flags.join(" · "))}</td></tr>`).join("");
+}
+function meAcross(){
+  const d = meData, A = d.across || [];
+  $("meAcrossCard").style.display = A.length ? "" : "none";
+  if (!A.length) return;
+  const refs = d.selection.map(s => s.ref), name = Object.fromEntries(d.selection.map(s => [s.ref, s.name]));
+  $("meAcross").innerHTML = `<tr><th>Item</th><th>Section</th>${refs.map(r => `<th>${esc(name[r])}</th>`).join("")}</tr>` +
+    A.slice(0, 80).map(a => `<tr><td><b>${esc(a.name)}</b> <span class="meta">${esc(a.mi)}</span></td><td>${esc(a.section)}</td>${refs.map(r => { const v = a.by[r]; return `<td>${v ? meSt(v.cls) + ` <span class="meta">${fmt(v.qty)}</span>` : ""}</td>`; }).join("")}</tr>`).join("");
+}
 // ---------- Sales → Location intelligence ----------
 // Every restaurant as a square, from the same Simphony read as the Sales tab (/api/sales).
 var slTab = "main", slSort = "net";
 function slShowTab(tab){
   slTab = tab;
   document.querySelectorAll("#slTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("slMain").style.display = tab === "loc" || tab === "prices" ? "none" : "";
+  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" ? "none" : "";
   $("slLocView").style.display = tab === "loc" ? "" : "none";
   $("slPrView").style.display = tab === "prices" ? "" : "none";
+  $("slMeView").style.display = tab === "menu" ? "" : "none";
   if (tab === "prices" && !prxData) prxLoad();
+  if (tab === "menu" && (!meData || meKey !== meQs())) meLoad();
   if (currentView().id === "sales") setHeader();
   if (tab === "loc") { if (!salesData || salesData._q !== params()) loadSales(); else slRender(); if (!chData || chData._q !== chQuery()) loadCh(); else chRender(); }
 }
@@ -3513,7 +3729,7 @@ function setHeader(){
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){
-    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : "Sales") + " · all restaurants";
+    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : "Sales") + " · all restaurants";
     $("period").textContent = salesData && salesData.available
       ? `${salesData.period.label} · ${salesData.period.from} → ${salesData.period.to} · against ${salesData.prior.from} → ${salesData.prior.to}`
       : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";
