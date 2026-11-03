@@ -1054,6 +1054,7 @@ td.num,th.num{text-align:right}
         <label class="field">Companies (blank = default)<input id="ngCo" placeholder="SALT"></label>
         <label class="field">Lines per owner in the email (0 = all)<input id="ngLines" type="number" min="0" max="1000" value="50"></label>
         <label class="field">Send a test to<input id="ngTestTo" placeholder="you@rhg.al"></label>
+        <label class="field" style="grid-column:span 2">Leave out positive adjustments (document no. starts with: from..to; several with ;)<input id="ngEx" placeholder="SHITJE: 2026-10-01..2026-10-31"></label>
       </div>
       <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="ngOn" style="width:auto"> Send on the days above</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
@@ -3980,7 +3981,7 @@ function renderNegReport(st){
   const s = st.settings || {}, m = st.mail || {};
   const dayText = {daily: "Every day", mon_sat: "Monday to Saturday", weekdays: "Monday to Friday"};
   $("ngTo").value = s.to || ""; $("ngCc").value = s.cc || ""; $("ngDays").value = s.days || "daily"; $("ngTime").value = s.time || "07:30";
-  $("ngCo").value = s.companies || ""; $("ngLines").value = s.email_lines ?? "50"; $("ngOn").checked = !!s.enabled;
+  $("ngCo").value = s.companies || ""; $("ngLines").value = s.email_lines ?? "50"; $("ngEx").value = s.exclude_adjustments || ""; $("ngOn").checked = !!s.enabled;
   if (!$("ngTestTo").value) $("ngTestTo").value = (s.to || "").split(",")[0].trim();
   $("ngPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : "info");
   $("ngPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : `On · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}`;
@@ -3999,7 +4000,7 @@ $("ngSave").onclick = async () => {
   $("ngMsg").textContent = "Saving…";
   try{
     const st = await simphonyPost("/api/negative-report/settings", {to: $("ngTo").value, cc: $("ngCc").value, days: $("ngDays").value,
-      time: $("ngTime").value, companies: $("ngCo").value, email_lines: $("ngLines").value, enabled: $("ngOn").checked});
+      time: $("ngTime").value, companies: $("ngCo").value, email_lines: $("ngLines").value, exclude_adjustments: $("ngEx").value, enabled: $("ngOn").checked});
     renderNegReport(st); $("ngMsg").textContent = st.settings.enabled ? "Saved. The report goes out on the days set." : "Saved. Tick Send on the days above to switch it on.";
   }catch(e){ $("ngMsg").textContent = "Could not save: " + e.message; }
 };

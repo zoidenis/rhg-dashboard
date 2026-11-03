@@ -21,14 +21,20 @@ last 90 days (the movements since the line went below zero, else the whole windo
 "Since" is the day the balance last went below zero, walked back from the quantity on hand with the daily
 movements; before the window it shows as more than 90 days.
 
+Positive adjustments can be left out of the calculation (Settings: document number prefix and dates, by default
+SHITJE in October 2026, which put back sales that had taken the stock below zero): their quantity is taken off
+the quantity on hand and off the daily movements, so a line they had lifted to zero or above shows again.
+
 It reads what Movement & dead stock reads (stock by location and the item ledger), the open purchase orders
 (page 50 with its lines) and the open transfers. Business Central is never written. One email per company
 to the Stock manager, the Cost controller and Purchasing (Email recipients → Negative stock · daily), one
 per location to the location's own people, every day at the time set in Finance → Settings.
 """
+import fnmatch
 import html
 import io
 import json
+import re
 import threading
 import time
 import traceback
@@ -72,6 +78,13 @@ def _q(v):
     a = abs(v)
     s = f"{a:,.0f}" if a >= 100 else (f"{a:,.1f}" if a >= 10 else f"{a:,.2f}").rstrip("0").rstrip(".")
     return ("−" if v < 0 else "") + s
+
+
+def _dm(v):
+    try:
+        return f"{date.fromisoformat(v):%d %b %Y}"
+    except (TypeError, ValueError):
+        return v or "…"
 
 
 def _day(v):
@@ -126,16 +139,88 @@ def _doc_text(d):
     return f"Transfer {d['no']} from {d['party']}: {_q(d['qty'])} shipped {d['date']}, not received"
 
 
+# ---------------------------------------------------------------- adjustments left out
+def exclusion_rules(text):
+    """[(prefix, date_from, date_to)] from "SHITJE: 2026-10-01..2026-10-31; ..." (dates optional).
+    A prefix keeps letters, digits, spaces and . - / _ only (it goes into the OData filter)."""
+    out = []
+    for part in re.split(r"[;\n]+", text or ""):
+        part = part.strip()
+        if not part:
+            continue
+        prefix, _, span = part.partition(":")
+        prefix = re.sub(r"[^A-Za-z0-9 .\-/_]", "", prefix).strip().upper()[:20]
+        if not prefix:
+            continue
+        a, _, b = span.strip().partition("..")
+        try:
+            a = date.fromisoformat(a.strip()).isoformat() if a.strip() else ""
+            b = date.fromisoformat(b.strip()).isoformat() if b.strip() else ""
+        except ValueError:
+            continue
+        out.append((prefix, a, b))
+    return out
+
+
+def excluded_adjustments(client, company, rules, as_of):
+    """{(location, item): [(day, qty, cost, document)]}: the positive adjustments (Entry_Type Positive Adjmt., either
+    sign) whose document number starts with a prefix of the rules, posted in the rule's dates up to as_of."""
+    out, errors = {}, []
+    for prefix, a, b in rules:
+        b = min(b or as_of.isoformat(), as_of.isoformat())
+        if a and a > b:
+            continue
+        flt = (f"Entry_Type eq 'Positive Adjmt.' and startswith(Document_No,'{prefix}')"
+               + (f" and Posting_Date ge {a}" if a else "") + f" and Posting_Date le {b}")
+        try:
+            rows = client._get_all(client._url(company, config.E_ILE),
+                                   {"$filter": flt, "$select": "Entry_No,Posting_Date,Document_No,Location_Code,Item_No,"
+                                                               "Quantity,Cost_Amount_Actual"})
+        except Exception as exc:                                   # noqa: BLE001
+            errors.append(f"Adjustments {prefix} could not be read, so they are not left out: {str(exc)[:200]}")
+            continue
+        seen = set()
+        for r in rows:
+            if r.get("Entry_No") in seen or not str(r.get("Document_No") or "").upper().startswith(prefix):
+                continue
+            seen.add(r.get("Entry_No"))
+            out.setdefault((r.get("Location_Code") or "", str(r.get("Item_No") or "")), []).append(
+                (str(r.get("Posting_Date"))[:10], float(r.get("Quantity") or 0), float(r.get("Cost_Amount_Actual") or 0),
+                 str(r.get("Document_No") or "")))
+    return out, errors
+
+
 # ---------------------------------------------------------------- the analysis
-def analyse(company, mv, m, docs, as_of, previous=None, settings=None):
-    """mv: a Movement & dead stock result (its _rows); m: recipes.master; docs: open_documents."""
+def analyse(company, mv, m, docs, as_of, previous=None, settings=None, excluded=None, rules=None):
+    """mv: a Movement & dead stock result (its _rows); m: recipes.master; docs: open_documents;
+    excluded: excluded_adjustments, taken out of the quantity on hand and of the daily movements."""
     items = (m or {}).get("items") or {}
     uom = {(it, code): per for it, code, per in (m or {}).get("uom") or []}
     used_in = {}
     for parent, _line, typ, no, _desc, _nested, qty, unit in (m or {}).get("bom") or []:
         if typ == "Item" and no:
             used_in.setdefault(no, []).append((parent, qty, (unit or "").upper()))
-    rows = mv.get("_rows") or []
+    excluded = excluded or {}
+    rows = [list(r[:4]) for r in mv.get("_rows") or []]
+    left_out = {}
+    if excluded:
+        mr = mv.get("rules") or {}
+        ex_locs, ex_cats = mr.get("exclude_locations") or [], set(mr.get("exclude_categories") or [])
+        have = {(r[0], r[1]) for r in rows}
+        for (loc, it) in excluded:          # a line at zero in BC is not in the stock read: it starts at zero
+            if (loc, it) in have or any(fnmatch.fnmatchcase(loc.upper(), p) for p in ex_locs) \
+                    or str((items.get(it) or {}).get("Item_Category_Code") or "").upper() in ex_cats:
+                continue
+            rows.append([loc, it, 0.0, 0.0])
+        for r in rows:
+            ents = excluded.get((r[0], r[1]))
+            if not ents:
+                continue
+            q_out = sum(q for _, q, _, _ in ents)
+            cost = float((items.get(r[1]) or {}).get("Unit_Cost") or 0) or (r[3] / r[2] if r[2] else 0.0)
+            left_out[(r[0], r[1])] = round(q_out, 3)
+            r[2] = round(r[2] - q_out, 3)
+            r[3] = round(r[2] * cost, 2)
     neg = [r for r in rows if r[2] < -TOL]
     held = {}
     for r in rows:
@@ -154,6 +239,10 @@ def analyse(company, mv, m, docs, as_of, previous=None, settings=None):
                 daily.setdefault((loc, it), []).append((day, kind, qty))
             if it in parents and kind in ("sale", "sale_return"):
                 sold_parent.setdefault((loc, it), []).append((day, -qty))
+    for key in keys:                        # the left-out adjustments leave the daily movements too
+        for day, q_, _c, _d in excluded.get(key, []):
+            if start.isoformat() <= day <= as_of.isoformat():
+                daily.setdefault(key, []).append((day, "adj_pos", -q_))
     prev_lines = {x["key"]: x for x in (previous or {}).get("lines") or []}
     out = []
     for r in neg:
@@ -256,7 +345,7 @@ def analyse(company, mv, m, docs, as_of, previous=None, settings=None):
                     "owner": owner, "cause": OWNER[owner][1], "why": why, "strength": strength,
                     "evidence": evidence, "recipes": recipe_list[:5], "received": round(received, 3),
                     "made": round(made, 3), "outs": {k: round(v, 3) for k, v in outs.items()}, "last_in": last_in,
-                    "elsewhere": elsewhere})
+                    "elsewhere": elsewhere, "left_out": left_out.get((loc, it), 0.0)})
     out.sort(key=lambda x: (not x["new"], x["value"]))
     locs = {}
     for x in out:
@@ -271,9 +360,15 @@ def analyse(company, mv, m, docs, as_of, previous=None, settings=None):
     head = {"lines": len(out), "value": round(sum(x["value"] for x in out), 0), "new": sum(1 for x in out if x["new"]),
             "locations": len(locs), "documents": sum(1 for x in out if x["strength"] == "document"),
             **{f"{k}_lines": v[0] for k, v in by_owner.items()}}
+    ents = [e for v in excluded.values() for e in v]
+    head["left_out_lines"] = sum(1 for x in out if x["left_out"])
+    exc = {"rules": [list(x) for x in rules or []], "entries": len(ents), "pairs": len(excluded),
+           "value": round(sum(e[2] for e in ents), 0), "documents": sorted({e[3] for e in ents})[:10],
+           "negative_lines": head["left_out_lines"]}
     gone = [v for k, v in prev_lines.items() if k not in {x["key"] for x in out}] if previous else []
     return {"company": company, "as_of": as_of.isoformat(), "history_from": start.isoformat(), "lines": out,
             "locations": sorted(locs.values(), key=lambda L: L["value"]), "by_owner": by_owner, "headline": head,
+            "excluded": exc,
             "resolved": [{"location": g["location"], "item": g["item"], "desc": g.get("desc", ""), "owner": g["owner"]}
                          for g in gone]}
 
@@ -285,6 +380,7 @@ def cut(r, location):
                 for k, *_ in OWNERS}
     head = {"lines": len(lines), "value": round(sum(x["value"] for x in lines), 0), "new": sum(1 for x in lines if x["new"]),
             "locations": 1 if lines else 0, "documents": sum(1 for x in lines if x["strength"] == "document"),
+            "left_out_lines": sum(1 for x in lines if x.get("left_out")),
             **{f"{k}_lines": v[0] for k, v in by_owner.items()}}
     return dict(r, location=location, label=f"{r['company']} · {location}", key=f"{r['company']}|{location}",
                 lines=lines, by_owner=by_owner, headline=head,
@@ -353,7 +449,7 @@ def render(r, public_url="", max_lines=50):
         lines = [x for x in r["lines"] if x["owner"] == k]
         n, v = len(lines), sum(x["value"] for x in lines)
         head = (f"<h3 style='font-size:14px;color:{ink};margin:24px 0 2px'>{e(label)} · {e(cause)} "
-                f"<span style='color:{muted};font-weight:400'>({n:,} lines, {_m(v)})</span></h3>"
+                f"<span style='color:{muted};font-weight:400'>({n:,} {'line' if n == 1 else 'lines'}, {_m(v)})</span></h3>"
                 f"<div style='font-size:12px;color:{muted}'>{e(todo)}</div>")
         if not lines:
             sections.append(head + f"<p style='font-size:12px;color:{green};margin:6px 0 0'>Nothing for {e(label.lower())} today.</p>")
@@ -374,6 +470,14 @@ def render(r, public_url="", max_lines=50):
                         f"<th style='{th}'>Why</th></tr>{body}</table>{more}")
     errs = "".join(f"<div style='background:#fdf3e2;color:{amber};padding:7px 11px;border-radius:8px;font-size:12px;margin-bottom:8px'>"
                    f"{e(x)}</div>" for x in r.get("errors") or [])
+    ex = r.get("excluded") or {}
+    if ex.get("rules"):
+        spans = "; ".join(f"{pfx}…" + (f" {_dm(a)} – {_dm(b)}" if a or b else "") for pfx, a, b in ex["rules"])
+        errs += (f"<div style='background:{sky};color:{ink};padding:8px 11px;border-radius:8px;font-size:12px;margin-bottom:10px'>"
+                 f"<b>Left out of the calculation:</b> positive adjustments whose document no. starts with {e(spans)} "
+                 f"({ex.get('entries', 0):,} entries, {_m(ex.get('value'))} {e(C)}). Stock on hand and the movements are taken "
+                 f"without them; {H.get('left_out_lines', 0):,} of the lines below are below zero or lower because of it "
+                 f"(column Left out in Excel).</div>")
     empty = (f"<p style='font-size:14px;color:{green};font-weight:600'>No item is below zero at {e(r.get('location') or 'any location')} "
              f"at the end of {d:%d %b %Y}.</p>") if not r["lines"] else ""
     body = f"""<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#ecebeb;font-family:Figtree,Segoe UI,Arial,sans-serif;color:{ink}">
@@ -429,14 +533,15 @@ def render_xlsx(r):
         return ws
     sheet("Below zero", ["Owner", "Cause", "Location", "Item", "Description", "Category", "Quantity", "Unit", "Unit cost",
                          "Value", "Below zero since", "Days", "New", "Basis", "Why", "Received 90 d", "Made 90 d",
-                         "Used by recipes", "Sold", "Shipped out", "Negative adj.", "Last in", "Held elsewhere"],
+                         "Used by recipes", "Sold", "Shipped out", "Negative adj.", "Last in", "Held elsewhere",
+                         "Left out (adjustments)"],
           [[OWNER[x["owner"]][0], x["cause"], x["location"], x["item"], x["desc"], x["category"], x["qty"], x["unit"],
             round(x["unit_cost"], 2), round(x["value"]), x["since"] or f"> {HISTORY} days", x["days"], "yes" if x["new"] else "",
             "Document" if x["strength"] == "document" else "Item ledger", x["why"], x["received"], x["made"],
             x["outs"].get("consumption"), x["outs"].get("sale"), x["outs"].get("transfer_out"), x["outs"].get("adj_neg"),
-            x["last_in"], ", ".join(f"{L} {q:g}" for L, q in x["elsewhere"])] for x in r["lines"]],
-          [None] * 6 + [qty, None, money, money, None, None, None, None, None, qty, qty, qty, qty, qty, qty, None, None],
-          [14, 20, 13, 11, 32, 16, 11, 6, 10, 12, 12, 6, 5, 11, 70, 11, 10, 11, 10, 10, 10, 11, 22], first=True)
+            x["last_in"], ", ".join(f"{L} {q:g}" for L, q in x["elsewhere"]), x.get("left_out") or None] for x in r["lines"]],
+          [None] * 6 + [qty, None, money, money, None, None, None, None, None, qty, qty, qty, qty, qty, qty, None, None, qty],
+          [14, 20, 13, 11, 32, 16, 11, 6, 10, 12, 12, 6, 5, 11, 70, 11, 10, 11, 10, 10, 10, 11, 22, 12], first=True)
     sheet("By location", ["Location", "Lines", "Value", *[OWNER[k][1] for k, *_ in OWNERS], "New"],
           [[L["location"], L["lines"], round(L["value"]), *[L[k] for k, *_ in OWNERS], L["new"]] for L in r["locations"]],
           [None, None, money, None, None, None, None], [16, 8, 13, 18, 14, 20, 7])
@@ -461,6 +566,10 @@ def render_xlsx(r):
          "bought: bought outside BC or without a PO, or the purchase is not posted."],
         ["Basis: Document = an open purchase order or transfer is the evidence; Item ledger = read from the movements "
          "since the line went below zero, a likely cause to check, not a certain one."],
+        ["Left out of the calculation: positive adjustments whose document no. starts with "
+         + ("; ".join(f"{p_} ({a or '…'} to {b or '…'})" for p_, a, b in (r.get("excluded") or {}).get("rules") or []) or "nothing")
+         + f": {(r.get('excluded') or {}).get('entries', 0)} entries. The quantity on hand and the movements are taken without "
+           "them (column Left out = the quantity taken out)."],
         ["Values at item unit cost (estimated). Business Central was only read."]], [None], [120])
     for row in ws.iter_rows(min_row=2):
         row[0].alignment = Alignment(wrap_text=True, vertical="top")
@@ -539,9 +648,12 @@ class Reporter:
         m = recipes.master_cached(company) or recipes.master(self.client, company)
         docs, derr = open_documents(self.client, company)
         errors += derr
+        rules = exclusion_rules(self.settings().get("exclude_adjustments"))
+        excluded, xerr = excluded_adjustments(self.client, company, rules, a) if rules else ({}, [])
+        errors += xerr
         with _state_lock:
             prev = (_read_state().get("last") or {}).get(company)
-        r = analyse(company, mv, m, docs, a, prev)
+        r = analyse(company, mv, m, docs, a, prev, excluded=excluded, rules=rules)
         r.update(currency=self.currency_of(company), errors=errors, label=company, key=company, location="",
                  previous=prev, built_at=datetime.now().isoformat(timespec="seconds"))
         return r

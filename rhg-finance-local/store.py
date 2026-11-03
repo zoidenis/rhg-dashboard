@@ -110,7 +110,10 @@ DEFAULT_SETTINGS = {
     # (stock manager, cost control, purchasing); days: daily, mon_sat or weekdays; email_lines: lines per owner
     # in the email body (0 = all, every line is in the Excel file)
     "negative_report": {"enabled": False, "to": "", "cc": "", "time": "07:30", "days": "daily", "companies": "",
-                        "email_lines": "50"},
+                        "email_lines": "50",
+                        # positive adjustments left out of the calculation: "DOCUMENT PREFIX: from..to", several with ";"
+                        # (the SHITJE adjustments of October 2026 put back sales that had taken the stock below zero)
+                        "exclude_adjustments": "SHITJE: 2026-10-01..2026-10-31"},
     # weekly and monthly performance email of every brand (sales and costs against budget and last
     # year): one email per brand to its own addresses ("BRAND: emails" lines), finance and operations in Cc;
     # monthly goes twice: provisional on the first working day, final on final_day

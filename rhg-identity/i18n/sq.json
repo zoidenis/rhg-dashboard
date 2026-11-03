@@ -1730,6 +1730,7 @@
  "Late invoice": "Faturë me vonesë",
  "Late postings": "Postime me vonesë",
  "Late: not released after # days; not received by the expected date (or after # days without one); not invoiced after # days. Change these and the purchasers' names in Settings → Purchasers.": "Me vonesë: e palëshuar pas # ditësh; e pamarrë deri në datën e pritur (ose pas # ditësh pa të); e pafaturuar pas # ditësh. Ndryshojini këto dhe emrat e blerësve te Cilësimet → Blerësit.",
+ "Leave out positive adjustments (document no. starts with: from..to; several with ;)": "Lër jashtë rregullimet pozitive (nr. i dokumentit fillon me: nga..deri; disa të ndara me ;)",
  "Leave this role without saving the changes?": "Të largohesh nga ky rol pa ruajtur ndryshimet?",
  "Left (cost)": "Mbetur (kosto)",
  "Left out (Settings): # lines, # at #": "Lënë jashtë (Cilësimet): # rreshta, # në #",
