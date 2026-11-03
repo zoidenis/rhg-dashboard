@@ -39,6 +39,8 @@ DEFAULT_SETTINGS = {
         "requisition_warning_hours": 24,
         "requisition_critical_hours": 48,
         "price_above_contract_pct": 2,
+        # Purchase price changes (pricechg.py): a line when the price moved this much against the last purchase
+        "price_change_pct": 2,
         "stock_cover_days": 45,
         "stock_dead_days": 90,
         "stock_value_floor": 10000,
@@ -68,7 +70,10 @@ DEFAULT_SETTINGS = {
                       "savings_monthly": False,
                       # Weekly purchasing report for the week before: on/off, the day (0 = Monday) at the
                       # same time, and addresses added to the Manager and Coordinator
-                      "weekly_report": False, "weekly_day": "0", "weekly_to": ""},
+                      "weekly_report": False, "weekly_day": "0", "weekly_to": "",
+                      # Purchase price changes every Monday for the week before: to each purchaser (Settings →
+                      # Purchasers) and to the Purchasing manager (Email recipients → Purchase price changes)
+                      "price_changes": False, "price_changes_time": "08:30"},
     # Purchaser performance: who each Purchaser Code is (code=name, comma separated; the code is shown when
     # no name is given) and how long an order may stay at each step, in days, before it is flagged.
     "purchasers": {"names": "", "emails": "", "release_days": 2, "receive_days": 7, "invoice_days": 3},
@@ -150,7 +155,7 @@ def save_settings(patch, actor="director"):
                     v = max(1, min(120, int(float(v))))
                 except (TypeError, ValueError):
                     continue
-            elif k == "time":
+            elif k in ("time", "price_changes_time"):
                 v = str(v).strip()[:5]
                 if not re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", v):
                     continue

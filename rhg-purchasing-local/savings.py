@@ -197,6 +197,14 @@ def rows(company, a, b, location=None, vendor=None):
         return _db().execute(sql, args).fetchall()
 
 
+def daily(company, a, b):
+    """(day, location, vendor, item, cost, qty in base unit) of every day and location, for the price changes."""
+    with _lock:
+        return _db().execute("SELECT day, location, vendor, item, SUM(cost), SUM(qty) FROM buys WHERE company=? AND "
+                             "day>=? AND day<=? GROUP BY day, location, vendor, item",
+                             (company, a.isoformat(), b.isoformat())).fetchall()
+
+
 def names(company, kind):
     with _lock:
         return dict(_db().execute("SELECT code, name FROM names WHERE company=? AND kind=?",

@@ -49,6 +49,8 @@ REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
             ["purchasing_manager", "purchasing_coordinator"], ["cost_controller", "stock_manager"]),
            ("savings_monthly", "Price savings · monthly", "Purchasing",
             ["purchasing_manager", "purchasing_coordinator"], ["cost_controller"]),
+           # the whole report; each purchaser gets their own suppliers' lines (Settings → Purchasers)
+           ("price_changes", "Purchase price changes · weekly", "Purchasing", ["purchasing_manager"], ["cost_controller"]),
            ("arap_daily", "Payables and receivables exceptions · daily", "Finance", ["finance"], ["accounting"]),
            ("cost_weekly", "Cost control · weekly", "Finance", ["cost_controller"], ["purchasing_manager", "stock_manager"]),
            # the three owners of a line below zero: receipt not posted, recipe wrong, sold without purchase; at a

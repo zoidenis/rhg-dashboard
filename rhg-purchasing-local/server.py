@@ -31,6 +31,7 @@ import executive
 import notify
 import savings
 import savings_report
+import pricechg
 import purchasers
 import weekly_report
 import unicorn_facts
@@ -1139,12 +1140,13 @@ PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.c
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
                      "/api/notify/test": "settings", "/api/notify/smtp": "settings",
                      "/api/savings/send": "export", "/api/weekly/job": "settings", "/api/recipients": "settings",
+                     "/api/price-changes/send": "settings",
                      "/api/users": "users", "/api/password": "view"}
 
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx", "/api/purchasers/xlsx"}
+EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx", "/api/purchasers/xlsx", "/api/price-changes/xlsx"}
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/users", "/api/cache",
                "/api/notify/status", "/api/weekly/status"}
 # read for one location (the "location" parameter) by a person limited to some locations of the company
@@ -1336,6 +1338,33 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Disposition",
                                      f'{"inline" if pdf else "attachment"}; filename="'
                                      f'{savings_report.file_stem(r)}.{"pdf" if pdf else "xlsx"}"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+            elif url.path in ("/api/price-changes", "/api/price-changes/xlsx"):
+                # Purchase price changes (pricechg.py): against the last purchase and the contract, by purchaser
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    r = pricechg.request(client, company, q.get("from"), q.get("to"),
+                                         q.get("refresh") == "1" and url.path == "/api/price-changes")
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                cur = company_currency(company)
+                if url.path == "/api/price-changes":
+                    to, cc = pricechg.summary_recipients(company)
+                    self._send(200, dict(r, currency=cur, schedule=pricechg.settings(), next_run=pricechg.next_run(),
+                                         runs=pricechg.recent_runs(), summary_to=to, summary_cc=cc))
+                elif r.get("pending"):
+                    self._send(409, {"error": "The months are still being read; try again in a moment."})
+                else:
+                    if q.get("purchaser") is not None and q.get("purchaser") != "*":
+                        r = pricechg.cut(r, q.get("purchaser"))
+                    body = pricechg.render_xlsx(r, cur)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="{pricechg.file_stem(r)}.xlsx"')
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
@@ -1661,6 +1690,27 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as exc:                        # noqa: BLE001
                     traceback.print_exc()
                     self._send(502, {"error": str(exc)[:300]})
+            elif url.path == "/api/price-changes/send":
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                company = body.get("company") or config.BC_COMPANY
+                test_to, bad = notify.parse_emails(body.get("test_to") or "")
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                try:
+                    r = pricechg.request(client, company, body.get("from"), body.get("to"))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                if r.get("pending"):
+                    self._send(409, {"error": "The months are still being read; send when the report is on screen."})
+                    return
+                only = body.get("purchaser")
+                sent = pricechg.send_all(r, company_currency(company), actor=actor, test_to=test_to or None,
+                                         only=None if only in (None, "", "*") else only)
+                self._send(200, {"sent": sent, "runs": pricechg.recent_runs()})
             elif url.path == "/api/weekly/job":
                 if self.headers.get("X-Requested-With") != "RHG-Purchasing":
                     self._send(403, {"error": "This request must come from Purchasing."})
@@ -1767,6 +1817,7 @@ def main():
     notifier.start()
     savings_report.Monthly(client, lambda: notifier.companies(), company_currency).start()
     weekly.start()
+    pricechg.Weekly(client, lambda: notifier.companies(), company_currency).start()
     smtp = notify.smtp_info()
     print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]
                                else "mail server not configured in Settings"))

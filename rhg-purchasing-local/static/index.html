@@ -584,8 +584,42 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-prices">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Purchase price changes</h2>
+        <p class="hint" id="pqNote">Every item bought at a price that moved against the last purchase from the same supplier, or paid above the contract, with the impact on the quantity bought. Each purchaser gets their suppliers' lines every Monday.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mini" data-pqw="1">Last week</button><button class="mini" data-pqw="0">This week</button><button class="mini" data-pqw="m">Last month</button></div></div>
+      <div class="filters" style="margin:6px 0 10px">
+        <label>From<input type="date" id="pqFrom"></label>
+        <label>To<input type="date" id="pqTo"></label>
+        <label>Purchaser<select id="pqWho"><option value="*">All purchasers</option></select></label>
+        <label>Show<select id="pqShow"><option value="">Every line</option><option value="up">Dearer</option><option value="down">Cheaper</option><option value="above">Above the contract</option><option value="check">To check</option></select></label>
+        <label>Search<input id="pqQ" placeholder="item or supplier"></label>
+        <div style="display:flex;gap:6px;align-items:flex-end"><button class="mini dark" id="pqRead">Read</button><button class="mini" id="pqXlsx">Excel</button></div></div>
+      <div class="kpis five" id="pqKpis"></div>
+      <p class="meta" id="pqMsg"></p>
+    </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>By purchaser</h2>
+      <p class="hint">The purchaser of a supplier is the Purchaser Code on its card in Business Central; names and addresses in Settings → Purchasers. Click a purchaser to see only their lines.</p></div></div>
+      <div class="scroll"><table id="pqWhoTable"></table></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Lines</h2><p class="hint" id="pqLinesNote"></p></div></div>
+      <div class="scroll"><table id="pqLines"></table></div><p class="meta" id="pqMore"></p></div>
+    <div class="card" style="margin-bottom:16px" id="pqMailCard"><div class="card-head"><div><h2>Weekly email</h2>
+      <p class="hint">Every Monday at the time set, last week's report: to each purchaser with an address in Settings → Purchasers, their suppliers' lines; to the Purchasing manager (Email recipients by company → Purchase price changes) every line. The limit is in Settings → Thresholds (Price change, %).</p></div>
+        <span class="pill" id="pqPill"><span class="dot"></span><span id="pqPillT">Off</span></span></div>
+      <div class="formgrid">
+        <label class="field">Time (Monday)<input id="pqTime" type="time" value="08:30"></label>
+        <label class="field">Price change limit (%)<input id="pqLim" type="number" min="0" max="100" step="0.5"></label>
+        <label class="field">Send a test to<input id="pqTestTo" placeholder="you@rhg.al"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="pqOn" style="width:auto"> Send every Monday</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="pqSave">Save</button><button class="btn" id="pqTest">Send a test of this report</button><button class="btn" id="pqSend">Send this report now</button>
+        <span class="meta" id="pqMailMsg"></span></div>
+      <p class="hint" id="pqWhoTo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="pqRuns"></table></div></div>
     <div class="card" id="pricesCard">
-      <div class="card-head"><div><h2>Price changes</h2><p class="hint" id="pricesHint">Average unit cost per item, this period vs comparison. Click a column to sort.</p></div>
+      <div class="card-head"><div><h2>Average unit cost against the comparison period</h2><p class="hint" id="pricesHint">Average unit cost per item, this period vs comparison. Click a column to sort.</p></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input class="search" id="search" placeholder="Search item or location">
           <button class="mini" id="pricesCsv">Export CSV</button></div></div>
@@ -3136,6 +3170,7 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   if (b.dataset.view === "stock") fillStockControls();
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
   if (b.dataset.view === "savings" && !svData) svQuick("lastmonth");
+  if (b.dataset.view === "prices" && !pqData) pqWeek("1");
   // the screen is part of the address, so a link from the control center can open it
   if (history.replaceState) history.replaceState(null, "", (b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view).replace(/^#/, location.search + "#"));
   pcTabsSync(b.dataset.view);
@@ -3151,6 +3186,123 @@ $("refreshBtn").onclick = () => load(true);
 $("exportBtn").onclick = exportCsv;
 $("search").oninput = () => data && renderMovers();
 
+
+// ---------- purchase price changes (pricechg.py) ----------
+let pqData = null, pqTimer = null, pqSetLoaded = false;
+const pqP = v => v == null ? "–" : Math.abs(v) >= 1000 ? fmt(v) : fmt(v, 2);
+const pqS = v => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v));
+function pqWeek(kind){
+  const t = new Date(), mon = new Date(t.getFullYear(), t.getMonth(), t.getDate() - ((t.getDay() + 6) % 7));
+  let a, b;
+  if (kind === "1") { a = new Date(mon); a.setDate(a.getDate() - 7); b = new Date(mon); b.setDate(b.getDate() - 1); }
+  else if (kind === "0") { a = mon; b = t; }
+  else { a = new Date(t.getFullYear(), t.getMonth() - 1, 1); b = new Date(t.getFullYear(), t.getMonth(), 0); }
+  $("pqFrom").value = svIso(a); $("pqTo").value = svIso(b);
+  loadPq(false);
+}
+document.querySelectorAll("[data-pqw]").forEach(b => b.onclick = () => pqWeek(b.dataset.pqw));
+const pqParams = () => new URLSearchParams({company: $("company").value || "", from: $("pqFrom").value, to: $("pqTo").value});
+async function loadPq(refresh){
+  clearTimeout(pqTimer);
+  $("pqMsg").textContent = "Reading…";
+  try{
+    const r = await fetch("/api/price-changes?" + pqParams().toString() + (refresh ? "&refresh=1" : ""));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "failed");
+    if (j.pending) { $("pqMsg").textContent = `${j.note} ${fmt(j.progress.done)} of ${fmt(j.progress.total)} months read.`; pqTimer = setTimeout(() => loadPq(false), 4000); return; }
+    pqData = j; renderPq();
+  }catch(e){ $("pqMsg").textContent = "Could not read: " + e.message; }
+}
+function pqRows(){
+  const who = $("pqWho").value, show = $("pqShow").value, q = $("pqQ").value.trim().toLowerCase();
+  return pqData.rows.filter(x => (who === "*" || x.purchaser === who)
+    && (!show || (show === "above" ? x.above : x.flag === show))
+    && (!q || `${x.item} ${x.desc} ${x.vendor} ${x.vendor_name}`.toLowerCase().includes(q)));
+}
+function renderPq(){
+  const d = pqData, C = d.currency || CUR, who = $("pqWho").value;
+  const P = who === "*" ? d.kpis : (d.purchasers.find(p => p.purchaser === who) || {});
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("pqKpis").innerHTML =
+    card("Impact on the volume bought", pqS(P.net), `${pqS(P.up)} dearer · ${pqS(-(P.down || 0))} cheaper · ${C}`, (P.net || 0) > 0 ? "up" : "down") +
+    card("A year at this volume", pqS(P.annual), "at the quantity of the last 90 days", (P.annual || 0) > 0 ? "up" : "down") +
+    card("Lines", fmt(P.lines), `${fmt(P.dearer)} dearer · ${fmt(P.cheaper)} cheaper`) +
+    card("Above the contract", fmt(P.above), `${fmt(P.over_contract)} ${C} paid above`, P.above ? "warn" : "") +
+    card("To check", fmt(P.check), "over 4× apart: unit or data error, not in the totals", P.check ? "warn" : "");
+  $("pqMsg").textContent = `${d.company} · invoices posted ${d.from} to ${d.to} · a line when the price moved ${d.limit}% or more, or above the contract by more than ${d.contract_tol}% · last price up to ${d.lookback} days back`
+    + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  const keep = $("pqWho").value;
+  $("pqWho").innerHTML = `<option value="*">All purchasers</option>` + d.purchasers.map(p => `<option value="${esc(p.purchaser)}">${esc(p.name)}</option>`).join("");
+  $("pqWho").value = d.purchasers.some(p => p.purchaser === keep) ? keep : "*";
+  $("pqWhoTable").innerHTML = d.purchasers.length ? `<tr><th>Purchaser</th><th>Email</th><th class="num">Suppliers</th><th class="num">Lines</th><th class="num">Dearer</th><th class="num">Above contract</th><th class="num">Impact</th><th class="num">A year</th></tr>` +
+    d.purchasers.map(p => `<tr data-who="${esc(p.purchaser)}" style="cursor:pointer${p.purchaser === $("pqWho").value ? ";font-weight:700" : ""}"><td>${esc(p.name)}</td>
+      <td class="meta">${esc(p.email || (p.purchaser ? "no address: Settings → Purchasers" : "set the Purchaser Code on the supplier cards"))}</td>
+      <td class="num">${fmt(p.suppliers)}</td><td class="num">${fmt(p.lines)}</td><td class="num">${fmt(p.dearer)}</td><td class="num">${fmt(p.above)}</td>
+      <td class="num ${p.net > 0 ? "up" : "down"}">${pqS(p.net)}</td><td class="num">${pqS(p.annual)}</td></tr>`).join("")
+    : `<tr><td class="meta">No price moved by ${d.limit}% or more in the period, and nothing was paid above the contract.</td></tr>`;
+  $("pqWhoTable").querySelectorAll("tr[data-who]").forEach(tr => tr.onclick = () => { $("pqWho").value = $("pqWho").value === tr.dataset.who ? "*" : tr.dataset.who; renderPq(); });
+  renderPqLines();
+  renderPqMail();
+}
+function renderPqLines(){
+  const d = pqData, rows = pqRows();
+  $("pqLinesNote").textContent = `${fmt(rows.length)} lines · the largest impact first · prices per base unit, excluding VAT, after discounts`;
+  const fl = {up: "Dearer", down: "Cheaper", contract: "Above contract", check: "To check"};
+  $("pqLines").innerHTML = rows.length ? `<tr><th>Item</th><th>Supplier</th><th>Purchaser</th><th class="num">Last price</th><th class="num">Now</th><th class="num">Change</th><th class="num">Contract</th><th class="num">Quantity</th><th class="num">Impact</th><th class="num">A year</th></tr>` +
+    rows.slice(0, 300).map(x => `<tr><td><b>${esc(x.desc || x.item)}</b> <span class="meta">${esc(x.item)}</span><div class="meta">${esc(x.locations.slice(0, 4).join(", "))}${x.flag === "check" ? ` · <span class="warn">${fl.check}: over 4× apart</span>` : ""}</div></td>
+      <td>${esc(x.vendor_name)}</td><td class="meta">${esc(x.purchaser_name)}</td>
+      <td class="num">${pqP(x.prev)}<div class="meta">${esc(x.prev_day || "")}${x.basis ? " · " + esc(x.basis) : ""}</div></td>
+      <td class="num"><b>${pqP(x.price)}</b></td>
+      <td class="num ${(x.d_prev || 0) > 0 ? "up" : "down"}">${x.d_prev == null ? "–" : (x.d_prev > 0 ? "+" : "") + x.d_prev.toFixed(1) + "%"}</td>
+      <td class="num">${pqP(x.contract)}${x.d_contract != null ? `<div class="meta ${x.above ? "up" : ""}">${x.d_contract > 0 ? "+" : ""}${x.d_contract.toFixed(1)}%${x.contract_other ? " · other supplier" : ""}</div>` : ""}</td>
+      <td class="num">${fmt(x.qty, 2)}</td><td class="num ${(x.impact || 0) > 0 ? "up" : "down"}"><b>${pqS(x.impact)}</b>${x.over_contract ? `<div class="meta up">${pqS(x.over_contract)} above contract</div>` : ""}</td>
+      <td class="num">${pqS(x.annual)}</td></tr>`).join("")
+    : `<tr><td class="meta">No line matches.</td></tr>`;
+  $("pqMore").textContent = rows.length > 300 ? `${fmt(rows.length - 300)} more lines in the Excel file.` : "";
+}
+function renderPqMail(){
+  const d = pqData, s = d.schedule || {};
+  if (!pqSetLoaded) { pqSetLoaded = true; $("pqTime").value = s.time || "08:30"; $("pqOn").checked = !!s.enabled; $("pqLim").value = d.limit; }
+  $("pqPill").className = "pill " + (s.enabled ? "ok" : "");
+  $("pqPillT").textContent = s.enabled ? `On · next ${(d.next_run || "–").replace("T", " ")}` : "Off";
+  const noMail = d.purchasers.filter(p => p.purchaser && !p.email).map(p => p.name);
+  $("pqWhoTo").textContent = `Purchasing manager: ${(d.summary_to || []).join(", ") || "nobody set in Email recipients by company → Purchase price changes"}${(d.summary_cc || []).length ? " · Cc " + d.summary_cc.join(", ") : ""}.`
+    + (noMail.length ? ` No address for ${noMail.join(", ")}: their lines reach only the Purchasing manager.` : "");
+  const r = d.runs || [];
+  $("pqRuns").innerHTML = r.length ? `<tr><th>When</th><th>Purchaser</th><th>To</th><th class="num">Lines</th><th class="num">Impact</th><th>Status</th></tr>` +
+    r.slice(0, 12).map(x => `<tr><td class="meta">${esc((x.ts || "").replace("T", " "))}</td><td>${esc(x.purchaser || "")}</td><td class="meta">${esc((x.to || []).join(", "))}</td>
+      <td class="num">${fmt(x.lines)}</td><td class="num">${pqS(x.net)}</td><td>${esc(x.status || "")}${x.test ? " · test" : ""}${x.detail ? ` <span class="meta">${esc(x.detail)}</span>` : ""}</td></tr>`).join("") : "";
+  ["pqSave", "pqTest", "pqSend"].forEach(id => { $(id).disabled = !can("settings"); $(id).title = can("settings") ? "" : "Your role cannot change settings."; });
+}
+$("pqRead").onclick = () => loadPq(true);
+["pqWho", "pqShow"].forEach(id => $(id).onchange = () => pqData && renderPq());
+$("pqQ").oninput = () => pqData && renderPqLines();
+$("pqXlsx").onclick = () => { if (pqData) location.href = "/api/price-changes/xlsx?" + pqParams().toString() + "&purchaser=" + encodeURIComponent($("pqWho").value); };
+$("pqSave").onclick = async () => {
+  $("pqMailMsg").textContent = "Saving…";
+  try{
+    const r = await fetch("/api/settings", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({notifications: {price_changes: $("pqOn").checked, price_changes_time: $("pqTime").value}, thresholds: {price_change_pct: $("pqLim").value}})});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "save failed");
+    $("pqMailMsg").textContent = $("pqOn").checked ? "Saved. The report goes out every Monday." : "Saved."; pqSetLoaded = false; loadPq(false);
+  }catch(e){ $("pqMailMsg").textContent = "Could not save: " + e.message; }
+};
+async function pqSendNow(testTo){
+  if (!pqData) { $("pqMailMsg").textContent = "Read the report first."; return; }
+  $("pqMailMsg").textContent = "Sending…";
+  try{
+    const body = Object.fromEntries(pqParams().entries()); body.purchaser = $("pqWho").value; if (testTo) body.test_to = testTo;
+    const r = await fetch("/api/price-changes/send", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Purchasing"}, body: JSON.stringify(body)});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || "failed");
+    const ok = j.sent.filter(x => x.status === "sent");
+    $("pqMailMsg").textContent = ok.length ? `Sent ${ok.length} ${ok.length === 1 ? "email" : "emails"}: ${ok.map(x => `${x.purchaser} → ${x.to.join(", ")}`).join(" · ")}`
+      + (j.sent.length > ok.length ? " · not sent: " + j.sent.filter(x => x.status !== "sent").map(x => `${x.purchaser} (${x.detail || x.status})`).join(" · ") : "")
+      : "Nothing sent: " + j.sent.map(x => `${x.purchaser} (${x.detail || x.status})`).join(" · ");
+    pqData.runs = j.runs; renderPqMail();
+  }catch(e){ $("pqMailMsg").textContent = "Could not send: " + e.message; }
+}
+$("pqTest").onclick = () => { const t = $("pqTestTo").value.trim(); if (!t) { $("pqMailMsg").textContent = "Enter an address for the test."; return; } pqSendNow(t); };
+$("pqSend").onclick = () => pqSendNow("");
 
 // ---------- price savings ----------
 let svData = null, svTimer = null, svSort = "effect";
