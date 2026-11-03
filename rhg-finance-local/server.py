@@ -39,6 +39,7 @@ import recipients
 import requests
 import cost_report
 import negstock
+import capital
 import kpilib
 import fx
 import exreg
@@ -101,10 +102,15 @@ _last, _last_lock = {}, threading.Lock()
 
 DATA_GAPS = [
     {"kpi": "Exchange rates for the group view",
-     "missing": "The published currency service is empty in every company, so rates cannot be read from BC.",
-     "requirement": "Publish 'Currency Exchange Rates' (page 21) so the group view uses BC's own rates, with "
-                    "the average rate for the result and the closing rate for the balance sheet. Until then "
-                    "the rate is entered in Settings and shown on the screen."},
+     "missing": "Currency Exchange Rates (page 483) is published as CurrencyExchangeRates; the group view reads it. "
+                "Finance still has to confirm that the EUR rows are complete and approve the method.",
+     "requirement": "Keep the EUR rate in Business Central for every day (or at least every month end), so the "
+                    "result converts at the average rate and the balance sheet at the closing rate."},
+    {"kpi": "Current and quick ratio",
+     "missing": "Business Central does not say which loans (468, 46801), loans given (46802) and deposits (418*) "
+                "fall due within twelve months.",
+     "requirement": "Split those accounts into current and non-current (separate accounts, or a maturity schedule "
+                    "Finance keeps), so current assets and current liabilities can be told apart."},
     {"kpi": "Who posted an entry, and when it was created or posted",
      "missing": "G/L Entries publishes no User ID, Created timestamp or Posting timestamp.",
      "requirement": "Extend the G_LEntries web service with User ID, SystemCreatedAt and SystemCreatedBy, "
@@ -950,6 +956,69 @@ def kpi_mapping_screen(company):
             "bs": {"lines": B["lines"], "totals": B["totals"]} if B else None,
             "kpis": kpilib.pl_kpis(P, m) if P else None,
             "period": [date(today.year, 1, 1).isoformat(), today.isoformat()], "sources": sources}
+
+
+def capital_screen(company, anchor, mode):
+    """Financial statements → Balance sheet and Liquidity & capital of one legal entity at the end of the period
+    chosen, against the end of the month before and the end of last year: the balance sheet by line of the KPI
+    mapping, the liquidity and debt figures, the equity bridge and what is owed to suppliers by due date. Never cut
+    by location. Read only."""
+    m = kpilib.mapping(company)
+    _c_from, c_to, *_rest = periods(anchor, mode)
+    today = date.today()
+    at = min(c_to, today)
+    pm, py = capital.dates(at)
+    sources = []
+
+    def chart(d, label, required=False):
+        # one read gives both: the balance at d and the movement of the year up to d (the year's result)
+        return _safe(sources, f"Chart of accounts at {d:%d.%m.%Y} ({label})",
+                     lambda: client.accounts(company, date(d.year, 1, 1).isoformat(), d.isoformat(), None,
+                                             max(config.REFRESH_SECONDS - 10, 30) if d >= today else 3600),
+                     [], required)
+    rows_now = chart(at, "the date chosen", True)
+    rows_pm = chart(pm, "end of the month before")
+    rows_py = rows_pm if pm == py else chart(py, "end of last year")
+    if not rows_now:
+        return {"loaded": True, "available": False, "company": company, "sources": sources,
+                "error": "The chart of accounts could not be read from Business Central."}
+    now = capital.position(rows_now, rows_now, m)
+    P_pm = capital.position(rows_pm, rows_pm, m) if rows_pm else None
+    P_py = capital.position(rows_py, rows_py, m) if rows_py else None
+    approved = bool(m and m.get("status") == "Approved")
+    p_ltm = None
+    if approved:          # EBITDA of the last twelve months only once Finance has approved the mapping
+        ltm = _safe(sources, "Chart of accounts, last 12 months",
+                    lambda: client.accounts(company, (at - timedelta(days=364)).isoformat(), at.isoformat(), None,
+                                            3600), [], False)
+        p_ltm = kpilib.pl_lines(ltm, m) if ltm else None
+    kpis, status = capital.liquidity(now, P_pm, P_py, m, p_ltm, approved)
+    vendors = _safe(sources, "Open supplier entries", lambda: client.open_vendor_entries(company), [], False)
+    try:
+        companies = client.companies()
+    except BCError:
+        companies = []
+    mat = capital.maturity(vendors, today, [c for c in companies if c.strip().upper() != company.strip().upper()])
+    t = now["totals"]
+    return {"loaded": True, "available": True, "company": company, "sources": sources,
+            "dates": {"current": at.isoformat(), "month_end": pm.isoformat(), "year_end": py.isoformat()},
+            "status": status,
+            "mapping": {"status": (m or {}).get("status") or "Content required",
+                        "approved_by": (m or {}).get("approved_by") or "",
+                        "approved_at": (m or {}).get("approved_at") or ""},
+            "statement": capital.statement(now, P_pm, P_py, m),
+            "totals": {"assets": t["assets"] if m else None, "liabilities": t["liabilities"] if m else None,
+                       "equity": t["equity"] if m else None, "difference": t["difference"] if m else None,
+                       "month_end": P_pm["totals"] if (P_pm and m) else None,
+                       "year_end": P_py["totals"] if (P_py and m) else None},
+            "unmapped": [{"account": no, "name": n, "value": v} for no, n, v, _l in now["unmapped"]][:60],
+            "liquidity": kpis, "equity_bridge": capital.equity_bridge(now, P_py, m), "maturity": mat,
+            "note": "The balance sheet of the legal entity at the date chosen, by line of the KPI mapping (Finance → "
+                    "Settings → KPI mapping), against the end of the month before and the end of last year. A "
+                    "balance sheet is a position of the company, so it is never cut by location. Business Central "
+                    "has never closed the income-statement accounts to equity: the result they hold is shown as the "
+                    "result of prior years not closed and the profit or loss of the current year. Figures stay "
+                    "Pilot until Finance approves the mapping."}
 
 
 def consolidation_screen(anchor, mode):
@@ -2171,6 +2240,9 @@ class Handler(BaseHTTPRequestHandler):
                                               q.get("mode", "month"), q.get("dimension")))
             elif url.path == "/api/consolidation":
                 self._send(200, consolidation_screen(q.get("period"), q.get("mode", "month")))
+            elif url.path == "/api/capital":
+                self._send(200, capital_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
+                                               q.get("mode", "month")))
             elif url.path == "/api/drill":
                 self._send(200, drill(q.get("kind", "pl"), q.get("key", "")))
             elif url.path == "/api/recipients/locations":

@@ -54,10 +54,12 @@ LINES = [
     ("leases", "Lease liabilities", "bs", "credit"),
     ("ic_liabilities", "Intercompany (payable)", "bs", "credit"),
     ("other_liabilities", "Other liabilities", "bs", "credit"),
-    ("equity", "Equity", "bs", "credit"),
+    ("share_capital", "Share capital", "bs", "credit"),
+    ("equity", "Other equity", "bs", "credit"),
 ]
 LINE = {k: {"key": k, "label": lb, "statement": st, "sign": sg} for k, lb, st, sg in LINES}
 PL_LINES = [k for k, _, st, _ in LINES if st == "pl"]
+EQUITY_LINES = ("share_capital", "equity")
 BS_LINES = [k for k, _, st, _ in LINES if st == "bs"]
 
 # The chart model of SALT (TBM and Zoi Greece were opened from it). A proposal from the chart as read on
@@ -87,6 +89,7 @@ SALT_MODEL = {
     "leases": "",
     "ic_liabilities": "40102, 467, 46701, 467011, 46702",
     "other_liabilities": "4181",
+    "share_capital": "101*",
     "equity": "1*, 8*",
 }
 PROPOSALS = {"SALT": SALT_MODEL, "TBM": SALT_MODEL, "ZOI GREECE": SALT_MODEL}
@@ -128,10 +131,28 @@ KPIS = [
     {"key": "owc", "label": "Operating working capital", "kind": "point", "unit": "money",
      "needs": ["inventory", "receivables", "payables"],
      "formula": "Operating working capital = Inventory + Trade receivables − Trade payables"},
-    {"key": "net_debt", "label": "Net debt", "kind": "point", "unit": "money", "needs": ["loans", "leases", "cash"],
-     "formula": "Net debt = Loans and borrowings + Lease liabilities − Cash and bank"},
+    {"key": "net_debt", "label": "Net debt", "kind": "point", "unit": "money", "needs": ["loans", "cash"],
+     "formula": "Net debt = Gross financial debt − Cash and bank"},
     {"key": "total_equity", "label": "Total equity", "kind": "point", "unit": "money", "needs": ["equity"],
-     "formula": "Total equity = the mapped equity accounts + the result not yet closed to equity"},
+     "formula": "Total equity = Share capital + the other equity accounts + the result not yet closed to equity "
+                "(prior years) + the profit or loss of the current year"},
+    {"key": "gross_debt", "label": "Gross financial debt", "kind": "point", "unit": "money", "needs": ["loans"],
+     "formula": "Gross financial debt = Loans and borrowings + Lease liabilities + cash and bank accounts with a "
+                "credit balance (overdrafts)"},
+    {"key": "debt_equity", "label": "Debt / equity", "kind": "point", "unit": "ratio", "needs": ["loans", "equity"],
+     "formula": "Debt / equity = Gross financial debt / Total equity"},
+    {"key": "net_debt_ebitda", "label": "Net debt / EBITDA", "kind": "point", "unit": "ratio",
+     "needs": ["loans", "cash", "revenue", "cogs", "labour", "opex"],
+     "formula": "Net debt / EBITDA of the last 12 months; shown only once the mapping is approved"},
+    {"key": "interest_cover", "label": "Interest coverage", "kind": "period", "unit": "ratio",
+     "needs": ["revenue", "cogs", "labour", "opex", "finance"],
+     "formula": "Interest coverage = EBITDA of the last 12 months / interest expense of the last 12 months; shown "
+                "only once the mapping is approved"},
+    {"key": "current_ratio", "label": "Current ratio", "kind": "point", "unit": "ratio", "needs": ["current_split"],
+     "formula": "Current ratio = Current assets / Current liabilities; needs the split of loans, deposits and loans "
+                "given by maturity (within or after 12 months)"},
+    {"key": "quick_ratio", "label": "Quick ratio", "kind": "point", "unit": "ratio", "needs": ["current_split"],
+     "formula": "Quick ratio = (Current assets − Inventory) / Current liabilities; same condition as the current ratio"},
 ]
 KPI = {k["key"]: k for k in KPIS}
 
@@ -313,10 +334,11 @@ def bs_lines(rows, m, field="Balance_at_Date"):
     for k in comps:
         comps[k].sort(key=lambda x: -abs(x[2]))
     assets = sum(vals[k] for k in BS_LINES if LINE[k]["sign"] == "asset")
-    liab = sum(vals[k] for k in BS_LINES if LINE[k]["sign"] == "credit" and k != "equity")
+    liab = sum(vals[k] for k in BS_LINES if LINE[k]["sign"] == "credit" and k not in EQUITY_LINES)
+    equity = sum(vals[k] for k in EQUITY_LINES)
     return {"lines": {k: round(v, 2) for k, v in vals.items()}, "accounts": comps, "unmapped": unmapped,
-            "totals": {"assets": round(assets, 2), "liabilities": round(liab, 2), "equity": round(vals["equity"], 2),
-                       "difference": round(assets - liab - vals["equity"], 2)},
+            "totals": {"assets": round(assets, 2), "liabilities": round(liab, 2), "equity": round(equity, 2),
+                       "difference": round(assets - liab - equity, 2)},
             "result_in_equity": round(result, 2)}
 
 

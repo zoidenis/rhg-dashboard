@@ -243,7 +243,9 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing
                  "finance.s.register": ("finance.s.actions", "finance.s.inventory.recipes", "purchasing.s.compare"),
                  # the sales reconciliation: whoever reads receivables or fiscal sales
-                 "finance.s.salesrec": ("finance.s.kartela.ar", "finance.s.fiscal.fsales")}
+                 "finance.s.salesrec": ("finance.s.kartela.ar", "finance.s.fiscal.fsales"),
+                 # Liquidity & capital: whoever reads the balance sheet
+                 "finance.s.pl.liquidity": "finance.s.pl.bs"}
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 
