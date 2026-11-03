@@ -120,6 +120,7 @@ td.num,th.num{text-align:right}
 .modal-bg.on{display:flex}
 .modal{background:var(--card);border-radius:14px;max-width:1150px;width:100%;padding:20px 22px;border:1px solid var(--line)}
 .mhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+#dqTable td.st{white-space:nowrap}#dqTable tr.dq-bad td{background:var(--up-bg)}
 .lq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:8px}
 .lq-k{border:1px solid var(--line);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .lq-k .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}.lq-k .f{font-size:11.5px;color:var(--sub)}
@@ -463,7 +464,7 @@ td.num,th.num{text-align:right}
     <button data-view="salesrec">Simphony ↔ BC</button>
 
     <div class="grp">System</div>
-    <button data-view="gaps">Data availability</button>
+    <button data-view="gaps">Data quality &amp; reconciliation</button>
     <button data-view="settings">Settings</button>
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
   </nav>
@@ -1271,10 +1272,22 @@ td.num,th.num{text-align:right}
     <div id="actionList"></div></div></section>
 
   <section class="view" id="v-gaps">
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Data quality &amp; reconciliation</h2><p class="hint" id="dqNote">Choose a company and a month above, then Check.</p></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="dqFreeze" hidden>Freeze this month</button><button class="mini dark" id="dqLoad">Check</button></div></div>
+      <div class="money" id="dqCounts"></div>
+      <div class="scroll"><table id="dqTable" data-nosort></table></div><p class="meta" id="dqReg" style="margin:8px 0 0"></p></div>
+    <div class="card" id="dqChangesCard" hidden style="margin-bottom:15px"><h2>Posted after the freeze</h2><p class="hint" id="dqChNote"></p>
+      <div class="scroll"><table id="dqChanges" data-nosort></table></div><div id="dqLate"></div></div>
+    <div class="grid">
+      <div class="card"><h2>Accounts outside the mapping</h2><p class="hint">Income statement: the net change of the period; balance sheet: the balance at its end. Map them in Settings → KPI mapping.</p>
+        <div class="scroll"><table id="dqUnmapped"></table></div></div>
+      <div class="card"><h2>Frozen months</h2><p class="hint">A frozen month keeps its trial balance and the number of the last G/L entry, so every later posting to it shows above.</p>
+        <div class="scroll"><table id="dqFrozen"></table></div></div>
+    </div>
     <div class="card" style="margin-bottom:15px">
       <div class="card-head"><div><h2>Speed and local cache</h2><p class="hint" id="cacheNote"></p></div>
         <button class="mini" id="cacheLoad">Check</button></div>
-      <div class="scroll"><table id="cacheTable"></table></div></div><div class="card"><h2>Data availability</h2>
+      <div class="scroll"><table id="cacheTable"></table></div></div><div class="card"><h2>What Business Central does not publish</h2>
     <p class="hint">Figures the brief asks for that the published web services cannot supply. Nothing here is estimated.</p>
     <div id="gapList"></div></div></section>
 
@@ -2145,8 +2158,106 @@ function renderActions(){
 $("actNew").onclick = ()=>{ const t = prompt("Action title"); if(t) createAction({title:t, description:"Created manually.", company:data.meta.company, priority:"Medium"}); };
 
 function renderGaps(){
+  if ($("v-gaps").classList.contains("on")) loadDq(false);
   $("gapList").innerHTML = (data.gaps||[]).map(g=>`<div class="gap"><b>${esc(g.kpi)}</b><span>${esc(g.missing)}<br><b>Requirement:</b> ${esc(g.requirement)}</span></div>`).join("");
 }
+
+// ---- Data quality & reconciliation: the checks of one company and period (/api/dq) and the frozen months
+var dqData = null, dqKey = "", dqBusy = false;
+const dqQuery = () => { const p = new URLSearchParams(params()); p.delete("dimension"); p.delete("compare"); return p.toString(); };
+const DQ_ST = {"Pass": "down", "Difference": "up", "Content required": "warn", "Not read": "", "Info": ""};
+const dqChip = s => `<span class="chip ${DQ_ST[s] || ""}">${esc(s)}</span>`;
+async function loadDq(force){
+  const q = dqQuery();
+  if (dqKey !== q) { dqData = null; dqKey = q; }
+  if (dqData && !force) { renderDq(); return; }
+  if (dqBusy) return;
+  dqBusy = true; $("dqLoad").disabled = true;
+  $("dqNote").textContent = "Reading Business Central: the chart of accounts, the open supplier and customer entries, the budget…";
+  try {
+    const j = await readJSON(await fetch("/api/dq?" + q));
+    if (j.error && !j.checks) throw new Error(j.error);
+    if (dqKey !== q) return;
+    dqData = j; renderDq();
+  } catch (e) { $("dqNote").textContent = "Could not read: " + e.message; }
+  finally { dqBusy = false; $("dqLoad").disabled = false; }
+}
+$("dqLoad").onclick = () => loadDq(true);
+function dqVal(v, unit){
+  if (v == null) return "–";
+  if (typeof v === "string") return esc(v);
+  return unit === "rate" ? fmt(v, 4) : fmt(v);
+}
+function renderDq(){
+  const d = dqData; if (!d) return;
+  const fromTo = d.mode === "month" ? d.period : `${d.from} → ${d.to}`;
+  $("dqNote").innerHTML = `<span>${esc(d.company)} · ${esc(fromTo)}${d.ended ? "" : " (to date)"}</span>. ` + d.note.split(/(?<=\.) /).map(x => `<span>${esc(x)}</span>`).join(" ");
+  const C = d.counts || {};
+  $("dqCounts").innerHTML = `<div>Pass<b class="down">${C["Pass"] || 0}</b></div><div>Difference<b class="${C["Difference"] ? "up" : ""}">${C["Difference"] || 0}</b></div>
+    <div>Content required<b class="${C["Content required"] ? "warn" : ""}">${C["Content required"] || 0}</b></div><div>Not read<b>${C["Not read"] || 0}</b></div>`;
+  $("dqTable").innerHTML = `<tr><th>Check</th><th>Status</th><th class="num">Expected</th><th class="num">Found</th><th class="num">Difference</th><th></th></tr>` +
+    d.checks.map(c => `<tr class="${c.status === "Difference" ? "dq-bad" : ""}"><td class="name" style="min-width:220px"><b>${esc(c.check)}</b><div class="meta">${esc(c.compared)}</div>${c.detail ? `<div class="meta" style="color:var(--ink)">${esc(c.detail)}</div>` : ""}</td>
+      <td class="st">${dqChip(c.status)}</td><td class="num">${dqVal(c.expected, c.unit)}</td><td class="num">${dqVal(c.found, c.unit)}</td>
+      <td class="num">${c.difference == null ? "–" : `<b class="${Math.abs(c.difference) >= 1 ? "up" : ""}">${sign(c.difference)}</b>`}</td>
+      <td>${c.link ? `<a href="#" class="mini" data-dq-go="${esc(c.link)}">Open</a>` : ""}</td></tr>`).join("");
+  document.querySelectorAll("[data-dq-go]").forEach(a => a.onclick = e => { e.preventDefault(); navTo(a.dataset.dqGo); });
+  const R = d.register;
+  $("dqReg").textContent = R ? `Exceptions register: ${R.found} found, ${R.opened} opened, ${R.closed} closed (Data quality, owner: chief accountant).`
+    : d.ended ? "" : "The month is still running: its failed checks go to the Exceptions register once it has ended.";
+  $("dqUnmapped").innerHTML = `<tr><th>Account</th><th>Name</th><th>Statement</th><th class="num">Amount</th></tr>` +
+    ((d.unmapped || []).length ? d.unmapped.map(u => `<tr><td><a href="#" class="acc" data-acc="${esc(u.account)}">${esc(u.account)}</a></td><td class="name">${esc(u.name)}</td>
+      <td class="meta">${esc(u.statement)}</td><td class="num">${fmt(u.value)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">Every account with a figure is in the mapping.</td></tr>`);
+  document.querySelectorAll("#dqUnmapped .acc").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("account", a.dataset.acc); });
+  $("dqFreeze").hidden = !d.can_freeze;
+  $("dqFreeze").disabled = !can("settings");
+  $("dqFreeze").title = can("settings") ? "" : "Your role cannot freeze a month (needs finance.settings.manage).";
+  $("dqFreeze").textContent = d.snapshot ? "Freeze again" : "Freeze this month";
+  $("dqFrozen").innerHTML = `<tr><th>Month</th><th>Frozen</th><th>By</th><th class="num">Last G/L entry</th><th></th></tr>` +
+    ((d.frozen || []).length ? d.frozen.map(f => `<tr><td><a href="#" data-dq-month="${esc(f.from)}">${esc(f.period)}</a></td><td>${esc(String(f.at).replace("T", " ").slice(0, 16))}</td>
+      <td>${esc(f.by)}</td><td class="num">${fmt(f.entry_no)}</td><td>${can("settings") ? `<button class="mini" data-dq-unfreeze="${esc(f.from)}">Remove</button>` : ""}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No month frozen yet for ${esc(d.company)}.</td></tr>`);
+  document.querySelectorAll("[data-dq-month]").forEach(a => a.onclick = e => {
+    e.preventDefault(); $("mode").value = "month"; $("anchorLabel").firstChild.textContent = MODE_LABEL.month + " ";
+    $("anchor").value = a.dataset.dqMonth; rangeSync(); load(); loadDq(false); });
+  document.querySelectorAll("[data-dq-unfreeze]").forEach(b => b.onclick = () => dqFreeze(b.dataset.dqUnfreeze, "unfreeze"));
+  const ch = d.changes || [];
+  $("dqChangesCard").hidden = !d.snapshot;
+  if (d.snapshot) {
+    $("dqChNote").textContent = ch.length ? `${ch.length} accounts of ${d.period} changed after it was frozen on ${String(d.snapshot.at).replace("T", " ").slice(0, 16)} by ${d.snapshot.by} (last G/L entry then ${fmt(d.snapshot.entry_no)}). Click an account for the entries posted since.`
+      : `Nothing posted to ${d.period} since it was frozen on ${String(d.snapshot.at).replace("T", " ").slice(0, 16)} by ${d.snapshot.by}.`;
+    $("dqChanges").innerHTML = ch.length ? `<tr><th>Account</th><th class="num">Net change, frozen</th><th class="num">Now</th><th class="num">Change</th><th class="num">Balance at month end, frozen</th><th class="num">Now</th><th class="num">Change</th></tr>` +
+      ch.map(x => `<tr><td class="name"><a href="#" data-dq-late="${esc(x.account)}">${esc(x.account)}</a> ${esc(x.name)}</td><td class="num">${fmt(x.net_frozen)}</td><td class="num">${fmt(x.net_now)}</td>
+        <td class="num"><b class="${Math.abs(x.net_change) >= 1 ? "up" : ""}">${sign(x.net_change)}</b></td><td class="num">${fmt(x.bal_frozen)}</td><td class="num">${fmt(x.bal_now)}</td>
+        <td class="num"><b class="${Math.abs(x.bal_change) >= 1 ? "up" : ""}">${sign(x.bal_change)}</b></td></tr>`).join("") : "";
+    $("dqLate").innerHTML = "";
+    document.querySelectorAll("[data-dq-late]").forEach(a => a.onclick = e => { e.preventDefault(); dqLate(a.dataset.dqLate); });
+  }
+}
+async function dqLate(account){
+  const d = dqData; if (!d) return;
+  $("dqLate").innerHTML = `<p class="hint">Reading the entries of ${esc(account)} numbered above ${fmt(d.snapshot.entry_no)}…</p>`;
+  try {
+    const j = await readJSON(await fetch(`/api/dq/late?company=${encodeURIComponent(d.company)}&period=${encodeURIComponent(d.period)}&account=${encodeURIComponent(account)}`));
+    if (j.error) throw new Error(j.error);
+    $("dqLate").innerHTML = `<h3 style="font-size:14px;margin:14px 0 6px">${esc(account)}: entries posted after the freeze</h3>` + (j.entries.length
+      ? `<div class="scroll"><table><tr><th class="num">Entry</th><th>Posting date</th><th>Document</th><th>Type</th><th>Source</th><th class="num">Amount</th></tr>` +
+        j.entries.map(x => `<tr><td class="num">${fmt(x.entry)}</td><td>${esc(x.date)}</td><td>${esc(x.document)}</td><td>${esc(x.type || "")}</td><td>${esc(x.source || "")}</td><td class="num">${fmt(x.amount)}</td></tr>`).join("") +
+        `<tr class="total"><td colspan="5">Total${j.more ? " (the first 300)" : ""}</td><td class="num">${fmt(j.total)}</td></tr></table></div>`
+      : `<p class="hint">No entry of this account above the frozen number: the change comes from an entry with a posting date in an earlier month, or the account was renamed.</p>`);
+  } catch (e) { $("dqLate").innerHTML = `<p class="hint">Could not read: ${esc(e.message)}</p>`; }
+}
+async function dqFreeze(month, action){
+  const d = dqData; if (!d) return;
+  if (action === "freeze") { $("dqFreeze").disabled = true; $("dqNote").textContent = `Freezing ${d.period}: finding the last G/L entry number and reading the trial balance…`; }
+  try {
+    const r = await fetch("/api/dq/freeze", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"},
+      body: JSON.stringify({company: d.company, period: month, action})});
+    const j = await readJSON(r);
+    if (!r.ok || j.error) throw new Error(j.error || "failed");
+  } catch (e) { $("dqNote").textContent = "Could not " + (action === "freeze" ? "freeze" : "remove the freeze") + ": " + e.message; $("dqFreeze").disabled = false; return; }
+  loadDq(true);
+}
+$("dqFreeze").onclick = () => dqData && dqFreeze(dqData.from, "freeze");
 
 const TH_LABEL = {materiality:"Materiality (ALL)", stock_monitor_days:"Stock unchanged, monitor (days)",
   stock_slow_days:"Stock unchanged, slow-moving (days)", stock_dead_days:"Stock unchanged, non-moving (days)",
@@ -4552,6 +4663,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="bs" || b.dataset.view==="liquidity") loadCap(false);
+  if(b.dataset.view==="gaps") loadDq(false);
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
   if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");
   if(b.dataset.view==="budget" && data && !(data.budget||{}).loaded) loadPane("/api/budget","budget",renderBudget,"bgNote");

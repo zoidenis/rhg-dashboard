@@ -2,7 +2,7 @@
 
 The FA ledger holds hundreds of thousands of entries across the years, so only
 the selected period is read. Net book value per asset needs the full history and
-the asset card, neither of which is published; that stays under Data availability.
+the asset card, neither of which is published; that stays under Data quality & reconciliation.
 """
 from collections import defaultdict
 
@@ -87,5 +87,5 @@ def build(rows, settings, period):
         "classes": classes[:25], "assets": assets[:60], "entries": entries[:300],
         "exceptions": exceptions,
         "note": "Only the selected period is read from the FA ledger. Net book value, useful life and "
-                "custodian need the asset card, which is not published; see Data availability.",
+                "custodian need the asset card, which is not published; see Data quality & reconciliation.",
     }

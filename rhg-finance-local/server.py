@@ -40,6 +40,7 @@ import requests
 import cost_report
 import negstock
 import capital
+import dq
 import kpilib
 import fx
 import exreg
@@ -88,7 +89,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
-                     "/api/kpi/mapping": "settings",
+                     "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -1019,6 +1020,234 @@ def capital_screen(company, anchor, mode):
                     "has never closed the income-statement accounts to equity: the result they hold is shown as the "
                     "result of prior years not closed and the profit or loss of the current year. Figures stay "
                     "Pilot until Finance approves the mapping."}
+
+def _f(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _company_rate_status(company_list, c_to, sources):
+    """The exchange rate of each company keeping its books in another currency than the group's, at c_to."""
+    settings = store.get_settings()
+    group = settings["group"]
+    reporting = (group.get("reporting_currency") or "ALL").upper()
+    currencies = {k.lower(): v.upper() for k, v in _parse_map(group.get("currencies")).items()}
+    foreign = sorted({currencies.get(c.lower(), reporting) for c in company_list} - {reporting})
+    if not foreign:
+        return [], reporting
+    src = next((c for c in [config.BC_COMPANY] + list(company_list)
+                if currencies.get(c.lower(), reporting) == reporting), config.BC_COMPANY)
+    rows = _safe(sources, f"Currency Exchange Rates, {src}", lambda: client.exchange_rates(src), [], False)
+    series, _skipped, errs = fx.parse(rows)
+    out = []
+    for cur in foreign:
+        rate, since = fx.closing(series.get(cur), c_to)
+        out.append({"currency": cur, "rate": rate, "since": since.isoformat() if since else None, "source": src,
+                    "error": "; ".join(errs)})
+    return out, reporting
+
+
+def dq_screen(company, anchor, mode, sync=True):
+    """Finance tower → Data quality & reconciliation for one company and period: the checks of the KPI library
+    (mapping, P&L and balance sheet), the ledgers against the G/L, inventory, Simphony ↔ BC, budget, FX and
+    intercompany, and the frozen months. Read only; failed checks of an ended month go to the Exceptions register."""
+    settings = store.get_settings()
+    mat = float(settings["thresholds"].get("materiality") or 0)
+    m = kpilib.mapping(company)
+    c_from, c_to, *_ = periods(anchor, mode)
+    today = date.today()
+    end = min(c_to, today)
+    ended = c_to < today
+    period = f"{c_from:%Y-%m}" if mode == "month" else f"{c_from.isoformat()}..{c_to.isoformat()}"
+    sources = []
+    rows = _safe(sources, f"Chart of accounts {c_from:%d.%m.%Y}–{end:%d.%m.%Y}",
+                 lambda: client.accounts(company, c_from.isoformat(), end.isoformat(), None, 900 if ended else 300),
+                 [], True)
+    if not rows:
+        return {"loaded": True, "available": False, "company": company, "sources": sources,
+                "error": "The chart of accounts could not be read from Business Central."}
+    P, B = kpilib.pl_lines(rows, m), kpilib.bs_lines(rows, m)
+    rules = (m or {}).get("rules") or {}
+    checks = []
+    st = (m or {}).get("status")
+    checks.append(dq.row("mapping", "KPI mapping approved by Finance", "Status of the account mapping", "Approved",
+                         st or "none", "Pass" if st == "Approved" else "Content required" if not m else "Info",
+                         (f"Approved by {m.get('approved_by')} on {str(m.get('approved_at'))[:10]}." if st == "Approved"
+                          else "No mapping for this company." if not m else
+                          f"{st}: every figure of the library is Pilot until Finance approves the mapping."),
+                         "settings", "text"))
+    un_is = [u for u in P["unmapped"] if abs(u[2]) >= 0.5]
+    checks.append(dq.row("is_unmapped", "Income-statement accounts outside the mapping",
+                         f"{len(un_is)} accounts with postings in the period", 0.0,
+                         round(sum(u[2] for u in un_is), 2), "Pass" if not un_is else "Difference",
+                         "" if not un_is else "They are in the net profit but in no line: map them.", "settings"))
+    checks.append(dq.row("pl_check", "P&L lines add up to the net profit",
+                         "Σ of the lines against − Σ of every income-statement account (the trial balance of BC)",
+                         P["net_profit"], round(P["net_profit"] + P["check"], 2),
+                         "Pass" if abs(P["check"]) < 1 else "Difference", "", "pl"))
+    un_bs = [u for u in B["unmapped"] if abs(u[2]) >= 0.5]
+    checks.append(dq.row("bs_check", f"Balance sheet balances at {end:%d.%m.%Y}",
+                         "Assets − liabilities − equity, the unclosed result in equity", 0.0,
+                         B["totals"]["difference"] if m else None,
+                         "Content required" if not m else "Pass" if abs(B["totals"]["difference"]) < 1 else "Difference",
+                         "" if not un_bs else f"{len(un_bs)} balance-sheet accounts with a balance are outside the "
+                                              f"mapping.", "bs"))
+    # the supplier and customer ledgers hold only what is open now: compared with the G/L today
+    rows_today = rows if end == today else _safe(
+        sources, "Chart of accounts today",
+        lambda: client.accounts(company, date(today.year, 1, 1).isoformat(), today.isoformat(), None, 300), [], False)
+    Bt = kpilib.bs_lines(rows_today, m) if rows_today else None
+    vend = _safe(sources, "Open supplier entries", lambda: client.open_vendor_entries(company), None, False)
+    cust = _safe(sources, "Open customer entries", lambda: client.open_customer_entries(company), None, False)
+    try:
+        group = [c for c in client.companies() if c.strip().upper() != company.strip().upper()]
+    except BCError:
+        group = []
+    ap_led = None if vend is None else round(-sum(_f(r.get("Remaining_Amt_LCY")) for r in vend), 2)
+    ap_ic = 0.0 if vend is None else -sum(_f(r.get("Remaining_Amt_LCY")) for r in vend
+                                          if any(g.upper() in str(r.get("Vendor_Name") or "").upper() for g in group))
+    gl_ap = Bt["lines"]["payables"] if (Bt and str(rules.get("payables") or "").strip()) else None
+    c = dq.ledger_check("ap_rec", "Trade payables against the supplier ledger", gl_ap, ap_led, mat, "ap",
+                        "the open supplier entries", "Trade payables")
+    if ap_ic:
+        c["detail"] = (c["detail"] + f" Of the supplier entries, {ap_ic:,.0f} are owed to group companies.").strip()
+    checks.append(c)
+    ar_led = None if cust is None else round(sum(_f(r.get("Remaining_Amt_LCY")) for r in cust), 2)
+    gl_ar = Bt["lines"]["receivables"] if (Bt and str(rules.get("receivables") or "").strip()) else None
+    checks.append(dq.ledger_check("ar_rec", "Trade receivables against the customer ledger", gl_ar, ar_led, mat,
+                                  "ar", "the open customer entries", "Trade receivables"))
+    # inventory: the last read of the Inventory screen of this company (on hand today)
+    with _last_lock:
+        d = _last.get("data") or {}
+    inv = d.get("inventory") if (d.get("meta") or {}).get("company") == company else None
+    rec = (inv or {}).get("reconciliation") if inv and inv.get("loaded") else None
+    if rec:
+        th = float(settings["thresholds"].get("inventory_difference") or 0)
+        checks.append(dq.row("inventory", "Inventory against the G/L",
+                             "Stock on hand at item cost against the inventory accounts, today", rec["gl_balance"],
+                             rec["inventory_value"], "Pass" if abs(rec["difference"]) < max(1, th) else "Difference",
+                             rec["method"], "inventory"))
+    else:
+        checks.append(dq.row("inventory", "Inventory against the G/L",
+                             "Stock on hand at item cost against the inventory accounts, today", None, None,
+                             "Not read", "Open Inventory once for this company; the check uses its last read.",
+                             "inventory"))
+    sr = salesrec.held(company)
+    if sr and sr.get("kpis"):
+        k = sr["kpis"]
+        checks.append(dq.row("sales_rec", "Simphony sales against Business Central",
+                             f"Every restaurant and day {sr['from']} → {sr['to']}: Simphony, the POS import, the "
+                             f"invoices", float(k["sim"]), float(k["imp"]),
+                             "Pass" if not k["issues"] else "Difference",
+                             f"{k['ok']} of {k['days']} restaurant-days agree; {k['issues']} issues "
+                             f"(import gap {k['imp_gap']:,.0f}, invoice gap {k['inv_gap']:,.0f}).", "salesrec"))
+    else:
+        checks.append(dq.row("sales_rec", "Simphony sales against Business Central",
+                             "Every restaurant and day: Simphony, the POS import, the invoices", None, None, "Not read",
+                             "Open Control → Simphony ↔ BC once; the check uses its last read.", "salesrec"))
+    bud_name = (settings.get("budget") or {}).get("name") or f"BUDGET{c_from.year}"
+    bud = _safe(sources, f"Budget {bud_name}",
+                lambda: client.budget(company, c_from.isoformat(), c_to.isoformat(), bud_name), [], False)
+    bc = dq.budget_check(bud, m, P) if m else None
+    if not bud:
+        checks.append(dq.row("budget", f"Budget {bud_name} for the period", "Budget entries of the period", None,
+                             None, "Content required", f"No entries of {bud_name} in the period.", "budget"))
+    else:
+        checks.append(dq.row("budget", f"Budget {bud_name} for the period",
+                             f"{len(bud)} entries; budget on accounts outside the mapping", 0.0,
+                             bc["unmapped_value"] if bc else None,
+                             "Content required" if not bc else "Pass" if abs(bc["unmapped_value"]) < 1 else "Difference",
+                             (f"Budget net revenue {bc['revenue']:,.0f}, net profit {bc['net_profit']:,.0f} through the "
+                              f"same mapping." if bc else "Needs the KPI mapping."), "budget"))
+    try:
+        all_co = client.companies()
+    except BCError:
+        all_co = [company]
+    rates, reporting = _company_rate_status(all_co, end, sources)
+    if not rates:
+        checks.append(dq.row("fx", "Exchange rates for the group view", "Companies in another currency", None,
+                             "none", "Info", f"Every company keeps its books in {reporting}.", "group", "text"))
+    for r in rates:
+        checks.append(dq.row(f"fx_{r['currency'].lower()}", f"{r['currency']} rate at {end:%d.%m.%Y}",
+                             f"Currency Exchange Rates of {r['source']} (page 483)", None,
+                             None if r["rate"] is None else r["rate"],
+                             "Pass" if r["rate"] is not None else "Content required",
+                             (f"In force since {r['since']}; the method (average for the P&L, closing for the balance "
+                              f"sheet) is a proposal until Finance approves it.") if r["rate"] is not None else
+                             (f"No {r['currency']} rate in Business Central for this date. {r['error']}").strip(),
+                             "group", "rate"))
+    checks.append(dq.row("ic", "Intercompany eliminations", "Pairs of group accounts and the elimination method",
+                         None, None, "Content required",
+                         "Business Central has no IC partner on the accounts; Finance has to list the pairs and the "
+                         "method. Until then the group view is combined, not consolidated.", "group", "text"))
+    # the frozen month
+    snap = dq.snapshot(company, period) if mode == "month" else None
+    changes = []
+    if snap:
+        changes = dq.compare(snap, rows)
+        checks.append(dq.row("frozen", f"{period} unchanged since it was frozen",
+                             f"Trial balance now against the one frozen on {snap['at'][:16].replace('T', ' ')} by "
+                             f"{snap['by']}", 0.0, round(sum(abs(x['net_change']) + abs(x['bal_change'])
+                                                             for x in changes), 2),
+                             "Pass" if not changes else "Difference",
+                             "" if not changes else f"{len(changes)} accounts were posted to after the freeze.",
+                             ""))
+    elif mode == "month" and ended:
+        checks.append(dq.row("frozen", f"{period} frozen", "A snapshot of the trial balance of the closed month",
+                             None, None, "Info", "Not frozen yet: freeze it once the month is closed, so later "
+                                                 "postings to it show here.", "", "text"))
+    reg = None
+    if sync and ended and mode == "month":
+        try:
+            reg = exreg.sync("data_quality", company, dq.findings(period, checks, changes),
+                             in_scope=lambda x: (x.get("subject") or "").startswith(period + " "))
+        except Exception:                                          # noqa: BLE001
+            traceback.print_exc()
+    frozen = []
+    for sp in dq.snapshots(company)[:8]:
+        frozen.append({"period": sp["period"], "at": sp["at"], "by": sp["by"], "entry_no": sp.get("entry_no"),
+                       "from": sp["from"], "to": sp["to"]})
+    counts = {s_: sum(1 for c in checks if c["status"] == s_) for s_ in dq.STATUSES}
+    return {"loaded": True, "available": True, "company": company, "period": period, "mode": mode,
+            "from": c_from.isoformat(), "to": end.isoformat(), "ended": ended, "checks": checks, "counts": counts,
+            "unmapped": dq.unmapped_rows(P, B)[:80], "changes": changes[:80], "snapshot": snap and
+            {k: snap[k] for k in ("at", "by", "entry_no", "from", "to")},
+            "frozen": frozen, "register": reg, "sources": sources,
+            "budget": bc and {k: bc[k] for k in ("rows", "accounts", "revenue", "net_profit", "unmapped_value")},
+            "can_freeze": mode == "month" and ended,
+            "note": "Each check says what is compared with what. The supplier and customer ledgers and the stock only "
+                    "hold what is open today, so they are compared with the G/L today, whatever the period. Failed "
+                    "checks of an ended month go to the Exceptions register (Data quality, owner: chief accountant). "
+                    "Nothing is written to Business Central."}
+
+
+def dq_freeze(company, anchor, action, actor):
+    c_from, c_to, *_ = periods(anchor, "month")
+    period = f"{c_from:%Y-%m}"
+    if action == "unfreeze":
+        return {"ok": dq.unfreeze(company, period, actor)}
+    if c_to >= date.today():
+        return {"error": "Only a month that has ended can be frozen."}
+    entry_no = client.last_gl_entry_no(company)           # first the number, then the figures
+    rows = client.accounts(company, c_from.isoformat(), c_to.isoformat(), None, 0)
+    if not rows:
+        return {"error": "The chart of accounts could not be read."}
+    snap = dq.freeze(company, period, c_from.isoformat(), c_to.isoformat(), rows, entry_no, actor)
+    return {"ok": True, "period": period, "entry_no": entry_no, "accounts": len(snap["accounts"])}
+
+
+def dq_late(company, period, account):
+    snap = dq.snapshot(company, period)
+    if not snap:
+        return {"error": f"{period} is not frozen."}
+    rows = client.gl_after(company, snap.get("entry_no") or 0, account, snap["to"])
+    return {"account": account, "period": period, "entry_no": snap.get("entry_no"),
+            "entries": [{"entry": r.get("Entry_No"), "date": r.get("Posting_Date"), "document": r.get("Document_No"),
+                         "type": r.get("Document_Type"), "source": r.get("Source_Code"),
+                         "amount": _f(r.get("Amount"))} for r in rows],
+            "total": round(sum(_f(r.get("Amount")) for r in rows), 2), "more": len(rows) >= 300}
 
 
 def consolidation_screen(anchor, mode):
@@ -2240,6 +2469,15 @@ class Handler(BaseHTTPRequestHandler):
                                               q.get("mode", "month"), q.get("dimension")))
             elif url.path == "/api/consolidation":
                 self._send(200, consolidation_screen(q.get("period"), q.get("mode", "month")))
+            elif url.path == "/api/dq":
+                self._send(200, dq_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
+                                          q.get("mode", "month")))
+            elif url.path == "/api/dq/late":
+                try:
+                    self._send(200, dq_late(q.get("company") or config.BC_COMPANY, q.get("period") or "",
+                                            q.get("account") or ""))
+                except BCError as exc:
+                    self._send(200, {"error": str(exc)[:300]})
             elif url.path == "/api/capital":
                 self._send(200, capital_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                                q.get("mode", "month")))
@@ -2417,6 +2655,16 @@ class Handler(BaseHTTPRequestHandler):
                 with _dash_lock:
                     _dash_cache.clear()
                 self._send(200, kpi_mapping_screen(company))
+            elif url.path == "/api/dq/freeze":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                try:
+                    r = dq_freeze(body.get("company") or config.BC_COMPANY, body.get("period"),
+                                  body.get("action") or "freeze", user.get("name") or actor)
+                except BCError as exc:
+                    r = {"error": str(exc)[:300]}
+                self._send(200 if not r.get("error") else 400, r)
             elif url.path == "/api/register/update":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

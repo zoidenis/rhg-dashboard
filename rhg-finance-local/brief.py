@@ -99,7 +99,7 @@ def build(data, settings, meta):
     if data["gaps"]:
         accounting.append({"kind": "fact",
                            "text": f"{len(data['gaps'])} requested figures cannot be produced from the "
-                                   f"published web services and are listed under Data availability.",
+                                   f"published web services and are listed under Data quality & reconciliation.",
                            "drill": {"kind": "gaps", "key": ""}})
 
     due = (date.today() + timedelta(days=2)).isoformat()

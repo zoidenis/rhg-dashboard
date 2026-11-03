@@ -294,6 +294,39 @@ class BCClient:
                                  limit=limit)
         return self._cached(("gl", company, date_from, date_to, threshold), max_age, go)
 
+    def last_gl_entry_no(self, company):
+        """The number of the last G/L entry. G_LEntries is a query and takes no $orderby, but a filter on the entry
+        number is quick (it is the key): the first entry at or above n tells whether any exists there, so the
+        last one is found by doubling and halving (about 50 reads of one row)."""
+        url = self._url(company, config.E_GL)
+
+        def at_or_above(n):
+            rows = self._get_all(url, {"$filter": f"Entry_No ge {n}", "$select": "Entry_No", "$top": "1"}, limit=1)
+            return int(rows[0]["Entry_No"]) if rows else None
+        first = at_or_above(1)
+        if first is None:
+            return 0
+        lo, hi = first, max(first * 2, 1024)
+        while at_or_above(hi) is not None:
+            lo, hi = hi, hi * 2
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            got = at_or_above(mid)
+            if got is None:
+                hi = mid
+            else:
+                lo = got
+                if got >= hi:
+                    break
+        return lo
+
+    def gl_after(self, company, entry_no, account, date_to, limit=300):
+        """The entries of one account numbered above entry_no with a posting date up to date_to: postings made
+        after a month was frozen that change it."""
+        flt = (f"Entry_No gt {int(entry_no)} and G_L_Account_No eq '{account}' and Posting_Date le {date_to}")
+        return self._get_all(self._url(company, config.E_GL),
+                             {"$filter": flt, "$select": ",".join(GL_FIELDS), "$top": str(limit)}, limit=limit)
+
     def gl_for_account(self, company, account, date_from, date_to, limit=300):
         flt = (f"G_L_Account_No eq '{account}' and Posting_Date ge {date_from} "
                f"and Posting_Date le {date_to}")
