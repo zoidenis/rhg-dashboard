@@ -96,7 +96,9 @@ DEFAULT_SETTINGS = {
                   "discharge_min_value": "1000",
                   # menu engineering: the popularity line (% of an equal share), the portion cost target (% of the
                   # net price) and the item discount share that is flagged
-                  "menu_popularity_pct": "70", "menu_cost_target_pct": "32", "menu_discount_pct": "15"},
+                  "menu_popularity_pct": "70", "menu_cost_target_pct": "32", "menu_discount_pct": "15",
+                  # the section's average margin: weighted by items sold (the method) or simple
+                  "menu_margin_method": "weighted"},
     # Fallback rules for companies where Account Category was never filled in
     "accounts": {"income_prefixes": "", "cogs_prefixes": "", "expense_prefixes": "", "equity_prefixes": ""},
     # Business Central publishes no exchange-rate service here, so the group view uses

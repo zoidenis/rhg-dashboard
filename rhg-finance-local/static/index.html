@@ -151,6 +151,9 @@ td.num,th.num{text-align:right}
 .me-c-star{--c:var(--down)}.me-c-plowhorse{--c:var(--warn)}.me-c-puzzle{--c:var(--accent)}.me-c-dog{--c:var(--up)}.me-c-nocost,.me-c-noprice{--c:var(--sub)}
 .me-st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;white-space:nowrap;color:var(--ink)}
 .me-st i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.me-par{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:14px 16px;margin:10px 0 6px}
+.me-par h3{margin:0;font-size:14px}
+.me-par .field .meta{font-weight:400;white-space:normal}
 .me-quad{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .me-q{border:1px solid var(--line);border-top:3px solid var(--c);border-radius:12px;padding:12px 14px;background:var(--card);min-width:0}
 .me-q h3{margin:0;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
@@ -957,7 +960,21 @@ td.num,th.num{text-align:right}
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu engineering</h2>
           <p class="hint">Every menu item by popularity and margin, within its menu section: Stars, Plowhorses, Puzzles and Dogs, with what the kitchen and the floor should do. Items sold and sales from Simphony; the portion cost from the recipes and item cards of Business Central. The period is the one chosen above.</p></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini dark" id="meXlsx">Excel</button><button class="mini" id="meRead">Read again</button></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="meParBtn" aria-expanded="false" aria-controls="mePar">Parameters</button><button class="mini dark" id="meXlsx">Excel</button><button class="mini" id="meRead">Read again</button></div></div>
+        <div class="me-par" id="mePar" hidden>
+          <h3>Classification parameters</h3>
+          <p class="hint" style="margin:2px 0 10px">They apply to every brand and location and to the Excel file. The class changes at once; nothing is read again from Simphony or Business Central.</p>
+          <div class="formgrid">
+            <label class="field">Popularity line (% of an equal share)<input id="meParPop" type="number" min="1" max="200" step="1"><span class="meta">70 = Kasavana &amp; Smith. With 10 items in a section, 70 puts the line at 7% of the items sold.</span></label>
+            <label class="field">Section's average margin<select id="meParMargin"><option value="weighted">Weighted by items sold (the method)</option><option value="simple">Simple average of the items</option></select><span class="meta">Weighted: an item sold a lot moves the average more.</span></label>
+            <label class="field">Portion cost target (% of the net price)<input id="meParTarget" type="number" min="1" max="100" step="0.5"><span class="meta">Above it the item is flagged; the class does not change.</span></label>
+            <label class="field">Item discounts flagged above (% of sales)<input id="meParDisc" type="number" min="1" max="100" step="0.5"><span class="meta">A flag only.</span></label>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            <button class="btn dark" id="meParSave">Save and apply</button><button class="btn" id="meParReset">Back to the method's values</button><button class="btn" id="meParClose">Close</button>
+            <span class="meta" id="meParMsg"></span></div>
+        </div>
+        <p class="meta" id="mePars" style="margin:4px 0 0"></p>
         <div class="filters" style="margin:6px 0 8px">
           <label>Level<select id="meLevel"><option value="all">All RHG</option><option value="brand">Brand</option><option value="location">Location</option></select></label>
           <label id="meKeyL" style="display:none"><span id="meKeyT">Brand</span><select id="meKey"></select></label>
@@ -976,7 +993,7 @@ td.num,th.num{text-align:right}
         <p class="hint">Dogs first, then Plowhorses, Puzzles, items with no cost and Stars with a flag; operations (kitchen, recipe, purchasing) and sales (menu, price, staff). By net sales within each class.</p>
         <div class="scroll" style="max-height:520px"><table id="meActs"></table></div></div>
       <div class="card" style="margin-bottom:16px"><h2>Menu sections</h2>
-        <p class="hint">Each section is measured on its own: its popularity line (70% of an equal share) and its average margin.</p>
+        <p class="hint" id="meSecsHint">Each section is measured on its own: its popularity line (70% of an equal share) and its average margin.</p>
         <div class="scroll"><table id="meSecs"></table></div></div>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Menu items</h2><p class="hint" id="meItemsNote"></p></div></div>
         <div class="sk-chips" id="meChips"></div>
@@ -1800,6 +1817,7 @@ function renderSettings(){
     <label class="field">Menu engineering: popularity line (% of an equal share)<input id="inv-mepop" value="${esc((s.inventory||{}).menu_popularity_pct||"")}" placeholder="70"></label>
     <label class="field">Menu engineering: portion cost target (% of the net price)<input id="inv-metg" value="${esc((s.inventory||{}).menu_cost_target_pct||"")}" placeholder="32"></label>
     <label class="field">Menu engineering: item discounts flagged above (% of sales)<input id="inv-medc" value="${esc((s.inventory||{}).menu_discount_pct||"")}" placeholder="15"></label>
+    <label class="field">Menu engineering: section's average margin<select id="inv-memg"><option value="weighted" ${((s.inventory||{}).menu_margin_method||"weighted")==="weighted"?"selected":""}>Weighted by items sold</option><option value="simple" ${(s.inventory||{}).menu_margin_method==="simple"?"selected":""}>Simple average</option></select></label>
     <label class="field" style="grid-column:1/-1">POS technical items, not products (number or description; * = starts with)<input id="inv-tech" value="${esc((s.inventory||{}).pos_technical_items||"")}" placeholder="FIRE*, 1 LEK*, NO EXTRA*"></label>
     <label class="field">Reporting currency<input id="gr-cur" value="${esc((s.group||{}).reporting_currency||"ALL")}"></label>
     <label class="field">Company currencies<input id="gr-map" value="${esc((s.group||{}).currencies||"")}" placeholder="SALT=ALL, Zoi Greece=EUR"></label>
@@ -1837,7 +1855,7 @@ $("saveSettings").onclick = async ()=>{
                    discharge_low_ratio:$("inv-dclow").value, discharge_high_ratio:$("inv-dchigh").value,
                    discharge_cover_days:$("inv-dccov").value, discharge_min_value:$("inv-dcmin").value,
                    menu_popularity_pct:$("inv-mepop").value, menu_cost_target_pct:$("inv-metg").value,
-                   menu_discount_pct:$("inv-medc").value},
+                   menu_discount_pct:$("inv-medc").value, menu_margin_method:$("inv-memg").value},
         group:{reporting_currency:$("gr-cur").value, currencies:$("gr-map").value,
                rates:$("gr-rates").value, rate_note:$("gr-note").value},
         accounts:{income_prefixes:$("ac-inc").value, cogs_prefixes:$("ac-cogs").value,
@@ -2179,9 +2197,42 @@ function meRender(){
   $("meChartSec").innerHTML = `<option value="">All sections</option>` + d.sections.map(s => `<option>${esc(s.section)}</option>`).join("");
   $("meChartSec").value = secs.includes(keep) ? keep : "";
   $("meLegend").innerHTML = ME_ORDER.slice(0, 4).map(c => `${meSt(c)}<span class="meta">${esc(d.meaning[c])}</span>`).join("");
+  $("mePars").textContent = `Parameters: popularity line ${fmt(S.pop)}% of an equal share · section's average margin ${S.margin === "simple" ? "simple" : "weighted by items sold"} · portion cost target ${fmt(S.target, 1)}% · item discounts flagged above ${fmt(S.disc, 1)}%`;
+  $("meSecsHint").textContent = `Each section is measured on its own: its popularity line (${fmt(S.pop)}% of an equal share) and its average margin${S.margin === "simple" ? " (simple)" : " (weighted by items sold)"}.`;
+  if (!$("mePar").hidden) meParFill();
   meChart(); meQuad(); meActs(); meSecs(); meItems(); meAcross();
   $("meDefs").innerHTML = Object.values(d.definitions).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
 }
+// the classification parameters, changed from the tab (saved in Settings → Inventory)
+const ME_DEF = {pop: 70, margin: "weighted", target: 32, disc: 15};
+function meParFill(S){
+  S = S || (meData && meData.settings) || ME_DEF;
+  $("meParPop").value = S.pop; $("meParMargin").value = S.margin || "weighted"; $("meParTarget").value = S.target; $("meParDisc").value = S.disc;
+  const ok = can("settings");
+  ["meParSave", "meParReset"].forEach(id => { $(id).disabled = !ok; $(id).title = ok ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+function meParShow(on){
+  $("mePar").hidden = !on; $("meParBtn").setAttribute("aria-expanded", on);
+  if (on) { meParFill(); $("meParMsg").textContent = ""; $("meParPop").focus(); }
+}
+$("meParBtn").onclick = () => meParShow($("mePar").hidden);
+$("meParClose").onclick = () => meParShow(false);
+$("meParReset").onclick = () => { meParFill(ME_DEF); $("meParMsg").textContent = "The method's values are filled in; Save to apply them."; };
+$("meParSave").onclick = async () => {
+  const n = (id, lo, hi) => { const v = parseFloat($(id).value); return isFinite(v) && v >= lo && v <= hi ? v : null; };
+  const pop = n("meParPop", 1, 200), target = n("meParTarget", 1, 100), disc = n("meParDisc", 1, 100);
+  if (pop == null || target == null || disc == null) { $("meParMsg").textContent = "Popularity 1–200, cost target and discounts 1–100."; return; }
+  $("meParMsg").textContent = "Saving…";
+  try{
+    const r = await fetch("/api/settings", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({inventory: {menu_popularity_pct: String(pop), menu_margin_method: $("meParMargin").value,
+        menu_cost_target_pct: String(target), menu_discount_pct: String(disc)}})});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "HTTP " + r.status);
+    $("meParMsg").textContent = "Saved. The classes are being worked out again…";
+    meKey = ""; await meLoad();
+    $("meParMsg").textContent = "Saved and applied.";
+  }catch(e){ $("meParMsg").textContent = "Could not save: " + e.message; }
+};
 function meChart(){
   const d = meData, sec = $("meChartSec").value;
   const pts = d.items.filter(i => i.x != null && i.y != null && (!sec || i.section === sec));

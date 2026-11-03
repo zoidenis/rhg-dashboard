@@ -283,8 +283,9 @@ def settings_of(settings):
             return v if v > 0 else d
         except (TypeError, ValueError):
             return d
+    method = str(inv.get("menu_margin_method") or "weighted").strip().lower()
     return {"pop": num("menu_popularity_pct", 70.0), "target": num("menu_cost_target_pct", 32.0),
-            "disc": num("menu_discount_pct", 15.0)}
+            "disc": num("menu_discount_pct", 15.0), "margin": method if method in ("weighted", "simple") else "weighted"}
 
 
 def _classify(items, S):
@@ -295,7 +296,10 @@ def _classify(items, S):
     thr = S["pop"] / 100 / n
     costed = [x for x in priced if x["cost"] is not None]
     cq = sum(x["qty"] for x in costed)
-    avg_cm = sum(x["cm"] * x["qty"] for x in costed) / cq if cq else None
+    if S.get("margin") == "simple":                    # every item counts the same
+        avg_cm = sum(x["cm"] for x in costed) / len(costed) if costed else None
+    else:                                              # weighted by items sold (Kasavana & Smith)
+        avg_cm = sum(x["cm"] * x["qty"] for x in costed) / cq if cq else None
     for x in priced:
         x["mm"] = x["qty"] / total_qty
         x["mm_threshold"] = thr
@@ -458,7 +462,13 @@ def analyse(ds, level="all", key="", section="family", settings=None):
             "items": sorted(items, key=lambda i: -i["net"]), "sections": sections, "actions": actions,
             "across": across[:200], "brands": brands,
             "locations": [{"ref": L["ref"], "name": L["name"], "brand": L["brand"]} for L in locs],
-            "definitions": DEFINITIONS}
+            "definitions": dict(DEFINITIONS, method=(
+                f"Within each menu section (family group, or major group): popularity = the item's share of the items sold "
+                f"in the section against {S['pop']:g}% of an equal share; contribution margin = average net price − portion "
+                f"cost against the section's average margin "
+                + ("weighted by items sold" if S["margin"] == "weighted" else "of its items, each counted once")
+                + ". Star = popular and high margin; Plowhorse = popular, low margin; Puzzle = high margin, sold little; "
+                  "Dog = low margin, sold little."))}
 
 
 DEFINITIONS = {
