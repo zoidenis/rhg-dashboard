@@ -81,6 +81,24 @@ def scope_of(row):
         return dict(ALL_SCOPE)
 
 
+LANGS = ("sq", "en")
+
+
+def lang_of(row):
+    try:
+        v = row["lang"]
+    except (IndexError, KeyError):
+        v = None
+    return v if v in LANGS else "sq"
+
+
+def set_lang(username, lang):
+    if lang not in LANGS:
+        return False
+    store.run("UPDATE users SET lang=? WHERE username=?", (lang, username))
+    return True
+
+
 def public(row):
     perms = permissions.effective(store.role_permissions(row["role"]))
     scope = scope_of(row)
@@ -90,7 +108,7 @@ def public(row):
     return {"username": row["username"], "name": row["name"], "email": row["email"],
             "role": row["role"], "active": bool(row["active"]),
             "must_change": bool(row["must_change"]), "last_login": row["last_login"],
-            "permissions": perms, "scope": scope}
+            "permissions": perms, "scope": scope, "lang": lang_of(row)}
 
 
 def find(username):

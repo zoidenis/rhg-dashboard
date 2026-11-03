@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RHG Finance Control Tower</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -1683,7 +1684,7 @@ async function loadUsers(){
         <td>${u.active?'<span class="chip down">active</span>':'<span class="chip up">disabled</span>'}${u.locked_until?' <span class="chip up">locked</span>':""}</td>
         <td class="meta">${esc((u.last_login||"never").replace("T"," "))}</td>
         <td class="meta">${esc((u.created_at||"").slice(0,10))} · ${esc(u.created_by||"")}</td>
-        <td><button class="mini" data-ua="toggle" data-u="${esc(u.username)}">${u.active?"Disable":"Enable"}</button>
+        <td><button class="mini" data-ua="toggle" data-u="${esc(u.username)}" data-active="${u.active?1:0}">${u.active?"Disable":"Enable"}</button>
             <button class="mini" data-ua="reset" data-u="${esc(u.username)}">Reset password</button>
             ${u.locked_until?`<button class="mini" data-ua="unlock" data-u="${esc(u.username)}">Unlock</button>`:""}</td></tr>`).join("");
     $("sessTable").innerHTML = `<tr><th>User</th><th>Role</th><th>Signed in</th><th>Last seen</th></tr>` +
@@ -1693,7 +1694,7 @@ async function loadUsers(){
     document.querySelectorAll("[data-uf=role]").forEach(el=>el.onchange=()=>patchUser(el.dataset.u,{role:el.value}));
     document.querySelectorAll("[data-ua]").forEach(b=>b.onclick=()=>{
       const u = b.dataset.u;
-      if(b.dataset.ua==="toggle") patchUser(u,{active: b.textContent==="Enable"});
+      if(b.dataset.ua==="toggle") patchUser(u,{active: b.dataset.active !== "1"});
       if(b.dataset.ua==="unlock") patchUser(u,{unlock:true});
       if(b.dataset.ua==="reset"){ const pw = prompt(`Temporary password for ${u} (at least 8 characters)`); if(pw) patchUser(u,{password:pw}); }});
   }catch(e){ $("usersNote").textContent = "Could not load the accounts: " + e.message; }

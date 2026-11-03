@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c475e">
 <title>RHG Administration</title>
@@ -169,7 +170,7 @@ async function renderUsers(){
         <tbody>${rows.map(u => `
           <tr>
             <td><b>${esc(u.name)}</b><div class="muted" style="font-size:12px">${esc(u.username)}</div></td>
-            <td>${esc(u.role)}<div class="muted" style="font-size:12px">${esc(depOf(u.role))}</div></td>
+            <td><span data-no-i18n>${esc(u.role)}</span><div class="muted" style="font-size:12px">${esc(depOf(u.role))}</div></td>
             <td class="scope">${scopeText(u.scope)}</td>
             <td>${u.active ? '<span class="pill">Active</span>' : '<span class="pill off">Disabled</span>'}
                 ${u.must_change ? '<span class="pill off">Must change</span>' : ''}</td>
@@ -208,7 +209,7 @@ const depOf = name => (ROLES.find(r => r.name === name) || {}).department || "";
 function roleOptions(sel){
   const deps = [...new Set(ROLES.map(r => r.department || "Other"))];
   return deps.map(d => `<optgroup label="${esc(d)}">${ROLES.filter(r => (r.department || "Other") === d).map(r =>
-    `<option value="${esc(r.name)}"${r.name===sel?" selected":""}>${esc(r.name)}</option>`).join("")}</optgroup>`).join("");
+    `<option data-no-i18n value="${esc(r.name)}"${r.name===sel?" selected":""}>${esc(r.name)}</option>`).join("")}</optgroup>`).join("");
 }
 
 /* The access of an account in words: "All companies", or each company with its locations. */
@@ -397,7 +398,7 @@ function paintRoleList(){
   $("rlist").innerHTML = `<button class="btn sm primary" id="rnew" style="width:100%">New role</button>` +
     deps.filter(d => RD.roles.some(r => r.department === d)).map(d => `<div class="rdep">${esc(d)}</div>` +
       RD.roles.filter(r => r.department === d).map(r => `<button class="ritem${RSEL && RSEL.name === r.name ? " on" : ""}"
-        data-r="${esc(r.name)}"><span>${esc(r.name)}</span><small>${r.users ? r.users + (r.users === 1 ? " account" : " accounts") : ""}</small></button>`).join("")
+        data-r="${esc(r.name)}"><span data-no-i18n>${esc(r.name)}</span><small>${r.users ? r.users + (r.users === 1 ? " account" : " accounts") : ""}</small></button>`).join("")
     ).join("");
   $("rlist").querySelectorAll("[data-r]").forEach(b => b.onclick = () => {
     if(RDIRTY && !confirm("Leave this role without saving the changes?")) return;

@@ -5,6 +5,7 @@ session cookie here through /internal/validate and are told who the user is and
 what they may do. That call is protected by a shared service token, so only the
 group's own services can ask.
 """
+import hashlib
 import json
 import secrets
 import sys
@@ -39,7 +40,7 @@ STATIC_FILES = {
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",
                 "/brand.css", "/app.css", "/icon.svg", "/manifest.webmanifest", "/sw.js",
-                "/select.js", "/select.css"}
+                "/select.js", "/select.css", "/i18n.js"}
 
 # Simple in-process rate limit for sign-in attempts, keyed by client address.
 _hits, _hits_lock = {}, threading.Lock()
@@ -56,6 +57,29 @@ def rate_limited(ip):
             for k in [k for k, v in _hits.items() if not v or now - v[-1] > RATE_WINDOW]:
                 _hits.pop(k, None)
         return len(hits) > RATE_MAX
+
+
+_i18n = {"key": None, "body": b""}
+
+
+def i18n_bundle():
+    """/i18n.js: the Albanian dictionary (i18n/sq.json, with data/i18n-sq.json on top for corrections made on the
+    server) followed by the script that translates the pages (static/i18n-runtime.js); rebuilt when a file changes."""
+    files = [config.BASE_DIR / "i18n" / "sq.json", config.BASE_DIR / "data" / "i18n-sq.json",
+             STATIC / "i18n-runtime.js"]
+    key = tuple(f.stat().st_mtime if f.exists() else 0 for f in files)
+    if _i18n["key"] != key:
+        words = {}
+        for f in files[:2]:
+            if f.exists():
+                try:
+                    words.update(json.loads(f.read_text(encoding="utf-8")))
+                except ValueError:
+                    pass
+        runtime = files[2].read_text(encoding="utf-8") if files[2].exists() else ""
+        body = "window.PULSE_SQ=" + json.dumps(words, ensure_ascii=False, separators=(",", ":")) + ";\n" + runtime
+        _i18n.update(key=key, body=body.encode("utf-8"))
+    return _i18n["body"]
 
 
 def scope_options():
@@ -151,6 +175,24 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if url.path in ("/admin", "/admin.html"):
                 self._send(200, (STATIC / "admin.html").read_bytes(), "text/html; charset=utf-8")
+                return
+            if url.path == "/i18n.js":
+                # 240 kB of dictionary: asked again on every page, sent again only when it changed (ETag)
+                body = i18n_bundle()
+                tag = '"%s"' % hashlib.sha1(body).hexdigest()[:16]
+                if self.headers.get("If-None-Match") == tag:
+                    self.send_response(304)
+                    self.send_header("ETag", tag)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("ETag", tag)
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(body)
                 return
             name = url.path.lstrip("/")
             if name in STATIC_FILES and (STATIC / name).exists():
@@ -287,6 +329,12 @@ class Handler(BaseHTTPRequestHandler):
             if not self._csrf_ok(user):
                 self._send(403, {"error": "Missing or wrong CSRF token."}); return
 
+            if url.path == "/api/me/lang":
+                # the language of pulse for the signed-in person (sq, en); every page reads it from the session
+                if not auth.set_lang(user["username"], body.get("lang")):
+                    self._send(400, {"error": "Unknown language."}); return
+                self._send(200, {"ok": True, "lang": body.get("lang")})
+                return
             if url.path == "/api/password":
                 ok, err = auth.change_password(user["username"], body.get("current"),
                                                body.get("new"), ip)
