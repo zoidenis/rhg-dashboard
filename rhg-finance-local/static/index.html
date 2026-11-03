@@ -146,6 +146,26 @@ td.num,th.num{text-align:right}
 .dc-st{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sub);background:var(--bg)}
 .dc-st.not_received,.dc-st.over{color:var(--up);background:var(--up-bg)}.dc-st.not_used,.dc-st.under{color:var(--warn);background:var(--warn-bg)}
 .dc-st.ok{color:var(--down);background:var(--down-bg)}
+/* exceptions register */
+.rg-st{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sub);background:var(--bg)}
+.rg-st.s-open{color:var(--warn);background:var(--warn-bg)}.rg-st.s-progress{color:var(--ink);background:var(--bg)}
+.rg-st.s-awaiting{color:var(--down);background:var(--down-bg)}.rg-st.s-closed{color:var(--down);background:var(--down-bg)}
+.rg-st.s-overdue{color:var(--up);background:var(--up-bg)}
+.rg-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--sub)}
+.rg-sev.critical{background:var(--up)}.rg-sev.warning{background:var(--warn)}
+#rgKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#rgItems tr.rg-row{cursor:pointer}#rgItems tr.rg-row:hover td{background:var(--bg)}
+#rgItems tr.rg-open td{background:var(--bg)}
+#rgItems .rg-det td{background:var(--bg);padding:12px 14px;white-space:normal}
+.rg-panel,.rg-panel *{white-space:normal;overflow-wrap:anywhere}
+.rg-panel{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.rg-panel textarea{width:100%;min-height:58px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card);color:var(--ink);box-sizing:border-box}
+.rg-panel input{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card);color:var(--ink);min-width:0}
+.rg-btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.rg-hist{list-style:none;margin:0;padding:0;font-size:12px;max-height:220px;overflow:auto}
+.rg-hist li{padding:5px 0;border-bottom:1px solid var(--line)}.rg-hist li b{font-weight:600}
+#rgOwners tr.on td{font-weight:700}#rgOwners tr{cursor:pointer}
+@media (max-width:760px){.rg-panel{grid-template-columns:1fr}}
 .pl-sq.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 /* Sales → Menu engineering */
 .me-c-star{--c:var(--down)}.me-c-plowhorse{--c:var(--warn)}.me-c-puzzle{--c:var(--accent)}.me-c-dog{--c:var(--up)}.me-c-nocost,.me-c-noprice{--c:var(--sub)}
@@ -402,6 +422,7 @@ td.num,th.num{text-align:right}
     <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
     <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
     <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
+    <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
 
     <div class="grp">System</div>
     <button data-view="gaps">Data availability</button>
@@ -1099,6 +1120,52 @@ td.num,th.num{text-align:right}
   <section class="view" id="v-exceptions"><div class="card"><h2>Exceptions</h2>
     <p class="hint">Rules applied to live BC records using the thresholds in Settings. Each one can become a tracked action.</p>
     <div id="excList"></div></div></section>
+
+  <section class="view" id="v-register">
+    <div class="card">
+      <div class="card-head"><div><h2>Exceptions register</h2>
+        <p class="hint" id="rgNote">Every exception the daily controls find in Business Central, with an owner from Email recipients by company, a due date and a status, until the data shows it is gone. An item the next run no longer finds closes by itself as verified; one that comes back is reopened.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="mini dark" id="rgRead">Read again</button><button class="mini" id="rgRun">Run the controls now</button></div></div>
+      <div class="kpis six" id="rgKpis" style="margin-top:14px"></div>
+      <p class="meta" id="rgStatus"></p>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>Owners</h2>
+      <p class="hint">Who holds what: open and overdue items, the oldest, the value at stake and what they closed in the last 7 days. Click an owner to see only their items; click again for all.</p></div></div>
+      <div class="scroll"><table id="rgOwners"></table></div></div>
+    <div class="card"><div class="card-head"><div><h2>Items</h2><p class="hint" id="rgItemsNote"></p></div></div>
+      <div class="sk-chips" id="rgChips"></div>
+      <div class="filters" style="margin:0 0 10px">
+        <label>Owner<select id="rgOwner"><option value="">Everyone</option></select></label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="rgMine" style="width:auto"> My items</label>
+        <label>Source<select id="rgSource"><option value="">All controls</option></select></label>
+        <label>Company<select id="rgCompany"><option value="">All</option></select></label>
+        <label>Location<select id="rgLoc"><option value="">All</option></select></label>
+        <label>Search<input id="rgQ" placeholder="item, number or text"></label></div>
+      <div class="scroll"><table id="rgItems"></table></div><p class="meta" id="rgMore"></p></div>
+    <div class="card" id="rgSetCard" style="display:none">
+      <div class="card-head"><div><h2>Daily controls and the owners' email</h2>
+        <p class="hint">At the time set, the controls read every company of the negative stock email (Settings → Negative stock daily email) unless the 07:30 email has already read it that day, and sync the register: negative stock lines and the recipe interventions of Received vs discharged (30 days). Then, if switched on, every owner gets one email with their open items, overdue first; items overdue longer than the escalation days put the roles below (of Email recipients by company) in Cc.</p></div>
+        <span class="rhg-pill" id="rgPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">Time<input id="rgTime" type="time" value="08:15"></label>
+        <label class="field">Escalate after (days overdue)<input id="rgEsc" type="number" min="0" max="60" value="3"></label>
+        <label class="field">Escalate to (roles)<input id="rgRoles" placeholder="coo, cfo"></label>
+        <label class="field">Send a test to<input id="rgTestTo" placeholder="you@rhg.al"></label>
+        <label class="field">Test: the email of<select id="rgTestOwner"><option value="">the first owner</option></select></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 4px"><input type="checkbox" id="rgCtl" style="width:auto"> Run the controls every day</label>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0 0 12px"><input type="checkbox" id="rgOn" style="width:auto"> Email every owner their open items every day</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="rgSave">Save</button>
+        <button class="btn" id="rgTest">Send a test</button>
+        <span class="meta" id="rgMsg"></span>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table id="rgRuns"></table></div>
+    </div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the register works</summary>
+      <div class="hint" id="rgDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
 
   <section class="view" id="v-actions"><div class="card">
     <div class="card-head"><div><h2>Action center</h2><p class="hint">Actions live in this application only; Business Central stays read-only.</p></div>
@@ -3335,6 +3402,166 @@ $("modalCsv").onclick=()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
+// ---------------------------------------------------------------- exceptions register
+let rgData = null, rgStatus = "active", rgOpen = "", rgJobTimer = null, rgSetLoaded = false;
+const RG_CHIPS = [["active", "Active"], ["overdue", "Overdue"], ["Open", "Open"], ["In progress", "In progress"],
+  ["Awaiting verification", "Awaiting verification"], ["Closed", "Closed"], ["Dismissed", "Dismissed"], ["all", "All"]];
+const RG_CLS = {"Open": "s-open", "In progress": "s-progress", "Awaiting verification": "s-awaiting", "Closed": "s-closed", "Dismissed": ""};
+const rgM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
+const rgWhen = t => (t || "").replace("T", " ").slice(0, 16);
+function rgQuery(){
+  const p = new URLSearchParams({status: rgStatus});
+  if ($("rgMine").checked) p.set("mine", "1"); else if ($("rgOwner").value) p.set("owner", $("rgOwner").value);
+  [["source", "rgSource"], ["company", "rgCompany"], ["location", "rgLoc"], ["q", "rgQ"]].forEach(([k, id]) => { const v = $(id).value.trim(); if (v) p.set(k, v); });
+  return p.toString();
+}
+async function loadRegister(){
+  $("rgStatus").textContent = "Reading…";
+  try{
+    const j = await readJSON(await fetch("/api/register?" + rgQuery()));
+    if (j.error) throw new Error(j.error);
+    rgData = j; renderRegister();
+  }catch(e){ $("rgStatus").textContent = "Could not read: " + e.message; }
+}
+function rgFill(id, values, first, label){
+  const el = $(id), keep = el.value;
+  el.innerHTML = `<option value="">${first}</option>` + values.map(v => `<option value="${esc(v)}">${esc(label ? label(v) : v)}</option>`).join("");
+  el.value = values.includes(keep) ? keep : "";
+}
+function renderRegister(){
+  const d = rgData, k = d.kpis;
+  $("regCount").textContent = k.overdue || k.open || 0;
+  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  $("rgKpis").innerHTML =
+    card("Open", fmt(k.open), `${rgM(k.value_open)} at stake`, k.open ? "warn" : "") +
+    card("Overdue", fmt(k.overdue), "past their due date", k.overdue ? "up" : "") +
+    card("New today", fmt(k.new_today), "found by today's controls") +
+    card("Awaiting verification", fmt(k.awaiting), "marked fixed, the next run checks") +
+    card("Closed in 7 days", fmt(k.closed_7), "verified by the data", k.closed_7 ? "down" : "") +
+    card("Median days to close", k.median_days == null ? "–" : fmt(k.median_days), `${fmt(k.reopened)} open again after a close`, k.reopened ? "warn" : "");
+  const runs = d.runs || [];
+  const src = s => (d.sources || {})[s] || s;
+  $("rgStatus").textContent = runs.length ? "Last control runs: " + runs.map(r => `${src(r.source)} · ${r.company} ${rgWhen(r.at)}`).join(" · ")
+    : "No control has run yet: Run the controls now, or wait for the daily run.";
+  // owners
+  const ow = d.owners || [], cur = $("rgMine").checked ? d.me : $("rgOwner").value;
+  $("rgOwners").innerHTML = ow.length ? `<tr><th>Owner</th><th class="num">Open</th><th class="num">Overdue</th><th class="num">Oldest (days)</th><th class="num">Value at stake</th><th class="num">Closed in 7 days</th></tr>` +
+    ow.map(o => `<tr data-owner="${esc(o.owner)}" class="${o.owner === cur ? "on" : ""}"><td>${esc(o.owner)}</td><td class="num">${fmt(o.open)}</td>
+      <td class="num">${o.overdue ? `<span class="rg-st s-overdue">${fmt(o.overdue)}</span>` : "0"}</td><td class="num">${fmt(o.oldest)}</td>
+      <td class="num">${rgM(o.value)}</td><td class="num">${fmt(o.closed_7)}</td></tr>`).join("")
+    : `<tr><td class="meta">Nobody holds an open item.</td></tr>`;
+  $("rgOwners").querySelectorAll("tr[data-owner]").forEach(tr => tr.onclick = () => {
+    const o = tr.dataset.owner; $("rgMine").checked = false;
+    $("rgOwner").value = $("rgOwner").value === o ? "" : o; loadRegister(); });
+  rgFill("rgOwner", ow.map(o => o.owner), "Everyone");
+  rgFill("rgSource", Object.keys(d.sources || {}), "All controls", src);
+  rgFill("rgCompany", d.companies || [], "All");
+  rgFill("rgLoc", d.locations || [], "All");
+  $("rgChips").innerHTML = RG_CHIPS.map(([key, l]) => `<button data-st="${esc(key)}" class="${key === rgStatus ? "on" : ""}">${esc(l)}</button>`).join("");
+  $("rgChips").querySelectorAll("button").forEach(b => b.onclick = () => { rgStatus = b.dataset.st; loadRegister(); });
+  renderRgItems();
+  $("rgRun").disabled = !d.can_settings || (d.job && d.job.state === "running");
+  $("rgRun").title = d.can_settings ? "Reads Business Central for every company of the negative stock email and syncs the register." : "Your role cannot run the controls (needs finance.settings.manage).";
+  if (d.job && d.job.state !== "running") $("rgStatus").textContent += ` · Run by ${d.job.by} at ${rgWhen(d.job.ended)}: ` + (d.job.state === "failed" ? "failed, " + (d.job.error || "")
+    : (d.job.result || []).map(r => `${r.company} ${r.status}` + (r.negative_stock ? ` (${r.negative_stock.found} + ${(r.discharge || {}).found || 0} found, ${r.negative_stock.opened + ((r.discharge || {}).opened || 0)} opened, ${r.negative_stock.closed + ((r.discharge || {}).closed || 0)} closed)` : r.detail ? ` (${r.detail})` : "")).join(" · "));
+  if (d.job && d.job.state === "running") { $("rgStatus").textContent = `Controls running since ${rgWhen(d.job.started)}… several minutes.`; clearTimeout(rgJobTimer); rgJobTimer = setTimeout(loadRegister, 8000); }
+  $("rgSetCard").style.display = d.can_settings ? "" : "none";
+  if (d.can_settings) renderRgSettings();
+  const sla = d.sla || {};
+  $("rgDefs").innerHTML = `<p><b>Where the items come from.</b> Negative stock: every item below zero at a location at the end of the day before (the same lines as the negative stock email), owned by its likely cause: receipt not posted → Stock manager, recipe wrong → Cost controller, sold without purchase → Purchasing manager. Received vs discharged: every recipe intervention over the last 30 days → Cost controller.</p>
+    <p><b>Owner.</b> The people in that role at the item's location in Email recipients by company, else at the company, else in the group row. An owner can hand an item to someone else; it then keeps that owner. Blank hands it back to the role.</p>
+    <p><b>Due date.</b> From the day it is found: critical ${sla.critical} days, warning ${sla.warning} days, info ${sla.info} days. A negative stock line below zero for more than 3 days is critical, as are a recipe code not received and a discharge far above what came in.</p>
+    <p><b>Statuses.</b> Open → In progress → Fixed – verify (Awaiting verification). Only the data closes an item: the next run that no longer finds it closes it as verified; if it still finds it, it goes back to Open with a note. Dismissed needs a reason and stays out of the counts. A closed item found again is reopened and counted.</p>
+    <p><b>Who can change an item.</b> Its owner, and the roles with actions. Every change is in the item's history and in the audit trail. Nothing is written to Business Central or Simphony.</p>`;
+}
+function renderRgItems(){
+  const d = rgData, items = d.items || [];
+  const canAll = d.can_manage, me = (d.me || "").toLowerCase();
+  const src = s => (d.sources || {})[s] || s;
+  $("rgItemsNote").textContent = `${fmt(d.total)} items${d.total > items.length ? `, the first ${fmt(items.length)} shown` : ""} · overdue first, then by severity and value.`;
+  $("rgMore").textContent = "";
+  if (!items.length) { $("rgItems").innerHTML = `<tr><td class="meta">No item matches.</td></tr>`; return; }
+  const head = `<tr><th>Due</th><th>Where</th><th>Exception</th><th>Owner</th><th>Status</th><th class="num">Age</th><th class="num">Value</th></tr>`;
+  $("rgItems").innerHTML = head + items.map(x => {
+    const mine = canAll || (me && (x.owner || "").toLowerCase().split(", ").includes(me));
+    const st = `<span class="rg-st ${RG_CLS[x.status] || ""}">${esc(x.status)}</span>${x.reopened ? ` <span class="rg-st s-open" title="Found again after it was closed">reopened ${x.reopened}×</span>` : ""}`;
+    const due = x.overdue ? `<span class="rg-st s-overdue">${esc(x.due)}</span>` : `<span class="meta">${esc(x.due || "")}</span>`;
+    const row = `<tr class="rg-row${rgOpen === x.id ? " rg-open" : ""}" data-id="${esc(x.id)}"><td>${due}</td><td>${esc(x.company)}<div class="meta">${esc(x.location || "company")}</div></td>
+      <td><span class="rg-sev ${esc(x.severity)}" title="${esc(x.severity)}"></span><b>${esc(x.title)}</b><div class="meta">${esc(src(x.source))} · ${esc(x.subject)}</div></td>
+      <td class="meta">${esc(x.owner || "nobody: set the role in Email recipients")}${x.owner_set ? " · handed over" : ""}</td><td>${st}</td>
+      <td class="num">${fmt(x.age)} d</td><td class="num">${rgM(x.value)}</td></tr>`;
+    if (rgOpen !== x.id) return row;
+    const act = (s, l, cls) => `<button class="mini ${cls || ""}" data-act="${esc(s)}" ${mine ? "" : "disabled"}>${l}</button>`;
+    const active = ["Open", "In progress", "Awaiting verification"].includes(x.status);
+    const btns = active
+      ? (x.status !== "In progress" ? act("In progress", "In progress", "dark") : "") + (x.status !== "Awaiting verification" ? act("Awaiting verification", "Fixed – verify") : "") + act("Dismissed", "Dismiss") + act("", "Comment")
+      : act("Open", "Reopen") + act("", "Comment");
+    const hist = (x.history || []).slice().reverse().map(h => `<li><b>${esc(rgWhen(h.ts))}</b> · ${esc(h.by)} → ${esc(h.to)}${h.note ? `: ${esc(h.note)}` : ""}</li>`).join("");
+    return row + `<tr class="rg-det"><td colspan="7"><div class="rg-panel"><div>
+        <div class="hint" style="margin:0 0 8px">${esc(x.detail)}</div>
+        <div class="meta">First seen ${esc(rgWhen(x.first_seen))} · last seen ${esc(rgWhen(x.last_seen))}${x.closed_at ? ` · ${x.status === "Dismissed" ? "dismissed" : "closed"} ${esc(rgWhen(x.closed_at))} by ${esc(x.closed_by || "")}` : ""}</div>
+        <textarea id="rgComment" placeholder="${mine ? "What was done, or why it is dismissed" : "Only its owner or a role with actions can change this item"}" ${mine ? "" : "disabled"}></textarea>
+        <div class="rg-btns">${btns}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input id="rgNewOwner" placeholder="hand over to name@rhg.al" value="${x.owner_set ? esc(x.owner) : ""}" ${mine ? "" : "disabled"} style="flex:1 1 220px">
+          <button class="mini" data-act="owner" ${mine ? "" : "disabled"}>Hand over</button></div>
+        <p class="meta" id="rgItemMsg"></p></div>
+      <div><div class="meta" style="font-weight:600;margin-bottom:4px">History</div><ul class="rg-hist">${hist}</ul></div></div></td></tr>`;
+  }).join("");
+  $("rgItems").querySelectorAll("tr.rg-row").forEach(tr => tr.onclick = () => { rgOpen = rgOpen === tr.dataset.id ? "" : tr.dataset.id; renderRgItems(); });
+  $("rgItems").querySelectorAll("[data-act]").forEach(b => b.onclick = ev => { ev.stopPropagation(); rgAct(b.dataset.act); });
+}
+async function rgAct(a){
+  const body = {id: rgOpen, comment: ($("rgComment") || {}).value || ""};
+  if (a === "owner") { body.owner = $("rgNewOwner").value.trim(); delete body.comment; }
+  else if (a) body.status = a;
+  else if (!body.comment.trim()) { $("rgItemMsg").textContent = "Write the comment first."; return; }
+  if (a === "Dismissed" && !body.comment.trim()) { $("rgItemMsg").textContent = "Say why it is dismissed."; return; }
+  $("rgItemMsg").textContent = "Saving…";
+  try{ await simphonyPost("/api/register/update", body); await loadRegister(); }
+  catch(e){ $("rgItemMsg").textContent = "Could not save: " + e.message; }
+}
+function renderRgSettings(){
+  const d = rgData, s = d.settings || {}, m = d.mail || {};
+  if (!rgSetLoaded) {
+    rgSetLoaded = true;
+    $("rgTime").value = s.time || "08:15"; $("rgEsc").value = s.escalate_days ?? 3; $("rgRoles").value = s.escalate_roles || "";
+    $("rgCtl").checked = !!s.controls; $("rgOn").checked = !!s.enabled;
+    if (!$("rgTestTo").value) $("rgTestTo").value = d.me || "";
+  }
+  rgFill("rgTestOwner", (d.owners || []).filter(o => o.open && o.owner !== "(nobody)").map(o => o.owner), "the first owner");
+  $("rgPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : s.controls ? "info" : "info");
+  $("rgPill").textContent = s.enabled ? (m.configured ? `Email on · ${s.time}` : "On · mail server not ready") : s.controls ? `Controls daily · ${s.time} · no email` : "Off";
+  const r = d.recent || [];
+  $("rgRuns").innerHTML = r.length ? `<tr><th>When</th><th>Control</th><th>Company</th><th class="num">Found</th><th class="num">Opened</th><th class="num">Closed</th><th class="num">Reopened</th></tr>` +
+    r.slice(0, 12).map(x => `<tr><td class="meta">${esc(rgWhen(x.at))}</td><td>${esc((d.sources || {})[x.source] || x.source)}</td><td>${esc(x.company)}</td>
+      <td class="num">${fmt(x.found)}</td><td class="num">${fmt(x.opened)}</td><td class="num">${fmt(x.closed)}</td><td class="num">${fmt(x.reopened)}</td></tr>`).join("") : "";
+}
+$("rgRead").onclick = () => loadRegister();
+["rgOwner", "rgSource", "rgCompany", "rgLoc"].forEach(id => $(id).onchange = () => loadRegister());
+$("rgMine").onchange = () => { if ($("rgMine").checked) $("rgOwner").value = ""; loadRegister(); };
+let rgQT = null; $("rgQ").oninput = () => { clearTimeout(rgQT); rgQT = setTimeout(loadRegister, 350); };
+$("rgRun").onclick = async () => {
+  $("rgStatus").textContent = "Starting the controls…";
+  try{ await simphonyPost("/api/register/run", {}); setTimeout(loadRegister, 1500); }
+  catch(e){ $("rgStatus").textContent = "Could not start: " + e.message; }
+};
+$("rgSave").onclick = async () => {
+  $("rgMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/register/settings", {time: $("rgTime").value, escalate_days: $("rgEsc").value,
+      escalate_roles: $("rgRoles").value, controls: $("rgCtl").checked, enabled: $("rgOn").checked});
+    rgData.settings = st.settings; rgSetLoaded = false; renderRgSettings();
+    $("rgMsg").textContent = st.settings.enabled ? "Saved. Every owner gets their open items every day." : "Saved.";
+  }catch(e){ $("rgMsg").textContent = "Could not save: " + e.message; }
+};
+$("rgTest").onclick = async () => {
+  const to = $("rgTestTo").value.trim(); if (!to) { $("rgMsg").textContent = "Enter an address for the test."; return; }
+  $("rgMsg").textContent = "Sending…";
+  try{ const j = await simphonyPost("/api/register/test", {to, owner: $("rgTestOwner").value});
+    const x = (j.sent || [])[0] || {};
+    $("rgMsg").textContent = x.status === "sent" ? `Sent to ${to}: the email of ${x.owner} (${x.items} open, ${x.overdue} overdue).` : "Failed: " + (x.detail || ""); }
+  catch(e){ $("rgMsg").textContent = "Could not send: " + e.message; }
+};
 // ---------------------------------------------------------------- received vs discharged
 let dcData = null, dcTimer = null, dcSt = "flagged", dcWantLoc = "";
 const DC_ORDER = ["not_received", "not_used", "over", "under", "from_stock", "ok"];
@@ -3905,6 +4132,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
+  if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="settings") liSettings();
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);

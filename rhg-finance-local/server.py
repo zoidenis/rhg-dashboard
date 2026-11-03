@@ -39,6 +39,7 @@ import recipients
 import requests
 import cost_report
 import negstock
+import exreg
 import assets
 import auth
 import brief
@@ -81,6 +82,8 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
+                     "/api/register/settings": "settings", "/api/register/run": "settings",
+                     "/api/register/test": "settings",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -1178,6 +1181,69 @@ def cost_report_status():
 negrep = negstock.Reporter(client, company_currency, config.BC_COMPANY)
 
 
+# ---------------------------------------------------------------- the exceptions register (exreg.py)
+def register_after_negative(company, r, mv, m, excluded):
+    """After every complete negative stock build of a company: its lines into the register, and Received vs
+    discharged over 30 days from the same movement data (the same SHITJE adjustments left out)."""
+    out = {"negative_stock": exreg.sync("negative_stock", company, exreg.from_negative(r))}
+    try:
+        du = recipeuse.analyse(company, mv, m, store.get_settings(), 30, excluded)
+        out["discharge"] = exreg.sync("discharge", company, exreg.from_discharge(du))
+    except Exception as exc:                                        # noqa: BLE001
+        traceback.print_exc()
+        out["discharge"] = {"error": str(exc)[:200]}
+    return out
+
+
+negrep.on_built = register_after_negative
+
+
+def register_controls(actor="scheduler", force=False):
+    """The daily control run: every company of the negative stock email, read once a day (the 07:30 email has
+    usually read it already)."""
+    out = []
+    for c in negrep.companies():
+        if not force and exreg.synced_today("negative_stock", c):
+            out.append({"company": c, "status": "already read today"})
+            continue
+        try:
+            r = negrep.build(c)
+            if r.get("register"):
+                out.append({"company": c, "status": "synced", **r["register"]})
+            else:
+                out.append({"company": c, "status": "not synced",
+                            "detail": "Business Central did not answer in full: " + "; ".join(r.get("errors") or [])[:300]})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "status": "failed", "detail": str(exc)[:300]})
+    store.audit("controls", "exceptions register", actor, {}, {"companies": len(out)}, "")
+    return out
+
+
+def register_allow(user):
+    """What a person limited to some companies or locations may see of the register; None = everything."""
+    if not access.limited(user):
+        return None
+    cache = {}
+
+    def ok(company, location):
+        if not access.company_ok(user, company):
+            return False
+        if company not in cache:
+            L = access.locations(user, company)
+            cache[company] = None if L is None else scope_expand(company, L)
+        return cache[company] is None or (location or "").upper() in cache[company]
+    return ok
+
+
+def register_status(user):
+    me = (user.get("email") or "").strip().lower()
+    return {"settings": exreg.settings(), "job": exreg.job(), "recent": exreg.recent_runs(),
+            "mail": arap_notify.mail_status(), "me": me,
+            "can_manage": auth.can(user, "actions") or auth.can(user, "settings"),
+            "can_settings": auth.can(user, "settings")}
+
+
 def negative_report_status():
     return {"settings": negrep.settings(), "companies": negrep.companies(), "recipients": negrep.recipients(),
             "next_run": negrep.next_run(), "runs": negstock.recent_runs(), "mail": arap_notify.mail_status(),
@@ -1261,7 +1327,9 @@ EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/ch
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/simphony/status", "/api/users",
-               "/api/cache"}
+               "/api/cache",
+               # the exceptions register cuts every answer to the person's scope itself (register_allow)
+               "/api/register", "/api/register/update"}
 # The location screens: answered to a person limited to some locations, cut to them. Everything else shows the
 # whole company and is refused to them.
 ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/kartela/locations",
@@ -1687,6 +1755,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(pdf)
             elif url.path == "/api/cost-report":
                 self._send(200, cost_report_status())
+            elif url.path == "/api/register":
+                if not auth.can(user, "finance.s.register"):
+                    self._send(403, {"error": "Your role does not include the Exceptions register."})
+                    return
+                owner = q.get("owner") or ""
+                if q.get("mine") == "1":
+                    owner = (user.get("email") or "").strip() or "(nobody has this address)"
+                d = exreg.query(q.get("status") or "active", owner, q.get("source") or "", q.get("company") or "",
+                                q.get("location") or "", q.get("q") or "", register_allow(user))
+                self._send(200, dict(d, **register_status(user)))
             elif url.path == "/api/negative-report":
                 self._send(200, negative_report_status())
             elif url.path in ("/api/negative-report/job", "/api/negative-report/preview"):
@@ -2139,6 +2217,48 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or costrep.companies()[0]
                 self._send(202, costrep.start_job(company, actor, only or None))
+            elif url.path == "/api/register/update":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if not auth.can(user, "finance.s.register"):
+                    self._send(403, {"error": "Your role does not include the Exceptions register."})
+                    return
+                allow = register_allow(user)
+                item = exreg.get(str(body.get("id") or ""))
+                found = [item] if item and (allow is None or allow(item["company"], item["location"])) else []
+                if not found:
+                    self._send(404, {"error": "This exception is not in the register, or not in your scope."})
+                    return
+                me = (user.get("email") or "").strip().lower()
+                mine = bool(me) and me in [o.lower() for o in (found[0]["owner"] or "").split(", ")]
+                if not mine and not (auth.can(user, "actions") or auth.can(user, "settings")):
+                    self._send(403, {"error": "Only its owner, or a role with actions, can change this item."})
+                    return
+                patch = {k: body[k] for k in ("status", "comment", "owner") if k in body}
+                try:
+                    self._send(200, {"item": exreg.update(body.get("id"), patch, actor)})
+                except (KeyError, ValueError) as exc:
+                    self._send(400, {"error": str(exc).strip("'\"")})
+            elif url.path in ("/api/register/settings", "/api/register/run", "/api/register/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    store.save_settings({"exception_register": body}, actor)
+                    self._send(200, register_status(user))
+                elif url.path.endswith("/run"):
+                    self._send(202, {"job": exreg.start_job(actor)})
+                else:
+                    to, bad = arap_notify.parse_emails(body.get("to") or user.get("email") or "")
+                    if bad or not to:
+                        self._send(400, {"error": "Give the address to send the test to."
+                                         if not bad else "Not an email address: " + ", ".join(bad)})
+                        return
+                    try:
+                        self._send(200, {"sent": exreg.send_digests(to, body.get("owner") or None, actor)})
+                    except ValueError as exc:
+                        self._send(400, {"error": str(exc)})
             elif url.path in ("/api/negative-report/settings", "/api/negative-report/job"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -2383,6 +2503,7 @@ def main():
     arap.start()
     costrep.start()
     negrep.start()
+    exreg.start(register_controls)
     brandrep.start()
     salesrep.start()
     plmemo.start()

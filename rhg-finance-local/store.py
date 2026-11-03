@@ -123,6 +123,11 @@ DEFAULT_SETTINGS = {
                         # positive adjustments left out of the calculation: "DOCUMENT PREFIX: from..to", several with ";"
                         # (the SHITJE adjustments of October 2026 put back sales that had taken the stock below zero)
                         "exclude_adjustments": "SHITJE: 2026-10-01..2026-10-31"},
+    # the exceptions register (exreg.py): the controls run every day at time (negative stock and received vs
+    # discharged, synced into the register); enabled: the daily email to every owner of open items; items overdue
+    # more than escalate_days put the escalate_roles of Email recipients in Cc
+    "exception_register": {"controls": True, "enabled": False, "time": "08:15", "escalate_days": "3",
+                           "escalate_roles": "coo, cfo"},
     # weekly and monthly performance email of every brand (sales and costs against budget and last
     # year): one email per brand to its own addresses ("BRAND: emails" lines), finance and operations in Cc;
     # monthly goes twice: provisional on the first working day, final on final_day
@@ -195,6 +200,7 @@ def get_settings():
     merged["arap_notify"].update(s.get("arap_notify", {}))
     merged["cost_report"].update(s.get("cost_report", {}))
     merged["negative_report"].update(s.get("negative_report", {}))
+    merged["exception_register"].update(s.get("exception_register", {}))
     merged["brand_report"].update(s.get("brand_report", {}))
     merged["sales_report"].update(s.get("sales_report", {}))
     merged["pl_memo"].update(s.get("pl_memo", {}))
@@ -264,6 +270,20 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("negative_report", {})[k] = v
+        for k, v in (patch.get("exception_register") or {}).items():
+            if k in DEFAULT_SETTINGS["exception_register"]:
+                if isinstance(DEFAULT_SETTINGS["exception_register"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "08:15"
+                elif k == "escalate_days":
+                    try:
+                        v = str(max(0, min(60, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "3"
+                else:
+                    v = ", ".join(r for r in re.split(r"[,;\s]+", str(v)[:200]) if r)
+                current.setdefault("exception_register", {})[k] = v
         for k, v in (patch.get("brand_report") or {}).items():
             if k in DEFAULT_SETTINGS["brand_report"]:
                 if isinstance(DEFAULT_SETTINGS["brand_report"][k], bool):

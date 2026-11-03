@@ -621,6 +621,7 @@ class Reporter:
     def __init__(self, client, currency_of, default_company):
         self.client, self.currency_of, self.default_company = client, currency_of, default_company
         self._jobs, self._jobs_lock = {}, threading.Lock()
+        self.on_built = None          # (company, report, movement, recipes master, excluded) → the exceptions register
 
     @staticmethod
     def settings():
@@ -656,6 +657,11 @@ class Reporter:
         r = analyse(company, mv, m, docs, a, prev, excluded=excluded, rules=rules)
         r.update(currency=self.currency_of(company), errors=errors, label=company, key=company, location="",
                  previous=prev, built_at=datetime.now().isoformat(timespec="seconds"))
+        if self.on_built and not errors:
+            try:
+                r["register"] = self.on_built(company, r, mv, m, excluded)
+            except Exception:                                      # noqa: BLE001
+                traceback.print_exc()
         return r
 
     @staticmethod

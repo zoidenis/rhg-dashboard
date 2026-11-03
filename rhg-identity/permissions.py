@@ -174,7 +174,7 @@ DEFAULT_ROLES = {
                            "description": "Purchasing screens and actions, savings and contracts; no thresholds.",
                            "permissions": _s("purchasing.s", but=("purchasing.s.settings",))
                                           + _s("finance.s.inventory.sku", "finance.s.inventory.loc")
-                                          + ["purchasing.export", "purchasing.actions.manage"]},
+                                          + ["finance.s.register", "purchasing.export", "purchasing.actions.manage"]},
     "Purchasing coordinator": {"department": "Purchasing", "system": False,
                                "description": "Requisitions, orders, invoices without PO, exceptions.",
                                "permissions": _s("purchasing.s.overview", "purchasing.s.reqs",
@@ -189,13 +189,14 @@ DEFAULT_ROLES = {
     "Cost controller": {"department": "Purchasing", "system": False,
                         "description": "Prices, savings, inventory, recipes, movement and SKU planning.",
                         "permissions": _s("purchasing.s.compare", "purchasing.s.overview", "purchasing.s.exceptions")
-                                       + _s("finance.s.inventory") + ["finance.s.budget.budget",
+                                       + _s("finance.s.inventory") + ["finance.s.budget.budget", "finance.s.register",
                                                                        "platform.s.executive.food"]
                                        + ["finance.export", "purchasing.export"]},
     "Stock manager": {"department": "Purchasing", "system": False,
                       "description": "Inventory, movement, SKU planning, requisitions and orders at the locations.",
                       "permissions": _s("finance.s.inventory", but=("finance.s.inventory.stockwc",))
-                                     + _s("purchasing.s.reqs.reqs", "purchasing.s.reqs.po") + ["finance.export"]},
+                                     + _s("purchasing.s.reqs.reqs", "purchasing.s.reqs.po")
+                                     + ["finance.s.register", "finance.export"]},
     "Inputer": {"department": "Purchasing", "system": False,
                 "description": "Invoice entry in BC: invoices, invoices without PO, posting follow-up, fiscal "
                                "purchases.",
@@ -232,11 +233,13 @@ DEFAULT_ROLES = {
                "description": "Read only, both towers, including exports.",
                "permissions": _FIN_ALL + _PUR_ALL + ["finance.export", "purchasing.export"]},
 }
-# Screens added after the roles were stored: {new screen: the screen whose holders get it once}.
+# Screens added after the roles were stored: {new screen: the screen (or screens) whose holders get it once}.
 ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sales.prices": "finance.s.sales.main",
                  "finance.s.inventory.discharge": "finance.s.inventory.recipes",
                  "finance.s.sales.menu": "finance.s.sales.prices",
-                 "finance.s.sales.chanprofit": "finance.s.sales.main"}
+                 "finance.s.sales.chanprofit": "finance.s.sales.main",
+                 # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing
+                 "finance.s.register": ("finance.s.actions", "finance.s.inventory.recipes", "purchasing.s.compare")}
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 
