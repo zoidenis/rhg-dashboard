@@ -1042,6 +1042,29 @@ td.num,th.num{text-align:right}
       <p class="hint" id="crInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="crRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="ngCard">
+      <div class="card-head"><div><h2>Negative stock daily email</h2>
+        <p class="hint">Every day, every item below zero at every location at the end of the day before, each line with its likely cause and owner: receipt not posted (Stock manager), recipe wrong (Cost control), sold without purchase (Purchasing). An open purchase order or a transfer shipped and not received is shown as the evidence; otherwise the cause is read from the item ledger since the line went below zero. New lines first, with how many days each has been below zero. One email per company to the three owners (Email recipients by company → Negative stock · daily), one per location to the location's own people; every line in an Excel file. Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="ngPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">To (when Email recipients has nobody)<input id="ngTo" placeholder="stock@rhg.al, cost@rhg.al"></label>
+        <label class="field">Cc (optional)<input id="ngCc" placeholder="name@rhg.al"></label>
+        <label class="field">Days<select id="ngDays"><option value="daily">Every day</option><option value="mon_sat">Monday to Saturday</option><option value="weekdays">Monday to Friday</option></select></label>
+        <label class="field">Time<input id="ngTime" type="time" value="07:30"></label>
+        <label class="field">Companies (blank = default)<input id="ngCo" placeholder="SALT"></label>
+        <label class="field">Lines per owner in the email (0 = all)<input id="ngLines" type="number" min="0" max="1000" value="50"></label>
+        <label class="field">Send a test to<input id="ngTestTo" placeholder="you@rhg.al"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="ngOn" style="width:auto"> Send on the days above</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="ngSave">Save</button>
+        <button class="btn" id="ngPreview">Preview</button>
+        <button class="btn" id="ngTest">Send a test</button>
+        <span class="meta" id="ngMsg"></span>
+      </div>
+      <p class="hint" id="ngInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="ngRuns"></table></div>
+    </div>
     <div class="card" style="margin-bottom:15px" id="brCard">
       <div class="card-head"><div><h2>Brand performance email</h2>
         <p class="hint">One email per brand, to the brand's own addresses with finance and operations in Cc. <b>Weekly</b>, for the week before: sales of every location (Simphony, excluding VAT) against the budget, the week before and the same weekdays last year; guests, checks and the average check; sales by day; the month to date with the costs posted so far. <b>Monthly</b>, for the month before, twice: <i>provisional</i> on the first working day and <i>final</i> on the day set below, once payroll and stock usage are posted: the P&amp;L of the brand (sales, food &amp; beverage, labour, prime cost, other costs, EBITDA) against budget and last year, the month and the year to date, every location. Brands and locations come from the registry in Location intelligence. Sent through the Purchasing mail server.</p></div>
@@ -1282,6 +1305,7 @@ function render(){
   if(!spLoaded) loadSimphony();
   if(!arLoaded) loadArap();
   if(!crLoaded) loadCostReport();
+  if(!ngLoaded) loadNegReport();
   if(!brLoaded) loadBrandReport();
   if(!srLoaded) loadSalesReport();
   if(!pmLoaded) loadPlMemo();
@@ -3946,6 +3970,60 @@ async function pollCostReport(){
 }
 $("crPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the cost control report…</p>"); startCostReport("", w); };
 $("crTest").onclick = () => { const to = $("crTestTo").value.trim(); if (!to) { $("crMsg").textContent = "Enter an address for the test."; return; } startCostReport(to, null); };
+// ---------- negative stock daily email ----------
+let ngLoaded = false, ngJob = null, ngTimer = null;
+async function loadNegReport(){
+  ngLoaded = true;
+  try{ renderNegReport(await readJSON(await fetch("/api/negative-report"))); }catch(e){ $("ngMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function renderNegReport(st){
+  const s = st.settings || {}, m = st.mail || {};
+  const dayText = {daily: "Every day", mon_sat: "Monday to Saturday", weekdays: "Monday to Friday"};
+  $("ngTo").value = s.to || ""; $("ngCc").value = s.cc || ""; $("ngDays").value = s.days || "daily"; $("ngTime").value = s.time || "07:30";
+  $("ngCo").value = s.companies || ""; $("ngLines").value = s.email_lines ?? "50"; $("ngOn").checked = !!s.enabled;
+  if (!$("ngTestTo").value) $("ngTestTo").value = (s.to || "").split(",")[0].trim();
+  $("ngPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : "info");
+  $("ngPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : `On · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}`;
+  const r = st.recipients || {};
+  $("ngInfo").textContent = `${dayText[s.days || "daily"]} at ${s.time || "07:30"}, the stock at the end of the day before (today: ${st.as_of}). Companies: ${(st.companies || []).join(", ")}. `
+    + "The people come from Email recipients by company (Negative stock · daily); " + ((r.to || []).length ? `when nobody is set there: ${r.to.join(", ")}${(r.cc || []).length ? " · Cc: " + r.cc.join(", ") : ""}.` : "no address here for when nobody is set there.")
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [];
+  $("ngRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Company</th><th>Stock at</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 10).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.company)}</td><td class="meta">${esc(x.as_of || "")}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc((x.to || []).join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["ngSave", "ngTest", "ngPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "ngSave" && !!ngJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("ngSave").onclick = async () => {
+  $("ngMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/negative-report/settings", {to: $("ngTo").value, cc: $("ngCc").value, days: $("ngDays").value,
+      time: $("ngTime").value, companies: $("ngCo").value, email_lines: $("ngLines").value, enabled: $("ngOn").checked});
+    renderNegReport(st); $("ngMsg").textContent = st.settings.enabled ? "Saved. The report goes out on the days set." : "Saved. Tick Send on the days above to switch it on.";
+  }catch(e){ $("ngMsg").textContent = "Could not save: " + e.message; }
+};
+async function startNegReport(to, win){
+  $("ngMsg").textContent = "Reading stock, movements, open purchase orders and transfers from Business Central… several minutes the first time.";
+  try{
+    const job = await simphonyPost("/api/negative-report/job", {company: ($("ngCo").value.split(",")[0] || "").trim() || $("company").value, to});
+    ngJob = job; ["ngTest", "ngPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/negative-report/preview?id=" + encodeURIComponent(job.id);
+    pollNegReport();
+  }catch(e){ $("ngMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollNegReport(){
+  clearTimeout(ngTimer);
+  if (!ngJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/negative-report/job?id=" + encodeURIComponent(ngJob.id)));
+    if (j.status === "running") { ngTimer = setTimeout(pollNegReport, 5000); return; }
+    $("ngMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("ngMsg").textContent = "Lost track of the report: " + e.message; }
+  ngJob = null; loadNegReport();
+}
+$("ngPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the negative stock report…</p>"); startNegReport("", w); };
+$("ngTest").onclick = () => { const to = $("ngTestTo").value.trim(); if (!to) { $("ngMsg").textContent = "Enter an address for the test."; return; } startNegReport(to, null); };
 // ---------- brand performance email (weekly and monthly, one email per brand) ----------
 let brLoaded = false, brJob = null, brTimer = null, brBrands = [];
 async function loadBrandReport(){

@@ -77,4 +77,7 @@ E_PINV = get("E_PINV", "PostedPurchaseInvoices")
 E_VALUE = get("E_VALUE", "ValueEntries")
 E_VENDOR_CARD = get("E_VENDOR_CARD", "VendorCard")
 E_PO = get("E_PO", "PurchaseOrder")
+E_PO_LINES = get("E_PO_LINES", "PurchaseOrderPurchLines")   # the lines part of page 50, read with $expand
+E_TRANSFER_HEADERS = get("E_TRANSFER_HEADERS", "navtransferheaders")   # open transfer orders
+E_TRANSFER_LINES = get("E_TRANSFER_LINES", "navtransferlines")
 E_SKU = get("E_SKU", "StockkeepingUnitCard")      # SKU cards: planning parameters per item and location

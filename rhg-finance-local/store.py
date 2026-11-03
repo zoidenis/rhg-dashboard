@@ -106,6 +106,11 @@ DEFAULT_SETTINGS = {
     # weekly cost control email (inventory exceptions and an action list) for the week before:
     # the day (0 = Monday) and time it goes out, recipients and companies
     "cost_report": {"enabled": False, "to": "", "cc": "", "day": "0", "time": "08:30", "companies": ""},
+    # daily negative stock email: every item below zero at the end of yesterday, with its likely cause and owner
+    # (stock manager, cost control, purchasing); days: daily, mon_sat or weekdays; email_lines: lines per owner
+    # in the email body (0 = all, every line is in the Excel file)
+    "negative_report": {"enabled": False, "to": "", "cc": "", "time": "07:30", "days": "daily", "companies": "",
+                        "email_lines": "50"},
     # weekly and monthly performance email of every brand (sales and costs against budget and last
     # year): one email per brand to its own addresses ("BRAND: emails" lines), finance and operations in Cc;
     # monthly goes twice: provisional on the first working day, final on final_day
@@ -177,6 +182,7 @@ def get_settings():
     merged["executive"].update(s.get("executive", {}))
     merged["arap_notify"].update(s.get("arap_notify", {}))
     merged["cost_report"].update(s.get("cost_report", {}))
+    merged["negative_report"].update(s.get("negative_report", {}))
     merged["brand_report"].update(s.get("brand_report", {}))
     merged["sales_report"].update(s.get("sales_report", {}))
     merged["pl_memo"].update(s.get("pl_memo", {}))
@@ -230,6 +236,22 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("cost_report", {})[k] = v
+        for k, v in (patch.get("negative_report") or {}).items():
+            if k in DEFAULT_SETTINGS["negative_report"]:
+                if isinstance(DEFAULT_SETTINGS["negative_report"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "07:30"
+                elif k == "days":
+                    v = str(v) if str(v) in ("daily", "mon_sat", "weekdays") else "daily"
+                elif k == "email_lines":
+                    try:
+                        v = str(max(0, min(1000, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "50"
+                else:
+                    v = str(v)[:400]
+                current.setdefault("negative_report", {})[k] = v
         for k, v in (patch.get("brand_report") or {}).items():
             if k in DEFAULT_SETTINGS["brand_report"]:
                 if isinstance(DEFAULT_SETTINGS["brand_report"][k], bool):

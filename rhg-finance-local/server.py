@@ -35,6 +35,7 @@ import faloc
 import recipients
 import requests
 import cost_report
+import negstock
 import assets
 import auth
 import brief
@@ -76,6 +77,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
+                     "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
                      "/api/pl-memo/settings": "settings", "/api/pl-memo/job": "settings",
@@ -1118,6 +1120,15 @@ def cost_report_status():
             "week": [d.isoformat() for d in cost_report.last_week()]}
 
 
+negrep = negstock.Reporter(client, company_currency, config.BC_COMPANY)
+
+
+def negative_report_status():
+    return {"settings": negrep.settings(), "companies": negrep.companies(), "recipients": negrep.recipients(),
+            "next_run": negrep.next_run(), "runs": negstock.recent_runs(), "mail": arap_notify.mail_status(),
+            "as_of": negrep.as_of().isoformat()}
+
+
 brandrep = brand_report.Reporter(client, _latest, in_parallel_jobs, company_currency)
 
 
@@ -1542,6 +1553,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(pdf)
             elif url.path == "/api/cost-report":
                 self._send(200, cost_report_status())
+            elif url.path == "/api/negative-report":
+                self._send(200, negative_report_status())
+            elif url.path in ("/api/negative-report/job", "/api/negative-report/preview"):
+                job = negrep.job(q.get("id") or "", user["username"])
+                if not job:
+                    self._send(404, {"error": "This report is no longer held; build it again."})
+                elif url.path.endswith("/job"):
+                    self._send(200, {k: v for k, v in job.items() if k != "html"})
+                elif job.get("html"):
+                    self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
+                else:
+                    msg = ("Reading Business Central: stock by location, the item ledger, open purchase orders and "
+                           "transfers… the first read can take several minutes." if job["status"] == "running"
+                           else html.escape(job.get("detail") or ""))
+                    self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
+                                     f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/api/brand-report":
                 self._send(200, brand_report_status())
             elif url.path == "/api/sales-report":
@@ -1940,6 +1967,24 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or costrep.companies()[0]
                 self._send(202, costrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/negative-report/settings", "/api/negative-report/job"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    bad = arap_notify.parse_emails(body.get("to"))[1] + arap_notify.parse_emails(body.get("cc"))[1]
+                    if bad:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                        return
+                    store.save_settings({"negative_report": body}, actor)
+                    self._send(200, negative_report_status())
+                    return
+                only, bad = arap_notify.parse_emails(body.get("to"))
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                company = body.get("company") or negrep.companies()[0]
+                self._send(202, negrep.start_job(company, actor, only or None))
             elif url.path == "/api/recipients":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -2165,6 +2210,7 @@ def main():
     threading.Thread(target=_warm_loop, daemon=True).start()
     arap.start()
     costrep.start()
+    negrep.start()
     brandrep.start()
     salesrep.start()
     plmemo.start()
