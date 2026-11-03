@@ -125,7 +125,9 @@ td.num,th.num{text-align:right}
 .dc-st{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sub);background:var(--bg)}
 .dc-st.not_received,.dc-st.over{color:var(--up);background:var(--up-bg)}.dc-st.not_used,.dc-st.under{color:var(--warn);background:var(--warn-bg)}
 .dc-st.ok{color:var(--down);background:var(--down-bg)}
-#dcLoc td.n{cursor:pointer}#dcLoc td.n:hover{text-decoration:underline}
+.pl-sq.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.dc-c-not_received{background:var(--up)}.dc-c-over{background:var(--up);opacity:.5}.dc-c-not_used{background:var(--warn)}
+.dc-c-under{background:var(--warn);opacity:.5}.dc-c-from_stock{background:var(--prev)}.dc-c-ok{background:var(--down)}
 .dc-pair{font-size:11.5px;color:var(--sub)}
 #dcActs td.w,#dcLines td.w{white-space:normal;min-width:260px;max-width:460px}#dcActs td.it,#dcLines td.it{white-space:normal;min-width:180px}
 .ty-st.count{color:var(--up);background:var(--card);border:1px solid var(--up)}
@@ -783,12 +785,13 @@ td.num,th.num{text-align:right}
       <div class="kpis six" id="dcKpis" style="margin-top:14px"></div>
       <p class="meta" id="dcStatus"></p>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Locations</h2>
+      <p class="hint">Every location as a square: its signals, the codes it receives and discharges, and the first thing to change. Click a square to see only that location; click it again for all.</p></div></div>
+      <div class="il-lg" id="dcLegend" style="margin:0 0 4px"></div>
+      <div id="dcGrid"></div></div>
     <div class="card"><div class="card-head"><div><h2>Recipe interventions</h2>
       <p class="hint">One line per thing to change, the paired codes first (a recipe code with the code the location receives instead), then by value. Value at item unit cost, estimated.</p></div></div>
       <div class="scroll"><table id="dcActs"></table></div><p class="meta" id="dcActsMore"></p></div>
-    <div class="card"><div class="card-head"><div><h2>By location</h2>
-      <p class="hint">Codes received and discharged in the period, and the signals of each location. Click a number for its lines.</p></div></div>
-      <div class="scroll"><table id="dcLoc"></table></div></div>
     <div class="card"><div class="card-head"><div><h2>Lines</h2><p class="hint" id="dcLinesNote"></p></div></div>
       <div class="sk-chips" id="dcChips"></div>
       <div class="filters" style="margin:0 0 10px"><label>Item<input id="dcQ" placeholder="number or name"></label></div>
@@ -2840,13 +2843,15 @@ function renderDischarge(){
       <td class="w">${esc(a.action)}</td><td class="meta">${esc(a.recipes.slice(0, 3).join(", "))}${a.recipes.length > 3 ? " …" : ""}</td><td class="num">${a.value ? dcM(Math.abs(a.value)) : ""}</td></tr>`).join("")
     : `<tr><td class="meta">Nothing to change in the recipes${loc ? " at " + esc(loc) : ""} for this period.</td></tr>`;
   $("dcActsMore").textContent = acts.length > 60 ? `${fmt(acts.length - 60)} more in the Excel file.` : "";
-  // by location
-  const locs = d.locations.filter(x => !loc || x.location === loc);
-  $("dcLoc").innerHTML = `<tr><th>Location</th><th class="num">Codes in</th><th class="num">Codes discharged</th>` + DC_ORDER.map(k => `<th class="num">${esc(d.statuses[k])}</th>`).join("") + `<th class="num">Value flagged</th></tr>` +
-    locs.map(x => `<tr><td>${esc(x.location)}</td><td class="num">${fmt(x.codes_in)}</td><td class="num">${fmt(x.codes_out)}</td>` +
-      DC_ORDER.map(k => `<td class="num ${x[k] ? "n" : ""}" data-l="${esc(x.location)}" data-s="${k}">${x[k] ? fmt(x[k]) : ""}</td>`).join("") +
-      `<td class="num">${dcM(x.value)}</td></tr>`).join("");
-  $("dcLoc").querySelectorAll("td.n").forEach(td => td.onclick = () => { $("dcLocSel").value = td.dataset.l; dcSt = td.dataset.s; renderDischarge(); $("dcLines").scrollIntoView({behavior: "smooth", block: "start"}); });
+  // locations, as squares
+  $("dcLegend").innerHTML = DC_ORDER.map(k => `<span><i class="dc-c-${k}"></i>${esc(d.statuses[k])}</span>`).join("");
+  $("dcGrid").innerHTML = d.locations.length ? dcGroups(d.locations).map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${fmt(g.c.reduce((a, x) => a + dcFlag(x), 0))} signals</span></div>
+      <div class="pl-grid">${g.c.map(x => dcSquare(x, x.location === loc)).join("")}</div>`).join("")
+    : `<p class="hint">No location received or discharged a code in scope in the period.</p>`;
+  $("dcGrid").querySelectorAll("[data-dcloc]").forEach(el => {
+    const go = () => { $("dcLocSel").value = $("dcLocSel").value === el.dataset.dcloc ? "" : el.dataset.dcloc; dcSt = "flagged"; renderDischarge(); };
+    el.onclick = go; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  });
   renderDcLines();
   // company view
   const C = d.company_view.filter(c => DC_ORDER.indexOf(c.status) < 4);
@@ -2856,6 +2861,40 @@ function renderDischarge(){
       <td class="num">${c.locations_in} / ${c.locations_out}</td><td class="num">${c.value ? dcM(Math.abs(c.value)) : ""}</td></tr>`).join("")
     : `<tr><td class="meta">Company-wide, every code discharged is received and in line.</td></tr>`;
   $("dcDefs").innerHTML = Object.values(d.definitions).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
+}
+const dcFlag = x => x.not_received + x.not_used + x.over + x.under;
+function dcGroups(list){
+  const by = {}, out = [];
+  const sorted = [...list].sort((a, b) => dcFlag(b) - dcFlag(a) || b.value - a.value || a.name.localeCompare(b.name));
+  const rest = sorted.filter(x => x.group === "restaurant"), wh = sorted.filter(x => x.group === "warehouse"), other = sorted.filter(x => x.group === "other");
+  rest.forEach(x => { const k = (x.brand || x.location).toUpperCase(); (by[k] = by[k] || []).push(x); });
+  const multi = Object.keys(by).filter(k => by[k].length > 1).sort((a, b) => by[b].length - by[a].length);
+  const singles = rest.filter(x => !multi.includes((x.brand || x.location).toUpperCase()));
+  if (wh.length) out.push({t: "Warehouses, central and production", c: wh});
+  if (singles.length) out.push({t: "Restaurants", c: singles});
+  multi.forEach(k => out.push({t: k, c: by[k]}));
+  if (other.length) out.push({t: "Other locations", c: other});
+  const sig = g => g.c.reduce((a, x) => a + dcFlag(x), 0);
+  return out.sort((a, b) => (sig(b) > 0) - (sig(a) > 0));      // the groups with signals first, else as listed
+}
+function dcSquare(x, on){
+  const d = dcData, n = dcFlag(x), tot = DC_ORDER.reduce((a, k) => a + (x[k] || 0), 0) || 1;
+  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  const t = x.top, al = !t ? ["good", "No recipe signal"]
+    : t.pair ? ["crit", `Swap ${t.item} ↔ ${t.pair}`]
+    : [t.status === "not_received" ? "crit" : "warn", `${t.item} ${t.desc}: ${d.statuses[t.status].toLowerCase()}`];
+  return `<div class="pl-sq${on ? " on" : ""}" role="button" tabindex="0" data-dcloc="${esc(x.location)}" aria-pressed="${on}" aria-label="${esc(x.name)}: ${n} signals">
+    <div class="hd"><div class="ic">${ilGlyph(x)}</div><div class="nm"><b>${esc(x.name)}</b><span>${esc(x.name !== x.location ? x.location : "")}</span></div></div>
+    <div class="big"><span class="v ${x.not_received ? "up" : n ? "warn" : ""}">${fmt(n)}</span><span class="cmp">${n ? `signals · ${dcM(x.value)} at stake` : "signals: received and discharged in line"}</span></div>
+    <div class="sk-mini" title="${DC_ORDER.filter(k => x[k]).map(k => `${d.statuses[k]} ${x[k]}`).join(" · ")}">${DC_ORDER.filter(k => x[k]).map(k => `<i class="dc-c-${k}" style="flex:${x[k] / tot}"></i>`).join("")}</div>
+    <div class="st">${stat("Codes in", fmt(x.codes_in), "", "Codes received or made here in the period")}
+      ${stat("Codes discharged", fmt(x.codes_out), "", "Codes taken out by recipes or sales")}
+      ${stat("Not received", fmt(x.not_received), x.not_received ? "up" : "", d.statuses.not_received)}
+      ${stat("Not discharged", fmt(x.not_used), x.not_used ? "warn" : "", d.statuses.not_used)}
+      ${stat("Out of line", fmt(x.over + x.under), x.over + x.under ? "warn" : "", `${d.statuses.over} ${x.over} · ${d.statuses.under} ${x.under}`)}
+      ${stat("Swaps", fmt(x.pairs), x.pairs ? "up" : "", "Recipe code paired with the code received instead")}</div>
+    <div class="al ${al[0]}" title="${esc(al[1])}"><i></i><span>${esc(al[1])}</span></div>
+  </div>`;
 }
 function renderDcLines(){
   const d = dcData, L = dcLines(), q = ($("dcQ").value || "").trim().toLowerCase();

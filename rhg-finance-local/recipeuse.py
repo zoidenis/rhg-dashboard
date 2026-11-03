@@ -41,6 +41,7 @@ import time
 import unicodedata
 from datetime import date, timedelta
 
+import locintel
 import movement
 import typology
 
@@ -279,15 +280,30 @@ def analyse(company, mv, m, settings, period=30, excluded=None, location=None):
         company_rows.append(c)
     company_rows.sort(key=lambda c: (rank[c["status"]], -abs(c["value"])))
 
+    try:
+        reg = {(r.get("bc") or "").upper(): r for r in locintel.registry(settings)
+               if (r.get("company") or "").upper() == (company or "").upper() and r.get("bc")}
+    except Exception:                                              # noqa: BLE001
+        reg = {}
     locs = {}
     for x in lines:
-        L = locs.setdefault(x["location"], {"location": x["location"], "codes_in": 0, "codes_out": 0, "value": 0.0,
-                                            **{k: 0 for k in STATUS}})
+        if x["location"] not in locs:
+            g = reg.get(x["location"].upper())
+            locs[x["location"]] = {"location": x["location"], "codes_in": 0, "codes_out": 0, "value": 0.0, "pairs": 0,
+                                   "name": (g or {}).get("name") or x["location"], "brand": (g or {}).get("brand") or "",
+                                   "group": "restaurant" if g else ("warehouse" if x["location"].upper() in dist else "other"),
+                                   "top": None, **{k: 0 for k in STATUS}}
+        L = locs[x["location"]]
         L["codes_in"] += x["received"] + x["made"] > TOL
         L["codes_out"] += x["consumed"] + x["sold"] > TOL
         L[x["status"]] += 1
+        L["pairs"] += bool(x.get("pair"))
         if x["status"] in FLAGGED:
             L["value"] += abs(x["value"])
+    for a in acts:                                         # the first thing to change at each location
+        L = locs.get(a["location"])
+        if L is not None and L["top"] is None:
+            L["top"] = {"status": a["status"], "item": a["item"], "pair": a["pair"], "desc": a["desc"]}
     kpis = {"codes_in": sum(1 for x in lines if x["received"] + x["made"] > TOL),
             "codes_out": sum(1 for x in lines if x["consumed"] + x["sold"] > TOL),
             **{k: [sum(1 for x in lines if x["status"] == k), round(sum(abs(x["value"]) for x in lines if x["status"] == k), 0)]
