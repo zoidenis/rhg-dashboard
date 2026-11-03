@@ -35,6 +35,13 @@ GL_FIELDS = ["Entry_No", "G_L_Account_No", "G_L_Account_Name", "Posting_Date", "
              "Credit_Amount", "Dimension_Set_ID", "Business_Unit_Code"]
 
 
+
+def dimension_filter(dimension):
+    """The department filter of the flow fields: "SALT,LIFT" (several chosen) becomes SALT|LIFT, which BC reads
+    as one or the other. Only letters, digits, spaces and . _ - / are kept in a code."""
+    codes = [re.sub(r"[^A-Za-z0-9 ._/-]", "", c).strip() for c in str(dimension or "").split(",")]
+    return "|".join(dict.fromkeys(c for c in codes if c))
+
 class BCError(Exception):
     pass
 
@@ -187,7 +194,7 @@ class BCClient:
         def go():
             flt = f"Date_Filter eq '{date_from}..{date_to}'"
             if dimension:
-                flt += f" and Global_Dimension_1_Filter eq '{dimension}'"
+                flt += f" and Global_Dimension_1_Filter eq '{dimension_filter(dimension)}'"
             return self._get_all(self._url(company, config.E_ACCOUNTS),
                                  {"$filter": flt, "$select": ",".join(ACCOUNT_FIELDS)})
         return self._cached(("acc", company, date_from, date_to, dimension or ""), max_age, go)

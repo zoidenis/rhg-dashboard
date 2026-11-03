@@ -44,6 +44,27 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);font-weight:600}
 .filters select,.filters input{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:160px}
+/* Department: several at once (a dropdown of checkboxes; the hidden <select multiple> holds the choice) */
+.filters .dimf{position:relative;flex:1 1 150px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:0 14px 0 20px;min-height:38px;font-size:12px;color:var(--ink);white-space:nowrap;min-width:0}
+.filters .dimf:focus-within,.filters .dimf.open{border-color:var(--accent)}
+.dimf-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:6px;border:0;background:transparent;
+  padding:9px 0;font:inherit;font-size:12px;color:var(--ink);cursor:pointer;text-align:left}
+.dimf-btn span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dimf-caret{color:var(--sub);font-size:11px}
+.dimf-list{position:absolute;z-index:70;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(380px,92vw);
+  background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;white-space:normal;
+  box-shadow:0 8px 28px rgba(8,34,45,.18),0 2px 6px rgba(8,34,45,.10)}
+.dimf-list input[type=search]{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin:0 0 6px;
+  background:var(--bg);color:var(--ink);font-size:12.5px;min-width:0}
+.dimf-opts{max-height:280px;overflow:auto}
+.filters .dimf-opt{display:flex;flex:none;align-items:center;justify-content:flex-start;gap:8px;padding:7px 8px;min-height:0;border:0;
+  border-radius:7px;background:transparent;cursor:pointer;font-size:12.5px;font-weight:400;color:var(--ink);white-space:normal}
+.filters .dimf-opt:hover{background:rgba(120,170,190,.16)}
+.filters .dimf-opt input{flex:none;width:15px;height:15px;min-width:0;margin:0;padding:0;accent-color:var(--accent)}
+.filters .dimf-opt.all{font-weight:600;border-bottom:1px solid var(--line);border-radius:7px 7px 0 0;margin-bottom:2px}
+.dimf-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);margin-top:6px;padding:7px 2px 1px}
+.dimf-foot .meta{font-size:11.5px}
 .banner{background:var(--up-bg);color:var(--up);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-weight:600;display:none}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px;margin-bottom:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:17px}
@@ -376,7 +397,10 @@ td.num,th.num{text-align:right}
     </select></label>
     <label id="anchorLabel">Month starting <input type="date" id="anchor"></label>
     <label id="toLabel" style="display:none">Until <input type="date" id="anchorTo"></label>
-    <label>Department <select id="dimension"><option value="">All departments</option></select></label>
+    <div class="dimf" id="dimPick"><span>Department</span>
+      <button type="button" class="dimf-btn" id="dimBtn" aria-haspopup="listbox" aria-expanded="false"><span id="dimText">All departments</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
+      <div class="dimf-list" id="dimList" hidden></div>
+      <select id="dimension" multiple hidden><option value="">All departments</option></select></div>
     <label>Compare <select id="cmpMode">
       <option value="prior">Period before</option>
       <option value="last_year">Same dates last year</option>
@@ -1257,11 +1281,58 @@ function snap(v){
   if(m==="quarter") return iso(new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1));
   return iso(new Date(d.getFullYear(), d.getMonth(), 1));
 }
+// ---------- Department: one, several or all (the hidden <select multiple id="dimension"> holds the choice)
+const dimValues = () => Array.from($("dimension").selectedOptions).map(o => o.value).filter(Boolean);
+function dimSync(){
+  const v = Array.from($("dimension").selectedOptions).filter(o => o.value);
+  $("dimText").textContent = !v.length ? "All departments" : v.length === 1 ? v[0].text
+    : `${v.length} departments: ${v.map(o => o.value).join(", ")}`;
+  $("dimBtn").title = v.length > 1 ? v.map(o => o.text).join("\n") : "";
+}
+let dimWork = null;
+function dimOpen(){
+  dimWork = new Set(dimValues());
+  const opts = Array.from($("dimension").options).filter(o => o.value);
+  $("dimList").innerHTML = (opts.length > 8 ? `<input type="search" id="dimQ" placeholder="Search departments">` : "")
+    + `<label class="dimf-opt all"><input type="checkbox" data-all="1"> <span>All departments</span></label>`
+    + `<div class="dimf-opts" role="listbox" aria-multiselectable="true">` + opts.map(o => `<label class="dimf-opt" data-t="${esc((o.value + " " + o.text).toLowerCase())}"><input type="checkbox" value="${esc(o.value)}"> <span>${esc(o.text)}</span></label>`).join("") + `</div>`
+    + `<div class="dimf-foot"><span class="meta" id="dimCount"></span><span style="display:flex;gap:6px"><button type="button" class="mini" id="dimClear">All</button><button type="button" class="mini dark" id="dimApply">Apply</button></span></div>`;
+  const paint = () => {
+    $("dimList").querySelectorAll("input[value]").forEach(c => c.checked = dimWork.has(c.value));
+    $("dimList").querySelector("[data-all]").checked = !dimWork.size;
+    $("dimCount").textContent = dimWork.size ? `${dimWork.size} chosen` : "All departments";
+  };
+  $("dimList").onchange = e => {
+    const c = e.target; if (c.type !== "checkbox") return;
+    if (c.dataset.all) dimWork.clear(); else if (c.checked) dimWork.add(c.value); else dimWork.delete(c.value);
+    paint();
+  };
+  if ($("dimQ")) $("dimQ").oninput = () => { const q = $("dimQ").value.trim().toLowerCase();
+    $("dimList").querySelectorAll(".dimf-opts .dimf-opt").forEach(l => l.style.display = !q || l.dataset.t.includes(q) ? "" : "none"); };
+  $("dimClear").onclick = () => { dimWork.clear(); paint(); };
+  $("dimApply").onclick = () => dimClose(true);
+  paint();
+  $("dimList").hidden = false; $("dimPick").classList.add("open"); $("dimBtn").setAttribute("aria-expanded", "true");
+  if ($("dimQ")) $("dimQ").focus();
+}
+function dimClose(apply){
+  if ($("dimList").hidden) return;
+  $("dimList").hidden = true; $("dimPick").classList.remove("open"); $("dimBtn").setAttribute("aria-expanded", "false");
+  const before = dimValues().join(","), after = dimWork ? [...dimWork].sort().join(",") : before;
+  if (apply && dimWork && after !== [...dimValues()].sort().join(",")) {
+    Array.from($("dimension").options).forEach(o => o.selected = !!o.value && dimWork.has(o.value));
+    dimSync(); $("dimension").dispatchEvent(new Event("change"));
+  }
+  dimWork = null;
+}
+$("dimBtn").onclick = e => { e.stopPropagation(); $("dimList").hidden ? dimOpen() : dimClose(true); };
+document.addEventListener("click", e => { if (!$("dimList").hidden && !e.target.closest("#dimPick")) dimClose(true); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("dimList").hidden) dimClose(false); });
 function params(){
   const p = new URLSearchParams();
   if($("company").value) p.set("company",$("company").value);
   if($("anchor").value) p.set("period",periodValue());
-  if($("dimension").value) p.set("dimension",$("dimension").value);
+  if(dimValues().length) p.set("dimension",dimValues().join(","));
   p.set("mode",$("mode").value);
   p.set("compare",$("cmpMode").value);
   return p.toString();
@@ -3448,11 +3519,11 @@ function setHeader(){
       : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";
     return;
   }
-  $("title").textContent = `${v.label} · ${m.company}${m.dimension ? " · " + m.dimension : ""}`;
+  $("title").textContent = `${v.label} · ${m.company}${m.dimension ? " · " + m.dimension.split(",").join(" + ") : ""}`;
   const ss = data.stockSummary;
   $("period").textContent = inv && ss && ss.available
     ? `Stock position · company-wide · Opening ${ss.opening_date} → closing ${ss.as_of}`
-    : `${m.period_label} · against ${m.compare_label}${m.dimension ? " · " + m.dimension : ""} · ${m.currency}`;
+    : `${m.period_label} · against ${m.compare_label}${m.dimension ? " · " + m.dimension.split(",").join(" + ") : ""} · ${m.currency}`;
 }
 function openFromHash(){
   const v = (location.hash || "").slice(1);
@@ -3505,6 +3576,7 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
     $("company").innerHTML = (j.companies||[]).map(c=>`<option ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
     $("dimension").innerHTML = '<option value="">All departments</option>' +
       (j.dimensions||[]).map(([code,name])=>`<option value="${esc(code)}">${esc(code)} — ${esc(name)}</option>`).join("");
+    dimSync();
   }catch(e){ $("company").innerHTML = `<option>SALT</option>`; }
   openFromHash();
   load();
@@ -4099,7 +4171,7 @@ function flDraw(code){
 function flGo(view, code){
   $("flBd").classList.remove("show");
   if (view === "exec") { location.href = "/executive?tab=locations"; return; }
-  if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; load(); }
+  if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; dimSync(); load(); }
   navTo(view);
 }
 document.addEventListener("click", e => {
@@ -5228,7 +5300,7 @@ function blDraw(code){
 }
 function blGo(view, code){
   $("blBd").classList.remove("show");
-  if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; load(); }
+  if (view === "pl" && code && [...$("dimension").options].some(o => o.value === code)) { $("dimension").value = code; dimSync(); load(); }
   navTo(view);
 }
 document.addEventListener("click", e => {
