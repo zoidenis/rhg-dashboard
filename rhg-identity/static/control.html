@@ -133,7 +133,7 @@ async function get(path){
 function shell(){
   const t = $("towers");
   const links = [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],
-                 ["finance.s.inventory.","/finance/#inventory","Inventory"]].filter(([p]) => holds(p));
+                 ["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Sales"]].filter(([p]) => holds(p));
   const ex = t.querySelector('a[href="/executive"]'); if (ex && !holds("platform.s.executive.")) ex.remove();
   t.insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
   if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs

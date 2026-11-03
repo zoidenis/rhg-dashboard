@@ -295,6 +295,7 @@ td.num,th.num{text-align:right}
     <a href="/purchasing/">Purchasing</a>
     <a href="/finance/" class="on" id="towerFinance" aria-current="page">Finance</a>
     <a href="/finance/#inventory" id="towerInventory">Inventory</a>
+    <a href="/finance/#sales" id="towerSales">Sales</a>
   </div>
   <nav id="nav">
     <div class="grp">Overview</div>
@@ -3218,8 +3219,9 @@ function navTo(view){
 function setHeader(){
   const v = currentView();
   const inv = v.id === "inventory", invTower = inv || INV_TABS.has(v.id);
-  $("towerFinance").classList.toggle("on", !invTower); $("towerInventory").classList.toggle("on", invTower);
-  $("towerFinance").toggleAttribute("aria-current", !invTower); $("towerInventory").toggleAttribute("aria-current", invTower);
+  const salesTower = v.id === "sales", finTower = !invTower && !salesTower;
+  $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower);
+  $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower);
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){

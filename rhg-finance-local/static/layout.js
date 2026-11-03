@@ -571,7 +571,8 @@ body.lay-edit main{padding-bottom:190px}
     document.querySelectorAll("aside .towers a[href]").forEach(a => {
       const h = a.getAttribute("href");
       const need = h === "/" ? "platform.s.control" : h.startsWith("/executive") ? "platform.s.executive."
-        : h.startsWith("/finance/#inventory") ? "finance.s.inventory." : h.startsWith("/finance") ? "finance.s."
+        : h.startsWith("/finance/#inventory") ? "finance.s.inventory." : h.startsWith("/finance/#sales") ? "finance.s.sales."
+        : h.startsWith("/finance") ? "finance.s."
         : h.startsWith("/purchasing") ? "purchasing.s." : null;
       if (need) a.classList.toggle("scr-off", !heldUnder(need));
     });

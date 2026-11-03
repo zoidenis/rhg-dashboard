@@ -915,7 +915,7 @@ $("logoutBtn").onclick = async () => {
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   const t = $("towers");
   if (!holds("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
-  [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],["finance.s.inventory.","/finance/#inventory","Inventory"]]
+  [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Sales"]]
     .filter(([p]) => holds(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs
     t.insertAdjacentHTML("beforeend", `<a href="/unicorn" id="uniLink">Unicorn</a>`);
