@@ -165,9 +165,13 @@ ose butoni *Schedule as report* në krye të çdo faqeje (për rolet me `reports
   foto (në trupin e email-it) dhe një PDF të plotë, dhe e dërgon përmes serverit të mail-it të Purchasing.
 - Nuk ka `.env` të ri: `reporter` merr SERVICE_TOKEN nga `deploy/.env`, si kullat. `PUBLIC_URL` (identity, opsionale)
   është adresa e lidhjes "Hape në pulse" (parazgjedhur `https://dashboard.rhg.al`).
-- Deploy-i automatik (GitHub Actions) **nuk** e ndërton dhe nuk e nis `reporter` (profili `reports`): ndërtimi i
-  Chromium-it (~400 MB imazh) e ndërpreu deploy-in #114 pas 5 minutash. Niset me dorë në server, një herë, dhe pas
-  çdo ndryshimi të `rhg-identity/reporter`:
+- Deploy-i automatik (GitHub Actions) e mban `reporter`-in lart vetë. Imazhi (Chromium, ~400 MB) **nuk** ndërtohet
+  në server, sepse atje ndërtimi e ndërpreu deploy-in #114: ndërtohet në runner-in e GitHub-it dhe dërgohet me
+  `docker save | docker load`, vetëm kur ndryshon kodi te `rhg-identity/reporter` (etiketa `rhg.tree` e imazhit mban
+  hash-in e dosjes në git). Në çdo deploy tjetër hapi vetëm kontrollon që kontejneri të jetë `Up`. Hapi vjen pas
+  verifikimit të faqes, kështu që një dështim i tij nuk e lë faqen poshtë.
+
+  Me dorë (p.sh. pa GitHub) mund të ndërtohet edhe në server, me kujdes për memorien:
 
       cd /opt/rhg/deploy
       df -h / && free -m                      # duhen ~2 GB disk të lirë dhe memorie për build-in
@@ -175,7 +179,8 @@ ose butoni *Schedule as report* në krye të çdo faqeje (për rolet me `reports
       docker compose --profile reports up -d reporter
       docker compose logs --tail=20 reporter
 
-  Kontejneri ka `mem_limit: 1200m`.
+  Kontejneri ka `mem_limit: 700m`, nën RAM-in e serverit (1 GB): një faqe shumë e rëndë e ndal Chromium-in brenda
+  kontejnerit dhe raporti del si i dështuar, në vend që kernel-i të vrasë Finance ose Purchasing.
 - Kontroll: `docker compose logs reporter | tail` duhet të tregojë "pulse report sender: ...". Te Settings, shenja
   *Report sender on* tregon që ai është lidhur në 3 minutat e fundit.
 

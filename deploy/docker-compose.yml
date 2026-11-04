@@ -87,8 +87,10 @@ services:
   # sessions from identity) and emails a picture and a PDF through the Purchasing mail server. No ports, no data.
   # Its code lives in rhg-identity/reporter: the deploy copies only the three app folders to the server.
   # It waits for identity and nginx on its own (it asks again every minute until they answer).
-  # Profile "reports": the automatic deploy neither builds nor starts it (building Chromium is heavy for the
-  # server); it is built and started by hand on the server, see README-DEPLOY.md → Raportet e planifikuara.
+  # Profile "reports": the plain "docker compose build/up" on the server leaves it alone, because building Chromium
+  # there is too heavy (1 CPU / 1 GB). The GitHub Actions deploy builds the image on the runner, loads it onto the
+  # server only when rhg-identity/reporter changed, and starts it; see README-DEPLOY.md → Raportet e planifikuara.
+  # mem_limit stays below the server's RAM, so a heavy page kills Chromium here and not one of the towers.
   reporter:
     profiles: ["reports"]
     build:
@@ -102,7 +104,7 @@ services:
       PURCHASING_URL: "http://purchasing:8765"
       SERVICE_TOKEN: "${SERVICE_TOKEN}"
       COOKIE_NAME: "rhg_session"
-    mem_limit: 1200m
+    mem_limit: 700m
     shm_size: 256m
     networks: [rhg]
 
