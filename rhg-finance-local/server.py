@@ -1853,11 +1853,13 @@ def scope_options():
     """Every company of Business Central and its locations (code, and the registry's restaurant when there is one)."""
     reg = locintel.registry()
     out, errors = [], []
-    for company in client.companies():
+    names = client.companies()
+    # every company at once: one after the other, a cold read of a dozen companies outlasts identity's wait
+    read = in_parallel_jobs({c: (lambda c=c: client.locations(c)) for c in names}, workers=8)
+    for company in names:
         locs = []
-        try:
-            codes = client.locations(company)
-        except Exception as exc:                                    # noqa: BLE001
+        codes, exc = read.get(company, (None, None))
+        if exc is not None or codes is None:
             codes = []
             errors.append(f"{company}: {str(exc)[:120]}")
         by_bc = {(r.get("bc") or "").upper(): r for r in reg

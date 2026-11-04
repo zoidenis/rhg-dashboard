@@ -259,14 +259,29 @@ REPORT_MINUTES = 25
 READ_ONLY_KEEP = {"layout.personal", "finance.export", "purchasing.export"}
 
 
-def report_session(username):
+def narrow(scope, company, codes):
+    """The person's access cut to some locations of one company (a report of chosen locations); None when nothing of
+    them is in the access."""
+    comps = scope.get("companies", "*")
+    if comps != "*" and company not in comps:
+        return None
+    have = (scope.get("locations") or {}).get(company, "*")
+    keep = sorted(set(codes) if have == "*" else set(codes) & set(have))
+    return {"companies": [company], "locations": {company: keep}} if keep else None
+
+
+def report_session(username, cut=None):
+    """cut: (company, [location codes]) to see only those locations of that company."""
     row = find(username)
     if not row or not row["active"]:
         return None
+    sc = narrow(scope_of(row), *cut) if cut else None
+    if cut and not sc:
+        return None
     token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-    store.run("""INSERT INTO sessions(token,username,csrf,created,last_seen,ip,user_agent)
-                 VALUES(?,?,?,?,?,?,?)""", (token, row["username"], csrf, time.time(), time.time(), "reporter",
-                                           REPORT_AGENT))
+    store.run("""INSERT INTO sessions(token,username,csrf,created,last_seen,ip,user_agent,scope)
+                 VALUES(?,?,?,?,?,?,?,?)""", (token, row["username"], csrf, time.time(), time.time(), "reporter",
+                                             REPORT_AGENT, json.dumps(sc) if sc else None))
     return token
 
 
@@ -297,6 +312,12 @@ def session(token):
     if report:
         u["permissions"] = [p for p in u["permissions"] if p not in permissions.ACTIONS or p in READ_ONLY_KEEP]
         u["report"] = True
+        try:
+            cut = json.loads(s["scope"]) if s["scope"] else None
+        except (IndexError, KeyError, ValueError):
+            cut = None
+        if cut:
+            u["scope"] = cut
     return u
 
 

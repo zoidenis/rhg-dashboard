@@ -60,9 +60,16 @@
     (D.reports || []).forEach(r => set.add(r.company));
     return [...set].filter(Boolean).sort();
   }
+  // The locations of a company: Business Central's (through Finance); when they cannot be read, the ones the
+  // accounts' access and the saved reports name, so the choice still works
   function locsOf(company) {
     const c = ((LOCS && LOCS.companies) || []).find(x => x.company === company);
-    return c ? c.locations : [];
+    if (c && c.locations.length) return c.locations;
+    const codes = new Set();
+    (D.people || []).forEach(p => { const w = whereIn(p, company); if (Array.isArray(w)) w.forEach(x => codes.add(x)); });
+    (D.reports || []).filter(r => r.company === company).forEach(r => (r.locations || []).forEach(x => codes.add(x)));
+    ((EDIT && EDIT.company === company && EDIT.locations) || []).forEach(x => codes.add(x));
+    return [...codes].sort().map(code => ({code, name: ""}));
   }
   function locName(company, code) {
     const l = locsOf(company).find(x => x.code === code);
@@ -76,13 +83,15 @@
     return l && l !== "*" ? l : "*";
   }
   // The same rules as identity (reports.py): may this person receive this screen of this company, and why not
-  function why(p, s, company) {
+  function why(p, s, company, locs) {
     if (!p.active) return "Account disabled";
     if (!String(p.email || "").trim()) return "No email address on the account";
+    if (!s) return "";
     if (!(p.screens || []).includes(s.key)) return "The role does not open this screen";
     const w = whereIn(p, company);
     if (w === null) return "The account does not cover " + company;
     if (s.kind === "company" && w !== "*") return "This screen shows the whole company; the account covers some locations only";
+    if (s.kind === "location" && (locs || []).length && Array.isArray(w) && !w.some(x => locs.includes(x))) return "Does not work at the report's locations";
     return "";
   }
 
@@ -149,6 +158,8 @@
 .pr-person:last-child{border-bottom:0}
 .pr-person.no{cursor:default;opacity:.6}
 .pr-person small{display:block;color:var(--sub,#5f636b);font-size:11.5px;overflow-wrap:anywhere}
+.pr-locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 12px;border:1px solid var(--line,#e3e1d9);border-radius:10px;padding:8px 10px;max-height:190px;overflow:auto;font-size:13px}
+.pr-loc{display:flex;gap:6px;align-items:flex-start;cursor:pointer;padding:3px 0;min-width:0}.pr-loc span{overflow-wrap:anywhere}
 .pr-grp{padding:6px 10px;font-size:11.5px;font-weight:700;color:var(--sub,#5f636b);background:var(--rhg-sky,#efede6);letter-spacing:.02em}
 .pr-msg{min-height:18px;font-size:12.5px;color:var(--up,#c2412d);margin-top:8px}
 .pr-foot{display:flex;justify-content:flex-end;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
@@ -188,7 +199,7 @@
       ${rows.length ? `<div class="pr-scroll"><table class="pr-tbl"><thead><tr><th>Report</th><th>How often</th><th>Who receives it</th><th>Next</th><th>Last</th><th></th></tr></thead><tbody>
         ${rows.map(r => `<tr data-id="${esc(r.id)}">
           <td><b>${r.name ? esc(r.name) : lab(r.screen, r.label)}</b>${r.missing ? " " + chip("bad", "Screen no longer in pulse") : ""}
-            <div class="pr-sub">${r.name ? lab(r.screen, r.label) + " · " : ""}${esc(r.company)}${r.period !== "screen" ? " · " + span(D.periods[r.period] || r.period) : ""}</div></td>
+            <div class="pr-sub">${r.name ? lab(r.screen, r.label) + " · " : ""}${esc(r.company)}${r.period !== "screen" ? " · " + span(D.periods[r.period] || r.period) : ""}${(r.locations || []).length ? " · " + esc(r.locations.join(", ")) : ""}</div></td>
           <td>${r.enabled ? when(r) : chip("off", "Off")}</td>
           <td>${recips(r)}</td>
           <td>${r.queued ? chip("warn", "Going now") : esc(dt(r.next))}</td>
@@ -272,12 +283,19 @@
       </div>
       <div class="pr-checks"><label><input type="checkbox" id="prPdf"${EDIT.pdf ? " checked" : ""}> Attach the whole screen as PDF</label>
         <label><input type="checkbox" id="prOn"${EDIT.enabled ? " checked" : ""}> On</label></div>
-      <div class="pr-f" style="margin-top:6px">Who receives it</div>
-      <div class="pr-bar"><select id="prLoc" aria-label="Location"></select><input id="prQ" placeholder="Search people" aria-label="Search people">
+      <div class="pr-f" style="margin-top:6px">Locations of the report</div>
+      <p class="pr-hint" id="prLocHint"></p>
+      <div id="prLocBox"><div class="pr-bar"><input id="prLq" placeholder="Search locations" aria-label="Search locations">
+        <button type="button" class="pr-btn" id="prLAll">Tick shown</button><button type="button" class="pr-btn" id="prLNone">All locations</button>
+        <span class="pr-mute" id="prLCount"></span><button type="button" class="pr-link" id="prLRead" style="display:none">Read the locations again</button></div>
+        <div class="pr-locs" id="prLocs"></div></div>
+      <p class="pr-hint" id="prLocNote"></p>
+      <div class="pr-f" style="margin-top:12px">Who receives it</div>
+      <div class="pr-bar"><input id="prQ" placeholder="Search people" aria-label="Search people">
         <button type="button" class="pr-btn" id="prAll">Tick shown</button><button type="button" class="pr-btn" id="prNone">Clear</button>
         <span class="pr-mute" id="prCount"></span></div>
       <div class="pr-people" id="prPeople"></div>
-      <p class="pr-hint" id="prLocNote"></p>
+      <p class="pr-hint" id="prPeopleNote"></p>
       <div class="pr-msg" id="prMsg" role="alert"></div>
       <div class="pr-foot"><button type="button" class="pr-btn" id="prCancel">Cancel</button><button type="button" class="pr-btn dark" id="prSave">Save</button></div>
     </div>`;
@@ -298,18 +316,30 @@
     };
     const per = () => { const s = screenOf(g("prScreen").value); g("prPerL").style.display = s && s.period ? "" : "none"; };
     const locSel = () => {
-      const co = g("prCo").value, ls = locsOf(co);
-      const cur = (EDIT.locations || [])[0] || "";
-      g("prLoc").innerHTML = `<option value="">All locations</option>` + ls.map(l =>
-        `<option value="${esc(l.code)}"${l.code === cur ? " selected" : ""}>${esc(l.name ? l.name + " · " + l.code : l.code)}</option>`).join("");
-      g("prLocNote").textContent = LOCS_ERR ? "The locations could not be read: " + LOCS_ERR : "";
+      const s = screenOf(g("prScreen").value), co = g("prCo").value, ls = locsOf(co), q = g("prLq").value.toLowerCase();
+      const wholeScreen = s && s.kind === "company";
+      g("prLocBox").style.display = wholeScreen ? "none" : "";
+      g("prLocHint").innerHTML = wholeScreen ? span("This screen shows the whole company, so it is not cut to locations.")
+        : EDIT.locations.length ? span("Only these locations are in the report; each person receives those of them their access covers.")
+        : span("All locations: each person receives the locations their access covers.") + " " + span("Tick locations to send only those.");
+      const chosen = new Set(EDIT.locations);
+      const shown = ls.filter(l => !q || (l.code + " " + (l.name || "")).toLowerCase().includes(q));
+      g("prLocs").innerHTML = shown.map(l => `<label class="pr-loc"><input type="checkbox" value="${esc(l.code)}"${chosen.has(l.code) ? " checked" : ""}> <span><b>${esc(l.code)}</b>${l.name ? " " + esc(l.name) : ""}</span></label>`).join("")
+        || `<p class="pr-mute" style="padding:8px">${LOCS ? "No location matches." : "Reading the locations…"}</p>`;
+      g("prLCount").innerHTML = chosen.size ? span(chosen.size + " chosen") : span("All locations");
+      g("prLRead").style.display = LOCS_ERR ? "" : "none";
+      g("prLocNote").textContent = LOCS_ERR ? "The locations could not be read from Business Central (" + LOCS_ERR + "); the list shows the locations of the accounts' access." : "";
+      g("prLocs").querySelectorAll("input").forEach(cb => cb.onchange = () => {
+        EDIT.locations = EDIT.locations.filter(x => x !== cb.value).concat(cb.checked ? [cb.value] : []);
+        locSel(); people();
+      });
     };
     const people = () => {
-      const s = screenOf(g("prScreen").value), co = g("prCo").value, loc = g("prLoc").value, q = g("prQ").value.toLowerCase();
+      const s = screenOf(g("prScreen").value), co = g("prCo").value, q = g("prQ").value.toLowerCase();
+      const locs = s && s.kind === "company" ? [] : EDIT.locations;
       const chosen = new Set(EDIT.recipients);
-      if (!s) { g("prPeople").innerHTML = `<p class="pr-mute" style="padding:10px">Choose the screen first.</p>`; g("prCount").textContent = ""; return; }
       const row = p => {
-        const w = whereIn(p, co), no = why(p, s, co);
+        const w = whereIn(p, co), no = why(p, s, co, locs);
         const where = w === null ? "" : w === "*" ? "Whole company" : w.map(c => locName(co, c)).join(", ");
         return `<label class="pr-person${no ? " no" : ""}" data-u="${esc(p.username)}"><input type="checkbox" ${chosen.has(p.username) ? "checked" : ""} ${no && !chosen.has(p.username) ? "disabled" : ""}>
           <span><b>${esc(p.name)}</b><small>${esc(p.email || "no email")}</small></span><span>${esc(p.role)}<small>${esc(where)}</small></span>
@@ -317,16 +347,18 @@
       };
       const match = p => !q || (p.name + " " + p.username + " " + p.email + " " + p.role).toLowerCase().includes(q);
       const all = (D.people || []).filter(p => p.active || chosen.has(p.username)).filter(match);
-      const there = all.filter(p => { const w = whereIn(p, co); return Array.isArray(w) && (!loc || w.includes(loc)); });
+      // people of the chosen locations first (all location people when none is chosen), then the whole company
+      const there = all.filter(p => { const w = whereIn(p, co); return Array.isArray(w) && (!locs.length || w.some(x => locs.includes(x))); });
       const whole = all.filter(p => whereIn(p, co) === "*");
-      const rest = all.filter(p => whereIn(p, co) === null && chosen.has(p.username));
-      const ok = p => !why(p, s, co);
+      const rest = all.filter(p => !there.includes(p) && !whole.includes(p) && chosen.has(p.username));
+      const ok = p => !why(p, s, co, locs);
       const sortp = a => a.sort((x, y) => (ok(y) - ok(x)) || x.name.localeCompare(y.name));
       g("prPeople").innerHTML =
-        (there.length ? `<div class="pr-grp">${esc(loc ? "Working at " + locName(co, loc) : "Working at some locations of " + co)}</div>` + sortp(there).map(row).join("") : "")
-        + (whole.length ? `<div class="pr-grp">${esc("Whole company · " + co)}</div>` + sortp(whole).map(row).join("") : "")
-        + (rest.length ? `<div class="pr-grp">Not in this company</div>` + rest.map(row).join("") : "")
+        (there.length ? `<div class="pr-grp">${locs.length ? span("Working at the report's locations") : span("Working at some locations of " + co)}</div>` + sortp(there).map(row).join("") : "")
+        + (whole.length ? `<div class="pr-grp">${span("Whole company")} · ${esc(co)}</div>` + sortp(whole).map(row).join("") : "")
+        + (rest.length ? `<div class="pr-grp">${span("Chosen, not at these locations")}</div>` + rest.map(row).join("") : "")
         || `<p class="pr-mute" style="padding:10px">Nobody matches.</p>`;
+      g("prPeopleNote").innerHTML = s ? "" : span("Choose the screen to see who can receive it: someone whose role does not open the screen cannot.");
       const n = EDIT.recipients.length, okN = EDIT.recipients.filter(u => { const p = (D.people || []).find(x => x.username === u); return p && ok(p); }).length;
       g("prCount").innerHTML = span(n + " chosen") + (okN < n ? " · " + span((n - okN) + " cannot receive it") : "");
       g("prPeople").querySelectorAll("label[data-u] input").forEach(cb => cb.onchange = () => {
@@ -335,9 +367,13 @@
         people();
       });
     };
-    g("prScreen").onchange = () => { per(); people(); if (!g("prName").value) g("prName").placeholder = (screenOf(g("prScreen").value) || {}).label || "The screen's name"; };
+    g("prScreen").onchange = () => { per(); locSel(); people(); if (!g("prName").value) g("prName").placeholder = (screenOf(g("prScreen").value) || {}).label || "The screen's name"; };
     g("prCo").onchange = () => { EDIT.locations = []; locSel(); people(); };
-    g("prLoc").onchange = () => { EDIT.locations = g("prLoc").value ? [g("prLoc").value] : []; people(); };
+    g("prLq").oninput = locSel;
+    g("prLAll").onclick = () => { g("prLocs").querySelectorAll("input").forEach(cb => { if (!EDIT.locations.includes(cb.value)) EDIT.locations.push(cb.value); }); locSel(); people(); };
+    g("prLNone").onclick = () => { EDIT.locations = []; locSel(); people(); };
+    g("prLRead").onclick = () => { LOCS = null; LOCS_ERR = ""; g("prLRead").style.display = "none"; g("prLocNote").textContent = "Reading the locations…";
+      locs().then(() => { if (document.getElementById("prDlg")) { locSel(); people(); } }); };
     g("prQ").oninput = people;
     g("prFreq").onchange = () => { days(); };
     g("prAll").onclick = () => {
@@ -354,7 +390,7 @@
       const body = {id: r ? r.id : undefined, screen: g("prScreen").value, company: g("prCo").value, period: g("prPer").value,
         freq: g("prFreq").value, day: +g("prDay").value || 0, time: g("prTime").value || "08:00", name: g("prName").value,
         note: g("prNote").value, pdf: g("prPdf").checked, enabled: g("prOn").checked, recipients: EDIT.recipients,
-        locations: EDIT.locations};
+        locations: (screenOf(g("prScreen").value) || {}).kind === "company" ? [] : EDIT.locations};
       g("prMsg").textContent = "";
       if (!body.screen) { g("prMsg").textContent = "Choose the screen to send."; return; }
       if (!body.recipients.length && body.enabled) { g("prMsg").textContent = "Choose who receives it."; return; }

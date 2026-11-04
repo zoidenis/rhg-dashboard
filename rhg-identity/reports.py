@@ -146,7 +146,13 @@ def people(screen_key=None, company=None):
     return out
 
 
-def _eligible(row, s, company):
+def cut_of(r, s):
+    """(company, [codes]) when the report is cut to some locations (a location screen only), else None."""
+    locs = r.get("locations") or []
+    return (r["company"], locs) if locs and s and s["kind"] == "location" else None
+
+
+def _eligible(row, s, company, cut=None):
     u = auth.public(row)
     if not u["active"]:
         return None, "Account disabled"
@@ -157,6 +163,11 @@ def _eligible(row, s, company):
     ok, _l = _covers(u["scope"], company, s["kind"])
     if not ok:
         return None, f"The access does not cover {company}" + (" in full" if _l not in (None, "*") else "")
+    if cut:
+        sc = auth.narrow(u["scope"], *cut)
+        if not sc:
+            return None, "Does not work at the report's locations"
+        u = dict(u, scope=sc)                    # what this person will see of the report
     return u, ""
 
 
@@ -344,12 +355,13 @@ def _groups(r, s, only=None):
     """[{as, lang, to: [{username, name, email}]}] and [{username, why}] of those left out. People with the same
     role, access and language see the same screen, so they share one rendering and one email."""
     groups, skipped = {}, []
+    cut = cut_of(r, s)
     for name in only or r["recipients"]:
         row = auth.find(name)
         if not row:
             skipped.append({"username": name, "why": "No such account"})
             continue
-        u, why = _eligible(row, s, r["company"])
+        u, why = _eligible(row, s, r["company"], cut)
         if not u:
             skipped.append({"username": name, "why": why})
             continue
@@ -370,7 +382,7 @@ def _make_run(d, r, slot, actor, test_to=None):
            "claimed_at": now.isoformat(), "status": "claimed", "skipped": skipped, "groups": []}
     tokens = []
     for g in groups:
-        tok = auth.report_session(g["as"])
+        tok = auth.report_session(g["as"], cut_of(r, s))
         if not tok:
             skipped += [{"username": x["username"], "why": "Account disabled"} for x in g["to"]]
             continue
@@ -420,7 +432,8 @@ def claim(reporter_info=None):
             out.append({"run": run["id"], "test": run["test"], "address": address(r, s, now),
                         "public": PUBLIC_URL + address(r, s, now), "app": s["app"], "bar": s["bar"],
                         "tab": s["tab_key"], "screen": s["key"], "company": r["company"],
-                        "period": period_label(r, now), "note": r.get("note") or "", "pdf": r.get("pdf", True),
+                        "period": " · ".join(x for x in (period_label(r, now), ", ".join(
+                            (cut_of(r, s) or ("", []))[1])) if x), "note": r.get("note") or "", "pdf": r.get("pdf", True),
                         "name": r.get("name") or "",
                         "groups": [{"as": g["as"], "lang": g["lang"], "token": g["token"], "to": g["to"],
                                     "title": r.get("name") or title(s, g["lang"]),
@@ -472,7 +485,8 @@ def send_now(rid, actor, test):
             raise ValueError("That report no longer exists.")
         if test:
             row = auth.find(actor)
-            u, why = _eligible(row, _screen(r["screen"]), r["company"]) if row else (None, "No account")
+            sc_ = _screen(r["screen"])
+            u, why = _eligible(row, sc_, r["company"], cut_of(r, sc_)) if row else (None, "No account")
             if not u:
                 raise ValueError(f"The test goes to you, as you see the screen: {why}.")
         elif not r["recipients"]:

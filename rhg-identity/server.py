@@ -84,17 +84,34 @@ def i18n_bundle():
     return _i18n["body"]
 
 
-_opts = {"at": 0, "value": None}
+_opts = {"at": 0, "value": None, "reading": False}
+_opts_lock = threading.Lock()
+
+
+def _read_options():
+    try:
+        status, body = scope_options()
+        if status == 200:
+            with _opts_lock:
+                _opts.update(at=time.time(), value=body)
+        return status, body
+    finally:
+        _opts["reading"] = False
 
 
 def scope_options_cached():
-    """scope_options, kept 10 minutes (the report tool reads it each time it opens)."""
-    if _opts["value"] and time.time() - _opts["at"] < 600:
-        return 200, _opts["value"]
-    status, body = scope_options()
-    if status == 200:
-        _opts.update(at=time.time(), value=body)
-    return status, body
+    """scope_options for the report tool: the last list read is answered at once (and read again in the background
+    after 10 minutes); only the very first read waits for Finance."""
+    with _opts_lock:
+        value, age = _opts["value"], time.time() - _opts["at"]
+        stale = value is not None and age > 600 and not _opts["reading"]
+        if stale:
+            _opts["reading"] = True
+    if value is not None:
+        if stale:
+            threading.Thread(target=_read_options, daemon=True, name="scope-options").start()
+        return 200, value
+    return _read_options()
 
 
 def scope_options():
@@ -104,7 +121,7 @@ def scope_options():
     base = config.get("FINANCE_URL", "http://finance:8766").rstrip("/")
     req = urllib.request.Request(base + "/internal/scope-options", headers={"X-Service-Token": config.SERVICE_TOKEN})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=170) as r:
             return 200, json.loads(r.read() or b"{}")
     except (urllib.error.URLError, OSError, ValueError) as exc:
         return 502, {"error": f"Finance could not list the companies and locations: {str(exc)[:160]}"}

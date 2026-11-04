@@ -117,6 +117,8 @@ def _seed_roles(conn):
         conn.execute("ALTER TABLE roles ADD COLUMN department TEXT")
     if "scope" not in _columns(conn, "users"):
         conn.execute("ALTER TABLE users ADD COLUMN scope TEXT")
+    if "scope" not in _columns(conn, "sessions"):        # a report session cut to the report's locations
+        conn.execute("ALTER TABLE sessions ADD COLUMN scope TEXT")
     if "lang" not in _columns(conn, "users"):            # the language of pulse for the person: sq (default), en
         conn.execute("ALTER TABLE users ADD COLUMN lang TEXT")
     have = {r["name"] for r in conn.execute("SELECT name FROM roles")}
