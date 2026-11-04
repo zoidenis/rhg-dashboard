@@ -4,8 +4,6 @@ services:
   # Central sign-in, accounts and permissions. The towers hold no accounts:
   # they ask this service who the caller is on every request.
   identity:
-    # the report sender starts with identity: the deploy recreates finance, purchasing and identity only
-    depends_on: [reporter]
     build:
       context: ../rhg-identity
     image: rhg-identity:latest
@@ -89,7 +87,10 @@ services:
   # sessions from identity) and emails a picture and a PDF through the Purchasing mail server. No ports, no data.
   # Its code lives in rhg-identity/reporter: the deploy copies only the three app folders to the server.
   # It waits for identity and nginx on its own (it asks again every minute until they answer).
+  # Profile "reports": the automatic deploy neither builds nor starts it (building Chromium is heavy for the
+  # server); it is built and started by hand on the server, see README-DEPLOY.md → Raportet e planifikuara.
   reporter:
+    profiles: ["reports"]
     build:
       context: ../rhg-identity/reporter
     image: rhg-reporter:latest

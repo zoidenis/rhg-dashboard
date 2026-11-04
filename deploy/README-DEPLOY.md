@@ -165,8 +165,17 @@ ose butoni *Schedule as report* në krye të çdo faqeje (për rolet me `reports
   foto (në trupin e email-it) dhe një PDF të plotë, dhe e dërgon përmes serverit të mail-it të Purchasing.
 - Nuk ka `.env` të ri: `reporter` merr SERVICE_TOKEN nga `deploy/.env`, si kullat. `PUBLIC_URL` (identity, opsionale)
   është adresa e lidhjes "Hape në pulse" (parazgjedhur `https://dashboard.rhg.al`).
-- Deploy-i i parë pas këtij ndryshimi zgjat disa minuta më shumë: shkarkohen Chromium dhe libraritë e tij (~400 MB
-  imazh). Kontejneri ka `mem_limit: 1200m`.
+- Deploy-i automatik (GitHub Actions) **nuk** e ndërton dhe nuk e nis `reporter` (profili `reports`): ndërtimi i
+  Chromium-it (~400 MB imazh) e ndërpreu deploy-in #114 pas 5 minutash. Niset me dorë në server, një herë, dhe pas
+  çdo ndryshimi të `rhg-identity/reporter`:
+
+      cd /opt/rhg/deploy
+      df -h / && free -m                      # duhen ~2 GB disk të lirë dhe memorie për build-in
+      docker compose --profile reports build reporter
+      docker compose --profile reports up -d reporter
+      docker compose logs --tail=20 reporter
+
+  Kontejneri ka `mem_limit: 1200m`.
 - Kontroll: `docker compose logs reporter | tail` duhet të tregojë "pulse report sender: ...". Te Settings, shenja
   *Report sender on* tregon që ai është lidhur në 3 minutat e fundit.
 
