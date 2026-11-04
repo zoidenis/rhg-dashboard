@@ -128,7 +128,23 @@ jobs:
           ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 "$SERVER" 'set -e
             cd /opt/rhg/deploy
             docker compose build
-            docker compose up -d --force-recreate finance purchasing identity
+
+            # Nje rikrijim i nderprere i compose-it le pas nje kontejner "<id>_deploy-<sherbimi>-1"
+            # ne gjendjen Created; rikrijimi tjeter perplaset me emrin ("name already in use") dhe
+            # sherbimi mbetet i ndalur (identity ra keshtu me 4 nentor). Hiqen para dhe pas.
+            cleanup() {
+              docker ps -a --format "{{.ID}} {{.Names}}" \
+                | awk "\$2 ~ /^[0-9a-f]{12}_deploy-/ {print \$1}" \
+                | xargs -r docker rm -f
+            }
+            cleanup
+            # Pa --force-recreate: compose rikrijon vetem kontejneret, imazhi i te cileve ndryshoi.
+            if ! docker compose up -d finance purchasing identity; then
+              echo "::warning::up deshtoi; pastrohen mbetjet dhe provohet edhe nje here"
+              cleanup
+              sleep 3
+              docker compose up -d finance purchasing identity
+            fi
             docker image prune -f >/dev/null 2>&1 || true'
 
       - name: Prit health-check-et
@@ -175,3 +191,41 @@ jobs:
           }
           echo "Rrënja ktheu $code"
           [ "$code" = "200" ] || { echo "::error::Pritej 200, erdhi $code"; exit 1; }
+
+      # Raportet e planifikuara. Imazhi (Chromium, ~400 MB) NUK ndertohet ne server: atje
+      # ndertimi e nderpreu deploy-in #114 dhe serveri ka 1 CPU / 1 GB. Ndertohet ketu ne
+      # runner dhe dergohet me docker save | docker load, vetem kur kodi i
+      # rhg-identity/reporter ndryshon (etiketa rhg.tree mban hash-in e dosjes ne git).
+      # Ne cdo deploy tjeter vetem sigurohet qe reporter-i te jete ndezur.
+      # Vjen pas verifikimit te faqes: nese deshton, faqja eshte tashme lart.
+      - name: Reporter (raportet me email)
+        env:
+          SERVER: ${{ secrets.SERVER_SSH }}
+        run: |
+          SSH="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i $HOME/.ssh/id_ed25519"
+          tree=$(git rev-parse HEAD:rhg-identity/reporter)
+          recreate=""
+          if $SSH "$SERVER" "docker image inspect -f '{{json .Config.Labels}}' rhg-reporter:latest 2>/dev/null" \
+               | grep -q "$tree"; then
+            echo "Kodi i reporter-it nuk ndryshoi ($tree): imazhi ne server mbetet."
+          else
+            echo "==> Ndertoj rhg-reporter ne runner ($tree)"
+            docker build --label "rhg.tree=$tree" -t rhg-reporter:latest rhg-identity/reporter
+            docker image ls rhg-reporter:latest
+            echo "==> Dergoj imazhin ne server"
+            docker save rhg-reporter:latest | gzip -1 | $SSH "$SERVER" 'docker load'
+            recreate="--force-recreate"
+          fi
+
+          $SSH "$SERVER" "set -e
+            cd /opt/rhg/deploy
+            docker compose --profile reports up -d --no-build $recreate reporter
+            sleep 10
+            docker compose --profile reports ps reporter --format '{{.Service}}: {{.Status}}'
+            docker compose --profile reports ps reporter --format '{{.Status}}' | grep -q '^Up' || {
+              echo '::error::reporter nuk eshte ndezur'
+              docker compose --profile reports logs --tail=40 reporter
+              exit 1
+            }
+            docker compose --profile reports logs --tail=5 reporter
+            docker image prune -f >/dev/null 2>&1 || true"
