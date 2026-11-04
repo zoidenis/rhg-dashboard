@@ -253,7 +253,8 @@ def _remember_summary(company, location, month, totals):
 
 
 # ---------------------------------------------------------------- the valuation (Business Central)
-ILE_FIELDS = "Entry_No,Entry_Type,Item_No,Posting_Date,Quantity,Remaining_Quantity,Cost_Amount_Actual,Cost_Amount_Expected"
+ILE_FIELDS = ("Entry_No,Entry_Type,Item_No,Posting_Date,Document_No,Quantity,Remaining_Quantity,Cost_Amount_Actual,"
+              "Cost_Amount_Expected")
 
 
 def valuation(client, company, location, month, progress=None):
@@ -271,7 +272,7 @@ def valuation(client, company, location, month, progress=None):
         "$filter": f"Posting_Date ge {first.isoformat()} and Location_Code eq '{loc}'", "$select": ILE_FIELDS})
     say("stock at the month end")
     bc_qty = client.stock_by_location(company, location, last.isoformat())
-    items = {}
+    items, month_moves = {}, {}
 
     def it(no):
         return items.setdefault(no, {"now_qty": 0.0, "now_value": 0.0, "after_qty": 0.0, "after_value": 0.0,
@@ -292,7 +293,12 @@ def valuation(client, company, location, month, progress=None):
         if str(r.get("Posting_Date") or "")[:10] > end:
             x["after_qty"] += q
             x["after_value"] += v
-        elif q > 0 or (q == 0 and v > 0):
+            continue
+        # the month's entries of the item (to name what BC posted after the count form was printed)
+        month_moves.setdefault(str(r.get("Item_No")), []).append(
+            (int(r.get("Entry_No") or 0), str(r.get("Posting_Date") or "")[:10], str(r.get("Entry_Type") or ""),
+             str(r.get("Document_No") or ""), round(q, 4)))
+        if q > 0 or (q == 0 and v > 0):
             x["in_qty"] += q
             x["in_value"] += v
         else:
@@ -313,7 +319,7 @@ def valuation(client, company, location, month, progress=None):
         row["opening_value"] = round(cv - x["in_value"] - x["out_value"], 2)
         if any(abs(row[k]) > TOL for k in ("closing_qty", "closing_value", "in_qty", "out_qty", "opening_qty")):
             out[no] = row
-    return {"items": out, "first": first.isoformat(), "last": last.isoformat(),
+    return {"items": out, "moves": month_moves, "first": first.isoformat(), "last": last.isoformat(),
             "entries": {"open": len(open_rows), "moves": len(moves)},
             "qty_check": {"items": len(items), "off": len(off), "examples": off[:10]}}
 
@@ -325,7 +331,21 @@ def client_entity(client):
 
 # ---------------------------------------------------------------- the analysis
 STATUSES = {"match": "Match", "short": "Shortage", "surplus": "Surplus", "not_counted": "Not counted",
-            "not_on_form": "Not on the form", "unknown": "Not in Business Central"}
+            "not_on_form": "Not on the form", "unknown": "Not in Business Central",
+            "cutoff": "Posted after the form"}
+
+
+def _late(moves, delta):
+    """The month's entries that explain BC's change since the form was printed (delta = BC closing − the form's
+    system stock): the latest entries whose quantities add up to delta. (entries, exact)."""
+    rows = sorted(moves or [], reverse=True)[:40]
+    acc, took = 0.0, []
+    for e in rows[:12]:
+        acc += e[4]
+        took.append(e)
+        if abs(acc - delta) <= 0.001:
+            return took, True
+    return rows[:3], False
 
 
 def analyse(val, count, master):
@@ -391,6 +411,13 @@ def analyse(val, count, master):
             line["flags"].append("unit")
         if f and f.get("system") is not None and abs(f["system"] - bq) > 0.001:
             line["flags"].append("form_system")
+            late, exact = _late((val.get("moves") or {}).get(no), bq - f["system"])
+            line["late"] = [{"entry": e[0], "date": e[1], "type": e[2], "document": e[3], "qty": e[4]} for e in late]
+            line["late_exact"] = exact
+            # counted as the form says, and BC moved after the form was printed: a cut-off (a document dated in the
+            # month, posted later, for goods that were still there, or not yet there, when they were counted)
+            if f.get("counted") is not None and abs(f["counted"] - f["system"]) <= TOL and line["status"] != "match":
+                line["status"] = "cutoff"
         if src not in ("month end",) and (line["diff_qty"] or 0):
             line["flags"].append("cost")
         lines.append(line)
@@ -399,8 +426,10 @@ def analyse(val, count, master):
            "in_value": round(sum(x["in_value"] for x in lines), 2),
            "out_value": round(sum(x["out_value"] for x in lines), 2), "items": len(lines)}
     if count:
-        cnt = [x for x in lines if x["diff_value"] is not None]
+        cnt = [x for x in lines if x["diff_value"] is not None and x["status"] != "cutoff"]
+        cut = [x for x in lines if x["status"] == "cutoff"]
         tot.update(
+            cutoff_value=round(sum(x["diff_value"] for x in cut), 2),
             counted_value=round(sum(x["counted_value"] for x in cnt), 2),
             counted_bc_value=round(sum(x["bc_qty"] * x["cost"] for x in cnt), 2),
             net_value=round(sum(x["diff_value"] for x in cnt), 2),
@@ -421,9 +450,12 @@ def analyse(val, count, master):
         c["lines"] += 1
         if x["diff_value"] is not None:
             c["counted_value"] += x["counted_value"]
+            if x["status"] == "cutoff":
+                continue
             c["net"] += x["diff_value"]
             c["shortage" if x["diff_value"] < 0 else "surplus"] += x["diff_value"]
-    lines.sort(key=lambda x: (-(abs(x["diff_value"]) if x["diff_value"] is not None else -1), -abs(x["bc_value"])))
+    lines.sort(key=lambda x: (x["status"] == "cutoff", -(abs(x["diff_value"]) if x["diff_value"] is not None else -1),
+                              -abs(x["bc_value"])))
     return {"lines": lines, "totals": tot,
             "categories": sorted(({k: round(v, 2) if isinstance(v, float) else v for k, v in c.items()}
                                   for c in cats.values()), key=lambda c: c["net"])}
@@ -436,6 +468,7 @@ def build(client, company, location, month, progress=None):
     master = {str(r.get("No")): r for r in client.item_snapshot(company, last.isoformat())}
     count = get(company, location, month)
     a = analyse(val, count, master)
+    val.pop("moves", None)
     if count:
         _remember_summary(company, location, month, a["totals"])
     return {"available": True, "company": company, "location": location, "month": month,
@@ -500,11 +533,13 @@ def render_xlsx(r):
     ws.title = "Count vs BC"
     sheet(ws, ["Item", "Description", "Category", "Unit (BC)", "Unit (form)", "BC closing qty", "Form system qty",
                "Counted", "Difference qty", "Average cost", "Cost from", "Difference value", "BC closing value",
-               "Status", "Checks", "Comment"],
+               "Status", "Checks", "BC entries after the form", "Comment"],
           [[x["item"], x["description"], x["category"] or x["form_category"], x["unit"], x["form_unit"], x["bc_qty"],
             x["form_system"], x["counted"], x["diff_qty"], x["cost"], x["cost_source"], x["diff_value"],
-            x["bc_value"], STATUSES.get(x["status"], ""), ", ".join(x["flags"]), x["comment"]] for x in r["lines"]],
-          [12, 40, 16, 9, 9, 12, 12, 11, 12, 12, 14, 14, 15, 16, 14, 40])
+            x["bc_value"], STATUSES.get(x["status"], ""), ", ".join(x["flags"]),
+            "; ".join(f"{e['type']} {e['document']} {e['date']} {e['qty']:g}" for e in x.get("late") or []),
+            x["comment"]] for x in r["lines"]],
+          [12, 40, 16, 9, 9, 12, 12, 11, 12, 12, 14, 14, 15, 18, 14, 40, 40])
     v = wb.create_sheet("Inventory valuation")
     sheet(v, ["Item", "Description", "Category", "Unit", "Opening qty", "Opening value", "Increases qty",
               "Increases value", "Decreases qty", "Decreases value", "Closing qty", "Closing value", "Average cost"],
@@ -525,7 +560,10 @@ def render_xlsx(r):
               "Where the closing quantity is not above zero: the cost of the month's receipts, then the item card's "
               "Unit Cost (column Cost from).",
               "Difference = counted − BC closing qty; value = difference × average cost. A blank count is not counted, "
-              "not zero."):
+              "not zero.",
+              "Posted after the form: counted = the form's system stock (Gjendje Finance), but BC changed after the form "
+              "was printed with documents dated in the month (named in BC entries after the form). These lines are "
+              "kept out of the shortages, surpluses and net difference: check the cut-off of those documents."):
         rd.append([t])
     rd.column_dimensions["A"].width = 120
     out = io.BytesIO()

@@ -344,7 +344,8 @@ td.num,th.num{text-align:right}
 #cnLines td.num,#cnLines th.num{white-space:nowrap}
 .cn-st{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--rhg-sky,#efede6);color:var(--ink)}
 .cn-st.short{background:var(--up-bg);color:var(--up)}.cn-st.surplus{background:var(--warn-bg);color:var(--warn)}
-.cn-st.match{background:var(--down-bg);color:var(--down)}
+.cn-st.match{background:var(--down-bg);color:var(--down)}.cn-st.cutoff{background:#e4ecf9;color:#2f5aa8}
+@media (prefers-color-scheme: dark){.cn-st.cutoff{background:#1d2a40;color:#9db8ea}}
 #v-stockcount .neg{color:var(--up)}
 #v-stockcount .card-head select,#cnSheet{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
 .sk-chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
@@ -1012,6 +1013,7 @@ td.num,th.num{text-align:right}
         <p><span>Difference = counted − BC closing quantity; its value = difference × average cost.</span> <span>A blank count is Not counted, never zero.</span> <span>Items with BC stock that are not on the form are listed as Not on the form.</span></p>
         <p><span>The figures are exact once the cost adjustment (Adjust Cost – Item Entries) has run up to the month end: in this Business Central it runs by hand (Automatic Cost Adjustment = Never), as part of the month-end close.</span></p>
         <p><span>Excel drops the zeros in front of a number: a code like 7020 on the form is matched to the one BC item 007020.</span></p>
+        <p><span>Posted after the form: the count equals the form's system stock (Gjendje Finance), but BC changed after the form was printed, with documents dated in the month (a transfer or a return dated the last day and posted days later).</span> <span>The documents are named on the line.</span> <span>These lines are kept out of the shortages, surpluses and net difference: the question is the cut-off of those documents, not the count.</span></p>
       </div></details></div>
   </section>
 
@@ -4247,7 +4249,7 @@ async function loadDischarge(refresh){
 }
 // ---------- Inventory → Stock count analysis (stockcount.py) ----------
 var cnData = null, cnTimer = null, cnFilter = "all", cnFile = null, cnSetupData = null;
-const CN_ST = {match: "Match", short: "Shortage", surplus: "Surplus", not_counted: "Not counted", not_on_form: "Not on the form", unknown: "Not in Business Central"};
+const CN_ST = {match: "Match", short: "Shortage", surplus: "Surplus", not_counted: "Not counted", not_on_form: "Not on the form", unknown: "Not in Business Central", cutoff: "Posted after the form"};
 const CN_FLAG = {unit: "Unit differs", form_system: "Form's system stock differs from BC", cost: "Cost not from the month end"};
 const CN_MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const cnMonth = m => { const [y, mo] = String(m || "").split("-"); return mo ? CN_MON[+mo - 1] + " " + y : ""; };
@@ -4313,7 +4315,8 @@ function cnRender(){
   $("cnKpis").innerHTML = c ?
     card("BC closing value", fmt(t.closing_value), `<span>${fmt(t.items)} items</span> · <span>at ${cnD(d.to)}</span>`) +
     card("Counted value", fmt(t.counted_value), `<span>BC for the same lines ${fmt(t.counted_bc_value)}</span>`) +
-    card("Net difference", fmt(t.net_value), t.net_pct == null ? "" : `<span>${fmt(t.net_pct, 2)}% of the closing value</span>`, t.net_value < 0 ? "up" : t.net_value > 0 ? "warn" : "") +
+    card("Net difference", fmt(t.net_value), (t.net_pct == null ? "" : `<span>${fmt(t.net_pct, 2)}% of the closing value</span>`)
+      + (t.n_cutoff ? `<br><span>without ${fmt(t.n_cutoff)} lines posted after the form (${fmt(t.cutoff_value)})</span>` : ""), t.net_value < 0 ? "up" : t.net_value > 0 ? "warn" : "") +
     card("Shortages", fmt(t.shortage_value), `<span>${fmt(t.n_short)} lines</span>`, t.n_short ? "up" : "") +
     card("Surpluses", fmt(t.surplus_value), `<span>${fmt(t.n_surplus)} lines</span>`, t.n_surplus ? "warn" : "") +
     card("Not counted", fmt(t.not_counted_value), `<span>${fmt(t.n_not_counted)} left blank on the form</span> · <span>${fmt(t.n_not_on_form)} not on the form</span>`, (t.n_not_counted + t.n_not_on_form) ? "warn" : "")
@@ -4347,7 +4350,7 @@ function cnRender(){
 function cnLines(){
   const d = cnData, all = d.lines.filter(x => x.status);
   const n = k => all.filter(x => x.status === k || (x.flags || []).includes(k)).length;
-  const chips = [["all", "All", all.length], ["short", "Shortage", n("short")], ["surplus", "Surplus", n("surplus")], ["not_counted", "Not counted", n("not_counted")],
+  const chips = [["all", "All", all.length], ["short", "Shortage", n("short")], ["surplus", "Surplus", n("surplus")], ["cutoff", "Posted after the form", n("cutoff")], ["not_counted", "Not counted", n("not_counted")],
     ["not_on_form", "Not on the form", n("not_on_form")], ["unknown", "Not in Business Central", n("unknown")], ["unit", "Unit differs", n("unit")],
     ["form_system", "Form's system stock differs from BC", n("form_system")], ["match", "Match", n("match")]].filter(x => x[0] === "all" || x[2]);
   $("cnChips").innerHTML = chips.map(x => `<button data-cnf="${x[0]}" class="${cnFilter === x[0] ? "on" : ""}"><span>${esc(x[1])}</span> · ${fmt(x[2])}</button>`).join("");
@@ -4357,7 +4360,8 @@ function cnLines(){
     && (!q || (x.item + " " + (x.form_item || "") + " " + x.description).toLowerCase().includes(q)));
   $("cnLinesT").textContent = `Lines · ${fmt(rows.length)}`;
   $("cnLinesNote").innerHTML = `<span>Largest difference in value first.</span> <span>Showing ${fmt(Math.min(rows.length, 300))}; the Excel file has every line.</span>`;
-  const st = x => `<span class="cn-st ${x.status}">${esc(CN_ST[x.status] || "")}</span>` + (x.flags || []).filter(f => f !== "cost").map(f => ` <span class="cn-st" title="${esc(CN_FLAG[f])}">${esc(f === "unit" ? "Unit" : "Form ≠ BC")}</span>`).join("");
+  const late = x => (x.late || []).length ? `<div class="meta" style="margin-top:4px" title="${esc(x.late_exact ? "These entries make up the whole change since the form was printed" : "The latest entries of the month")}">${x.late.map(e => `${esc(e.type)} ${esc(e.document)} · ${esc(cnD(e.date))} · ${cnN(e.qty)}`).join("<br>")}</div>` : "";
+  const st = x => `<span class="cn-st ${x.status}">${esc(CN_ST[x.status] || "")}</span>` + (x.flags || []).filter(f => f !== "cost" && !(f === "form_system" && x.status === "cutoff")).map(f => ` <span class="cn-st" title="${esc(CN_FLAG[f])}">${esc(f === "unit" ? "Unit" : "Form ≠ BC")}</span>`).join("") + late(x);
   $("cnLines").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">BC closing</th><th class="num">Form system</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Average cost</th><th class="num">Difference value</th><th>Status</th><th>Comment</th></tr>` +
     (rows.slice(0, 300).map(x => `<tr><td><b>${esc(x.item)}</b>${x.form_item ? ` <span class="meta">(${esc(x.form_item)} on the form)</span>` : ""} ${esc(x.description)}<div class="meta">${esc(x.category || x.form_category)}</div></td>
       <td>${esc(x.unit || x.form_unit)}${x.flags.includes("unit") ? `<div class="meta neg">${esc(x.form_unit)} on the form</div>` : ""}</td>
