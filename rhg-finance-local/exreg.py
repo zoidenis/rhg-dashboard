@@ -34,7 +34,7 @@ SEVERITY = ("critical", "warning", "info")
 SLA = {"critical": 2, "warning": 5, "info": 10}
 # source → label, and type → the role that owns it (Email recipients roles)
 SOURCES = {"negative_stock": "Negative stock", "discharge": "Received vs discharged", "sales_rec": "Simphony ↔ BC",
-           "data_quality": "Data quality"}
+           "data_quality": "Data quality", "receipts_rec": "Takings POS ↔ BC"}
 OWNER_ROLE = {
     ("negative_stock", "stock"): "stock_manager", ("negative_stock", "cost"): "cost_controller",
     ("negative_stock", "purchasing"): "purchasing_manager",
@@ -46,6 +46,8 @@ OWNER_ROLE = {
     ("sales_rec", "unpaid"): "finance", ("sales_rec", "*"): "cost_controller",
     # Data quality & reconciliation: the checks of a closed month and the postings after its freeze
     ("data_quality", "*"): "accounting",
+    # takings POS ↔ BC: the money to finance (treasury), the tender mapping and the tips to the chief accountant
+    ("receipts_rec", "unmapped"): "accounting", ("receipts_rec", "tips"): "accounting", ("receipts_rec", "*"): "finance",
 }
 ROLE_LABEL = {"stock_manager": "Stock manager", "cost_controller": "Cost controller",
               "purchasing_manager": "Purchasing manager", "finance": "Finance", "accounting": "Chief accountant"}

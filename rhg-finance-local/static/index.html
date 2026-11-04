@@ -186,7 +186,15 @@ td.num,th.num{text-align:right}
 #kmCo{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit}
 /* Simphony ↔ BC */
 #sxKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-#sxGrid{border-collapse:separate;border-spacing:3px}
+#sxGrid,#tkGrid{border-collapse:separate;border-spacing:3px}
+#tkGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
+#tkGrid td.loc,#tkGrid th.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px;position:sticky;left:0;background:var(--card);z-index:1}
+#tkGrid td.loc .meta{font-size:11px}
+#tkGrid td.c{width:44px;min-width:44px;height:30px;border-radius:6px;text-align:center;font-size:10.5px;font-weight:600;cursor:pointer;padding:0;border:2px solid transparent}
+#tkGrid td.c.ok{background:var(--down-bg);color:var(--down)}#tkGrid td.c.late{background:var(--warn-bg);color:var(--warn)}
+#tkGrid td.c.open{background:var(--up-bg);color:var(--up)}#tkGrid td.c.pending{background:var(--card);border:2px dashed var(--line)}
+#tkGrid td.c.none{background:none;color:var(--line);cursor:default}#tkGrid td.c.sel{border-color:var(--ink)}
+#tkMap input,#tkMap select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:12.5px}
 #sxGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
 #sxGrid th.loc,#sxGrid td.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px}
 #sxGrid td.loc,#sxGrid th.loc{position:sticky;left:0;background:var(--card);z-index:1}
@@ -464,6 +472,7 @@ td.num,th.num{text-align:right}
     <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
     <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
     <button data-view="salesrec">Simphony ↔ BC</button>
+    <button data-view="receipts">Takings POS ↔ BC</button>
 
     <div class="grp">System</div>
     <button data-view="gaps">Data quality &amp; reconciliation</button>
@@ -1266,6 +1275,46 @@ td.num,th.num{text-align:right}
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="sxSave">Save</button><span class="meta" id="sxMsg"></span></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
       <div class="hint" id="sxDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-receipts">
+    <div class="card">
+      <div class="card-head"><div><h2>Takings POS ↔ BC</h2>
+        <p class="hint" id="tkNote">Every restaurant and business day: what the till took by tender (Simphony) against what Business Central received for it, tender by tender, on the restaurant's department. A day not received after its lag becomes a case in the register.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="mini dark" id="tkRead">Read again</button><button class="mini" id="tkReg">Cases in the register</button></div></div>
+      <div class="kpis six" id="tkKpis" style="margin-top:14px"></div>
+      <p class="meta" id="tkStatus"></p>
+    </div>
+    <div class="card"><div class="card-head"><div><h2>Every restaurant and channel, every day</h2>
+      <p class="hint">A channel is the tenders that land on the same BC accounts (cash on the cash box, each card on its bank). A square per day: green received, amber received late, red not received after the lag, dashed still within the lag. Click a square for the day.</p></div></div>
+      <div class="il-lg sx-lg" style="margin:0 0 8px"><span><i class="ok"></i>Received</span><span><i class="warn"></i>Received late</span><span><i class="bad"></i>Not received</span><span><i class="pend"></i>Within the lag</span></div>
+      <div class="scroll" data-nosort><table id="tkGrid"></table></div>
+      <div id="tkDet" style="margin-top:10px"></div></div>
+    <div class="card"><div class="card-head"><div><h2>By restaurant and channel</h2><p class="hint" id="tkChNote"></p></div></div>
+      <div class="scroll"><table id="tkTable"></table></div></div>
+    <div class="grid">
+      <div class="card"><h2>Tips, VAT and service charge</h2>
+        <p class="hint">Net sales in Simphony include VAT; the service charge is apart; the tenders are what guests paid. Tenders − (net sales + service charge) is what was paid on top: card tips keyed on the till, rounding. How card tips are recorded is <b>Content required</b> from Finance.</p>
+        <div class="scroll"><table id="tkTips"></table></div></div>
+      <div class="card"><h2>Refunds and chargebacks</h2>
+        <p class="hint">Money going out of a card or online account on a restaurant's department: a refund to a guest, a chargeback or a fee. Each one is a case to check against the bank or terminal statement.</p>
+        <div class="scroll"><table id="tkOut"></table></div></div>
+    </div>
+    <div class="card" id="tkMapCard"><div class="card-head"><div><h2>Tender mapping</h2>
+      <p class="hint" id="tkMapNote">Every Simphony tender: what it is and which BC accounts receive its money, and in how many days. The proposal comes from the tender's category and name and the bank accounts seen on the restaurants; save it once it is right.</p></div></div>
+      <div class="scroll" data-nosort><table id="tkMap"></table></div>
+      <div class="formgrid" style="margin-top:12px">
+        <label class="field">Days read (back from yesterday)<input id="tkPDays" type="number" min="3" max="62"></label>
+        <label class="field">Grace after the lag (days)<input id="tkPGrace" type="number" min="0" max="30"></label>
+        <label class="field">Tolerance (amount)<input id="tkPAbs" type="number" min="0"></label>
+        <label class="field">Tolerance (%)<input id="tkPPct" type="number" min="0" max="100" step="0.1"></label>
+        <label class="field">Tips and other on top, case above (%)<input id="tkPTips" type="number" min="0" max="100" step="0.1"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="tkSave">Save the mapping</button><span class="meta" id="tkMsg"></span></div>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">BC accounts seen on the restaurants</summary><div class="scroll" style="margin-top:8px"><table id="tkAcc"></table></div></details></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
+      <div class="hint" id="tkDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-actions"><div class="card">
@@ -2274,6 +2323,98 @@ async function dqFreeze(month, action){
   loadDq(true);
 }
 $("dqFreeze").onclick = () => dqData && dqFreeze(dqData.from, "freeze");
+
+// ---------------------------------------------------------------- Takings POS ↔ BC (rcpt.py)
+let tkData = null, tkTimer = null, tkSel = null;
+const TK_SHORT = {ok: "✓", late: "late", pending: "…", none: "·"};
+async function loadReceipts(refresh){
+  clearTimeout(tkTimer);
+  $("tkStatus").textContent = "Reading…";
+  try{
+    const p = new URLSearchParams({company: $("company").value || ""});
+    const j = await readJSON(await fetch("/api/receipts?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    if (j.pending) { $("tkStatus").textContent = `Reading Simphony and Business Central… ${j.stage || ""}`; tkTimer = setTimeout(() => loadReceipts(false), 4000); return; }
+    if (j.available === false || (j.error && !j.locations)) throw new Error(j.error || "not available");
+    tkData = j; renderReceipts();
+  }catch(e){ $("tkStatus").textContent = "Could not read: " + e.message; }
+}
+function renderReceipts(){
+  const d = tkData, k = d.kpis;
+  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  $("tkKpis").innerHTML =
+    card("Taken at the till", sxM(k.taken), "cash, cards and online, the mapped tenders") +
+    card("Received in BC", sxM(k.matched), `matched to the days · ${fmt(k.ok_days)} days on time, ${fmt(k.late_days)} late`) +
+    card("Not received", sxM(k.open), `${fmt(k.open_days)} restaurant-days past their lag`, k.open_days ? "up" : "down") +
+    card("Within the lag", sxM(k.pending), "not due yet") +
+    card("Received with no takings", sxM(k.over), "more than the till took", k.over ? "warn" : "") +
+    card("Refunds and chargebacks", sxM(k.refunds), k.unmapped ? `${fmt(k.unmapped)} tenders not mapped` : "out of card and online accounts", k.refunds || k.unmapped ? "warn" : "");
+  $("tkNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.filter(L => L.tips && L.tips.tenders).length} restaurants with takings` + (d.simphony ? "" : " · Simphony is not connected") +
+    (d.mapping.saved ? ` · tender mapping saved by ${d.mapping.saved_by} on ${String(d.mapping.saved_at).slice(0, 10)}` : " · tender mapping: the proposal, not saved yet");
+  $("tkStatus").textContent = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.found} found, ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
+    + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const rows = [];
+  d.locations.forEach((L, li) => L.channels.forEach((c, ci) => rows.push([L, c, li, ci])));
+  $("tkGrid").innerHTML = rows.length ? `<tr><th class="loc"></th>${days.map(x => `<th>${wd[new Date(x + "T12:00:00").getDay()]}<br>${x.slice(8)}</th>`).join("")}</tr>` +
+    rows.map(([L, c, li, ci]) => { const by = Object.fromEntries(c.days.map(x => [x.date, x]));
+      return `<tr><td class="loc"><b>${esc(L.name)}</b><div class="meta">${esc(c.tenders.join(", "))} → ${esc(c.account_names.join(", "))}</div></td>` +
+        days.map(x => { const v = by[x], st = v ? v.status : "none", txt = st === "open" ? sxM(v.outstanding) : TK_SHORT[st];
+          return `<td class="c ${st}${tkSel && tkSel[0] === li && tkSel[1] === ci && tkSel[2] === x ? " sel" : ""}" ${v ? `data-l="${li}" data-c="${ci}" data-d="${x}"` : ""} title="${esc(L.name)} ${x}${v ? `: taken ${fmt(v.taken)}, received ${fmt(v.received)}${v.paid_on ? " by " + v.paid_on : ""}` : ": no takings"}">${txt}</td>`; }).join("") + `</tr>`; }).join("")
+    : `<tr><td class="meta">No money tender is mapped to a BC account yet: map the tenders below.</td></tr>`;
+  $("tkGrid").querySelectorAll("td.c[data-l]").forEach(td => td.onclick = () => { tkSel = [+td.dataset.l, +td.dataset.c, td.dataset.d]; renderReceipts(); });
+  if (tkSel && d.locations[tkSel[0]] && d.locations[tkSel[0]].channels[tkSel[1]]) {
+    const L = d.locations[tkSel[0]], c = L.channels[tkSel[1]], v = c.days.find(x => x.date === tkSel[2]);
+    $("tkDet").innerHTML = v ? `<div class="sx-tiles">
+      <div class="sx-tile"><div class="l">${esc(L.name)} · ${esc(v.date)}</div><div class="v">${sxM(v.taken)}</div><div class="s">taken: ${esc(c.tenders.join(", "))}${c.groups.includes("cash") ? " (cash less paid out)" : ""}</div></div>
+      <div class="sx-tile"><div class="l">Received in BC</div><div class="v">${sxM(v.received)}</div><div class="s">${esc(c.account_names.join(", "))}${v.paid_on ? ` · last on ${esc(v.paid_on)}` : ""}</div></div>
+      <div class="sx-tile"><div class="l">Outstanding</div><div class="v ${v.status === "open" ? "up" : ""}">${sxM(v.outstanding)}</div><div class="s">${esc({ok: "received", late: "received after the lag", open: "not received after the lag", pending: "within the lag"}[v.status])} · lag ${c.lag} days · ${v.age} days ago</div></div></div>` : "";
+  } else $("tkDet").innerHTML = "";
+  const T = d.locations.flatMap(L => L.channels.map(c => [L, c]));
+  $("tkChNote").textContent = `Each channel's takings matched with its receipts first in, first out over ${d.from} → ${d.to}. Tolerance ${fmt(d.params.tol_abs)} or ${d.params.tol_pct}%, ${d.params.grace} grace days after the lag.`;
+  $("tkTable").innerHTML = T.length ? `<tr><th>Restaurant</th><th>Tenders</th><th>BC accounts</th><th class="num">Lag</th><th class="num">Taken</th><th class="num">Received</th><th class="num">Not received</th><th class="num">Within lag</th><th class="num">No takings</th><th class="num">Days ok · late · open</th></tr>` +
+    T.map(([L, c]) => `<tr><td class="name">${esc(L.name)}</td><td>${esc(c.tenders.join(", "))}</td><td class="meta">${esc(c.account_names.join(", "))}</td><td class="num">${c.lag}</td>
+      <td class="num">${fmt(c.taken)}</td><td class="num">${fmt(c.matched)}</td><td class="num ${c.open ? "up" : ""}">${fmt(c.open)}</td><td class="num">${fmt(c.pending)}</td>
+      <td class="num ${c.over ? "warn" : ""}">${fmt(c.over)}</td><td class="num">${c.ok_days} · ${c.late_days} · <b class="${c.open_days ? "up" : ""}">${c.open_days}</b></td></tr>`).join("") : "";
+  $("tkTips").innerHTML = `<tr><th>Restaurant</th><th class="num">Net sales</th><th class="num">VAT</th><th class="num">Ex VAT</th><th class="num">Service charge</th><th class="num">Tenders</th><th class="num">On top</th></tr>` +
+    d.locations.filter(L => L.tips && (L.tips.tenders || L.tips.net)).map(L => { const t = L.tips; return `<tr><td class="name">${esc(L.name)}</td><td class="num">${fmt(t.net)}</td><td class="num">${fmt(t.vat)}</td><td class="num">${fmt(t.ex_vat)}</td>
+      <td class="num">${fmt(t.service)}</td><td class="num">${fmt(t.tenders)}</td><td class="num ${t.on_top_pct != null && Math.abs(t.on_top_pct) > d.params.tips_pct ? "warn" : ""}">${sxS(t.on_top)}${t.on_top_pct != null ? ` <span class="meta">${t.on_top_pct.toFixed(1)}%</span>` : ""}</td></tr>`; }).join("");
+  const outs = d.locations.flatMap(L => (L.refunds || []).map(o => [L, o]));
+  $("tkOut").innerHTML = outs.length ? `<tr><th>Date</th><th>Restaurant</th><th>Account</th><th>Document</th><th class="num">Amount</th></tr>` +
+    outs.map(([L, o]) => `<tr><td>${esc(o.date)}</td><td class="name">${esc(L.name)}</td><td class="meta">${esc(o.name)}</td><td>${esc(o.type)} ${esc(o.document)}</td><td class="num">${fmt(o.amount)}</td></tr>`).join("")
+    : `<tr><td class="meta">Nothing went out of the card and online accounts on the restaurants in this period.</td></tr>`;
+  const ed = d.can_settings;
+  const opts = (sel) => Object.entries(d.groups).map(([g, l]) => `<option value="${g}" ${g === sel ? "selected" : ""}>${esc(l)}</option>`).join("");
+  $("tkMap").innerHTML = `<tr><th>Tender</th><th>Where</th><th class="num">Paid</th><th class="num">Count</th><th>Group</th><th>BC accounts</th><th class="num">Lag (days)</th><th></th></tr>` +
+    d.tenders.map(t => `<tr data-tkt="${esc(t.key)}"><td class="name"><b>${esc(t.name)}</b></td><td class="meta">${esc(t.locations.join(", "))}</td><td class="num">${fmt(t.total)}</td><td class="num">${fmt(t.count)}</td>
+      <td>${ed ? `<select data-f="group">${opts(t.group)}</select>` : esc(d.groups[t.group] || t.group)}</td>
+      <td>${ed ? `<input data-f="accounts" value="${esc((t.accounts || []).join(", "))}" style="width:220px" placeholder="e.g. B009, CREDINS BANK ALL">` : esc((t.accounts || []).join(", ") || "–")}</td>
+      <td class="num">${ed ? `<input data-f="lag" type="number" min="0" max="30" value="${t.lag}" style="width:60px">` : t.lag}</td>
+      <td>${t.proposal ? `<span class="chip warn">proposal</span>` : `<span class="chip down">saved</span>`}</td></tr>`).join("");
+  $("tkAcc").innerHTML = `<tr><th>No.</th><th>Name</th><th>Kind</th></tr>` + (d.accounts || []).map(a => `<tr><td>${esc(a.no)}</td><td>${esc(a.name)}</td><td class="meta">${esc(a.kind)}</td></tr>`).join("");
+  const P = d.params;
+  [["tkPDays", "days"], ["tkPGrace", "grace"], ["tkPAbs", "tol_abs"], ["tkPPct", "tol_pct"], ["tkPTips", "tips_pct"]].forEach(([id, key]) => { if (document.activeElement !== $(id)) { $(id).value = P[key]; $(id).disabled = !ed; } });
+  $("tkSave").disabled = !ed; $("tkSave").title = ed ? "" : "Your role cannot change Settings (needs finance.settings.manage).";
+  $("tkDefs").innerHTML = `<p><b>Simphony.</b> The payments of each business day by tender media, every revenue centre together; the day's net sales (VAT included), VAT, service charge and returns. Paid out at the till lowers the cash expected, paid in raises it.</p>
+    <p><b>Business Central.</b> Bank account ledger entries on the restaurant's department: receipts (debits) on the accounts of the channel, less the reversals of receipts. The days are read up to today, so a receipt posted late still pays its day.</p>
+    <p><b>Matching.</b> The receipts of a channel pay its days first in, first out. A day is received when what is left is within ${fmt(P.tol_abs)} or ${P.tol_pct}%; late when it was paid after its lag; not received after its lag and ${P.grace} grace days; within the lag before that. Receipts left with no takings to pay are "no takings".</p>
+    <p><b>Cases.</b> Not received, received with no takings, refunds and chargebacks → Finance (treasury). Tenders not mapped and tips above ${P.tips_pct}% → Chief accountant. They go to the Exceptions register (Takings POS ↔ BC) with the daily email of the register, and close by themselves when the data meets.</p>
+    <p><b>Not yet.</b> Bank and terminal settlement extracts (what really reached the bank, acquirer fees, chargebacks notified by the bank) are not read: this compares the till with what is posted in Business Central. They come in a later step.</p>`;
+}
+$("tkRead").onclick = () => loadReceipts(true);
+$("tkReg").onclick = () => { navTo("register"); $("rgSource").innerHTML = `<option value="receipts_rec">Takings POS ↔ BC</option>`; $("rgSource").value = "receipts_rec"; loadRegister(); };
+$("tkSave").onclick = async () => {
+  if (!tkData) return;
+  const tenders = {};
+  document.querySelectorAll("#tkMap tr[data-tkt]").forEach(tr => {
+    const f = n => (tr.querySelector(`[data-f="${n}"]`) || {}).value;
+    tenders[tr.dataset.tkt] = {group: f("group"), accounts: f("accounts") || "", lag: f("lag")};
+  });
+  $("tkMsg").textContent = "Saving…";
+  try { await simphonyPost("/api/receipts/config", {company: tkData.company, tenders,
+      params: {days: $("tkPDays").value, grace: $("tkPGrace").value, tol_abs: $("tkPAbs").value, tol_pct: $("tkPPct").value, tips_pct: $("tkPTips").value}});
+    $("tkMsg").textContent = "Saved. Reading again with the mapping…"; loadReceipts(true); }
+  catch (e) { $("tkMsg").textContent = "Could not save: " + e.message; }
+};
 
 const TH_LABEL = {materiality:"Materiality (ALL)", stock_monitor_days:"Stock unchanged, monitor (days)",
   stock_slow_days:"Stock unchanged, slow-moving (days)", stock_dead_days:"Stock unchanged, non-moving (days)",
@@ -4712,6 +4853,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="register") loadRegister();
+  if(b.dataset.view==="receipts" && (!tkData || tkData.company !== ($("company").value || tkData.company))) loadReceipts(false);
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
   if(b.dataset.view==="settings") { liSettings(); loadKm(); loadAc(); }
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);

@@ -247,7 +247,9 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # Liquidity & capital: whoever reads the balance sheet
                  "finance.s.pl.liquidity": "finance.s.pl.bs",
                  # Executive dashboard → Balance & capital: whoever holds its Executive KPIs
-                 "platform.s.executive.balance": "platform.s.executive.overview"}
+                 "platform.s.executive.balance": "platform.s.executive.overview",
+                 # takings POS ↔ BC: whoever reads the sales reconciliation or cash & bank
+                 "finance.s.receipts": ("finance.s.salesrec", "finance.s.cash.main")}
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 

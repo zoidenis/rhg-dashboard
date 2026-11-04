@@ -40,6 +40,7 @@ import requests
 import cost_report
 import negstock
 import allocation
+import rcpt
 import capital
 import dq
 import kpilib
@@ -91,6 +92,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
+                     "/api/receipts/config": "settings",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -1633,6 +1635,16 @@ def register_after_sales(company, r):
 salesrec.on_built = register_after_sales
 
 
+def register_after_receipts(company, r):
+    """After every complete takings reconciliation: its cases into the register, for the days it covered."""
+    if not r.get("complete"):
+        return None
+    return exreg.sync("receipts_rec", company, rcpt.findings(r), in_scope=rcpt.in_scope(r))
+
+
+rcpt.on_built = register_after_receipts
+
+
 def register_controls(actor="scheduler", force=False):
     """The daily control run: every company of the negative stock email, read once a day (the 07:30 email has
     usually read it already), and the sales reconciliation Simphony ↔ BC of every company with restaurants."""
@@ -1656,6 +1668,21 @@ def register_controls(actor="scheduler", force=False):
         except Exception as exc:                                    # noqa: BLE001
             traceback.print_exc()
             out.append({"company": c, "control": "sales_rec", "status": "failed", "detail": str(exc)[:300]})
+    for c in rcpt.companies():
+        if known is not None and c.upper() not in known:
+            continue
+        if not force and exreg.synced_today("receipts_rec", c):
+            out.append({"company": c, "control": "receipts_rec", "status": "already read today"})
+            continue
+        try:
+            r = rcpt.build(client, c, _latest, in_parallel_jobs)
+            rcpt.remember(c, r)
+            reg = register_after_receipts(c, r)
+            out.append({"company": c, "control": "receipts_rec", "status": "synced" if reg else "not synced",
+                        "receipts_rec": reg, "detail": "" if reg else "; ".join(r.get("errors") or [])[:300]})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "control": "receipts_rec", "status": "failed", "detail": str(exc)[:300]})
     for c in negrep.companies():
         if not force and exreg.synced_today("negative_stock", c):
             out.append({"company": c, "status": "already read today"})
@@ -2543,6 +2570,17 @@ class Handler(BaseHTTPRequestHandler):
                                               q.get("mode", "month"), q.get("dimension")))
             elif url.path == "/api/consolidation":
                 self._send(200, consolidation_screen(q.get("period"), q.get("mode", "month")))
+            elif url.path == "/api/receipts":
+                if not auth.can(user, "finance.s.receipts"):
+                    self._send(403, {"error": "Your role does not include Takings POS ↔ BC."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    r = rcpt.request(client, company, _latest, in_parallel_jobs, q.get("refresh") == "1")
+                except ValueError as exc:
+                    r = {"available": False, "error": str(exc)}
+                self._send(200, dict(r, companies=rcpt.companies(), can_settings=auth.can(user, "settings"))
+                           if isinstance(r, dict) else r)
             elif url.path == "/api/dq":
                 self._send(200, dq_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month")))
@@ -2729,6 +2767,14 @@ class Handler(BaseHTTPRequestHandler):
                 with _dash_lock:
                     _dash_cache.clear()
                 self._send(200, kpi_mapping_screen(company))
+            elif url.path == "/api/receipts/config":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                company = body.get("company") or config.BC_COMPANY
+                c = rcpt.save_config(company, body.get("params") or {}, body.get("tenders") or {},
+                                     user.get("name") or actor)
+                self._send(200, {"ok": True, "config": c})
             elif url.path == "/api/allocation":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
