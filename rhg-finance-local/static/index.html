@@ -339,6 +339,14 @@ td.num,th.num{text-align:right}
 .sk-c-missing{background:var(--up)}.sk-c-empty,.sk-c-incomplete{background:var(--warn)}.sk-c-off{background:#dcc07a}
 .sk-c-unused{background:var(--prev)}.sk-c-ok{background:var(--down)}.sk-c-low_use{background:var(--line)}
 .sk-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.cn-up{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.cn-up label.mini{display:inline-flex;align-items:center}
+#cnLines td.num,#cnLines th.num{white-space:nowrap}
+.cn-st{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--rhg-sky,#efede6);color:var(--ink)}
+.cn-st.short{background:var(--up-bg);color:var(--up)}.cn-st.surplus{background:var(--warn-bg);color:var(--warn)}
+.cn-st.match{background:var(--down-bg);color:var(--down)}
+#v-stockcount .neg{color:var(--up)}
+#v-stockcount .card-head select,#cnSheet{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
 .sk-chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
 .sk-chips button.on{border-color:var(--ink);font-weight:600}
 .sk-chips i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
@@ -460,6 +468,7 @@ td.num,th.num{text-align:right}
     <button data-view="itemmaster" data-parent="inventory" style="display:none">Item master control</button>
     <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
     <button data-view="discharge" data-parent="inventory" style="display:none">Received vs discharged</button>
+    <button data-view="stockcount" data-parent="inventory" style="display:none">Stock count analysis</button>
     <button data-view="stockwc" data-parent="inventory" style="display:none">Stock &amp; working capital</button>
 
     <div class="grp">Planning</div>
@@ -841,7 +850,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -964,6 +973,46 @@ td.num,th.num{text-align:right}
       <div class="scroll"><table id="dcComp"></table></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
       <div class="hint" id="dcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-stockcount">
+    <div class="card">
+      <div class="card-head"><div><h2>Stock count analysis</h2>
+        <p class="hint"><span>The stock Business Central holds at a location at the end of the month (the month's Inventory Valuation: opening, increases, decreases, closing) against the physical count uploaded as the Excel form.</span> <span>Every difference at the average cost of the month end.</span> <span>Business Central is read only.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select id="cnLoc" aria-label="Location"><option value="">Choose a location</option></select>
+          <select id="cnMonth" aria-label="Month"></select>
+          <button class="mini dark" id="cnRead">Read BC again</button><button class="mini" id="cnXlsx">Excel</button></div></div>
+      <div class="cn-up" id="cnUp">
+        <label class="mini dark" style="cursor:pointer">Upload the count form (Excel)<input type="file" id="cnFile" accept=".xlsx" hidden></label>
+        <select id="cnSheet" hidden aria-label="Sheet of the form"></select>
+        <span class="meta" id="cnUpMsg"></span></div>
+      <div class="kpis six" id="cnKpis" style="margin-top:14px"></div>
+      <p class="meta" id="cnStatus">Choose the location and the month the count closes.</p>
+    </div>
+    <div class="card" id="cnCatCard" hidden><div class="card-head"><div><h2>By category</h2>
+      <p class="hint">BC closing value, counted value and the differences by item category (Business Central's; the form's when the item is not in BC).</p></div></div>
+      <div class="scroll"><table id="cnCats"></table></div></div>
+    <div class="card" id="cnLinesCard" hidden><div class="card-head"><div><h2 id="cnLinesT">Lines</h2><p class="hint" id="cnLinesNote"></p></div></div>
+      <div class="sk-chips" id="cnChips"></div>
+      <div class="filters" style="margin:0 0 10px"><label>Item<input id="cnQ" placeholder="number or name"></label></div>
+      <div class="scroll"><table id="cnLines"></table></div><p class="meta" id="cnMore"></p></div>
+    <div class="card" id="cnValCard" hidden><div class="card-head"><div><h2>Inventory valuation</h2>
+      <p class="hint" id="cnValNote"></p></div></div>
+      <div class="scroll"><table id="cnVal"></table></div></div>
+    <div class="card"><div class="card-head"><div><h2>Counts uploaded</h2>
+      <p class="hint">Every count form uploaded for this company, by month and location; a new upload of the same location and month replaces the one before.</p></div></div>
+      <div class="scroll"><table id="cnCounts"></table></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" style="margin-top:12px;line-height:1.55">
+        <p><span>BC closing quantity: Inventory by date at the last day of the month for the location (the item card in Business Central).</span></p>
+        <p><span>Closing value: the remaining cost of the open item ledger entries of the location today (actual and expected cost, in proportion to the quantity still open), less the cost of every entry posted after the month end.</span> <span>The same done for the quantity must give BC's closing quantity: the line Quantity check says whether it does.</span></p>
+        <p><span>Increases and decreases: the entries of the month (from the 1st to the last day) with a positive and a negative quantity, at their cost.</span> <span>Opening = closing − increases − decreases.</span></p>
+        <p><span>Average cost at the month end = closing value ÷ closing quantity.</span> <span>When the closing quantity is not above zero: the cost of the month's increases, then the item card's Unit Cost; the column Cost from names it.</span></p>
+        <p><span>Difference = counted − BC closing quantity; its value = difference × average cost.</span> <span>A blank count is Not counted, never zero.</span> <span>Items with BC stock that are not on the form are listed as Not on the form.</span></p>
+        <p><span>The figures are exact once the cost adjustment (Adjust Cost – Item Entries) has run up to the month end: in this Business Central it runs by hand (Automatic Cost Adjustment = Never), as part of the month-end close.</span></p>
+        <p><span>Excel drops the zeros in front of a number: a code like 7020 on the form is matched to the one BC item 007020.</span></p>
+      </div></details></div>
   </section>
 
   <section class="view" id="v-closing">
@@ -4196,6 +4245,159 @@ async function loadDischarge(refresh){
     renderDischarge();
   }catch(e){ $("dcStatus").textContent = "Could not read: " + e.message; }
 }
+// ---------- Inventory → Stock count analysis (stockcount.py) ----------
+var cnData = null, cnTimer = null, cnFilter = "all", cnFile = null, cnSetupData = null;
+const CN_ST = {match: "Match", short: "Shortage", surplus: "Surplus", not_counted: "Not counted", not_on_form: "Not on the form", unknown: "Not in Business Central"};
+const CN_FLAG = {unit: "Unit differs", form_system: "Form's system stock differs from BC", cost: "Cost not from the month end"};
+const CN_MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const cnMonth = m => { const [y, mo] = String(m || "").split("-"); return mo ? CN_MON[+mo - 1] + " " + y : ""; };
+const cnN = v => v == null ? "–" : fmt(v, Math.abs(v % 1) > 1e-9 ? 2 : 0);
+const cnD = s => s ? s.slice(8, 10) + "." + s.slice(5, 7) + "." + s.slice(0, 4) : "";
+function cnQs(extra){ return new URLSearchParams(Object.assign({company: $("company").value || "", location: $("cnLoc").value, month: $("cnMonth").value || ""}, extra || {})).toString(); }
+function cnSetup(st){
+  cnSetupData = st;
+  const loc = $("cnLoc"), mon = $("cnMonth");
+  if (loc.dataset.co !== st.company) {
+    let want = loc.value;
+    try { want = want || localStorage.getItem("pulse-cn-loc-" + st.company) || ""; } catch (e) { /* storage off */ }
+    loc.innerHTML = `<option value="">Choose a location</option>` + st.locations.map(l => `<option value="${esc(l.code)}">${esc(l.code)}${l.name ? " · " + esc(l.name) : ""}</option>`).join("");
+    if (st.locations.some(l => l.code === want)) loc.value = want;
+    loc.dataset.co = st.company;
+  }
+  if (!mon.options.length) {
+    mon.innerHTML = st.months.map(m => `<option value="${m}">${cnMonth(m)}</option>`).join("");
+    mon.value = st.month || st.default_month;
+  }
+  $("cnUp").style.display = st.can_upload ? "" : "none";
+  $("cnXlsx").style.display = st.can_export ? "" : "none";
+  const cs = st.counts || [];
+  $("cnCounts").innerHTML = `<tr><th>Month</th><th>Location</th><th>File</th><th class="num">Counted lines</th><th class="num">Net difference</th><th>Uploaded</th><th></th></tr>` +
+    (cs.map(c => `<tr><td>${esc(cnMonth(c.month))}</td><td><b>${esc(c.location)}</b></td><td>${esc(c.file || "")}<div class="meta">${esc([c.sheet, (c.meta || {}).counted_by, (c.meta || {}).place].filter(Boolean).join(" · "))}</div></td>
+      <td class="num">${fmt(c.counted_lines)} <span class="meta">of ${fmt(c.lines)}</span></td><td class="num">${c.summary && c.summary.net_value != null ? `<b class="${c.summary.net_value < 0 ? "neg" : ""}">${fmt(c.summary.net_value)}</b>` : "–"}</td>
+      <td class="meta">${esc(c.uploaded_by || "")} · ${esc((c.uploaded_at || "").replace("T", " ").slice(0, 16))}</td>
+      <td style="white-space:nowrap"><button class="mini" data-cnopen="${esc(c.location)}|${esc(c.month)}">Open</button>${st.can_upload ? ` <button class="mini" data-cndel="${esc(c.location)}|${esc(c.month)}">Remove</button>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="7" class="meta">No count uploaded yet for ${esc(st.company)}.</td></tr>`);
+  $("cnCounts").querySelectorAll("[data-cnopen]").forEach(b => b.onclick = () => {
+    const [l, m] = b.dataset.cnopen.split("|"); $("cnLoc").value = l;
+    if (![...$("cnMonth").options].some(o => o.value === m)) $("cnMonth").insertAdjacentHTML("beforeend", `<option value="${esc(m)}">${esc(cnMonth(m))}</option>`);
+    $("cnMonth").value = m; cnData = null; loadCn(false); window.scrollTo({top: 0, behavior: "smooth"}); });
+  $("cnCounts").querySelectorAll("[data-cndel]").forEach(b => b.onclick = async () => {
+    if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Remove for sure?"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "Remove"; } }, 4000); return; }
+    const [l, m] = b.dataset.cndel.split("|");
+    try { await simphonyPost("/api/stockcount/delete", {company: $("company").value || "", location: l, month: m}); cnData = null; loadCn(false); }
+    catch (e) { $("cnUpMsg").textContent = "Could not remove: " + e.message; }
+  });
+}
+async function loadCn(refresh){
+  clearTimeout(cnTimer);
+  const loc = $("cnLoc").value;
+  if (loc) { try { localStorage.setItem("pulse-cn-loc-" + ($("company").value || ""), loc); } catch (e) { /* storage off */ } }
+  $("cnStatus").textContent = loc ? "Reading Business Central…" : "Choose the location and the month the count closes.";
+  if (!loc) { cnData = null; cnRender(); }
+  try {
+    const j = await readJSON(await fetch("/api/stockcount?" + cnQs(refresh ? {refresh: 1} : {})));
+    if (j.setup) cnSetup(j.setup);
+    if (!$("cnLoc").value) { cnData = null; cnRender(); $("cnStatus").textContent = "Choose the location and the month the count closes."; return; }
+    if (j.pending) { $("cnStatus").textContent = `Reading Business Central: ${j.stage || "starting"}…`; cnTimer = setTimeout(() => loadCn(false), 3000); return; }
+    if (!j.available) throw new Error(j.error || "not available");
+    cnData = j; cnRender();
+  } catch (e) { $("cnStatus").textContent = "Could not read: " + e.message; }
+}
+function cnRender(){
+  const d = cnData;
+  ["cnCatCard", "cnLinesCard", "cnValCard"].forEach(id => $(id).hidden = !d);
+  if (!d) { $("cnKpis").innerHTML = ""; return; }
+  const t = d.totals, c = d.count;
+  // values in millions on the cards (the full figure in the tooltip and the tables)
+  const card = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}" title="${v}">${v === "–" ? v : ilM(+String(v).replace(/,/g, ""))}</div><div class="s">${sub}</div></div>`;
+  $("cnKpis").innerHTML = c ?
+    card("BC closing value", fmt(t.closing_value), `<span>${fmt(t.items)} items</span> · <span>at ${cnD(d.to)}</span>`) +
+    card("Counted value", fmt(t.counted_value), `<span>BC for the same lines ${fmt(t.counted_bc_value)}</span>`) +
+    card("Net difference", fmt(t.net_value), t.net_pct == null ? "" : `<span>${fmt(t.net_pct, 2)}% of the closing value</span>`, t.net_value < 0 ? "up" : t.net_value > 0 ? "warn" : "") +
+    card("Shortages", fmt(t.shortage_value), `<span>${fmt(t.n_short)} lines</span>`, t.n_short ? "up" : "") +
+    card("Surpluses", fmt(t.surplus_value), `<span>${fmt(t.n_surplus)} lines</span>`, t.n_surplus ? "warn" : "") +
+    card("Not counted", fmt(t.not_counted_value), `<span>${fmt(t.n_not_counted)} left blank on the form</span> · <span>${fmt(t.n_not_on_form)} not on the form</span>`, (t.n_not_counted + t.n_not_on_form) ? "warn" : "")
+    : card("BC closing value", fmt(t.closing_value), `<span>${fmt(t.items)} items</span> · <span>at ${cnD(d.to)}</span>`) +
+      card("Opening value", fmt(t.opening_value), `<span>at ${cnD(d.from)}</span>`) +
+      card("Increases", fmt(t.in_value), `<span>the month's entries in</span>`) +
+      card("Decreases", fmt(t.out_value), `<span>the month's entries out</span>`) +
+      card("Count", "–", `<span>No count uploaded for this location and month.</span>`, "warn");
+  const qc = d.qty_check || {};
+  const parts = [`${esc(d.company)} · ${esc(d.location)} · ${cnD(d.from)} → ${cnD(d.to)}`, `<span>read at ${esc((d.read_at || "").replace("T", " ").slice(0, 16))}</span>`,
+    qc.off ? `<span class="neg">Quantity check: the entries do not give BC's closing quantity for ${fmt(qc.off)} items (${esc((qc.examples || []).slice(0, 3).map(x => x[0]).join(", "))})</span>` : `<span>Quantity check: the entries give BC's closing quantity for every item</span>`];
+  if (c) parts.push(`<span>Count: ${esc(c.file || "")}</span>${c.sheet ? " · " + esc(c.sheet) : ""}${(c.meta || {}).counted_by ? " · " + esc(c.meta.counted_by) : ""} · <span>${fmt(c.counted_lines)} of ${fmt(c.lines)} lines counted</span> · <span>uploaded by ${esc(c.uploaded_by || "")}</span>`
+    + (c.month && c.month !== d.month ? ` · <span class="neg">the form says ${esc(cnMonth(c.month))}</span>` : "")
+    + ((c.warnings || []).length ? ` · <span title="${esc(c.warnings.join("\n"))}">${fmt(c.warnings.length)} notes on reading the form</span>` : ""));
+  $("cnStatus").innerHTML = parts.join(" · ");
+  // by category
+  $("cnCatCard").hidden = !c;
+  if (c) $("cnCats").innerHTML = `<tr><th>Category</th><th class="num">Lines</th><th class="num">BC closing value</th><th class="num">Counted value</th><th class="num">Shortages</th><th class="num">Surpluses</th><th class="num">Net difference</th><th class="num">% of BC</th></tr>` +
+    d.categories.map(x => `<tr><td><b>${esc(x.category)}</b></td><td class="num">${fmt(x.lines)}</td><td class="num">${fmt(x.bc_value)}</td><td class="num">${fmt(x.counted_value)}</td><td class="num">${x.shortage ? `<span class="neg">${fmt(x.shortage)}</span>` : "–"}</td><td class="num">${x.surplus ? fmt(x.surplus) : "–"}</td><td class="num"><b>${fmt(x.net)}</b></td><td class="num">${x.bc_value ? fmt(x.net / x.bc_value * 100, 1) + "%" : "–"}</td></tr>`).join("");
+  // lines
+  $("cnLinesCard").hidden = !c;
+  if (c) cnLines();
+  // valuation
+  const V = d.lines.filter(x => x.status !== "unknown").slice().sort((a, b) => Math.abs(b.bc_value) - Math.abs(a.bc_value));
+  $("cnValNote").innerHTML = `<span>Opening at ${cnD(d.from)}, the month's increases and decreases, closing at ${cnD(d.to)}, at cost (actual and expected).</span> <span>The ${fmt(Math.min(V.length, 200))} largest of ${fmt(V.length)} items by closing value; the Excel file has every item.</span>`;
+  const sum = k => V.reduce((s, x) => s + (x[k] || 0), 0);
+  $("cnVal").innerHTML = `<tr><th>Item</th><th class="num">Opening qty</th><th class="num">Opening value</th><th class="num">Increases qty</th><th class="num">Increases value</th><th class="num">Decreases qty</th><th class="num">Decreases value</th><th class="num">Closing qty</th><th class="num">Closing value</th><th class="num">Average cost</th></tr>` +
+    `<tr><td><b>Total</b></td><td></td><td class="num"><b>${fmt(sum("opening_value"))}</b></td><td></td><td class="num"><b>${fmt(sum("in_value"))}</b></td><td></td><td class="num"><b>${fmt(sum("out_value"))}</b></td><td></td><td class="num"><b>${fmt(sum("bc_value"))}</b></td><td></td></tr>` +
+    V.slice(0, 200).map(x => `<tr><td><b>${esc(x.item)}</b> ${esc(x.description)} <span class="meta">${esc(x.unit)}</span></td><td class="num">${cnN(x.opening_qty)}</td><td class="num">${fmt(x.opening_value)}</td><td class="num">${cnN(x.in_qty)}</td><td class="num">${fmt(x.in_value)}</td><td class="num">${cnN(x.out_qty)}</td><td class="num">${fmt(x.out_value)}</td><td class="num"><b>${cnN(x.bc_qty)}</b></td><td class="num"><b>${fmt(x.bc_value)}</b></td><td class="num">${fmt(x.cost, 2)}</td></tr>`).join("");
+}
+function cnLines(){
+  const d = cnData, all = d.lines.filter(x => x.status);
+  const n = k => all.filter(x => x.status === k || (x.flags || []).includes(k)).length;
+  const chips = [["all", "All", all.length], ["short", "Shortage", n("short")], ["surplus", "Surplus", n("surplus")], ["not_counted", "Not counted", n("not_counted")],
+    ["not_on_form", "Not on the form", n("not_on_form")], ["unknown", "Not in Business Central", n("unknown")], ["unit", "Unit differs", n("unit")],
+    ["form_system", "Form's system stock differs from BC", n("form_system")], ["match", "Match", n("match")]].filter(x => x[0] === "all" || x[2]);
+  $("cnChips").innerHTML = chips.map(x => `<button data-cnf="${x[0]}" class="${cnFilter === x[0] ? "on" : ""}"><span>${esc(x[1])}</span> · ${fmt(x[2])}</button>`).join("");
+  $("cnChips").querySelectorAll("button").forEach(b => b.onclick = () => { cnFilter = b.dataset.cnf; cnLines(); });
+  const q = $("cnQ").value.trim().toLowerCase();
+  const rows = all.filter(x => (cnFilter === "all" || x.status === cnFilter || (x.flags || []).includes(cnFilter))
+    && (!q || (x.item + " " + (x.form_item || "") + " " + x.description).toLowerCase().includes(q)));
+  $("cnLinesT").textContent = `Lines · ${fmt(rows.length)}`;
+  $("cnLinesNote").innerHTML = `<span>Largest difference in value first.</span> <span>Showing ${fmt(Math.min(rows.length, 300))}; the Excel file has every line.</span>`;
+  const st = x => `<span class="cn-st ${x.status}">${esc(CN_ST[x.status] || "")}</span>` + (x.flags || []).filter(f => f !== "cost").map(f => ` <span class="cn-st" title="${esc(CN_FLAG[f])}">${esc(f === "unit" ? "Unit" : "Form ≠ BC")}</span>`).join("");
+  $("cnLines").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">BC closing</th><th class="num">Form system</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Average cost</th><th class="num">Difference value</th><th>Status</th><th>Comment</th></tr>` +
+    (rows.slice(0, 300).map(x => `<tr><td><b>${esc(x.item)}</b>${x.form_item ? ` <span class="meta">(${esc(x.form_item)} on the form)</span>` : ""} ${esc(x.description)}<div class="meta">${esc(x.category || x.form_category)}</div></td>
+      <td>${esc(x.unit || x.form_unit)}${x.flags.includes("unit") ? `<div class="meta neg">${esc(x.form_unit)} on the form</div>` : ""}</td>
+      <td class="num">${cnN(x.bc_qty)}</td><td class="num">${x.form_system == null ? "–" : cnN(x.form_system)}</td><td class="num"><b>${x.counted == null ? "–" : cnN(x.counted)}</b></td>
+      <td class="num">${x.diff_qty == null ? "–" : `<b class="${x.diff_qty < 0 ? "neg" : ""}">${cnN(x.diff_qty)}</b>`}</td>
+      <td class="num">${fmt(x.cost, 2)}${x.cost_source !== "month end" ? `<div class="meta">${esc(x.cost_source === "none" ? "no cost" : x.cost_source)}</div>` : ""}</td>
+      <td class="num">${x.diff_value == null ? (x.status === "not_on_form" || x.status === "not_counted" ? `<span class="meta">BC ${fmt(x.bc_value)}</span>` : "–") : `<b class="${x.diff_value < 0 ? "neg" : ""}">${fmt(x.diff_value)}</b>`}</td>
+      <td>${st(x)}</td><td class="meta" style="max-width:260px">${esc(x.comment)}</td></tr>`).join("")
+      || `<tr><td colspan="10" class="meta">Nothing for this filter.</td></tr>`);
+}
+async function cnUpload(sheet){
+  if (!cnFile) return;
+  if (!$("cnLoc").value) { $("cnUpMsg").textContent = "Choose the location of the count first."; return; }
+  $("cnUpMsg").textContent = "Reading the form…";
+  try {
+    const j = await simphonyPost("/api/stockcount/upload", {company: $("company").value || "", location: $("cnLoc").value, month: $("cnMonth").value,
+      filename: cnFile.name, data: cnFile.data, sheet: sheet || ""});
+    const sel = $("cnSheet");
+    sel.hidden = (j.sheets || []).length < 2;
+    sel.innerHTML = (j.sheets || []).map(x => `<option${x === j.sheet ? " selected" : ""}>${esc(x)}</option>`).join("");
+    const other = j.month_on_form && j.month_on_form !== $("cnMonth").value;
+    $("cnUpMsg").innerHTML = `<span>Read ${fmt(j.counted_lines)} counted lines of ${fmt(j.lines)}</span> (${esc(j.sheet)})` +
+      (other ? ` · <span class="neg">the form says ${esc(cnMonth(j.month_on_form))}; it is kept for ${esc(cnMonth($("cnMonth").value))}</span>` : "") +
+      ((j.warnings || []).length ? ` · <span title="${esc(j.warnings.join("\n"))}">${fmt(j.warnings.length)} notes</span>` : "");
+    cnData = null; cnFilter = "all"; loadCn(false);
+  } catch (e) { $("cnUpMsg").textContent = "Could not read the form: " + e.message; }
+}
+$("cnFile").onchange = () => {
+  const f = $("cnFile").files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { cnFile = {name: f.name, data: String(rd.result).split(",")[1] || ""}; $("cnFile").value = ""; cnUpload(""); };
+  rd.readAsDataURL(f);
+};
+$("cnSheet").onchange = () => cnUpload($("cnSheet").value);
+$("cnLoc").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; loadCn(false); };
+$("cnMonth").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; loadCn(false); };
+$("cnRead").onclick = () => { cnData = null; loadCn(true); };
+$("cnXlsx").onclick = () => { if (cnData) location.href = "/api/stockcount/xlsx?" + cnQs(); };
+$("cnQ").oninput = () => cnData && cnLines();
+$("company").addEventListener("change", () => { $("cnLoc").dataset.co = ""; cnData = null; if ($("v-stockcount").classList.contains("on")) loadCn(false); });
 $("dcRead").onclick = () => { dcData = null; loadDischarge(true); };
 $("dcDays").onchange = () => { dcData = null; loadDischarge(false); };
 $("dcLocSel").onchange = () => dcData && renderDischarge();
@@ -4853,6 +5055,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
+  if(b.dataset.view==="stockcount") loadCn(false);
   if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="receipts" && (!tkData || tkData.company !== ($("company").value || tkData.company))) loadReceipts(false);
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
@@ -5043,7 +5246,7 @@ function ilBar(L, cls){
 // Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
 // Typology & turnover, Recipe integrity, Item master control and Movement & dead stock, which stay views
 // of their own (their addresses and loading do not change) with the same tab bar on top.
-var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockwc"]);
+var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockcount", "stockwc"]);
 // the embedded Purchasing screen: loaded when the tab opens (again when the company changes), sized to its content
 var swCompany = null, swTimer = null;
 function swShow(){

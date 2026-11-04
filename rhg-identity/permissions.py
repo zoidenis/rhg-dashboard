@@ -255,6 +255,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "platform.s.executive.balance": "platform.s.executive.overview",
                  # takings POS ↔ BC: whoever reads the sales reconciliation or cash & bank
                  "finance.s.receipts": ("finance.s.salesrec", "finance.s.cash.main"),
+                 # Inventory → Stock count analysis: whoever reads Movement & dead stock
+                 "finance.s.inventory.stockcount": "finance.s.inventory.movement",
                  # scheduled reports: whoever sets the towers' email settings
                  "reports.manage": ("finance.settings.manage", "purchasing.settings.manage")}
 

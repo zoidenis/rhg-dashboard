@@ -56,6 +56,7 @@ FINANCE = [
         ("discharge", "Received vs discharged", "company", ["finance.inventory.view"]),
         ("itemmaster", "Item master control", "company", ["finance.inventory.view"]),
         ("movement", "Movement & dead stock", "company", ["finance.inventory.view"]),
+        ("stockcount", "Stock count analysis", "company", ["finance.inventory.view"]),
         ("stockwc", "Stock & working capital", "company", ["finance.inventory.view", "purchasing.view"]),
         ("today", "Today", "location", ["finance.inventory.view"])]),
     ("budget", "Budget & forecast", "Planning", "bgTabs", [

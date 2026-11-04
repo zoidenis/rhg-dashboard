@@ -41,6 +41,7 @@ import cost_report
 import negstock
 import allocation
 import rcpt
+import stockcount
 import capital
 import dq
 import kpilib
@@ -93,6 +94,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
                      "/api/receipts/config": "settings",
+                     "/api/stockcount/upload": "actions", "/api/stockcount/delete": "actions",
                      "/api/sales/channel-profit/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
@@ -1804,7 +1806,7 @@ def arap_status(user):
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
 EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
-                "/api/discharge/xlsx",
+                "/api/discharge/xlsx", "/api/stockcount/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/simphony/status", "/api/users",
@@ -1922,6 +1924,52 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand)
         return None
+
+    def _stockcount(self, q, user, xlsx):
+        """Inventory → Stock count analysis: the month's valuation of a location against its count."""
+        company = q.get("company") or config.BC_COMPANY
+        month = q.get("month") or stockcount.default_month()
+        try:
+            stockcount.month_range(month)
+        except (ValueError, TypeError):
+            month = stockcount.default_month()
+        location = (q.get("location") or "").strip()
+        try:
+            codes = client.locations(company)
+        except BCError as exc:
+            self._send(200, {"available": False, "error": str(exc)[:300]})
+            return
+        names = {(r.get("bc") or "").upper(): r.get("name") for r in locintel.registry()
+                 if (r.get("company") or "").upper() == company.upper() and r.get("bc")}
+        today = date.today().replace(day=1)
+        setup = {"company": company, "month": month, "default_month": stockcount.default_month(),
+                 "months": [(today - timedelta(days=1 + 31 * i)).strftime("%Y-%m") for i in range(13)],
+                 "locations": [{"code": c, "name": names.get(c.upper()) or ""} for c in codes],
+                 "counts": stockcount.counts(company), "can_upload": auth.can(user, "actions"),
+                 "can_export": auth.can(user, "export")}
+        if xlsx:
+            hit = stockcount.request(client, company, location, month) if location in codes else {}
+            if not hit.get("available"):
+                self._send(409, {"error": "Read the analysis first."})
+                return
+            body = stockcount.render_xlsx(hit)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                             f'stock_count_{location.replace(" ", "_")}_{month}.xlsx"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if not location:
+            self._send(200, {"available": False, "setup": setup})
+            return
+        if location not in codes:
+            self._send(200, {"available": False, "setup": setup, "error": f"{location} is not a location of {company}."})
+            return
+        r = stockcount.request(client, company, location, month, q.get("refresh") == "1")
+        self._send(200, dict(r, setup=setup))
 
     def _service_call(self):
         """Another RHG service on the internal network (identity asking for Unicorn's facts)."""
@@ -2581,6 +2629,11 @@ class Handler(BaseHTTPRequestHandler):
                     r = {"available": False, "error": str(exc)}
                 self._send(200, dict(r, companies=rcpt.companies(), can_settings=auth.can(user, "settings"))
                            if isinstance(r, dict) else r)
+            elif url.path in ("/api/stockcount", "/api/stockcount/xlsx"):
+                if not auth.can(user, "finance.s.inventory.stockcount"):
+                    self._send(403, {"error": "Your role does not include Stock count analysis."})
+                    return
+                self._stockcount(q, user, url.path.endswith("/xlsx"))
             elif url.path == "/api/dq":
                 self._send(200, dq_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                           q.get("mode", "month")))
@@ -2767,6 +2820,32 @@ class Handler(BaseHTTPRequestHandler):
                 with _dash_lock:
                     _dash_cache.clear()
                 self._send(200, kpi_mapping_screen(company))
+            elif url.path in ("/api/stockcount/upload", "/api/stockcount/delete"):
+                if not auth.can(user, "finance.s.inventory.stockcount"):
+                    self._send(403, {"error": "Your role does not include Stock count analysis."})
+                    return
+                company, location = body.get("company") or config.BC_COMPANY, str(body.get("location") or "").strip()
+                month = str(body.get("month") or "")
+                try:
+                    stockcount.month_range(month)
+                except (ValueError, TypeError):
+                    self._send(400, {"error": "Choose the month the count closes."})
+                    return
+                if not location or location not in client.locations(company):
+                    self._send(400, {"error": "Choose the location of the count."})
+                    return
+                if url.path.endswith("/delete"):
+                    self._send(200, {"ok": stockcount.delete(company, location, month, actor)})
+                    return
+                try:
+                    parsed = stockcount.parse(stockcount.decode(body.get("data")), body.get("sheet") or None)
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                c = stockcount.save(company, location, month, parsed, body.get("filename"), actor)
+                self._send(200, {"ok": True, "sheet": c["sheet"], "sheets": c["sheets"], "meta": c["meta"],
+                                 "month_on_form": c["month"], "lines": len(c["rows"]),
+                                 "counted_lines": c["counted_lines"], "warnings": c["warnings"]})
             elif url.path == "/api/receipts/config":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
