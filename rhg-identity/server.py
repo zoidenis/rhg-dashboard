@@ -19,6 +19,7 @@ import auth
 import config
 import layouts
 import permissions
+import reports
 import screens
 import store
 import unicorn
@@ -37,6 +38,7 @@ STATIC_FILES = {
     "locintel.js": "application/javascript; charset=utf-8",
     "locintel.css": "text/css; charset=utf-8",
     "tables.js": "application/javascript; charset=utf-8",
+    "reports.js": "application/javascript; charset=utf-8",
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",
                 "/brand.css", "/app.css", "/icon.svg", "/manifest.webmanifest", "/sw.js",
@@ -80,6 +82,19 @@ def i18n_bundle():
         body = "window.PULSE_SQ=" + json.dumps(words, ensure_ascii=False, separators=(",", ":")) + ";\n" + runtime
         _i18n.update(key=key, body=body.encode("utf-8"))
     return _i18n["body"]
+
+
+_opts = {"at": 0, "value": None}
+
+
+def scope_options_cached():
+    """scope_options, kept 10 minutes (the report tool reads it each time it opens)."""
+    if _opts["value"] and time.time() - _opts["at"] < 600:
+        return 200, _opts["value"]
+    status, body = scope_options()
+    if status == 200:
+        _opts.update(at=time.time(), value=body)
+    return status, body
 
 
 def scope_options():
@@ -226,6 +241,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.can(user, "admin.users.manage"):
                     self._send(403, {"error": "Your role cannot manage accounts."}); return
                 self._send(*scope_options())
+            elif url.path == "/api/reports":
+                # Scheduled reports: the list, the screens that can be sent, the people who can receive them
+                if not auth.can(user, "reports.manage"):
+                    self._send(403, {"error": "Your role cannot schedule reports."}); return
+                self._send(200, reports.view(user))
+            elif url.path == "/api/reports/locations":
+                if not auth.can(user, "reports.manage"):
+                    self._send(403, {"error": "Your role cannot schedule reports."}); return
+                self._send(*scope_options_cached())
             elif url.path == "/api/unicorn/status":
                 # For the menus: may this person talk to Unicorn, and how many briefs are unread.
                 ok = auth.can(user, "unicorn.use")
@@ -301,6 +325,16 @@ class Handler(BaseHTTPRequestHandler):
 
             body = self._body()
 
+            # --- the report sender (rhg-reporter): the runs to do now, and how they went
+            if url.path in ("/internal/reports/claim", "/internal/reports/done"):
+                if not self._service_ok():
+                    self._send(403, {"error": "Bad service token."}); return
+                if url.path.endswith("/claim"):
+                    self._send(200, reports.claim(body.get("reporter") or {}))
+                else:
+                    self._send(200, {"ok": reports.done(body.get("run"), body.get("results"), body.get("detail"))})
+                return
+
             if url.path == "/api/login":
                 if rate_limited(ip):
                     self._send(429, {"error": "Too many failed attempts. Try again in a few minutes."}); return
@@ -328,6 +362,23 @@ class Handler(BaseHTTPRequestHandler):
             # Everything below changes state, so it must carry the CSRF token.
             if not self._csrf_ok(user):
                 self._send(403, {"error": "Missing or wrong CSRF token."}); return
+            if user.get("report"):                  # a report session only reads
+                self._send(403, {"error": "A report session cannot change anything."}); return
+
+            if url.path in ("/api/reports", "/api/reports/delete", "/api/reports/send"):
+                if not auth.can(user, "reports.manage"):
+                    self._send(403, {"error": "Your role cannot schedule reports."}); return
+                try:
+                    if url.path == "/api/reports":
+                        self._send(200, {"report": reports.save(body, user["username"])})
+                    elif url.path.endswith("/delete"):
+                        self._send(200, {"ok": reports.delete(str(body.get("id") or ""), user["username"])})
+                    else:
+                        self._send(200, reports.send_now(str(body.get("id") or ""), user["username"],
+                                                         bool(body.get("test"))))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                return
 
             if url.path == "/api/me/lang":
                 # the language of pulse for the signed-in person (sq, en); every page reads it from the session

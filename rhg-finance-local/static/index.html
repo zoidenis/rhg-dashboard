@@ -1448,6 +1448,7 @@ td.num,th.num{text-align:right}
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="liRegSave">Save</button><span class="meta" id="liRegMsg"></span></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="pulseReports" hidden></div><!-- scheduled reports (/reports.js) -->
     <div class="card" style="margin-bottom:15px" id="arCard">
       <div class="card-head"><div><h2>Receivables &amp; payables email</h2>
         <p class="hint">A daily email with the exceptions of the Payables and Receivables control sections: overdue beyond the critical limit, supplier accounts in debit and concentration, with the ageing; every exception, document by document, comes as an attached PDF. It is sent through the mail server set up in Purchasing → Settings, so no password is entered here.</p></div>
@@ -6976,5 +6977,6 @@ document.addEventListener("keydown", e => {
 <script src="tables.js"></script>
 <script src="layout.js" data-app="finance"></script>
 <script src="recipients.js"></script>
+<script src="/reports.js"></script><!-- scheduled reports: any screen by email (identity) -->
 </body>
 </html>

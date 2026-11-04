@@ -44,6 +44,9 @@ PERMISSIONS = {
     # --- Unicorn, the business analyst (morning brief and chat; for management)
     "unicorn.use":           "Talk to Unicorn, the business analyst: the morning brief and the chat",
 
+    # --- Scheduled reports (any screen of pulse sent by email, as each recipient sees it)
+    "reports.manage":        "Schedule screens as email reports and choose who receives them",
+
     # --- Platform
     "admin.users.manage":    "Create, edit and disable accounts",
     "admin.roles.manage":    "Change what roles are allowed to do",
@@ -67,6 +70,7 @@ ACTIONS = {
     "purchasing.actions.manage": "Purchasing: create and update actions",
     "purchasing.settings.manage": "Purchasing: change thresholds and email settings",
     "unicorn.use": "Unicorn, the business analyst: the morning brief and the chat",
+    "reports.manage": "Scheduled reports: send screens by email, choose how often and to whom",
     "layout.personal": "Rearrange and hide sections for yourself",
     "layout.roles.manage": "Set the sections each role sees, and their order",
     "admin.users.manage": "Administration: create, edit and disable accounts, and their access",
@@ -111,8 +115,9 @@ def _s(*prefixes, but=()):
 _FIN_ALL = _s("finance.s")
 _PUR_ALL = _s("purchasing.s")
 _EXEC = _s("platform.s.executive")
-_FIN_ACT = ["finance.export", "finance.actions.manage", "finance.closing.manage", "finance.settings.manage"]
-_PUR_ACT = ["purchasing.export", "purchasing.actions.manage", "purchasing.settings.manage"]
+_FIN_ACT = ["finance.export", "finance.actions.manage", "finance.closing.manage", "finance.settings.manage",
+            "reports.manage"]
+_PUR_ACT = ["purchasing.export", "purchasing.actions.manage", "purchasing.settings.manage", "reports.manage"]
 
 # ---------------------------------------------------------------- roles
 # The administration of RHG by department (Purchasing, Sales, Finance, HR), plus management. Each can be changed
@@ -249,7 +254,9 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # Executive dashboard → Balance & capital: whoever holds its Executive KPIs
                  "platform.s.executive.balance": "platform.s.executive.overview",
                  # takings POS ↔ BC: whoever reads the sales reconciliation or cash & bank
-                 "finance.s.receipts": ("finance.s.salesrec", "finance.s.cash.main")}
+                 "finance.s.receipts": ("finance.s.salesrec", "finance.s.cash.main"),
+                 # scheduled reports: whoever sets the towers' email settings
+                 "reports.manage": ("finance.settings.manage", "purchasing.settings.manage")}
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 

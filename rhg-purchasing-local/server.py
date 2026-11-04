@@ -1541,7 +1541,9 @@ class Handler(BaseHTTPRequestHandler):
 
     # what another tower may attach: content type -> (file extension, first bytes of the file)
     ATTACHMENT_TYPES = {"application/pdf": (".pdf", b"%PDF"), "text/csv": (".csv", b""),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (".xlsx", b"PK\x03\x04")}
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": (".xlsx", b"PK\x03\x04"),
+                        # pictures of a screen (scheduled reports): shown in the body (cid) or attached
+                        "image/png": (".png", b"\x89PNG"), "image/jpeg": (".jpg", b"\xff\xd8\xff")}
 
     def _internal_mail(self, body):
         """Sends one email for another tower (Finance) through the mail server set up here,
@@ -1557,12 +1559,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": "Recipients, subject or body are not valid."})
             return
         source = str(body.get("source") or "another tower")[:60]
-        files = []
+        files, inline = [], []
         for a in (body.get("attachments") or [])[:5]:
             name = re.sub(r"[^A-Za-z0-9._ -]", "_", str(a.get("filename") or "attachment"))[:120]
             ctype = str(a.get("content_type") or "application/octet-stream")
             if ctype not in self.ATTACHMENT_TYPES:
-                self._send(400, {"error": "Only PDF, CSV and Excel (.xlsx) attachments are accepted."})
+                self._send(400, {"error": "Only PDF, CSV, Excel (.xlsx) and PNG / JPEG attachments are accepted."})
                 return
             try:
                 data = base64.b64decode(a.get("data") or "", validate=True)
@@ -1576,9 +1578,14 @@ class Handler(BaseHTTPRequestHandler):
             if len(data) > 10_000_000:
                 self._send(400, {"error": "An attachment is larger than 10 MB."})
                 return
-            files.append((name, *ctype.split("/", 1), data))
+            cid = re.sub(r"[^A-Za-z0-9._-]", "", str(a.get("cid") or ""))[:60]
+            if cid and ctype.startswith("image/"):
+                inline.append((cid, *ctype.split("/", 1), data))
+            else:
+                files.append((name, *ctype.split("/", 1), data))
         try:
-            notify.send_mail(to, [c for c in cc if c not in to], subject, html_body, text_body or subject, files)
+            notify.send_mail(to, [c for c in cc if c not in to], subject, html_body, text_body or subject, files,
+                             inline)
         except Exception as exc:                                # noqa: BLE001
             store.audit("internal mail", source, "service", {}, {"to": to, "cc": cc, "status": "failed"},
                         str(exc)[:300])

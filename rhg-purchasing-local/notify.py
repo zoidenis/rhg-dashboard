@@ -60,8 +60,9 @@ def parse_emails(text):
     return out, bad
 
 
-def send_mail(to, cc, subject, html_body, text_body, attachments=None):
-    """attachments: [(filename, maintype, subtype, bytes)]"""
+def send_mail(to, cc, subject, html_body, text_body, attachments=None, inline=None):
+    """attachments: [(filename, maintype, subtype, bytes)]; inline: [(cid, maintype, subtype, bytes)], pictures the
+    html shows with src="cid:<cid>"."""
     smtp = smtp_config.current()
     if not smtp_config.ready(smtp):
         raise RuntimeError("Complete the mail server settings before sending email.")
@@ -75,6 +76,10 @@ def send_mail(to, cc, subject, html_body, text_body, attachments=None):
     msg["Message-ID"] = make_msgid(domain=(smtp["from"].split("@")[-1] or "rhg.al").strip(">"))
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
+    if inline:
+        part = msg.get_body(("html",))
+        for cid, maintype, subtype, data in inline:
+            part.add_related(data, maintype=maintype, subtype=subtype, cid=f"<{cid}>", disposition="inline")
     for name, maintype, subtype, data in attachments or []:
         msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
     context = ssl.create_default_context()

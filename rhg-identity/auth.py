@@ -251,6 +251,30 @@ def login(username, password, ip="", agent=""):
     return token, csrf, None
 
 
+# A report session: the report sender (rhg-reporter) opens a screen as the person who receives it, so the email
+# shows exactly what that person may see (their screens, companies and locations). It is made only on the service
+# token, lives REPORT_MINUTES, reads only (no action, setting or Unicorn right) and is deleted when the run ends.
+REPORT_AGENT = "pulse-report"
+REPORT_MINUTES = 25
+READ_ONLY_KEEP = {"layout.personal", "finance.export", "purchasing.export"}
+
+
+def report_session(username):
+    row = find(username)
+    if not row or not row["active"]:
+        return None
+    token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+    store.run("""INSERT INTO sessions(token,username,csrf,created,last_seen,ip,user_agent)
+                 VALUES(?,?,?,?,?,?,?)""", (token, row["username"], csrf, time.time(), time.time(), "reporter",
+                                           REPORT_AGENT))
+    return token
+
+
+def end_report_sessions(tokens):
+    for t in tokens or []:
+        store.run("DELETE FROM sessions WHERE token=? AND user_agent=?", (t, REPORT_AGENT))
+
+
 def session(token):
     """Returns the signed-in user, or None. Enforces both time limits."""
     if not token:
@@ -258,7 +282,8 @@ def session(token):
     s = store.one("SELECT * FROM sessions WHERE token=?", (token,))
     if not s:
         return None
-    if time.time() - s["created"] > config.SESSION_HOURS * 3600 \
+    report = s["user_agent"] == REPORT_AGENT
+    if time.time() - s["created"] > (REPORT_MINUTES * 60 if report else config.SESSION_HOURS * 3600) \
             or time.time() - s["last_seen"] > config.IDLE_MINUTES * 60:
         store.run("DELETE FROM sessions WHERE token=?", (token,))
         return None
@@ -269,6 +294,9 @@ def session(token):
     store.run("UPDATE sessions SET last_seen=? WHERE token=?", (time.time(), token))
     u = public(row)
     u["csrf"] = s["csrf"]
+    if report:
+        u["permissions"] = [p for p in u["permissions"] if p not in permissions.ACTIONS or p in READ_ONLY_KEEP]
+        u["report"] = True
     return u
 
 

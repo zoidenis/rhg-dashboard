@@ -83,6 +83,25 @@ services:
       start_period: 15s
       retries: 3
 
+  # Scheduled reports: a headless Chromium that opens screens as the people who receive them (short read-only
+  # sessions from identity) and emails a picture and a PDF through the Purchasing mail server. No ports, no data.
+  reporter:
+    depends_on: [identity, nginx]
+    build:
+      context: ../rhg-reporter
+    image: rhg-reporter:latest
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Tirane
+      IDENTITY_URL: "http://identity:8767"
+      SITE_URL: "http://nginx"
+      PURCHASING_URL: "http://purchasing:8765"
+      SERVICE_TOKEN: "${SERVICE_TOKEN}"
+      COOKIE_NAME: "rhg_session"
+    mem_limit: 1200m
+    shm_size: 256m
+    networks: [rhg]
+
   # Internal router: keeps the /finance and /purchasing path rewriting
   # (sub_filter + cookie scoping) that NPM's GUI cannot express.
   # NPM publishes 80/443 and forwards to this on port 80.

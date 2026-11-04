@@ -856,6 +856,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <button class="btn dark" id="prsSave">Save purchasers</button>
       <span class="meta" id="prsSaved" style="margin-left:10px"></span>
     </div>
+    <div class="card" style="margin-bottom:16px" id="pulseReports" hidden></div><!-- scheduled reports (/reports.js) -->
     <div class="card" style="margin-bottom:16px" id="ntCard">
       <div class="card-head"><div><h2>Email notifications</h2>
         <p class="hint">A daily email of the invoices posted without a purchase order: the new ones since the last notice, and those reported before that nobody has closed. An invoice is closed when its action in the Action center is Resolved or Dismissed.</p></div>
@@ -3931,5 +3932,6 @@ $("company").addEventListener("change", () => { prData = null; if ($("v-purchase
 <script src="tables.js"></script>
 <script src="layout.js" data-app="purchasing"></script>
 <script src="recipients.js"></script>
+<script src="/reports.js"></script><!-- scheduled reports: any screen by email (identity) -->
 </body>
 </html>

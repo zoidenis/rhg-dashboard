@@ -154,6 +154,22 @@ përgjigjet pyetjeve në `/unicorn`, vetëm për rolet me të drejtën **unicorn
 furnitorëve/klientëve më të mëdhenj) drejt Anthropic API. Prompt-i kryesor është `rhg-identity/unicorn_prompt.md`;
 një kopje në `identity-data` si `data/unicorn_prompt.md` e zëvendëson pa deploy.
 
+## Raportet e planifikuara (shërbimi `reporter`)
+
+Çdo faqe (tab) e pulse mund të dërgohet me email sipas një orari: Finance/Purchasing → Settings → *Scheduled reports*,
+ose butoni *Schedule as report* në krye të çdo faqeje (për rolet me `reports.manage`).
+
+- Identity mban raportet (`data/reports.json` në volumin e identity-t) dhe vendos kur është radha e secilit.
+- Kontejneri `reporter` (Chromium headless, pa porta, pa të dhëna) pyet identity çdo 30 sekonda, hap faqen **si
+  personi që e merr** (sesion vetëm-lexim 25 minutësh, i krijuar me SERVICE_TOKEN dhe i fshirë në fund), merr një
+  foto (në trupin e email-it) dhe një PDF të plotë, dhe e dërgon përmes serverit të mail-it të Purchasing.
+- Nuk ka `.env` të ri: `reporter` merr SERVICE_TOKEN nga `deploy/.env`, si kullat. `PUBLIC_URL` (identity, opsionale)
+  është adresa e lidhjes "Hape në pulse" (parazgjedhur `https://dashboard.rhg.al`).
+- Deploy-i i parë pas këtij ndryshimi zgjat disa minuta më shumë: shkarkohen Chromium dhe libraritë e tij (~400 MB
+  imazh). Kontejneri ka `mem_limit: 1200m`.
+- Kontroll: `docker compose logs reporter | tail` duhet të tregojë "pulse report sender: ...". Te Settings, shenja
+  *Report sender on* tregon që ai është lidhur në 3 minutat e fundit.
+
 ## Vendime të zbatuara
 
 **TLS self-signed.** Let's Encrypt nuk lëshon certifikata për IP, pra pa domain
