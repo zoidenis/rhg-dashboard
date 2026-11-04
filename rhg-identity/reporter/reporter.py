@@ -214,27 +214,30 @@ def main():
     if not TOKEN:
         print("SERVICE_TOKEN is empty: the report sender cannot ask identity for reports.")
     print(f"pulse report sender: identity {IDENTITY}, screens through {SITE}, mail through {PURCHASING}")
-    with sync_playwright() as pw:
-        while True:
-            try:
-                runs = _post(IDENTITY + "/internal/reports/claim", {"reporter": {"version": VERSION}})["runs"]
-            except Exception as exc:                                # noqa: BLE001
-                print("identity:", exc)
-                time.sleep(max(POLL, 60))
-                continue
-            for run in runs:
-                try:
-                    results = do_run(pw, run)
-                    detail = ""
-                except Exception as exc:                            # noqa: BLE001
-                    traceback.print_exc()
-                    results, detail = [], str(exc)[:300]
-                try:
-                    _post(IDENTITY + "/internal/reports/done", {"run": run["run"], "results": results,
-                                                                "detail": detail})
-                except Exception as exc:                            # noqa: BLE001
-                    print("identity (done):", exc)
-            time.sleep(POLL if not runs else 2)
+    # Playwright (its Node driver, ~100 MB) is started only while there are reports to send and stopped after:
+    # the server has 1 GB, and most of the time this service only waits.
+    while True:
+        try:
+            runs = _post(IDENTITY + "/internal/reports/claim", {"reporter": {"version": VERSION}})["runs"]
+        except Exception as exc:                                    # noqa: BLE001
+            print("identity:", exc)
+            time.sleep(max(POLL, 60))
+            continue
+        if runs:
+            with sync_playwright() as pw:
+                for run in runs:
+                    try:
+                        results = do_run(pw, run)
+                        detail = ""
+                    except Exception as exc:                        # noqa: BLE001
+                        traceback.print_exc()
+                        results, detail = [], str(exc)[:300]
+                    try:
+                        _post(IDENTITY + "/internal/reports/done", {"run": run["run"], "results": results,
+                                                                    "detail": detail})
+                    except Exception as exc:                        # noqa: BLE001
+                        print("identity (done):", exc)
+        time.sleep(POLL if not runs else 2)
 
 
 if __name__ == "__main__":
