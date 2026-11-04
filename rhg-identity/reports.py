@@ -15,6 +15,7 @@ the report sender claims them (/internal/reports/claim), renders, sends through 
 how it went (/internal/reports/done).
 """
 import json
+import re
 import secrets
 import threading
 from datetime import date, datetime, timedelta
@@ -36,6 +37,8 @@ PERIOD_APPS = ("finance", "platform")          # the towers that take a period i
 WINDOW_HOURS = 6                               # a slot missed by more than this is not sent late
 RETRY_MINUTES, MAX_TRIES, LEASE_MINUTES = 20, 3, 25
 MAX_RECIPIENTS = 60
+MAX_EMAILS = 20
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 NOT_REPORTS = {"finance.s.settings", "purchasing.s.settings"}
 PUBLIC_URL = (config.get("PUBLIC_URL", "https://dashboard.rhg.al") or "").rstrip("/")
 
@@ -209,10 +212,26 @@ def _clean(body, old=None):
     if len(names) > MAX_RECIPIENTS:
         raise ValueError(f"At most {MAX_RECIPIENTS} people per report.")
     locs = sorted({str(x).strip()[:40] for x in (body.get("locations") or []) if str(x).strip()})[:100]
+    # addresses of people without an account in pulse: they receive the screen as one account sees it (emails_as)
+    emails, bad = [], []
+    raw = body.get("emails") or []
+    for x in (re.split(r"[,;\s]+", raw) if isinstance(raw, str) else raw):
+        x = str(x).strip().strip("<>").lower()[:120]
+        if not x:
+            continue
+        if not EMAIL_RE.match(x):
+            bad.append(x)
+        elif x not in emails:
+            emails.append(x)
+    if bad:
+        raise ValueError("These addresses are not valid: " + ", ".join(bad[:5]) + ".")
+    if len(emails) > MAX_EMAILS:
+        raise ValueError(f"At most {MAX_EMAILS} other addresses per report.")
+    emails_as = str(body.get("emails_as") or "").strip().lower()[:80] if emails else ""
     now = _now().isoformat()
     enabled = bool(body.get("enabled", True))
     r = {"screen": s["key"], "company": company, "freq": freq, "day": day, "time": f"{hh:02d}:{mm:02d}",
-         "period": period, "recipients": names, "locations": locs,
+         "period": period, "recipients": names, "locations": locs, "emails": emails, "emails_as": emails_as,
          "name": str(body.get("name") or "").strip()[:120], "note": str(body.get("note") or "").strip()[:600],
          "pdf": bool(body.get("pdf", True)), "enabled": enabled}
     if old:
@@ -230,6 +249,14 @@ def save(body, actor):
         if body.get("id") and not old:
             raise ValueError("That report no longer exists.")
         r = _clean(body, old)
+        if r["emails"]:
+            r["emails_as"] = r["emails_as"] or actor
+            row = auth.find(r["emails_as"])
+            sc_ = _screen(r["screen"])
+            u, why = _eligible(row, sc_, r["company"], cut_of(r, sc_)) if row else (None, "No such account")
+            if not u:
+                raise ValueError(f"The other addresses receive the screen as {r['emails_as']} sees it, and that "
+                                 f"cannot be: {why}.")
         if not old:
             r["created_by"] = actor
         r.update(updated_at=_now().isoformat(), updated_by=actor)
@@ -237,6 +264,7 @@ def save(body, actor):
         _write(d)
     store.audit("report saved", actor, r["id"], {"screen": r["screen"], "company": r["company"], "freq": r["freq"],
                                                  "time": r["time"], "recipients": len(r["recipients"]),
+                                                 "emails": r["emails"], "emails_as": r["emails_as"],
                                                  "enabled": r["enabled"]})
     return r
 
@@ -297,7 +325,7 @@ def due(d, now):
     """[(report, slot)] whose slot has come, within the window, not yet sent or tried too often."""
     out = []
     for r in d["reports"].values():
-        if not r.get("enabled") or not r.get("recipients"):
+        if not r.get("enabled") or not (r.get("recipients") or r.get("emails")):
             continue
         t = last_slot(r, now)
         if not t or now - t > timedelta(hours=WINDOW_HOURS) or t.isoformat() < (r.get("armed_at") or ""):
@@ -368,7 +396,18 @@ def _groups(r, s, only=None):
         k = (u["role"], json.dumps(u["scope"], sort_keys=True), u["lang"])
         g = groups.setdefault(k, {"as": u["username"], "lang": u["lang"], "to": []})
         g["to"].append({"username": u["username"], "name": u["name"], "email": u["email"].strip()})
-    return list(groups.values()), skipped
+    out = list(groups.values())
+    # the other addresses: one email of their own (they do not see the colleagues' addresses), the screen as the
+    # account chosen for them sees it
+    if r.get("emails") and not only:
+        row = auth.find(r.get("emails_as") or "")
+        u, why = _eligible(row, s, r["company"], cut) if row else (None, "No such account")
+        if u:
+            out.append({"as": u["username"], "as_name": u["name"], "lang": u["lang"],
+                        "to": [{"username": "", "name": e, "email": e} for e in r["emails"]]})
+        else:
+            skipped += [{"username": e, "why": f"Sent as {r.get('emails_as')}: {why}"} for e in r["emails"]]
+    return out, skipped
 
 
 def _make_run(d, r, slot, actor, test_to=None):
@@ -387,7 +426,8 @@ def _make_run(d, r, slot, actor, test_to=None):
             skipped += [{"username": x["username"], "why": "Account disabled"} for x in g["to"]]
             continue
         tokens.append(tok)
-        run["groups"].append({"as": g["as"], "lang": g["lang"], "to": g["to"], "token": tok})
+        run["groups"].append({"gid": len(run["groups"]), "as": g["as"], "lang": g["lang"], "to": g["to"],
+                              "token": tok, "as_name": g.get("as_name") or ""})
     run["tokens"] = tokens
     return run, s
 
@@ -435,7 +475,8 @@ def claim(reporter_info=None):
                         "period": " · ".join(x for x in (period_label(r, now), ", ".join(
                             (cut_of(r, s) or ("", []))[1])) if x), "note": r.get("note") or "", "pdf": r.get("pdf", True),
                         "name": r.get("name") or "",
-                        "groups": [{"as": g["as"], "lang": g["lang"], "token": g["token"], "to": g["to"],
+                        "groups": [{"gid": g["gid"], "as": g["as"], "as_name": g.get("as_name") or "", "lang": g["lang"],
+                                    "token": g["token"], "to": g["to"],
                                     "title": r.get("name") or title(s, g["lang"]),
                                     "tower": tr(s["tower"], g["lang"])} for g in run["groups"]]})
         _write(d)
@@ -456,9 +497,11 @@ def done(run_id, results, detail=""):
         if not a:
             return False
         auth.end_report_sessions(a.get("tokens"))
+        # a group is answered by its number (the other addresses can be sent as someone who also has a group)
+        by_gid = {x.get("gid"): x for x in results or [] if x.get("gid") is not None}
         res = {str(x.get("as")): x for x in results or []}
         for g in a["groups"]:
-            x = res.get(g["as"]) or {"status": "failed", "detail": "No answer for this group."}
+            x = by_gid.get(g.get("gid")) or res.get(g["as"]) or {"status": "failed", "detail": "No answer for this group."}
             g.update(status=x.get("status") if x.get("status") in ("sent", "failed") else "failed",
                      detail=str(x.get("detail") or "")[:300])
         sent = [g for g in a["groups"] if g["status"] == "sent"]
@@ -489,7 +532,7 @@ def send_now(rid, actor, test):
             u, why = _eligible(row, sc_, r["company"], cut_of(r, sc_)) if row else (None, "No account")
             if not u:
                 raise ValueError(f"The test goes to you, as you see the screen: {why}.")
-        elif not r["recipients"]:
+        elif not r["recipients"] and not r.get("emails"):
             raise ValueError("Choose who receives it first.")
         if len(d["queue"]) >= 20:
             raise ValueError("Too many reports are waiting to go; try again in a minute.")

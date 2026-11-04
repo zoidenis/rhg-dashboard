@@ -158,6 +158,7 @@
 .pr-person:last-child{border-bottom:0}
 .pr-person.no{cursor:default;opacity:.6}
 .pr-person small{display:block;color:var(--sub,#5f636b);font-size:11.5px;overflow-wrap:anywhere}
+.pr-in{font:inherit;font-size:13.5px;color:var(--ink,#16181d);padding:7px 9px;border:1px solid var(--line,#e3e1d9);border-radius:8px;background:var(--card,#fff);box-sizing:border-box;width:100%}
 .pr-locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 12px;border:1px solid var(--line,#e3e1d9);border-radius:10px;padding:8px 10px;max-height:190px;overflow:auto;font-size:13px}
 .pr-loc{display:flex;gap:6px;align-items:flex-start;cursor:pointer;padding:3px 0;min-width:0}.pr-loc span{overflow-wrap:anywhere}
 .pr-grp{padding:6px 10px;font-size:11.5px;font-weight:700;color:var(--sub,#5f636b);background:var(--rhg-sky,#efede6);letter-spacing:.02em}
@@ -186,7 +187,8 @@
       const s = screenOf(r.screen);
       const ok = r.recipients.filter(u => ppl.has(u) && s && !why(ppl.get(u), s, r.company));
       const names = r.recipients.map(u => (ppl.get(u) || {name: u}).name).join(", ");
-      return `<span title="${esc(names)}">${span(ok.length + (ok.length === 1 ? " person" : " people"))}</span>`
+      const em = (r.emails || []).length;
+      return `<span title="${esc(names + (em ? "\n" + r.emails.join(", ") : ""))}">${span(ok.length + (ok.length === 1 ? " person" : " people"))}${em ? " + " + span(em + (em === 1 ? " address" : " addresses")) : ""}</span>`
         + (ok.length < r.recipients.length ? `<div class="pr-sub">${span((r.recipients.length - ok.length) + " cannot receive it")}</div>` : "");
     };
     host.innerHTML = `
@@ -296,6 +298,11 @@
         <span class="pr-mute" id="prCount"></span></div>
       <div class="pr-people" id="prPeople"></div>
       <p class="pr-hint" id="prPeopleNote"></p>
+      <div class="pr-f" style="margin-top:12px">Other email addresses</div>
+      <p class="pr-hint"><span>For people without an account in pulse: separated by commas or on separate lines.</span> <span>They get one email of their own, with the screen as the account chosen below sees it (and only the report's locations).</span></p>
+      <textarea id="prEmails" rows="2" class="pr-in" placeholder="name@rhg.al, name@partner.al">${esc((EDIT.emails || []).join(", "))}</textarea>
+      <div class="pr-bar" style="margin-top:6px"><label class="pr-f" style="flex-direction:row;align-items:center;gap:8px;font-weight:400">${span("They see the screen as")}
+        <select id="prAs" class="pr-in" style="width:auto"></select></label><span class="pr-mute" id="prEmailsNote"></span></div>
       <div class="pr-msg" id="prMsg" role="alert"></div>
       <div class="pr-foot"><button type="button" class="pr-btn" id="prCancel">Cancel</button><button type="button" class="pr-btn dark" id="prSave">Save</button></div>
     </div>`;
@@ -359,6 +366,7 @@
         + (rest.length ? `<div class="pr-grp">${span("Chosen, not at these locations")}</div>` + rest.map(row).join("") : "")
         || `<p class="pr-mute" style="padding:10px">Nobody matches.</p>`;
       g("prPeopleNote").innerHTML = s ? "" : span("Choose the screen to see who can receive it: someone whose role does not open the screen cannot.");
+      asSel();
       const n = EDIT.recipients.length, okN = EDIT.recipients.filter(u => { const p = (D.people || []).find(x => x.username === u); return p && ok(p); }).length;
       g("prCount").innerHTML = span(n + " chosen") + (okN < n ? " · " + span((n - okN) + " cannot receive it") : "");
       g("prPeople").querySelectorAll("label[data-u] input").forEach(cb => cb.onchange = () => {
@@ -367,6 +375,22 @@
         people();
       });
     };
+    // the account the other addresses see the screen as: only someone who may receive it; the person saving by default
+    const asSel = () => {
+      const s = screenOf(g("prScreen").value), co = g("prCo").value, locs = s && s.kind === "company" ? [] : EDIT.locations;
+      const cur = g("prAs").value || EDIT.emails_as || (ME && ME.username) || "";
+      const ok = (D.people || []).filter(p => p.active && whereIn(p, co) !== null && !why(p, s, co, locs));
+      g("prAs").innerHTML = ok.map(p => `<option value="${esc(p.username)}"${p.username === cur ? " selected" : ""}>${esc(p.name)} · ${esc(p.role)}</option>`).join("")
+        || `<option value="">Nobody can receive this screen</option>`;
+      emNote();
+    };
+    const emList = () => g("prEmails").value.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
+    const emNote = () => {
+      const l = emList(), outside = l.filter(x => !/@rhg\.al$/i.test(x));
+      g("prEmailsNote").innerHTML = l.length ? span(l.length + (l.length === 1 ? " address" : " addresses"))
+        + (outside.length ? ` · <span style="color:var(--warn,#b86e0e)">${span(outside.length + " outside rhg.al: check before saving")}</span>` : "") : "";
+    };
+    g("prEmails").oninput = emNote;
     g("prScreen").onchange = () => { per(); locSel(); people(); if (!g("prName").value) g("prName").placeholder = (screenOf(g("prScreen").value) || {}).label || "The screen's name"; };
     g("prCo").onchange = () => { EDIT.locations = []; locSel(); people(); };
     g("prLq").oninput = locSel;
@@ -390,10 +414,12 @@
       const body = {id: r ? r.id : undefined, screen: g("prScreen").value, company: g("prCo").value, period: g("prPer").value,
         freq: g("prFreq").value, day: +g("prDay").value || 0, time: g("prTime").value || "08:00", name: g("prName").value,
         note: g("prNote").value, pdf: g("prPdf").checked, enabled: g("prOn").checked, recipients: EDIT.recipients,
-        locations: (screenOf(g("prScreen").value) || {}).kind === "company" ? [] : EDIT.locations};
+        locations: (screenOf(g("prScreen").value) || {}).kind === "company" ? [] : EDIT.locations,
+        emails: emList(), emails_as: g("prAs").value};
       g("prMsg").textContent = "";
       if (!body.screen) { g("prMsg").textContent = "Choose the screen to send."; return; }
-      if (!body.recipients.length && body.enabled) { g("prMsg").textContent = "Choose who receives it."; return; }
+      if (!body.recipients.length && !body.emails.length && body.enabled) { g("prMsg").textContent = "Choose who receives it."; return; }
+      if (body.emails.length && !body.emails_as) { g("prMsg").textContent = "Choose the account the other addresses see the screen as."; return; }
       busy = true; g("prSave").disabled = true;
       try {
         await api("reports", body);

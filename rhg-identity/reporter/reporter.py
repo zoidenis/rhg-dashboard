@@ -155,8 +155,9 @@ def email(run, group, shot, pdf, complete):
     at = datetime.now().strftime("%d.%m.%Y %H:%M")
     title = group["title"]
     head = " · ".join(x for x in (group.get("tower"), run["company"], run.get("period")) if x)
-    seen = t["seen"].format(name=group["to"][0]["name"], at=at) if len(group["to"]) == 1 else \
-        t["seen_all"].format(at=at)
+    # the other addresses (no account in pulse) receive the screen as the account chosen for them sees it
+    seen = t["seen"].format(name=group["as_name"], at=at) if group.get("as_name") else \
+        t["seen"].format(name=group["to"][0]["name"], at=at) if len(group["to"]) == 1 else t["seen_all"].format(at=at)
     subject = f"{title} · {run['company']}" + (f" · {run['period']}" if run.get("period") else "") + \
               (" [TEST]" if run.get("test") and lang == "en" else " [PROVË]" if run.get("test") else "")
     note = html.escape(run.get("note") or "").replace("\n", "<br>")
@@ -200,11 +201,11 @@ def do_run(pw, run):
             try:
                 shot, pdf, complete = render(browser, run, g)
                 n = send(run, g, shot, pdf, complete)
-                results.append({"as": g["as"], "status": "sent", "detail": "" if complete else "still reading",
-                                "emails": n})
+                results.append({"gid": g.get("gid"), "as": g["as"], "status": "sent",
+                                "detail": "" if complete else "still reading", "emails": n})
             except Exception as exc:                                # noqa: BLE001
                 traceback.print_exc()
-                results.append({"as": g["as"], "status": "failed", "detail": str(exc)[:300]})
+                results.append({"gid": g.get("gid"), "as": g["as"], "status": "failed", "detail": str(exc)[:300]})
     finally:
         browser.close()
     return results
