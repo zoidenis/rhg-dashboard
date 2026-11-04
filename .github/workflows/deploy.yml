@@ -128,7 +128,23 @@ jobs:
           ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 "$SERVER" 'set -e
             cd /opt/rhg/deploy
             docker compose build
-            docker compose up -d --force-recreate finance purchasing identity
+
+            # Nje rikrijim i nderprere i compose-it le pas nje kontejner "<id>_deploy-<sherbimi>-1"
+            # ne gjendjen Created; rikrijimi tjeter perplaset me emrin ("name already in use") dhe
+            # sherbimi mbetet i ndalur (identity ra keshtu me 4 nentor). Hiqen para dhe pas.
+            cleanup() {
+              docker ps -a --format "{{.ID}} {{.Names}}" \
+                | awk "\$2 ~ /^[0-9a-f]{12}_deploy-/ {print \$1}" \
+                | xargs -r docker rm -f
+            }
+            cleanup
+            # Pa --force-recreate: compose rikrijon vetem kontejneret, imazhi i te cileve ndryshoi.
+            if ! docker compose up -d finance purchasing identity; then
+              echo "::warning::up deshtoi; pastrohen mbetjet dhe provohet edhe nje here"
+              cleanup
+              sleep 3
+              docker compose up -d finance purchasing identity
+            fi
             docker image prune -f >/dev/null 2>&1 || true'
 
       - name: Prit health-check-et
