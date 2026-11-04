@@ -160,7 +160,7 @@ një kopje në `identity-data` si `data/unicorn_prompt.md` e zëvendëson pa dep
 ose butoni *Schedule as report* në krye të çdo faqeje (për rolet me `reports.manage`).
 
 - Identity mban raportet (`data/reports.json` në volumin e identity-t) dhe vendos kur është radha e secilit.
-- Kontejneri `reporter` (Chromium headless, pa porta, pa të dhëna) pyet identity çdo 30 sekonda, hap faqen **si
+- Kontejneri `reporter` (kodi te `rhg-identity/reporter`, sepse deploy-i kopjon vetëm tre dosjet e aplikacioneve; Chromium headless, pa porta, pa të dhëna) pyet identity çdo 30 sekonda, hap faqen **si
   personi që e merr** (sesion vetëm-lexim 25 minutësh, i krijuar me SERVICE_TOKEN dhe i fshirë në fund), merr një
   foto (në trupin e email-it) dhe një PDF të plotë, dhe e dërgon përmes serverit të mail-it të Purchasing.
 - Nuk ka `.env` të ri: `reporter` merr SERVICE_TOKEN nga `deploy/.env`, si kullat. `PUBLIC_URL` (identity, opsionale)

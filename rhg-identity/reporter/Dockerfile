@@ -1,6 +1,6 @@
 # The report sender: a headless Chromium that opens screens of pulse as the people who receive them and emails
 # a picture and a PDF of each. It holds no data and no accounts; identity tells it what to send.
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -10,9 +10,9 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY requirements.txt .
-# Chromium's headless shell and the system libraries and fonts it needs (a layer that survives code edits)
+# Chromium and the system libraries and fonts it needs (a layer that survives code edits)
 RUN pip install --no-cache-dir -r requirements.txt && \
-    playwright install --with-deps --only-shell chromium && \
+    playwright install --with-deps chromium && \
     rm -rf /var/lib/apt/lists/*
 
 COPY . .
