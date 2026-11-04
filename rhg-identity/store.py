@@ -115,6 +115,8 @@ def _seed_roles(conn):
     # (companies and locations; NULL = everything)
     if "department" not in _columns(conn, "roles"):
         conn.execute("ALTER TABLE roles ADD COLUMN department TEXT")
+    if "scope" not in _columns(conn, "roles"):           # the companies and locations of a role; NULL = everything
+        conn.execute("ALTER TABLE roles ADD COLUMN scope TEXT")
     if "scope" not in _columns(conn, "users"):
         conn.execute("ALTER TABLE users ADD COLUMN scope TEXT")
     if "scope" not in _columns(conn, "sessions"):        # a report session cut to the report's locations
@@ -184,6 +186,11 @@ def run(sql, args=()):
 def audit(action, actor, subject="", detail=None, ip=""):
     run("INSERT INTO audit(at,actor,action,subject,detail,ip) VALUES(?,?,?,?,?,?)",
         (now(), actor or "", action, subject or "", json.dumps(detail or {}), ip or ""))
+
+
+def role_scope(name):
+    r = one("SELECT scope FROM roles WHERE name=?", (name,))
+    return r["scope"] if r else None
 
 
 def role_permissions(name):

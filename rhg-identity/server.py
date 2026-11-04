@@ -298,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
                     users_by[u["role"]] = users_by.get(u["role"], 0) + 1
                 rows = [{"name": r["name"], "description": r["description"], "department": r["department"] or "Other",
                          "permissions": json.loads(r["permissions"]), "system": bool(r["system"]),
-                         "users": users_by.get(r["name"], 0)}
+                         "users": users_by.get(r["name"], 0), "scope": auth.role_scope(r["name"])}
                         for r in store.q("SELECT * FROM roles ORDER BY name")]
                 self._send(200, {"roles": rows, "permissions": permissions.PERMISSIONS,
                                  "catalogue": screens.catalogue(), "actions": permissions.ACTIONS,
@@ -463,13 +463,25 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"ok": True}); return
                 if existing and existing["system"] and set(perms) != set(json.loads(existing["permissions"])):
                     self._send(400, {"error": "The Administrator role cannot be narrowed."}); return
+                sc = None
+                if "scope" in body:                    # the companies and locations of the role
+                    try:
+                        sc = auth.clean_scope(body.get("scope"))
+                    except ValueError as exc:
+                        self._send(400, {"error": str(exc)}); return
+                    if existing and existing["system"] and sc != auth.ALL_SCOPE:
+                        self._send(400, {"error": "The Administrator role sees every company and location."}); return
                 dep = (body.get("department") or (existing["department"] if existing else "") or "Other")[:40]
                 store.run("""INSERT INTO roles(name,description,permissions,system,department) VALUES(?,?,?,0,?)
                              ON CONFLICT(name) DO UPDATE SET description=excluded.description,
                                                              permissions=excluded.permissions,
                                                              department=excluded.department""",
                           (name, (body.get("description") or "")[:200], json.dumps(perms), dep))
-                store.audit("role saved", user["username"], name, {"count": len(perms)}, ip)
+                if sc is not None:
+                    store.run("UPDATE roles SET scope=? WHERE name=?",
+                              (None if sc == auth.ALL_SCOPE else json.dumps(sc), name))
+                store.audit("role saved", user["username"], name,
+                            {"count": len(perms)} | ({"scope": sc} if sc is not None else {}), ip)
                 self._send(200, {"ok": True})
             elif url.path == "/api/sessions/revoke":
                 if not auth.can(user, "admin.sessions.manage"):

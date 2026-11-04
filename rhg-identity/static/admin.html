@@ -88,6 +88,7 @@ tr:last-child td{border-bottom:0}
 .lbar{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
 .lbar input{flex:1;min-width:160px;padding:7px 10px}
 .scope{font-size:12.5px;line-height:1.45}
+.rscope{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;line-height:1.45}
 .rsel-grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);padding:10px 10px 3px}
 @media(max-width:1000px){ .rl{grid-template-columns:1fr} .rlist{position:static;max-height:none} }
 @media(max-width:860px){
@@ -216,7 +217,8 @@ function roleOptions(sel){
 function scopeText(sc){
   sc = sc || {companies:"*", locations:{}};
   const L = sc.locations || {};
-  const loc = c => L[c] ? `<span class="muted">${esc(L[c].join(", "))}</span>` : '<span class="muted">all locations</span>';
+  const loc = c => !L[c] ? '<span class="muted">all locations</span>' : L[c].length ? `<span class="muted">${esc(L[c].join(", "))}</span>`
+    : '<span class="muted" style="color:var(--rhg-red,#c2412d)">no location: the role and the account have none in common</span>';
   if(sc.companies === "*"){
     const lim = Object.keys(L);
     return lim.length ? "All companies; " + lim.map(c => `<b>${esc(c)}</b>: ${loc(c)}`).join("; ") : "All companies";
@@ -284,21 +286,10 @@ function resetModal(username){
 /* ---------------------------------------------------------- access of an account */
 let SCOPE_OPTS = null;
 
-async function accessModal(u){
-  modal(`<h3 style="margin-bottom:6px">Access of ${esc(u.name)}</h3>
-    <p class="muted" style="margin:0 0 6px;font-size:13px">Which companies, and which locations of each, ${esc(u.username)}
-      sees. The role (${esc(u.role)}) decides the screens; limited to some locations of a company, the account gets only
-      the location screens of that company. Unicorn reads the whole group, so it is only for accounts with all companies
-      and all locations.</p>
-    <div id="acBody"><p class="muted">Reading the companies and locations from Business Central…</p></div>
-    <div class="msg err" id="mmsg"></div>
-    <div class="actions" style="margin-top:16px;justify-content:flex-end">
-      <button class="btn" onclick="close()">Cancel</button>
-      <button class="btn primary" id="asave" disabled>Save access</button></div>`, true);
-  try{ SCOPE_OPTS = SCOPE_OPTS || await api("/api/admin/scope-options"); }
-  catch(e){ $("acBody").innerHTML = ""; $("mmsg").textContent = e.message; return; }
-  if(!$("acBody")) return;                       // closed while reading
-  const sc = u.scope || {companies:"*", locations:{}};
+// The choice of companies and locations (each company: all its locations, or the chosen ones), used for an account's
+// access and for a role's. sc: {companies: "*" | [names], locations: {company: [codes]}}. Returns {get, problem}.
+function scopePicker(box, sc, onChange){
+  sc = sc || {companies:"*", locations:{}};
   const L = sc.locations || {};
   const comps = SCOPE_OPTS.companies.map(c => ({...c}));
   // A company of the access that Business Central no longer lists stays visible, so it can be removed.
@@ -306,11 +297,11 @@ async function accessModal(u){
     if(!comps.some(c => c.company === n)) comps.push({company:n, locations:[], missing:true});
   });
   const inScope = n => sc.companies === "*" || sc.companies.includes(n);
-  $("acBody").innerHTML = `
-    <label class="chk" style="margin:10px 0 4px;font-weight:700"><input type="checkbox" id="allc"
+  box.innerHTML = `
+    <label class="chk" style="margin:10px 0 4px;font-weight:700"><input type="checkbox" class="allc"
       ${sc.companies === "*" ? "checked" : ""}> All companies, also the ones added later</label>
     ${(SCOPE_OPTS.errors||[]).length ? `<p class="muted" style="font-size:12px">Not read: ${esc(SCOPE_OPTS.errors.join("; "))}</p>` : ""}
-    <div id="clist">${comps.map((c, i) => {
+    <div class="clist">${comps.map((c, i) => {
       const chosen = L[c.company] || null;
       return `<div class="acomp" data-i="${i}">
         <div class="top">
@@ -331,9 +322,8 @@ async function accessModal(u){
               <span><b style="font-weight:600">${esc(l.code)}</b>${l.name ? `<small>${esc(l.name)}${l.brand ? " · "+esc(l.brand) : ""}</small>` : ""}</span></label>`).join("")
             || '<span class="muted" style="font-size:12.5px">Business Central lists no location for this company.</span>'}</div>
         </div></div>`;}).join("")}</div>`;
-  const box = $("acBody");
   const paint = () => {
-    const all = $("allc").checked;
+    const all = box.querySelector(".allc").checked;
     box.querySelectorAll(".acomp").forEach(el => {
       const cin = el.querySelector(".cin");
       cin.disabled = all; if(all) cin.checked = true;
@@ -344,21 +334,21 @@ async function accessModal(u){
       const n = el.querySelectorAll(".lgrid input:checked").length;
       const c = el.querySelector(".lcount"); if(c) c.textContent = `${n} chosen`;
     });
-    $("asave").disabled = false;
   };
-  box.addEventListener("change", paint);
-  box.querySelectorAll(".lf").forEach(f => f.oninput = () => {
+  box.addEventListener("change", e => { e.stopPropagation(); paint(); onChange && onChange(); });
+  box.querySelectorAll(".lf").forEach(f => f.oninput = e => {
+    e.stopPropagation();
     const q = f.value.trim().toLowerCase();
     f.closest(".locs").querySelectorAll(".lgrid .chk").forEach(l => l.hidden = q && !l.dataset.txt.includes(q));
   });
   box.querySelectorAll("[data-all]").forEach(b => b.onclick = () => {
     b.closest(".locs").querySelectorAll(".lgrid .chk").forEach(l => {
       if(!l.hidden) l.querySelector("input").checked = b.dataset.all === "1"; });
-    paint();
+    paint(); onChange && onChange();
   });
   paint();
-  $("asave").onclick = async () => {
-    const all = $("allc").checked, out = {companies: all ? "*" : [], locations: {}};
+  const get = () => {
+    const all = box.querySelector(".allc").checked, out = {companies: all ? "*" : [], locations: {}};
     box.querySelectorAll(".acomp").forEach(el => {
       const name = comps[+el.dataset.i].company;
       if(!el.querySelector(".cin").checked) return;
@@ -366,12 +356,42 @@ async function accessModal(u){
       if(el.querySelector(".cmode").value === "some")
         out.locations[name] = [...el.querySelectorAll(".lgrid input:checked")].map(i => i.value);
     });
-    $("mmsg").textContent = "";
-    if(!all && !out.companies.length){ $("mmsg").textContent = "Choose at least one company, or all companies."; return; }
+    return out;
+  };
+  const problem = () => {
+    const out = get();
+    if(out.companies !== "*" && !out.companies.length) return "Choose at least one company, or all companies.";
     const empty = Object.entries(out.locations).find(([, v]) => !v.length);
-    if(empty){ $("mmsg").textContent = `Choose at least one location of ${empty[0]}, or all its locations.`; return; }
+    return empty ? `Choose at least one location of ${empty[0]}, or all its locations.` : "";
+  };
+  return {get, problem};
+}
+const allScope = sc => !sc || (sc.companies === "*" && !Object.keys(sc.locations || {}).length);
+
+async function accessModal(u){
+  const rs = u.role_scope;
+  modal(`<h3 style="margin-bottom:6px">Access of ${esc(u.name)}</h3>
+    <p class="muted" style="margin:0 0 6px;font-size:13px">Which companies, and which locations of each, ${esc(u.username)}
+      sees. The role (${esc(u.role)}) decides the screens; limited to some locations of a company, the account gets only
+      the location screens of that company. Unicorn reads the whole group, so it is only for accounts with all companies
+      and all locations.</p>
+    ${allScope(rs) ? "" : `<p class="muted" style="margin:0 0 6px;font-size:13px"><span>The role ${esc(u.role)} sees only</span>:
+      ${scopeText(rs)}. <span>The account sees what both allow.</span></p>`}
+    <div id="acBody"><p class="muted">Reading the companies and locations from Business Central…</p></div>
+    <div class="msg err" id="mmsg"></div>
+    <div class="actions" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="close()">Cancel</button>
+      <button class="btn primary" id="asave" disabled>Save access</button></div>`, true);
+  try{ SCOPE_OPTS = SCOPE_OPTS || await api("/api/admin/scope-options"); }
+  catch(e){ $("acBody").innerHTML = ""; $("mmsg").textContent = e.message; return; }
+  if(!$("acBody")) return;                       // closed while reading
+  const pick = scopePicker($("acBody"), u.account_scope || u.scope, () => { $("asave").disabled = false; });
+  $("asave").disabled = false;
+  $("asave").onclick = async () => {
+    $("mmsg").textContent = pick.problem();
+    if($("mmsg").textContent) return;
     $("asave").disabled = true;
-    try{ await api("/api/users/"+encodeURIComponent(u.username), {scope: out});
+    try{ await api("/api/users/"+encodeURIComponent(u.username), {scope: pick.get()});
       close(); say(`Access of ${u.username} saved. It applies from their next page load.`, "ok"); renderUsers(); }
     catch(e){ $("mmsg").textContent = e.message; $("asave").disabled = false; }
   };
@@ -411,7 +431,7 @@ function paintRoleList(){
 function newRole(from){
   if(RDIRTY && !confirm("Leave this role without saving the changes?")) return;
   RSEL = {name:"", department: from ? from.department : "Other", description: from ? from.description : "",
-          permissions: from ? [...from.permissions] : [], system:false, users:0, isNew:true};
+          permissions: from ? [...from.permissions] : [], scope: from ? from.scope || null : null, system:false, users:0, isNew:true};
   RDIRTY = !!from; paintRoleList(); paintRole(); $("rname").focus();
 }
 
@@ -439,6 +459,12 @@ function paintRole(){
     </div>
     <div class="rsum" id="rsum"></div>
     ${sys ? '<p class="muted" style="font-size:12.5px">The Administrator role always holds every screen and action.</p>' : ""}
+    <h3 style="margin-top:18px;font-size:15px">Companies and locations</h3>
+    <p class="legend">What every account of this role may see. An account's own access (Accounts → Access) can narrow it
+      further, never widen it.</p>
+    <div class="rscope"><span id="rscopeText">${sys ? "Every company and location." : scopeText(r.scope)}</span>
+      ${sys ? "" : '<button class="btn sm" id="rscopeBtn" type="button">Choose companies and locations</button>'}</div>
+    <div id="rscopeBox"></div>
     <h3 style="margin-top:18px;font-size:15px">Screens</h3>
     <p class="legend">Tick a menu item to give all its tabs, or the tabs one by one. <span class="co-tag">company</span> marks a
       screen of the whole company: an account limited to some locations of a company does not get it, even when the
@@ -493,21 +519,32 @@ function paintRole(){
   ed.addEventListener("input", e => { if(e.target.matches("input:not([type=checkbox])")){ RDIRTY = true; sync(); } });
   sync();
   if(sys) return;
+  let rpick = null;
+  $("rscopeBtn").onclick = async () => {
+    $("rscopeBtn").disabled = true;
+    $("rscopeBox").innerHTML = '<p class="muted" style="font-size:13px">Reading the companies and locations from Business Central…</p>';
+    try{ SCOPE_OPTS = SCOPE_OPTS || await api("/api/admin/scope-options"); }
+    catch(e){ $("rscopeBox").innerHTML = `<p class="msg err">${esc(e.message)}</p>`; $("rscopeBtn").disabled = false; return; }
+    $("rscopeBtn").style.display = "none";
+    rpick = scopePicker($("rscopeBox"), r.scope, () => { RDIRTY = true; sync(); });
+  };
   $("rsave").onclick = async () => {
     const name = $("rname").value.trim();
     if(!name){ say("A role name is required.", "err"); $("rname").focus(); return; }
     if(r.isNew && RD.roles.some(x => x.name.toLowerCase() === name.toLowerCase())){ say(`A role named ${name} already exists.`, "err"); return; }
     const perms = [...ed.querySelectorAll(".leaf:checked, .act:checked")].map(i => i.value);
+    if(rpick && rpick.problem()){ say(rpick.problem(), "err"); return; }
     $("rsave").disabled = true;
     try{
-      await api("/api/roles", {name, department:$("rdept").value, description:$("rdesc").value.trim(), permissions:perms});
+      await api("/api/roles", Object.assign({name, department:$("rdept").value, description:$("rdesc").value.trim(), permissions:perms},
+        rpick ? {scope: rpick.get()} : r.isNew && r.scope ? {scope: r.scope} : {}));
       say(`${name} saved. Accounts with this role get it from their next page load.`, "ok");
       RSEL = {name}; RDIRTY = false; await renderRoles();
     }catch(e){ say(e.message, "err"); $("rsave").disabled = false; }
   };
   if($("rdup")) $("rdup").onclick = () => {
     const perms = [...ed.querySelectorAll(".leaf:checked, .act:checked")].map(i => i.value);
-    newRole({department:$("rdept").value, description:$("rdesc").value, permissions:perms});
+    newRole({department:$("rdept").value, description:$("rdesc").value, permissions:perms, scope: rpick ? rpick.get() : r.scope});
     $("rname").value = r.name + " (copy)"; $("rname").select();
   };
   if($("rdel")) $("rdel").onclick = async () => {

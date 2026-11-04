@@ -81,6 +81,34 @@ def scope_of(row):
         return dict(ALL_SCOPE)
 
 
+def intersect(a, b):
+    """The access both scopes allow: companies in both, and of each company the locations in both."""
+    ca, cb = a.get("companies", "*"), b.get("companies", "*")
+    comps = cb if ca == "*" else ca if cb == "*" else [c for c in ca if c in cb]
+    locs = {}
+    for c in set((a.get("locations") or {})) | set((b.get("locations") or {})):
+        if comps != "*" and c not in comps:
+            continue
+        la, lb = (a.get("locations") or {}).get(c, "*"), (b.get("locations") or {}).get(c, "*")
+        locs[c] = lb if la == "*" else la if lb == "*" else [x for x in la if x in lb]
+    return {"companies": comps, "locations": {c: v for c, v in locs.items() if v != "*"}}
+
+
+def role_scope(role):
+    """The companies and locations a role may see (Admin → Roles & permissions); everything when none is set."""
+    raw = store.role_scope(role)
+    try:
+        return clean_scope(json.loads(raw)) if raw else dict(ALL_SCOPE)
+    except ValueError:
+        return dict(ALL_SCOPE)
+
+
+def effective_scope(row):
+    """What the account may see: its own access (Admin → Accounts) within its role's (Roles & permissions)."""
+    own, rs = scope_of(row), role_scope(row["role"])
+    return own if rs == ALL_SCOPE else rs if own == ALL_SCOPE else intersect(own, rs)
+
+
 LANGS = ("sq", "en")
 
 
@@ -101,14 +129,15 @@ def set_lang(username, lang):
 
 def public(row):
     perms = permissions.effective(store.role_permissions(row["role"]))
-    scope = scope_of(row)
+    scope = effective_scope(row)
     if scope != ALL_SCOPE:
         # Unicorn reads the whole group: not for an account limited to some companies or locations.
         perms = [p for p in perms if p != "unicorn.use"]
     return {"username": row["username"], "name": row["name"], "email": row["email"],
             "role": row["role"], "active": bool(row["active"]),
             "must_change": bool(row["must_change"]), "last_login": row["last_login"],
-            "permissions": perms, "scope": scope, "lang": lang_of(row)}
+            "permissions": perms, "scope": scope, "lang": lang_of(row),
+            "account_scope": scope_of(row), "role_scope": role_scope(row["role"])}
 
 
 def find(username):
@@ -275,7 +304,7 @@ def report_session(username, cut=None):
     row = find(username)
     if not row or not row["active"]:
         return None
-    sc = narrow(scope_of(row), *cut) if cut else None
+    sc = narrow(effective_scope(row), *cut) if cut else None
     if cut and not sc:
         return None
     token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
