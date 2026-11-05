@@ -99,12 +99,13 @@ def track_orders(company, pos):
     return out
 
 
-def track_requisitions(company, lines):
+def track_requisitions(company, lines, scope=None):
     """Records requisition worksheet lines and how long they stay open.
 
     A line that disappears was carried out into an order (or deleted); the time
     it was open is the closest measurable proxy for requisition-to-PO time,
-    because BC keeps no record of the line afterwards.
+    because BC keeps no record of the line afterwards. scope: the locations (upper case) the lines were read
+    for, when not every location: only a line of those can be found closed.
     """
     now = _now()
     seen, out, closed = set(), {}, []
@@ -127,11 +128,14 @@ def track_requisitions(company, lines):
         for key, rec in reqs.items():
             if not key.startswith(f"{company}|") or rec.get("closed_at") or key in seen:
                 continue
+            if scope is not None and str(rec.get("location") or "").strip().upper() not in scope:
+                continue                    # not read this time: another location's line
             if rec.get("last_seen") and rec["last_seen"] < _iso(now - timedelta(seconds=30)):
                 rec["closed_at"] = rec["last_seen"]
                 rec["hours_open"] = _hours(_parse(rec["first_seen"]), _parse(rec["last_seen"]))
         for key, rec in reqs.items():
-            if key.startswith(f"{company}|") and rec.get("closed_at"):
+            if key.startswith(f"{company}|") and rec.get("closed_at") and \
+                    (scope is None or str(rec.get("location") or "").strip().upper() in scope):
                 closed.append({"key": key.split("|", 1)[1], "item": rec.get("item"),
                                "description": rec.get("description"), "location": rec.get("location"),
                                "vendor": rec.get("vendor"), "user": rec.get("user"),

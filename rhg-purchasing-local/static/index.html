@@ -1061,13 +1061,13 @@ function mondayOf(d){
 }
 
 // Access (Admin → Accounts → Access): the locations of the company in view this person is limited to, or null for
-// all of them. A limited person reads one of their locations at a time: "All locations" is not offered.
+// all of them. A limited person reads one of their locations, or "All my locations" (every one of theirs together).
 function myLocs(){
   const L = (me && me.scope && me.scope.locations) || {}, co = ($("company").value || "").toUpperCase();
   const k = Object.keys(L).find(x => x.toUpperCase() === co);
   return k && Array.isArray(L[k]) && L[k].length ? L[k] : null;
 }
-function fitLocation(sel){
+function fitLocation(sel, one){          // one: the screen reads a single location (Price savings)
   if (!sel) return;
   const mine = myLocs();
   if (!mine) {                 // all locations of this company: "All locations" comes back after another company
@@ -1075,9 +1075,15 @@ function fitLocation(sel){
     return;
   }
   const cur = sel.value;
-  if (sel.options.length !== mine.length || !mine.includes(cur))
-    sel.innerHTML = mine.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
-  sel.value = mine.includes(cur) ? cur : mine[0];
+  if (one) {
+    if (sel.options.length !== mine.length || !mine.includes(cur))
+      sel.innerHTML = mine.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+    sel.value = mine.includes(cur) ? cur : mine[0];
+    return;
+  }
+  if (sel.options.length !== mine.length + 1 || sel.options[0].value !== "" || (cur && !mine.includes(cur)))
+    sel.innerHTML = '<option value="">All my locations</option>' + mine.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+  sel.value = mine.includes(cur) ? cur : "";
 }
 function params(){
   fitLocation($("location"));
@@ -1137,7 +1143,7 @@ function render(){
 
   const locSel = $("location"), cur = locSel.value;
   const mine = myLocs();
-  locSel.innerHTML = (mine ? "" : '<option value="">All locations</option>') + (mine || data.all_locations).map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
+  locSel.innerHTML = (mine ? '<option value="">All my locations</option>' : '<option value="">All locations</option>') + (mine || data.all_locations).map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
 
   const ops = data.operations || {}, po = ops.po_summary || {}, sla = ops.sla || [];
   const per = {week:"this week", month:"this month", ytd:"this year"}[m.mode] || "this period";
@@ -3361,7 +3367,7 @@ function svQuick(kind){
 }
 document.querySelectorAll("[data-svq]").forEach(b => b.onclick = () => svQuick(b.dataset.svq));
 function svParams(){
-  fitLocation($("svLoc"));
+  fitLocation($("svLoc"), true);
   const p = new URLSearchParams({company: $("company").value || "", from: $("svFrom").value, to: $("svTo").value,
     location: $("svLoc").value, vendor: $("svVendor").value, category: $("svCat").value, stream: $("svStream").value, q: $("svQ").value.trim()});
   return p;
@@ -3407,7 +3413,7 @@ function svFill(sel, list, label, cur){
 function renderSavings(){
   const d = svData; if (!d) return;
   const C = d.currency || CUR, s = d.summary, o = d.options;
-  svFill($("svLoc"), o.locations, "All locations"); fitLocation($("svLoc")); svFill($("svVendor"), o.vendors, "All suppliers");
+  svFill($("svLoc"), o.locations, "All locations"); fitLocation($("svLoc"), true); svFill($("svVendor"), o.vendors, "All suppliers");
   svFill($("svCat"), o.categories, "All categories"); svFill($("svStream"), o.streams, "All types");
   const rc = d.recipients || {};
   $("svRecip").textContent = `Send goes to ${(rc.to || []).join(", ") || "nobody yet: set the Purchasing Manager and Coordinator in Settings → Email notifications"}${(rc.cc || []).length ? " · Cc " + rc.cc.join(", ") : ""}. `

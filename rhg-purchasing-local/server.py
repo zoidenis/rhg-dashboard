@@ -236,7 +236,20 @@ def _refresh_dashboard(key, company, week, location, mode):
             _dash_building.discard(key)
 
 
+def _scope_of(location):
+    """location: "" (every location), one code, or a frozenset of codes (a person or a report limited to some
+    locations, who reads them all together): (the one code or "", the set in upper case or None)."""
+    if isinstance(location, (frozenset, set)):
+        return "", {str(x).strip().upper() for x in location}
+    return location or "", None
+
+
+def _in_scope(only, code):
+    return only is None or str(code or "").strip().upper() in only
+
+
 def _dashboard_build(company, week, location, mode="week"):
+    location, only = _scope_of(location)
     c_from, c_to, p_from, p_to, like_for_like, label = _period(week, mode)
     cur_age = max(config.REFRESH_SECONDS - 5, 5) if like_for_like else 600
     t0 = time.time()
@@ -258,12 +271,15 @@ def _dashboard_build(company, week, location, mode="week"):
     cur = first["cur"][0]
     prev = first["prev"][0] if not first["prev"][1] else {"rows": [], "checked_at": time.time(),
                                                           "new_since_last": 0}
+    if only is not None:                    # some locations only: everything below is built from their entries
+        cur = dict(cur, rows=[r for r in cur["rows"] if _in_scope(only, r.get("Location_Code"))])
+        prev = dict(prev, rows=[r for r in prev["rows"] if _in_scope(only, r.get("Location_Code"))])
     data = analytics.build(cur["rows"], prev["rows"], location or None)
     # Location intelligence (Overview): every location's purchase figures, on the all-locations read
     data["by_location"] = analytics.by_location(cur["rows"], prev["rows"]) if not location else None
 
     meta = {
-        "company": company, "location": location or "",
+        "company": company, "location": location or "", "scope": sorted(only) if only is not None else None,
         "current": [c_from.isoformat(), c_to.isoformat()],
         "prior": [p_from.isoformat(), p_to.isoformat()],
         "like_for_like": like_for_like, "mode": mode, "period_label": label,
@@ -285,6 +301,11 @@ def _dashboard_build(company, week, location, mode="week"):
             raise first["vcur"][1]
         vcur = first["vcur"][0]
         vprev = first["vprev"][0] if not first["vprev"][1] else {"rows": []}
+        if only is not None:                # the supplier documents of those locations' entries only
+            dn = {str(r.get("Document_No")) for r in cur["rows"]}
+            dp = {str(r.get("Document_No")) for r in prev["rows"]}
+            vcur = dict(vcur, rows=[r for r in vcur["rows"] if str(r.get("Document_No")) in dn])
+            vprev = dict(vprev, rows=[r for r in vprev["rows"] if str(r.get("Document_No")) in dp])
         registers, reg_status = None, None
         entries = [r.get("Entry_No") or 0 for r in cur["rows"]]
         if entries:
@@ -317,6 +338,8 @@ def _dashboard_build(company, week, location, mode="week"):
         else:
             po_error = None
         pos = operations.purchase_orders(po_rows, settings)
+        if only is not None:
+            pos = [p for p in pos if _in_scope(only, p.get("location"))]
         if data.get("by_location") is not None:
             # suppliers and open orders of every location, for the location squares
             from collections import defaultdict as _dd
@@ -372,7 +395,11 @@ def _dashboard_build(company, week, location, mode="week"):
         if req_rows is not None:
             if location:
                 req_rows = [r for r in req_rows if r["location"] == location]
-            req_hist, closed_reqs = history.track_requisitions(company, req_rows)
+            if only is not None:
+                req_rows = [r for r in req_rows if _in_scope(only, r.get("location"))]
+            # a read of some locations closes only their vanished lines, never those of the others
+            req_hist, closed_reqs = history.track_requisitions(
+                company, req_rows, {location.upper()} if location else only)
             reqs = operations.requisitions(req_rows, req_hist, settings)
             req_exceptions = operations.requisition_exceptions(reqs, settings)
 
@@ -444,6 +471,8 @@ def _dashboard_build(company, week, location, mode="week"):
                                               [r for r in prev["rows"] if r.get("Location_Code") == location])
         free_text = []
         for l in (first["lines"][0] or []) if not first["lines"][1] else []:
+            if only is not None and not _in_scope(only, l.get("Location_Code")):
+                continue
             if l.get("Document_Type") == "Order" and not (l.get("No_") or "").strip() and (l.get("Description") or "").strip():
                 free_text.append({"Description": (l.get("Description") or "").strip(),
                                   "Quantity": l.get("Quantity"), "Location": l.get("Location_Code") or "",
@@ -468,6 +497,8 @@ def _dashboard_build(company, week, location, mode="week"):
     data["gaps"] = gaps
     data["settings"] = settings
     actions = store.list_actions()
+    if only is not None:
+        actions = [a for a in actions if _in_scope(only, a.get("location"))]
     data["actions"] = actions
     tracked = {a.get("source_exception") for a in actions if a.get("source_exception")}
     live_codes = {e["code"] for e in (ops.get("sla") or [])}
@@ -492,6 +523,8 @@ def _dashboard_build(company, week, location, mode="week"):
     meta["query_ms"] = int((time.time() - t0) * 1000)
     data["meta"] = meta
 
+    if only is not None:                    # the drill-down keeps the read of every location
+        return data
     with _last_lock:
         _last["rows"] = ve_cur
         _last["prev"] = prev["rows"]
@@ -754,6 +787,7 @@ def streams(company, week, location, mode="week"):
     services and CAPEX. Read on demand, because it needs the item catalogue and the
     purchase postings in the general ledger as well as the value entries."""
     key = (company, week or "", location or "", mode)
+    location, only = _scope_of(location)
     hit = _streams_cache.get(key)
     if hit and time.time() - hit[0] < 600:
         return hit[1]
@@ -774,6 +808,8 @@ def streams(company, week, location, mode="week"):
 
     ve_all = period_rows(company, c_from, c_to, 120)["rows"]
     ve = [r for r in ve_all if r.get("Location_Code") == location] if location else ve_all
+    if only is not None:
+        ve = [r for r in ve if _in_scope(only, r.get("Location_Code"))]
     ve_flt = (f"Posting_Date ge {c_from.isoformat()} and Posting_Date le {c_to.isoformat()}"
               + (f" and {config.BC_PURCHASE_FILTER}" if config.BC_PURCHASE_FILTER else ""))
     ve_expected = client.count(company, config.BC_ENTITY, ve_flt)
@@ -822,6 +858,14 @@ def streams(company, week, location, mode="week"):
                         for r in vendor_rows}
 
     maps = classify.parse_maps(cl)
+    # the posted invoices name the location (else the department) of a posting in the general ledger
+    heads = _read("Posted purchase invoices", lambda: client.posted_invoices(company, c_from.isoformat(),
+                                                                             c_to.isoformat()), [], critical=False)
+    head_loc = {str(h.get("No") or ""): (h.get("Location_Code") or h.get("Shortcut_Dimension_1_Code") or "").strip()
+                for h in heads}
+    if only is not None:                    # some locations only: their postings and invoices
+        gl = [g for g in gl if _in_scope(only, head_loc.get(str(g.get("Document_No") or ""), ""))]
+        heads = [h for h in heads if _in_scope(only, head_loc.get(str(h.get("No") or ""), ""))]
 
     item_streams, item_rows, unclassified, by_field = classify.item_types(ve, catalog, maps)
     gl_streams, gl_rows, skipped, unknown_accounts, goods = classify.gl_types(
@@ -837,10 +881,6 @@ def streams(company, week, location, mode="week"):
 
     # ---- Buying → Location intelligence: everything above by location. Item lines carry their location;
     # postings in the general ledger take the location (else the department) of their posted invoice.
-    heads = _read("Posted purchase invoices", lambda: client.posted_invoices(company, c_from.isoformat(),
-                                                                             c_to.isoformat()), [], critical=False)
-    head_loc = {str(h.get("No") or ""): (h.get("Location_Code") or h.get("Shortcut_Dimension_1_Code") or "").strip()
-                for h in heads}
     by_loc = {}
 
     def bl(code):
@@ -895,7 +935,8 @@ def streams(company, week, location, mode="week"):
     out = {
         "by_location": by_loc,
         "period": [c_from.isoformat(), c_to.isoformat()], "label": label, "mode": mode,
-        "company": company, "location": location or "", "summary": summary,
+        "company": company, "location": location or "", "scope": sorted(only) if only is not None else None,
+        "summary": summary,
         "item_rows": item_rows[:600], "gl_rows": gl_rows[:600],
         "services": services[:400], "capex": capex[:200],
         "unclassified": unclassified_rows[:200],
@@ -936,7 +977,7 @@ def streams(company, week, location, mode="week"):
                          f"read account by account for {len(wanted_accounts)} accounts)",
                          config.BC_ITEMS_ENTITY, config.BC_ACCOUNTS_ENTITY, config.BC_VENDOR_ENTITY],
             "date_field": "Posting_Date", "date_range": f"{c_from.isoformat()} .. {c_to.isoformat()}",
-            "filters": f"location={location or 'all'}",
+            "filters": f"location={location or (', '.join(sorted(only)) if only is not None else 'all')}",
             "records": {"value_entries": len(ve), "gl_purchase_entries": len(gl),
                         "item_cards": len(catalog), "accounts": len(accounts)},
             "currency": company_currency(company),
@@ -971,26 +1012,32 @@ def compare(company, week, location, mode="week"):
     """Equivalent-period comparisons and the budget benchmark. Cached for 15 minutes
     because these are settled periods; the live 30-second refresh does not touch them."""
     key = (company, week or "", location or "", mode)
+    location, only = _scope_of(location)
+    mine = (lambda rows: rows) if only is None else \
+        (lambda rows: [r for r in rows if _in_scope(only, r.get("Location_Code"))])
     hit = _compare_cache.get(key)
     if hit and time.time() - hit[0] < 900:
         return hit[1]
     c_from, c_to, _, _, like_for_like, label = _period(week, mode)
     settings = store.get_settings()
     cur = period_rows(company, c_from, c_to, 60)
-    current_total = comparisons.total(cur["rows"], location or None)
+    current_total = comparisons.total(mine(cur["rows"]), location or None)
 
     specs, rolling_label = comparisons.specs(c_from, c_to, mode)
     periods = []
     for spec in specs:
         rows = period_rows(company, spec["from"], spec["to"], 3600)["rows"]
         periods.append({**spec, "from": spec["from"].isoformat(), "to": spec["to"].isoformat(),
-                        "total": comparisons.total(rows, location or None)})
+                        "total": comparisons.total(mine(rows), location or None)})
     rows = comparisons.build(current_total, periods, rolling_label)
 
     # ---- budget benchmark ----
     accounts = [a.strip() for a in (settings["budget"].get("cogs_accounts") or "").split(",") if a.strip()]
     budget = {"available": False, "reason": "No cost-of-goods accounts configured in Settings."}
-    if accounts:
+    if accounts and only is not None:
+        budget = {"available": False, "reason": "The budget is the whole company's; it is not compared with "
+                                                "some locations."}
+    elif accounts:
         try:
             b_rows = client.budget_entries(company, (c_from.replace(day=1)).isoformat(), c_to.isoformat(),
                                            accounts, settings["budget"].get("name") or "")
@@ -1198,6 +1245,9 @@ ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/
 # read for one location (the "location" parameter) by a person limited to some locations of the company
 ACCESS_ONE_LOCATION = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/savings", "/api/savings/pdf",
                        "/api/savings/xlsx", "/api/stock", "/api/report"}
+# read without a location by a person limited to some locations: all of theirs together, built from their entries
+# only (the Location intelligence screens, Live operations, the Action center, Supplier performance)
+ACCESS_SCOPE_SET = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/report", "/api/suppliers/locations"}
 # answered cut to the locations in scope
 ACCESS_FILTERED = {"/api/today/locations", "/api/locations", "/api/recipients/locations"}
 
@@ -1258,6 +1308,7 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         self._scope_filter = None
+        self._scope_set = None
         if url.path == "/internal/recipients":
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})
@@ -1317,7 +1368,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(404, {"error": "Font not installed"})
             elif url.path == "/api/dashboard":
-                d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), q.get("location"),
+                d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), self._scope_set or q.get("location"),
                               q.get("mode", "week"))
                 self._send(200, {k: v for k, v in d.items() if k != "_supplier_matrix"} if isinstance(d, dict) else d)
             elif url.path == "/api/suppliers/locations" and not (
@@ -1326,16 +1377,24 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/suppliers/locations":
                 # Supplier performance → Location intelligence and Whole company: the company read of the period
                 # (every location), by location, supplier and item
-                d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), "", q.get("mode", "week"))
+                d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), self._scope_set or "",
+                              q.get("mode", "week"))
                 m = d.get("_supplier_matrix") if isinstance(d, dict) else None
                 if m is None:
                     self._send(200, {"available": False, "error": ((d or {}).get("operations") or {}).get("error")
                                      or "The supplier figures could not be read."})
                 else:
-                    self._send(200, dict(m, available=True, meta=d.get("meta"),
-                                         transfers=transfers_request(q.get("company") or config.BC_COMPANY,
-                                                                     (d.get("meta") or {}).get("current"),
-                                                                     q.get("refresh") == "1")))
+                    tr = transfers_request(q.get("company") or config.BC_COMPANY, (d.get("meta") or {}).get("current"),
+                                           q.get("refresh") == "1")
+                    if self._scope_set and isinstance(tr, dict) and isinstance(tr.get("rows"), list):
+                        # a person limited to some locations: what they received and what they sent
+                        A = {x.upper() for x in self._scope_set}
+                        mine = lambda to, fr: (to or "").upper() in A or (fr or "").upper() in A
+                        rows = [r for r in tr["rows"] if mine(r[0], r[1])]
+                        tr = dict(tr, rows=rows, docs=[x for x in tr.get("docs") or [] if mine(x[0], x[1])],
+                                  items={r[2]: (tr.get("items") or {}).get(r[2]) for r in rows},
+                                  unmatched_documents=None)
+                    self._send(200, dict(m, available=True, meta=d.get("meta"), transfers=tr))
             elif url.path == "/api/cache":
                 with _dash_lock:
                     held = [{"company": k[0], "period": k[1] or "current", "location": k[2] or "all",
@@ -1472,14 +1531,15 @@ class Handler(BaseHTTPRequestHandler):
                                                q.get("month") or date.today().strftime("%Y-%m")))
             elif url.path == "/api/streams":
                 self._send(200, streams(q.get("company") or config.BC_COMPANY, q.get("week"),
-                                        q.get("location"), q.get("mode", "week")))
+                                        self._scope_set or q.get("location"), q.get("mode", "week")))
             elif url.path == "/api/comparisons":
                 self._send(200, compare(q.get("company") or config.BC_COMPANY, q.get("week"),
-                                        q.get("location"), q.get("mode", "week")))
+                                        self._scope_set or q.get("location"), q.get("mode", "week")))
             elif url.path == "/api/report":
                 kind = q.get("type", "weekly")
                 mode = q.get("mode", "week")
-                full = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), q.get("location"), mode)
+                full = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), self._scope_set or q.get("location"),
+                                 mode)
                 if kind == "daily":
                     day = date.fromisoformat(q["day"]) if q.get("day") else date.today() - timedelta(days=1)
                     company = q.get("company") or config.BC_COMPANY
@@ -1487,9 +1547,13 @@ class Handler(BaseHTTPRequestHandler):
                     loc = q.get("location")
                     if loc:
                         day_rows = [r for r in day_rows if r.get("Location_Code") == loc]
+                    elif self._scope_set:
+                        day_rows = [r for r in day_rows if _in_scope({x.upper() for x in self._scope_set},
+                                                                     r.get("Location_Code"))]
                     self._send(200, reports.daily(full, day_rows, day))
                 else:
-                    cmp_data = compare(q.get("company") or config.BC_COMPANY, q.get("week"), q.get("location"), mode)
+                    cmp_data = compare(q.get("company") or config.BC_COMPANY, q.get("week"),
+                                       self._scope_set or q.get("location"), mode)
                     self._send(200, reports.weekly(full, cmp_data))
             elif url.path == "/api/drill":
                 self._send(200, drill(q.get("kind", "purchases"), q.get("key", "")))
@@ -1584,13 +1648,19 @@ class Handler(BaseHTTPRequestHandler):
         if L is not None:
             if body is not None:
                 return access.refuse_company_wide(user, company)
-            if path in ACCESS_ONE_LOCATION:
-                if (q.get("location") or "").upper() not in L:
+            loc = (q.get("location") or "").upper()
+            if not loc and path in ACCESS_SCOPE_SET:
+                self._scope_set = frozenset(L)          # every location of theirs, together
+            elif not loc and path in ACCESS_ONE_LOCATION and len(L) == 1:
+                q["location"] = next(iter(L))           # their one location
+            elif path in ACCESS_ONE_LOCATION:
+                if loc not in L:
                     return {"error": f"Choose one of your locations: {access.describe(user, company)}.",
                             "access": "location", "scope": access.describe(user, company)}
             elif path not in ACCESS_FILTERED:
                 return access.refuse_company_wide(user, company)
-        if L is not None and path in ACCESS_ONE_LOCATION:     # read for one location of the scope: keep it whole
+        if L is not None and (path in ACCESS_ONE_LOCATION or path in ACCESS_SCOPE_SET):
+            # read for one location of the scope, or for all of theirs: built from their entries, keep it whole
             self._scope_filter = lambda b: access.filter_payload(b, user, company, None, ("all_locations",), False)
         else:
             self._scope_filter = lambda b: access.filter_payload(b, user, company)
@@ -1696,6 +1766,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(403, {"error": "Your role does not have access to this application."})
             return
         self._scope_filter = None
+        self._scope_set = None
         refusal = self._access(url.path, {}, user, body) if url.path.startswith("/api/") else None
         if refusal:
             self._send(403, refusal)

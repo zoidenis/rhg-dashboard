@@ -326,7 +326,7 @@
       const s = screenOf(g("prScreen").value), co = g("prCo").value, ls = locsOf(co), q = g("prLq").value.toLowerCase();
       const wholeScreen = s && s.kind === "company";
       g("prLocBox").style.display = wholeScreen ? "none" : "";
-      g("prLocHint").innerHTML = wholeScreen ? span("This screen shows the whole company, so it is not cut to locations.")
+      g("prLocHint").innerHTML = wholeScreen ? span("This screen shows the whole company, so it is not cut to locations.") + " " + span("Its figures are the company's accounts, statements or settings in Business Central, not those of a location.")
         : EDIT.locations.length ? span("Only these locations are in the report; each person receives those of them their access covers.")
         : span("All locations: each person receives the locations their access covers.") + " " + span("Tick locations to send only those.");
       const chosen = new Set(EDIT.locations);
