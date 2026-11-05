@@ -317,6 +317,24 @@ def analyse(company, mv, m, settings, period=30, excluded=None, location=None):
             "definitions": DEFINITIONS, "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
 
 
+def cut(r, allowed):
+    """The analysis for some locations only (a person or a report limited to them): their lines, interventions and
+    squares; the company view (every location summed) is the whole company and is left out. allowed: upper-case codes."""
+    if not isinstance(r, dict) or allowed is None or not isinstance(r.get("lines"), list):
+        return r
+    A = {str(x).strip().upper() for x in allowed}
+    ok = lambda x: str((x or {}).get("location") or "").strip().upper() in A
+    lines = [x for x in r["lines"] if ok(x)]
+    acts = [a for a in r.get("interventions") or [] if ok(a)]
+    kpis = {"codes_in": sum(1 for x in lines if x["received"] + x["made"] > TOL),
+            "codes_out": sum(1 for x in lines if x["consumed"] + x["sold"] > TOL),
+            **{k: [sum(1 for x in lines if x["status"] == k), round(sum(abs(x["value"]) for x in lines if x["status"] == k), 0)]
+               for k in STATUS},
+            "pairs": sum(1 for x in lines if x.get("pair")), "interventions": len(acts), "company_flagged": None}
+    return dict(r, lines=lines, interventions=acts, kpis=kpis, company_view=[], cut=True,
+                locations=[L for L in r.get("locations") or [] if ok(L)])
+
+
 def _q(v):
     a = abs(v or 0)
     s = f"{a:,.0f}" if a >= 100 else (f"{a:,.1f}" if a >= 10 else f"{a:,.2f}").rstrip("0").rstrip(".")

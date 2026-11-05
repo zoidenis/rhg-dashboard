@@ -1819,7 +1819,8 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
-                         "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx"}
+                         "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
+                         "/api/discharge", "/api/discharge/xlsx"}
 
 
 def scope_expand(company, codes):
@@ -1923,6 +1924,8 @@ class Handler(BaseHTTPRequestHandler):
                             "access": "location"}
         if path in ("/api/inventory/sku/location", "/api/inventory/sku/xlsx"):   # one location of the scope
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand, ("all_locations",), False)
+        elif path in ("/api/discharge", "/api/discharge/xlsx"):     # its lines, interventions and squares; no company view
+            self._scope_filter = lambda b: recipeuse.cut(b, scope_expand(company, L) | L) if L is not None else b
         else:
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand)
         return None
@@ -2545,6 +2548,8 @@ class Handler(BaseHTTPRequestHandler):
                     if not r:
                         self._send(409, {"error": "Read the report first."})
                         return
+                    if getattr(self, "_scope_filter", None):
+                        r = self._scope_filter(r)                # a person limited to some locations: theirs only
                     body = recipeuse.render_xlsx(r)
                     self.send_response(200)
                     self.send_header("Content-Type",

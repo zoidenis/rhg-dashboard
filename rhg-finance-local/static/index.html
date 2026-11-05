@@ -969,7 +969,7 @@ td.num,th.num{text-align:right}
       <div class="sk-chips" id="dcChips"></div>
       <div class="filters" style="margin:0 0 10px"><label>Item<input id="dcQ" placeholder="number or name"></label></div>
       <div class="scroll"><table id="dcLines"></table></div><p class="meta" id="dcLinesMore"></p></div>
-    <div class="card"><div class="card-head"><div><h2>Company view</h2>
+    <div class="card" id="dcCompCard"><div class="card-head"><div><h2>Company view</h2>
       <p class="hint">Every location summed, so transfers between locations cancel out: purchases and output against what the recipes and the sales discharge. The cleanest test of a recipe quantity.</p></div></div>
       <div class="scroll"><table id="dcComp"></table></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
@@ -4442,7 +4442,8 @@ function renderDischarge(){
     el.onclick = go; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
   });
   renderDcLines();
-  // company view
+  // company view: the whole company, left out of an answer cut to some locations
+  $("dcCompCard").style.display = d.cut ? "none" : "";
   const C = d.company_view.filter(c => DC_ORDER.indexOf(c.status) < 4);
   $("dcComp").innerHTML = C.length ? `<tr><th>Item</th><th>Signal</th><th class="num">Purchased</th><th class="num">Made</th><th class="num">By recipes</th><th class="num">Sold as it is</th><th class="num">Closing</th><th class="num">Discharged / in</th><th class="num">Locations in / out</th><th class="num">Value</th></tr>` +
     C.slice(0, 40).map(c => `<tr><td><b>${esc(c.item)}</b> ${esc(c.desc)} <span class="meta">${esc(c.unit)}</span></td><td>${dcSt1(c.status)}</td><td class="num">${dcQ(c.purchased)}</td><td class="num">${dcQ(c.made)}</td>
