@@ -394,6 +394,29 @@ def build(client, company, latest_fn, parallel_fn, progress=None, today=None):
             "checked_at": datetime.now().isoformat(timespec="seconds")}
 
 
+def cut(r, allowed):
+    """The takings for some restaurants only (allowed: upper-case codes of the scope; None = all): their rows and
+    the totals recomputed; a tender is kept when it is used at one of them, its total only when it is theirs alone."""
+    if allowed is None or not isinstance(r, dict) or not isinstance(r.get("locations"), list):
+        return r
+    A = {str(x).strip().upper() for x in allowed}
+    out = [L for L in r["locations"] if {str(L.get(k) or "").strip().upper() for k in ("ref", "dept", "bc")} & A]
+    refs = {str(L.get("ref") or "").strip().upper() for L in out} | A
+    tenders = []
+    for t in r.get("tenders") or []:
+        mine = [x for x in t.get("locations") or [] if str(x).strip().upper() in refs]
+        if mine:
+            alone = len(mine) == len(t.get("locations") or [])
+            tenders.append(dict(t, locations=mine, **({} if alone else {"total": None, "count": None})))
+    S = lambda k: round(sum(c[k] for L in out for c in L["channels"]), 2)
+    N = lambda k: sum(c[k] for L in out for c in L["channels"])
+    kpis = {"taken": S("taken"), "matched": S("matched"), "open": S("open"), "pending": S("pending"), "over": S("over"),
+            "open_days": N("open_days"), "late_days": N("late_days"), "ok_days": N("ok_days"),
+            "refunds": round(sum(o["amount"] for L in out for o in L["refunds"]), 2),
+            "unmapped": len({t for L in out for t in L["unmapped"]})}
+    return dict(r, locations=out, tenders=tenders, kpis=kpis, cut=True)
+
+
 # ---------------------------------------------------------------- the register
 def findings(r):
     """The cases of a reconciliation for exreg.sync (source "receipts_rec")."""

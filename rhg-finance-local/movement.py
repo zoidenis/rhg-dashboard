@@ -170,6 +170,57 @@ def thresholds(settings):
     return base, per
 
 
+def _summary(out_rows):
+    """By location, aging and totals of the rows (analyse; cut for a person limited to some locations)."""
+    classes = ["ACTIVE", "MONITOR", "SLOW MOVING", "NON-MOVING", "DEAD STOCK", "NEW ITEM", "SEASONAL", "NEGATIVE"]
+    by_loc = {}
+    for r in out_rows:
+        L = by_loc.setdefault(r[0], {"location": r[0], **{c: [0, 0.0] for c in classes}, "rnc": [0, 0.0],
+                                     "items": 0, "value": 0.0})
+        L["items"] += 1
+        L["value"] += r[3]
+        L[r[13]][0] += 1
+        L[r[13]][1] += r[3]
+        if r[14]:
+            L["rnc"][0] += 1
+            L["rnc"][1] += r[3]
+    buckets = [("0–30", 0, 30), ("31–60", 31, 60), ("61–90", 61, 90), ("91–180", 91, 180),
+               ("181–365", 181, 365), ("no use in history", None, None)]
+    aging = {}
+    for r in out_rows:
+        if r[2] <= 0:
+            continue
+        d = r[12]
+        label = buckets[-1][0] if d is None else next((b[0] for b in buckets[:-1] if b[1] <= d <= b[2]), "181–365")
+        a = aging.setdefault(r[0], {})
+        a[label] = a.get(label, 0.0) + r[3]
+    totals = {c: [sum(L[c][0] for L in by_loc.values()), round(sum(L[c][1] for L in by_loc.values()), 0)]
+              for c in classes}
+    rnc = [r for r in out_rows if r[14]]
+    negative = [r for r in out_rows if r[2] < 0]
+    return {"totals": {"items": len(out_rows), "value": round(sum(r[3] for r in out_rows if r[2] > 0), 0),
+                       "classes": totals, "received_not_used": [len(rnc), round(sum(r[3] for r in rnc), 0)],
+                       "negative": [len(negative), round(sum(r[3] for r in negative), 0)]},
+            "locations": sorted(({**{k: v for k, v in L.items()}, "value": round(L["value"], 0)} for L in by_loc.values()),
+                                key=lambda L: -L["value"]),
+            "aging": aging, "buckets": [b[0] for b in buckets]}
+
+
+def cut(r, allowed):
+    """The result for some locations only (allowed: upper-case codes; None = all): their rows, squares, aging,
+    adjustments and typology lines, the totals recomputed. Exclusions by category span every location and are
+    left out."""
+    if allowed is None or not isinstance(r, dict) or "_rows" not in r:
+        return r
+    A = {str(x).strip().upper() for x in allowed}
+    ok = lambda loc: str(loc or "").strip().upper() in A
+    rows = [x for x in r["_rows"] if ok(x[0])]
+    return dict(r, **_summary(rows), _rows=rows, _typo=[x for x in r.get("_typo") or [] if ok(x[0])],
+                _names={x[1]: r["_names"].get(x[1], "") for x in rows},
+                adjustments=[a for a in r.get("adjustments") or [] if ok(a.get("location"))],
+                excluded=[e for e in r.get("excluded") or [] if ok(e[0])], cut=True)
+
+
 def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, held_from):
     th = settings["thresholds"]
     inv = settings.get("inventory") or {}
@@ -301,44 +352,14 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
         typo.append([loc, it, round(qty, 3), float(card.get("Unit_Cost") or 0), round(use, 3),
                      round(s["adj_neg"], 3) if s else 0.0, len(s["rdays"]) if s else 0])
 
-    # summaries
-    classes = ["ACTIVE", "MONITOR", "SLOW MOVING", "NON-MOVING", "DEAD STOCK", "NEW ITEM", "SEASONAL", "NEGATIVE"]
-    by_loc = {}
-    for r in out_rows:
-        L = by_loc.setdefault(r[0], {"location": r[0], **{c: [0, 0.0] for c in classes}, "rnc": [0, 0.0],
-                                     "items": 0, "value": 0.0})
-        L["items"] += 1
-        L["value"] += r[3]
-        L[r[13]][0] += 1
-        L[r[13]][1] += r[3]
-        if r[14]:
-            L["rnc"][0] += 1
-            L["rnc"][1] += r[3]
-    buckets = [("0–30", 0, 30), ("31–60", 31, 60), ("61–90", 61, 90), ("91–180", 91, 180),
-               ("181–365", 181, 365), ("no use in history", None, None)]
-    aging = {}
-    for r in out_rows:
-        if r[2] <= 0:
-            continue
-        d = r[12]
-        label = buckets[-1][0] if d is None else next((b[0] for b in buckets[:-1] if b[1] <= d <= b[2]), "181–365")
-        a = aging.setdefault(r[0], {})
-        a[label] = a.get(label, 0.0) + r[3]
-    totals = {c: [sum(L[c][0] for L in by_loc.values()), round(sum(L[c][1] for L in by_loc.values()), 0)]
-              for c in classes}
-    rnc = [r for r in out_rows if r[14]]
+    sm = _summary(out_rows)
     names = {}
     for r in out_rows:
         names[r[1]] = (items.get(r[1]) or {}).get("Description") or ""
     return {
         "company": company, "as_of": as_of.isoformat(), "history_days": history_days,
         "history_from": max(start.isoformat(), held_from or start.isoformat()),
-        "totals": {"items": len(out_rows), "value": round(sum(r[3] for r in out_rows if r[2] > 0), 0),
-                   "classes": totals, "received_not_used": [len(rnc), round(sum(r[3] for r in rnc), 0)],
-                   "negative": [len(negative), round(sum(r[3] for r in negative), 0)]},
-        "locations": sorted(({**{k: v for k, v in L.items()}, "value": round(L["value"], 0)} for L in by_loc.values()),
-                            key=lambda L: -L["value"]),
-        "aging": aging, "buckets": [b[0] for b in buckets],
+        **sm,
         "adjustments": sorted(adj.values(), key=lambda a: -(a["pos_cost"] - a["neg_cost"])),
         "excluded": sorted(([k, v[0], round(v[1], 0)] for k, v in excluded.items()), key=lambda x: -abs(x[2])),
         "rules": {"exclude_locations": sorted(ex_locs), "exclude_categories": sorted(ex_cats),

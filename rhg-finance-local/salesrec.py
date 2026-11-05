@@ -283,6 +283,40 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
             "statuses": STATUS, "mapping_labels": MAPPING, "simphony": sim_on}
 
 
+def cut(r, allowed):
+    """The reconciliation for some restaurants only (allowed: upper-case codes of the scope; None = all): their rows,
+    the totals recomputed from their days; a menu item problem is kept when it is at one of them, with only their
+    codes, and its value only when it is theirs alone."""
+    if allowed is None or not isinstance(r, dict) or not isinstance(r.get("locations"), list):
+        return r
+    A = {str(x).strip().upper() for x in allowed}
+    keys = lambda L: {str(L.get(k) or "").strip().upper() for k in ("bc", "ref", "customer")} - {""}
+    locs = [L for L in r["locations"] if keys(L) & A]
+    tot = {"sim": 0.0, "imp": 0.0, "inv": 0.0, "remaining": 0.0, "imp_gap": 0.0, "inv_gap": 0.0}
+    counts = {k: 0 for k in (r.get("kpis") or {}).get("counts") or {}}
+    for L in locs:
+        for c in L["cells"].values():
+            counts[c["status"]] = counts.get(c["status"], 0) + 1
+            for k in ("sim", "imp", "inv"):
+                tot[k] += c.get(k) or 0
+            tot["remaining"] += max(c.get("remaining") or 0, 0)
+            if c.get("sim") is not None and c.get("imp") is not None:
+                tot["imp_gap"] += c["imp"] - c["sim"]
+            if c.get("inv") is not None and c.get("imp") is not None:
+                tot["inv_gap"] += c["inv"] - c["imp"]
+    maps = []
+    for M in r.get("mapping") or []:
+        mine = [x for x in M.get("locations") or [] if str(x).strip().upper() in A]
+        if mine:
+            alone = len(mine) == len(M.get("locations") or [])
+            maps.append(dict(M, locations=mine, **({} if alone else {"value": None, "qty": None})))
+    checked = [c for L in locs for c in L["cells"].values() if c["status"] not in ("pending", "no_sales")]
+    kpis = {**{k: round(v) for k, v in tot.items()}, "days": len(checked),
+            "ok": sum(1 for c in checked if c["status"] == "ok"),
+            "issues": sum(L["issues"] for L in locs) + len(maps), "mapping": len(maps), "counts": counts}
+    return dict(r, locations=locs, mapping=maps, kpis=kpis, cut=True)
+
+
 def build(client, company, latest_fn, progress=None, today=None):
     today = today or date.today()
     settings = store.get_settings()

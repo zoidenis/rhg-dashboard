@@ -533,6 +533,48 @@ def _latest(loc_ref):
     return value
 
 
+SALES_KEYS = ("net", "discounts", "gross", "checks", "guests", "voids", "returns", "service", "tax",
+              "open_checks", "open_value", "error_corrects")
+
+
+def sales_totals(rows):
+    """Sales: the totals of the rows by currency."""
+    totals = {}
+    for r in rows:
+        t = totals.setdefault(r["currency"] or "?", {"cur": dict.fromkeys(SALES_KEYS, 0),
+                                                       "prev": dict.fromkeys(SALES_KEYS, 0), "locations": 0})
+        t["locations"] += 1
+        for k in SALES_KEYS:
+            t["cur"][k] += r["cur"].get(k) or 0
+            t["prev"][k] += r["prev"].get(k) or 0
+    for t in totals.values():
+        c, p = t["cur"], t["prev"]
+        t["change_pct"] = (c["net"] - p["net"]) / abs(p["net"]) * 100 if p["net"] else None
+        t["avg_check"] = c["net"] / c["checks"] if c["checks"] else None
+        t["avg_guest"] = c["net"] / c["guests"] if c["guests"] else None
+    return totals
+
+
+def sales_cut(body, user, company):
+    """Sales for a person limited to some locations: their rows (access.filter_payload), the totals and the days
+    summed again from them, so the screen shows their restaurants as the whole of it."""
+    out = access.filter_payload(body, user, company, scope_expand)
+    if out is body or not isinstance(out.get("locations"), list) or not body.get("available"):
+        return out
+    rows = out["locations"]
+    by_day = {}
+    for r in rows:
+        for d, net in (r.get("daily") or {}).items():
+            day = by_day.setdefault(d, {"date": d, "net": {}, "checks": 0, "guests": 0})
+            day["net"][r["currency"] or "?"] = day["net"].get(r["currency"] or "?", 0) + net
+            cg = (r.get("daily_cg") or {}).get(d) or [0, 0]
+            day["checks"] += cg[0]
+            day["guests"] += cg[1]
+    totals = sales_totals(rows)
+    return dict(out, totals=totals, days=sorted(by_day.values(), key=lambda d: d["date"]), cut=True,
+                currency=max(totals, key=lambda k: totals[k]["cur"]["net"]) if totals else body.get("currency"))
+
+
 def sales_screen(anchor, mode, compare="prior"):
     """Net sales, checks and guests by location from Simphony, against the period before
     or the same dates last year."""
@@ -594,7 +636,7 @@ def sales_screen(anchor, mode, compare="prior"):
         cur = dict.fromkeys(keys, 0)
         prev = dict.fromkeys(keys, 0)
         read = missing = 0
-        daily_cur, daily_prev = {}, {}                       # for Location intelligence's lines
+        daily_cur, daily_prev, daily_cg = {}, {}, {}           # for Location intelligence's lines
         for d in cur_days + prev_days:
             value, err = results.get((l["locRef"], d), (None, None))
             if value is None:
@@ -607,6 +649,7 @@ def sales_screen(anchor, mode, compare="prior"):
                 target[k] += fig[k]
             (daily_cur if d in cur_days else daily_prev)[d] = round(fig["net"])
             if d in cur_days:
+                daily_cg[d] = [fig["checks"], fig["guests"]]
                 read += 1
                 day = by_day.setdefault(d, {"date": d, "net": {}, "checks": 0, "guests": 0})
                 day["net"][l["currency"] or "?"] = day["net"].get(l["currency"] or "?", 0) + fig["net"]
@@ -618,7 +661,7 @@ def sales_screen(anchor, mode, compare="prior"):
         rows.append({"locRef": l["locRef"], "name": l["name"], "currency": l["currency"],
                      "reg_name": rg.get("name") or "", "brand": rg.get("brand") or "", "seasonal": bool(rg.get("seasonal")),
                      "company": rg.get("company") or "", "in_registry": bool(rg),
-                     "daily": daily_cur, "daily_prev": daily_prev,
+                     "daily": daily_cur, "daily_prev": daily_prev, "daily_cg": daily_cg,
                      "bc": mapping.get(l["locRef"], ""), "latest": latest.get(l["locRef"]),
                      "days_read": read, "days_missing": missing, "cur": cur, "prev": prev,
                      "change_pct": ((cur["net"] - prev["net"]) / abs(prev["net"]) * 100) if prev["net"] else None,
@@ -626,19 +669,7 @@ def sales_screen(anchor, mode, compare="prior"):
                      "avg_guest": cur["net"] / cur["guests"] if cur["guests"] else None,
                      "discount_pct": cur["discounts"] / cur["gross"] * 100 if cur["gross"] else None})
     rows.sort(key=lambda r: -r["cur"]["net"])
-    totals = {}
-    for r in rows:
-        t = totals.setdefault(r["currency"] or "?", {"cur": dict.fromkeys(keys, 0), "prev": dict.fromkeys(keys, 0),
-                                                       "locations": 0})
-        t["locations"] += 1
-        for k in keys:
-            t["cur"][k] += r["cur"][k]
-            t["prev"][k] += r["prev"][k]
-    for t in totals.values():
-        c, p = t["cur"], t["prev"]
-        t["change_pct"] = (c["net"] - p["net"]) / abs(p["net"]) * 100 if p["net"] else None
-        t["avg_check"] = c["net"] / c["checks"] if c["checks"] else None
-        t["avg_guest"] = c["net"] / c["guests"] if c["guests"] else None
+    totals = sales_totals(rows)
     main_currency = max(totals, key=lambda k: totals[k]["cur"]["net"]) if totals else ""
     return {
         "available": True, "configured": True,
@@ -1820,7 +1851,14 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
                          "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
-                         "/api/discharge", "/api/discharge/xlsx"}
+                         "/api/discharge", "/api/discharge/xlsx",
+                         # Inventory: Movement & dead stock, Typology & turnover, Stock count analysis
+                         "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
+                         "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
+                         # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
+                         "/api/salesrec", "/api/receipts",
+                         # Budget & forecast → Location intelligence, by department
+                         "/api/executive"}
 
 
 def scope_expand(company, codes):
@@ -1922,10 +1960,24 @@ class Handler(BaseHTTPRequestHandler):
                 if code not in L:
                     return {"error": f"Choose one of your locations: {access.describe(user, company)}.",
                             "access": "location"}
-        if path in ("/api/inventory/sku/location", "/api/inventory/sku/xlsx"):   # one location of the scope
+        # the codes of the scope (BC code, department, Simphony reference): the screens that cut their answer
+        # themselves (movement, typology, stock count, inventory) read them from here
+        self._allowed = (scope_expand(company, L) | L) if L is not None else None
+        if path == "/api/sales":                                    # Sales: their restaurants, totals again
+            self._scope_filter = lambda b: sales_cut(b, user, company)
+        elif path in ("/api/inventory/sku/location", "/api/inventory/sku/xlsx"):   # one location of the scope
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand, ("all_locations",), False)
         elif path in ("/api/discharge", "/api/discharge/xlsx"):     # its lines, interventions and squares; no company view
-            self._scope_filter = lambda b: recipeuse.cut(b, scope_expand(company, L) | L) if L is not None else b
+            self._scope_filter = lambda b: recipeuse.cut(b, self._allowed)
+        elif path in ("/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
+                      "/api/stockcount", "/api/stockcount/xlsx"):
+            self._scope_filter = None                                   # cut by the handler (self._allowed)
+        elif path == "/api/executive":
+            self._scope_filter = lambda b: executive.cut(b, self._allowed)
+        elif path == "/api/salesrec":
+            self._scope_filter = lambda b: salesrec.cut(b, self._allowed)
+        elif path == "/api/receipts":
+            self._scope_filter = lambda b: dict(rcpt.cut(b, self._allowed), can_settings=False)
         else:
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand)
         return None
@@ -1944,13 +1996,17 @@ class Handler(BaseHTTPRequestHandler):
         except BCError as exc:
             self._send(200, {"available": False, "error": str(exc)[:300]})
             return
+        A = self._allowed                                   # a person limited to some locations: theirs only
+        if A is not None:
+            codes = [c for c in codes if c.upper() in A]
         names = {(r.get("bc") or "").upper(): r.get("name") for r in locintel.registry()
                  if (r.get("company") or "").upper() == company.upper() and r.get("bc")}
         today = date.today().replace(day=1)
         setup = {"company": company, "month": month, "default_month": stockcount.default_month(),
                  "months": [(today - timedelta(days=1 + 31 * i)).strftime("%Y-%m") for i in range(13)],
                  "locations": [{"code": c, "name": names.get(c.upper()) or ""} for c in codes],
-                 "counts": stockcount.counts(company), "can_upload": auth.can(user, "actions"),
+                 "counts": [c for c in stockcount.counts(company) if A is None or (c.get("location") or "").upper() in A],
+                 "can_upload": auth.can(user, "actions") and A is None,
                  "can_export": auth.can(user, "export")}
         if xlsx:
             hit = stockcount.request(client, company, location, month) if location in codes else {}
@@ -1971,7 +2027,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {"available": False, "setup": setup})
             return
         if location not in codes:
-            self._send(200, {"available": False, "setup": setup, "error": f"{location} is not a location of {company}."})
+            self._send(200, {"available": False, "setup": setup,
+                             "error": f"{location} is not a location of {company}." if A is None
+                             else f"Choose one of your locations: {', '.join(codes) or 'none'}."})
             return
         r = stockcount.request(client, company, location, month, q.get("refresh") == "1")
         self._send(200, dict(r, setup=setup))
@@ -2006,6 +2064,7 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         self._scope_filter = None
+        self._allowed = None
         if url.path == "/internal/scope-options":
             # identity's Admin → Accounts → access: the companies and their locations to choose from
             if not self._service_call():
@@ -2422,12 +2481,15 @@ class Handler(BaseHTTPRequestHandler):
                     days = 90
                 if url.path == "/api/movement":
                     r = movement.request(client, company, q.get("as_of"), days, q.get("refresh") == "1")
-                    self._send(200, r if r.get("pending") or r.get("available") is False else movement.public(r))
+                    self._send(200, r if r.get("pending") or r.get("available") is False
+                               else movement.public(movement.cut(r, self._allowed)))
                     return
                 r = movement.held(company, q.get("as_of") or "", days)
                 if not r or r.get("available") is False:
                     self._send(409, {"error": "Read the movement report first."})
-                elif url.path == "/api/movement/rows":
+                    return
+                r = movement.cut(r, self._allowed)               # a person limited to some locations: theirs only
+                if url.path == "/api/movement/rows":
                     self._send(200, movement.select_rows(r, q.get("location") or "", q.get("class") or "",
                                                          q.get("category") or "", q.get("q") or "",
                                                          q.get("rnc") == "1", q.get("sort") or "value",
@@ -2519,7 +2581,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, r)
                     return
                 m = recipes.master_cached(company) or {}
-                t = typology.analyse(r, m.get("items") or {}, store.get_settings())
+                t = typology.analyse(movement.cut(r, self._allowed), m.get("items") or {}, store.get_settings())
                 if url.path == "/api/typology":
                     self._send(200, t)
                 else:
@@ -2732,6 +2794,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(403, {"error": "Your role does not have access to this application."})
             return
         self._scope_filter = None
+        self._allowed = None
         refusal = self._access(url.path, {}, user, body) if url.path.startswith("/api/") else None
         if refusal:
             self._send(403, refusal)

@@ -443,6 +443,37 @@ def assemble(company, year, currency, today=None, departments=None):
     }
 
 
+def cut(r, allowed):
+    """The figures of some departments only (a person or a report limited to some locations; allowed: upper-case
+    codes of the scope, None = all): their departments, actual and budget; the company line ("*") becomes the sum
+    of those departments, so nothing of the other locations or of what has no department shows."""
+    if allowed is None or not isinstance(r, dict) or not isinstance(r.get("actual"), dict):
+        return r
+    A = {str(x).strip().upper() for x in allowed}
+    ok = lambda code: str(code or "").strip().upper() in A
+
+    def part(cellmap):
+        out = {d: v for d, v in (cellmap or {}).items() if d != "*" and ok(d)}
+        tot = {}
+        for by_month in out.values():
+            for m, row in by_month.items():
+                t = tot.setdefault(m, {})
+                for no, v in row.items():
+                    t[no] = round(t.get(no, 0) + v, 2)
+        out["*"] = tot
+        return out
+    b = dict(r.get("budget") or {})
+    if b.get("cells") is not None:
+        b["cells"] = part(b["cells"])
+    sim = dict(r.get("simphony") or {})
+    if isinstance(sim.get("locations"), dict):
+        sim["locations"] = {k: v for k, v in sim["locations"].items() if ok(k) or ok((v or {}).get("dept"))}
+    return dict(r, departments=[x for x in r.get("departments") or [] if ok(x.get("code"))], actual=part(r["actual"]),
+                budget=b, simphony=sim, registry=[x for x in r.get("registry") or [] if ok(x.get("dept")) or ok(x.get("ref"))],
+                restaurants=[x for x in r.get("restaurants") or [] if ok(x)] if isinstance(r.get("restaurants"), list)
+                else r.get("restaurants"), cut=True)
+
+
 def simphony_months(company, year, active):
     """Monthly Simphony figures from the days already held; never calls Simphony."""
     if not simphony.info().get("configured"):

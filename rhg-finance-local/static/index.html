@@ -4264,6 +4264,7 @@ function cnSetup(st){
     try { want = want || localStorage.getItem("pulse-cn-loc-" + st.company) || ""; } catch (e) { /* storage off */ }
     loc.innerHTML = `<option value="">Choose a location</option>` + st.locations.map(l => `<option value="${esc(l.code)}">${esc(l.code)}${l.name ? " · " + esc(l.name) : ""}</option>`).join("");
     if (st.locations.some(l => l.code === want)) loc.value = want;
+    else if (st.locations.length === 1) loc.value = st.locations[0].code;      // one location in the scope (a report)
     loc.dataset.co = st.company;
   }
   if (!mon.options.length) {
@@ -4299,6 +4300,7 @@ async function loadCn(refresh){
   try {
     const j = await readJSON(await fetch("/api/stockcount?" + cnQs(refresh ? {refresh: 1} : {})));
     if (j.setup) cnSetup(j.setup);
+    if (!loc && $("cnLoc").value) return loadCn(refresh);                     // the setup chose the location
     if (!$("cnLoc").value) { cnData = null; cnRender(); $("cnStatus").textContent = "Choose the location and the month the count closes."; return; }
     if (j.pending) { $("cnStatus").textContent = `Reading Business Central: ${j.stage || "starting"}…`; cnTimer = setTimeout(() => loadCn(false), 3000); return; }
     if (!j.available) throw new Error(j.error || "not available");
