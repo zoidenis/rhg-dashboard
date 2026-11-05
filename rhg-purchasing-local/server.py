@@ -343,6 +343,10 @@ def _dashboard_build(company, week, location, mode="week"):
         except BCError:
             catalog = {}
         data["contracts"] = contracts.build(ve_cur, prices or {}, price_status, catalog, settings, label)
+        if data.get("by_location") is not None:
+            # Supplier performance → Location intelligence / Whole company (sent by /api/suppliers/locations only)
+            data["_supplier_matrix"] = operations.supplier_matrix(
+                ve_cur, suppliers, prev["rows"], operations.supplier_index(vprev["rows"]), catalog)
 
         sla = (operations.sla_exceptions(docs, pos, data["movers"], settings, meta)
                + req_exceptions + contract_exceptions)
@@ -1271,8 +1275,22 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(404, {"error": "Font not installed"})
             elif url.path == "/api/dashboard":
-                self._send(200, dashboard(q.get("company") or config.BC_COMPANY, q.get("week"),
-                                          q.get("location"), q.get("mode", "week")))
+                d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), q.get("location"),
+                              q.get("mode", "week"))
+                self._send(200, {k: v for k, v in d.items() if k != "_supplier_matrix"} if isinstance(d, dict) else d)
+            elif url.path == "/api/suppliers/locations" and not (
+                    auth.can(user, "purchasing.s.suppliers.suploc") or auth.can(user, "purchasing.s.suppliers.supco")):
+                self._send(403, {"error": "Your role does not include Supplier performance by location."})
+            elif url.path == "/api/suppliers/locations":
+                # Supplier performance → Location intelligence and Whole company: the company read of the period
+                # (every location), by location, supplier and item
+                d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), "", q.get("mode", "week"))
+                m = d.get("_supplier_matrix") if isinstance(d, dict) else None
+                if m is None:
+                    self._send(200, {"available": False, "error": ((d or {}).get("operations") or {}).get("error")
+                                     or "The supplier figures could not be read."})
+                else:
+                    self._send(200, dict(m, available=True, meta=d.get("meta")))
             elif url.path == "/api/cache":
                 with _dash_lock:
                     held = [{"company": k[0], "period": k[1] or "current", "location": k[2] or "all",

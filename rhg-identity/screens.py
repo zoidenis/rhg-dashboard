@@ -103,7 +103,10 @@ PURCHASING = [
         ("today", "Today", "location", ["purchasing.quality.view"])]),
     ("compliance", "Invoices without PO", "Control", None, [], "company", ["purchasing.invoices.view"]),
     ("feed", "Posting follow-up", "Control", None, [], "location", ["purchasing.invoices.view"]),
-    ("suppliers", "Supplier performance", "Performance", None, [], "location", ["purchasing.spend.view"]),
+    ("suppliers", "Supplier performance", "Performance", "spTabs", [
+        ("suppliers", "Supplier performance", "location", ["purchasing.spend.view"]),
+        ("suploc", "Location intelligence", "company", ["purchasing.spend.view"]),
+        ("supco", "Whole company", "company", ["purchasing.spend.view"])]),
     ("purchasers", "Purchaser performance", "Performance", None, [], "company", ["purchasing.spend.view"]),
     ("users", "User performance", "Performance", None, [], "company", []),
     ("reports", "Reports", "Performance", None, [], "company", []),

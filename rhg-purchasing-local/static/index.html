@@ -257,6 +257,11 @@ td.num,th.num{text-align:right}
 @media (max-width:1000px){.pl-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pl-cols{grid-template-columns:minmax(0,1fr)}.pl-span2{grid-column:auto}}
 @media (max-width:600px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .wk-box{border-top:1px solid var(--line);margin:12px 0;padding-top:12px}
+/* Supplier performance → Location intelligence / Whole company */
+.sp-row{cursor:pointer}.sp-row:hover td{background:var(--bg)}.sp-row.on td{background:var(--rhg-sky,#efede6)}
+.sp-bar{display:inline-block;height:7px;border-radius:3px;background:var(--accent);vertical-align:middle;margin-right:6px;min-width:2px}
+.sp-back{all:unset;cursor:pointer;color:var(--accent);font-weight:600;font-size:12.5px;margin-bottom:8px;display:inline-block}
+.sp-back:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 /* Purchaser performance */
 .pr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-bottom:18px}
 .pr-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;text-align:left;font:inherit;color:inherit;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -327,6 +332,8 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 
     <div class="grp">Performance</div>
     <button data-view="suppliers">Supplier performance</button>
+    <button data-view="suploc" data-parent="suppliers" data-tab="Location intelligence" style="display:none">Location intelligence</button>
+    <button data-view="supco" data-parent="suppliers" data-tab="Whole company" style="display:none">Whole company</button>
     <button data-view="purchasers">Purchaser performance</button>
     <button data-view="users">User performance</button>
     <button data-view="reports">Reports</button>
@@ -748,11 +755,38 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-suppliers">
+    <div class="ov-tabs" id="spTabs" role="tablist"><button data-t="suppliers" class="on" role="tab" aria-selected="true">Supplier performance</button><button data-t="suploc" role="tab" aria-selected="false">Location intelligence</button><button data-t="supco" role="tab" aria-selected="false">Whole company</button></div>
     <div class="card">
       <h2>Supplier performance</h2>
       <p class="hint">Supplier comes from the vendor ledger entry matched to each posted document number. Delivery performance is not shown because expected receipt dates are empty in BC.</p>
       <div class="scroll"><table id="supTable"></table></div>
     </div>
+  </section>
+
+  <section class="view" id="v-suploc">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Suppliers by location</h2>
+        <p class="hint"><span>Every location as a square: what it bought from its suppliers in the period chosen above (purchase invoices less credit memos), against the period before.</span> <span>Click a location for its suppliers, and a supplier for what it bought from them, by category and by item.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <label class="meta" for="spSort">Order</label><select id="spSort"><option value="value">by purchases</option><option value="change">by change</option><option value="sups">by suppliers</option><option value="name">by name</option></select>
+          <button class="mini dark" id="spRead">Read again</button></div></div>
+      <p class="meta" id="spStatus" style="margin:6px 0 0"></p>
+    </div>
+    <div class="kpis" id="spKpis"></div>
+    <div id="spGrid"></div>
+  </section>
+
+  <section class="view" id="v-supco">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Suppliers of the whole company</h2>
+        <p class="hint"><span>Every supplier of the company in the period chosen above, all locations together (purchase invoices less credit memos), against the period before.</span> <span>Click a supplier for its categories, items and locations.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input class="search" id="spcQ" placeholder="Search supplier" aria-label="Search supplier">
+          <button class="mini dark" id="spcRead">Read again</button></div></div>
+      <p class="meta" id="spcStatus" style="margin:6px 0 0"></p>
+    </div>
+    <div class="kpis" id="spcKpis"></div>
+    <div class="card" style="margin-bottom:14px"><div class="scroll"><table id="spcTable"></table></div><p class="meta" id="spcMore"></p></div>
+    <div id="spcDetail"></div>
   </section>
 
   <section class="view" id="v-actions">
@@ -982,6 +1016,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 </div>
 
 <div class="pl-bd" id="prBd"><div class="pl-pop" id="prPop" role="dialog" aria-modal="true" aria-label="Purchaser"></div></div>
+<div class="pl-bd" id="spBd"><div class="pl-pop" id="spPop" role="dialog" aria-modal="true" aria-label="Suppliers of a location"></div></div>
 <div class="pl-bd" id="byBd"><div class="pl-pop" id="byPop" role="dialog" aria-modal="true" aria-label="Buying at a location"></div></div>
 <div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
@@ -1124,6 +1159,7 @@ function render(){
   renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
   plRender();
   if ($("v-buyloc").classList.contains("on")) { byRender(); if (!streams) loadStreams(false); }
+  if ($("v-suploc").classList.contains("on") || $("v-supco").classList.contains("on")) loadSp(false);
 
   const t = new Date(m.checked_at);
   setPill(m.serving ? "load" : "", m.serving
@@ -3151,7 +3187,8 @@ document.addEventListener("keydown", e => {
 });
 // Buying and Prices & contracts: views under one menu item each, with one tab bar on top of the open one
 var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services", "buyloc"],
-                pcTabs: ["compare", "contracts", "savings", "prices", "locations"]};
+                pcTabs: ["compare", "contracts", "savings", "prices", "locations"],
+                spTabs: ["suppliers", "suploc", "supco"]};
 function pcTabsSync(view){
   for (const [id, views] of Object.entries(TAB_BARS)) {
     const bar = $(id), sec = $("v-" + view);
@@ -3161,12 +3198,13 @@ function pcTabsSync(view){
     const on = bar.querySelector("button.on"); if (on && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
   }
 }
-document.querySelectorAll("#pcTabs button, #byTabs button").forEach(b => b.onclick = () => { const n = document.querySelector(`#nav button[data-view="${b.dataset.t}"]`); if (n) n.click(); });
+document.querySelectorAll("#pcTabs button, #byTabs button, #spTabs button").forEach(b => b.onclick = () => { const n = document.querySelector(`#nav button[data-view="${b.dataset.t}"]`); if (n) n.click(); });
 document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#nav button").forEach(x => { x.classList.toggle("on", x===b); x.classList.toggle("sub-on", !!b.dataset.parent && x.dataset.view === b.dataset.parent); });
   if ($("v-exdetail").classList.contains("on")) exCurrent = null;
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.view));
   if (b.dataset.view === "compare") loadComparisons(false);
+  if (b.dataset.view === "suploc" || b.dataset.view === "supco") loadSp(false);
   if ((b.dataset.view === "streams" || b.dataset.view === "services" || b.dataset.view === "buyloc") && data) loadStreams(false);
   if (b.dataset.view === "stock") fillStockControls();
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
@@ -3653,6 +3691,164 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("byBd").classList.contains("show")) { $("byBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.byloc != null) { e.preventDefault(); byOpen(e.target.dataset.byloc); }
+});
+// ---------------------------------------------------------------- Supplier performance → Location intelligence / Whole company
+// /api/suppliers/locations: the company read of the period (every location) by location, supplier and item, from the
+// purchase invoices and credit memos (the vendor ledger names their supplier). Squares per location → its suppliers →
+// one supplier by category and item; the Whole company tab is the same for all locations together.
+var spData = null, spKey = "", spSort = "value", spAggC = null, spcSup = null, spSel = null;
+function spQs(){ const p = new URLSearchParams(params()); p.delete("location"); return p.toString(); }
+async function loadSp(force){
+  const q = spQs();
+  if (spData && spKey === q && !force) { spRender(); return; }
+  ["spStatus", "spcStatus"].forEach(id => $(id).textContent = "Reading Business Central…");
+  try {
+    const r = await fetch("/api/suppliers/locations?" + q), j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.status);
+    if (spQs() !== q) return;
+    spData = j; spKey = q; spAggC = null; spRender();
+  } catch (e) { ["spStatus", "spcStatus"].forEach(id => $(id).textContent = "Could not read: " + e.message); }
+}
+function spAgg(){
+  if (spAggC) return spAggC;
+  const d = spData, L = {}, C = {};
+  const loc = k => L[k] = L[k] || {code: k, value: 0, prev: 0, sups: {}};
+  const sup = (o, n) => o[n] = o[n] || {name: n, value: 0, prev: 0, inv: 0, cm: 0, items: new Set(), locs: new Set(), cats: {}};
+  d.rows.forEach(([l, s, it, q, v]) => {
+    const x = loc(l); x.value += v; const y = sup(x.sups, s); y.value += v; y.items.add(it);
+    const c = sup(C, s); c.value += v; c.items.add(it); c.locs.add(l);
+  });
+  d.docs.forEach(([l, s, inv, cm]) => { const y = sup(loc(l).sups, s); y.inv += inv; y.cm += cm; const c = sup(C, s); c.inv += inv; c.cm += cm; });
+  d.prev.forEach(([l, s, v]) => { const x = loc(l); x.prev += v; sup(x.sups, s).prev += v; sup(C, s).prev += v; });
+  return spAggC = {L, C};
+}
+const spPctOf = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null;
+const spCat = it => ((spData.items || {})[it] || [])[1] || "(no category)";
+function spRender(){
+  if (!spData) return;
+  const m = spData.meta || {}, A = spAgg();
+  const st = esc([m.period_label, m.company].filter(Boolean).join(" · ")) + ` · <span>invoiced purchases, against the period before</span>`;
+  $("spStatus").innerHTML = st; $("spcStatus").innerHTML = st;
+  if ($("v-suploc").classList.contains("on")) spLocRender(A);
+  if ($("v-supco").classList.contains("on")) spCoRender(A);
+  if ($("spBd").classList.contains("show") && spSel) spDraw();
+}
+function spLocRender(A){
+  plLoadNames();
+  const keys = Object.keys(A.L).filter(k => A.L[k].value || A.L[k].prev);
+  const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  const tot = keys.reduce((a, x) => a + A.L[x].value, 0), prev = keys.reduce((a, x) => a + A.L[x].prev, 0);
+  const sups = Object.values(A.C).filter(x => x.value > 0).length;
+  $("spKpis").innerHTML = k("Invoiced purchases", plM(tot), `${CUR} · ${fmt(keys.length)} locations`) +
+    k("Against the period before", plPct(spPctOf(tot, prev)), plM(prev), spPctOf(tot, prev) > 10 ? "up" : "") +
+    k("Suppliers", fmt(sups), "with purchases in the period");
+  const sq = code => {
+    const x = A.L[code], S = Object.values(x.sups).filter(y => y.value > 0).sort((a, b) => b.value - a.value);
+    const pct = spPctOf(x.value, x.prev), nm = plName(code), top3 = S.slice(0, 3).reduce((a, y) => a + y.value, 0);
+    const bar = x.value > 0 ? `<div class="by-types">${S.slice(0, 5).map((y, i) => `<i class="by-t${i}" style="flex:${y.value}" title="${esc(y.name)}: ${plM(y.value)}"></i>`).join("")}${S.length > 5 ? `<i class="by-t5" style="flex:${S.slice(5).reduce((a, y) => a + y.value, 0)}" title="others"></i>` : ""}</div>` : "";
+    const stat = (l, v) => `<div><span>${l}</span><b>${v}</b></div>`;
+    return `<div class="pl-sq" role="button" tabindex="0" data-sploc="${esc(code)}" aria-label="${esc(nm || code || "No location")}: suppliers">
+      <div class="hd"><div class="ic">${plGlyph(code)}</div><div class="nm"><b>${esc(nm || code || "No location")}</b><span>${esc(nm ? code : "")}</span></div></div>
+      <div class="big"><span class="v">${plM(x.value)}</span><span class="cmp">vs before <b class="${pct == null ? "" : pct > 10 ? "up" : pct < -10 ? "down" : ""}">${plPct(pct)}</b> · ${plM(x.prev)}</span></div>
+      ${bar}
+      <div class="st">${stat("Suppliers", fmt(S.length))}${stat("Top 3", x.value > 0 ? Math.round(top3 / x.value * 100) + "%" : "–")}</div>
+      <div class="sup">${S[0] ? `Top: <b>${esc(S[0].name)}</b> ${Math.round(S[0].value / x.value * 100)}%` : "&nbsp;"}</div></div>`;
+  };
+  const key = {value: c => -A.L[c].value, change: c => -Math.abs(A.L[c].value - A.L[c].prev), sups: c => -Object.keys(A.L[c].sups).length, name: c => 0}[spSort];
+  const sorted = l => [...l].sort((a, b) => key(a) - key(b) || (plName(a) || a).localeCompare(plName(b) || b));
+  const wh = keys.filter(c => c && plIsWh(c)), none = keys.filter(c => !c), rest = keys.filter(c => c && !plIsWh(c));
+  const groups = [rest.length && {t: "Restaurants and other locations", c: rest}, wh.length && {t: "Warehouses and central kitchen", c: wh}, none.length && {t: "No location", c: none}].filter(Boolean);
+  $("spGrid").innerHTML = keys.length ? groups.map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}</span></div><div class="pl-grid">${sorted(g.c).map(sq).join("")}</div>`).join("")
+    : `<p class="hint">No invoiced purchase in this period.</p>`;
+}
+// one supplier's purchases (rows of a location, or of every location): by category and by item
+function spDetail(sup, loc){
+  const rows = spData.rows.filter(r => r[1] === sup && (loc == null || r[0] === loc));
+  const cats = {}, items = {}, locs = {};
+  rows.forEach(([l, s, it, q, v]) => {
+    const c = spCat(it); (cats[c] = cats[c] || {v: 0, n: new Set()}).v += v; cats[c].n.add(it);
+    const i = items[it] = items[it] || {q: 0, v: 0, locs: new Set()}; i.q += q; i.v += v; i.locs.add(l);
+    locs[l] = (locs[l] || 0) + v;
+  });
+  const tot = rows.reduce((a, r) => a + r[4], 0);
+  const mx = Math.max(1, ...Object.values(cats).map(c => Math.abs(c.v)));
+  const catT = `<table data-nosort><tr><th>Category</th><th class="num">Items</th><th class="num">Value</th><th class="num">Share</th></tr>` +
+    Object.entries(cats).sort((a, b) => b[1].v - a[1].v).map(([c, x]) => `<tr><td><span class="sp-bar" style="width:${Math.round(Math.abs(x.v) / mx * 80)}px"></span>${esc(c)}</td><td class="num">${fmt(x.n.size)}</td><td class="num">${fmt(x.v)}</td><td class="num">${tot ? fmt(x.v / tot * 100, 1) + "%" : "–"}</td></tr>`).join("") + `</table>`;
+  const it = Object.entries(items).sort((a, b) => b[1].v - a[1].v);
+  const itT = `<table data-nosort><tr><th>Item</th><th>Category</th><th class="num">Quantity</th><th class="num">Value</th><th class="num">Average cost</th>${loc == null ? '<th class="num">Locations</th>' : ""}</tr>` +
+    it.slice(0, 300).map(([no, x]) => { const I = (spData.items || {})[no] || []; return `<tr><td><b>${esc(no)}</b> ${esc(I[0] || "")}</td><td class="meta">${esc(I[1] || "")}</td><td class="num">${fmt(x.q, Math.abs(x.q % 1) > 1e-9 ? 2 : 0)} <span class="meta">${esc(I[2] || "")}</span></td><td class="num">${fmt(x.v)}</td><td class="num">${x.q ? fmt(x.v / x.q, 2) : "–"}</td>${loc == null ? `<td class="num">${fmt(x.locs.size)}</td>` : ""}</tr>`; }).join("") + `</table>` +
+    (it.length > 300 ? `<p class="meta">${span(`Showing 300 of ${fmt(it.length)} items.`)}</p>` : "");
+  const locT = loc != null ? "" : `<table data-nosort><tr><th>Location</th><th class="num">Value</th><th class="num">Share</th></tr>` +
+    Object.entries(locs).sort((a, b) => b[1] - a[1]).map(([l, v]) => `<tr><td>${esc(plName(l) || l || "No location")} <span class="meta">${esc(plName(l) ? l : "")}</span></td><td class="num">${fmt(v)}</td><td class="num">${tot ? fmt(v / tot * 100, 1) + "%" : "–"}</td></tr>`).join("") + `</table>`;
+  return {tot, items: it.length, cats: Object.keys(cats).length, catT, itT, locT, locN: Object.keys(locs).length};
+}
+const span = t => `<span>${esc(t)}</span>`;
+function spOpen(loc){ spSel = {loc, sup: null}; spDraw(); $("spBd").classList.add("show"); }
+function spDraw(){
+  const A = spAgg(), x = A.L[spSel.loc]; if (!x) return;
+  const nm = plName(x.code) || x.code || "No location";
+  const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+  const panel = (t, body, wide) => `<div class="pl-panel${wide ? " pl-span2" : ""}" style="margin-bottom:12px"><div class="ttl"><h3>${t}</h3></div>${body}</div>`;
+  const head = `<div class="ph"><div class="ic">${plGlyph(x.code)}</div><div><h2>${esc(spSel.sup || nm)}</h2><div class="sub">${esc([spSel.sup ? nm : x.code, (spData.meta || {}).period_label].filter(Boolean).join(" · "))}</div></div><div class="sp"></div><button class="close" data-spclose="1">Close ✕</button></div>`;
+  let body;
+  if (!spSel.sup) {
+    const S = Object.values(x.sups).sort((a, b) => b.value - a.value), pct = spPctOf(x.value, x.prev);
+    const mx = Math.max(1, ...S.map(y => Math.abs(y.value)));
+    body = `<div class="pl-tiles">${tile("Invoiced purchases", plM(x.value), `vs before ${plPct(pct)} · ${plM(x.prev)}`, pct > 10 ? "up" : "")}${tile("Suppliers", fmt(S.filter(y => y.value > 0).length), "with purchases in the period")}
+        ${tile("Largest supplier", S[0] ? esc(S[0].name) : "–", S[0] && x.value ? Math.round(S[0].value / x.value * 100) + "% of the purchases" : "")}${tile("Top 3", x.value ? Math.round(S.slice(0, 3).reduce((a, y) => a + y.value, 0) / x.value * 100) + "%" : "–", "share of the purchases")}</div>` +
+      panel("Suppliers · click one for its categories and items", `<table data-nosort><tr><th>Supplier</th><th class="num">Value</th><th class="num">Share</th><th class="num">Vs before</th><th class="num">Invoices</th><th class="num">Credit memos</th><th class="num">Items</th></tr>` +
+        S.map(y => { const p = spPctOf(y.value, y.prev); return `<tr class="sp-row" tabindex="0" data-spsup="${esc(y.name)}"><td><span class="sp-bar" style="width:${Math.round(Math.abs(y.value) / mx * 80)}px"></span><b>${esc(y.name)}</b></td><td class="num">${fmt(y.value)}</td><td class="num">${x.value ? fmt(y.value / x.value * 100, 1) + "%" : "–"}</td><td class="num ${p > 10 ? "up" : ""}">${y.prev ? plPct(p) : `<span class="meta">new</span>`}</td><td class="num">${fmt(y.inv)}</td><td class="num">${fmt(y.cm)}</td><td class="num">${fmt(y.items.size)}</td></tr>`; }).join("") + `</table>`, true);
+  } else {
+    const y = x.sups[spSel.sup] || {value: 0, prev: 0, inv: 0, cm: 0}, D = spDetail(spSel.sup, spSel.loc), p = spPctOf(y.value, y.prev);
+    body = `<button class="sp-back" data-spback="1">‹ ${span("All suppliers of " + nm)}</button>
+      <div class="pl-tiles">${tile("Purchases", plM(y.value), `vs before ${y.prev ? plPct(p) : "new"} · ${plM(y.prev)}`, p > 10 ? "up" : "")}${tile("Share of the location", x.value ? fmt(y.value / x.value * 100, 1) + "%" : "–", plM(x.value))}
+        ${tile("Invoices", fmt(y.inv), `${fmt(y.cm)} credit memos`)}${tile("Items", fmt(D.items), `${fmt(D.cats)} categories`)}</div>
+      <div class="pl-cols">${panel("By category", D.catT)}${panel("By item", D.itT)}</div>`;
+  }
+  $("spPop").innerHTML = head + `<div class="pl-body">${body}</div>`;
+}
+function spCoRender(A){
+  const q = ($("spcQ").value || "").toLowerCase();
+  const S = Object.values(A.C).sort((a, b) => b.value - a.value), tot = S.reduce((a, y) => a + y.value, 0), prev = S.reduce((a, y) => a + y.prev, 0);
+  const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  const top5 = S.slice(0, 5).reduce((a, y) => a + y.value, 0);
+  $("spcKpis").innerHTML = k("Invoiced purchases", plM(tot), `${CUR} · vs before ${plPct(spPctOf(tot, prev))}`) +
+    k("Suppliers", fmt(S.filter(y => y.value > 0).length), "with purchases in the period") +
+    k("Top 5 suppliers", tot ? Math.round(top5 / tot * 100) + "%" : "–", "share of the purchases") +
+    k("New suppliers", fmt(S.filter(y => y.value > 0 && !y.prev).length), "no purchase in the period before");
+  const shown = S.filter(y => !q || y.name.toLowerCase().includes(q)), mx = Math.max(1, ...S.map(y => Math.abs(y.value)));
+  $("spcTable").innerHTML = `<tr><th>Supplier</th><th class="num">Value</th><th class="num">Share</th><th class="num">Vs before</th><th class="num">Invoices</th><th class="num">Credit memos</th><th class="num">Locations</th><th class="num">Items</th></tr>` +
+    shown.slice(0, 200).map(y => { const p = spPctOf(y.value, y.prev); return `<tr class="sp-row${spcSup === y.name ? " on" : ""}" tabindex="0" data-spcsup="${esc(y.name)}"><td><span class="sp-bar" style="width:${Math.round(Math.abs(y.value) / mx * 80)}px"></span><b>${esc(y.name)}</b></td><td class="num">${fmt(y.value)}</td><td class="num">${tot ? fmt(y.value / tot * 100, 1) + "%" : "–"}</td><td class="num ${p > 10 ? "up" : ""}">${y.prev ? plPct(p) : `<span class="meta">new</span>`}</td><td class="num">${fmt(y.inv)}</td><td class="num">${fmt(y.cm)}</td><td class="num">${fmt(y.locs.size)}</td><td class="num">${fmt(y.items.size)}</td></tr>`; }).join("")
+    || `<tr><td colspan="8" class="meta">No supplier matches.</td></tr>`;
+  $("spcMore").innerHTML = shown.length > 200 ? span(`Showing 200 of ${fmt(shown.length)} suppliers.`) : "";
+  if (spcSup && A.C[spcSup]) {
+    const y = A.C[spcSup], D = spDetail(spcSup, null), p = spPctOf(y.value, y.prev);
+    const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
+    $("spcDetail").innerHTML = `<div class="card" id="spcCard"><div class="card-head"><div><h2>${esc(spcSup)}</h2><p class="hint">${span("Every location together, in the period chosen above.")}</p></div><button class="mini" data-spcclose="1">Close</button></div>
+      <div class="pl-tiles">${tile("Purchases", plM(y.value), `vs before ${y.prev ? plPct(p) : "new"} · ${plM(y.prev)}`, p > 10 ? "up" : "")}${tile("Share of the company", tot ? fmt(y.value / tot * 100, 1) + "%" : "–", plM(tot))}
+        ${tile("Invoices", fmt(y.inv), `${fmt(y.cm)} credit memos`)}${tile("Items", fmt(D.items), `${fmt(D.cats)} categories · ${fmt(D.locN)} locations`)}</div>
+      <div class="pl-cols"><div class="pl-panel"><div class="ttl"><h3>By category</h3></div>${D.catT}</div><div class="pl-panel"><div class="ttl"><h3>By location</h3></div>${D.locT}</div>
+        <div class="pl-panel pl-span2"><div class="ttl"><h3>By item</h3></div>${D.itT}</div></div></div>`;
+  } else $("spcDetail").innerHTML = "";
+}
+$("spSort").onchange = () => { spSort = $("spSort").value; spRender(); };
+$("spRead").onclick = () => loadSp(true);
+$("spcRead").onclick = () => loadSp(true);
+$("spcQ").oninput = () => spData && spCoRender(spAgg());
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.closest("[data-spclose]") || t === $("spBd")) { $("spBd").classList.remove("show"); return; }
+  if (t.closest("[data-spback]")) { spSel.sup = null; spDraw(); return; }
+  const r = t.closest("[data-spsup]"); if (r) { spSel.sup = r.dataset.spsup; spDraw(); $("spBd").scrollTop = 0; return; }
+  const s = t.closest("[data-sploc]"); if (s) { spOpen(s.dataset.sploc); return; }
+  const c = t.closest("[data-spcsup]"); if (c) { spcSup = spcSup === c.dataset.spcsup ? null : c.dataset.spcsup; spCoRender(spAgg()); if (spcSup) $("spcCard").scrollIntoView({behavior: "smooth", block: "start"}); return; }
+  if (t.closest("[data-spcclose]")) { spcSup = null; spCoRender(spAgg()); }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("spBd").classList.contains("show")) { $("spBd").classList.remove("show"); return; }
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const d = e.target.dataset || {};
+  if (d.sploc != null || d.spsup != null || d.spcsup != null) { e.preventDefault(); e.target.click(); }
 });
 // ---------------------------------------------------------------- Location intelligence → Today
 // A "Today" tab next to each Location intelligence: what every location received, was invoiced and ordered

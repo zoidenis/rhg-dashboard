@@ -257,6 +257,10 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.receipts": ("finance.s.salesrec", "finance.s.cash.main"),
                  # Inventory → Stock count analysis: whoever reads Movement & dead stock
                  "finance.s.inventory.stockcount": "finance.s.inventory.movement",
+                 # Supplier performance became three tabs: whoever held the screen gets all three
+                 "purchasing.s.suppliers.suppliers": "purchasing.s.suppliers",
+                 "purchasing.s.suppliers.suploc": "purchasing.s.suppliers",
+                 "purchasing.s.suppliers.supco": "purchasing.s.suppliers",
                  # scheduled reports: whoever sets the towers' email settings
                  "reports.manage": ("finance.settings.manage", "purchasing.settings.manage")}
 

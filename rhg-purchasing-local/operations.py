@@ -405,3 +405,46 @@ def supplier_summary(docs, settings, limit=20):
             for k, v in agg.items()]
     rows.sort(key=lambda r: r["spend"], reverse=True)
     return rows[:limit], total
+
+
+def supplier_matrix(rows, suppliers, prev_rows, prev_suppliers, catalog):
+    """Supplier performance → Location intelligence and Whole company: invoiced purchases (purchase invoices less
+    credit memos, actual cost) by location, supplier and item, and each location's suppliers in the comparison
+    period. Only invoice and credit-memo lines name a supplier (the vendor ledger joined on the document number),
+    so goods received and not yet invoiced are not here. Quantity: the line's quantity, else value / cost per unit
+    (a line invoicing an earlier receipt carries no quantity of its own)."""
+    agg, docs, vendors = defaultdict(lambda: [0.0, 0.0]), defaultdict(lambda: [set(), set()]), {}
+    for r in rows:
+        t = r.get("Document_Type")
+        if t not in (INV, CM):
+            continue
+        s = suppliers.get(str(r.get("Document_No"))) or {}
+        sup = s.get("vendor")
+        if not sup:
+            continue
+        vendors.setdefault(sup, s.get("vendor_no") or "")
+        loc, item = r.get("Location_Code") or "", str(r.get("Item_No") or "")
+        v = _f(r.get("Cost_Amount_Actual"))
+        q = _f(r.get("Item_Ledger_Entry_Quantity"))
+        if not q and _f(r.get("Cost_per_Unit")):
+            q = v / _f(r.get("Cost_per_Unit"))
+        a = agg[(loc, sup, item)]
+        a[0] += q
+        a[1] += v
+        docs[(loc, sup)][0 if t == INV else 1].add(str(r.get("Document_No")))
+    prev = defaultdict(float)
+    for r in prev_rows:
+        if r.get("Document_Type") not in (INV, CM):
+            continue
+        sup = (prev_suppliers.get(str(r.get("Document_No"))) or {}).get("vendor")
+        if sup:
+            prev[(r.get("Location_Code") or "", sup)] += _f(r.get("Cost_Amount_Actual"))
+    items = {}
+    for _loc, _sup, item in agg:
+        if item and item not in items:
+            c = (catalog or {}).get(item) or {}
+            items[item] = [c.get("desc") or "", c.get("code") or c.get("posting_group") or "", c.get("uom") or ""]
+    return {"vendors": vendors, "items": items,
+            "rows": [[k[0], k[1], k[2], round(a[0], 3), round(a[1], 2)] for k, a in agg.items() if a[0] or a[1]],
+            "docs": [[k[0], k[1], len(d[0]), len(d[1])] for k, d in docs.items()],
+            "prev": [[k[0], k[1], round(v, 2)] for k, v in prev.items() if v]}
