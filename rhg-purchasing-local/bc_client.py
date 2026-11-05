@@ -526,6 +526,16 @@ class BCClient:
                                              "Cost_Amount_Actual,Cost_Amount_Expected"})
         return self._cached_value(("ile", company, location or "", date_from, date_to), max_age, go)
 
+    def transfer_entries(self, company, date_from, date_to, max_age=600):
+        """Every transfer movement (shipments and receipts, the in-transit location too) of a period: which
+        location sent goods to which."""
+        def go():
+            return self._get_all(self._url(company, config.BC_ILE_ENTITY), {
+                "$filter": f"Entry_Type eq 'Transfer' and Posting_Date ge {date_from} and Posting_Date le {date_to}",
+                "$select": "Entry_No,Item_No,Posting_Date,Document_No,Document_Type,Location_Code,Quantity,"
+                           "Cost_Amount_Actual"})
+        return self._cached_value(("transfers", company, date_from, date_to), max_age, go)
+
     def stockkeeping_units(self, company, location=None, max_age=3600):
         """Planning parameters per item and location: reorder point, maximum inventory,
         reorder quantity. Returns ({(item, location): params}, status). A card can exist

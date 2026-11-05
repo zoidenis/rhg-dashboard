@@ -175,6 +175,48 @@ def dashboard(company, week, location, mode="week"):
     return out
 
 
+_tr_jobs, _tr_lock = {}, threading.Lock()
+
+
+def transfers_request(company, period, refresh=False):
+    """Supplier performance → the goods each location received from the other locations of the company in the
+    period (operations.transfer_matrix), read in the background: {"pending": True} until it is ready."""
+    if not period or len(period) != 2:
+        return {"error": "No period."}
+    key = (company, period[0], period[1])
+    with _tr_lock:
+        j = _tr_jobs.get(key)
+        if j and j["state"] == "done" and not refresh and time.time() - j["at"] < 600:
+            return j["value"]
+        if j and j["state"] == "running":
+            return {"pending": True}
+        if j and j["state"] == "failed" and not refresh and time.time() - j["at"] < 60:
+            return {"error": j["error"]}
+        j = _tr_jobs[key] = {"state": "running", "at": time.time()}
+        for k in [k for k, v in _tr_jobs.items() if time.time() - v["at"] > 3600]:
+            _tr_jobs.pop(k, None)
+
+    def go():
+        try:
+            start = (date.fromisoformat(period[0]) - timedelta(days=45)).isoformat()
+            rows = client.transfer_entries(company, start, period[1], 0 if refresh else 600)
+            out = operations.transfer_matrix(rows, period[0], period[1])
+            try:
+                catalog = client.item_catalog(company)
+            except BCError:
+                catalog = {}
+            out["items"] = {}
+            for r in out["rows"]:
+                if r[2] not in out["items"]:
+                    c = catalog.get(r[2]) or {}
+                    out["items"][r[2]] = [c.get("desc") or "", c.get("code") or c.get("posting_group") or "", c.get("uom") or ""]
+            j.update(state="done", at=time.time(), value=out)
+        except Exception as exc:                                 # noqa: BLE001
+            j.update(state="failed", at=time.time(), error=str(exc)[:300])
+    threading.Thread(target=go, daemon=True, name="transfers").start()
+    return {"pending": True}
+
+
 def _trim_dash(keep=6):
     with _dash_lock:
         if len(_dash_cache) > keep:
@@ -1290,7 +1332,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"available": False, "error": ((d or {}).get("operations") or {}).get("error")
                                      or "The supplier figures could not be read."})
                 else:
-                    self._send(200, dict(m, available=True, meta=d.get("meta")))
+                    self._send(200, dict(m, available=True, meta=d.get("meta"),
+                                         transfers=transfers_request(q.get("company") or config.BC_COMPANY,
+                                                                     (d.get("meta") or {}).get("current"),
+                                                                     q.get("refresh") == "1")))
             elif url.path == "/api/cache":
                 with _dash_lock:
                     held = [{"company": k[0], "period": k[1] or "current", "location": k[2] or "all",

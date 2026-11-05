@@ -216,6 +216,7 @@ td.num,th.num{text-align:right}
 .pl-sq .st b.up{color:var(--up)}
 .pl-sq .sup{font-size:10.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-sq .sup b{color:var(--ink)}
+.pl-sq .sup.tr{margin-top:-4px}
 .pl-sq .al{margin-top:auto;display:flex;align-items:center;gap:5px;font-size:10.5px;border-radius:7px;padding:4px 6px;background:var(--bg);min-width:0}
 .pl-sq .al i{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:var(--down)}
 .pl-sq .al span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -766,7 +767,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   <section class="view" id="v-suploc">
     <div class="card" style="margin-bottom:14px">
       <div class="card-head"><div><h2>Suppliers by location</h2>
-        <p class="hint"><span>Every location as a square: what it bought from its suppliers in the period chosen above (purchase invoices less credit memos), against the period before.</span> <span>Click a location for its suppliers, and a supplier for what it bought from them, by category and by item.</span></p></div>
+        <p class="hint"><span>Every location as a square: what it bought from its suppliers in the period chosen above (purchase invoices less credit memos), against the period before.</span> <span>Click a location for its suppliers, and a supplier for what it bought from them, by category and by item.</span> <span>Transfers it received from the other locations of the company (the warehouse, the central kitchen) are shown apart, at BC cost.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <label class="meta" for="spSort">Order</label><select id="spSort"><option value="value">by purchases</option><option value="change">by change</option><option value="sups">by suppliers</option><option value="name">by name</option></select>
           <button class="mini dark" id="spRead">Read again</button></div></div>
@@ -787,6 +788,9 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <div class="kpis" id="spcKpis"></div>
     <div class="card" style="margin-bottom:14px"><div class="scroll"><table id="spcTable"></table></div><p class="meta" id="spcMore"></p></div>
     <div id="spcDetail"></div>
+    <div class="card" style="margin-bottom:14px" id="spcTrCard"><div class="card-head"><div><h2>Transfers between locations</h2>
+      <p class="hint"><span>What each location received from the other locations of the company in the period, at BC cost.</span> <span>Transfers move goods inside the company, so they are not added to the purchases.</span> <span>Click a line for its categories and items.</span></p></div></div>
+      <div id="spcTr"></div></div>
   </section>
 
   <section class="view" id="v-actions">
@@ -3698,21 +3702,38 @@ document.addEventListener("keydown", e => {
 // one supplier by category and item; the Whole company tab is the same for all locations together.
 var spData = null, spKey = "", spSort = "value", spAggC = null, spcSup = null, spSel = null;
 function spQs(){ const p = new URLSearchParams(params()); p.delete("location"); return p.toString(); }
+var spPoll = null;
 async function loadSp(force){
   const q = spQs();
   if (spData && spKey === q && !force) { spRender(); return; }
   ["spStatus", "spcStatus"].forEach(id => $(id).textContent = "Reading Business Central…");
+  clearTimeout(spPoll);
   try {
-    const r = await fetch("/api/suppliers/locations?" + q), j = await r.json();
+    const r = await fetch("/api/suppliers/locations?" + q + (force ? "&refresh=1" : "")), j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || r.status);
     if (spQs() !== q) return;
-    spData = j; spKey = q; spAggC = null; spRender();
+    spData = j; spKey = q; spAggC = null; spRender(); spWaitTr(q);
   } catch (e) { ["spStatus", "spcStatus"].forEach(id => $(id).textContent = "Could not read: " + e.message); }
 }
+// the transfers between locations are read in the background: ask again until they are there
+function spWaitTr(q){
+  clearTimeout(spPoll);
+  if (!spData || !(spData.transfers || {}).pending) return;
+  spPoll = setTimeout(async () => {
+    if (spKey !== q || spQs() !== q) return;
+    try {
+      const r = await fetch("/api/suppliers/locations?" + q), j = await r.json();
+      if (!r.ok || j.error || spKey !== q) throw new Error(j.error || r.status);
+      spData.transfers = j.transfers; spAggC = null; spRender();
+    } catch (e) { spData.transfers = {error: String(e.message || e)}; spAggC = null; spRender(); return; }
+    spWaitTr(q);
+  }, 4000);
+}
+const spTr = () => { const t = spData && spData.transfers; return t && Array.isArray(t.rows) ? t : null; };
 function spAgg(){
   if (spAggC) return spAggC;
   const d = spData, L = {}, C = {};
-  const loc = k => L[k] = L[k] || {code: k, value: 0, prev: 0, sups: {}};
+  const loc = k => L[k] = L[k] || {code: k, value: 0, prev: 0, sups: {}, tin: 0, tout: 0, tfrom: {}, tto: {}};
   const sup = (o, n) => o[n] = o[n] || {name: n, value: 0, prev: 0, inv: 0, cm: 0, items: new Set(), locs: new Set(), cats: {}};
   d.rows.forEach(([l, s, it, q, v]) => {
     const x = loc(l); x.value += v; const y = sup(x.sups, s); y.value += v; y.items.add(it);
@@ -3720,14 +3741,35 @@ function spAgg(){
   });
   d.docs.forEach(([l, s, inv, cm]) => { const y = sup(loc(l).sups, s); y.inv += inv; y.cm += cm; const c = sup(C, s); c.inv += inv; c.cm += cm; });
   d.prev.forEach(([l, s, v]) => { const x = loc(l); x.prev += v; sup(x.sups, s).prev += v; sup(C, s).prev += v; });
-  return spAggC = {L, C};
+  // transfers: [to, from, item, qty, value] — what a location received from another one, and what that one sent
+  const T = spTr(), P = {};
+  const src = (o, n) => o[n] = o[n] || {code: n, value: 0, docs: 0, items: new Set()};
+  if (T) {
+    T.rows.forEach(([to, fr, it, q, v]) => {
+      const x = loc(to); x.tin += v; const y = src(x.tfrom, fr); y.value += v; y.items.add(it);
+      const z = loc(fr); z.tout += v; const w = src(z.tto, to); w.value += v; w.items.add(it);
+      const pk = fr + "\u0001" + to, pp = P[pk] = P[pk] || {from: fr, to, value: 0, docs: 0, items: new Set()}; pp.value += v; pp.items.add(it);
+    });
+    T.docs.forEach(([to, fr, n]) => { src(loc(to).tfrom, fr).docs += n; src(loc(fr).tto, to).docs += n; const pp = P[fr + "\u0001" + to]; if (pp) pp.docs += n; });
+  }
+  return spAggC = {L, C, P: Object.values(P), T};
 }
 const spPctOf = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null;
-const spCat = it => ((spData.items || {})[it] || [])[1] || "(no category)";
+const spItem = it => (spData.items || {})[it] || ((spData.transfers || {}).items || {})[it] || [];
+const spCat = it => spItem(it)[1] || "(no category)";
+const spLocNm = l => plName(l) || l || "No location";
+// one line about the transfers for the status bars
+function spTrNote(){
+  const t = spData.transfers || {};
+  if (t.pending) return ` · <span>reading the transfers between locations…</span>`;
+  if (t.error) return ` · <span>the transfers could not be read: ${esc(t.error)}</span>`;
+  if (t.unmatched_documents) return ` · <span>${esc(`${fmt(t.unmatched_documents)} transfer receipts without a sending location`)}</span>`;
+  return "";
+}
 function spRender(){
   if (!spData) return;
   const m = spData.meta || {}, A = spAgg();
-  const st = esc([m.period_label, m.company].filter(Boolean).join(" · ")) + ` · <span>invoiced purchases, against the period before</span>`;
+  const st = esc([m.period_label, m.company].filter(Boolean).join(" · ")) + ` · <span>invoiced purchases, against the period before</span>` + spTrNote();
   $("spStatus").innerHTML = st; $("spcStatus").innerHTML = st;
   if ($("v-suploc").classList.contains("on")) spLocRender(A);
   if ($("v-supco").classList.contains("on")) spCoRender(A);
@@ -3735,13 +3777,15 @@ function spRender(){
 }
 function spLocRender(A){
   plLoadNames();
-  const keys = Object.keys(A.L).filter(k => A.L[k].value || A.L[k].prev);
+  const keys = Object.keys(A.L).filter(k => A.L[k].value || A.L[k].prev || A.L[k].tin || A.L[k].tout);
   const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
   const tot = keys.reduce((a, x) => a + A.L[x].value, 0), prev = keys.reduce((a, x) => a + A.L[x].prev, 0);
   const sups = Object.values(A.C).filter(x => x.value > 0).length;
   $("spKpis").innerHTML = k("Invoiced purchases", plM(tot), `${CUR} · ${fmt(keys.length)} locations`) +
     k("Against the period before", plPct(spPctOf(tot, prev)), plM(prev), spPctOf(tot, prev) > 10 ? "up" : "") +
-    k("Suppliers", fmt(sups), "with purchases in the period");
+    k("Suppliers", fmt(sups), "with purchases in the period") +
+    (A.T ? k("Transfers between locations", plM(A.P.reduce((a, p) => a + p.value, 0)), `${CUR} · ${fmt(A.T.docs.reduce((a, d) => a + d[2], 0))} receipts, at BC cost`)
+      : k("Transfers between locations", "…", (spData.transfers || {}).error ? "could not be read" : "reading Business Central"));
   const sq = code => {
     const x = A.L[code], S = Object.values(x.sups).filter(y => y.value > 0).sort((a, b) => b.value - a.value);
     const pct = spPctOf(x.value, x.prev), nm = plName(code), top3 = S.slice(0, 3).reduce((a, y) => a + y.value, 0);
@@ -3752,7 +3796,7 @@ function spLocRender(A){
       <div class="big"><span class="v">${plM(x.value)}</span><span class="cmp">vs before <b class="${pct == null ? "" : pct > 10 ? "up" : pct < -10 ? "down" : ""}">${plPct(pct)}</b> · ${plM(x.prev)}</span></div>
       ${bar}
       <div class="st">${stat("Suppliers", fmt(S.length))}${stat("Top 3", x.value > 0 ? Math.round(top3 / x.value * 100) + "%" : "–")}</div>
-      <div class="sup">${S[0] ? `Top: <b>${esc(S[0].name)}</b> ${Math.round(S[0].value / x.value * 100)}%` : "&nbsp;"}</div></div>`;
+      <div class="sup">${S[0] ? `Top: <b>${esc(S[0].name)}</b> ${Math.round(S[0].value / x.value * 100)}%` : "&nbsp;"}</div>${spSqTr(x)}</div>`;
   };
   const key = {value: c => -A.L[c].value, change: c => -Math.abs(A.L[c].value - A.L[c].prev), sups: c => -Object.keys(A.L[c].sups).length, name: c => 0}[spSort];
   const sorted = l => [...l].sort((a, b) => key(a) - key(b) || (plName(a) || a).localeCompare(plName(b) || b));
@@ -3761,9 +3805,17 @@ function spLocRender(A){
   $("spGrid").innerHTML = keys.length ? groups.map(g => `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""}</span></div><div class="pl-grid">${sorted(g.c).map(sq).join("")}</div>`).join("")
     : `<p class="hint">No invoiced purchase in this period.</p>`;
 }
+// the transfers line of a square: received from the other locations (and sent, for a warehouse)
+function spSqTr(x){
+  if (!spTr()) return "";
+  const F = Object.values(x.tfrom).sort((a, b) => b.value - a.value);
+  const tin = x.tin ? `Transfers in: <b>${plM(x.tin)}</b>${F[0] ? ` · <b>${esc(spLocNm(F[0].code))}</b> ${Math.round(F[0].value / x.tin * 100)}%` : ""}` : "";
+  const tout = x.tout ? `Sent to locations: <b>${plM(x.tout)}</b>` : "";
+  return tin || tout ? `<div class="sup tr">${[tin, tout].filter(Boolean).join(" · ")}</div>` : `<div class="sup tr">No transfer received</div>`;
+}
 // one supplier's purchases (rows of a location, or of every location): by category and by item
-function spDetail(sup, loc){
-  const rows = spData.rows.filter(r => r[1] === sup && (loc == null || r[0] === loc));
+function spDetail(sup, loc, tr){
+  const rows = (tr ? (spTr() || {rows: []}).rows : spData.rows).filter(r => r[1] === sup && (loc == null || r[0] === loc));
   const cats = {}, items = {}, locs = {};
   rows.forEach(([l, s, it, q, v]) => {
     const c = spCat(it); (cats[c] = cats[c] || {v: 0, n: new Set()}).v += v; cats[c].n.add(it);
@@ -3776,28 +3828,34 @@ function spDetail(sup, loc){
     Object.entries(cats).sort((a, b) => b[1].v - a[1].v).map(([c, x]) => `<tr><td><span class="sp-bar" style="width:${Math.round(Math.abs(x.v) / mx * 80)}px"></span>${esc(c)}</td><td class="num">${fmt(x.n.size)}</td><td class="num">${fmt(x.v)}</td><td class="num">${tot ? fmt(x.v / tot * 100, 1) + "%" : "–"}</td></tr>`).join("") + `</table>`;
   const it = Object.entries(items).sort((a, b) => b[1].v - a[1].v);
   const itT = `<table data-nosort><tr><th>Item</th><th>Category</th><th class="num">Quantity</th><th class="num">Value</th><th class="num">Average cost</th>${loc == null ? '<th class="num">Locations</th>' : ""}</tr>` +
-    it.slice(0, 300).map(([no, x]) => { const I = (spData.items || {})[no] || []; return `<tr><td><b>${esc(no)}</b> ${esc(I[0] || "")}</td><td class="meta">${esc(I[1] || "")}</td><td class="num">${fmt(x.q, Math.abs(x.q % 1) > 1e-9 ? 2 : 0)} <span class="meta">${esc(I[2] || "")}</span></td><td class="num">${fmt(x.v)}</td><td class="num">${x.q ? fmt(x.v / x.q, 2) : "–"}</td>${loc == null ? `<td class="num">${fmt(x.locs.size)}</td>` : ""}</tr>`; }).join("") + `</table>` +
+    it.slice(0, 300).map(([no, x]) => { const I = spItem(no); return `<tr><td><b>${esc(no)}</b> ${esc(I[0] || "")}</td><td class="meta">${esc(I[1] || "")}</td><td class="num">${fmt(x.q, Math.abs(x.q % 1) > 1e-9 ? 2 : 0)} <span class="meta">${esc(I[2] || "")}</span></td><td class="num">${fmt(x.v)}</td><td class="num">${x.q ? fmt(x.v / x.q, 2) : "–"}</td>${loc == null ? `<td class="num">${fmt(x.locs.size)}</td>` : ""}</tr>`; }).join("") + `</table>` +
     (it.length > 300 ? `<p class="meta">${span(`Showing 300 of ${fmt(it.length)} items.`)}</p>` : "");
   const locT = loc != null ? "" : `<table data-nosort><tr><th>Location</th><th class="num">Value</th><th class="num">Share</th></tr>` +
     Object.entries(locs).sort((a, b) => b[1] - a[1]).map(([l, v]) => `<tr><td>${esc(plName(l) || l || "No location")} <span class="meta">${esc(plName(l) ? l : "")}</span></td><td class="num">${fmt(v)}</td><td class="num">${tot ? fmt(v / tot * 100, 1) + "%" : "–"}</td></tr>`).join("") + `</table>`;
   return {tot, items: it.length, cats: Object.keys(cats).length, catT, itT, locT, locN: Object.keys(locs).length};
 }
 const span = t => `<span>${esc(t)}</span>`;
-function spOpen(loc){ spSel = {loc, sup: null}; spDraw(); $("spBd").classList.add("show"); }
+function spOpen(loc, from){ spSel = {loc, sup: null, from: from == null ? null : from}; spDraw(); $("spBd").classList.add("show"); $("spBd").scrollTop = 0; }
 function spDraw(){
   const A = spAgg(), x = A.L[spSel.loc]; if (!x) return;
   const nm = plName(x.code) || x.code || "No location";
   const tile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub || ""}</div></div>`;
   const panel = (t, body, wide) => `<div class="pl-panel${wide ? " pl-span2" : ""}" style="margin-bottom:12px"><div class="ttl"><h3>${t}</h3></div>${body}</div>`;
-  const head = `<div class="ph"><div class="ic">${plGlyph(x.code)}</div><div><h2>${esc(spSel.sup || nm)}</h2><div class="sub">${esc([spSel.sup ? nm : x.code, (spData.meta || {}).period_label].filter(Boolean).join(" · "))}</div></div><div class="sp"></div><button class="close" data-spclose="1">Close ✕</button></div>`;
+  const head = `<div class="ph"><div class="ic">${plGlyph(x.code)}</div><div><h2>${esc(spSel.sup || (spSel.from != null ? "Transfers from " + spLocNm(spSel.from) : nm))}</h2><div class="sub">${esc([spSel.sup || spSel.from != null ? nm : x.code, (spData.meta || {}).period_label].filter(Boolean).join(" · "))}</div></div><div class="sp"></div><button class="close" data-spclose="1">Close ✕</button></div>`;
   let body;
-  if (!spSel.sup) {
+  if (spSel.from != null) {
+    const y = x.tfrom[spSel.from] || {value: 0, docs: 0}, D = spDetail(spSel.from, spSel.loc, true);
+    body = `<button class="sp-back" data-spback="1">‹ ${span("Back to " + nm)}</button>
+      <div class="pl-tiles">${tile("Transfers received", plM(y.value), "at BC cost")}${tile("Share of the transfers in", x.tin ? fmt(y.value / x.tin * 100, 1) + "%" : "–", plM(x.tin))}
+        ${tile("Transfer receipts", fmt(y.docs), "documents")}${tile("Items", fmt(D.items), `${fmt(D.cats)} categories`)}</div>
+      <div class="pl-cols">${panel("By category", D.catT)}${panel("By item", D.itT)}</div>`;
+  } else if (!spSel.sup) {
     const S = Object.values(x.sups).sort((a, b) => b.value - a.value), pct = spPctOf(x.value, x.prev);
     const mx = Math.max(1, ...S.map(y => Math.abs(y.value)));
     body = `<div class="pl-tiles">${tile("Invoiced purchases", plM(x.value), `vs before ${plPct(pct)} · ${plM(x.prev)}`, pct > 10 ? "up" : "")}${tile("Suppliers", fmt(S.filter(y => y.value > 0).length), "with purchases in the period")}
         ${tile("Largest supplier", S[0] ? esc(S[0].name) : "–", S[0] && x.value ? Math.round(S[0].value / x.value * 100) + "% of the purchases" : "")}${tile("Top 3", x.value ? Math.round(S.slice(0, 3).reduce((a, y) => a + y.value, 0) / x.value * 100) + "%" : "–", "share of the purchases")}</div>` +
       panel("Suppliers · click one for its categories and items", `<table data-nosort><tr><th>Supplier</th><th class="num">Value</th><th class="num">Share</th><th class="num">Vs before</th><th class="num">Invoices</th><th class="num">Credit memos</th><th class="num">Items</th></tr>` +
-        S.map(y => { const p = spPctOf(y.value, y.prev); return `<tr class="sp-row" tabindex="0" data-spsup="${esc(y.name)}"><td><span class="sp-bar" style="width:${Math.round(Math.abs(y.value) / mx * 80)}px"></span><b>${esc(y.name)}</b></td><td class="num">${fmt(y.value)}</td><td class="num">${x.value ? fmt(y.value / x.value * 100, 1) + "%" : "–"}</td><td class="num ${p > 10 ? "up" : ""}">${y.prev ? plPct(p) : `<span class="meta">new</span>`}</td><td class="num">${fmt(y.inv)}</td><td class="num">${fmt(y.cm)}</td><td class="num">${fmt(y.items.size)}</td></tr>`; }).join("") + `</table>`, true);
+        S.map(y => { const p = spPctOf(y.value, y.prev); return `<tr class="sp-row" tabindex="0" data-spsup="${esc(y.name)}"><td><span class="sp-bar" style="width:${Math.round(Math.abs(y.value) / mx * 80)}px"></span><b>${esc(y.name)}</b></td><td class="num">${fmt(y.value)}</td><td class="num">${x.value ? fmt(y.value / x.value * 100, 1) + "%" : "–"}</td><td class="num ${p > 10 ? "up" : ""}">${y.prev ? plPct(p) : `<span class="meta">new</span>`}</td><td class="num">${fmt(y.inv)}</td><td class="num">${fmt(y.cm)}</td><td class="num">${fmt(y.items.size)}</td></tr>`; }).join("") + `</table>`, true) + spTrPanels(x, panel);
   } else {
     const y = x.sups[spSel.sup] || {value: 0, prev: 0, inv: 0, cm: 0}, D = spDetail(spSel.sup, spSel.loc), p = spPctOf(y.value, y.prev);
     body = `<button class="sp-back" data-spback="1">‹ ${span("All suppliers of " + nm)}</button>
@@ -3806,6 +3864,18 @@ function spDraw(){
       <div class="pl-cols">${panel("By category", D.catT)}${panel("By item", D.itT)}</div>`;
   }
   $("spPop").innerHTML = head + `<div class="pl-body">${body}</div>`;
+}
+// the location overview: transfers received from the other locations, and sent to them
+function spTrPanels(x, panel){
+  const T = spTr(), t = spData.transfers || {};
+  if (!T) return panel("Transfers from other locations", `<p class="meta">${t.error ? span("The transfers could not be read: " + t.error) : span("Reading the transfers between locations…")}</p>`, true);
+  const tab = (o, tot, attr, l) => { const R = Object.values(o).sort((a, b) => b.value - a.value), mx = Math.max(1, ...R.map(r => Math.abs(r.value)));
+    return `<table data-nosort><tr><th>${l}</th><th class="num">Value</th><th class="num">Share</th><th class="num">Documents</th><th class="num">Items</th></tr>` +
+      R.map(r => `<tr class="sp-row" tabindex="0" ${attr}="${esc(r.code)}"><td><span class="sp-bar" style="width:${Math.round(Math.abs(r.value) / mx * 80)}px"></span><b>${esc(spLocNm(r.code))}</b> <span class="meta">${esc(plName(r.code) ? r.code : "")}</span></td><td class="num">${fmt(r.value)}</td><td class="num">${tot ? fmt(r.value / tot * 100, 1) + "%" : "–"}</td><td class="num">${fmt(r.docs)}</td><td class="num">${fmt(r.items.size)}</td></tr>`).join("") + `</table>`; };
+  let out = panel("Transfers from other locations · click one for its categories and items",
+    x.tin ? `<p class="meta" style="margin:0 0 6px">${span(`${plM(x.tin)} received at BC cost, apart from the purchases.`)}</p>` + tab(x.tfrom, x.tin, "data-spfrom", "From location") : `<p class="meta">${span("No transfer received in the period.")}</p>`, true);
+  if (x.tout) out += panel("Sent to other locations · click one for what it received", tab(x.tto, x.tout, "data-spto", "To location"), true);
+  return out;
 }
 function spCoRender(A){
   const q = ($("spcQ").value || "").toLowerCase();
@@ -3830,6 +3900,23 @@ function spCoRender(A){
       <div class="pl-cols"><div class="pl-panel"><div class="ttl"><h3>By category</h3></div>${D.catT}</div><div class="pl-panel"><div class="ttl"><h3>By location</h3></div>${D.locT}</div>
         <div class="pl-panel pl-span2"><div class="ttl"><h3>By item</h3></div>${D.itT}</div></div></div>`;
   } else $("spcDetail").innerHTML = "";
+  spCoTr(A, q);
+}
+function spCoTr(A, q){
+  const t = spData.transfers || {};
+  if (!A.T) { $("spcTr").innerHTML = `<p class="meta">${t.error ? span("The transfers could not be read: " + t.error) : span("Reading the transfers between locations…")}</p>`; return; }
+  const P = [...A.P].sort((a, b) => b.value - a.value), tot = P.reduce((a, p) => a + p.value, 0), mx = Math.max(1, ...P.map(p => Math.abs(p.value)));
+  const shown = P.filter(p => !q || [p.from, p.to, plName(p.from), plName(p.to)].some(v => (v || "").toLowerCase().includes(q)));
+  const by = (k) => { const o = {}; P.forEach(p => o[p[k]] = (o[p[k]] || 0) + p.value); return Object.entries(o).sort((a, b) => b[1] - a[1]); };
+  const send = by("from"), recv = by("to");
+  const tile = (l, v, sub) => `<div class="pl-tile"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${sub || ""}</div></div>`;
+  $("spcTr").innerHTML = (P.length ? `<div class="pl-tiles">${tile("Transferred", plM(tot), `${CUR} · at BC cost`)}${tile("Transfer receipts", fmt(P.reduce((a, p) => a + p.docs, 0)), `${fmt(P.length)} routes`)}
+      ${tile("Largest sender", send[0] ? esc(spLocNm(send[0][0])) : "–", send[0] && tot ? Math.round(send[0][1] / tot * 100) + "% of the transfers" : "")}${tile("Largest receiver", recv[0] ? esc(spLocNm(recv[0][0])) : "–", recv[0] && tot ? Math.round(recv[0][1] / tot * 100) + "% of the transfers" : "")}</div>` : "") +
+    `<div class="scroll"><table data-nosort><tr><th>From</th><th>To</th><th class="num">Value</th><th class="num">Share</th><th class="num">Documents</th><th class="num">Items</th></tr>` +
+    (shown.slice(0, 200).map(p => `<tr class="sp-row" tabindex="0" data-sptr="${esc(p.to)}" data-sptrf="${esc(p.from)}"><td><span class="sp-bar" style="width:${Math.round(Math.abs(p.value) / mx * 80)}px"></span><b>${esc(spLocNm(p.from))}</b></td><td>${esc(spLocNm(p.to))}</td><td class="num">${fmt(p.value)}</td><td class="num">${tot ? fmt(p.value / tot * 100, 1) + "%" : "–"}</td><td class="num">${fmt(p.docs)}</td><td class="num">${fmt(p.items.size)}</td></tr>`).join("")
+      || `<tr><td colspan="6" class="meta">${P.length ? "No transfer matches." : "No transfer between locations in the period."}</td></tr>`) + `</table></div>` +
+    (shown.length > 200 ? `<p class="meta">${span(`Showing 200 of ${fmt(shown.length)} routes.`)}</p>` : "") +
+    (t.unmatched_documents ? `<p class="meta">${span(`${fmt(t.unmatched_documents)} transfer receipts could not be matched to the location that sent them; they are shown as "No location".`)}</p>` : "");
 }
 $("spSort").onchange = () => { spSort = $("spSort").value; spRender(); };
 $("spRead").onclick = () => loadSp(true);
@@ -3838,8 +3925,11 @@ $("spcQ").oninput = () => spData && spCoRender(spAgg());
 document.addEventListener("click", e => {
   const t = e.target;
   if (t.closest("[data-spclose]") || t === $("spBd")) { $("spBd").classList.remove("show"); return; }
-  if (t.closest("[data-spback]")) { spSel.sup = null; spDraw(); return; }
-  const r = t.closest("[data-spsup]"); if (r) { spSel.sup = r.dataset.spsup; spDraw(); $("spBd").scrollTop = 0; return; }
+  if (t.closest("[data-spback]")) { spSel.sup = null; spSel.from = null; spDraw(); return; }
+  const f = t.closest("[data-spfrom]"); if (f) { spSel.from = f.dataset.spfrom; spSel.sup = null; spDraw(); $("spBd").scrollTop = 0; return; }
+  const to = t.closest("[data-spto]"); if (to) { spOpen(to.dataset.spto, spSel.loc); return; }
+  const tr = t.closest("[data-sptr]"); if (tr) { spOpen(tr.dataset.sptr, tr.dataset.sptrf); return; }
+  const r = t.closest("[data-spsup]"); if (r) { spSel.sup = r.dataset.spsup; spSel.from = null; spDraw(); $("spBd").scrollTop = 0; return; }
   const s = t.closest("[data-sploc]"); if (s) { spOpen(s.dataset.sploc); return; }
   const c = t.closest("[data-spcsup]"); if (c) { spcSup = spcSup === c.dataset.spcsup ? null : c.dataset.spcsup; spCoRender(spAgg()); if (spcSup) $("spcCard").scrollIntoView({behavior: "smooth", block: "start"}); return; }
   if (t.closest("[data-spcclose]")) { spcSup = null; spCoRender(spAgg()); }
@@ -3848,7 +3938,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("spBd").classList.contains("show")) { $("spBd").classList.remove("show"); return; }
   if (e.key !== "Enter" && e.key !== " ") return;
   const d = e.target.dataset || {};
-  if (d.sploc != null || d.spsup != null || d.spcsup != null) { e.preventDefault(); e.target.click(); }
+  if (d.sploc != null || d.spsup != null || d.spcsup != null || d.spfrom != null || d.spto != null || d.sptr != null) { e.preventDefault(); e.target.click(); }
 });
 // ---------------------------------------------------------------- Location intelligence → Today
 // A "Today" tab next to each Location intelligence: what every location received, was invoiced and ordered

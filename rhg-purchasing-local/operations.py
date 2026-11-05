@@ -448,3 +448,80 @@ def supplier_matrix(rows, suppliers, prev_rows, prev_suppliers, catalog):
             "rows": [[k[0], k[1], k[2], round(a[0], 3), round(a[1], 2)] for k, a in agg.items() if a[0] or a[1]],
             "docs": [[k[0], k[1], len(d[0]), len(d[1])] for k, d in docs.items()],
             "prev": [[k[0], k[1], round(v, 2)] for k, v in prev.items() if v]}
+
+
+
+def transfer_matrix(rows, date_from, date_to, locations_in_transit=("TRANSIT",)):
+    """Goods each location received from the other locations of the company in the period (transfer receipts at
+    the location, at their cost), by receiving location, sending location and item.
+
+    A transfer goes out with a shipment (−quantity at the sender, + at the in-transit location) and comes in with a
+    receipt (− at in-transit, + at the receiver); the receipt does not name the sender. It is found by pairing the
+    receipt's in-transit line with a shipment line of the same item, quantity and cost (the sender's line, or one
+    in-transit line: BC splits those by cost layer), then the item alone (the latest shipment before it from another
+    location); a direct transfer (no in-transit) names both.
+    rows: the transfer entries from 45 days before the period to its end, so shipments of the period before count."""
+    transit = {x.upper() for x in locations_in_transit}
+    is_t = lambda loc: (loc or "").upper() in transit or "TRANSIT" in (loc or "").upper()
+    ships = defaultdict(list)         # document -> lines
+    rec = defaultdict(list)
+    for r in rows:
+        t = r.get("Document_Type") or ""
+        (ships if "Shipment" in t else rec)[str(r.get("Document_No"))].append(r)
+    origin_of_ship = {}
+    by_exact, by_item = defaultdict(list), defaultdict(list)
+    for doc, lines in ships.items():
+        out = [l for l in lines if _f(l.get("Quantity")) < 0 and not is_t(l.get("Location_Code"))]
+        if not out:
+            continue
+        o = max(out, key=lambda l: abs(_f(l.get("Cost_Amount_Actual")))).get("Location_Code") or ""
+        origin_of_ship[doc] = o
+        for l in out:                  # BC splits the in-transit lines by cost layer; the receipt has the sender's total
+            by_exact[(str(l.get("Item_No") or ""), round(-_f(l.get("Quantity")), 4),
+                      round(-_f(l.get("Cost_Amount_Actual")), 2))].append(l.get("Location_Code") or "")
+        for l in lines:
+            if is_t(l.get("Location_Code")) and _f(l.get("Quantity")) > 0:
+                item = str(l.get("Item_No") or "")
+                by_exact[(item, round(_f(l.get("Quantity")), 4), round(_f(l.get("Cost_Amount_Actual")), 2))].append(o)
+                by_item[item].append((str(l.get("Posting_Date") or ""), o))
+    for v in by_item.values():
+        v.sort()
+    agg, docs = defaultdict(lambda: [0.0, 0.0]), defaultdict(set)
+    unmatched = 0
+    for doc, lines in rec.items():
+        ins = [l for l in lines if _f(l.get("Quantity")) > 0 and not is_t(l.get("Location_Code"))
+               and date_from <= str(l.get("Posting_Date") or "")[:10] <= date_to]
+        if not ins:
+            continue
+        outs = [l for l in lines if _f(l.get("Quantity")) < 0 and not is_t(l.get("Location_Code"))]
+        receivers = {l.get("Location_Code") or "" for l in ins}
+        votes = defaultdict(float)
+        if outs:                       # a direct transfer names the sender on the same document
+            for l in outs:
+                votes[l.get("Location_Code") or ""] += abs(_f(l.get("Cost_Amount_Actual")))
+        for l in lines:
+            if not (is_t(l.get("Location_Code")) and _f(l.get("Quantity")) < 0):
+                continue
+            item = str(l.get("Item_No") or "")
+            k = (item, round(-_f(l.get("Quantity")), 4), round(-_f(l.get("Cost_Amount_Actual")), 2))
+            exact = [o for o in by_exact.get(k, []) if o not in receivers]
+            if exact:
+                votes[exact[0]] += abs(_f(l.get("Cost_Amount_Actual")))
+            else:                      # a location does not send to itself: its own shipments are not the source
+                before = [o for d, o in by_item.get(item, []) if d <= str(l.get("Posting_Date") or "") and o not in receivers]
+                if before:
+                    votes[before[-1]] += abs(_f(l.get("Cost_Amount_Actual"))) * 0.5
+        votes = {k: v for k, v in votes.items() if k not in receivers}
+        sender = max(votes.items(), key=lambda kv: kv[1])[0] if votes else ""
+        if not sender:
+            unmatched += 1
+        for l in ins:
+            to = l.get("Location_Code") or ""
+            if to == sender:
+                continue
+            a = agg[(to, sender, str(l.get("Item_No") or ""))]
+            a[0] += _f(l.get("Quantity"))
+            a[1] += _f(l.get("Cost_Amount_Actual"))
+            docs[(to, sender)].add(doc)
+    return {"rows": [[k[0], k[1], k[2], round(a[0], 3), round(a[1], 2)] for k, a in agg.items() if a[0] or a[1]],
+            "docs": [[k[0], k[1], len(v)] for k, v in docs.items()], "unmatched_documents": unmatched}
