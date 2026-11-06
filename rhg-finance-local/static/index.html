@@ -28,6 +28,33 @@ nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:9px;display:f
 nav button:hover{background:rgba(160,216,234,.09)}
 nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font-weight:700}
 #invTabs,#fbTabs,#stTabs{overflow-x:auto;scrollbar-width:thin}
+/* Financial statements → P&L charts */
+.fc-viz{--fc-total:#08303f;--fc-up:#1f8a57;--fc-down:#c8442f;--fc-act:#2a78d6;--fc-bud:#6b7680}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .fc-viz{--fc-total:#a0d8ea;--fc-up:#3fc58a;--fc-down:#e8705c;--fc-act:#3987e5;--fc-bud:#a4a8af}}
+:root[data-theme="dark"] .fc-viz{--fc-total:#a0d8ea;--fc-up:#3fc58a;--fc-down:#e8705c;--fc-act:#3987e5;--fc-bud:#a4a8af}
+.fc-chart{position:relative;margin-top:10px}.fc-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.fc-chart .ax{font-size:11px;fill:var(--sub)}.fc-chart .gr{stroke:var(--line);stroke-width:1}
+.fc-chart .vl{font-size:11px;font-weight:600;fill:var(--ink)}.fc-chart .lb{font-size:11.5px;fill:var(--ink)}
+.fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
+.fc-seg button.on{background:var(--accent);color:var(--card)}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.fc-keys{display:flex;gap:16px;font-size:12px;margin-top:8px}
+.fc-keys i{display:inline-block;width:18px;height:0;border-top:2px solid;margin-right:6px;vertical-align:3px}
+.fc-k1{border-color:var(--fc-act)!important}.fc-k2{border-color:var(--fc-bud)!important;border-top-style:dashed!important}
+.fc-tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.12);min-width:180px;display:none;z-index:2}
+.fc-tip b{display:block;margin-bottom:4px}.fc-tip div{display:flex;justify-content:space-between;gap:12px}
+.fc-dev{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr) minmax(120px,auto);gap:6px 12px;align-items:center;font-size:12.5px}
+.fc-dev .bar{position:relative;height:18px}.fc-dev .bar i{position:absolute;top:2px;height:14px;border-radius:3px}
+.fc-dev .bar b{position:absolute;top:0;bottom:0;left:50%;border-left:1px solid var(--sub)}
+.fc-dev .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fc-age{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.fc-age h3{font-size:14px;margin:4px 0 2px}.fc-age .s{font-size:12px;color:var(--sub);margin-bottom:8px}
+.fc-hb{display:grid;grid-template-columns:90px 1fr;gap:5px 10px;align-items:center;font-size:12px;margin-bottom:12px}
+.fc-hb .t{position:relative;height:20px;background:var(--bg);border-radius:4px;overflow:hidden}
+.fc-hb .t i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.fc-hb .t span{position:absolute;left:6px;top:2px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fc-hb .t span.out{left:auto}
+@media (max-width:900px){.fc-age{grid-template-columns:1fr}.fc-dev{grid-template-columns:100px minmax(0,1fr) 92px}.fc-dev .num{white-space:normal;font-size:11.5px}}
 #invTabs button,#fbTabs button,#stTabs button{white-space:nowrap}
 nav .count{background:rgba(160,216,234,.2);color:var(--prev);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
 .side-foot{margin-top:auto;font-size:11.5px;color:#7e9daa;line-height:1.5;padding:0 6px}
@@ -467,6 +494,7 @@ td.num,th.num{text-align:right}
     <button data-view="bs" data-parent="pl" data-tab="Balance sheet" style="display:none">Balance sheet</button>
     <button data-view="liquidity" data-parent="pl" data-tab="Liquidity &amp; capital" style="display:none">Liquidity &amp; capital</button>
     <button data-view="treasury" data-parent="pl" data-tab="Cash flow &amp; treasury" style="display:none">Cash flow &amp; treasury</button>
+    <button data-view="charts" data-parent="pl" data-tab="P&amp;L charts" style="display:none">P&amp;L charts</button>
     <button data-view="gl">G/L entries</button>
 
     <div class="grp">Working capital</div>
@@ -585,7 +613,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-pl">
-    <div class="ov-tabs" id="stTabs" role="tablist"><button data-t="pl" class="on" role="tab" aria-selected="true">Profit &amp; loss</button><button data-t="bs" role="tab" aria-selected="false">Balance sheet</button><button data-t="liquidity" role="tab" aria-selected="false">Liquidity &amp; capital</button><button data-t="treasury" role="tab" aria-selected="false">Cash flow &amp; treasury</button></div>
+    <div class="ov-tabs" id="stTabs" role="tablist"><button data-t="pl" class="on" role="tab" aria-selected="true">Profit &amp; loss</button><button data-t="bs" role="tab" aria-selected="false">Balance sheet</button><button data-t="liquidity" role="tab" aria-selected="false">Liquidity &amp; capital</button><button data-t="treasury" role="tab" aria-selected="false">Cash flow &amp; treasury</button><button data-t="charts" role="tab" aria-selected="false">P&amp;L charts</button></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plNote"></p></div>
       <button class="mini" data-drill="pl">Open by account</button></div>
       <div class="scroll"><table id="plTable"></table></div></div>
@@ -597,6 +625,25 @@ td.num,th.num{text-align:right}
     </div>
     <div class="card"><h2>Largest accounts</h2><p class="hint">Click an account to open its ledger entries for the period</p>
       <div class="scroll"><table id="plAccounts"></table></div></div>
+  </section>
+
+  <section class="view" id="v-charts">
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>From revenue to EBITDA</h2>
+      <p class="hint"><span>The period chosen above, as the P&amp;L reads it: each bar adds or takes away from the revenue, the dark bars are the subtotals.</span></p></div></div>
+      <div class="fc-chart" id="fcWf"></div><p class="meta" id="fcWfNote"></p></div>
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>Actual against budget</h2>
+      <p class="hint"><span>Every month of the year from the G/L and the G/L budget; the running month against the budget of the days already gone.</span></p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div class="fc-seg" id="fcMetric" role="tablist" aria-label="Measure"><button class="on" data-m="revenue" role="tab">Revenue</button><button data-m="gross" role="tab">Gross margin</button><button data-m="ebitda" role="tab">EBITDA</button></div>
+        <div class="fc-seg" id="fcCum" role="tablist" aria-label="Span"><button class="on" data-c="0" role="tab">By month</button><button data-c="1" role="tab">Year to date</button></div></div></div>
+      <div class="fc-keys"><span><i class="fc-k1"></i>Actual</span><span><i class="fc-k2"></i>Budget</span></div>
+      <div class="fc-chart" id="fcAb"><p class="meta">Reading the months…</p></div><p class="meta" id="fcAbNote"></p>
+      <h3 style="font-size:14px;margin:16px 0 4px">Where the year deviates from the budget</h3>
+      <p class="hint" style="margin:0 0 8px"><span>Year to date, actual less budget by P&amp;L line: green is in our favour (more income, less cost), red against it.</span></p>
+      <div id="fcDev"></div></div>
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>Ageing of payables and receivables</h2>
+      <p class="hint"><span>What is open today by days past the due date, and who is the most overdue.</span> <span>Click a name for the Kartela.</span></p></div></div>
+      <div class="fc-age"><div id="fcAp"></div><div id="fcAr"></div></div></div>
   </section>
 
   <section class="view" id="v-bs">
@@ -1888,6 +1935,7 @@ function render(){
     + (v.length ? " · Resolve validation before distributing the pack." : " · Figures are ready to distribute once the exceptions are reviewed.");
   $("excCount").textContent = k.critical;
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
+  if ($("v-charts").classList.contains("on")) renderCharts();
   renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
   if(!spLoaded) loadSimphony();
   if(!arLoaded) loadArap();
@@ -2008,6 +2056,140 @@ function renderPL(){
   renderPLRatios(pl, hidden, credit);
   renderPLWaterfall(pl);
 }
+// ---------- Financial statements → P&L charts: revenue to EBITDA, actual against budget, ageing of AP and AR
+const fcM = v => v == null || !isFinite(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
+const fcSp = t => `<span>${esc(t)}</span>`;
+var fcAbData = null, fcAbKey = "", fcAbTimer = null, fcMetric = "revenue", fcCum = false;
+function renderCharts(){
+  if (!data) return;
+  fcWaterfall(); fcAgeing(); fcLoadAb();
+}
+// the waterfall: net revenue, other income → revenue total, COGS → gross margin, labour, occupancy, other OPEX → EBITDA
+function fcWaterfall(){
+  const pl = data.pl || {}, S = Object.fromEntries((pl.summary || pl.statement || []).map(l => [l.key, l.current]));
+  if (!pl.library || S.revenue == null) { $("fcWf").innerHTML = `<p class="meta">${fcSp("Needs the KPI mapping of this company (Settings → KPI mapping).")}</p>`; $("fcWfNote").textContent = ""; return; }
+  const rt = (S.revenue || 0) + (S.other_income || 0), gm = rt - (S.cogs || 0), eb = gm - (S.labour || 0) - (S.occupancy || 0) - (S.opex || 0);
+  const steps = [["Net revenue", 0, S.revenue, "t"], ["Other income", S.revenue, rt, "s"], ["Revenue total", 0, rt, "t"], ["Cost of goods sold", rt, gm, "s"],
+    ["Gross margin", 0, gm, "t"], ["Labour", gm, gm - (S.labour || 0), "s"], ["Occupancy", gm - (S.labour || 0), gm - (S.labour || 0) - (S.occupancy || 0), "s"],
+    ["Other operating expenses", gm - (S.labour || 0) - (S.occupancy || 0), eb, "s"], ["EBITDA", 0, eb, "t"]];
+  const box = $("fcWf"), W = Math.max(360, box.clientWidth || 900), H = 300, pl_ = 56, pr = 10, pt = 22, pb = 46;
+  const vals = steps.flatMap(x => [x[1], x[2]]), lo = Math.min(0, ...vals), hi = Math.max(1, ...vals), span = hi - lo || 1;
+  const y = v => pt + (H - pt - pb) * (hi - v) / span, n = steps.length, bw = (W - pl_ - pr) / n, x = i => pl_ + bw * i;
+  const ticks = [0, .25, .5, .75, 1].map(t => lo + span * t);
+  const rev = S.revenue || 0;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("From revenue to EBITDA")}">`;
+  g += ticks.map(t => `<line class="gr" x1="${pl_}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${pl_ - 6}" y="${y(t) + 4}" text-anchor="end">${fcM(t)}</text>`).join("");
+  g += `<line x1="${pl_}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--sub)" stroke-width="1"/>`;
+  steps.forEach(([lab, a, b, kind], i) => {
+    const top = y(Math.max(a, b)), h = Math.max(1, Math.abs(y(a) - y(b))), d = b - a;
+    const col = kind === "t" ? "var(--fc-total)" : d >= 0 ? "var(--fc-up)" : "var(--fc-down)";
+    g += `<rect x="${x(i) + bw * 0.18}" y="${top}" width="${bw * 0.64}" height="${h}" rx="3" fill="${col}"><title>${esc(lab)}: ${fmt(Math.round(kind === "t" ? b : d))}</title></rect>`;
+    if (i < n - 1) g += `<line x1="${x(i) + bw * 0.82}" x2="${x(i + 1) + bw * 0.18}" y1="${y(b)}" y2="${y(b)}" stroke="var(--sub)" stroke-dasharray="2 3"/>`;
+    const v = kind === "t" ? b : d;
+    g += `<text class="vl" x="${x(i) + bw / 2}" y="${top - 6}" text-anchor="middle">${(kind === "t" ? "" : v >= 0 ? "+" : "−") + fcM(Math.abs(v))}</text>`;
+    const words = lab.split(" "), l1 = words.length > 2 ? words.slice(0, 2).join(" ") : words[0], l2 = words.length > 2 ? words.slice(2).join(" ") : words.slice(1).join(" ");
+    g += `<text class="lb" x="${x(i) + bw / 2}" y="${H - pb + 16}" text-anchor="middle" ${kind === "t" ? 'font-weight="700"' : ""}>${esc(l1)}</text>` + (l2 ? `<text class="lb" x="${x(i) + bw / 2}" y="${H - pb + 30}" text-anchor="middle">${esc(l2)}</text>` : "");
+    if (rev) g += `<text class="ax" x="${x(i) + bw / 2}" y="${H - 2}" text-anchor="middle">${(v / rev * 100).toFixed(1)}%</text>`;
+  });
+  box.innerHTML = g + `</svg>`;
+  $("fcWfNote").innerHTML = `${fcSp(`${data.meta.company} · ${data.meta.period_label} · ${data.meta.currency}`)} · ${fcSp("% of net revenue under each bar.")}` +
+    (pl.mapping && pl.mapping.status !== "Approved" ? ` · ${fcSp("KPI mapping " + pl.mapping.status + ": figures Pilot.")}` : "");
+}
+// AP and AR by days past the due date, the most overdue first
+function fcAgeing(){
+  const one = (id, d, title, kind) => {
+    if (!d) { $(id).innerHTML = `<h3>${fcSp(title)}</h3><p class="meta">${fcSp("Your role does not include it, or it was not read.")}</p>`; return; }
+    const B = d.buckets || [], mx = Math.max(1, ...B.map(b => Math.abs(b.value))), tot = d.total || 0;
+    const shade = i => i === 0 ? "var(--down-bg)" : `color-mix(in srgb, var(--fc-down) ${[0, 30, 50, 70, 95][i] || 95}%, var(--card))`;
+    const P = (d.parties || []).filter(p => p.overdue > 0).sort((a, b) => b.overdue - a.overdue).slice(0, 8);
+    $(id).innerHTML = `<h3>${fcSp(title)}</h3><div class="s">${fcSp(`${fcM(tot)} open · ${fcM(d.overdue)} overdue (${tot ? Math.round(d.overdue / tot * 100) : 0}%)`)}</div>
+      <div class="fc-hb">${B.map((b, i) => { const w = Math.max(0, Math.abs(b.value) / mx * 100); return `<span>${esc(b.label)}</span><div class="t" title="${esc(b.label)}: ${fmt(Math.round(b.value))}"><i style="width:${w}%;background:${shade(i)}"></i><span${w > 45 ? ` style="color:${i >= 3 ? "#fff" : "var(--ink)"}"` : ` class="out" style="left:calc(${w}% + 6px)"`}>${fcM(b.value)}${tot ? ` · ${Math.round(b.value / tot * 100)}%` : ""}</span></div>`; }).join("")}</div>
+      <table data-nosort><tr><th>${kind === "ap" ? "Supplier" : "Customer"}</th><th class="num">Overdue</th><th class="num">Oldest</th></tr>${P.map(p => `<tr><td><a href="#${kind}" class="acc" data-goto-view="${kind}">${esc(p.party)}</a></td><td class="num">${fmt(Math.round(p.overdue))}</td><td class="num">${p.oldest_days != null ? p.oldest_days + " d" : "–"}</td></tr>`).join("") || `<tr><td colspan="3" class="meta">${fcSp("Nothing overdue.")}</td></tr>`}</table>`;
+  };
+  one("fcAp", data.payables, "Payables (AP)", "ap");
+  one("fcAr", data.receivables, "Receivables (AR)", "ar");
+  bindGotoViews($("v-charts"));
+}
+// actual against budget: the months of the year (Budget & forecast → /api/executive, the same read)
+function fcLoadAb(refresh){
+  const q = blQuery();
+  if (fcAbData && fcAbKey === q && !refresh) { fcActualBudget(); return; }
+  clearTimeout(fcAbTimer);
+  fetch("/api/executive?" + q).then(readJSON).then(j => {
+    if (blQuery() !== q) return;
+    if (j.error) throw new Error(j.error);
+    fcAbData = j; fcAbKey = q; fcActualBudget();
+    if (j.pending) fcAbTimer = setTimeout(() => { if ($("v-charts").classList.contains("on")) fcLoadAb(true); }, 6000);
+  }).catch(e => { $("fcAb").innerHTML = `<p class="meta">${fcSp("Could not read the months: " + e.message)}</p>`; });
+}
+const FC_INCOME = new Set(["revenue", "other_income"]);
+function fcLines(src, k, scale){
+  // {KPI line: amount} of one month: income and costs positive, as the P&L shows them
+  const out = {}, acc = fcAbData.accounts || {}, c = src && src["*"] && src["*"][k];
+  if (!c) return null;
+  const f = scale && scale[k] != null ? scale[k] : 1;
+  for (const no in c) {
+    const line = (acc[no] || [])[2]; if (!line) continue;
+    const b = (acc[no] || [])[1], net = BL_INCOME.has(b) ? -c[no] : c[no];     // the G/L net change
+    out[line] = (out[line] || 0) + (FC_INCOME.has(line) ? -net : net) * f;
+  }
+  return out;
+}
+const fcMeasure = (L, m) => { if (!L) return null; const g = k => L[k] || 0, rev = g("revenue"), gm = rev + g("other_income") - g("cogs");
+  return m === "revenue" ? rev : m === "gross" ? gm : gm - g("labour") - g("occupancy") - g("opex"); };
+function fcActualBudget(){
+  const d = fcAbData; if (!d || !d.months) return;
+  const months = d.months.filter(k => k.slice(0, 4) === String(d.year));
+  const bud = d.budget && d.budget.available ? d.budget.cells : null;
+  const run = d.running, sc = {};
+  if (run && months.includes(run.month)) { const [yy, mm] = run.month.split("-").map(Number); sc[run.month] = new Date(run.to + "T00:00:00").getDate() / new Date(yy, mm, 0).getDate(); }
+  const A = months.map(k => fcLines(d.actual, k)), B = months.map(k => bud ? fcLines(bud, k, sc) : null);
+  let a = A.map(L => fcMeasure(L, fcMetric)), b = B.map(L => fcMeasure(L, fcMetric));
+  if (fcCum) { let s1 = 0, s2 = 0; a = a.map(v => v == null ? null : (s1 += v)); b = b.map(v => v == null ? null : (s2 += v)); }
+  const lab = k => new Date(k + "-01T12:00:00").toLocaleString("en-US", {month: "short"});
+  $("fcAbNote").innerHTML = `${fcSp(`${d.company || ""} ${d.year} · ${d.currency || ""}`)}` + (bud ? ` · ${fcSp("budget " + d.budget.name)}` : ` · ${fcSp(`No budget ${(d.budget || {}).name || ""} found for ${d.year}: set its name in Settings.`)}`) +
+    (run && months.includes(run.month) ? ` · ${fcSp(`${lab(run.month)}: actual to ${run.to}, budget for the same days`)}` : "") + (d.pending ? ` · ${fcSp("still reading some months…")}` : "");
+  if (!months.length) { $("fcAb").innerHTML = `<p class="meta">${fcSp("Reading the months…")}</p>`; return; }
+  const box = $("fcAb"), W = Math.max(360, box.clientWidth || 900), H = 260, pl_ = 56, pr = 14, pt = 12, pb = 26, n = months.length;
+  const vals = [...a, ...b].filter(v => v != null), lo = Math.min(0, ...vals), hi = Math.max(1, ...vals), span = hi - lo || 1;
+  const x = i => pl_ + (n > 1 ? (W - pl_ - pr) * i / (n - 1) : (W - pl_ - pr) / 2), y = v => pt + (H - pt - pb) * (hi - v) / span;
+  const path = arr => arr.map((v, i) => v == null ? null : `${x(i)},${y(v)}`).filter(Boolean).join(" ");
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Actual against budget by month")}">`;
+  g += [0, .25, .5, .75, 1].map(t => lo + span * t).map(t => `<line class="gr" x1="${pl_}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${pl_ - 6}" y="${y(t) + 4}" text-anchor="end">${fcM(t)}</text>`).join("");
+  g += months.map((k, i) => `<text class="ax" x="${x(i)}" y="${H - 6}" text-anchor="middle">${lab(k)}</text>`).join("");
+  if (b.some(v => v != null)) g += `<polyline points="${path(b)}" fill="none" stroke="var(--fc-bud)" stroke-width="2" stroke-dasharray="6 4"/>`;
+  g += `<polyline points="${path(a)}" fill="none" stroke="var(--fc-act)" stroke-width="2"/>`;
+  g += a.map((v, i) => v == null ? "" : `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="var(--fc-act)"/>`).join("");
+  g += `<line id="fcX" y1="${pt}" y2="${H - pb}" stroke="var(--sub)" stroke-dasharray="3 3" visibility="hidden"/><rect id="fcHit" x="${pl_ - 10}" y="${pt}" width="${W - pl_ - pr + 20}" height="${H - pt - pb}" fill="transparent"/></svg><div class="fc-tip" id="fcTip"></div>`;
+  box.innerHTML = g;
+  const hit = $("fcHit"), tip = $("fcTip"), xl = $("fcX");
+  const show = ev => {
+    const r = hit.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((ev.clientX - r.left - 10 * r.width / (W - pl_ - pr + 20)) / (r.width * (W - pl_ - pr) / (W - pl_ - pr + 20)) * (n - 1))));
+    xl.setAttribute("x1", x(i)); xl.setAttribute("x2", x(i)); xl.setAttribute("visibility", "visible");
+    const dv = a[i] != null && b[i] != null ? a[i] - b[i] : null;
+    tip.innerHTML = `<b>${esc(lab(months[i]) + " " + d.year)}${fcCum ? " · " + fcSp("year to date") : ""}</b><div><span>${fcSp("Actual")}</span><span>${a[i] == null ? "–" : fmt(Math.round(a[i]))}</span></div><div><span>${fcSp("Budget")}</span><span>${b[i] == null ? "–" : fmt(Math.round(b[i]))}</span></div>` +
+      (dv != null ? `<div><span>${fcSp("Difference")}</span><span>${dv >= 0 ? "+" : "−"}${fmt(Math.abs(Math.round(dv)))}${b[i] ? ` (${(dv / Math.abs(b[i]) * 100).toFixed(1)}%)` : ""}</span></div>` : "");
+    tip.style.display = "block";
+    const bx = box.getBoundingClientRect(), px = x(i) / W * bx.width;
+    tip.style.left = Math.min(bx.width - tip.offsetWidth, Math.max(0, px + (px > bx.width / 2 ? -tip.offsetWidth - 12 : 12))) + "px"; tip.style.top = "6px";
+  };
+  hit.onpointermove = show; hit.onpointerdown = show;
+  hit.onpointerleave = () => { tip.style.display = "none"; xl.setAttribute("visibility", "hidden"); };
+  // year to date by P&L line: actual less budget, in our favour or against it
+  const sum = arr => arr.reduce((o, L) => { if (L) for (const k in L) o[k] = (o[k] || 0) + L[k]; return o; }, {});
+  const SA = sum(A), SB = sum(B);
+  const names = {revenue: "Net revenue", other_income: "Other operating income", cogs: "Cost of goods sold", labour: "Labour", occupancy: "Occupancy", opex: "Other operating expenses", da: "Depreciation and amortisation", finance: "Interest and finance costs (net)", nonop: "Non-operating items", tax: "Income tax"};
+  if (!bud) { $("fcDev").innerHTML = `<p class="meta">${fcSp("No budget to compare with.")}</p>`; return; }
+  const rows = Object.keys(names).map(k => ({k, a: SA[k] || 0, b: SB[k] || 0})).filter(r => r.a || r.b).map(r => ({...r, d: r.a - r.b, fav: FC_INCOME.has(r.k) ? r.a - r.b : r.b - r.a}))
+    .sort((p, q) => Math.abs(q.d) - Math.abs(p.d));
+  const mx = Math.max(1, ...rows.map(r => Math.abs(r.fav)));
+  $("fcDev").innerHTML = `<div class="fc-dev">${rows.map(r => { const w = Math.abs(r.fav) / mx * 50;
+    return `<span>${fcSp(names[r.k])}</span><div class="bar" title="${esc(names[r.k])}: actual ${fmt(Math.round(r.a))}, budget ${fmt(Math.round(r.b))}"><b></b><i style="${r.fav >= 0 ? `left:50%` : `right:50%`};width:${w}%;background:${r.fav >= 0 ? "var(--fc-up)" : "var(--fc-down)"}"></i></div>
+      <span class="num"><b class="${r.fav < 0 ? "neg" : ""}">${r.d >= 0 ? "+" : "−"}${fcM(Math.abs(r.d))}</b>${r.b ? ` · ${(r.d / Math.abs(r.b) * 100 >= 0 ? "+" : "")}${(r.d / Math.abs(r.b) * 100).toFixed(1)}%` : ""}</span>`; }).join("")}</div>`;
+}
+$("fcMetric").onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; fcMetric = b.dataset.m; $("fcMetric").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); fcActualBudget(); };
+$("fcCum").onclick = e => { const b = e.target.closest("[data-c]"); if (!b) return; fcCum = b.dataset.c === "1"; $("fcCum").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); fcActualBudget(); };
+window.addEventListener("resize", () => { if ($("v-charts") && $("v-charts").classList.contains("on") && data) { fcWaterfall(); fcActualBudget(); } });
 // The ratios of the KPI library, each with its status and formula; the comparison column is the same ratio on the
 // comparison period's lines (revenue growth is always against last year).
 const PL_RATIOS = ["revenue_growth", "cogs_pct", "labour_pct", "prime_cost_pct", "occupancy_pct", "ebitda_margin", "net_margin"];
@@ -5186,6 +5368,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="bs" || b.dataset.view==="liquidity") loadCap(false);
   if(b.dataset.view==="gaps") loadDq(false);
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
+  if(b.dataset.view==="charts") renderCharts();
   if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");
   if(b.dataset.view==="budget" && data && !(data.budget||{}).loaded) loadPane("/api/budget","budget",renderBudget,"bgNote");
   if(b.dataset.view==="group" && data && !(data.group||{}).loaded) loadPane("/api/consolidation","group",renderGroup,"grpNote");
@@ -5381,7 +5564,7 @@ function invTabsSync(view){
 // Views shown as tabs of one menu item: Fiscal vs BC (purchases, sales) and Financial statements (P&L,
 // balance sheet, cash flow & treasury). Each stays a view of its own (address, loading); the tab bar
 // moves on top of the open one.
-var TAB_BARS = {fbTabs: ["fiscal", "fsales"], stTabs: ["pl", "bs", "liquidity", "treasury"]};
+var TAB_BARS = {fbTabs: ["fiscal", "fsales"], stTabs: ["pl", "bs", "liquidity", "treasury", "charts"]};
 function fbTabsSync(view){
   for (const [id, views] of Object.entries(TAB_BARS)) {
     const bar = $(id), sec = $("v-" + view);

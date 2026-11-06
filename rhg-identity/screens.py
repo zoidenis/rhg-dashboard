@@ -32,7 +32,8 @@ FINANCE = [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),
         ("bs", "Balance sheet", "company", ["finance.bs.view"]),
         ("liquidity", "Liquidity & capital", "company", ["finance.bs.view"]),
-        ("treasury", "Cash flow & treasury", "company", ["finance.treasury.view", "finance.cash.view"])]),
+        ("treasury", "Cash flow & treasury", "company", ["finance.treasury.view", "finance.cash.view"]),
+        ("charts", "P&L charts", "company", ["finance.pl.view"])]),
     ("gl", "G/L entries", "Statements", None, [], "company", ["finance.gl.view"]),
     ("cash", "Cash & bank", "Working capital", "clTabs", [
         ("main", "Cash & bank", "company", ["finance.cash.view"]),
