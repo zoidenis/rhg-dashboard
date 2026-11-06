@@ -340,6 +340,18 @@ td.num,th.num{text-align:right}
 .sk-c-unused{background:var(--prev)}.sk-c-ok{background:var(--down)}.sk-c-low_use{background:var(--line)}
 .sk-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .cn-up{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.cn-pop{width:min(760px,100%)}
+.cn-pop select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+.cn-step{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--card);margin-bottom:10px}
+.cn-step.off{opacity:.5}.cn-step.off :is(button,select,label){pointer-events:none}
+.cn-step h3{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:15px}
+.cn-step h3 i{flex-shrink:0;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12.5px;font-weight:700;background:var(--bg);color:var(--sub);border:1px solid var(--line)}
+.cn-step.done h3 i{background:var(--down);border-color:var(--down);color:#fff}
+.cn-step .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cn-step .msg{font-size:12.5px;color:var(--sub);margin-top:8px}
+.cn-drop{display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px dashed var(--line);border-radius:10px;padding:16px;cursor:pointer;font-weight:600;font-size:13px;width:100%;box-sizing:border-box}
+.cn-drop:hover,.cn-drop.over{border-color:var(--accent);color:var(--accent)}
+.cn-drop:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 .cn-up label.mini{display:inline-flex;align-items:center}
 #cnLines td.num,#cnLines th.num{white-space:nowrap}
 .cn-st{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--rhg-sky,#efede6);color:var(--ink)}
@@ -981,6 +993,7 @@ td.num,th.num{text-align:right}
       <div class="card-head"><div><h2>Stock count analysis</h2>
         <p class="hint"><span>The stock Business Central holds at a location at the end of the month (the month's Inventory Valuation: opening, increases, decreases, closing) against the physical count uploaded as the Excel form.</span> <span>Every difference at the average cost of the month end.</span> <span>Business Central is read only.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="mini dark" id="cnWiz">New count analysis</button>
           <select id="cnLoc" aria-label="Location"><option value="">Choose a location</option></select>
           <select id="cnMonth" aria-label="Month"></select>
           <button class="mini dark" id="cnRead">Read BC again</button><button class="mini" id="cnXlsx">Excel</button></div></div>
@@ -1001,6 +1014,7 @@ td.num,th.num{text-align:right}
     <div class="card" id="cnValCard" hidden><div class="card-head"><div><h2>Inventory valuation</h2>
       <p class="hint" id="cnValNote"></p></div></div>
       <div class="scroll"><table id="cnVal"></table></div></div>
+    <div class="pl-bd" id="cnBd"><div class="pl-pop cn-pop" id="cnPop" role="dialog" aria-modal="true" aria-labelledby="cnWizT"></div></div>
     <div class="card"><div class="card-head"><div><h2>Counts uploaded</h2>
       <p class="hint">Every count form uploaded for this company, by month and location; a new upload of the same location and month replaces the one before.</p></div></div>
       <div class="scroll"><table id="cnCounts"></table></div></div>
@@ -4404,6 +4418,81 @@ $("cnMonth").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidde
 $("cnRead").onclick = () => { cnData = null; loadCn(true); };
 $("cnXlsx").onclick = () => { if (cnData) location.href = "/api/stockcount/xlsx?" + cnQs(); };
 $("cnQ").oninput = () => cnData && cnLines();
+// ---------- the window of a new count: location and month → read Business Central → upload the form → Excel
+const cnSp = t => `<span>${esc(t)}</span>`;
+var cnWizOn = false, cnWizTimer = null, cnWizRead = false, cnWizXlsx = false;
+const cnWizMine = () => cnData && cnData.available && cnData.location === $("cnwLoc").value && cnData.month === $("cnwMonth").value;
+async function cnWizShow(){
+  if (!cnSetupData) { await loadCn(false); }
+  const st = cnSetupData || {locations: [], months: []};
+  const step = (n, t, body, id) => `<div class="cn-step" id="${id}"><h3><i>${n}</i><span>${t}</span></h3>${body}</div>`;
+  $("cnPop").innerHTML = `<div class="ph"><div><h2 id="cnWizT">New count analysis</h2><div class="sub">${cnSp("Location → Business Central → count form → Excel")}</div></div><div class="sp"></div><button class="close" data-cnwclose="1">Close ✕</button></div>
+    <div class="pl-body">` +
+    step(1, "Choose the location and the month", `<div class="row"><select id="cnwLoc" aria-label="Location"><option value="">Choose a location</option>${st.locations.map(l => `<option value="${esc(l.code)}">${esc(l.code)}${l.name ? " · " + esc(l.name) : ""}</option>`).join("")}</select>
+      <select id="cnwMonth" aria-label="Month">${st.months.map(m => `<option value="${m}">${esc(cnMonth(m))}</option>`).join("")}</select></div>
+      <div class="msg">${cnSp("The month the count closes: Business Central is read at its last day.")}</div>`, "cnw1") +
+    step(2, "Read Business Central", `<div class="row"><button class="mini dark" id="cnwRead">Read Business Central</button><button class="mini" id="cnwAgain" hidden>Read again</button></div><div class="msg" id="cnwReadMsg"></div>`, "cnw2") +
+    step(3, "Upload the count form", `<label class="cn-drop" id="cnwDrop"><span>Choose the Excel form, or drop it here</span><input type="file" id="cnwFile" accept=".xlsx" hidden></label>
+      <div class="row" style="margin-top:8px"><select id="cnwSheet" hidden aria-label="Sheet of the form"></select></div><div class="msg" id="cnwUpMsg"></div>`, "cnw3") +
+    step(4, "Generate the Excel file", `<div class="row"><button class="mini dark" id="cnwXlsx">Generate the Excel file</button><button class="mini" id="cnwSee">See the analysis</button></div><div class="msg" id="cnwXMsg"></div>`, "cnw4") +
+    `</div>`;
+  $("cnwLoc").value = $("cnLoc").value || (st.locations.length === 1 ? st.locations[0].code : "");
+  $("cnwMonth").value = [...$("cnwMonth").options].some(o => o.value === $("cnMonth").value) ? $("cnMonth").value : (st.month || st.default_month);
+  cnWizRead = cnWizMine(); cnWizXlsx = false;
+  const pick = () => { cnWizRead = false; cnWizXlsx = false; cnWizDraw(); };
+  $("cnwLoc").onchange = pick; $("cnwMonth").onchange = pick;
+  const read = refresh => {
+    $("cnLoc").value = $("cnwLoc").value;
+    if (![...$("cnMonth").options].some(o => o.value === $("cnwMonth").value)) $("cnMonth").insertAdjacentHTML("beforeend", `<option value="${esc($("cnwMonth").value)}">${esc(cnMonth($("cnwMonth").value))}</option>`);
+    $("cnMonth").value = $("cnwMonth").value;
+    cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; cnFilter = "all";
+    cnWizRead = true; cnWizXlsx = false; loadCn(refresh); cnWizDraw();
+  };
+  $("cnwRead").onclick = () => read(false);
+  $("cnwAgain").onclick = () => read(true);
+  const take = f => { if (!f) return; const rd = new FileReader();
+    rd.onload = () => { cnFile = {name: f.name, data: String(rd.result).split(",")[1] || ""}; cnWizXlsx = false; cnUpload(""); cnWizDraw(); };
+    rd.readAsDataURL(f); };
+  $("cnwFile").onchange = () => { take($("cnwFile").files[0]); $("cnwFile").value = ""; };
+  const drop = $("cnwDrop");
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (!$("cnw3").classList.contains("off")) take(e.dataTransfer.files[0]); };
+  $("cnwSheet").onchange = () => cnUpload($("cnwSheet").value);
+  $("cnwXlsx").onclick = () => { if (!cnWizMine()) return; location.href = "/api/stockcount/xlsx?" + cnQs(); cnWizXlsx = true; cnWizDraw(); };
+  $("cnwSee").onclick = () => { cnWizClose(); window.scrollTo({top: 0, behavior: "smooth"}); };
+  cnWizOn = true; $("cnBd").classList.add("show"); cnWizDraw();
+  clearInterval(cnWizTimer); cnWizTimer = setInterval(cnWizDraw, 800);
+}
+function cnWizClose(){ cnWizOn = false; clearInterval(cnWizTimer); $("cnBd").classList.remove("show"); }
+function cnWizDraw(){
+  if (!cnWizOn || !$("cnw1")) return;
+  const st = cnSetupData || {}, mine = cnWizMine(), d = mine ? cnData : null, t = (d && d.totals) || {};
+  const set = (id, on, done) => { $(id).classList.toggle("off", !on); $(id).classList.toggle("done", !!done); };
+  const s1 = !!$("cnwLoc").value, s2 = s1 && cnWizRead && !!d, s3 = s2 && !!d.count, s4 = s3 && cnWizXlsx;
+  set("cnw1", true, s1); set("cnw2", s1, s2); set("cnw3", s2 && st.can_upload, s3); set("cnw4", s3 && st.can_export, s4);
+  $("cnwAgain").hidden = !s2;
+  $("cnwReadMsg").innerHTML = !s1 ? "" : s2
+    ? `${cnSp(`BC closing value ${fmt(t.closing_value)} · ${fmt(t.items)} items`)} · ${cnSp(`${cnD(d.from)} to ${cnD(d.to)}`)}`
+    : cnWizRead ? esc($("cnStatus").textContent || "Reading Business Central…") : cnSp("Reads the month's Inventory Valuation of the location; the first read takes a few minutes.");
+  const c = d && d.count;
+  $("cnwUpMsg").innerHTML = !st.can_upload ? cnSp("Your role cannot upload a count form (the actions right).")
+    : $("cnUpMsg").innerHTML && cnFile ? $("cnUpMsg").innerHTML
+    : c ? `${cnSp(`${c.file} · ${fmt(c.counted_lines)} counted lines of ${fmt(c.lines)}`)} · ${cnSp(`uploaded by ${c.uploaded_by}`)}` + `<br>${cnSp("A new form replaces this one.")}`
+    : cnSp("The form of the location and month: Kartela, Gjendje Finance, GjendjeFizike.");
+  const sh = $("cnSheet");
+  $("cnwSheet").hidden = sh.hidden;
+  if (!sh.hidden && $("cnwSheet").innerHTML !== sh.innerHTML) { $("cnwSheet").innerHTML = sh.innerHTML; $("cnwSheet").value = sh.value; }
+  $("cnwXMsg").innerHTML = !st.can_export ? cnSp("Your role cannot export.")
+    : s3 ? (cnWizXlsx ? cnSp("The Excel file is downloading.") + " " : "") + cnSp(`Net difference ${fmt(t.net_value)} · shortages ${fmt(t.shortage_value)} · surpluses ${fmt(t.surplus_value)}`)
+    : cnSp("Count vs BC, the inventory valuation and the categories, in one file.");
+}
+$("cnWiz").onclick = () => cnWizShow();
+document.addEventListener("click", e => {
+  if (!cnWizOn) return;
+  if (e.target.closest("[data-cnwclose]") || e.target === $("cnBd")) cnWizClose();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && cnWizOn) cnWizClose(); });
 $("company").addEventListener("change", () => { $("cnLoc").dataset.co = ""; cnData = null; if ($("v-stockcount").classList.contains("on")) loadCn(false); });
 $("dcRead").onclick = () => { dcData = null; loadDischarge(true); };
 $("dcDays").onchange = () => { dcData = null; loadDischarge(false); };
