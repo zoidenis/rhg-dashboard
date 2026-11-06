@@ -5,7 +5,8 @@ the address of the screen, the tab to open and, for every group of recipients wh
 read-only session of one of them. For each group it:
   1. opens the screen in a headless Chromium with that session (through the internal nginx, like a browser would),
      in the person's language, and opens the tab;
-  2. waits until the screen has read its data (no request for a few seconds);
+  2. waits until the screen has read its data: no request for a few seconds, and no answer of the screen still
+     saying it is reading in the background ("pending": the first read of a period can take minutes);
   3. takes a picture of the screen (shown in the email) and, when the report asks for it, a PDF (attached);
   4. emails both through the Purchasing mail server (/internal/mail), to the people of the group;
 and tells identity how it went (/internal/reports/done), which ends the sessions.
@@ -31,20 +32,39 @@ COOKIE = os.environ.get("COOKIE_NAME", "rhg_session")
 POLL = int(os.environ.get("REPORT_POLL_SECONDS", "30"))
 QUIET_MS = 3500                 # no request for this long = the screen has read its data
 MAX_WAIT = 180                  # seconds a screen may take to read its data
+PENDING_WAIT = 900              # seconds while the server still answers "pending" (it reads Business Central behind)
 MAX_SHOT_HEIGHT = 6000          # px of the picture in the email; the PDF has the whole screen
 MAX_PDF_HEIGHT = 18000          # px: a PDF page may be up to 200 inches tall
-VERSION = "1"
+VERSION = "2"
 
 # Counts the requests the page makes, so the wait ends when the screen has its data rather than after a fixed time.
+# An answer that says the server is still reading ({"pending": true}, also one level down, as the transfers of
+# Supplier performance) keeps its address busy until an answer of the same address no longer says so: between
+# two polls of such a screen there is no request, and that is not the end of the read.
 INIT_JS = """(() => {
   let n = 0, last = Date.now();
+  const busy = {};
   const tick = () => { last = Date.now(); };
+  const pend = j => !!j && typeof j === "object" && (j.pending === true ||
+    Object.values(j).some(v => v && typeof v === "object" && !Array.isArray(v) && v.pending === true));
+  const look = (url, r) => {
+    try {
+      const path = new URL(url, location.href).pathname;
+      if (!path.startsWith("/api/") || !(r.headers.get("content-type") || "").includes("json")) return;
+      r.clone().json().then(j => { if (pend(j)) busy[path] = Date.now(); else delete busy[path]; }).catch(() => {});
+    } catch (e) {}
+  };
   const f = window.fetch;
-  window.fetch = function () { n++; tick(); return f.apply(this, arguments).finally(() => { n--; tick(); }); };
+  window.fetch = function (input) {
+    n++; tick();
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    return f.apply(this, arguments).then(r => { look(url, r); return r; }).finally(() => { n--; tick(); });
+  };
   const send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function () { n++; tick(); this.addEventListener("loadend", () => { n--; tick(); });
     return send.apply(this, arguments); };
-  window.__pulseQuiet = ms => n <= 0 && Date.now() - last > ms;
+  window.__pulseQuiet = ms => n <= 0 && Date.now() - last > ms && !Object.keys(busy).length;
+  window.__pulseBusy = () => Object.keys(busy).length > 0;
   try { localStorage.setItem("pulse-lang", "%LANG%"); } catch (e) {}
 })();"""
 
@@ -82,23 +102,31 @@ def _post(url, body, timeout=60):
     return j
 
 
+class StillReading(RuntimeError):
+    pass
+
+
 def slug(t):
     return re.sub(r"[^A-Za-z0-9]+", "_", t).strip("_")[:60] or "report"
 
 
 # ---------------------------------------------------------------- rendering
 def wait_quiet(page, max_s=MAX_WAIT):
-    """True when the page has made no request for QUIET_MS; False when it was still busy after max_s."""
-    end = time.time() + max_s
+    """True when the page has made no request for QUIET_MS and no answer says the server is still reading; False
+    when it was still busy after max_s (PENDING_WAIT while the server answers "pending")."""
+    start = time.time()
     page.wait_for_timeout(1500)
-    while time.time() < end:
+    while True:
+        busy = False
         try:
             if page.evaluate(f"window.__pulseQuiet ? window.__pulseQuiet({QUIET_MS}) : true"):
                 return True
+            busy = page.evaluate("window.__pulseBusy ? window.__pulseBusy() : false")
         except Exception:                                           # noqa: BLE001  (navigating)
             pass
-        page.wait_for_timeout(500)
-    return False
+        if time.time() - start > (PENDING_WAIT if busy else max_s):
+            return False
+        page.wait_for_timeout(1000 if busy else 500)
 
 
 def render(browser, run, group):
@@ -127,6 +155,11 @@ def render(browser, run, group):
             page.evaluate("s => { const b = document.querySelector(s); if (b && !b.classList.contains('on')) "
                           "b.click(); }", sel)
             complete = wait_quiet(page) and complete
+        if not complete and page.evaluate("window.__pulseBusy ? window.__pulseBusy() : false"):
+            # still reading Business Central: a picture now would be an empty screen. Not sent; identity tries
+            # the report again later, when the figures the server read are held
+            raise StillReading("The screen was still reading Business Central after "
+                               f"{PENDING_WAIT // 60} minutes; the report is tried again later.")
         page.add_style_tag(content=REPORT_CSS)
         page.wait_for_timeout(400)
         h = page.evaluate("Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)")
@@ -203,6 +236,9 @@ def do_run(pw, run):
                 n = send(run, g, shot, pdf, complete)
                 results.append({"gid": g.get("gid"), "as": g["as"], "status": "sent",
                                 "detail": "" if complete else "still reading", "emails": n})
+            except StillReading as exc:
+                results.append({"gid": g.get("gid"), "as": g["as"], "status": "failed", "detail": str(exc)[:300],
+                                "retry": True})
             except Exception as exc:                                # noqa: BLE001
                 traceback.print_exc()
                 results.append({"gid": g.get("gid"), "as": g["as"], "status": "failed", "detail": str(exc)[:300]})

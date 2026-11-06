@@ -284,7 +284,7 @@ def login(username, password, ip="", agent=""):
 # shows exactly what that person may see (their screens, companies and locations). It is made only on the service
 # token, lives REPORT_MINUTES, reads only (no action, setting or Unicorn right) and is deleted when the run ends.
 REPORT_AGENT = "pulse-report"
-REPORT_MINUTES = 25
+REPORT_MINUTES = 60                  # reporter.PENDING_WAIT is 15 minutes a screen; the lease is 60 (reports.py)
 READ_ONLY_KEEP = {"layout.personal", "finance.export", "purchasing.export"}
 
 

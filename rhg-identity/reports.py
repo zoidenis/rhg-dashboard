@@ -35,7 +35,8 @@ PERIODS = {"screen": "As the screen opens", "prev_month": "Previous month", "mtd
            "ytd": "Year to date"}
 PERIOD_APPS = ("finance", "platform")          # the towers that take a period in the address
 WINDOW_HOURS = 6                               # a slot missed by more than this is not sent late
-RETRY_MINUTES, MAX_TRIES, LEASE_MINUTES = 20, 3, 25
+# the sender may wait up to 15 minutes for a screen whose first read of a period is long (reporter.PENDING_WAIT)
+RETRY_MINUTES, MAX_TRIES, LEASE_MINUTES = 20, 3, 60
 MAX_RECIPIENTS = 60
 MAX_EMAILS = 20
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
@@ -420,6 +421,11 @@ def _make_run(d, r, slot, actor, test_to=None):
            "slot": slot.isoformat(timespec="minutes") if slot else None, "by": actor, "test": bool(test_to),
            "claimed_at": now.isoformat(), "status": "claimed", "skipped": skipped, "groups": []}
     tokens = []
+    # a slot tried again: the people who already have it are not sent it twice
+    had = set((d["tries"].get(run["key"]) or {}).get("sent_to") or []) if run["key"] else set()
+    if had:
+        groups = [dict(g, to=[x for x in g["to"] if (x.get("email") or "").lower() not in had]) for g in groups]
+        groups = [g for g in groups if g["to"]]
     for g in groups:
         tok = auth.report_session(g["as"], cut_of(r, s))
         if not tok:
@@ -506,6 +512,11 @@ def done(run_id, results, detail=""):
                      detail=str(x.get("detail") or "")[:300])
         sent = [g for g in a["groups"] if g["status"] == "sent"]
         a["status"] = "sent" if len(sent) == len(a["groups"]) else "partial" if sent else "failed"
+        if a.get("key") and a["status"] == "partial" and a["key"] in d["tries"]:
+            # remembered for the next try of the slot, which goes to the others only
+            t_ = d["tries"][a["key"]]
+            t_["sent_to"] = sorted(set(t_.get("sent_to") or []) |
+                                   {(x.get("email") or "").lower() for g in sent for x in g["to"] if x.get("email")})
         a.update(finished_at=now.isoformat(), detail=str(detail or "")[:300])
         if a.get("key") and a["status"] == "sent":
             d["done"][a["key"]] = now.isoformat()
@@ -549,7 +560,8 @@ def view(user):
     with _lock:
         d = _read()
     seen = d["reporter"].get("seen_at")
-    online = bool(seen) and now - datetime.fromisoformat(seen) < timedelta(minutes=3)
+    # while it renders a report (up to 15 minutes a screen) the sender does not ask again: online all the same
+    online = bool(seen) and (now - datetime.fromisoformat(seen) < timedelta(minutes=3) or bool(d.get("active")))
     last = {}
     for run in d["runs"]:
         last[run["report"]] = run
