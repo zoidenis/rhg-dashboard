@@ -31,6 +31,47 @@ header{display:flex;justify-content:space-between}
 .adminlink{margin-top:auto;padding-top:16px}
 .adminlink a{color:var(--rhg-blue);font-size:11px;text-decoration:none}
 .adminlink a:hover{text-decoration:underline}
+/* Locations × KPI, the weekly trend, the risks */
+.cc-card{margin-bottom:20px;min-width:0}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cc-card .card-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.cc-card h2{font-size:18px;margin:0 0 4px}
+.cc-card .hint{margin:0;font-size:12.5px;color:var(--sub);max-width:720px}
+.cc-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--sub);align-items:center}
+.cc-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:10px}
+.cc-heat th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:6px 4px;white-space:normal;line-height:1.25;vertical-align:bottom;background:none;border:0}
+.cc-heat th:first-child{text-align:left}
+.cc-heat td{padding:0;border:0;text-align:center}
+.cc-heat td.loc{text-align:left;padding:4px 8px 4px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1}
+.cc-heat .lb{all:unset;cursor:pointer;display:block;font-weight:600;font-size:12.5px;color:var(--ink)}
+.cc-heat .lb small{display:block;font-weight:400;font-size:10.5px;color:var(--sub)}
+.cc-heat .lb:hover,.cc-heat .lb:focus-visible{color:var(--accent)}.cc-heat tr.sel .lb{color:var(--accent)}
+.cc-heat a.c{display:block;min-width:74px;padding:9px 6px;border-radius:6px;text-decoration:none;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border-left:3px solid transparent}
+.cc-heat a.c:hover,.cc-heat a.c:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cc-heat a.c.g{background:var(--down-bg)} .cc-heat a.c.w{background:var(--warn-bg);border-left-color:var(--warn)} .cc-heat a.c.b{background:var(--up-bg);border-left-color:var(--up)}
+.cc-heat a.c.n{color:var(--sub);font-weight:400}
+.cc-heat tr.grp td{padding:10px 0 2px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);text-align:left}
+.cc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.cc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
+.cc-seg button.on{background:var(--accent);color:#fff}
+.cc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cc-chart{position:relative;margin-top:12px}
+.cc-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.cc-chart .ax{font-size:11px;fill:var(--sub)}
+.cc-chart .gr{stroke:var(--line);stroke-width:1}
+.cc-chart .dl{font-size:11px;font-weight:600}
+.cc-tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.12);min-width:170px;display:none;z-index:2}
+.cc-tip b{display:block;margin-bottom:4px}.cc-tip div{display:flex;justify-content:space-between;gap:12px;color:var(--ink)}
+.cc-tip i{display:inline-block;width:10px;height:2px;margin-right:6px;vertical-align:3px}
+.cc-keys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:8px;color:var(--ink)}
+.cc-keys i{display:inline-block;width:14px;height:2px;margin-right:6px;vertical-align:3px}
+.cc-risk .rhg-row .loc{font-weight:600}
+.cc-flt{font-size:12px;color:var(--sub);margin-top:6px}
+.cc-flt button{all:unset;cursor:pointer;color:var(--accent);font-weight:600;margin-left:6px}
+.cc-viz{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .cc-viz{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}}
+:root[data-theme="dark"] .cc-viz{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.towers-grid{grid-template-columns:1fr}}
 @media(max-width:760px){aside{display:none}.kpis{grid-template-columns:1fr}}
 </style>
@@ -83,6 +124,26 @@ header{display:flex;justify-content:space-between}
     <div class="card kpi"><div class="l">Control queue</div><div class="v" id="kQueue">–</div><div class="s" id="kQueueS"></div></div>
   </div>
 
+  <div class="card cc-card" id="ccHeat">
+    <div class="card-head"><div><h2>Locations × KPI</h2>
+      <p class="hint"><span>Every restaurant of the company against sales, cost, stock and exceptions, month to date.</span> <span>Click a cell to open its sector; click a restaurant for its risks below.</span></p></div>
+      <div class="cc-legend" aria-label="Legend"><span><i style="background:var(--down-bg)"></i>On track</span><span><i style="background:var(--warn-bg);border-left:3px solid var(--warn)"></i>Watch</span><span><i style="background:var(--up-bg);border-left:3px solid var(--up)"></i>Act</span><span><i style="background:var(--bg)"></i>No data</span></div></div>
+    <p class="meta" id="ccHeatNote" style="margin:8px 0 0">Reading Finance → Location intelligence…</p>
+    <div class="scroll"><table class="cc-heat" id="ccHeatT" data-nosort></table></div>
+  </div>
+
+  <div class="card cc-card cc-viz" id="ccTrend">
+    <div class="card-head"><div><h2>Weekly trend</h2>
+      <p class="hint"><span>Simphony, the last twelve full weeks (Monday to Sunday), by brand of the company.</span></p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div class="cc-seg" role="tablist" aria-label="Measure" id="ccMetric"><button class="on" data-m="net" role="tab">Net sales</button><button data-m="checks" role="tab">Checks</button><button data-m="avg" role="tab">Average check</button></div>
+        <button class="mini" id="ccTblBtn" aria-pressed="false">Table</button></div></div>
+    <div class="cc-keys" id="ccKeys"></div>
+    <div class="cc-chart" id="ccChart"><p class="meta">Reading Simphony…</p></div>
+    <div class="scroll" id="ccTbl" hidden data-nosort><table id="ccTblT"></table></div>
+    <p class="meta" id="ccTrendNote" style="margin:8px 0 0"></p>
+  </div>
+
   <div class="towers-grid">
     <div class="card" id="cPurch"><h3>Purchasing tower</h3><p>Spend, suppliers, prices and exceptions</p>
       <span class="rhg-pill info" id="cPurchChip">–</span><a class="btn dark" href="/purchasing/">Open tower →</a></div>
@@ -94,7 +155,9 @@ header{display:flex;justify-content:space-between}
       <span class="rhg-pill info" id="cInvChip">–</span><a class="btn dark" href="/finance/#inventory">Open tower →</a></div>
   </div>
 
-  <div class="card" style="margin-bottom:20px"><h2 style="font-size:18px">Priority worklist</h2>
+  <div class="card cc-risk" style="margin-bottom:20px" id="ccRisk"><h2 style="font-size:18px">Risks by priority</h2>
+    <p class="hint" style="margin:2px 0 0;font-size:12.5px;color:var(--sub)"><span>Purchasing and Finance exceptions and the alerts of every restaurant, critical first, then by value.</span></p>
+    <div class="cc-flt" id="ccFlt" hidden></div>
     <div class="rhg-list" id="worklist" style="margin-top:12px"><div class="empty">Reading…</div></div></div>
 
   <div class="card" style="margin-bottom:20px"><h2>Reporting periods stay explicit</h2>
@@ -229,11 +292,11 @@ function render(p, f){
   for (let i = 0; i < Math.max(pq.length, fq.length) && items.length < 8; i++) { if (pq[i]) items.push(pq[i]); if (fq[i]) items.push(fq[i]); }
   if (validation.length) items.splice(Math.min(1, items.length), 0, {e: {severity: "warning", title: "Validate cost of goods sold before reporting margin",
     rule: "Under validation", owner: validation[0].owner, impact: 0, note: "Margin hidden until validation"}, tower: "Finance", href: "/finance/"});
-  $("worklist").innerHTML = items.length ? items.slice(0, 5).map(({e, tower, href}) => `<div class="rhg-row">
-      <span class="rhg-pill ${e.severity}">${e.severity === "critical" ? "Critical" : e.severity === "warning" ? "Warning" : "Info"}</span>
-      <div class="body"><b>${esc(e.title)}</b><span>${esc(tower)} · ${esc(e.owner || "Unassigned")}${e.impact ? ` · ${fmt(Math.abs(e.impact))} ${C}` : ""}${e.note ? " · " + esc(e.note) : ""}</span></div>
-      <a class="btn" href="${href}" style="text-decoration:none;text-align:center">Open detail</a></div>`).join("")
-    : '<div class="empty">Nothing in either tower needs attention right now.</div>';
+  CC.tower = items.map(({e, tower, href}) => ({sev: e.severity === "critical" ? "crit" : e.severity === "warning" ? "warn" : "info",
+    title: e.title, where: `${tower} · ${e.owner || "Unassigned"}`, impact: Math.abs(e.impact || 0), loc: String(e.location || "").split(",")[0].trim(),
+    note: e.note || "", href, ccy: C}));
+  CC.p = pOk ? p : null; CC.ccy = C;
+  renderRisks(); if (CC.loc) renderHeat();
 
   window.__last = {p, f, pOk, fOk};
   renderPeriods();
@@ -263,8 +326,205 @@ function renderPeriods(){
       : `<tr><td colspan="4" class="empty">Reading…</td></tr>`);
 }
 
-$("refreshBtn").onclick = () => load();
-$("company").onchange = () => load();
+// ---------------------------------------------------------------- Locations × KPI, weekly trend, risks
+// The restaurants come from Finance → Location intelligence (/finance/api/locations: Simphony, the posted sales, use at
+// cost, the stock position, the Exceptions register) and Purchasing's read of the company (its exceptions by
+// location); the weekly trend from Finance → Sales over a chosen range (/finance/api/sales, Simphony's days).
+const CC = {loc: null, trend: null, tower: [], p: null, ccy: "ALL", sel: "", metric: "net", table: false, timers: {}};
+const ccM = v => v == null || !isFinite(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(v);
+const ccP = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(0) + "%";
+const ccCo = () => $("company").value || "SALT";
+function ccPoll(name, url, done, fail){
+  clearTimeout(CC.timers[name]);
+  const co = ccCo(), t0 = Date.now();
+  const go = async () => {
+    try {
+      const j = await get(url);
+      if (ccCo() !== co) return;
+      if (j.pending) {
+        if (Date.now() - t0 > 15 * 60 * 1000) throw new Error("still reading after 15 minutes");
+        fail(null, j); CC.timers[name] = setTimeout(go, 5000); return;
+      }
+      done(j);
+    } catch (e) { if (ccCo() === co) fail(e.message); }
+  };
+  go();
+}
+function loadCC(){
+  const co = encodeURIComponent(ccCo());
+  if (!can("finance.view")) { $("ccHeat").hidden = true; $("ccTrend").hidden = true; return; }
+  ccPoll("loc", `/finance/api/locations?company=${co}`, j => { if (j.available === false) { CC.loc = null; $("ccHeatNote").textContent = "Location intelligence: " + (j.error || "not available"); return; } CC.loc = j; renderHeat(); renderRisks(); },
+    (err, j) => { $("ccHeatNote").textContent = err ? "Could not read Location intelligence: " + err : `Reading Business Central and Simphony… ${(j && j.stage) || ""}`; });
+  // the last twelve full weeks, Monday to Sunday
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  const lastSun = new Date(d); lastSun.setDate(d.getDate() - ((d.getDay() + 7) % 7 || 7));
+  const firstMon = new Date(lastSun); firstMon.setDate(lastSun.getDate() - 7 * 12 + 1);
+  const iso = x => x.toISOString().slice(0, 10);
+  CC.weeks = Array.from({length: 12}, (_, i) => { const a = new Date(firstMon); a.setDate(firstMon.getDate() + 7 * i); return iso(a); });
+  ccPoll("trend", `/finance/api/sales?mode=range&period=${iso(firstMon)}..${iso(lastSun)}`, j => { CC.trend = j; renderTrend(); },
+    (err, j) => { $("ccChart").innerHTML = `<p class="meta">${err ? "Could not read Simphony: " + esc(err) : "Reading Simphony, twelve weeks… the first read takes a few minutes."}</p>`; });
+}
+// one restaurant's figures: the same derivations as Location intelligence
+function ccRows(){
+  const j = CC.loc; if (!j) return [];
+  const co = (j.company_bc || j.company || ccCo()).toUpperCase(), th = j.thresholds || {};
+  const PB = (CC.p && CC.p.by_location) || {};
+  return j.locations.filter(l => (l.company || "").toUpperCase() === co && l.status === "open").map(l => {
+    const c = l.sim && l.sim.cur, p = l.sim && l.sim.prev, y = l.sim && l.sim.ly;
+    const exvat = c ? c.net - (c.tax || 0) : null, inv = l.inv;
+    const pe = (l.bc && (PB[l.bc] || PB[String(l.bc).toUpperCase()]) || {}).exceptions || null;
+    const r = {l, name: l.name, brand: l.brand || "", bc: l.bc, net: c ? c.net : null,
+      ly: c && y && y.net ? (c.net / y.net - 1) * 100 : null, prev: c && p && p.net ? (c.net / p.net - 1) * 100 : null,
+      fc: l.use != null && exvat > 0 ? l.use / exvat * 100 : null, inv, ex: l.exceptions || null, pe,
+      unposted: l.bc_posted ? l.bc_posted.unposted.length : null, posted0: l.bc_posted ? !l.bc_posted.total && c && c.net > 0 : false, th};
+    // health as Location intelligence scores it: sales vs last year, food cost, stock cover, stock book
+    const parts = [];
+    if (r.ly != null) parts.push(Math.max(0, Math.min(25, 25 + r.ly)));
+    if (r.fc != null) parts.push(Math.max(0, Math.min(25, 25 - Math.max(0, r.fc - th.food_cost) * 2.5)));
+    if (inv && inv.doh != null) parts.push(Math.max(0, Math.min(25, 25 - Math.max(0, inv.doh - th.cover_days) * 0.17)));
+    if (inv) parts.push(Math.max(0, Math.min(25, 25 - inv.neg_lines * 0.12 - inv.count * 0.08)));
+    r.score = parts.length >= 2 ? Math.round(parts.reduce((a, b) => a + b, 0) * 4 / parts.length) : null;
+    return r;
+  });
+}
+// the columns: label, value, class (g on track · w watch · b act · n no data), the sector a click opens
+function ccCols(){
+  const co = encodeURIComponent(ccCo()), F = h => `/finance/?company=${co}#${h}`;
+  return [
+    ["Health", "score of 100", r => r.score == null ? null : [r.score, r.score >= 75 ? "g" : r.score >= 55 ? "w" : "b"], v => v, F("overview")],
+    ["Sales", "Simphony, month to date", r => r.net == null ? null : [r.net, "n0"], v => ccM(v), F("sales")],
+    ["Sales vs last year", "same dates", r => r.ly == null ? null : [r.ly, r.ly <= -(r.th.sales_drop || 10) ? "b" : r.ly < 0 ? "w" : "g"], ccP, F("sales")],
+    ["Sales vs month before", "same days", r => r.prev == null ? null : [r.prev, r.prev <= -(r.th.sales_drop || 10) ? "b" : r.prev < 0 ? "w" : "g"], ccP, F("sales")],
+    ["Food cost", "use at cost ÷ sales ex VAT", r => r.fc == null ? null : [r.fc, r.fc > r.th.food_cost + 2 ? "b" : r.fc > r.th.food_cost ? "w" : "g"], v => v.toFixed(1) + "%", F("discharge")],
+    ["Sales posted in BC", "days not posted", r => r.unposted == null ? null : [r.unposted, r.posted0 ? "b" : r.unposted ? "w" : "g"], v => v ? fmt(v) + " d" : "all", F("salesrec")],
+    ["Stock cover", "days", r => !r.inv || r.inv.doh == null ? null : [r.inv.doh, r.inv.doh > r.th.cover_days * 1.5 ? "b" : r.inv.doh > r.th.cover_days ? "w" : "g"], v => fmt(v) + " d", F("inventory")],
+    ["Stock book", "negative · to count", r => !r.inv ? null : [r.inv.neg_lines + r.inv.count, r.inv.neg_lines >= 80 || r.inv.count >= 50 ? "b" : r.inv.neg_lines + r.inv.count ? "w" : "g", `${r.inv.neg_lines} · ${r.inv.count}`], (v, x) => x[2], F("movement")],
+    ["Finance exceptions", "open in the register", r => !r.ex ? null : [r.ex.open, r.ex.critical ? "b" : r.ex.open ? "w" : "g"], v => fmt(v), F("register")],
+    ["Purchasing exceptions", "critical · warning", r => !r.pe ? (CC.p && r.bc ? [0, "g", "0"] : null) : [(r.pe.critical || 0) + (r.pe.warning || 0), r.pe.critical ? "b" : r.pe.warning ? "w" : "g", `${r.pe.critical || 0} · ${r.pe.warning || 0}`], (v, x) => x[2], `/purchasing/?company=${co}#exceptions`],
+  ];
+}
+function renderHeat(){
+  const j = CC.loc; if (!j) return;
+  const rows = ccRows(), cols = ccCols();
+  const per = j.period || {};
+  $("ccHeatNote").textContent = `${j.company_bc || j.company} · ${per.label || ""}${per.running ? " (to yesterday)" : ""} · ${rows.length} restaurants open` +
+    (j.inventory && j.inventory.state === "hidden" ? " · stock not in your role" : "") + ((j.errors || []).length ? " · " + j.errors.slice(0, 2).join(" · ") : "");
+  if (!rows.length) { $("ccHeatT").innerHTML = `<tr><td class="meta" style="text-align:left">No restaurant of ${esc(j.company_bc || j.company)} in the registry with sales this month (Finance → Settings → Location intelligence).</td></tr>`; return; }
+  const by = {}; rows.forEach(r => (by[r.brand || "Other"] = by[r.brand || "Other"] || []).push(r));
+  const brands = Object.keys(by).sort((a, b) => by[b].reduce((s, r) => s + (r.net || 0), 0) - by[a].reduce((s, r) => s + (r.net || 0), 0));
+  const head = `<tr><th>Restaurant</th>${cols.map(c => `<th title="${esc(c[1])}"><span>${esc(c[0])}</span><br><span style="font-weight:400">${esc(c[1])}</span></th>`).join("")}</tr>`;
+  const cell = (r, c) => { const x = c[2](r); const v = x ? c[3](x[0], x) : "–", cls = x ? (x[1] === "n0" ? "" : x[1]) : "n";
+    const st = {g: "on track", w: "watch", b: "act", n: "no data"}[cls] || "";
+    return `<td><a class="c ${cls}" href="${c[4]}" title="${esc(`${r.name} · ${c[0]}: ${v}${st ? " · " + st : ""}`)}" aria-label="${esc(`${r.name}, ${c[0]} ${v}${st ? ", " + st : ""}`)}">${esc(v)}</a></td>`; };
+  $("ccHeatT").innerHTML = head + brands.map(b => (brands.length > 1 ? `<tr class="grp"><td colspan="${cols.length + 1}">${esc(b)}</td></tr>` : "") +
+    by[b].sort((x, y) => (y.net || 0) - (x.net || 0)).map(r => `<tr class="${CC.sel === r.l.ref ? "sel" : ""}"><td class="loc"><button class="lb" data-ccloc="${esc(r.l.ref)}" aria-pressed="${CC.sel === r.l.ref}">${esc(r.name)}<small>${esc(r.bc || r.l.ref)}</small></button></td>${cols.map(c => cell(r, c)).join("")}</tr>`).join("")).join("");
+}
+// the alerts of a restaurant, as Location intelligence words them, with the sector they open
+function ccLocRisks(){
+  const out = [], co = encodeURIComponent(ccCo()), F = h => `/finance/?company=${co}#${h}`;
+  ccRows().forEach(r => {
+    const th = r.th, L = r.l.ref, nm = r.name, add = (sev, title, href, impact, note) => out.push({sev, title, where: nm, loc: L, locBc: r.bc, impact: impact || 0, href, note: note || "", ccy: r.l.currency || CC.ccy});
+    if (r.posted0) add("crit", `${ccM(r.net)} sold in Simphony, nothing posted in BC`, F("salesrec"), r.net);
+    else if (r.unposted) add("warn", `${r.unposted} day${r.unposted > 1 ? "s" : ""} of sales not posted in BC`, F("salesrec"), 0);
+    if (r.ly != null && r.ly <= -(th.sales_drop || 10)) add("warn", `Sales ${ccP(r.ly)} against last year`, F("sales"), Math.abs(r.net * r.ly / (100 + r.ly)));
+    if (r.fc != null && r.fc > th.food_cost + 2) add("warn", `Food cost ${r.fc.toFixed(1)}%, target ${th.food_cost}%`, F("discharge"), r.l.use - (r.l.use / r.fc * th.food_cost));
+    if (r.inv) {
+      if (r.inv.count >= 50) add("crit", `${r.inv.count} fresh lines to count`, F("inventory"), 0);
+      if (r.inv.neg_lines >= 80) add("crit", `${r.inv.neg_lines} lines with negative stock`, F("movement"), 0);
+      if (r.inv.doh != null && r.inv.doh > th.cover_days * 1.5) add("warn", `Stock covers ${r.inv.doh} days, ${th.cover_days} expected`, F("inventory"), r.inv.value ? r.inv.value * (1 - th.cover_days / r.inv.doh) : 0);
+    }
+    if (r.ex && r.ex.open) add(r.ex.critical ? "crit" : "warn", `${r.ex.open} open in the Exceptions register (${r.ex.critical} critical, ${r.ex.overdue} overdue)`, F("register"), r.ex.value);
+  });
+  return out;
+}
+function renderRisks(){
+  const R = {crit: 0, warn: 1, info: 2};
+  let all = [...CC.tower, ...ccLocRisks()].sort((a, b) => (R[a.sev] ?? 3) - (R[b.sev] ?? 3) || (b.impact || 0) - (a.impact || 0));
+  const sel = CC.sel && ccRows().find(r => r.l.ref === CC.sel);
+  if (sel) all = all.filter(x => x.loc === sel.l.ref || (sel.bc && x.loc && x.loc.toUpperCase() === String(sel.bc).toUpperCase()));
+  $("ccFlt").hidden = !sel;
+  if (sel) { $("ccFlt").innerHTML = `<span>Only ${esc(sel.name)}</span><button id="ccFltX">Show every location</button>`; $("ccFltX").onclick = () => { CC.sel = ""; renderHeat(); renderRisks(); }; }
+  $("worklist").innerHTML = all.length ? all.slice(0, sel ? 20 : 10).map(x => `<div class="rhg-row">
+      <span class="rhg-pill ${x.sev === "crit" ? "critical" : x.sev === "warn" ? "warning" : "info"}">${x.sev === "crit" ? "Critical" : x.sev === "warn" ? "Warning" : "Info"}</span>
+      <div class="body"><b>${esc(x.title)}</b><span>${esc(x.where)}${x.impact ? ` · ${fmt(Math.abs(x.impact))} ${esc(x.ccy || CC.ccy)}` : ""}${x.note ? " · " + esc(x.note) : ""}</span></div>
+      <a class="btn" href="${x.href}" style="text-decoration:none;text-align:center">Open detail</a></div>`).join("")
+    : `<div class="empty">${sel ? `Nothing about ${esc(sel.name)} needs attention right now.` : "Nothing in either tower needs attention right now."}</div>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-ccloc]"); if (!b) return;
+  CC.sel = CC.sel === b.dataset.ccloc ? "" : b.dataset.ccloc; renderHeat(); renderRisks();
+  if (CC.sel) $("ccRisk").scrollIntoView({behavior: "smooth", block: "start"});
+});
+// ---- the weekly trend: one line per brand (six at most; the rest as Other), a crosshair with every value
+function ccSeries(){
+  const j = CC.trend; if (!j || !j.locations) return null;
+  const co = ccCo().toUpperCase();
+  const rows = j.locations.filter(r => (r.company || "").toUpperCase() === co);
+  const tally = {}; rows.forEach(r => tally[r.currency] = (tally[r.currency] || 0) + ((r.cur || {}).net || 0));
+  const ccy = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+  const mine = rows.filter(r => r.currency === ccy), left = rows.length - mine.length;
+  const wk = d => { const i = CC.weeks.findIndex((w, k) => d >= w && (k === 11 || d < CC.weeks[k + 1])); return i; };
+  const by = {};
+  mine.forEach(r => {
+    const b = (r.brand || r.reg_name || r.name || "Other").toUpperCase(), s = by[b] = by[b] || {name: b, net: Array(12).fill(0), checks: Array(12).fill(0)};
+    Object.entries(r.daily || {}).forEach(([d, v]) => { const i = wk(d); if (i >= 0) s.net[i] += v || 0; });
+    Object.entries(r.daily_cg || {}).forEach(([d, v]) => { const i = wk(d); if (i >= 0) s.checks[i] += (v || [0])[0] || 0; });
+  });
+  let S = Object.values(by).sort((a, b) => b.net.reduce((x, y) => x + y, 0) - a.net.reduce((x, y) => x + y, 0));
+  if (S.length > 6) { const o = {name: "OTHER", net: Array(12).fill(0), checks: Array(12).fill(0)}; S.slice(5).forEach(s => s.net.forEach((v, i) => { o.net[i] += v; o.checks[i] += s.checks[i]; })); S = S.slice(0, 5).concat([o]); }
+  return {S, ccy, left};
+}
+function renderTrend(){
+  const X = ccSeries(); if (!X) return;
+  const {S, ccy, left} = X, m = CC.metric;
+  const val = (s, i) => m === "net" ? s.net[i] : m === "checks" ? s.checks[i] : s.checks[i] ? s.net[i] / s.checks[i] : null;
+  const f = v => v == null ? "–" : m === "checks" ? fmt(v) : m === "avg" ? fmt(v) + " " + ccy : ccM(v) + " " + ccy;
+  const wl = w => { const d = new Date(w + "T12:00:00"); return d.getDate() + " " + d.toLocaleString("en-US", {month: "short"}); };
+  $("ccTrendNote").textContent = `${CC.weeks.length ? `${wl(CC.weeks[0])} – week of ${wl(CC.weeks[11])}` : ""} · ${ccy}` + (left ? ` · ${left} restaurant${left > 1 ? "s" : ""} in another currency left out` : "") + (m === "avg" ? " · average check = net sales ÷ checks" : "");
+  if (!S.length) { $("ccChart").innerHTML = `<p class="meta">No Simphony sales of ${esc(ccCo())} in these weeks.</p>`; $("ccKeys").innerHTML = ""; return; }
+  const col = i => `var(--s${i + 1})`;
+  $("ccKeys").innerHTML = S.length > 1 ? S.map((s, i) => `<span><i style="background:${col(i)}"></i>${esc(s.name)}</span>`).join("") : "";
+  // the table view
+  $("ccTblT").innerHTML = `<tr><th>Week of</th>${S.map(s => `<th class="num">${esc(s.name)}</th>`).join("")}</tr>` + CC.weeks.map((w, i) => `<tr><td>${wl(w)}</td>${S.map(s => `<td class="num">${f(val(s, i))}</td>`).join("")}</tr>`).join("");
+  $("ccTbl").hidden = !CC.table; $("ccChart").hidden = CC.table;
+  if (CC.table) return;
+  const box = $("ccChart"), W = Math.max(320, box.clientWidth || 900), H = 260, pl = 54, pr = S.length <= 4 ? 96 : 16, pt = 10, pb = 26;
+  const vals = S.flatMap(s => CC.weeks.map((_, i) => val(s, i))).filter(v => v != null);
+  const hi = Math.max(1, ...vals), top = (() => { const p = Math.pow(10, Math.floor(Math.log10(hi))); return Math.ceil(hi / p) * p; })();
+  const x = i => pl + (W - pl - pr) * i / 11, y = v => pt + (H - pt - pb) * (1 - v / top);
+  const ticks = [0, .25, .5, .75, 1].map(t => t * top);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly ${m === "net" ? "net sales" : m === "checks" ? "checks" : "average check"} by brand">`;
+  svg += ticks.map(t => `<line class="gr" x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${pl - 6}" y="${y(t) + 4}" text-anchor="end">${m === "net" ? ccM(t) : fmt(t)}</text>`).join("");
+  svg += CC.weeks.map((w, i) => i % 2 === 0 || W > 700 ? `<text class="ax" x="${x(i)}" y="${H - 6}" text-anchor="middle">${wl(w)}</text>` : "").join("");
+  S.forEach((s, k) => {
+    const pts = CC.weeks.map((_, i) => val(s, i)).map((v, i) => v == null ? null : `${x(i)},${y(v)}`).filter(Boolean).join(" ");
+    svg += `<polyline points="${pts}" fill="none" stroke="${col(k)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lv = val(s, 11);
+    if (S.length <= 4 && lv != null) svg += `<text class="dl" x="${x(11) + 8}" y="${y(lv) + 4}" fill="var(--ink)">${esc(s.name)}</text>`;
+  });
+  svg += `<line id="ccX" x1="0" x2="0" y1="${pt}" y2="${H - pb}" stroke="var(--sub)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  svg += S.map((s, k) => `<circle data-k="${k}" r="4" fill="${col(k)}" stroke="var(--card)" stroke-width="2" visibility="hidden"/>`).join("");
+  svg += `<rect x="${pl}" y="${pt}" width="${W - pl - pr}" height="${H - pt - pb}" fill="transparent" id="ccHit"/></svg><div class="cc-tip" id="ccTip"></div>`;
+  box.innerHTML = svg;
+  const hit = $("ccHit"), tip = $("ccTip"), xl = $("ccX"), dots = box.querySelectorAll("circle");
+  const show = ev => {
+    const r = hit.getBoundingClientRect(), fx = (ev.clientX - r.left) / r.width, i = Math.max(0, Math.min(11, Math.round(fx * 11)));
+    xl.setAttribute("x1", x(i)); xl.setAttribute("x2", x(i)); xl.setAttribute("visibility", "visible");
+    dots.forEach(d => { const v = val(S[+d.dataset.k], i); d.setAttribute("cx", x(i)); d.setAttribute("cy", v == null ? -10 : y(v)); d.setAttribute("visibility", v == null ? "hidden" : "visible"); });
+    tip.innerHTML = `<b>Week of ${wl(CC.weeks[i])}</b>` + S.map((s, k) => ({s, k, v: val(s, i)})).sort((a, b) => (b.v || 0) - (a.v || 0)).map(o => `<div><span><i style="background:${col(o.k)}"></i>${esc(o.s.name)}</span><span>${f(o.v)}</span></div>`).join("");
+    tip.style.display = "block";
+    const bx = box.getBoundingClientRect(), px = x(i) / W * bx.width;
+    tip.style.left = Math.min(bx.width - tip.offsetWidth, Math.max(0, px + (px > bx.width / 2 ? -tip.offsetWidth - 12 : 12))) + "px"; tip.style.top = "8px";
+  };
+  hit.onpointermove = show; hit.onpointerdown = show;
+  hit.onpointerleave = () => { tip.style.display = "none"; xl.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); };
+}
+$("ccMetric").onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; CC.metric = b.dataset.m; $("ccMetric").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); renderTrend(); };
+$("ccTblBtn").onclick = () => { CC.table = !CC.table; $("ccTblBtn").setAttribute("aria-pressed", CC.table); $("ccTblBtn").textContent = CC.table ? "Chart" : "Table"; renderTrend(); };
+window.addEventListener("resize", () => { clearTimeout(CC.timers.rs); CC.timers.rs = setTimeout(() => CC.trend && renderTrend(), 200); });
+
+$("refreshBtn").onclick = () => { load(); loadCC(); };
+$("company").onchange = () => { CC.loc = null; CC.trend = null; CC.sel = ""; load(); loadCC(); };
 async function signOut(){
   try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
   location.href = "/login?signedout=1";
@@ -295,7 +555,7 @@ $("logoutBtn").onclick = signOut;
       if (c.companies && c.companies.length) $("company").innerHTML = c.companies.map(x => `<option ${x === c.default ? "selected" : ""}>${esc(x)}</option>`).join("");
     } catch (e) {}
   }
-  load();
+  load(); loadCC();
   setInterval(() => { if (!document.hidden) load(); }, 120000);
 })();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
