@@ -107,6 +107,27 @@ td.num,th.num{text-align:right}
 @keyframes flash{from{background:var(--warn-bg)}to{background:transparent}}
 @media (prefers-reduced-motion:reduce){.new-row td{animation:none}}
 .kpis.five{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+/* Buying → Purchasing charts */
+.pc-viz{--pc-cur:var(--data-cur);--pc-prev:var(--data-prev);--pc-core:#2a78d6;--pc-rest:#9db7d9;--pc-warn:#c98500;--pc-crit:#c8442f;--pc-cum:#15181f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pc-viz{--pc-core:#3987e5;--pc-rest:#3d5675;--pc-warn:#e0a52e;--pc-crit:#e8705c;--pc-cum:#eef0f3}}
+:root[data-theme="dark"] .pc-viz{--pc-core:#3987e5;--pc-rest:#3d5675;--pc-warn:#e0a52e;--pc-crit:#e8705c;--pc-cum:#eef0f3}
+.pc-viz .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0 14px}
+.pc-viz .kpi{padding:12px 14px}.pc-viz .kpi .v{font-size:22px}
+.pc-gb{display:grid;grid-template-columns:minmax(80px,160px) minmax(0,1fr) auto;gap:4px 12px;align-items:center;font-size:12.5px}
+.pc-gb .lb{line-height:1.25;overflow:hidden;text-overflow:ellipsis}.pc-gb .lb small{display:block;color:var(--sub);font-size:11px}
+.pc-gb .pr{display:flex;flex-direction:column;gap:3px;padding:5px 0}
+.pc-gb .pr i{display:block;height:10px;border-radius:0 4px 4px 0;background:var(--pc-cur);min-width:1px}
+.pc-gb .pr i.p{background:var(--pc-prev)}
+.pc-gb .nm{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.3}
+.pc-gb .nm small{display:block;color:var(--sub);font-size:11px}
+.pc-keys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);align-items:center}
+.pc-keys i{display:inline-block;width:14px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+.pc-keys i.ln{height:2px;vertical-align:3px}
+.pc-chart{position:relative;margin-top:6px}.pc-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.pc-chart .ax{font-size:11px;fill:var(--sub)}.pc-chart .gr{stroke:var(--line);stroke-width:1}
+.pc-chart .lb{font-size:12px;fill:var(--ink)}.pc-chart .vl{font-size:11px;fill:var(--ink);font-variant-numeric:tabular-nums}
+.pc-chart .mt{font-size:10.5px;fill:var(--sub)}
+@media (max-width:640px){.pc-gb{grid-template-columns:72px minmax(0,1fr) auto;gap:4px 8px}.pc-viz .card-head{flex-direction:column;align-items:flex-start;gap:8px}.pc-viz .kpi .v{font-size:19px}}
 .setup{border:1px dashed var(--line);border-radius:12px;padding:16px 18px;line-height:1.6}
 .setup ol{margin:8px 0 0 18px;padding:0}
 .setup code{background:var(--bg);padding:1px 6px;border-radius:5px}
@@ -316,6 +337,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <button data-view="streams" data-parent="reqs" data-tab="Purchase types" style="display:none">Purchase types</button>
     <button data-view="services" data-parent="reqs" data-tab="Services &amp; CAPEX" style="display:none">Services &amp; CAPEX</button>
     <button data-view="buyloc" data-parent="reqs" data-tab="Location intelligence" style="display:none">Location intelligence</button>
+    <button data-view="buycharts" data-parent="reqs" data-tab="Purchasing charts" style="display:none">Purchasing charts</button>
     <!-- Prices & contracts: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
     <button data-view="compare" data-tab="Comparisons" data-group="Prices &amp; contracts">Prices &amp; contracts</button>
     <button data-view="contracts" data-parent="compare" data-tab="Contract prices" style="display:none">Contract prices</button>
@@ -692,7 +714,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-reqs">
-    <div class="ov-tabs" id="byTabs" role="tablist"><button data-t="reqs" class="on" role="tab" aria-selected="true">Requisitions <span class="count" id="reqCount">0</span></button><button data-t="po" role="tab" aria-selected="false">Purchase orders <span class="count" id="poCount">0</span></button><button data-t="invoices" role="tab" aria-selected="false">Invoices</button><button data-t="streams" role="tab" aria-selected="false">Purchase types</button><button data-t="services" role="tab" aria-selected="false">Services &amp; CAPEX</button><button data-t="buyloc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div class="ov-tabs" id="byTabs" role="tablist"><button data-t="reqs" class="on" role="tab" aria-selected="true">Requisitions <span class="count" id="reqCount">0</span></button><button data-t="po" role="tab" aria-selected="false">Purchase orders <span class="count" id="poCount">0</span></button><button data-t="invoices" role="tab" aria-selected="false">Invoices</button><button data-t="streams" role="tab" aria-selected="false">Purchase types</button><button data-t="services" role="tab" aria-selected="false">Services &amp; CAPEX</button><button data-t="buyloc" role="tab" aria-selected="false">Location intelligence</button><button data-t="buycharts" role="tab" aria-selected="false">Purchasing charts</button></div>
     <div id="reqSetup"></div>
     <div id="reqBody">
       <div class="kpis five" id="reqKpis"></div>
@@ -725,6 +747,27 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     </div>
     <div class="kpis" id="byKpis"></div>
     <div id="byGrid"></div>
+  </section>
+
+  <section class="view pc-viz" id="v-buycharts">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2 id="pcLocH">Spend by location</h2>
+        <p class="hint"><span>Item purchases of each location in the period chosen above against the period before, at cost ex-VAT (goods received and not invoiced at expected cost, as on the Overview).</span></p></div>
+        <div class="pc-keys" id="pcLocKeys"></div></div>
+      <div class="kpis" id="pcLocK"></div>
+      <div class="pc-gb" id="pcLoc"></div><p class="meta" id="pcLocNote"></p></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Paid against the contract price</h2>
+        <p class="hint"><span>Items bought in the period whose average paid unit cost is above the price agreed in the Business Central price list, beyond the tolerance of Settings.</span> <span>The bar is how far above; the figure on the right is what was paid more on the quantity bought.</span></p></div>
+        <div class="pc-keys" id="pcVarKeys"></div></div>
+      <div class="kpis" id="pcVarK"></div>
+      <div class="pc-chart" id="pcVar"></div><p class="meta" id="pcVarNote"></p></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Suppliers by share of spend</h2>
+        <p class="hint"><span>Invoiced purchases of the period by supplier, largest first (purchase invoices from the vendor ledger; credit memos not netted).</span> <span>The bars are each supplier's share, the line the running total: the suppliers left of the 80% line make up the main part of the spend.</span></p></div>
+        <div class="pc-keys" id="pcParKeys"></div></div>
+      <div class="kpis" id="pcParK"></div>
+      <div class="pc-chart" id="pcPar"></div><p class="meta" id="pcParNote"></p></div>
   </section>
 
   <section class="view" id="v-po">
@@ -1169,6 +1212,7 @@ function render(){
   renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
   plRender();
   if ($("v-buyloc").classList.contains("on")) { byRender(); if (!streams) loadStreams(false); }
+  if ($("v-buycharts").classList.contains("on")) renderBuyCharts();
   if ($("v-suploc").classList.contains("on") || $("v-supco").classList.contains("on")) loadSp(false);
 
   const t = new Date(m.checked_at);
@@ -3195,8 +3239,108 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("plBd").classList.contains("show")) { $("plBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.plloc) { e.preventDefault(); plOpen(e.target.dataset.plloc); }
 });
+// ---------- Buying → Purchasing charts: spend by location, price above the contract, suppliers by share (Pareto) ----------
+const pcSp = t => `<span>${esc(t)}</span>`;
+const pcK = (l, v, s, c) => `<div class="card kpi"><div class="l">${pcSp(l)}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
+const pcPct = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null;
+const pcSigned = p => p == null ? "–" : (p > 0 ? "+" : p < 0 ? "−" : "") + fmt(Math.abs(p), 1) + "%";
+function renderBuyCharts(){
+  if (!data) { $("pcLoc").innerHTML = `<p class="hint">${pcSp("Reading…")}</p>`; return; }
+  const fresh = !plNames;
+  pcLocations(); pcVariance(); pcPareto();
+  if (fresh) plLoadNames().then(() => { if ($("v-buycharts").classList.contains("on")) pcLocations(); });
+}
+function pcLocations(){
+  const m = data.meta, per = {week: "This week", month: "This month", ytd: "This year"}[m.mode] || "This period",
+    vs = {week: "Last week", month: "Last month", ytd: "Last year"}[m.mode] || "The period before";
+  $("pcLocH").innerHTML = pcSp(m.mode === "week" ? "Spend by location: this week against last week" : `Spend by location: ${per.toLowerCase()} against ${vs.toLowerCase()}`);
+  $("pcLocKeys").innerHTML = `<span><i style="background:var(--pc-cur)"></i>${pcSp(per)}</span><span><i style="background:var(--pc-prev)"></i>${pcSp(vs)}</span>`;
+  const L = (data.locations || []).filter(x => x.cur || x.prev), tc = L.reduce((a, x) => a + x.cur, 0), tp = L.reduce((a, x) => a + x.prev, 0);
+  const up = L.filter(x => x.cur > x.prev).length, dn = L.filter(x => x.cur < x.prev).length, d = pcPct(tc, tp);
+  $("pcLocK").innerHTML = pcK(per, plM(tc), `${pcSp(CUR)} · ${pcSp(`${fmt(L.length)} locations`)}`) +
+    pcK(vs, plM(tp), pcSp(`${dayName(m.prior[0])} – ${dayName(m.prior[1])}`)) +
+    pcK("Change", `<span class="${d > 0 ? "up" : d < 0 ? "down" : ""}">${pcSigned(d)}</span>`, pcSp(`${(tc - tp >= 0 ? "+" : "−") + plM(Math.abs(tc - tp))} ${CUR}`)) +
+    pcK("Locations", `<span class="up">${fmt(up)}</span> · <span class="down">${fmt(dn)}</span>`, pcSp("spending more · spending less"));
+  if (!L.length) { $("pcLoc").innerHTML = `<p class="hint">${pcSp("No item purchases in either period.")}</p>`; $("pcLocNote").textContent = ""; return; }
+  const mx = Math.max(1, ...L.map(x => Math.max(x.cur, x.prev)));
+  $("pcLoc").innerHTML = [...L].sort((a, b) => b.cur - a.cur || b.prev - a.prev).map(x => {
+    const p = pcPct(x.cur, x.prev), nm = x.code === "?" ? "(no location)" : x.code, full = plName(x.code);
+    return `<div class="lb" title="${esc(full || nm)}"><b>${esc(nm)}</b>${full ? `<small>${esc(full)}</small>` : ""}</div>
+      <div class="pr" title="${esc(nm)}: ${fmt(x.cur)} ${CUR} · ${fmt(x.prev)} ${CUR}"><i style="width:${Math.max(0, x.cur) / mx * 100}%"></i><i class="p" style="width:${Math.max(0, x.prev) / mx * 100}%"></i></div>
+      <div class="nm">${plM(x.cur)}<small><span class="${p > 0 ? "up" : p < 0 ? "down" : ""}">${x.prev ? pcSigned(p) : pcSp("new")}</span> · ${plM(x.prev)}</small></div>`;
+  }).join("");
+  $("pcLocNote").innerHTML = pcSp(`${dayName(m.current[0])} – ${dayName(m.current[1])} against ${dayName(m.prior[0])} – ${dayName(m.prior[1])}${m.like_for_like ? ", the same days of each" : ""}.`);
+}
+function pcVariance(){
+  const ops = data.operations || {}, st = ops.price_status || {}, A = ops.contract_above;
+  const tol = A ? A.tolerance : ((data.settings || {}).thresholds || {}).price_above_contract_pct;
+  $("pcVarKeys").innerHTML = `<span><i style="background:var(--pc-warn)"></i>${pcSp(`above by up to ${fmt(tol * 3, 0)}%`)}</span><span><i style="background:var(--pc-crit)"></i>${pcSp(`more than ${fmt(tol * 3, 0)}% above`)}</span>`;
+  if (!A || st.available === false) {
+    $("pcVarK").innerHTML = ""; $("pcVar").innerHTML = `<p class="hint">${pcSp("There is no contracted price list in Business Central to compare against.")}${st.reason ? ` <span class="meta">${esc(st.reason)}</span>` : ""}</p>`; $("pcVarNote").textContent = ""; return;
+  }
+  $("pcVarK").innerHTML = pcK("Items above the contract", `<span class="${A.count ? "up" : ""}">${fmt(A.count)}</span>`, pcSp(`of ${fmt(A.compared)} items with an agreed price`)) +
+    pcK("Paid above the contract", `<span class="${A.value ? "up" : ""}">${plM(A.value)}</span>`, `${pcSp(CUR)} · ${pcSp("on the quantity bought")}`) +
+    pcK("Items below the contract", `<span class="${A.below ? "down" : ""}">${fmt(A.below)}</span>`, pcSp(`${plM(A.below_value)} ${CUR} under the agreed price`));
+  const I = A.items || [];
+  if (!I.length) { $("pcVar").innerHTML = `<p class="hint">${pcSp(`Every item was paid within ${fmt(tol, 0)}% of its agreed price.`)}</p>`; $("pcVarNote").textContent = ""; return; }
+  const box = $("pcVar"), W = Math.max(300, box.clientWidth || 900), narrow = W < 640, lw = narrow ? 0 : Math.min(260, W * .3), rw = narrow ? 0 : 150;
+  const rh = narrow ? 44 : 30, pt = 18, H = pt + I.length * rh + 4, x0 = lw + 2, x1 = W - rw - (narrow ? 2 : 8);
+  const mx = Math.max(tol * 1.5, ...I.map(r => r.pct)), x = v => x0 + (x1 - x0) * Math.min(v, mx) / mx;
+  const step = mx > 200 ? 100 : mx > 80 ? 25 : mx > 30 ? 10 : 5;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Paid against the contract price")}">`;
+  for (let t = 0; t <= mx; t += step) g += `<line class="gr" x1="${x(t)}" x2="${x(t)}" y1="${pt - 4}" y2="${H}"/><text class="ax" x="${x(t)}" y="${pt - 7}" text-anchor="middle">${t ? "+" + t + "%" : "0"}</text>`;
+  g += `<line x1="${x(tol)}" x2="${x(tol)}" y1="${pt - 4}" y2="${H}" stroke="var(--sub)" stroke-dasharray="3 4"/>`;
+  I.forEach((r, i) => {
+    const y0 = pt + i * rh, by = narrow ? y0 + 22 : y0 + 9, col = r.pct > tol * 3 ? "var(--pc-crit)" : "var(--pc-warn)";
+    const tip = `${r.desc || r.item_no}: paid ${fmt(r.paid, 2)} against ${fmt(r.contract, 2)} ${CUR} agreed, ${pcSigned(r.pct)} on ${fmt(r.qty, 2)} units = ${fmt(r.overpaid)} ${CUR}${r.vendor ? " · " + r.vendor : ""}`;
+    g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${by}" width="${Math.max(2, x(r.pct) - x0)}" height="12" rx="3" fill="${col}"/>`;
+    const name = (r.desc || r.item_no), lab = `${r.item_no} ${name}`;
+    if (narrow) g += `<text class="lb" x="0" y="${y0 + 15}">${esc(lab.length > 34 ? lab.slice(0, 33) + "…" : lab)}</text><text class="vl" x="${W}" y="${y0 + 15}" text-anchor="end">${pcSigned(r.pct)} · ${plM(r.overpaid)}</text>`;
+    else g += `<text class="lb" x="0" y="${y0 + 15}"><tspan font-weight="700">${esc(r.item_no)}</tspan> ${esc(name.length > 26 ? name.slice(0, 25) + "…" : name)}</text><text class="mt" x="0" y="${y0 + 27}">${esc((r.vendor || "").slice(0, 34))}</text>`
+      + `<text class="vl" x="${W}" y="${y0 + 15}" text-anchor="end">${pcSigned(r.pct)} · ${fmt(r.overpaid)}</text><text class="mt" x="${W}" y="${y0 + 27}" text-anchor="end">${fmt(r.paid, 2)} / ${fmt(r.contract, 2)}</text>`;
+    if (r.pct > mx) g += `<text class="mt" x="${x1 - 4}" y="${by + 10}" text-anchor="end" fill="#fff">»</text>`;
+    g += `</g>`;
+  });
+  box.innerHTML = g + `</svg>`;
+  $("pcVarNote").innerHTML = `${pcSp(`The dashed line is the tolerance (${fmt(tol, 0)}%).`)} ${pcSp(A.count > I.length ? `The ${fmt(I.length)} items paid most above are shown, of ${fmt(A.count)}.` : "")} ${pcSp("The paid unit cost is the period's average for the item; a unit of measure that differs between the price list and the posting shows a false gap.")}`;
+}
+function pcPareto(){
+  const P = (data.operations || {}).supplier_pareto;
+  $("pcParKeys").innerHTML = `<span><i style="background:var(--pc-core)"></i>${pcSp("main part (to 80%)")}</span><span><i style="background:var(--pc-rest)"></i>${pcSp("the rest")}</span><span><i class="ln" style="background:var(--pc-cum)"></i>${pcSp("running total")}</span>`;
+  if (!P || !P.rows || !P.rows.length || !P.total) { $("pcParK").innerHTML = ""; $("pcPar").innerHTML = `<p class="hint">${pcSp("No invoiced purchases with a supplier in the period.")}</p>`; $("pcParNote").textContent = ""; return; }
+  const T = P.total; let run = 0, core = 0;
+  const R = P.rows.map(([n, v], i) => { const before = run; run += v; if (before / T < .8) core = i + 1; return {n, v, s: v / T * 100, c: run / T * 100}; });
+  const show = Math.min(R.length, Math.max(core + 3, 12), 20), rows = R.slice(0, show), rest = T - rows.reduce((a, r) => a + r.v, 0), restN = P.count - show;
+  if (rest > 0.005 * T && restN > 0) rows.push({n: `Other ${restN} suppliers`, v: rest, s: rest / T * 100, c: 100, other: true});
+  const coreAll = core <= R.length;
+  $("pcParK").innerHTML = pcK("Suppliers making 80% of spend", `${fmt(core)}`, pcSp(`of ${fmt(P.count)} suppliers invoiced (${fmt(core / P.count * 100, 0)}%)`)) +
+    pcK("Largest supplier", `${fmt(R[0].s, 1)}%`, `${pcSp(R[0].n)} · ${plM(R[0].v)} ${CUR}`) +
+    pcK("Top 5 suppliers", `${fmt(R[Math.min(4, R.length - 1)].c, 1)}%`, pcSp("of the invoiced spend")) +
+    pcK("Invoiced spend", plM(T), pcSp(CUR));
+  const box = $("pcPar"), W = Math.max(300, box.clientWidth || 900), narrow = W < 640, lw = narrow ? 104 : 190, rw = narrow ? 44 : 120;
+  const rh = 26, pt = 20, H = pt + rows.length * rh + 6, x0 = lw + 6, x1 = W - rw, x = v => x0 + (x1 - x0) * v / 100;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Suppliers by share of spend")}">`;
+  for (let t = 0; t <= 100; t += narrow ? 50 : 20) g += `<line class="gr" x1="${x(t)}" x2="${x(t)}" y1="${pt - 4}" y2="${H}"/><text class="ax" x="${x(t)}" y="${pt - 8}" text-anchor="middle">${t}%</text>`;
+  g += `<line x1="${x(80)}" x2="${x(80)}" y1="${pt - 4}" y2="${H}" stroke="var(--sub)" stroke-dasharray="3 4"/>`;
+  if (!narrow) g += `<text class="ax" x="${x(80) + 4}" y="${H - 4}">80%</text>`;
+  const pts = [];
+  rows.forEach((r, i) => {
+    const y0 = pt + i * rh, cy = y0 + rh / 2, col = r.other || i >= core ? "var(--pc-rest)" : "var(--pc-core)";
+    const nm = r.n.length > (narrow ? 15 : 28) ? r.n.slice(0, narrow ? 14 : 27) + "…" : r.n;
+    g += `<g><title>${esc(r.n)}: ${fmt(r.v)} ${CUR} · ${fmt(r.s, 1)}% · running ${fmt(r.c, 1)}%</title>
+      <text class="lb" x="${lw}" y="${cy + 4}" text-anchor="end"${r.other ? ' fill="var(--sub)"' : ""}>${r.other ? esc(nm) : `<tspan class="mt">${i + 1}.</tspan> ${esc(nm)}`}</text>
+      <rect x="${x0}" y="${cy - 6}" width="${Math.max(1.5, x(r.s) - x0)}" height="12" rx="3" fill="${col}"/>
+      <text class="vl" x="${W}" y="${cy + 4}" text-anchor="end">${fmt(r.s, 1)}%${narrow ? "" : ` · ${plM(r.v)}`}</text></g>`;
+    pts.push([x(r.c), cy]);
+  });
+  g += `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="var(--pc-cum)" stroke-width="2"/>`;
+  g += pts.map(([px, py], i) => `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="var(--pc-cum)" stroke="var(--card)" stroke-width="2"><title>${esc(rows[i].n)}: running ${fmt(rows[i].c, 1)}%</title></circle>`).join("");
+  box.innerHTML = g + `</svg>`;
+  $("pcParNote").innerHTML = pcSp(`${fmt(core)} suppliers of ${fmt(P.count)} bring the running total to 80% of ${plM(T)} ${CUR}.`) + (restN > 0 && rest > 0.005 * T ? " " + pcSp(`The other ${fmt(restN)} are one bar.`) : "");
+}
+window.addEventListener("resize", () => { if ($("v-buycharts") && $("v-buycharts").classList.contains("on") && data) { pcVariance(); pcPareto(); } });
 // Buying and Prices & contracts: views under one menu item each, with one tab bar on top of the open one
-var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services", "buyloc"],
+var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services", "buyloc", "buycharts"],
                 pcTabs: ["compare", "contracts", "savings", "prices", "locations"],
                 spTabs: ["suppliers", "suploc", "supco"]};
 function pcTabsSync(view){
@@ -3216,6 +3360,7 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   if (b.dataset.view === "compare") loadComparisons(false);
   if (b.dataset.view === "suploc" || b.dataset.view === "supco") loadSp(false);
   if ((b.dataset.view === "streams" || b.dataset.view === "services" || b.dataset.view === "buyloc") && data) loadStreams(false);
+  if (b.dataset.view === "buycharts") renderBuyCharts();
   if (b.dataset.view === "stock") fillStockControls();
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
   if (b.dataset.view === "savings" && !svData) svQuick("lastmonth");

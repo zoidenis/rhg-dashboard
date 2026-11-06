@@ -91,7 +91,8 @@ PURCHASING = [
         ("invoices", "Invoices", "location", ["purchasing.invoices.view"]),
         ("streams", "Purchase types", "location", ["purchasing.spend.view"]),
         ("services", "Services & CAPEX", "location", ["purchasing.spend.view"]),
-        ("buyloc", "Location intelligence", "location", ["purchasing.spend.view"])]),
+        ("buyloc", "Location intelligence", "location", ["purchasing.spend.view"]),
+        ("buycharts", "Purchasing charts", "location", ["purchasing.spend.view"])]),
     ("compare", "Prices & contracts", "Buying & prices", "pcTabs", [
         ("compare", "Comparisons", "location", ["purchasing.prices.view"]),
         ("contracts", "Contract prices", "location", ["purchasing.prices.view"]),

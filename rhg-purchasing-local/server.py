@@ -248,6 +248,18 @@ def _in_scope(only, code):
     return only is None or str(code or "").strip().upper() in only
 
 
+def _contract_above(rows, settings):
+    """Purchasing charts → price variance: the items paid above the contracted price beyond the tolerance, every one
+    counted (the screen lists the largest), and those paid below it."""
+    tol = float(settings["thresholds"].get("price_above_contract_pct", 2) or 0)
+    up = [r for r in rows if r["pct"] > tol]
+    down = [r for r in rows if r["pct"] < -tol]
+    return {"tolerance": tol, "compared": len(rows), "count": len(up), "value": round(sum(r["overpaid"] for r in up), 2),
+            "below": len(down), "below_value": round(-sum(r["overpaid"] for r in down), 2),
+            "items": [{k: r[k] for k in ("item_no", "desc", "paid", "contract", "pct", "overpaid", "qty", "vendor", "locations")}
+                      for r in sorted(up, key=lambda r: -r["overpaid"])[:25]]}
+
+
 def _dashboard_build(company, week, location, mode="week"):
     location, only = _scope_of(location)
     c_from, c_to, p_from, p_to, like_for_like, label = _period(week, mode)
@@ -428,7 +440,8 @@ def _dashboard_build(company, week, location, mode="week"):
                     if rec is not None:
                         x = rec.setdefault("exceptions", {"critical": 0, "warning": 0, "info": 0})
                         x[e.get("severity") if e.get("severity") in x else "info"] += 1
-        sup_rows, sup_total = operations.supplier_summary(docs, settings)
+        sup_all, sup_total = operations.supplier_summary(docs, settings, limit=None)
+        sup_rows = sup_all[:20]
         ops = {
             "events": operations.events(docs, pos, reqs=reqs, closed_reqs=closed_reqs, order_hist=order_hist),
             "purchase_orders": pos[:60],
@@ -440,7 +453,12 @@ def _dashboard_build(company, week, location, mode="week"):
                                    {"available": False, "reason": (req_status or {}).get("error", "")}),
             "history": history.stats(),
             "contract_prices": contract_rows[:40], "price_status": price_status,
+            "contract_above": _contract_above(contract_rows, settings),
             "po_error": po_error, "sla": sla, "suppliers": sup_rows, "supplier_total": sup_total,
+            # Purchasing charts → Pareto: every supplier's invoiced spend, largest first (name, spend)
+            "supplier_pareto": {"rows": [[r["supplier"], round(r["spend"], 2)] for r in sup_all if r["spend"] > 0][:60],
+                                "count": sum(1 for r in sup_all if r["spend"] > 0),
+                                "total": round(sum(r["spend"] for r in sup_all if r["spend"] > 0), 2)},
             "pending_invoice_value": sum(p["received_not_invoiced"] for p in pos),
             "open_orders": len(pos),
             # totals are counted on every order, not on the sixty carried to the screen
