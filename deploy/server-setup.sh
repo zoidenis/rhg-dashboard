@@ -23,6 +23,25 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 
+echo "==> Memory safety: 2 GB swapfile and earlyoom (the server has 1 GB of RAM)"
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+fi
+swapon --show=NAME | grep -qx /swapfile || swapon --priority 10 /swapfile
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw,pri=10 0 0' >> /etc/fstab
+# Keep the apps in RAM rather than the file cache.
+printf 'vm.swappiness = 10\n' > /etc/sysctl.d/90-rhg-memory.conf
+sysctl -q -p /etc/sysctl.d/90-rhg-memory.conf
+apt-get install -y -qq earlyoom
+cat > /etc/default/earlyoom <<'EOF'
+# Kills the biggest app (Docker restarts it) before the host freezes.
+EARLYOOM_ARGS="-m 6,3 -s 20,10 -r 3600 --prefer ^(headless_shell|chrome|python)$ --avoid ^(sshd|dockerd|containerd|containerd-shim-runc-v2|systemd.*|nginx|node)$"
+EOF
+systemctl enable earlyoom
+systemctl restart earlyoom
+
 echo "==> Self-signed certificate (10 years, IP SAN)"
 mkdir -p /opt/rhg/deploy/certs
 if [ ! -f /opt/rhg/deploy/certs/server.crt ]; then
