@@ -344,7 +344,7 @@ td.num,th.num{text-align:right}
 #cnLines td.num,#cnLines th.num{white-space:nowrap}
 .cn-st{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--rhg-sky,#efede6);color:var(--ink)}
 .cn-st.short{background:var(--up-bg);color:var(--up)}.cn-st.surplus{background:var(--warn-bg);color:var(--warn)}
-.cn-st.match{background:var(--down-bg);color:var(--down)}.cn-st.cutoff{background:#e4ecf9;color:#2f5aa8}
+.cn-st.match,.cn-st.late_match{background:var(--down-bg);color:var(--down)}.cn-st.cutoff{background:#e4ecf9;color:#2f5aa8}
 @media (prefers-color-scheme: dark){.cn-st.cutoff{background:#1d2a40;color:#9db8ea}}
 #v-stockcount .neg{color:var(--up)}
 #v-stockcount .card-head select,#cnSheet{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
@@ -4249,7 +4249,7 @@ async function loadDischarge(refresh){
 }
 // ---------- Inventory → Stock count analysis (stockcount.py) ----------
 var cnData = null, cnTimer = null, cnFilter = "all", cnFile = null, cnSetupData = null;
-const CN_ST = {match: "Match", short: "Shortage", surplus: "Surplus", not_counted: "Not counted", not_on_form: "Not on the form", unknown: "Not in Business Central", cutoff: "Posted after the form"};
+const CN_ST = {match: "Match", short: "Shortage", surplus: "Surplus", not_counted: "Not counted", not_on_form: "Not on the form", unknown: "Not in Business Central", cutoff: "Posted after the form", late_match: "Match after later postings", no_stock: "No stock"};
 const CN_FLAG = {unit: "Unit differs", form_system: "Form's system stock differs from BC", cost: "Cost not from the month end"};
 const CN_MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const cnMonth = m => { const [y, mo] = String(m || "").split("-"); return mo ? CN_MON[+mo - 1] + " " + y : ""; };
@@ -4350,11 +4350,12 @@ function cnRender(){
     V.slice(0, 200).map(x => `<tr><td><b>${esc(x.item)}</b> ${esc(x.description)} <span class="meta">${esc(x.unit)}</span></td><td class="num">${cnN(x.opening_qty)}</td><td class="num">${fmt(x.opening_value)}</td><td class="num">${cnN(x.in_qty)}</td><td class="num">${fmt(x.in_value)}</td><td class="num">${cnN(x.out_qty)}</td><td class="num">${fmt(x.out_value)}</td><td class="num"><b>${cnN(x.bc_qty)}</b></td><td class="num"><b>${fmt(x.bc_value)}</b></td><td class="num">${fmt(x.cost, 2)}</td></tr>`).join("");
 }
 function cnLines(){
-  const d = cnData, all = d.lines.filter(x => x.status);
+  const d = cnData, all = d.lines.filter(x => x.status && (x.status !== "no_stock" || cnFilter === "no_stock"));
   const n = k => all.filter(x => x.status === k || (x.flags || []).includes(k)).length;
-  const chips = [["all", "All", all.length], ["short", "Shortage", n("short")], ["surplus", "Surplus", n("surplus")], ["cutoff", "Posted after the form", n("cutoff")], ["not_counted", "Not counted", n("not_counted")],
+  const chips = [["all", "All", d.lines.filter(x => x.status && x.status !== "no_stock").length], ["short", "Shortage", n("short")], ["surplus", "Surplus", n("surplus")], ["cutoff", "Posted after the form", n("cutoff")], ["not_counted", "Not counted", n("not_counted")],
     ["not_on_form", "Not on the form", n("not_on_form")], ["unknown", "Not in Business Central", n("unknown")], ["unit", "Unit differs", n("unit")],
-    ["form_system", "Form's system stock differs from BC", n("form_system")], ["match", "Match", n("match")]].filter(x => x[0] === "all" || x[2]);
+    ["form_system", "Form's system stock differs from BC", n("form_system")], ["late_match", "Match after later postings", n("late_match")], ["match", "Match", n("match")],
+    ["no_stock", "No stock", d.lines.filter(x => x.status === "no_stock").length]].filter(x => x[0] === "all" || x[2]);
   $("cnChips").innerHTML = chips.map(x => `<button data-cnf="${x[0]}" class="${cnFilter === x[0] ? "on" : ""}"><span>${esc(x[1])}</span> · ${fmt(x[2])}</button>`).join("");
   $("cnChips").querySelectorAll("button").forEach(b => b.onclick = () => { cnFilter = b.dataset.cnf; cnLines(); });
   const q = $("cnQ").value.trim().toLowerCase();
@@ -4363,7 +4364,7 @@ function cnLines(){
   $("cnLinesT").textContent = `Lines · ${fmt(rows.length)}`;
   $("cnLinesNote").innerHTML = `<span>Largest difference in value first.</span> <span>Showing ${fmt(Math.min(rows.length, 300))}; the Excel file has every line.</span>`;
   const late = x => (x.late || []).length ? `<div class="meta" style="margin-top:4px" title="${esc(x.late_exact ? "These entries make up the whole change since the form was printed" : "The latest entries of the month")}">${x.late.map(e => `${esc(e.type)} ${esc(e.document)} · ${esc(cnD(e.date))} · ${cnN(e.qty)}`).join("<br>")}</div>` : "";
-  const st = x => `<span class="cn-st ${x.status}">${esc(CN_ST[x.status] || "")}</span>` + (x.flags || []).filter(f => f !== "cost" && !(f === "form_system" && x.status === "cutoff")).map(f => ` <span class="cn-st" title="${esc(CN_FLAG[f])}">${esc(f === "unit" ? "Unit" : "Form ≠ BC")}</span>`).join("") + late(x);
+  const st = x => `<span class="cn-st ${x.status}">${esc(CN_ST[x.status] || "")}</span>` + (x.flags || []).filter(f => f !== "cost" && !(f === "form_system" && (x.status === "cutoff" || x.status === "late_match"))).map(f => ` <span class="cn-st" title="${esc(CN_FLAG[f])}">${esc(f === "unit" ? "Unit" : "Form ≠ BC")}</span>`).join("") + late(x);
   $("cnLines").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">BC closing</th><th class="num">Form system</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Average cost</th><th class="num">Difference value</th><th>Status</th><th>Comment</th></tr>` +
     (rows.slice(0, 300).map(x => `<tr><td><b>${esc(x.item)}</b>${x.form_item ? ` <span class="meta">(${esc(x.form_item)} on the form)</span>` : ""} ${esc(x.description)}<div class="meta">${esc(x.category || x.form_category)}</div></td>
       <td>${esc(x.unit || x.form_unit)}${x.flags.includes("unit") ? `<div class="meta neg">${esc(x.form_unit)} on the form</div>` : ""}</td>

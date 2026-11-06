@@ -332,7 +332,10 @@ def client_entity(client):
 # ---------------------------------------------------------------- the analysis
 STATUSES = {"match": "Match", "short": "Shortage", "surplus": "Surplus", "not_counted": "Not counted",
             "not_on_form": "Not on the form", "unknown": "Not in Business Central",
-            "cutoff": "Posted after the form"}
+            "cutoff": "Posted after the form", "late_match": "Match after later postings",
+            "no_stock": "No stock"}
+FLAGS = {"unit": "Unit differs", "form_system": "Form's system stock differs from BC",
+         "cost": "Cost not from the month end"}
 
 
 def _late(moves, delta):
@@ -393,11 +396,12 @@ def analyse(val, count, master):
         if not count:
             line["status"] = None
         elif not f:
-            line["status"] = "not_on_form" if abs(bq) > TOL else None
+            line["status"] = "not_on_form" if abs(bq) > TOL else "no_stock"
         elif not card and not v:
             line["status"] = "unknown"
         elif f["counted"] is None:
-            line["status"] = "not_counted" if abs(bq) > TOL else None
+            # nothing counted and nothing in BC at the month end: no stock to count
+            line["status"] = "not_counted" if abs(bq) > TOL else "no_stock"
         else:
             d = f["counted"] - bq
             line["status"] = "match" if abs(d) <= TOL else "short" if d < 0 else "surplus"
@@ -418,6 +422,10 @@ def analyse(val, count, master):
             # month, posted later, for goods that were still there, or not yet there, when they were counted)
             if f.get("counted") is not None and abs(f["counted"] - f["system"]) <= TOL and line["status"] != "match":
                 line["status"] = "cutoff"
+            # counted as BC holds it at the month end, not as the form said: documents dated in the month and
+            # posted after the form was printed (a return to the supplier, a transfer) brought BC to the count
+            elif line["status"] == "match" and line["late"]:
+                line["status"] = "late_match"
         if src not in ("month end",) and (line["diff_qty"] or 0):
             line["flags"].append("cost")
         lines.append(line)
@@ -536,7 +544,7 @@ def render_xlsx(r):
                "Status", "Checks", "BC entries after the form", "Comment"],
           [[x["item"], x["description"], x["category"] or x["form_category"], x["unit"], x["form_unit"], x["bc_qty"],
             x["form_system"], x["counted"], x["diff_qty"], x["cost"], x["cost_source"], x["diff_value"],
-            x["bc_value"], STATUSES.get(x["status"], ""), ", ".join(x["flags"]),
+            x["bc_value"], STATUSES.get(x["status"], ""), ", ".join(FLAGS.get(f, f) for f in x["flags"]),
             "; ".join(f"{e['type']} {e['document']} {e['date']} {e['qty']:g}" for e in x.get("late") or []),
             x["comment"]] for x in r["lines"]],
           [12, 40, 16, 9, 9, 12, 12, 11, 12, 12, 14, 14, 15, 18, 14, 40, 40])
@@ -563,7 +571,11 @@ def render_xlsx(r):
               "not zero.",
               "Posted after the form: counted = the form's system stock (Gjendje Finance), but BC changed after the form "
               "was printed with documents dated in the month (named in BC entries after the form). These lines are "
-              "kept out of the shortages, surpluses and net difference: check the cut-off of those documents."):
+              "kept out of the shortages, surpluses and net difference: check the cut-off of those documents.",
+              "Match after later postings: counted = BC closing, but not the form's system stock: BC was brought to the "
+              "count by documents dated in the month and posted after the form was printed (a return to the supplier, "
+              "a transfer; named in BC entries after the form). Nothing is missing; the form was printed before them.",
+              "No stock: on the form or in the month's entries, zero in BC at the month end and nothing counted."):
         rd.append([t])
     rd.column_dimensions["A"].width = 120
     out = io.BytesIO()
