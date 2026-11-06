@@ -49,6 +49,9 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 .fc-dev .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .fc-age{display:grid;grid-template-columns:1fr 1fr;gap:22px}
 .fc-age h3{font-size:14px;margin:4px 0 2px}.fc-age .s{font-size:12px;color:var(--sub);margin-bottom:8px}
+.ic-keys{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink)}
+.ic-keys i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.ic-grp{--g-act:var(--fc-up);--g-slow:#c98500;--g-dead:var(--fc-down);--g-seas:#6b7680}
 .fc-hb{display:grid;grid-template-columns:90px 1fr;gap:5px 10px;align-items:center;font-size:12px;margin-bottom:12px}
 .fc-hb .t{position:relative;height:20px;background:var(--bg);border-radius:4px;overflow:hidden}
 .fc-hb .t i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
@@ -195,6 +198,7 @@ td.num,th.num{text-align:right}
 .rg-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--sub)}
 .rg-sev.critical{background:var(--up)}.rg-sev.warning{background:var(--warn)}
 #rgKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#icKpis,#icActK{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 #rgItems tr.rg-row{cursor:pointer}#rgItems tr.rg-row:hover td{background:var(--bg)}
 #rgItems tr.rg-open td{background:var(--bg)}
 #rgItems .rg-det td{background:var(--bg);padding:12px 14px;white-space:normal}
@@ -511,6 +515,7 @@ td.num,th.num{text-align:right}
     <button data-view="discharge" data-parent="inventory" style="display:none">Received vs discharged</button>
     <button data-view="stockcount" data-parent="inventory" style="display:none">Stock count analysis</button>
     <button data-view="stockwc" data-parent="inventory" style="display:none">Stock &amp; working capital</button>
+    <button data-view="invcharts" data-parent="inventory" style="display:none">Inventory charts</button>
 
     <div class="grp">Planning</div>
     <button data-view="budget">Budget &amp; forecast</button>
@@ -862,6 +867,24 @@ td.num,th.num{text-align:right}
       <div class="hint" id="rcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
+  <section class="view" id="v-invcharts">
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>Capital in stock by class</h2>
+      <p class="hint"><span>Stock on hand at item unit cost, by how long it has gone without use (Movement &amp; dead stock: its history, limits and exclusions).</span></p></div>
+      <span class="meta" id="icAsOf"></span></div>
+      <div class="kpis" id="icKpis"></div><div id="icBars"></div><p class="meta" id="icNote"></p></div>
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>Value against days without use</h2>
+      <p class="hint"><span>Every item and location with stock, the largest 2,000 by value: up and to the right is capital that does not move.</span> <span>The lines are the limits of the classes.</span></p></div>
+      <div class="ic-keys" id="icKeys"></div></div>
+      <div class="fc-chart" id="icSc"><p class="meta">Reading…</p></div><p class="meta" id="icScNote"></p></div>
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>Stock movement</h2>
+      <p class="hint"><span>From the stock at the start of the history to the stock today: what came in and what went out, at ledger cost.</span></p></div></div>
+      <div class="fc-chart" id="icWf"></div><p class="meta" id="icWfNote"></p></div>
+    <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>Items to act on</h2>
+      <p class="hint"><span>Slow, non-moving and dead stock, the largest first: transfer it where another location uses the item, consume it where none does, provision what is dead or was never used.</span></p></div></div>
+      <div class="kpis" id="icActK"></div><div class="sk-chips" id="icActChips"></div>
+      <div class="scroll"><table id="icAct"></table></div><p class="meta" id="icActMore"></p></div>
+  </section>
+
   <section class="view" id="v-movement">
     <div class="card">
       <div class="card-head"><div><h2>Inventory movement &amp; dead stock</h2>
@@ -910,7 +933,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button><button data-t="invcharts" role="tab" aria-selected="false">Inventory charts</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -2072,12 +2095,19 @@ function fcWaterfall(){
   const steps = [["Net revenue", 0, S.revenue, "t"], ["Other income", S.revenue, rt, "s"], ["Revenue total", 0, rt, "t"], ["Cost of goods sold", rt, gm, "s"],
     ["Gross margin", 0, gm, "t"], ["Labour", gm, gm - (S.labour || 0), "s"], ["Occupancy", gm - (S.labour || 0), gm - (S.labour || 0) - (S.occupancy || 0), "s"],
     ["Other operating expenses", gm - (S.labour || 0) - (S.occupancy || 0), eb, "s"], ["EBITDA", 0, eb, "t"]];
-  const box = $("fcWf"), W = Math.max(360, box.clientWidth || 900), H = 300, pl_ = 56, pr = 10, pt = 22, pb = 46;
+  fcWfDraw($("fcWf"), steps, S.revenue || 0, "From revenue to EBITDA");
+  $("fcWfNote").innerHTML = `${fcSp(`${data.meta.company} · ${data.meta.period_label} · ${data.meta.currency}`)} · ${fcSp("% of net revenue under each bar.")}` +
+    (pl.mapping && pl.mapping.status !== "Approved" ? ` · ${fcSp("KPI mapping " + pl.mapping.status + ": figures Pilot.")}` : "");
+}
+// a waterfall: [label, from, to, kind t (a total from zero) or s (a step)]; base: the % under each bar, when given
+function fcWfDraw(box, steps, base, aria){
+  const rev = base;
+  if ((box.clientWidth || 900) / steps.length < 72) return fcWfRows(box, steps, base, aria);   // narrow screen: one row per step
+  const W = Math.max(360, box.clientWidth || 900), H = 300, pl_ = 56, pr = 10, pt = 22, pb = 46;
   const vals = steps.flatMap(x => [x[1], x[2]]), lo = Math.min(0, ...vals), hi = Math.max(1, ...vals), span = hi - lo || 1;
   const y = v => pt + (H - pt - pb) * (hi - v) / span, n = steps.length, bw = (W - pl_ - pr) / n, x = i => pl_ + bw * i;
   const ticks = [0, .25, .5, .75, 1].map(t => lo + span * t);
-  const rev = S.revenue || 0;
-  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("From revenue to EBITDA")}">`;
+    let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`;
   g += ticks.map(t => `<line class="gr" x1="${pl_}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${pl_ - 6}" y="${y(t) + 4}" text-anchor="end">${fcM(t)}</text>`).join("");
   g += `<line x1="${pl_}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--sub)" stroke-width="1"/>`;
   steps.forEach(([lab, a, b, kind], i) => {
@@ -2092,8 +2122,22 @@ function fcWaterfall(){
     if (rev) g += `<text class="ax" x="${x(i) + bw / 2}" y="${H - 2}" text-anchor="middle">${(v / rev * 100).toFixed(1)}%</text>`;
   });
   box.innerHTML = g + `</svg>`;
-  $("fcWfNote").innerHTML = `${fcSp(`${data.meta.company} · ${data.meta.period_label} · ${data.meta.currency}`)} · ${fcSp("% of net revenue under each bar.")}` +
-    (pl.mapping && pl.mapping.status !== "Approved" ? ` · ${fcSp("KPI mapping " + pl.mapping.status + ": figures Pilot.")}` : "");
+}
+// the same waterfall turned on its side, for a phone: a row per step, the bar runs from where the last step ended
+function fcWfRows(box, steps, rev, aria){
+  const W = Math.max(260, box.clientWidth || 360), rh = 40, pt = 4, n = steps.length, H = pt + n * rh + 4;
+  const vals = steps.flatMap(x => [x[1], x[2]]), lo = Math.min(0, ...vals), hi = Math.max(1, ...vals), span = hi - lo || 1;
+  const x = v => 1 + (W - 2) * (v - lo) / span;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`;
+  steps.forEach(([lab, a, b, kind], i) => {
+    const y0 = pt + i * rh, l = x(Math.min(a, b)), w = Math.max(1, Math.abs(x(a) - x(b))), d = b - a, v = kind === "t" ? b : d;
+    const col = kind === "t" ? "var(--fc-total)" : d >= 0 ? "var(--fc-up)" : "var(--fc-down)";
+    g += `<rect x="${x(lo)}" y="${y0 + 20}" width="${W - 2}" height="12" rx="3" fill="var(--bg)"/><rect x="${l}" y="${y0 + 20}" width="${w}" height="12" rx="3" fill="${col}"><title>${esc(lab)}: ${fmt(Math.round(v))}</title></rect>`;
+    if (i < n - 1) g += `<line x1="${x(b)}" x2="${x(b)}" y1="${y0 + 32}" y2="${y0 + rh + 20}" stroke="var(--sub)" stroke-dasharray="2 3"/>`;
+    g += `<text class="lb" x="0" y="${y0 + 14}" ${kind === "t" ? 'font-weight="700"' : ""}>${esc(lab)}</text>`;
+    g += `<text class="vl" x="${W}" y="${y0 + 14}" text-anchor="end">${(kind === "t" ? "" : v >= 0 ? "+" : "−") + fcM(Math.abs(v))}${rev ? ` · ${(v / rev * 100).toFixed(1)}%` : ""}</text>`;
+  });
+  box.innerHTML = g + `</svg>`;
 }
 // AP and AR by days past the due date, the most overdue first
 function fcAgeing(){
@@ -3860,8 +3904,107 @@ async function loadMovement(refresh){
       mvTimer = setTimeout(() => loadMovement(false), 5000); return;
     }
     mvData = j; renderMovement(); loadMvRows();
+    if ($("v-invcharts").classList.contains("on")) renderInvCharts();
   }catch(e){ $("mvStatus").textContent = "Could not read: " + e.message; }
 }
+// ---------- Inventory → Inventory charts: capital by class, value × days without use, stock movement, items to act on
+const IC_GROUP = {"ACTIVE": "act", "NEW ITEM": "act", "MONITOR": "slow", "SLOW MOVING": "slow", "NON-MOVING": "dead", "DEAD STOCK": "dead", "SEASONAL": "seas", "NEGATIVE": "seas"};
+const IC_COL = {act: "var(--fc-up)", slow: "#c98500", dead: "var(--fc-down)", seas: "var(--fc-bud)"};
+const IC_LAB = {act: "Active", slow: "Slow", dead: "Non-moving", seas: "Seasonal and other"};
+var icRows = null, icRowsKey = "", icFilter = "all", icAll = false;
+function renderInvCharts(){
+  if (!mvData) { $("icNote").textContent = "Reading…"; return; }
+  const d = mvData, c = d.totals.classes, tot = Object.values(c).reduce((a, x) => a + Math.max(0, x[1]), 0) || 1;
+  $("icAsOf").textContent = `${d.company} · as of ${d.as_of} · ${d.history_days} days of history`;
+  const grp = g => Object.entries(c).filter(([k]) => IC_GROUP[k] === g).reduce((a, [, x]) => [a[0] + x[0], a[1] + x[1]], [0, 0]);
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const A = grp("act"), S = grp("slow"), D = grp("dead"), O = grp("seas");
+  $("icKpis").innerHTML = card(fcSp("Active"), fcM(A[1]), fcSp(`${Math.round(A[1] / tot * 100)}% · ${fmt(A[0])} lines`), "down") +
+    card(fcSp("Slow"), fcM(S[1]), fcSp(`${Math.round(S[1] / tot * 100)}% · ${fmt(S[0])} lines · monitor and slow moving`), S[1] ? "warn" : "") +
+    card(fcSp("Non-moving"), fcM(D[1]), fcSp(`${Math.round(D[1] / tot * 100)}% · ${fmt(D[0])} lines · non-moving and dead`), D[1] ? "up" : "") +
+    card(fcSp("Seasonal and other"), fcM(O[1]), fcSp(`${fmt(O[0])} lines · seasonal, negative`));
+  const order = ["ACTIVE", "NEW ITEM", "MONITOR", "SLOW MOVING", "NON-MOVING", "DEAD STOCK", "SEASONAL", "NEGATIVE"], mx = Math.max(1, ...order.map(k => Math.abs((c[k] || [0, 0])[1])));
+  const lim = d.rules.limits || [];
+  const sub = {ACTIVE: `used within ${lim[0]} days`, MONITOR: `${lim[0]}–${lim[1]} days`, "SLOW MOVING": `${lim[1]}–${lim[2]} days`, "NON-MOVING": `${lim[2]}–${lim[3]} days`, "DEAD STOCK": `over ${lim[3]} days`, "NEW ITEM": "first received lately", SEASONAL: "seasonal list", NEGATIVE: "below zero"};
+  $("icBars").innerHTML = `<div class="fc-hb" style="grid-template-columns:150px 1fr;margin-top:12px">${order.map(k => { const x = c[k] || [0, 0], w = Math.max(0, Math.abs(x[1]) / mx * 100);
+    return `<span title="${esc(sub[k] || "")}">${fcSp(k.charAt(0) + k.slice(1).toLowerCase())}<br><small class="meta">${fcSp(sub[k] || "")}</small></span><div class="t" style="height:24px"><i style="width:${w}%;background:${IC_COL[IC_GROUP[k]]};opacity:.85"></i><span${w > 45 ? ` style="color:#fff;top:4px"` : ` class="out" style="left:calc(${w}% + 6px);top:4px"`}>${fcM(x[1])} · ${fmt(x[0])}</span></div>`; }).join("")}</div>`;
+  $("icNote").innerHTML = `${fcSp(`${fcM(tot)} ${data && data.meta ? data.meta.currency : ""} in stock in all.`)} ${fcSp("Bars: value · lines (item and location).")}`;
+  icWaterfall(); icActions(); icLoadRows();
+}
+function icWaterfall(){
+  const f = mvData.flows; if (!f) { $("icWf").innerHTML = `<p class="meta">${fcSp("Read Movement & dead stock again for the movements.")}</p>`; return; }
+  const L = {purchases: "Purchases", transfers_in: "Transfers in", output: "Production", consumption: "Recipes (consumption)", sales: "Sold as it is",
+    transfers_out: "Transfers out", adj_pos: "Adjustments +", adj_neg: "Adjustments −", other: "Other"};
+  let run = f.opening; const steps = [["Opening (derived)", 0, run, "t"]];
+  f.groups.filter(g => Math.abs(g.value) >= 1).forEach(g => { steps.push([L[g.key] || g.key, run, run + g.value, "s"]); run += g.value; });
+  steps.push(["Stock today", 0, f.closing, "t"]);
+  fcWfDraw($("icWf"), steps, null, "Stock movement");
+  $("icWfNote").innerHTML = `${fcSp(`${f.from} to ${f.to}, the locations and categories Movement & dead stock counts.`)} ${fcSp("Stock today at item unit cost; the movements at ledger cost; the opening is today less the movements, so it also holds the difference between the two costs.")}`;
+}
+function icActions(){
+  const a = mvData.actions; if (!a) { $("icAct").innerHTML = ""; return; }
+  const T = a.totals || {}, lab = {transfer: "Transfer", consume: "Consume", provision: "Provision"}, cls = {transfer: "", consume: "warn", provision: "up"};
+  const card = (k, s) => `<div class="card kpi"><div class="l">${fcSp(lab[k])}</div><div class="v ${(T[k] || [0])[0] ? cls[k] : ""}">${fcM((T[k] || [0, 0])[1])}</div><div class="s">${fcSp(`${fmt((T[k] || [0])[0])} lines · ${s}`)}</div></div>`;
+  $("icActK").innerHTML = card("transfer", "another location uses the item") + card("consume", "no location uses it") + card("provision", "dead, or received and never used");
+  const items = a.items.filter(x => icFilter === "all" || x.action === icFilter);
+  $("icActChips").innerHTML = [["all", "All", a.items.length], ...["transfer", "consume", "provision"].map(k => [k, lab[k], a.items.filter(x => x.action === k).length])]
+    .map(([k, l, n]) => `<button data-icf="${k}" class="${icFilter === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
+  $("icActChips").querySelectorAll("[data-icf]").forEach(b => b.onclick = () => { icFilter = b.dataset.icf; icAll = false; icActions(); });
+  $("icAct").innerHTML = `<tr><th>Action</th><th>Item</th><th>Location</th><th>Class</th><th class="num">Days without use</th><th class="num">Quantity</th><th class="num">Value</th><th>Why</th></tr>` +
+    (items.slice(0, icAll ? 150 : 25).map(x => `<tr><td><span class="rhg-pill ${x.action === "provision" ? "critical" : x.action === "consume" ? "warning" : "info"}">${esc(lab[x.action])}</span>${x.to ? `<div class="meta">→ ${esc(x.to)}</div>` : ""}</td>
+      <td><b>${esc(x.item)}</b> ${esc(x.name)}<div class="meta">${esc(x.category || "")}</div></td><td>${esc(x.location)}</td><td class="meta">${esc(x.class)}</td>
+      <td class="num">${x.days == null ? fcSp("none in history") : fmt(x.days)}</td><td class="num">${fmt(x.qty, Math.abs(x.qty % 1) > 1e-9 ? 2 : 0)}</td><td class="num">${fmt(x.value)}</td><td class="meta">${esc(x.why)}</td></tr>`).join("")
+      || `<tr><td colspan="8" class="meta">${fcSp("Nothing to act on.")}</td></tr>`);
+  const more = !icAll && items.length > 25 ? `<button class="btn" id="icAllB" style="margin-right:10px">${fcSp(`Show ${fmt(Math.min(150, items.length))} lines`)}</button>` : "";
+  $("icActMore").innerHTML = more + (a.count > a.items.length ? fcSp(`${fmt(a.count)} lines in all; the ${fmt(a.items.length)} of largest value are listed. The Excel file of Movement & dead stock has every line.`) : "");
+  if ($("icAllB")) $("icAllB").onclick = () => { icAll = true; icActions(); };
+}
+async function icLoadRows(){
+  const q = mvQs({limit: 2000, sort: "value"});
+  if (icRows && icRowsKey === q) { icScatter(); return; }
+  try { const j = await readJSON(await fetch("/api/movement/rows?" + q)); if (j.error) throw new Error(j.error); icRows = j; icRowsKey = q; icScatter(); }
+  catch (e) { $("icSc").innerHTML = `<p class="meta">${fcSp("Could not read the items: " + e.message)}</p>`; }
+}
+function icScatter(){
+  const j = icRows, C = j.cols, ix = n => C.indexOf(n), d = mvData, lim = d.rules.limits || [], hd = d.history_days;
+  const pts = j.rows.filter(r => r[ix("qty")] > 0 && r[ix("value")] > 0).map(r => ({loc: r[ix("location")], item: r[ix("item")], v: r[ix("value")], days: r[ix("days_without")], cls: r[ix("class")], name: (j.names || {})[r[ix("item")]] || ""}));
+  $("icKeys").innerHTML = ["act", "slow", "dead", "seas"].map(g => `<span><i style="background:${IC_COL[g]}"></i>${fcSp(IC_LAB[g])}</span>`).join("");
+  if (!pts.length) { $("icSc").innerHTML = `<p class="meta">${fcSp("No stock on hand.")}</p>`; return; }
+  const box = $("icSc"), W = Math.max(360, box.clientWidth || 900), H = 340, pl_ = 56, pr = 16, pt = 12, pb = 30;
+  const xMax = hd + 30, xd = p => p.days == null ? hd + 18 : Math.min(p.days, hd);       // no use in the history: a band at the right
+  const vMin = Math.max(1, Math.min(...pts.map(p => p.v))), vMax = Math.max(...pts.map(p => p.v));
+  const lv0 = Math.floor(Math.log10(vMin)), lv1 = Math.ceil(Math.log10(vMax)) || 1;
+  const x = v => pl_ + (W - pl_ - pr) * v / xMax, y = v => pt + (H - pt - pb) * (1 - (Math.log10(v) - lv0) / ((lv1 - lv0) || 1));
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Value against days without use")}">`;
+  for (let e = lv0; e <= lv1; e++) g += `<line class="gr" x1="${pl_}" x2="${W - pr}" y1="${y(10 ** e)}" y2="${y(10 ** e)}"/><text class="ax" x="${pl_ - 6}" y="${y(10 ** e) + 4}" text-anchor="end">${fcM(10 ** e)}</text>`;
+  g += `<rect x="${x(hd + 6)}" y="${pt}" width="${x(xMax) - x(hd + 6)}" height="${H - pt - pb}" fill="var(--bg)"/><text class="ax" x="${x(hd + 18)}" y="${H - 8}" text-anchor="middle">${esc("none")}</text>`;
+  for (let t = 0; t <= hd; t += hd > 180 ? 60 : 30) g += `<text class="ax" x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}</text>`;
+  let labs = "";
+  lim.forEach((l, i) => { if (l != null && l <= hd) g += `<line x1="${x(l)}" x2="${x(l)}" y1="${pt}" y2="${H - pb}" stroke="var(--sub)" stroke-dasharray="3 4"/>`, labs += `<text class="ax" x="${x(l) > W - pr - 150 ? x(l) - 3 : x(l) + 3}" y="${pt + 10 + i * 12}" text-anchor="${x(l) > W - pr - 150 ? "end" : "start"}" stroke="var(--card)" stroke-width="3" paint-order="stroke">${W < 640 ? "" : esc(["monitor", "slow", "non-moving", "dead"][i] || "")} ${l} d</text>`; });
+  const order = [...pts].sort((a, b) => a.v - b.v);
+  g += order.map(p => `<circle cx="${x(xd(p)).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5" fill="${IC_COL[IC_GROUP[p.cls] || "seas"]}" fill-opacity=".8" stroke="var(--card)" stroke-width="1"/>`).join(""); g += labs;
+  g += `<circle id="icHl" r="6" fill="none" stroke="var(--ink)" stroke-width="2" visibility="hidden"/><rect id="icHit" x="${pl_}" y="${pt}" width="${W - pl_ - pr}" height="${H - pt - pb}" fill="transparent"/></svg><div class="fc-tip" id="icTip"></div>`;
+  box.innerHTML = g;
+  const hit = $("icHit"), tip = $("icTip"), hl = $("icHl");
+  const P = order.map(p => [x(xd(p)), y(p.v), p]);
+  const show = ev => {
+    const r = hit.getBoundingClientRect(), sx = W / box.getBoundingClientRect().width;
+    const mx = pl_ + (ev.clientX - r.left) * sx, my = pt + (ev.clientY - r.top) * sx;
+    let best = null, bd = 14 * 14;
+    for (const q of P) { const dd = (q[0] - mx) ** 2 + (q[1] - my) ** 2; if (dd < bd) { bd = dd; best = q; } }
+    if (!best) { tip.style.display = "none"; hl.setAttribute("visibility", "hidden"); return; }
+    const p = best[2];
+    hl.setAttribute("cx", best[0]); hl.setAttribute("cy", best[1]); hl.setAttribute("visibility", "visible");
+    tip.innerHTML = `<b>${esc(p.item)} ${esc(p.name)}</b><div><span>${fcSp("Location")}</span><span>${esc(p.loc)}</span></div><div><span>${fcSp("Value")}</span><span>${fmt(Math.round(p.v))}</span></div><div><span>${fcSp("Days without use")}</span><span>${p.days == null ? fcSp("none in history") : fmt(p.days)}</span></div><div><span>${fcSp("Class")}</span><span>${esc(p.cls)}</span></div>`;
+    tip.style.display = "block";
+    const bw = box.getBoundingClientRect().width, px = best[0] / sx;
+    tip.style.left = Math.min(bw - tip.offsetWidth, Math.max(0, px + (px > bw / 2 ? -tip.offsetWidth - 12 : 12))) + "px"; tip.style.top = Math.max(0, best[1] / sx - 40) + "px";
+  };
+  hit.onpointermove = show; hit.onpointerdown = show;
+  hit.onpointerleave = () => { tip.style.display = "none"; hl.setAttribute("visibility", "hidden"); };
+  $("icScNote").innerHTML = `${fcSp(`${fmt(pts.length)} lines of ${fmt(j.total)} with stock; value on a log scale.`)}`;
+}
+window.addEventListener("resize", () => { if ($("v-invcharts") && $("v-invcharts").classList.contains("on") && mvData) { icWaterfall(); if (icRows) icScatter(); } });
 $("mvRead").onclick = () => { mvData = null; loadMovement(true); };
 $("mvDays").onchange = () => { mvData = null; loadMovement(false); };
 $("mvAsOf").onchange = () => { mvData = null; loadMovement(false); };
@@ -5347,6 +5490,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
   if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
+  if(b.dataset.view==="invcharts") { if (!mvData) loadMovement(false); else renderInvCharts(); }
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="stockcount") loadCn(false);
@@ -5541,7 +5685,7 @@ function ilBar(L, cls){
 // Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
 // Typology & turnover, Recipe integrity, Item master control and Movement & dead stock, which stay views
 // of their own (their addresses and loading do not change) with the same tab bar on top.
-var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockcount", "stockwc"]);
+var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockcount", "stockwc", "invcharts"]);
 // the embedded Purchasing screen: loaded when the tab opens (again when the company changes), sized to its content
 var swCompany = null, swTimer = null;
 function swShow(){

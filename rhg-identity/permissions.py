@@ -251,6 +251,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.salesrec": ("finance.s.kartela.ar", "finance.s.fiscal.fsales"),
                  # Liquidity & capital: whoever reads the balance sheet
                  "finance.s.pl.liquidity": "finance.s.pl.bs",
+                 # Inventory → Inventory charts: whoever reads Movement & dead stock
+                 "finance.s.inventory.invcharts": "finance.s.inventory.movement",
                  # Financial statements → P&L charts: whoever reads the P&L
                  "finance.s.pl.charts": "finance.s.pl.pl",
                  # Executive dashboard → Balance & capital: whoever holds its Executive KPIs

@@ -216,6 +216,7 @@ def cut(r, allowed):
     ok = lambda loc: str(loc or "").strip().upper() in A
     rows = [x for x in r["_rows"] if ok(x[0])]
     return dict(r, **_summary(rows), _rows=rows, _typo=[x for x in r.get("_typo") or [] if ok(x[0])],
+                _flows={k: v for k, v in (r.get("_flows") or {}).items() if ok(k)},
                 _names={x[1]: r["_names"].get(x[1], "") for x in rows},
                 adjustments=[a for a in r.get("adjustments") or [] if ok(a.get("location"))],
                 excluded=[e for e in r.get("excluded") or [] if ok(e[0])], cut=True)
@@ -248,7 +249,11 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
                              "AND day<=?", (company, start.isoformat(), as_of.isoformat())).fetchall()
     stats = {}
     adj = {}
+    flows = {}               # {location: {kind: cost}}: the movements of the history, as the rows exclude them
     for loc, it, kind, day, qty, cost in rows:
+        if not left_out_loc(loc) and str((items.get(it) or {}).get("Item_Category_Code") or "").upper() not in ex_cats:
+            f = flows.setdefault(loc, {})
+            f[kind] = f.get(kind, 0.0) + (cost or 0.0)
         s = stats.setdefault((loc, it), {"cons": {w: 0.0 for w in WINDOWS}, "last_cons": "", "last_rcpt": "",
                                          "first_rcpt": "", "first_any": "", "in_qty": 0.0, "kinds": {},
                                          "rdays": set(), "adj_neg": 0.0})
@@ -366,7 +371,7 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
                   "limits": base, "perishable_limits": per, "distribution": sorted(distribution),
                   "count_negative_adjustments": count_neg, "seasonal": sorted(seasonal),
                   "perishable": sorted(perishable), "new_days": new_days},
-        "_rows": out_rows, "_names": names, "_typo": typo,
+        "_rows": out_rows, "_names": names, "_typo": typo, "_flows": flows,
     }
 
 
@@ -425,8 +430,69 @@ def request(client, company, as_of, history_days, refresh=False):
 
 
 def public(r):
-    """The result without the row store (rows are fetched with select_rows)."""
-    return {k: v for k, v in r.items() if not k.startswith("_")}
+    """The result without the row store (rows are fetched with select_rows), with the stock flows of the history and
+    the items to act on (Inventory → Inventory charts)."""
+    out = {k: v for k, v in r.items() if not k.startswith("_")}
+    if "_rows" in r:
+        out["flows"] = flows(r)
+        out["actions"] = actions(r)
+    return out
+
+
+FLOW_GROUPS = [("purchases", ("receipt", "purchase_return")), ("transfers_in", ("transfer_in",)),
+               ("output", ("output",)), ("consumption", ("consumption",)), ("sales", ("sale", "sale_return")),
+               ("transfers_out", ("transfer_out",)), ("adj_pos", ("adj_pos",)), ("adj_neg", ("adj_neg",)),
+               ("other", ("other",))]
+
+
+def flows(r):
+    """The stock movement of the history at ledger cost, in groups (inflows positive, outflows negative), and the
+    closing stock of the rows (on hand × item unit cost). The opening is derived: closing − the movements, so it also
+    carries the difference between the ledger cost and the item card cost."""
+    tot = {}
+    for by_kind in (r.get("_flows") or {}).values():
+        for k, v in by_kind.items():
+            tot[k] = tot.get(k, 0.0) + v
+    groups = [{"key": g, "value": round(sum(tot.get(k, 0.0) for k in kinds), 0)} for g, kinds in FLOW_GROUPS]
+    closing = round(sum(x[3] for x in r.get("_rows") or []), 0)
+    moved = sum(g["value"] for g in groups)
+    return {"groups": groups, "closing": closing, "opening": round(closing - moved, 0), "from": r.get("history_from"),
+            "to": r.get("as_of")}
+
+
+def actions(r, limit=300):
+    """The items to act on, by value: stock that does not move at a location while another location of the company
+    uses the item → transfer there; slow or non-moving and used nowhere → consume (menu, specials, staff meals)
+    before it ages further; dead stock, or received long ago and never used → provision (write down)."""
+    rows = r.get("_rows") or []
+    users = {}
+    for x in rows:                                     # who uses each item: active, with use in the last 90 days
+        if x[13] in ("ACTIVE", "NEW ITEM") and (x[7] or 0) > 0:
+            users.setdefault(x[1], []).append((x[0], x[7]))
+    names = r.get("_names") or {}
+    out = []
+    for x in rows:
+        loc, it, qty, value, cls, rnc = x[0], x[1], x[2], x[3], x[13], x[14]
+        if qty <= 0 or value < 1000 or cls not in ("SLOW MOVING", "NON-MOVING", "DEAD STOCK") and rnc != "critical":
+            continue
+        other = sorted((u for u in users.get(it, []) if u[0] != loc), key=lambda u: -u[1])
+        if other:
+            act, why = "transfer", f"{other[0][0]} used {other[0][1]:,.2f} in 90 days"
+            to = other[0][0]
+        elif cls == "DEAD STOCK" or rnc == "critical":
+            act, why, to = "provision", ("no use for longer than the dead-stock limit" if cls == "DEAD STOCK"
+                                         else "received and never used, beyond the limit"), ""
+        else:
+            act, why, to = "consume", "no other location uses it", ""
+        out.append({"action": act, "location": loc, "item": it, "name": names.get(it, ""), "qty": qty,
+                    "value": round(value, 0), "days": x[12], "class": cls, "category": x[15], "to": to, "why": why})
+    out.sort(key=lambda a: -a["value"])
+    totals = {}
+    for a in out:
+        t = totals.setdefault(a["action"], [0, 0.0])
+        t[0] += 1
+        t[1] += a["value"]
+    return {"totals": {k: [n, round(v, 0)] for k, (n, v) in totals.items()}, "items": out[:limit], "count": len(out)}
 
 
 def _run(client, company, a, history_days, refresh, job):
