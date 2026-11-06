@@ -31,6 +31,9 @@ if [ ! -f /swapfile ]; then
 fi
 swapon --show=NAME | grep -qx /swapfile || swapon --priority 10 /swapfile
 grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw,pri=10 0 0' >> /etc/fstab
+# Keep the apps in RAM rather than the file cache.
+printf 'vm.swappiness = 10\n' > /etc/sysctl.d/90-rhg-memory.conf
+sysctl -q -p /etc/sysctl.d/90-rhg-memory.conf
 apt-get install -y -qq earlyoom
 cat > /etc/default/earlyoom <<'EOF'
 # Kills the biggest app (Docker restarts it) before the host freezes.

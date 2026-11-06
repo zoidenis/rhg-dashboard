@@ -78,6 +78,7 @@ e lë pa memorie. `data/` është volume — përditësimi nuk prek users, actio
 ## Memoria (serveri ka 1 GB RAM)
 Më 6 nëntor 2026 serveri ngeci sepse RAM-i dhe swap-i u mbushën. Mbrojtjet tani:
 - **Swap 2.5 GB:** `/swapfile` (2 GB) mbi `/dev/sdb` (496 MB), që memoria e papërdorur të mos nxjerrë kodin nga RAM-i.
+- **`vm.swappiness = 10`** (`/etc/sysctl.d/90-rhg-memory.conf`): aplikacionet qëndrojnë në RAM dhe lirohet më parë cache-i i skedarëve.
 - **`earlyoom`:** vret aplikacionin më të madh para se host-i të ngecë, dhe Docker e rindez (`/etc/default/earlyoom`).
 - **Kufij për kontejner:** `mem_limit` dhe `memswap_limit` te `docker-compose.yml`. Një aplikacion i rëndë ngadalëson veten, jo gjithë serverin.
 
