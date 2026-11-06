@@ -31,6 +31,7 @@ import supstock
 import skuplan
 import recipeuse
 import menueng
+import menucost
 import chanprof
 import today as todayloc
 import unicorn_facts
@@ -1853,6 +1854,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
                          "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
+                         "/api/sales/foodcost",
                          "/api/discharge", "/api/discharge/xlsx",
                          # Inventory: Movement & dead stock, Typology & turnover, Stock count analysis
                          "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
@@ -1949,7 +1951,7 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
             return None
         multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
-                        "/api/sales/menu/xlsx", "/api/sales/channel-profit", "/api/sales/channel-profit/xlsx",
+                        "/api/sales/menu/xlsx", "/api/sales/foodcost", "/api/sales/channel-profit", "/api/sales/channel-profit/xlsx",
                         "/api/sales/channel-profit/params") or (path == "/api/today/locations" and q.get("scope") == "all")
         if not multi and not access.company_ok(user, company):
             return access.refuse_company(company)
@@ -2194,6 +2196,37 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 store.audit("export", f"menu engineering · {r['title']}", user["username"], {}, {}, r["period"]["from"])
+            elif url.path == "/api/sales/foodcost":
+                # Sales → Menu & food cost: the weekly theoretical food cost % (Simphony × BC recipes) and the
+                # monthly actual of the P&L (the Executive dashboard's months), for all RHG, a brand or a location
+                if not simphony.info()["configured"]:
+                    self._send(200, {"error": "The Simphony connection is not set."})
+                    return
+                try:
+                    weeks = max(4, min(int(q.get("weeks") or 13), 52))
+                except ValueError:
+                    weeks = 13
+                refs = simphony_refs_in_scope(user)
+                per = menucost.trend_period(weeks)
+                key = ("foodcost", per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
+                ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1")
+                if ds.get("pending") or ds.get("available") is False:
+                    self._send(200, ds)
+                    return
+                level = q.get("level") if q.get("level") in ("brand", "location", "all") else "all"
+                r = menucost.weekly(ds, level, (q.get("key") or "")[:60])
+                sel = r.pop("selection")
+                if not auth.can(user, "finance.pl.view"):
+                    r["actual"] = {"available": False, "reason": "Your role does not include the P&L."}
+                elif not sel:
+                    r["actual"] = {"available": False, "reason": "No location in this selection."}
+                else:
+                    try:
+                        r["actual"] = menucost.actual(client, sel, level, per[0], company_currency, limited=refs is not None)
+                    except BCError as exc:
+                        r["actual"] = {"available": False, "reason": str(exc)[:200]}
+                r["weeks_asked"] = weeks
+                self._send(200, r)
             elif url.path in ("/api/sales/prices", "/api/sales/prices/xlsx"):
                 # Sales → Menu prices: every active Simphony menu item price by location, revenue centre and level
                 if not simphony.info()["configured"]:
