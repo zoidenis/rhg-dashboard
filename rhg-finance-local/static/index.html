@@ -1980,14 +1980,14 @@ function renderPL(){
   $("plTable").innerHTML = head + statementRows(pl.statement);
   const hidden = new Set((pl.validation||[]).flatMap(x => x.suppressed || []));
   const credit = (pl.validation||[]).some(x => x.figure === "Cost of goods sold");
-  const anyBudget = pl.statement.some(l => l.budget);
+  const anyBudget = (pl.summary || pl.statement).some(l => l.budget);
   const varOf = l => anyBudget ? l.vs_budget_pct : (data.meta.compare === "last_year" ? l.vs_last_year_pct : l.vs_previous_pct);
   const pending = l => (l.label === "EBITDA" || l.label === "EBIT") && data.kpis.ebitda == null;
   const curCell = l => l.label === "Cost of goods sold" && credit ? "Credit · review"
     : hidden.has(l.label) ? (l.label === "Gross profit" ? "Hidden" : "Review pending") : pending(l) ? "Review pending" : fmt(l.current);
   $("plSumTitle").textContent = `P&L summary · ${data.meta.currency}`;
   $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th><th class="num">${data.meta.compare === "last_year" ? "Comparison" : "Prior"}</th><th class="num">Last year</th><th class="num">Budget</th><th class="num">Variance %${anyBudget?" vs budget":""}</th></tr>` +
-    pl.statement.map(l=>`<tr class="${l.total || l.label==="EBIT"?"total":""}"><td class="name">${esc(l.label)}</td>
+    (pl.summary || pl.statement).map(l=>`<tr class="${l.total || l.label==="EBIT"?"total":""}"><td class="name">${esc(l.label)}</td>
       <td class="num">${curCell(l)}</td><td class="num">${l.previous==null?"–":fmt(l.previous)}</td>
       <td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td><td class="num">${l.budget?fmt(l.budget):"–"}</td>
       <td class="num">${hidden.has(l.label)||pending(l)||varOf(l)==null||(l.label==="Cost of goods sold"&&credit)?"—":(varOf(l)>0?"+":varOf(l)<0?"−":"")+fmt(Math.abs(varOf(l)),1)+"%"}</td></tr>`).join("");
@@ -2014,7 +2014,7 @@ const PL_RATIOS = ["revenue_growth", "cogs_pct", "labour_pct", "prime_cost_pct",
 function renderPLRatios(pl, hidden, credit){
   const L = pl.library;
   if (!L) { $("plRatios").innerHTML = `<tr><td class="empty">${stChip("Content required")} This company has no KPI mapping: Settings → KPI mapping.</td></tr>`; return; }
-  const S = Object.fromEntries((pl.statement || []).map(l => [l.key, l]));
+  const S = Object.fromEntries((pl.summary || pl.statement || []).map(l => [l.key, l]));
   const prev = k => S[k] ? S[k].previous : null, rp = prev("revenue");
   const pp = v => v == null || !rp || rp <= 0 ? null : v / rp * 100;
   const cmp = {cogs_pct: pp(prev("cogs")), labour_pct: pp(prev("labour")),
@@ -2036,7 +2036,7 @@ function renderPLRatios(pl, hidden, credit){
 const WF_STEPS = [["revenue", 1], ["other_income", 1], ["cogs", -1], ["labour", -1], ["occupancy", -1], ["opex", -1],
                   ["da", -1], ["finance", -1], ["nonop", -1], ["tax", -1]];
 function renderPLWaterfall(pl){
-  const S = Object.fromEntries((pl.statement || []).map(l => [l.key, l])), np = S.net_profit;
+  const S = Object.fromEntries((pl.summary || pl.statement || []).map(l => [l.key, l])), np = S.net_profit;
   if (!pl.library || !np || np.previous == null) {
     $("plWfNote").textContent = pl.library ? "No comparison period to compare with." : "Needs the KPI mapping of this company.";
     $("plWf").innerHTML = ""; return;
@@ -5036,9 +5036,23 @@ function renderKm(){
     : `${d.company} · ${m.proposal ? "the proposal of the SALT chart model, not yet reviewed" : `saved by ${m.updated_by} on ${String(m.updated_at).replace("T", " ")}`}${m.approved_by ? ` · approved by ${m.approved_by} on ${String(m.approved_at).slice(0, 10)}` : ""} · year to date ${d.period[0]} to ${d.period[1]}`;
   const inp = k => `<input data-km="${k}" value="${esc(rules[k] || "")}" placeholder="${kmPlace(k)}" style="width:100%;min-width:220px">`;
   const lines = st => defs.lines.filter(l => l.statement === st);
+  const pack = (defs.clusters || []).some(c => String(rules[c.key] || "").trim());
+  const groups = (m || {}).groups || {};
+  const tot = (l, v) => `<tr class="total"><td>${esc(l)}</td><td></td>${pack ? "<td></td>" : ""}<td class="num">${v == null ? "–" : fmt(v)}</td></tr>`;
+  if (pack) {
+    // the lines of the management pack, each with the KPI line it counts in (the KPIs, Executive dashboard, Group view)
+    const at = {revenue: "revenue", other_income: "revenue", cogs: "cogs", labour: "opex", occupancy: "opex", opex: "opex", da: "da", finance: "finance", nonop: "finance", tax: "tax"};
+    const sel = c => `<select data-kmg="${c.key}" aria-label="KPI line of ${esc(c.label)}">${lines("pl").map(l => `<option value="${l.key}"${(groups[c.key] || c.group) === l.key ? " selected" : ""}>${esc(l.label)}</option>`).join("")}</select>`;
+    const rows = sec => defs.clusters.filter(c => at[groups[c.key] || c.group] === sec).map(c => `<tr><td class="name">${esc(c.label)}</td><td>${sel(c)}</td><td>${inp(c.key)}</td><td class="num">${P && P.clusters ? fmt(P.clusters[c.key]) : "–"}</td></tr>`).join("");
+    const D = (P || {}).derived || {};
+    $("kmPl").innerHTML = `<tr><th>Line (management pack)</th><th>KPI line</th><th>Accounts</th><th class="num">Year to date</th></tr>` +
+      rows("revenue") + tot("Revenue Total", D.revenue_total) + rows("cogs") + tot("Gross Margin", D.gross_profit) +
+      rows("opex") + tot("OPEX Total", D.opex_total) + tot("EBITDA", D.ebitda) + rows("da") + tot("EBIT", D.ebit) +
+      rows("finance") + tot("EBT", D.profit_before_tax) + rows("tax") + tot("Net profit from the lines", D.net_profit_from_lines);
+  } else
   $("kmPl").innerHTML = `<tr><th>Line</th><th>Accounts</th><th class="num">Year to date</th></tr>` +
     lines("pl").map(l => `<tr><td class="name">${esc(l.label)}</td><td>${inp(l.key)}</td><td class="num">${P ? fmt(P.lines[l.key]) : "–"}</td></tr>`).join("") +
-    (P ? `<tr class="total"><td>EBITDA</td><td></td><td class="num">${fmt(P.derived.ebitda)}</td></tr><tr class="total"><td>Net profit from the lines</td><td></td><td class="num">${fmt(P.derived.net_profit_from_lines)}</td></tr>` : "");
+    (P ? tot("EBITDA", P.derived.ebitda) + tot("Net profit from the lines", P.derived.net_profit_from_lines) : "");
   $("kmBs").innerHTML = `<tr><th>Line</th><th>Accounts</th><th class="num">Today</th></tr>` +
     lines("bs").map(l => `<tr><td class="name">${esc(l.label)}</td><td>${inp(l.key)}</td><td class="num">${B ? fmt(B.lines[l.key]) : "–"}</td></tr>`).join("") +
     (B ? `<tr class="total"><td>Assets · Liabilities · Equity</td><td></td><td class="num">${fmt(B.totals.assets)} · ${fmt(B.totals.liabilities)} · ${fmt(B.totals.equity)}</td></tr>` : "");
@@ -5059,11 +5073,12 @@ function renderKm(){
 }
 const kmPlace = k => ({revenue: "704*, 705*, 707*", cogs: "601*, 6051", labour: "641*, 644*, 648*", cash: "51*, 53*"})[k] || "";
 async function kmPost(action){
-  const rules = {}; document.querySelectorAll("[data-km]").forEach(i => rules[i.dataset.km] = i.value);
+  const rules = {}, groups = {}; document.querySelectorAll("[data-km]").forEach(i => rules[i.dataset.km] = i.value);
+  document.querySelectorAll("[data-kmg]").forEach(i => groups[i.dataset.kmg] = i.value);
   if (action === "approve" && !confirmKm()) return;
   $("kmMsg").textContent = "Saving…";
   try{
-    kmData = await simphonyPost("/api/kpi/mapping", {company: $("kmCo").value, rules: action === "reset" ? null : rules, action, note: $("kmNote").value});
+    kmData = await simphonyPost("/api/kpi/mapping", {company: $("kmCo").value, rules: action === "reset" ? null : rules, groups, action, note: $("kmNote").value});
     renderKm(); $("kmNote").value = "";
     $("kmMsg").textContent = action === "approve" ? "Approved. Every screen uses it from its next read." : action === "reset" ? "Back to the proposal." : "Saved as Reviewed. Every screen uses it from its next read; the KPIs stay Pilot until it is approved.";
   }catch(e){ $("kmMsg").textContent = "Could not save: " + e.message; }

@@ -979,14 +979,16 @@ def kpi_mapping_screen(company):
     acc = _safe(sources, f"Chart of accounts, {company}",
                 lambda: client.accounts(company, date(today.year, 1, 1).isoformat(), today.isoformat(), None, 900), [],
                 False)
-    line_of = kpilib.classifier(m)
+    line_of, rule_of = kpilib.classifier(m), kpilib.cluster_of(m)
     rows = []
     for r in acc:
         if r.get("Account_Type") != "Posting":
             continue
         line = line_of(r.get("No"))
+        rule = rule_of(r.get("No"))
         st = "pl" if r.get("Income_Balance") == "Income Statement" else "bs"
         rows.append({"no": r.get("No"), "name": r.get("Name"), "statement": st, "line": line,
+                     "pack_line": rule if rule in kpilib.CLUSTER else None,
                      "wrong_side": bool(line and kpilib.LINE[line]["statement"] != st),
                      "bc_category": (r.get("Account_Category") or "").strip(),
                      "ytd": round(float(r.get("Net_Change") or 0), 2),
@@ -996,7 +998,7 @@ def kpi_mapping_screen(company):
     return {"company": company, "mapping": m, "definitions": kpilib.definitions(), "accounts": rows,
             "unmapped": [x for x in rows if not x["line"]], "wrong_side": [x for x in rows if x["wrong_side"]],
             "pl": {"lines": P["lines"], "net_profit": P["net_profit"], "check": P["check"],
-                   "derived": P["derived"]} if P else None,
+                   "derived": P["derived"], "clusters": P["clusters"], "pack": P["pack"]} if P else None,
             "bs": {"lines": B["lines"], "totals": B["totals"]} if B else None,
             "kpis": kpilib.pl_kpis(P, m) if P else None,
             "period": [date(today.year, 1, 1).isoformat(), today.isoformat()], "sources": sources}
@@ -1481,7 +1483,7 @@ def _statement_exceptions(pl, bs, cash, settings):
                     "impact": 0, "document": "",
                     "next_action": "Set Account Category on the chart of accounts for this company.",
                     "drill": {"kind": "pl", "key": ""}})
-    for line in pl["statement"]:
+    for line in pl.get("summary") or pl["statement"]:      # the KPI lines, not every line of the pack
         v = line["vs_previous_pct"]
         if v is not None and abs(v) >= th["pl_variance_pct"] and abs(line["vs_previous"] or 0) >= th["materiality"]:
             out.append({"code": f"pl-{line['label'][:20]}", "severity": "warning", "area": "P&L",
@@ -2886,7 +2888,8 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or config.BC_COMPANY
                 rules = body.get("rules") if isinstance(body.get("rules"), dict) else None
-                kpilib.save(company, rules, user.get("name") or actor, action, str(body.get("note") or ""))
+                kpilib.save(company, rules, user.get("name") or actor, action, str(body.get("note") or ""),
+                            body.get("groups") if isinstance(body.get("groups"), dict) else None)
                 with _dash_lock:
                     _dash_cache.clear()
                 self._send(200, kpi_mapping_screen(company))

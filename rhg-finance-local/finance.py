@@ -216,6 +216,8 @@ def _pl_mapped(cur, prev, last_year, budget_rows, m):
     def get(X, key):
         if X is None:
             return None
+        if key.startswith("c:"):
+            return X["clusters"].get(key[2:])
         if key in X["lines"]:
             return X["lines"][key]
         if key == "net_profit":
@@ -233,7 +235,7 @@ def _pl_mapped(cur, prev, last_year, budget_rows, m):
                 "vs_budget": (cur_v - bud) if bud else None,
                 "vs_budget_pct": ((cur_v - bud) / abs(bud) * 100) if bud else None,
                 "of_revenue": (cur_v / revenue * 100) if revenue else None}
-    statement = [
+    summary = [
         block("Net revenue", "revenue"), block("Other operating income", "other_income"),
         block("Cost of goods sold", "cogs"), block("Gross profit", "gross_profit", True),
         block("Labour", "labour"), block("Occupancy", "occupancy"),
@@ -241,9 +243,33 @@ def _pl_mapped(cur, prev, last_year, budget_rows, m):
         block("Depreciation and amortization", "da"), block("EBIT", "ebit", True),
         block("Interest and finance costs (net)", "finance"), block("Non-operating items", "nonop"),
         block("Income tax", "tax"), block("Net profit", "net_profit", True)]
+    statement = summary
+    if P["pack"]:
+        # the lines of the management pack (P&L GL Category), each under the subtotal of its KPI line's place
+        groups = kpilib.groups_of(m)
+        place = {"revenue": "revenue", "other_income": "revenue", "cogs": "cogs", "labour": "opex",
+                 "occupancy": "opex", "opex": "opex", "da": "da", "finance": "finance", "nonop": "finance",
+                 "tax": "tax"}
+        at = lambda sec: [block(kpilib.CLUSTER[c]["label"], "c:" + c) for c, *_ in kpilib.CLUSTERS
+                          if place[groups[c]] == sec]
+        statement = (at("revenue") + [block("Revenue Total", "revenue_total", True)] +
+                     at("cogs") + [block("Gross Margin", "gross_profit", True)] +
+                     at("opex") + [block("OPEX Total", "opex_total", True), block("EBITDA", "ebitda", True)] +
+                     at("da") + [block("EBIT", "ebit", True)] +
+                     at("finance") + [block("EBT", "profit_before_tax", True)] +
+                     at("tax") + [block("Net Profit", "net_profit", True)])
     lines = []
+    if P["pack"]:
+        for c, *_ in kpilib.CLUSTERS:
+            for no, name, v in P["cluster_accounts"][c]:
+                lines.append({"account": no, "name": name, "category": kpilib.CLUSTER[c]["label"],
+                              "bucket": kpilib.groups_of(m)[c], "classified_by": "KPI mapping", "subcategory": "",
+                              "current": v, "previous": None, "last_year": None, "budget": None})
+    in_pack = {x[0] for c in kpilib.CLUSTER for x in P["cluster_accounts"][c]}
     for key in kpilib.PL_LINES:
         for no, name, v in P["accounts"][key]:
+            if no in in_pack:
+                continue
             lines.append({"account": no, "name": name, "category": kpilib.LINE[key]["label"], "bucket": key,
                           "classified_by": "KPI mapping", "subcategory": "", "current": v,
                           "previous": None, "last_year": None, "budget": None})
@@ -266,7 +292,7 @@ def _pl_mapped(cur, prev, last_year, budget_rows, m):
     v, d = P["lines"], P["derived"]
     validation = []
     cogs_credit = v["cogs"] < 0
-    margin_ok = revenue > 0 and not cogs_credit and d["gross_profit"] <= revenue
+    margin_ok = revenue > 0 and not cogs_credit and d["gross_profit"] <= revenue + max(v["other_income"], 0)
     if m is None:
         validation.append({"figure": "Every P&L line", "state": "Content required",
                            "reason": "This company has no KPI mapping: Finance → Settings → KPI mapping. Net profit is "
@@ -289,7 +315,8 @@ def _pl_mapped(cur, prev, last_year, budget_rows, m):
     lib = kpilib.pl_kpis(P, m, Pl)
     opex_all = v["labour"] + v["occupancy"] + v["opex"]
     return {
-        "statement": statement, "lines": lines[:300], "validation": validation, "margin_reliable": margin_ok,
+        "statement": statement, "summary": summary, "pack": P["pack"],
+        "lines": lines[:300], "validation": validation, "margin_reliable": margin_ok,
         "kpis": {"revenue": revenue, "cogs": v["cogs"], "gross": d["gross_profit"] if margin_ok else None,
                  "gross_raw": d["gross_profit"],
                  "gross_margin": (d["gross_profit"] / revenue * 100) if margin_ok else None,
@@ -306,7 +333,8 @@ def _pl_mapped(cur, prev, last_year, budget_rows, m):
                     "approved_by": (m or {}).get("approved_by") or "", "approved_at": (m or {}).get("approved_at") or ""},
         "classified_by": {"KPI mapping": sum(len(x) for x in P["accounts"].values()),
                           "Not in the KPI mapping": len(P["unmapped"])},
-        "note": "Lines follow the KPI mapping (Finance → Settings → KPI mapping), the same one the Executive "
+        "note": ("Lines of the management pack (P&L GL Category), each counted in a KPI line. " if P["pack"] else "") +
+                "Lines follow the KPI mapping (Finance → Settings → KPI mapping), the same one the Executive "
                 "dashboard, the P&L memo and Unicorn use. EBITDA is before interest and finance costs, income tax, "
                 "depreciation and amortisation and non-operating items. Net profit is the sum of every "
                 "income-statement account, whatever the mapping.",

@@ -60,7 +60,7 @@ def statement(now, pm, py, m):
             v, a, b = now["lines"].get(k, 0.0), (pm or {}).get("lines", {}).get(k), (py or {}).get("lines", {}).get(k)
             if not m and k in kpilib.LINE:     # no mapping: the lines are unknown, not nil
                 v = a = b = None
-            if k in kpilib.LINE and not str(((m or {}).get("rules") or {}).get(k) or "").strip():
+            if k in kpilib.LINE and not kpilib.filled(m, k):
                 status = "Content required"
             else:
                 status = "Approved" if (m or {}).get("status") == "Approved" else ("Pilot" if m else "Content required")
