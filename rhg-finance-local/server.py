@@ -49,6 +49,8 @@ import kpilib
 import fx
 import exreg
 import salesrec
+import billy
+import billyrec
 import assets
 import auth
 import brief
@@ -88,6 +90,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
+                     "/api/billy/settings": "settings", "/api/billy/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
@@ -1671,6 +1674,23 @@ def register_after_sales(company, r):
 salesrec.on_built = register_after_sales
 
 
+def _billy_pub():
+    S = billyrec.settings_of(store.get_settings())
+    return {"days": S["days"], "window": S["window"], "tol": S["tol"], "late": S["late"],
+            "rates": ", ".join(f"{x:g}" for x in sorted(S["rates"], reverse=True)), "shifts": S["shifts_text"],
+            "map": S["map"], "operators": S["operators"]}
+
+
+def register_after_billy(company, r):
+    """After every complete Simphony ↔ Billy read: its cases into the register, for the days it covered."""
+    if not r.get("complete"):
+        return None
+    return exreg.sync("billy_rec", company, billyrec.findings(r), in_scope=billyrec.in_scope(r))
+
+
+billyrec.on_built = register_after_billy
+
+
 def register_after_receipts(company, r):
     """After every complete takings reconciliation: its cases into the register, for the days it covered."""
     if not r.get("complete"):
@@ -1839,7 +1859,7 @@ def arap_status(user):
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
+EXPORT_PATHS = {"/api/billyrec/xlsx", "/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
                 "/api/discharge/xlsx", "/api/stockcount/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
@@ -1860,7 +1880,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
                          "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
-                         "/api/salesrec", "/api/receipts",
+                         "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx",
                          # Budget & forecast → Location intelligence, by department
                          "/api/executive"}
 
@@ -1980,6 +2000,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
         elif path == "/api/salesrec":
             self._scope_filter = lambda b: salesrec.cut(b, self._allowed)
+        elif path == "/api/billyrec":
+            self._scope_filter = lambda b: billyrec.cut(b, self._allowed)
         elif path == "/api/receipts":
             self._scope_filter = lambda b: dict(rcpt.cut(b, self._allowed), can_settings=False)
         else:
@@ -2411,6 +2433,39 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
                 self._send(200, dict(r, companies=salesrec.companies()) if isinstance(r, dict) else r)
+            elif url.path in ("/api/billyrec", "/api/billyrec/xlsx"):
+                # Control → Simphony ↔ Billy: every check against its fiscalized invoice, tills, shifts, sales book
+                if not auth.can(user, "finance.s.billyrec"):
+                    self._send(403, {"error": "Your role does not include Simphony ↔ Billy."})
+                    return
+                company = q.get("company") or (billyrec.companies() or [config.BC_COMPANY])[0]
+                if url.path.endswith("xlsx"):
+                    r = billyrec.held(company)
+                    if not r:
+                        self._send(409, {"error": "Read Simphony ↔ Billy first."})
+                        return
+                    r = billyrec.cut(r, self._allowed)
+                    body = billyrec.render_xlsx(r)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_libri_shitjes_billy_{re.sub(r"[^A-Za-z0-9_-]+", "_", company)}_{r["days"][0]}_{r["days"][-1]}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    store.audit("export", f"sales book Billy · {company}", user["username"], {}, {}, r["days"][0])
+                    return
+                try:
+                    r = billyrec.request(company, _latest, q.get("refresh") == "1")
+                except ValueError as exc:
+                    r = {"available": False, "error": str(exc)}
+                self._send(200, dict(r, companies=billyrec.companies(), connection=billy.info()["configured"],
+                                     can_settings=auth.can(user, "settings")) if isinstance(r, dict) else r)
+            elif url.path == "/api/billy/settings":
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role does not include Settings."})
+                    return
+                self._send(200, {"connection": billy.info(), "settings": _billy_pub(), "companies": salesrec.companies()})
             elif url.path == "/api/kpi/mapping":
                 self._send(200, kpi_mapping_screen(q.get("company") or config.BC_COMPANY))
             elif url.path == "/api/allocation":
@@ -2872,6 +2927,32 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/sales/channel-profit/params":
                 self._send(200, {"config": chanprof.save_config(body or {}, actor),
                                  "fields": [{"key": k, "label": lb, "unit": u} for k, lb, u in chanprof.CHANNEL_FIELDS]})
+            elif url.path in ("/api/billy/settings", "/api/billy/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    try:
+                        conn = billy.save(body["connection"], actor) if isinstance(body.get("connection"), dict) else billy.info()
+                        if isinstance(body.get("settings"), dict):
+                            rec = {k: str(v)[:4000] for k, v in body["settings"].items() if k in billyrec.DEFAULTS}
+                            store.save_settings({"billy_rec": rec}, actor)
+                        self._send(200, {"connection": conn, "settings": _billy_pub()})
+                    except (ValueError, KeyError) as exc:
+                        self._send(400, {"error": str(exc)})
+                    return
+                acct = billy.account(body.get("company") or "")
+                if not acct:
+                    self._send(200, {"ok": False, "error": "This company has no Billy account with a password."})
+                    return
+                try:
+                    with billy._tok_lock:
+                        billy._tokens.pop(acct["nuis"], None)
+                    billy._token(acct)
+                    store.audit("billy test", "connection", actor, {}, {"nuis": acct["nuis"]}, "")
+                    self._send(200, {"ok": True, "nuis": acct["nuis"]})
+                except billy.BillyError as exc:
+                    self._send(200, {"ok": False, "error": str(exc)})
             elif url.path in ("/api/simphony/settings", "/api/simphony/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

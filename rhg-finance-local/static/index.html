@@ -226,7 +226,17 @@ td.num,th.num{text-align:right}
 #kmCo{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit}
 /* Simphony ↔ BC */
 #sxKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-#sxGrid,#tkGrid{border-collapse:separate;border-spacing:3px}
+#sxGrid,#tkGrid,#biGrid{border-collapse:separate;border-spacing:3px}
+#biGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
+#biGrid td.loc,#biGrid th.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px;position:sticky;left:0;background:var(--card);z-index:1}
+#biGrid td.c{width:46px;min-width:46px;height:32px;border-radius:6px;text-align:center;font-size:10.5px;font-weight:600;padding:0;background:var(--bg);color:var(--sub)}
+#biGrid td.c.ok{background:var(--down-bg);color:var(--down)}#biGrid td.c.bad{background:var(--up-bg);color:var(--up)}
+#biGrid td.c.warn{background:var(--warn-bg);color:var(--warn)}#biGrid td.c.pend{background:var(--card);border:2px dashed var(--line)}#biGrid td.c.none{background:none;color:var(--line)}
+.bi-seg{margin:4px 0 14px;flex-wrap:wrap}
+.bi-acc{display:grid;grid-template-columns:minmax(110px,1fr) minmax(110px,1fr) minmax(110px,1fr) minmax(140px,1fr) auto;gap:6px;align-items:center;margin-bottom:6px}
+.bi-acc input,.bi-acc select,#biSet textarea{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;font-size:12.5px;min-width:0}
+#biSet textarea{width:100%;min-height:90px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+@media (max-width:700px){.bi-acc{grid-template-columns:1fr 1fr}}
 #tkGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
 #tkGrid td.loc,#tkGrid th.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px;position:sticky;left:0;background:var(--card);z-index:1}
 #tkGrid td.loc .meta{font-size:11px}
@@ -537,6 +547,7 @@ td.num,th.num{text-align:right}
     <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
     <button data-view="salesrec">Simphony ↔ BC</button>
     <button data-view="receipts">Takings POS ↔ BC</button>
+    <button data-view="billyrec">Simphony ↔ Billy</button>
 
     <div class="grp">System</div>
     <button data-view="gaps">Data quality &amp; reconciliation</button>
@@ -1411,6 +1422,62 @@ td.num,th.num{text-align:right}
     </div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the register works</summary>
       <div class="hint" id="rgDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-billyrec">
+    <div class="card">
+      <div class="card-head"><div><h2>Simphony ↔ Billy</h2>
+        <p class="hint" id="biNote"><span>Every Simphony check against the invoice Billy fiscalized for it: whether, with which IIC and FIC and at what time; the tills and units (kiosks included), shifts and operators, the summary invoices, and the sales book in the columns of the law in place of the Self-Care download.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="mini dark" id="biRead">Read again</button><button class="mini" id="biXlsx">Sales book (Excel)</button><button class="mini" id="biSetBtn" style="display:none">Connection &amp; mapping</button></div></div>
+      <div class="kpis six" id="biKpis" style="margin-top:14px"></div>
+      <p class="meta" id="biStatus"></p>
+    </div>
+    <div class="card" id="biSet" style="display:none">
+      <div class="card-head"><div><h2>Billy: connection &amp; mapping</h2>
+        <p class="hint"><span>The address of Billy Bridge and, per company, its NUIS and the Billy user. Each person types the password here; it stays on the server and the screen only shows whether it is set. The tower only reads: sign-in, sales invoices and invoices.</span></p></div></div>
+      <div class="formgrid"><label class="field">Billy address<input id="biBase" placeholder="https://…" autocomplete="off"></label></div>
+      <div id="biAccts" style="margin:8px 0"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn" id="biAddAcct">Add a company</button></div>
+      <div class="formgrid">
+        <label class="field">Days read (back from yesterday)<input id="biSDays" type="number" min="1" max="62"></label>
+        <label class="field">Time window (minutes)<input id="biSWin" type="number" min="1" max="240"></label>
+        <label class="field">Amount tolerance<input id="biSTol" type="number" min="0" step="0.01"></label>
+        <label class="field">Late after (minutes)<input id="biSLate" type="number" min="1" max="2880"></label>
+        <label class="field">VAT rates of the law (%)<input id="biSRates"></label>
+        <label class="field">Shifts<input id="biSShifts" placeholder="06:00-16:00 Morning; 16:00-06:00 Evening"></label>
+      </div>
+      <label class="field">Business units and tills → restaurant <span class="meta">one per line: code = Simphony reference | label (a till's line wins over its unit's)</span><textarea id="biSMap" spellcheck="false"></textarea></label>
+      <label class="field" style="margin-top:8px">Operators → employees <span class="meta">optional, one per line: operator code = Simphony employee number</span><textarea id="biSOps" spellcheck="false" style="min-height:60px"></textarea></label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="biSave">Save</button><span class="meta" id="biMsg"></span></div>
+    </div>
+    <div class="fc-seg bi-seg" id="biSeg" role="tablist"><button data-b="checks" class="on">Checks</button><button data-b="days">Restaurants &amp; days</button><button data-b="tills">Tills &amp; units</button><button data-b="ops">Shift &amp; operator</button><button data-b="summary">Summary invoices</button><button data-b="book">Sales book</button></div>
+    <div class="bi-p" data-p="checks">
+      <div class="card"><div class="card-head"><div><h2>Every check</h2><p class="hint"><span>Each Simphony check with its invoice: number, IIC, FIC, the time it was fiscalized and how long after the check closed.</span></p></div></div>
+        <div class="filters" style="margin:0 0 10px"><label>Restaurant<select id="biFLoc"><option value="">All</option></select></label>
+          <label>Status<select id="biFSt"></select></label><label>Find<input id="biFQ" placeholder="check, IIC, FIC, invoice number"></label></div>
+        <div class="scroll" style="max-height:620px"><table id="biChecks"></table></div><p class="meta" id="biChecksMore"></p></div>
+      <div class="card"><div class="card-head"><div><h2>Invoices without a check, and without a FIC</h2><p class="hint"><span>Fiscalized invoices no Simphony check accounts for (issued by hand, another till, or a check changed after it was fiscalized), and invoices of the bridge that never got a FIC.</span></p></div></div>
+        <div class="scroll" style="max-height:480px"><table id="biInv"></table></div></div>
+    </div>
+    <div class="bi-p" data-p="days" hidden><div class="card"><div class="card-head"><div><h2>Every restaurant, every day</h2>
+      <p class="hint"><span>Checks not fiscalized in the square; green when every check has its invoice. Hover for Simphony against fiscalized.</span></p></div></div>
+      <div class="scroll" data-nosort><table id="biGrid"></table></div></div></div>
+    <div class="bi-p" data-p="tills" hidden><div class="card"><div class="card-head"><div><h2>Tills and business units</h2>
+      <p class="hint"><span>Every till (tcrcode) and business unit (businUnitCode) with invoices in the period, and the restaurant it belongs to: mapped in Settings, or proposed where its invoices match the checks. A till of a restaurant whose invoices match no check, like a kiosk, is shown apart.</span></p></div></div>
+      <div class="scroll"><table id="biTills"></table></div><div id="biProp"></div></div></div>
+    <div class="bi-p" data-p="ops" hidden><div class="card"><div class="card-head"><div><h2>Shift and operator</h2>
+      <p class="hint"><span>Simphony checks by the employee who closed them against the invoices of their operator code, shift by shift. The difference is fiscalized less Simphony.</span></p></div></div>
+      <div class="scroll" style="max-height:620px"><table id="biOps"></table></div></div></div>
+    <div class="bi-p" data-p="summary" hidden><div class="card"><div class="card-head"><div><h2>Summary invoices</h2>
+      <p class="hint"><span>Invoices that sum up other invoices (their IIC references): fiscalized or not, and which of the invoices they refer to are found in Billy for the period.</span></p></div></div>
+      <div class="scroll"><table id="biSum"></table></div></div></div>
+    <div class="bi-p" data-p="book" hidden><div class="card"><div class="card-head"><div><h2>Sales book</h2>
+      <p class="hint"><span>Every invoice of the period in the columns of the sales book (exempt, without VAT, zero rate and exports, taxable value and VAT by rate), checked against the law; the Excel is the book with the cases.</span></p></div></div>
+      <div class="kpis" id="biBookK"></div><div class="sk-chips" id="biBookChips"></div>
+      <div class="scroll" style="max-height:620px"><table id="biBook"></table></div><p class="meta" id="biBookMore"></p></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
+      <div class="hint" id="biDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-salesrec">
@@ -4552,6 +4619,162 @@ $("modalCsv").onclick=()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
+// ---------------------------------------------------------------- Simphony ↔ Billy
+let biData = null, biTimer = null, biTab = "checks", biBookErr = "", biCfg = null;
+const BL_PILL = {ok: "low", late: "medium", late48: "critical", missing: "critical", pending: "", zero: ""};
+async function loadBilly(refresh){
+  clearTimeout(biTimer);
+  $("biStatus").textContent = "Reading…";
+  try{
+    const p = new URLSearchParams({company: $("company").value || ""});
+    const j = await readJSON(await fetch("/api/billyrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    $("biSetBtn").style.display = j.can_settings ? "" : "none";
+    if (j.pending) { $("biStatus").textContent = `Reading Simphony and Billy… ${j.stage || ""}`; biTimer = setTimeout(() => loadBilly(false), 4000); return; }
+    if (j.available === false || j.error) throw new Error(j.error || "not available");
+    biData = j; renderBilly();
+  }catch(e){ $("biStatus").textContent = "Could not read: " + e.message; }
+}
+const biM = v => v == null || isNaN(v) ? "–" : sxM(v);
+function renderBilly(){
+  const d = biData, k = d.kpis, card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const pct = k.checks ? k.fiscalized / k.checks * 100 : null;
+  $("biKpis").innerHTML =
+    card("Checks fiscalized", pct == null ? "–" : fmt(pct, 1) + "%", fcSp(`${fmt(k.fiscalized)} of ${fmt(k.checks)} checks`), pct == null ? "" : pct >= 99.9 ? "down" : "warn") +
+    card("Not fiscalized", fmt(k.missing), fcSp(`${biM(k.missing_value)} on the checks`), k.missing ? "up" : "down") +
+    card("Fiscalized late", fmt(k.late + k.late48), fcSp(`${fmt(k.late48)} after 48 hours · late after ${fmt(d.settings.late)} min`), k.late48 ? "up" : k.late ? "warn" : "") +
+    card("Invoices without a check", fmt(k.no_check), fcSp(`${biM(k.no_check_value)} · ${fmt(k.other_till || 0)} on tills without Simphony`), k.no_check ? "warn" : "") +
+    card("No FIC in Billy", fmt(k.no_fic), fcSp(`${biM(k.no_fic_value)} not fiscalized`), k.no_fic ? "up" : "down") +
+    card("Sales book cases", fmt(k.book_errors), fcSp(`of ${fmt(k.invoices)} invoices${k.unmapped ? ` · ${k.unmapped} tills not mapped` : ""}`), k.book_errors ? "warn" : "down");
+  $("biStatus").innerHTML = esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
+    + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
+    + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
+    + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
+  const locs = [...new Set(d.checks.map(c => c.ref))].sort(), lv = $("biFLoc").value, sv = $("biFSt").value || "missing";
+  $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
+  $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
+  $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
+  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook();
+}
+function biChecks(){
+  const d = biData, L = $("biFLoc").value, st = $("biFSt").value || "missing", q = ($("biFQ").value || "").trim().toUpperCase();
+  const rows = d.checks.filter(c => (!L || c.ref === L) && (st === "all" || c.status === st) && (!q || [c.num, c.iic, c.fic, c.inv_num].some(v => String(v || "").toUpperCase().includes(q))))
+    .sort((a, b) => (b.day + b.clsd).localeCompare(a.day + a.clsd));
+  $("biChecks").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th>Check</th><th>Closed</th><th class="num">Total</th><th>Employee</th><th>Shift</th><th>Status</th><th>Invoice</th><th>IIC</th><th>FIC</th><th>Fiscalized</th><th class="num">After (min)</th><th>Till</th><th>Operator</th></tr>` +
+    (rows.slice(0, 400).map(c => `<tr><td>${esc(c.ref)}</td><td>${esc(c.day)}</td><td><b>${esc(c.num)}</b></td><td>${esc((c.clsd || "").slice(11, 16))}</td><td class="num">${fmt(c.total, 2)}</td><td>${esc(c.emp ?? "")}</td><td>${esc(c.shift)}</td>
+      <td><span class="rhg-pill ${BL_PILL[c.status] || ""}">${esc(d.status[c.status])}</span>${c.how ? `<div class="meta">${fcSp(c.how)}</div>` : ""}</td><td>${esc(c.inv_num)}</td>
+      <td class="meta" title="${esc(c.iic)}">${esc((c.iic || "").slice(0, 12))}${c.iic ? "…" : ""}</td><td class="meta" title="${esc(c.fic)}">${esc((c.fic || "").slice(0, 13))}${c.fic ? "…" : ""}</td>
+      <td>${esc((c.issued || "").replace("T", " ").slice(5, 16))}</td><td class="num">${c.delay_min == null ? "" : fmt(c.delay_min, 0)}</td><td>${esc(c.tcr)}</td><td>${esc(c.op)}</td></tr>`).join("")
+      || `<tr><td colspan="15" class="meta">${fcSp("No check with this filter.")}</td></tr>`);
+  $("biChecksMore").textContent = rows.length > 400 ? `${fmt(rows.length)} checks; the latest 400 are shown. The Excel has the checks not fiscalized.` : "";
+}
+function biInv(){
+  const d = biData, L = $("biFLoc").value, rows = d.invoices.filter(i => !L || i.ref === L);
+  $("biInv").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Status</th><th>Restaurant</th><th>Unit</th><th>Till</th><th>Operator</th><th>Shift</th><th>IIC</th><th>FIC</th></tr>` +
+    (rows.slice(0, 300).map(i => `<tr><td>${esc((i.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(i.num)}</b></td><td class="num">${fmt(i.total, 2)}</td>
+      <td><span class="rhg-pill ${i.status === "no_fic" ? "critical" : "medium"}">${esc(d.inv_status[i.status])}</span></td><td>${esc(i.ref || "–")}</td><td>${esc(i.bu)}</td><td>${esc(i.tcr)}</td><td>${esc(i.op)}</td><td>${esc(i.shift)}</td>
+      <td class="meta" title="${esc(i.iic)}">${esc((i.iic || "").slice(0, 12))}…</td><td class="meta">${esc((i.fic || "–").slice(0, 13))}</td></tr>`).join("")
+      || `<tr><td colspan="11" class="meta">${fcSp("Every fiscalized invoice has its Simphony check, and every invoice of the bridge has a FIC.")}</td></tr>`);
+}
+function biGrid(){
+  const d = biData, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  $("biGrid").innerHTML = `<tr><th class="loc"></th>${d.days.map(x => `<th>${wd[new Date(x + "T12:00:00").getDay()]}<br>${x.slice(8)}</th>`).join("")}</tr>` +
+    d.locations.map(L => `<tr><td class="loc"><b>${esc(L.name)}</b><div class="meta">${esc(L.ref)}${L.missing ? ` · ${fmt(L.missing)} not fiscalized` : ""}</div></td>` + d.days.map(x => {
+      const c = L.cells[x] || {}, cls = !c.checks && !c.fisc ? "none" : c.missing ? "bad" : c.pending ? "pend" : c.late || c.no_check ? "warn" : "ok";
+      const t = `${L.name} ${x}: ${fmt(c.checks)} checks, Simphony ${fmt(c.sim)}, fiscalized ${fmt(c.fisc)}; ${fmt(c.missing)} not fiscalized (${fmt(c.missing_value)}), ${fmt(c.late)} late, ${fmt(c.no_check)} invoices without a check`;
+      return `<td class="c ${cls}" title="${esc(t)}">${cls === "none" ? "·" : c.missing ? fmt(c.missing) : cls === "pend" ? "…" : "✓"}</td>`; }).join("") + `</tr>`).join("");
+}
+function biTills(){
+  const d = biData;
+  $("biTills").innerHTML = `<tr><th>Till (TCR)</th><th>Business unit</th><th>Restaurant</th><th>Placed</th><th>Label</th><th>Kind</th><th class="num">Invoices</th><th class="num">Value</th><th class="num">With a check</th><th class="num">No FIC</th><th class="num">Operators</th><th>First – last</th></tr>` +
+    (d.tills.map(t => `<tr><td><b>${esc(t.tcr)}</b></td><td>${esc(t.bu)}</td><td>${esc(t.ref || "–")}</td><td><span class="rhg-pill ${t.placed === "mapped" ? "low" : t.placed === "proposed" ? "medium" : "critical"}">${fcSp(t.placed)}</span></td>
+      <td>${esc(t.label)}</td><td class="meta">${fcSp(t.kind)}</td><td class="num">${fmt(t.invoices)}</td><td class="num">${biM(t.value)}</td><td class="num">${fmt(t.matched)}</td><td class="num">${fmt(t.no_fic)}</td><td class="num">${fmt(t.ops)}</td>
+      <td class="meta">${esc((t.first || "").slice(5, 16).replace("T", " "))} – ${esc((t.last || "").slice(5, 16).replace("T", " "))}</td></tr>`).join("") || `<tr><td class="meta">${fcSp("No invoice in the period.")}</td></tr>`);
+  const P = Object.entries(d.proposals || {});
+  $("biProp").innerHTML = P.length ? `<h3 style="margin:16px 0 6px;font-size:14px">${fcSp("Proposed: paste into the mapping to keep them")}</h3><pre class="meta" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px">${esc(P.map(([code, p]) => `${code} = ${p.ref}    # ${p.matched} of ${p.invoices} invoices matched a check`).join("\n"))}</pre>` : "";
+}
+function biOps(){
+  const d = biData;
+  $("biOps").innerHTML = `<tr><th>Restaurant</th><th>Shift</th><th>Operator</th><th>Employees</th><th class="num">Checks</th><th class="num">Simphony</th><th class="num">Invoices</th><th class="num">Fiscalized</th><th class="num">Difference</th><th class="num">Not fiscalized</th><th class="num">Without a check</th></tr>` +
+    (d.operators.map(o => `<tr><td>${esc(o.ref || "–")}</td><td>${esc(o.shift)}</td><td><b>${esc(o.op)}</b></td><td class="meta">${esc(o.emps.join(", "))}</td><td class="num">${fmt(o.checks)}</td><td class="num">${fmt(o.sim, 0)}</td>
+      <td class="num">${fmt(o.invoices)}</td><td class="num">${fmt(o.fisc, 0)}</td><td class="num ${Math.abs(o.diff) > d.settings.tol * 10 ? (o.diff < 0 ? "up" : "warn") : ""}">${o.diff > 0 ? "+" : o.diff < 0 ? "−" : ""}${fmt(Math.abs(o.diff), 0)}</td>
+      <td class="num">${o.not_fisc ? `${fmt(o.not_fisc, 0)} <span class="meta">(${o.not_fisc_n})</span>` : ""}</td><td class="num">${o.no_check ? `${fmt(o.no_check, 0)} <span class="meta">(${o.no_check_n})</span>` : ""}</td></tr>`).join("")
+      || `<tr><td class="meta">${fcSp("No check or invoice in the period.")}</td></tr>`);
+}
+function biSum(){
+  const d = biData;
+  $("biSum").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Type</th><th>Till</th><th>Restaurant</th><th>Fiscalized</th><th class="num">Invoices referred</th><th class="num">Found</th><th>Not found</th></tr>` +
+    (d.summary.map(x => `<tr><td>${esc((x.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(x.num)}</b></td><td class="num">${fmt(x.total, 2)}</td><td>${esc(x.type)}</td><td>${esc(x.tcr)}</td><td>${esc(x.ref || "–")}</td>
+      <td><span class="rhg-pill ${x.fiscalized ? "low" : "critical"}">${fcSp(x.fiscalized ? "Yes" : "No FIC")}</span></td><td class="num">${fmt(x.refs)}</td><td class="num">${fmt(x.found)}</td><td class="meta">${esc(x.missing.slice(0, 4).map(m => m.slice(0, 10) + "…").join(", "))}${x.missing.length > 4 ? ` +${x.missing.length - 4}` : ""}</td></tr>`).join("")
+      || `<tr><td class="meta">${fcSp("No summary invoice in the period.")}</td></tr>`);
+}
+function biBook(){
+  const d = biData, B = d.book, rates = d.rates.filter(r => r > 0).sort((a, b) => b - a);
+  const sum = k => B.reduce((a, b) => a + (b[k] || 0), 0);
+  const card = (l, v) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v">${biM(v)}</div></div>`;
+  $("biBookK").innerHTML = card("Total with VAT", sum("total")) + card("Exempt", sum("exempt")) + card("Without VAT", sum("no_vat")) + card("Zero rate and exports", sum("zero")) +
+    rates.map(r => card(`Taxable ${r}%`, sum("b" + r)) + card(`VAT ${r}%`, sum("v" + r))).join("");
+  const counts = d.book_errors || {}, keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  $("biBookChips").innerHTML = [["", "Every invoice", B.length], ["*", "With a case", B.filter(b => b.errors.length).length], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
+    .map(([k, l, n]) => `<button data-be="${esc(k)}" class="${biBookErr === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
+  $("biBookChips").querySelectorAll("[data-be]").forEach(b => b.onclick = () => { biBookErr = b.dataset.be; biBook(); });
+  const rows = B.filter(b => !biBookErr || (biBookErr === "*" ? b.errors.length : b.errors.includes(biBookErr)));
+  $("biBook").innerHTML = `<tr><th>Date</th><th>No.</th><th>Invoice</th><th>Buyer</th><th class="num">Total</th><th class="num">Exempt</th><th class="num">No VAT</th><th class="num">0% / export</th>${rates.map(r => `<th class="num">Taxable ${r}%</th><th class="num">VAT ${r}%</th>`).join("")}<th>Till</th><th>Cases</th></tr>` +
+    (rows.slice(0, 400).map(b => `<tr><td>${esc((b.issue || "").slice(0, 16).replace("T", " "))}</td><td>${esc(b.ord ?? "")}</td><td><b>${esc(b.num)}</b>${b.eic ? `<div class="meta">EIC</div>` : ""}</td><td>${esc(b.buyer || "")}${b.buyer_id ? `<div class="meta">${esc(b.buyer_id)}</div>` : ""}</td>
+      <td class="num">${fmt(b.total, 2)}</td><td class="num">${b.exempt ? fmt(b.exempt, 2) : ""}</td><td class="num">${b.no_vat ? fmt(b.no_vat, 2) : ""}</td><td class="num">${b.zero ? fmt(b.zero, 2) : ""}</td>
+      ${rates.map(r => `<td class="num">${b["b" + r] ? fmt(b["b" + r], 2) : ""}</td><td class="num">${b["v" + r] ? fmt(b["v" + r], 2) : ""}</td>`).join("")}<td>${esc(b.tcr)}</td>
+      <td>${b.errors.map(e => `<span class="rhg-pill ${e === "no_fic" ? "critical" : e === "no_detail" ? "" : "medium"}" style="margin:1px">${esc(d.error_labels[e] || e)}</span>`).join("")}</td></tr>`).join("")
+      || `<tr><td colspan="${10 + rates.length * 2}" class="meta">${fcSp("No invoice with this filter.")}</td></tr>`);
+  $("biBookMore").textContent = rows.length > 400 ? `${fmt(rows.length)} invoices; 400 are shown, the Excel has every one.` : "";
+}
+$("biSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  biTab = b.dataset.b;
+  $("biSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("#v-billyrec .bi-p").forEach(p => p.hidden = p.dataset.p !== biTab);
+});
+$("biFLoc").onchange = () => { if (biData) { biChecks(); biInv(); } };
+$("biFSt").onchange = () => biData && biChecks();
+$("biFQ").oninput = () => biData && biChecks();
+$("biRead").onclick = () => loadBilly(true);
+$("biXlsx").onclick = () => { if (biData) location.href = "/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company); };
+// connection and mapping (Settings permission): the passwords are typed here and never shown back
+function biAcctRow(a){
+  const cos = (biCfg && biCfg.companies) || [];
+  return `<div class="bi-acc" data-acc><select data-f="company" aria-label="Company"><option value="">Company</option>${cos.map(c => `<option${c === a.company ? " selected" : ""}>${esc(c)}</option>`).join("")}${a.company && !cos.includes(a.company) ? `<option selected>${esc(a.company)}</option>` : ""}</select>
+    <input data-f="nuis" placeholder="NUIS" value="${esc(a.nuis || "")}" aria-label="NUIS" autocomplete="off"><input data-f="username" placeholder="Billy user" value="${esc(a.username || "")}" aria-label="Billy user" autocomplete="off">
+    <input data-f="password" type="password" placeholder="${a.has_password ? "password saved · type to change" : "password"}" aria-label="Password" autocomplete="new-password">
+    <span style="display:flex;gap:6px"><button class="mini" data-test type="button">Test</button><button class="mini" data-del type="button">Remove</button></span></div>`;
+}
+function biBindAcct(row){
+  row.querySelector("[data-del]").onclick = () => row.remove();
+  row.querySelector("[data-test]").onclick = async () => {
+    const co = row.querySelector('[data-f="company"]').value;
+    $("biMsg").textContent = "Signing in to Billy…";
+    try { const j = await simphonyPost("/api/billy/test", {company: co});
+      $("biMsg").textContent = j.ok ? `Billy accepted ${co} (${j.nuis}).` : "Billy: " + j.error; } catch(e){ $("biMsg").textContent = e.message; }
+  };
+}
+function biDrawAccts(list){
+  $("biAccts").innerHTML = list.map(biAcctRow).join("") || `<p class="meta">${fcSp("No company yet.")}</p>`;
+  $("biAccts").querySelectorAll("[data-acc]").forEach(biBindAcct);
+}
+$("biSetBtn").onclick = async () => {
+  const card = $("biSet"); if (card.style.display !== "none") { card.style.display = "none"; return; }
+  try { biCfg = await readJSON(await fetch("/api/billy/settings")); } catch(e){ $("biStatus").textContent = e.message; return; }
+  const S = biCfg.settings;
+  $("biBase").value = biCfg.connection.base_url || ""; biDrawAccts(biCfg.connection.accounts || []);
+  $("biSDays").value = S.days; $("biSWin").value = S.window; $("biSTol").value = S.tol; $("biSLate").value = S.late; $("biSRates").value = S.rates; $("biSShifts").value = S.shifts;
+  $("biSMap").value = S.map; $("biSOps").value = S.operators; $("biMsg").textContent = ""; card.style.display = "";
+};
+$("biAddAcct").onclick = () => { const div = document.createElement("div"); div.innerHTML = biAcctRow({}); $("biAccts").querySelector("p.meta")?.remove(); const row = div.firstElementChild; $("biAccts").appendChild(row); biBindAcct(row); };
+$("biSave").onclick = async () => {
+  const accounts = [...$("biAccts").querySelectorAll("[data-acc]")].map(r => { const g = f => r.querySelector(`[data-f="${f}"]`).value.trim(); return {company: g("company"), nuis: g("nuis").toUpperCase(), username: g("username"), password: r.querySelector('[data-f="password"]').value}; });
+  const body = {connection: {base_url: $("biBase").value.trim(), accounts}, settings: {days: $("biSDays").value, window: $("biSWin").value, tol: $("biSTol").value, late: $("biSLate").value,
+    rates: $("biSRates").value, shifts: $("biSShifts").value, map: $("biSMap").value, operators: $("biSOps").value}};
+  $("biMsg").textContent = "Saving…";
+  try { const j = await simphonyPost("/api/billy/settings", body);
+    $("biAccts").querySelectorAll('[data-f="password"]').forEach(x => x.value = "");
+    biCfg.connection = j.connection; biDrawAccts(j.connection.accounts || []); $("biMsg").textContent = "Saved. Read again to apply."; } catch(e){ $("biMsg").textContent = e.message; }
+};
 // ---------------------------------------------------------------- Simphony ↔ BC
 let sxData = null, sxTimer = null, sxSel = null;
 const SX_SHORT = {not_imported: "none", import_diff: "", invoice_diff: "inv", not_posted: "post", unpaid: "open", pending: "…", ok: "✓", no_sales: "·"};
@@ -5731,6 +5954,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="receipts" && (!tkData || tkData.company !== ($("company").value || tkData.company))) loadReceipts(false);
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
+  if(b.dataset.view==="billyrec" && (!biData || biData.company !== ($("company").value || biData.company))) loadBilly(false);
   if(b.dataset.view==="settings") { liSettings(); loadKm(); loadAc(); }
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);

@@ -245,6 +245,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.inventory.discharge": "finance.s.inventory.recipes",
                  "finance.s.sales.menu": "finance.s.sales.prices",
                  "finance.s.sales.chanprofit": "finance.s.sales.main",
+                 # Control → Simphony ↔ Billy: whoever reads Simphony ↔ BC
+                 "finance.s.billyrec": "finance.s.salesrec",
                  # Sales → Menu & food cost: whoever reads Menu engineering
                  "finance.s.sales.menucost": "finance.s.sales.menu",
                  # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing

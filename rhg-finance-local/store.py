@@ -130,6 +130,10 @@ DEFAULT_SETTINGS = {
     # day not imported, not posted, not settled is an exception; tolerance: the larger of the amount and the %
     "sales_rec": {"days": "14", "import_lag": "2", "post_lag": "4", "settle_days": "7", "tol_abs": "1000",
                   "tol_pct": "0.5"},
+    # Control → Simphony ↔ Billy (billyrec.py): days, time window and tolerance of the match, late minutes, the rates
+    # of the law, shifts, the mapping of business units and tills to restaurants, operators to employees
+    "billy_rec": {"days": "7", "window": "20", "tol": "1", "late": "60", "rates": "20, 10, 6, 0",
+                  "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": ""},
     "exception_register": {"controls": True, "enabled": False, "time": "08:15", "escalate_days": "3",
                            "escalate_roles": "coo, cfo"},
     # weekly and monthly performance email of every brand (sales and costs against budget and last
@@ -206,6 +210,7 @@ def get_settings():
     merged["negative_report"].update(s.get("negative_report", {}))
     merged["exception_register"].update(s.get("exception_register", {}))
     merged["sales_rec"].update(s.get("sales_rec", {}))
+    merged["billy_rec"].update(s.get("billy_rec", {}))
     merged["brand_report"].update(s.get("brand_report", {}))
     merged["sales_report"].update(s.get("sales_report", {}))
     merged["pl_memo"].update(s.get("pl_memo", {}))
@@ -283,6 +288,9 @@ def save_settings(patch, actor="director"):
                 except (TypeError, ValueError):
                     v = DEFAULT_SETTINGS["sales_rec"][k]
                 current.setdefault("sales_rec", {})[k] = v
+        for k, v in (patch.get("billy_rec") or {}).items():
+            if k in DEFAULT_SETTINGS["billy_rec"]:
+                current.setdefault("billy_rec", {})[k] = str(v)[:4000]
         for k, v in (patch.get("exception_register") or {}).items():
             if k in DEFAULT_SETTINGS["exception_register"]:
                 if isinstance(DEFAULT_SETTINGS["exception_register"][k], bool):
