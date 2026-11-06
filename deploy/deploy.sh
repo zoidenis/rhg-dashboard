@@ -19,6 +19,8 @@ if [ ! -f .env ]; then
   echo "Wrote deploy/.env with the shared service token."
 fi
 
+# Heavy on this 1 GB server: only for a first install or without GitHub. The normal path is the
+# GitHub Actions deploy, which builds on the runner and loads the images here.
 docker compose build
 docker compose up -d
 

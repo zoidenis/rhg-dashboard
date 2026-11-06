@@ -1,5 +1,14 @@
 # RHG Control Towers. nginx terminates TLS and is the only container with published
 # ports; the two apps are reachable only on the internal network.
+#
+# Memory: the server has 1 GB. mem_limit is what an app may hold in RAM; past that its own idle pages go to swap,
+# so one heavy app slows itself instead of freezing the whole host (6 Nov 2026). memswap_limit is RAM + swap: past
+# that the app alone is killed and Docker restarts it. Raise these when the server gets more RAM.
+# MALLOC_*: glibc gives every thread its own arena and keeps freed memory; these two hand it back to the system.
+x-python-memory: &python-memory
+  MALLOC_ARENA_MAX: "2"
+  MALLOC_TRIM_THRESHOLD_: "65536"
+
 services:
   # Central sign-in, accounts and permissions. The towers hold no accounts:
   # they ask this service who the caller is on every request.
@@ -13,16 +22,21 @@ services:
       APP_HOST: "0.0.0.0"
       APP_PORT: "8767"
       TZ: Europe/Tirane
+      <<: *python-memory
     volumes:
       - identity-data:/app/data
     networks: [rhg]
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8767/api/session',timeout=5)"]
-      interval: 30s
+      # every check starts a whole Python: once a minute, every 5 s only while starting
+      interval: 60s
       timeout: 10s
-      start_period: 15s
+      start_period: 60s
+      start_interval: 5s
       retries: 3
+    mem_limit: 128m
+    memswap_limit: 384m
 
   purchasing:
     depends_on: [identity]
@@ -37,6 +51,7 @@ services:
       APP_HOST: "0.0.0.0"
       APP_PORT: "8765"
       TZ: Europe/Tirane
+      <<: *python-memory
       # This tower holds no accounts: it asks identity who the caller is.
       RHG_APP: "purchasing"
       IDENTITY_URL: "http://identity:8767"
@@ -48,10 +63,14 @@ services:
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/api/session',timeout=5)"]
-      interval: 30s
+      # every check starts a whole Python: once a minute, every 5 s only while starting
+      interval: 60s
       timeout: 10s
-      start_period: 15s
+      start_period: 60s
+      start_interval: 5s
       retries: 3
+    mem_limit: 300m
+    memswap_limit: 800m
 
   finance:
     depends_on: [identity]
@@ -64,6 +83,7 @@ services:
       APP_HOST: "0.0.0.0"
       APP_PORT: "8766"
       TZ: Europe/Tirane
+      <<: *python-memory
       # This tower holds no accounts: it asks identity who the caller is.
       RHG_APP: "finance"
       IDENTITY_URL: "http://identity:8767"
@@ -78,18 +98,21 @@ services:
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8766/api/session',timeout=5)"]
-      interval: 30s
+      # every check starts a whole Python: once a minute, every 5 s only while starting
+      interval: 60s
       timeout: 10s
-      start_period: 15s
+      start_period: 60s
+      start_interval: 5s
       retries: 3
+    mem_limit: 450m
+    memswap_limit: 1200m
 
   # Scheduled reports: a headless Chromium that opens screens as the people who receive them (short read-only
   # sessions from identity) and emails a picture and a PDF through the Purchasing mail server. No ports, no data.
   # Its code lives in rhg-identity/reporter: the deploy copies only the three app folders to the server.
   # It waits for identity and nginx on its own (it asks again every minute until they answer).
-  # Profile "reports": the plain "docker compose build/up" on the server leaves it alone, because building Chromium
-  # there is too heavy (1 CPU / 1 GB). The GitHub Actions deploy builds the image on the runner, loads it onto the
-  # server only when rhg-identity/reporter changed, and starts it; see README-DEPLOY.md → Raportet e planifikuara.
+  # Profile "reports": a plain "docker compose up" on the server leaves it alone. Like the other images it is built
+  # on the GitHub runner and loaded onto the server only when its folder changed; see README-DEPLOY.md.
   # mem_limit stays below the server's RAM, so a heavy page kills Chromium here and not one of the towers.
   reporter:
     profiles: ["reports"]

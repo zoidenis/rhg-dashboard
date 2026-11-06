@@ -71,11 +71,18 @@ docker compose logs purchasing | grep -A4 "First run"
 ```
 
 ## Përditësim kodi
-```bash
-./deploy/push.sh                                   # nga Mac-u
-ssh root@139.162.169.104 'cd /opt/rhg/deploy && docker compose build && docker compose up -d'
-```
-`data/` është volume — përditësimi nuk prek users, actions, settings, audit.
+Çdo push te `main` i `fabiankuka01-stack/rhg-tower` bën deploy vetë: imazhet ndërtohen në runner-in e GitHub-it dhe
+ngarkohen në server me `docker save | docker load`, vetëm ato që ndryshuan. Në server nuk ndërtohet më, sepse ndërtimi
+e lë pa memorie. `data/` është volume — përditësimi nuk prek users, actions, settings, audit.
+
+## Memoria (serveri ka 1 GB RAM)
+Më 6 nëntor 2026 serveri ngeci sepse RAM-i dhe swap-i u mbushën. Mbrojtjet tani:
+- **Swap 2.5 GB:** `/swapfile` (2 GB) mbi `/dev/sdb` (496 MB), që memoria e papërdorur të mos nxjerrë kodin nga RAM-i.
+- **`earlyoom`:** vret aplikacionin më të madh para se host-i të ngecë, dhe Docker e rindez (`/etc/default/earlyoom`).
+- **Kufij për kontejner:** `mem_limit` dhe `memswap_limit` te `docker-compose.yml`. Një aplikacion i rëndë ngadalëson veten, jo gjithë serverin.
+
+Kontroll: `free -m`, `docker stats --no-stream`, `sar -r` (historiku), `journalctl -u earlyoom`.
+Nëse serveri rritet, ngriji kufijtë te `docker-compose.yml`.
 
 ## Backup
 State-i i aplikacionit është në volumet `finance-data`, `purchasing-data` dhe `identity-data`. Arkivat përmbajnë edhe kredenciale; `backup.sh` i kufizon për root.
@@ -165,8 +172,8 @@ ose butoni *Schedule as report* në krye të çdo faqeje (për rolet me `reports
   foto (në trupin e email-it) dhe një PDF të plotë, dhe e dërgon përmes serverit të mail-it të Purchasing.
 - Nuk ka `.env` të ri: `reporter` merr SERVICE_TOKEN nga `deploy/.env`, si kullat. `PUBLIC_URL` (identity, opsionale)
   është adresa e lidhjes "Hape në pulse" (parazgjedhur `https://dashboard.rhg.al`).
-- Deploy-i automatik (GitHub Actions) e mban `reporter`-in lart vetë. Imazhi (Chromium, ~400 MB) **nuk** ndërtohet
-  në server, sepse atje ndërtimi e ndërpreu deploy-in #114: ndërtohet në runner-in e GitHub-it dhe dërgohet me
+- Deploy-i automatik (GitHub Actions) e mban `reporter`-in lart vetë. Imazhi (Chromium, ~400 MB), si të tjerët,
+  ndërtohet në runner-in e GitHub-it dhe dërgohet me
   `docker save | docker load`, vetëm kur ndryshon kodi te `rhg-identity/reporter` (etiketa `rhg.tree` e imazhit mban
   hash-in e dosjes në git). Në çdo deploy tjetër hapi vetëm kontrollon që kontejneri të jetë `Up`. Hapi vjen pas
   verifikimit të faqes, kështu që një dështim i tij nuk e lë faqen poshtë.
