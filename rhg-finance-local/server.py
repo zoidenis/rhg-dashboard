@@ -2086,7 +2086,9 @@ class Handler(BaseHTTPRequestHandler):
             body = self._scope_filter(body)
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
         zipped = (len(payload) > 16 * 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "")
-                  and ctype.startswith(("application/json", "text/html", "application/javascript", "text/javascript", "text/css", "image/svg+xml")))
+                  and ctype.startswith("application/json"))
+        # JSON only: the pages, scripts and styles of this tower pass through nginx's sub_filter, which rewrites
+        # "/api/" into "/finance/api/" (or /purchasing/) and cannot read a compressed body (deploy/nginx/default.conf)
         if zipped:                                       # a large answer or page (index.html, Simphony ↔ Billy…) travels compressed
             payload = gzip.compress(payload, compresslevel=5)
         self.send_response(status)
