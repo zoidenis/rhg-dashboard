@@ -1678,7 +1678,7 @@ def _billy_pub():
     S = billyrec.settings_of(store.get_settings())
     return {"days": S["days"], "window": S["window"], "tol": S["tol"], "late": S["late"],
             "rates": ", ".join(f"{x:g}" for x in sorted(S["rates"], reverse=True)), "shifts": S["shifts_text"],
-            "map": S["map"], "operators": S["operators"]}
+            "map": S["map"], "operators": S["operators"], "exclude": ", ".join(S["exclude"])}
 
 
 def register_after_billy(company, r):

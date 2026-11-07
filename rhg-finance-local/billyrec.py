@@ -46,7 +46,7 @@ import store
 
 DB_PATH = store.DATA_DIR / "guest_checks.db"
 DEFAULTS = {"days": "7", "window": "20", "tol": "1", "late": "60", "rates": "20, 10, 6, 0",
-            "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": ""}
+            "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": "", "exclude": ""}
 STATUS = {"ok": "Fiscalized", "late": "Fiscalized late", "late48": "Fiscalized after 48 h", "missing": "Not fiscalized",
           "pending": "Pending", "zero": "No amount"}
 INV_STATUS = {"matched": "With a Simphony check", "no_check": "No Simphony check", "no_fic": "Not fiscalized (no FIC)",
@@ -78,7 +78,9 @@ def settings_of(settings):
     return {"days": int(num("days", 1, 62)), "window": num("window", 1, 240), "tol": num("tol", 0, 1000),
             "late": num("late", 1, 2880), "rates": rates or [20.0, 10.0, 6.0, 0.0], "shifts": shifts(s.get("shifts")),
             "shifts_text": str(s.get("shifts") or DEFAULTS["shifts"]), "map": str(s.get("map") or ""),
-            "operators": str(s.get("operators") or "")}
+            "operators": str(s.get("operators") or ""),
+            # restaurants of the company not fiscalized with its NUIS (a franchise): left out of the match
+            "exclude": sorted({x.upper() for x in re.split(r"[\s,;]+", str(s.get("exclude") or "")) if x})}
 
 
 def shifts(text):
@@ -374,7 +376,7 @@ def build(company, latest_fn, progress=None, today=None):
     acct = billy.account(company)
     if not acct:
         raise ValueError(f"{company} has no Billy account with a password (Finance → Settings → Billy).")
-    regs = restaurants(company, settings)
+    regs = [r for r in restaurants(company, settings) if (r.get("ref") or "").upper() not in S["exclude"]]
     b = today - timedelta(days=1)
     days = _dates(b - timedelta(days=S["days"] - 1), b)
     say = progress or (lambda *_: None)
@@ -661,7 +663,8 @@ DEFINITIONS = {
                "fiscalization service (VAT groups, buyer). Both only read.",
     "placing": "An invoice belongs to the restaurant its till (tcrcode) or business unit (businUnitCode) is mapped to "
                "in Settings; a code not mapped is proposed where its invoices match one restaurant's checks best. A "
-               "till whose invoices match no check (a kiosk with its own software) is listed apart.",
+               "till whose invoices match no check (a kiosk with its own software) is listed apart. Restaurants not "
+               "fiscalized with the company's NUIS (a franchise) are left out in Settings.",
     "match": "First the invoice's IIC, FIC or number written on the check; then the same total within the tolerance "
              "and issued within the window of the check's closing time, the nearest first. Each invoice is used once.",
     "status": "Not fiscalized: a check with no invoice, or with an invoice of the bridge that has no FIC. Late: "

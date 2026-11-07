@@ -1448,6 +1448,7 @@ td.num,th.num{text-align:right}
         <label class="field">Shifts<input id="biSShifts" placeholder="06:00-16:00 Morning; 16:00-06:00 Evening"></label>
       </div>
       <label class="field">Business units and tills → restaurant <span class="meta">one per line: code = Simphony reference | label (a till's line wins over its unit's)</span><textarea id="biSMap" spellcheck="false"></textarea></label>
+      <label class="field" style="margin-top:8px">Restaurants left out <span class="meta">Simphony references of the company's restaurants not fiscalized with its NUIS (a franchise), separated by commas</span><input id="biSExcl" placeholder="e.g. OPA_SK" autocomplete="off"></label>
       <label class="field" style="margin-top:8px">Operators → employees <span class="meta">optional, one per line: operator code = Simphony employee number</span><textarea id="biSOps" spellcheck="false" style="min-height:60px"></textarea></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="biSave">Save</button><span class="meta" id="biMsg"></span></div>
     </div>
@@ -4785,13 +4786,13 @@ $("biSetBtn").onclick = async () => {
   const S = biCfg.settings;
   $("biBase").value = biCfg.connection.base_url || ""; biDrawAccts(biCfg.connection.accounts || []);
   $("biSDays").value = S.days; $("biSWin").value = S.window; $("biSTol").value = S.tol; $("biSLate").value = S.late; $("biSRates").value = S.rates; $("biSShifts").value = S.shifts;
-  $("biSMap").value = S.map; $("biSOps").value = S.operators; $("biMsg").textContent = ""; card.style.display = "";
+  $("biSMap").value = S.map; $("biSOps").value = S.operators; $("biSExcl").value = S.exclude || ""; $("biMsg").textContent = ""; card.style.display = "";
 };
 $("biAddAcct").onclick = () => { const div = document.createElement("div"); div.innerHTML = biAcctRow({}); $("biAccts").querySelector("p.meta")?.remove(); const row = div.firstElementChild; $("biAccts").appendChild(row); biBindAcct(row); };
 $("biSave").onclick = async () => {
   const accounts = [...$("biAccts").querySelectorAll("[data-acc]")].map(r => { const g = f => r.querySelector(`[data-f="${f}"]`).value.trim(); return {company: g("company"), nuis: g("nuis").toUpperCase(), username: g("username"), password: r.querySelector('[data-f="password"]').value}; });
   const body = {connection: {base_url: $("biBase").value.trim(), accounts}, settings: {days: $("biSDays").value, window: $("biSWin").value, tol: $("biSTol").value, late: $("biSLate").value,
-    rates: $("biSRates").value, shifts: $("biSShifts").value, map: $("biSMap").value, operators: $("biSOps").value}};
+    rates: $("biSRates").value, shifts: $("biSShifts").value, map: $("biSMap").value, operators: $("biSOps").value, exclude: $("biSExcl").value}};
   $("biMsg").textContent = "Saving…";
   try { const j = await simphonyPost("/api/billy/settings", body);
     $("biAccts").querySelectorAll('[data-f="password"]').forEach(x => x.value = "");
