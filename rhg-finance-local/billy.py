@@ -294,6 +294,7 @@ def _db():
         _conn.executescript("""
             CREATE TABLE IF NOT EXISTS inv (nuis TEXT, src TEXT, day TEXT, k TEXT, j TEXT, PRIMARY KEY (nuis, src, k));
             CREATE INDEX IF NOT EXISTS inv_day ON inv (nuis, src, day);
+            CREATE TABLE IF NOT EXISTS det (nuis TEXT, iic TEXT, at REAL, j TEXT, PRIMARY KEY (nuis, iic));
             CREATE TABLE IF NOT EXISTS days (nuis TEXT, src TEXT, day TEXT, final INTEGER, at REAL, n INTEGER,
                                              PRIMARY KEY (nuis, src, day));
         """)
@@ -341,7 +342,38 @@ def held(nuis, src, a, b):
     return [compact(json.loads(j), src) for (j,) in rows]
 
 
-def sample(acct, src, day, n=3):
+def detail(acct, fic):
+    """One invoice in full (Billy's lists leave out the payment methods and the VAT groups): get-invoices by FIC."""
+    rows = _post(acct, "get-invoices", {"FIC": fic, "Type": "SALES", "Start": None, "End": None})
+    if isinstance(rows, dict):
+        rows = rows.get("invoices") or rows.get("Invoices") or [rows]
+    rows = [x for x in rows or [] if isinstance(x, dict)]
+    return next((x for x in rows if (x.get("fic") or "") == fic), rows[0] if rows else None)
+
+
+def details_held(nuis, iics):
+    """{iic: the invoice in full} of those already read."""
+    out, iics = {}, list(iics)
+    with _db_lock:
+        for k in range(0, len(iics), 500):
+            part = iics[k:k + 500]
+            for iic, j in _db().execute("SELECT iic, j FROM det WHERE nuis=? AND iic IN (%s)" % ",".join("?" * len(part)),
+                                        (nuis, *part)).fetchall():
+                out[iic] = json.loads(j)
+    return out
+
+
+def keep_detail(nuis, iic, x):
+    with _db_lock:
+        _db().execute("INSERT OR REPLACE INTO det VALUES (?,?,?,?)", (nuis, iic, time.time(), json.dumps(_keep(x or {}), separators=(",", ":"))))
+        _db().commit()
+
+
+def sample(acct, src, day, n=3, fic=None):
+    if fic:                                              # one invoice in full
+        x = detail(acct, fic)
+        return {"count": 1 if x else 0, "shape": "detail", "rows": [_keep(x)] if x else [], "keys": sorted(x or {}),
+                "pay_types": sorted({p[0] for p in _pay_types(x or {})})}
     """The first invoices of a day as Billy gives them (Settings → connection check): read-only, nothing kept."""
     if src == "bridge":
         rows = _post(acct, "get-sales-invoices", {"FIC": None, "TimeFrom": _stamp(day), "TimeTo": _stamp(day, True)})

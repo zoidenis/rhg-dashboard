@@ -4658,6 +4658,7 @@ function renderBilly(){
   $("biStatus").innerHTML = esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
     + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
     + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
+    + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
     + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
   const locs = [...new Set(d.checks.map(c => c.ref))].sort(), lv = $("biFLoc").value, sv = $("biFSt").value || "missing";
   $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");

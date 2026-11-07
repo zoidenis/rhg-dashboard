@@ -2487,7 +2487,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     day = date.fromisoformat(q.get("day") or (date.today() - timedelta(days=1)).isoformat())
                     self._send(200, billy.sample(acct, "fiscal" if q.get("src") == "fiscal" else "bridge", day,
-                                                 max(1, min(int(q.get("n") or 3), 10))))
+                                                 max(1, min(int(q.get("n") or 3), 10)), (q.get("fic") or "")[:80] or None))
                 except (ValueError, billy.BillyError) as exc:
                     self._send(200, {"error": str(exc)[:300]})
             elif url.path == "/api/billy/settings":
@@ -2966,6 +2966,8 @@ class Handler(BaseHTTPRequestHandler):
                         if isinstance(body.get("settings"), dict):
                             rec = {k: str(v)[:4000] for k, v in body["settings"].items() if k in billyrec.DEFAULTS}
                             store.save_settings({"billy_rec": rec}, actor)
+                            with billyrec._lock:             # the next read applies the new settings
+                                billyrec._results.clear()
                         self._send(200, {"connection": conn, "settings": _billy_pub()})
                     except (ValueError, KeyError) as exc:
                         self._send(400, {"error": str(exc)})

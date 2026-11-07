@@ -60,6 +60,7 @@ ERRORS = {"total": "Total ≠ value without VAT + VAT", "base_sum": "VAT groups 
           "mixed": "More than one VAT rate: groups needed"}
 INFO = ("no_fic", "no_detail")                      # not a mapping error of the book
 KEEP = 900
+DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
 LATE_LIMIT = 72 * 3600          # a check is looked for in invoices fiscalized up to three days after it closed
 _results, _jobs, _lock, _db_lock = {}, {}, threading.Lock(), threading.Lock()
 _conn = None
@@ -265,7 +266,7 @@ def _match(checks, invs, S, used, late_step=True):
 def _place(invs, checks_by_ref, M, S):
     """Each invoice → (restaurant ref, how): the mapping of its till, else of its unit, else proposed by matching.
     Proposals go till by till (a unit can hold the tills of several restaurants): the restaurant whose checks its
-    invoices match best, when it holds at least 15% of them and twice as many as the next restaurant."""
+    invoices match best, when it holds at least 5% of them (orders are many) and three times the next restaurant."""
     loc = {}
     unmapped = defaultdict(list)
     for i in invs:
@@ -283,7 +284,7 @@ def _place(invs, checks_by_ref, M, S):
             scores.append((len(_match(cs, lst, S, used, late_step=False)), ref))
         scores.sort(reverse=True)
         best, second = (scores + [(0, None), (0, None)])[:2]
-        if best[1] and best[0] >= max(3, 0.15 * len(lst)) and best[0] >= 2 * second[0]:
+        if best[1] and best[0] >= max(5, 0.05 * len(lst)) and best[0] >= 3 * second[0]:
             proposals[code] = (best[1], best[0], len(lst))
             for i in lst:
                 loc[i["_k"]] = (best[1], "proposed")
@@ -417,8 +418,58 @@ def build(company, latest_fn, progress=None, today=None):
     fiscal = billy.held(acct["nuis"], "fiscal", days[0], days[-1])
     checks = {r["ref"]: checks_held(r["ref"], a_, b_) for r in regs} if sim_on else {}
     r = analyse(company, acct["nuis"], regs, days, bridge, fiscal, checks, latest, S, today)
+    # the payment method: Billy's lists leave it out (payMethods null), so the invoices left without a check at a
+    # restaurant with checks are read one by one in full, once (kept in data/billy_v2.db), to tell the orders
+    # (payment method ORDER) from the invoices; then the match runs again without the orders
+    note = ""
+    cand = {i["iic"]: i["fic"] for i in r["invoices"] if i["status"] == "no_check" and i["fic"] and i["iic"]}
+    if cand:
+        have = billy.details_held(acct["nuis"], cand)
+        todo = [k for k in cand if k not in have]
+        gives = any(billy._pay_types(x) for x in have.values())
+        if todo and not gives and len(have) < 5:                 # does Billy give the payment method in full? try a few
+            for k in todo[:5]:
+                try:
+                    x = billy.detail(acct, cand[k])
+                    billy.keep_detail(acct["nuis"], k, x)
+                    gives = gives or bool(x and billy._pay_types(x))
+                except billy.BillyError as exc:
+                    errors.append(f"Billy invoice in full: {str(exc)[:160]}")
+                    break
+            todo = todo[5:]
+        if gives and todo:
+            todo = todo[:DETAIL_CAP]
+            say(f"Billy · payment method of {len(todo)} invoices without a check")
+
+            def one(k):
+                billy.keep_detail(acct["nuis"], k, billy.detail(acct, cand[k]))
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futs = [pool.submit(one, k) for k in todo]
+                for n, f in enumerate(as_completed(futs), 1):
+                    try:
+                        f.result()
+                    except Exception as exc:                       # noqa: BLE001
+                        if len(errors) < 12:
+                            errors.append(f"Billy invoice in full: {str(exc)[:140]}")
+                    if n % 50 == 0:
+                        say(f"Billy · payment method ({n} of {len(todo)})")
+            left = len([k for k in cand if k not in billy.details_held(acct["nuis"], cand)])
+            if left:
+                note = f"{left} invoices without a check still to be read in full; the next read continues."
+        elif not gives:
+            note = "Billy does not give the payment method of an invoice, even in full: orders cannot be told apart."
+        full = billy.details_held(acct["nuis"], cand)
+        if full:
+            for x in bridge + fiscal:
+                d = full.get(x["iic"])
+                if d:
+                    c = billy.compact(d, "fiscal")
+                    x["pays"], x["order"] = c["pays"], c["order"]
+                    if c["taxes"]:
+                        x["taxes"] = c["taxes"]
+            r = analyse(company, acct["nuis"], regs, days, bridge, fiscal, checks, latest, S, today)
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"), complete=not errors,
-             simphony=sim_on)
+             simphony=sim_on, orders_note=note)
     return r
 
 
