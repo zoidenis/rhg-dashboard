@@ -2085,8 +2085,9 @@ class Handler(BaseHTTPRequestHandler):
         if status == 200 and getattr(self, "_scope_filter", None) and isinstance(body, dict):
             body = self._scope_filter(body)
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
-        zipped = len(payload) > 64 * 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "") and ctype.startswith("application/json")
-        if zipped:                                       # a large answer (Simphony ↔ Billy, movement…) travels compressed
+        zipped = (len(payload) > 16 * 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+                  and ctype.startswith(("application/json", "text/html", "application/javascript", "text/javascript", "text/css", "image/svg+xml")))
+        if zipped:                                       # a large answer or page (index.html, Simphony ↔ Billy…) travels compressed
             payload = gzip.compress(payload, compresslevel=5)
         self.send_response(status)
         self.send_header("Content-Type", ctype)

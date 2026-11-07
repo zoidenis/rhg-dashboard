@@ -6,6 +6,7 @@ app are stored locally under ./data and never written back to BC.
 Run:  python server.py     then open http://127.0.0.1:8765
 """
 import base64
+import gzip
 import access
 import hmac
 import html
@@ -801,15 +802,33 @@ weekly = weekly_report.Weekly(lambda company, week, location="": _dashboard_buil
 _streams_cache = {}
 
 
-def streams(company, week, location, mode="week"):
+_streams_lock, _streams_reading = threading.Lock(), set()
+
+
+def streams(company, week, location, mode="week", _fresh=False):
     """Procurement split into its streams: food and beverage, non-food, supplies,
     services and CAPEX. Read on demand, because it needs the item catalogue and the
     purchase postings in the general ledger as well as the value entries."""
     key = (company, week or "", location or "", mode)
-    location, only = _scope_of(location)
     hit = _streams_cache.get(key)
     if hit and time.time() - hit[0] < 600:
         return hit[1]
+    if hit and not _fresh:                   # older: the last one at once, a new read behind it
+        with _streams_lock:
+            start = key not in _streams_reading
+            _streams_reading.add(key)
+        if start:
+            def again():
+                try:
+                    streams(company, week, location, mode, _fresh=True)
+                except Exception:                                   # noqa: BLE001
+                    traceback.print_exc()
+                finally:
+                    with _streams_lock:
+                        _streams_reading.discard(key)
+            threading.Thread(target=again, daemon=True, name="streams-refresh").start()
+        return dict(hit[1], reading=True)
+    location, only = _scope_of(location)
     c_from, c_to, p_from, p_to, like_for_like, label = _period(week, mode)
     settings = store.get_settings()
     sources = []
@@ -1353,8 +1372,15 @@ class Handler(BaseHTTPRequestHandler):
         if status == 200 and getattr(self, "_scope_filter", None) and isinstance(body, dict):
             body = self._scope_filter(body)
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
+        zipped = (len(payload) > 16 * 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+                  and ctype.startswith(("application/json", "text/html", "application/javascript", "text/javascript", "text/css", "image/svg+xml")))
+        if zipped:                                       # a large answer or page travels compressed
+            payload = gzip.compress(payload, compresslevel=5)
         self.send_response(status)
         self.send_header("Content-Type", ctype)
+        if zipped:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()

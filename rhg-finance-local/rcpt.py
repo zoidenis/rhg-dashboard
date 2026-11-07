@@ -33,6 +33,7 @@ from datetime import date, datetime, timedelta
 import cashloc
 import locintel
 import simphony
+import heldjob
 import store
 
 FILE = store.DATA_DIR / "receipts.json"
@@ -46,9 +47,10 @@ ACQUIRERS = [("BKT", ("BKT", "KOMB")), ("RAIFFEISEN", ("RAIF", "RFB")), ("CREDIN
              ("POK", ("POK",)), ("PAYSERA", ("PAYSERA",)), ("TIRANA BANK", ("TIRANA",)), ("INTESA", ("INTESA",))]
 KINDS = {"not_received": "Not received in BC", "late": "Received late", "over": "Received with no takings",
          "refund": "Refund or chargeback", "tips": "Tips and other on top of sales", "unmapped": "Tender not mapped"}
-_results, _jobs, _lock, _cfg_lock = {}, {}, threading.Lock(), threading.Lock()
+_cfg_lock = threading.Lock()
 on_built = None
 KEEP = 900
+_held = heldjob.Held("receipts", KEEP)
 
 
 # ---------------------------------------------------------------- configuration
@@ -96,8 +98,7 @@ def save_config(company, params, tenders, actor):
         tmp.replace(FILE)
     store.audit("receipts", f"tender mapping {company}", actor, {"tenders": len(old.get("tenders") or {})},
                 {"tenders": len(t)}, "")
-    with _lock:
-        _results.pop(company, None)
+    _held.forget(company)
     return config(company)
 
 
@@ -470,14 +471,11 @@ def in_scope(r):
 
 # ---------------------------------------------------------------- held results and background reads
 def held(company):
-    with _lock:
-        hit = _results.get(company)
-    return hit[1] if hit else None
+    return _held.held(company)
 
 
 def remember(company, r):
-    with _lock:
-        _results[company] = (time.time(), r)
+    _held.remember(company, r)
 
 
 def companies(settings=None):
@@ -485,30 +483,6 @@ def companies(settings=None):
 
 
 def request(client, company, latest_fn, parallel_fn, refresh=False):
-    with _lock:
-        hit = _results.get(company)
-        job = _jobs.get(company)
-        if hit and not refresh and time.time() - hit[0] < KEEP and not (job and job["state"] == "running"):
-            return hit[1]
-        if job and job["state"] == "running":
-            return {"pending": True, "stage": job["stage"]}
-        if job and job["state"] == "failed" and not refresh and time.time() - job["at"] < 60:
-            _jobs.pop(company, None)
-            return {"available": False, "error": job["error"]}
-        job = _jobs[company] = {"state": "running", "stage": "starting", "at": time.time(), "error": ""}
-
-    def go():
-        try:
-            r = build(client, company, latest_fn, parallel_fn, progress=lambda st: job.update(stage=st))
-            if on_built:
-                try:
-                    r["register"] = on_built(company, r)
-                except Exception:                                  # noqa: BLE001
-                    traceback.print_exc()
-            remember(company, r)
-            job["state"] = "done"
-        except Exception as exc:                                   # noqa: BLE001
-            traceback.print_exc()
-            job.update(state="failed", error=str(exc)[:300], at=time.time())
-    threading.Thread(target=go, daemon=True, name=f"receipts-{company}").start()
-    return {"pending": True, "stage": "starting"}
+    """The last reconciliation at once (reading: True while a new one runs behind it), else a background read."""
+    return _held.request(company, lambda progress: build(client, company, latest_fn, parallel_fn, progress=progress), refresh,
+                         (lambda r: on_built(company, r)) if on_built else None, "Reading Simphony and Business Central…")

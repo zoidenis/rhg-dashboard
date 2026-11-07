@@ -2791,6 +2791,7 @@ async function loadStreams(force){
     const j = await r.json();
     if(!r.ok) throw new Error(j.error || "failed");
     streams = j; renderStreams(); byRender();
+    if (j.reading) { $("strNote").innerHTML = "<b>Reading the new figures…</b> shown: the last read · " + $("strNote").innerHTML; setTimeout(() => loadStreams(true), 8000); }
   }catch(e){ $("strNote").textContent = "Could not read: " + e.message; }
 }
 $("strLoad").onclick = () => loadStreams(true);

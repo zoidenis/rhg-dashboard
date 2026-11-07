@@ -2724,6 +2724,14 @@ async function dqFreeze(month, action){
 }
 $("dqFreeze").onclick = () => dqData && dqFreeze(dqData.from, "freeze");
 
+// a held reconciliation: the last read is on screen while a new one runs behind it (heldjob.py)
+const heldNote = d => d && d.reading ? `Reading the new figures… ${d.stage || ""} · shown: the last read · ` : d && d.read_error ? `Last read failed: ${d.read_error} · ` : "";
+function heldPoll(prev, j, render, el, again){
+  const same = prev && prev.checked_at === j.checked_at;
+  if (!same) render();
+  else { const e = $(el); e.textContent = heldNote(j) + (e.dataset.base || ""); }
+  return j.reading ? setTimeout(again, 5000) : null;
+}
 // ---------------------------------------------------------------- Takings POS ↔ BC (rcpt.py)
 let tkData = null, tkTimer = null, tkSel = null;
 const TK_SHORT = {ok: "✓", late: "late", pending: "…", none: "·"};
@@ -2735,7 +2743,7 @@ async function loadReceipts(refresh){
     const j = await readJSON(await fetch("/api/receipts?" + p.toString() + (refresh ? "&refresh=1" : "")));
     if (j.pending) { $("tkStatus").textContent = `Reading Simphony and Business Central… ${j.stage || ""}`; tkTimer = setTimeout(() => loadReceipts(false), 4000); return; }
     if (j.available === false || (j.error && !j.locations)) throw new Error(j.error || "not available");
-    tkData = j; renderReceipts();
+    const prev = tkData; tkData = j; tkTimer = heldPoll(prev, j, renderReceipts, "tkStatus", () => loadReceipts(false));
   }catch(e){ $("tkStatus").textContent = "Could not read: " + e.message; }
 }
 function renderReceipts(){
@@ -2750,8 +2758,9 @@ function renderReceipts(){
     card("Refunds and chargebacks", sxM(k.refunds), k.unmapped ? `${fmt(k.unmapped)} tenders not mapped` : "out of card and online accounts", k.refunds || k.unmapped ? "warn" : "");
   $("tkNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.filter(L => L.tips && L.tips.tenders).length} restaurants with takings` + (d.simphony ? "" : " · Simphony is not connected") +
     (d.mapping.saved ? ` · tender mapping saved by ${d.mapping.saved_by} on ${String(d.mapping.saved_at).slice(0, 10)}` : " · tender mapping: the proposal, not saved yet");
-  $("tkStatus").textContent = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.found} found, ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
+  $("tkStatus").dataset.base = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.found} found, ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
     + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  $("tkStatus").textContent = heldNote(d) + $("tkStatus").dataset.base;
   const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const rows = [];
   d.locations.forEach((L, li) => L.channels.forEach((c, ci) => rows.push([L, c, li, ci])));
@@ -4819,9 +4828,9 @@ async function loadSalesrec(refresh){
     const p = new URLSearchParams({company: $("company").value || ""});
     const j = await readJSON(await fetch("/api/salesrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
     if (j.error && j.available !== false) throw new Error(j.error);
-    if (j.pending) { $("sxStatus").textContent = `${j.note} ${j.stage || ""}`; sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
+    if (j.pending) { $("sxStatus").textContent = `${j.note || "Reading…"} ${j.stage || ""}`; sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
     if (j.available === false) throw new Error(j.error || "not available");
-    sxData = j; renderSalesrec();
+    const prev = sxData; sxData = j; sxTimer = heldPoll(prev, j, renderSalesrec, "sxStatus", () => loadSalesrec(false));
   }catch(e){ $("sxStatus").textContent = "Could not read: " + e.message; }
 }
 function renderSalesrec(){
@@ -4835,8 +4844,9 @@ function renderSalesrec(){
     card("Open on the invoices", sxM(k.remaining), "takings not yet applied", k.remaining ? "warn" : "") +
     card("Exceptions", fmt(k.issues), `${fmt(k.mapping)} menu items`, k.issues ? "up" : "down");
   $("sxNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.length} restaurants` + (d.simphony ? "" : " · Simphony is not connected: only the import, the invoices and the takings are checked");
-  $("sxStatus").textContent = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
+  $("sxStatus").dataset.base = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
     + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  $("sxStatus").textContent = heldNote(d) + $("sxStatus").dataset.base;
   $("sxLegend").innerHTML = `<span><i class="ok"></i>${esc(d.statuses.ok)}</span><span><i class="bad"></i>${esc(d.statuses.not_imported)} · ${esc(d.statuses.invoice_diff)}</span>
     <span><i class="warn"></i>${esc(d.statuses.import_diff)} · ${esc(d.statuses.not_posted)} · ${esc(d.statuses.unpaid)}</span><span><i class="pend"></i>${esc(d.statuses.pending)}</span>`;
   const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];

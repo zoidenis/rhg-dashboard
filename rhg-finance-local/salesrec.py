@@ -29,6 +29,7 @@ import locintel
 import menueng
 import recipes
 import simphony
+import heldjob
 import store
 
 E_ARCHIVE = config.E_POS_ARCHIVE
@@ -40,9 +41,9 @@ RANK = ("not_imported", "import_diff", "invoice_diff", "not_posted", "unpaid", "
 MAPPING = {"no_item": "Imported with no BC item", "unknown_item": "BC item does not exist",
            "blocked_item": "BC item is blocked", "no_recipe": "Needs a recipe, has none",
            "not_in_import": "Sold in Simphony, never imported"}
-_results, _jobs, _lock = {}, {}, threading.Lock()
 on_built = None          # (company, result) → the exceptions register (server.register_after_sales)
 KEEP = 900
+_held = heldjob.Held("salesrec", KEEP)
 
 
 def settings_of(settings):
@@ -354,48 +355,19 @@ def build(client, company, latest_fn, progress=None, today=None):
 
 # ---------------------------------------------------------------- held results and background reads
 def held(company):
-    with _lock:
-        hit = _results.get(company)
-    return hit[1] if hit else None
+    return _held.held(company)
 
 
 def remember(company, r):
-    with _lock:
-        _results[company] = (time.time(), r)
+    _held.remember(company, r)
 
 
 def request(client, company, latest_fn, refresh=False):
-    """The held result while fresh, else a background read: {"pending": True, "stage"} until it is ready."""
-    with _lock:
-        hit = _results.get(company)
-        job = _jobs.get(company)
-        if hit and not refresh and time.time() - hit[0] < KEEP and not (job and job["state"] == "running"):
-            return hit[1]
-        if job and job["state"] == "running":
-            return {"pending": True, "stage": job["stage"], "note": "Reading Simphony and Business Central…"}
-        if job and job["state"] == "failed" and not refresh and time.time() - job["at"] < 60:
-            _jobs.pop(company, None)
-            return {"available": False, "error": job["error"]}
-        job = _jobs[company] = {"state": "running", "stage": "starting", "at": time.time(), "error": ""}
-
-    def go():
-        try:
-            r = build(client, company, latest_fn, progress=lambda st: job.update(stage=st))
-            if on_built:
-                try:
-                    r["register"] = on_built(company, r)
-                except Exception:                                  # noqa: BLE001
-                    traceback.print_exc()
-            remember(company, r)
-            job["state"] = "done"
-        except Exception as exc:                                   # noqa: BLE001
-            traceback.print_exc()
-            job.update(state="failed", error=str(exc)[:300], at=time.time())
-    threading.Thread(target=go, daemon=True, name=f"salesrec-{company}").start()
-    return {"pending": True, "stage": "starting", "note": "Reading Simphony and Business Central…"}
+    """The last reconciliation at once (reading: True while a new one runs behind it), else a background read."""
+    return _held.request(company, lambda progress: build(client, company, latest_fn, progress=progress), refresh,
+                         (lambda r: on_built(company, r)) if on_built else None, "Reading Simphony and Business Central…")
 
 
-# ---------------------------------------------------------------- the register
 def findings(r):
     """The exceptions of a reconciliation for exreg.sync (source "sales_rec") and the days it covered."""
     out, ccy = [], r.get("currency") or ""

@@ -5,6 +5,7 @@ session cookie here through /internal/validate and are told who the user is and
 what they may do. That call is protected by a shared service token, so only the
 group's own services can ask.
 """
+import gzip
 import hashlib
 import json
 import secrets
@@ -148,8 +149,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send(self, status, body, ctype="application/json; charset=utf-8", extra=None):
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
+        zipped = (len(payload) > 16 * 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+                  and ctype.startswith(("application/json", "text/html", "application/javascript", "text/javascript", "text/css", "image/svg+xml")))
+        if zipped:                                       # the pages, the i18n bundle and large answers travel compressed
+            payload = gzip.compress(payload, compresslevel=5)
         self.send_response(status)
         self.send_header("Content-Type", ctype)
+        if zipped:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
