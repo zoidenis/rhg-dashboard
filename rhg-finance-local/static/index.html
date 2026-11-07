@@ -4630,9 +4630,13 @@ async function loadBilly(refresh){
     const j = await readJSON(await fetch("/api/billyrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
     $("biSetBtn").style.display = j.can_settings ? "" : "none";
     if (j.pending) { $("biStatus").textContent = `Reading Simphony and Billy… ${j.stage || ""}`; biTimer = setTimeout(() => loadBilly(false), 4000); return; }
-    if (j.available === false || j.error) throw new Error(j.error || "not available");
+    if (j.available === false || j.error) throw Object.assign(new Error(j.error || "not available"), {companies: j.companies || []});
     biData = j; renderBilly();
-  }catch(e){ $("biStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){
+    const cos = (e.companies || []).filter(c => c !== $("company").value);
+    $("biStatus").innerHTML = esc("Could not read: " + e.message) + (cos.length ? ` · ${fcSp("Billy is set for")} ` + cos.map(c => `<button class="mini" data-bico="${esc(c)}" type="button">${esc(c)}</button>`).join(" ") : "");
+    $("biStatus").querySelectorAll("[data-bico]").forEach(b => b.onclick = () => { const sel = $("company"); if ([...sel.options].some(o => o.value === b.dataset.bico)) { sel.value = b.dataset.bico; sel.dispatchEvent(new Event("change")); } });
+  }
 }
 const biM = v => v == null || isNaN(v) ? "–" : sxM(v);
 function renderBilly(){
@@ -5276,6 +5280,8 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && cnWizOn) cnWizClose(); });
 $("company").addEventListener("change", () => { $("cnLoc").dataset.co = ""; cnData = null; if ($("v-stockcount").classList.contains("on")) loadCn(false); });
+// Simphony ↔ Billy follows the company above: each company is read with its own NUIS
+$("company").addEventListener("change", () => { if ($("v-billyrec").classList.contains("on")) { biData = null; loadBilly(false); } });
 $("dcRead").onclick = () => { dcData = null; loadDischarge(true); };
 $("dcDays").onchange = () => { dcData = null; loadDischarge(false); };
 $("dcLocSel").onchange = () => dcData && renderDischarge();

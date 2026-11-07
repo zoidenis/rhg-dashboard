@@ -1703,7 +1703,8 @@ rcpt.on_built = register_after_receipts
 
 def register_controls(actor="scheduler", force=False):
     """The daily control run: every company of the negative stock email, read once a day (the 07:30 email has
-    usually read it already), and the sales reconciliation Simphony ↔ BC of every company with restaurants."""
+    usually read it already), the sales reconciliation Simphony ↔ BC of every company with restaurants, and
+    Simphony ↔ Billy of every company with a Billy account."""
     out = []
     try:
         known = {c.upper() for c in client.companies()}
@@ -1739,6 +1740,19 @@ def register_controls(actor="scheduler", force=False):
         except Exception as exc:                                    # noqa: BLE001
             traceback.print_exc()
             out.append({"company": c, "control": "receipts_rec", "status": "failed", "detail": str(exc)[:300]})
+    for c in billyrec.companies():                    # Simphony ↔ Billy: every company with a Billy account (its NUIS)
+        if not force and exreg.synced_today("billy_rec", c):
+            out.append({"company": c, "control": "billy_rec", "status": "already read today"})
+            continue
+        try:
+            r = billyrec.build(c, _latest)
+            billyrec.remember(c, r)
+            reg = register_after_billy(c, r)
+            out.append({"company": c, "control": "billy_rec", "status": "synced" if reg else "not synced",
+                        "billy_rec": reg, "detail": "" if reg else "; ".join(r.get("errors") or [])[:300]})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "control": "billy_rec", "status": "failed", "detail": str(exc)[:300]})
     for c in negrep.companies():
         if not force and exreg.synced_today("negative_stock", c):
             out.append({"company": c, "status": "already read today"})
