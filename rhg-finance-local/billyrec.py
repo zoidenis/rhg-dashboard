@@ -49,7 +49,7 @@ import store
 
 DB_PATH = store.DATA_DIR / "guest_checks.db"
 DEFAULTS = {"days": "7", "window": "20", "tol": "1", "late": "60", "rates": "20, 10, 6, 0",
-            "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": "", "exclude": ""}
+            "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": "", "exclude": "", "read_time": "07:30"}
 STATUS = {"ok": "Fiscalized", "late": "Fiscalized late", "late48": "Fiscalized after 48 h", "missing": "Not fiscalized",
           "pending": "Pending", "zero": "No amount"}
 INV_STATUS = {"matched": "With a Simphony check", "no_check": "No Simphony check", "no_fic": "Not fiscalized (no FIC)",
@@ -62,7 +62,7 @@ ERRORS = {"total": "Total ≠ value without VAT + VAT", "base_sum": "VAT groups 
           "no_fic": "No FIC", "no_detail": "VAT groups not given by Billy (split from the totals)",
           "mixed": "More than one VAT rate: groups needed"}
 INFO = ("no_fic", "no_detail")                      # not a mapping error of the book
-KEEP = 900
+KEEP = 3 * 3600                 # the days end yesterday: a read holds for three hours (Read again reads at once)
 DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
 LATE_LIMIT = 72 * 3600
 _billy_gate = threading.Semaphore(3)
@@ -86,7 +86,9 @@ def settings_of(settings):
             "shifts_text": str(s.get("shifts") or DEFAULTS["shifts"]), "map": str(s.get("map") or ""),
             "operators": str(s.get("operators") or ""),
             # restaurants of the company not fiscalized with its NUIS (a franchise): left out of the match
-            "exclude": sorted({x.upper() for x in re.split(r"[\s,;]+", str(s.get("exclude") or "")) if x})}
+            "exclude": sorted({x.upper() for x in re.split(r"[\s,;]+", str(s.get("exclude") or "")) if x}),
+            # the daily read of every company, before the 08:00 reports (empty: no daily read)
+            "read_time": str(s.get("read_time") or "").strip()[:5] if re.fullmatch(r"\d{1,2}:\d{2}", str(s.get("read_time") or "").strip()) else ""}
 
 
 def shifts(text):
@@ -985,3 +987,38 @@ def render_xlsx(r):
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------- the daily read
+_daily = {"done": None}
+
+
+def start(latest_fn):
+    """Every day at the read time of Settings (default 07:30): every company with a Billy account is read, its
+    result held and its cases put in the register, so the 08:00 reports and the first look of the day are fresh."""
+    def loop():
+        while True:
+            try:
+                S = settings_of(store.get_settings())
+                now = datetime.now()
+                if S["read_time"] and _daily["done"] != now.date():
+                    hh, mm = (int(x) for x in S["read_time"].split(":"))
+                    at = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    if at <= now <= at + timedelta(hours=6):
+                        _daily["done"] = now.date()
+                        for c in companies():
+                            try:
+                                r = build(c, latest_fn)
+                                if on_built:
+                                    try:
+                                        r["register"] = on_built(c, r)
+                                    except Exception:                  # noqa: BLE001
+                                        traceback.print_exc()
+                                remember(c, r)
+                            except Exception:                          # noqa: BLE001
+                                traceback.print_exc()
+            except Exception:                                          # noqa: BLE001
+                traceback.print_exc()
+            time.sleep(60)
+    threading.Thread(target=loop, daemon=True, name="billyrec-daily").start()
+

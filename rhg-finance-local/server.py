@@ -1679,7 +1679,7 @@ def _billy_pub():
     S = billyrec.settings_of(store.get_settings())
     return {"days": S["days"], "window": S["window"], "tol": S["tol"], "late": S["late"],
             "rates": ", ".join(f"{x:g}" for x in sorted(S["rates"], reverse=True)), "shifts": S["shifts_text"],
-            "map": S["map"], "operators": S["operators"], "exclude": ", ".join(S["exclude"])}
+            "map": S["map"], "operators": S["operators"], "exclude": ", ".join(S["exclude"]), "read_time": S["read_time"]}
 
 
 def register_after_billy(company, r):
@@ -3400,6 +3400,7 @@ def main():
     costrep.start()
     negrep.start()
     exreg.start(register_controls)
+    billyrec.start(_latest)                 # Simphony ↔ Billy: the daily read before the 08:00 reports
     brandrep.start()
     salesrep.start()
     plmemo.start()

@@ -35,17 +35,18 @@ MAX_WAIT = 180                  # seconds a screen may take to read its data
 PENDING_WAIT = 900              # seconds while the server still answers "pending" (it reads Business Central behind)
 MAX_SHOT_HEIGHT = 6000          # px of the picture in the email; the PDF has the whole screen
 MAX_PDF_HEIGHT = 18000          # px: a PDF page may be up to 200 inches tall
-VERSION = "2"
+VERSION = "3"
 
 # Counts the requests the page makes, so the wait ends when the screen has its data rather than after a fixed time.
 # An answer that says the server is still reading ({"pending": true}, also one level down, as the transfers of
-# Supplier performance) keeps its address busy until an answer of the same address no longer says so: between
+# Supplier performance), or that a new read is running behind the last one ({"reading": true}, heldjob.py), keeps
+# its address busy until an answer of the same address no longer says so: between
 # two polls of such a screen there is no request, and that is not the end of the read.
 INIT_JS = """(() => {
   let n = 0, last = Date.now();
   const busy = {};
   const tick = () => { last = Date.now(); };
-  const pend = j => !!j && typeof j === "object" && (j.pending === true ||
+  const pend = j => !!j && typeof j === "object" && (j.pending === true || j.reading === true ||
     Object.values(j).some(v => v && typeof v === "object" && !Array.isArray(v) && v.pending === true));
   const look = (url, r) => {
     try {
@@ -72,6 +73,7 @@ INIT_JS = """(() => {
 REPORT_CSS = """
 aside, .side, #nav, .hdr-btns, .hdr-meta, .hdr-side, .banner, #langSw, #layBar, #layOpen, .lay-open, .lay-ctl,
 #unicornFab, #pulseRepBtn, .pr-dlg, button.btn, .refresh, .no-report { display: none !important; }
+.report-show[hidden] { display: block !important; }
 html, body { overflow: visible !important; height: auto !important; }
 .app { display: block !important; }
 main { margin: 0 !important; max-width: none !important; }

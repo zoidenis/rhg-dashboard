@@ -133,7 +133,7 @@ DEFAULT_SETTINGS = {
     # Control → Simphony ↔ Billy (billyrec.py): days, time window and tolerance of the match, late minutes, the rates
     # of the law, shifts, the mapping of business units and tills to restaurants, operators to employees
     "billy_rec": {"days": "7", "window": "20", "tol": "1", "late": "60", "rates": "20, 10, 6, 0",
-                  "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": "", "exclude": ""},
+                  "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": "", "exclude": "", "read_time": "07:30"},
     "exception_register": {"controls": True, "enabled": False, "time": "08:15", "escalate_days": "3",
                            "escalate_roles": "coo, cfo"},
     # weekly and monthly performance email of every brand (sales and costs against budget and last
