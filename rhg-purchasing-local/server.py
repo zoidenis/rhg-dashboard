@@ -10,6 +10,7 @@ import access
 import hmac
 import html
 import json
+from collections import defaultdict
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -906,10 +907,56 @@ def streams(company, week, location, mode="week"):
                                               "prepay": 0.0, "svc_accounts": {}, "capex_docs": [], "invoices": 0,
                                               "invoiced": 0.0, "no_po": 0, "no_po_value": 0.0, "credit_memos": 0,
                                               "suppliers": {}, "nopo_docs": []})
+    # the detail behind each purchase type of a location: by category (group 3 of the item card, else group 4) and
+    # by item; postings in the general ledger by account and by document
+    det = {}
+
+    def dt(code, ptype):
+        return det.setdefault((code or "", ptype), {"cats": {}, "items": {}, "lines": 0})
     for r in item_rows:
         L = bl(r["location"])
         L["types"][r["type"]] = L["types"].get(r["type"], 0.0) + r["value"]
         L["item_value"] += r["value"]
+        D = dt(r["location"], r["type"])
+        cat = (r["group3"] or r["group4"] or "").strip()
+        c = D["cats"].setdefault(cat or "(no category 3 or 4)", {"value": 0.0, "items": set(), "level": "3" if r["group3"] else "4" if r["group4"] else ""})
+        c["value"] += r["value"]
+        c["items"].add(r["item"])
+        it = D["items"].setdefault(r["item"] or r["description"], {"no": r["item"], "desc": r["description"], "cat": cat,
+                                                                   "qty": 0.0, "value": 0.0, "lines": 0, "docs": set(),
+                                                                   "sup": defaultdict(float), "last": ""})
+        it["qty"] += r["quantity"]
+        it["value"] += r["value"]
+        it["lines"] += 1
+        it["docs"].add(r["document"])
+        it["last"] = max(it["last"], str(r["posting"] or "")[:10])
+        sup = (suppliers_by_doc.get(str(r["document"])) or {}).get("vendor")
+        if sup:
+            it["sup"][sup] += r["value"]
+        D["lines"] += 1
+    for r in gl_rows:
+        D = dt(head_loc.get(str(r["document"]), ""), r["type"])
+        acc = f"{r['account']} {r['account_name']}".strip()
+        c = D["cats"].setdefault(acc, {"value": 0.0, "items": set(), "level": "account"})
+        c["value"] += r["value"]
+        c["items"].add(r["document"])
+        it = D["items"].setdefault(str(r["document"]), {"no": str(r["document"]), "desc": r["supplier"], "cat": acc, "qty": None,
+                                                        "value": 0.0, "lines": 0, "docs": {r["document"]},
+                                                        "sup": defaultdict(float), "last": ""})
+        it["value"] += r["value"]
+        it["lines"] += 1
+        it["last"] = max(it["last"], str(r["posting"] or "")[:10])
+        if r["supplier"]:
+            it["sup"][r["supplier"]] += r["value"]
+        D["lines"] += 1
+    for (code, ptype), D in det.items():
+        items = sorted(D["items"].values(), key=lambda x: -abs(x["value"]))
+        bl(code).setdefault("detail", {})[ptype] = {
+            "cats": sorted(([k, round(v["value"]), len(v["items"]), v["level"]] for k, v in D["cats"].items()), key=lambda x: -x[1]),
+            "items": [{"no": x["no"], "desc": x["desc"], "cat": x["cat"], "qty": round(x["qty"], 2) if x["qty"] is not None else None,
+                       "value": round(x["value"]), "lines": x["lines"], "docs": len(x["docs"]), "last": x["last"],
+                       "sup": max(x["sup"].items(), key=lambda kv: kv[1])[0] if x["sup"] else ""} for x in items[:120]],
+            "count": len(items), "lines": D["lines"]}
     for r in gl_rows:
         L = bl(head_loc.get(str(r["document"]), ""))
         if r["type"] == "CAPEX":
