@@ -28,6 +28,8 @@ The sales book: every invoice of the fiscalization service in the columns of the
 and exports, taxable and VAT by rate), with the checks of its mapping: the totals, the VAT groups, the rates and the
 buyer. Nothing is written to Simphony, Billy or the Tax Administration.
 """
+import ctypes
+import gc
 import gzip
 import io
 import json
@@ -63,6 +65,7 @@ INFO = ("no_fic", "no_detail")                      # not a mapping error of the
 KEEP = 900
 DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
 LATE_LIMIT = 72 * 3600
+_billy_gate = threading.Semaphore(3)
 _TOKEN = re.compile(r"[A-Z0-9][A-Z0-9/_-]{5,}")          # a check is looked for in invoices fiscalized up to three days after it closed
 _results, _jobs, _lock, _db_lock = {}, {}, threading.Lock(), threading.Lock()
 _conn = None
@@ -282,7 +285,7 @@ def _place(invs, checks_by_ref, M, S):
         scores = []
         for ref, checks in checks_by_ref.items():
             used = set()
-            cs = [dict(c, inv=None) for c in checks]
+            cs = [{"id": c["id"], "total": c["total"], "_t": c["_t"], "info": c["info"], "inv": None} for c in checks]
             scores.append((len(_match(cs, lst, S, used, late_step=False)), ref))
         scores.sort(reverse=True)
         best, second = (scores + [(0, None), (0, None)])[:2]
@@ -407,9 +410,10 @@ def build(company, latest_fn, progress=None, today=None):
     def run(job):
         kind, x, d = job
         if kind == "billy":
-            return billy.read_day(acct, x, d, today)
+            with _billy_gate:                 # a Billy day is ~5,000 invoices in memory: three at a time at most
+                return billy.read_day(acct, x, d, today)
         return read_checks(x, d, latest.get(x))
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=6) as pool:
         futs = {pool.submit(run, j): j for j in jobs}
         for n, f in enumerate(as_completed(futs), 1):
             kind, x, d = futs[f]
@@ -427,32 +431,25 @@ def build(company, latest_fn, progress=None, today=None):
     fiscal = billy.held(acct["nuis"], "fiscal", days[0], days[-1])
     checks = {r["ref"]: checks_held(r["ref"], a_, b_) for r in regs} if sim_on else {}
     r = analyse(company, acct["nuis"], regs, days, bridge, fiscal, checks, latest, S, today)
-    # the payment method: Billy's lists leave it out (payMethods null), so the invoices left without a check at a
-    # restaurant with checks are read one by one in full, once (kept in data/billy_v2.db), to tell the orders
-    # (payment method ORDER) from the invoices; then the match runs again without the orders
+    # Orders. Billy's lists leave out the payment method and the references (payMethods, sumInvIICRefs null). In
+    # full, the invoice that closes a check (cash, card, account) lists the IICs of the orders it closes, and an
+    # order says ORDER. So the invoices matched to a check, at the restaurants where documents without a check
+    # abound (table service), are read in full once (kept in data/billy_v2.db): each tells its orders at once,
+    # a few hundred calls instead of one per order. Then the match runs again without the orders.
     note = ""
-    cand = {i["iic"]: i["fic"] for i in r["invoices"] if i["status"] == "no_check" and i["fic"] and i["iic"]}
+    nochk = Counter(i["ref"] for i in r["invoices"] if i["status"] == "no_check")
+    nchk = Counter(c["ref"] for c in r["checks"] if c["status"] != "zero")
+    rest = {ref for ref, n in nochk.items() if ref and n >= max(20, 0.05 * nchk.get(ref, 0))}
+    cand = {c["iic"]: c["fic"] for c in r["checks"] if c["ref"] in rest and c["fic"] and c["iic"]}
     if cand:
         have = billy.details_held(acct["nuis"], cand)
-        todo = [k for k in cand if k not in have]
-        gives = any(billy._pay_types(x) for x in have.values())
-        if todo and not gives and len(have) < 5:                 # does Billy give the payment method in full? try a few
-            for k in todo[:5]:
-                try:
-                    x = billy.detail(acct, cand[k])
-                    billy.keep_detail(acct["nuis"], k, x)
-                    gives = gives or bool(x and billy._pay_types(x))
-                except billy.BillyError as exc:
-                    errors.append(f"Billy invoice in full: {str(exc)[:160]}")
-                    break
-            todo = todo[5:]
-        if gives and todo:
-            todo = todo[:DETAIL_CAP]
-            say(f"Billy · payment method of {len(todo)} invoices without a check")
+        todo = [k for k in cand if k not in have][:DETAIL_CAP]
+        if todo:
+            say(f"Billy · {len(todo)} invoices in full, for their orders")
 
             def one(k):
                 billy.keep_detail(acct["nuis"], k, billy.detail(acct, cand[k]))
-            with ThreadPoolExecutor(max_workers=6) as pool:
+            with ThreadPoolExecutor(max_workers=8) as pool:
                 futs = [pool.submit(one, k) for k in todo]
                 for n, f in enumerate(as_completed(futs), 1):
                     try:
@@ -461,25 +458,50 @@ def build(company, latest_fn, progress=None, today=None):
                         if len(errors) < 12:
                             errors.append(f"Billy invoice in full: {str(exc)[:140]}")
                     if n % 50 == 0:
-                        say(f"Billy · payment method ({n} of {len(todo)})")
-            left = len([k for k in cand if k not in billy.details_held(acct["nuis"], cand)])
-            if left:
-                note = f"{left} invoices without a check still to be read in full; the next read continues."
-        elif not gives:
-            note = "Billy does not give the payment method of an invoice, even in full: orders cannot be told apart."
-        full = billy.details_held(acct["nuis"], cand)
+                        say(f"Billy · invoices in full, for their orders ({n} of {len(todo)})")
+        all_iics = [x["iic"] for x in bridge if x["iic"]]
+        full = billy.details_held(acct["nuis"], all_iics)    # every invoice read in full so far, any read
+        left = len([k for k in cand if k not in full])
+        if left:
+            note = f"{left} invoices still to be read in full for their orders; the next read continues."
+        closes, orders = {}, set()
+        for k, d in full.items():
+            c = billy.compact(d, "fiscal")
+            if c["order"]:
+                orders.add(k)
+            else:
+                for ref in c["refs"]:
+                    closes[ref.upper()] = k                  # this order is closed by invoice k
+        orders |= set(closes)
         if full:
             for x in bridge + fiscal:
                 d = full.get(x["iic"])
                 if d:
                     c = billy.compact(d, "fiscal")
-                    x["pays"], x["order"] = c["pays"], c["order"]
+                    x["pays"] = c["pays"]
                     if c["taxes"]:
                         x["taxes"] = c["taxes"]
+                    if c["refs"] and all(ref.upper() in orders for ref in c["refs"]):
+                        x["orders_of"], x["refs"] = c["refs"], []      # it closes orders: a plain invoice, not a summary
+                    else:
+                        x["refs"] = c["refs"] or x.get("refs") or []
+                if x["iic"] in orders:
+                    x["order"], x["closed_by"] = True, closes.get(x["iic"], "")
             r = analyse(company, acct["nuis"], regs, days, bridge, fiscal, checks, latest, S, today)
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"), complete=not errors,
              simphony=sim_on, orders_note=note)
+    del bridge, fiscal, checks
+    _trim()
     return r
+
+
+def _trim():
+    """The tower has 450 MB: after a read the lists of invoices and checks are freed and handed back to the system."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass
 
 
 def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today):
@@ -647,12 +669,17 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
         if i["_t"] is not None and i["total"] is not None:
             by_till_total[(i["tcr"], round(i["total"]))].append(i["_t"])
     out_orders, till_ref = [], {t["tcr"]: t["ref"] for t in tills.values()}
+    by_iic = {i["iic"]: i for i in invs}
     for o in sorted(orders, key=lambda x: x["issue"] or ""):
         t0 = _ts(o["issue"])
         nxt = [t for t in by_till_total.get((o["tcr"], round(o["total"] or 0)), []) if t0 is not None and 0 <= t - t0 <= 24 * 3600]
+        closer = by_iic.get(o.get("closed_by") or "")
+        if closer and closer["_t"] is not None and t0 is not None:
+            nxt = [closer["_t"]]                         # the invoice that names this order among its references
         out_orders.append({"issue": o["issue"], "num": o["num"], "iic": o["iic"], "fic": o["fic"], "total": o["total"],
                            "tcr": o["tcr"], "bu": o["bu"], "op": o["op"], "ref": till_ref.get(o["tcr"]) or oloc.get(o["_k"], ("", ""))[0],
-                           "pays": ", ".join(p[0] for p in o.get("pays") or []), "invoiced": bool(nxt),
+                           "pays": ", ".join(p[0] for p in o.get("pays") or []) or ("ORDER" if o.get("closed_by") else ""),
+                           "closed_by": closer["num"] or closer["iic"][:12] if closer else "", "invoiced": bool(nxt),
                            "after_min": round((min(nxt) - t0) / 60) if nxt else None})
     # restaurants and days
     locs = []

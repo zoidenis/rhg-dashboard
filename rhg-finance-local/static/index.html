@@ -1471,7 +1471,7 @@ td.num,th.num{text-align:right}
       <p class="hint"><span>Simphony checks by the employee who closed them against the invoices of their operator code, shift by shift. The difference is fiscalized less Simphony.</span></p></div></div>
       <div class="scroll" style="max-height:620px"><table id="biOps"></table></div></div></div>
     <div class="bi-p" data-p="orders" hidden><div class="card"><div class="card-head"><div><h2>Orders</h2>
-      <p class="hint"><span>Documents of Billy with the payment method ORDER: orders, kept apart from the invoices (cash or account) so they are not matched to the checks or put in the sales book.</span> <span>For each order, whether an invoice of the same total follows on the same till within a day.</span></p></div></div>
+      <p class="hint"><span>Documents of Billy with the payment method ORDER: orders, kept apart from the invoices (cash or account) so they are not matched to the checks or put in the sales book.</span> <span>For each order, the invoice that closes it (the invoice names its orders), else whether an invoice of the same total follows on the same till within a day.</span></p></div></div>
       <div class="sk-chips" id="biOrdChips"></div>
       <div class="scroll" style="max-height:620px"><table id="biOrd"></table></div><p class="meta" id="biOrdMore"></p></div></div>
     <div class="bi-p" data-p="summary" hidden><div class="card"><div class="card-head"><div><h2>Summary invoices</h2>
@@ -2744,7 +2744,9 @@ async function loadReceipts(refresh){
     if (j.pending) { $("tkStatus").textContent = `Reading Simphony and Business Central… ${j.stage || ""}`; tkTimer = setTimeout(() => loadReceipts(false), 4000); return; }
     if (j.available === false || (j.error && !j.locations)) throw new Error(j.error || "not available");
     const prev = tkData; tkData = j; tkTimer = heldPoll(prev, j, renderReceipts, "tkStatus", () => loadReceipts(false));
-  }catch(e){ $("tkStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){
+    if (/HTTP 50[234]|restarting/i.test(e.message)) { $("tkStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; tkTimer = setTimeout(() => loadReceipts(false), 15000); return; }
+    $("tkStatus").textContent = "Could not read: " + e.message; }
 }
 function renderReceipts(){
   const d = tkData, k = d.kpis;
@@ -4650,6 +4652,7 @@ async function loadBilly(refresh){
     biData = j; if (!same) renderBilly(); else biStatusLine();
     if (j.reading) biTimer = setTimeout(() => loadBilly(false), 5000);
   }catch(e){
+    if (/HTTP 50[234]|restarting/i.test(e.message)) { $("biStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; biTimer = setTimeout(() => loadBilly(false), 15000); return; }
     const cos = (e.companies || []).filter(c => c !== $("company").value);
     $("biStatus").innerHTML = esc("Could not read: " + e.message) + (cos.length ? ` · ${fcSp("Billy is set for")} ` + cos.map(c => `<button class="mini" data-bico="${esc(c)}" type="button">${esc(c)}</button>`).join(" ") : "");
     $("biStatus").querySelectorAll("[data-bico]").forEach(b => b.onclick = () => { const sel = $("company"); if ([...sel.options].some(o => o.value === b.dataset.bico)) { sel.value = b.dataset.bico; sel.dispatchEvent(new Event("change")); } });
@@ -4736,7 +4739,7 @@ function biOrders(){
   $("biOrdChips").querySelectorAll("[data-bof]").forEach(b => b.onclick = () => { biOrdF = b.dataset.bof; biOrders(); });
   $("biOrd").innerHTML = `<tr><th>Issued</th><th>Order</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Payment</th><th>Invoice after</th><th>IIC</th></tr>` +
     (rows.slice(0, 400).map(o => `<tr><td>${esc((o.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(o.num || "")}</b></td><td class="num">${fmt(o.total, 2)}</td><td>${esc(o.ref || "–")}</td><td>${esc(o.tcr)}</td><td>${esc(o.op)}</td><td class="meta">${esc(o.pays)}</td>
-      <td>${o.invoiced ? `<span class="rhg-pill low">${fmt(o.after_min)} min</span>` : `<span class="rhg-pill medium">${fcSp("none")}</span>`}</td><td class="meta" title="${esc(o.iic)}">${esc((o.iic || "").slice(0, 12))}…</td></tr>`).join("")
+      <td>${o.invoiced ? `<span class="rhg-pill low">${fmt(o.after_min)} min</span>${o.closed_by ? `<div class="meta">${esc(o.closed_by)}</div>` : ""}` : `<span class="rhg-pill medium">${fcSp("none")}</span>`}</td><td class="meta" title="${esc(o.iic)}">${esc((o.iic || "").slice(0, 12))}…</td></tr>`).join("")
       || `<tr><td colspan="9" class="meta">${fcSp(O.length ? "No order with this filter." : "No document with the payment method ORDER in the period.")}</td></tr>`);
   $("biOrdMore").textContent = rows.length > 400 ? `${fmt(rows.length)} orders; 400 are shown, the Excel has every one.` : "";
 }
@@ -4831,7 +4834,9 @@ async function loadSalesrec(refresh){
     if (j.pending) { $("sxStatus").textContent = `${j.note || "Reading…"} ${j.stage || ""}`; sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
     if (j.available === false) throw new Error(j.error || "not available");
     const prev = sxData; sxData = j; sxTimer = heldPoll(prev, j, renderSalesrec, "sxStatus", () => loadSalesrec(false));
-  }catch(e){ $("sxStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){
+    if (/HTTP 50[234]|restarting/i.test(e.message)) { $("sxStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; sxTimer = setTimeout(() => loadSalesrec(false), 15000); return; }
+    $("sxStatus").textContent = "Could not read: " + e.message; }
 }
 function renderSalesrec(){
   const d = sxData, k = d.kpis, c = d.currency;
