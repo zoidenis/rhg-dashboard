@@ -56,7 +56,9 @@ ERRORS = {"total": "Total ≠ value without VAT + VAT", "base_sum": "VAT groups 
           "rate": "Rate not in the law", "exempt_vat": "Exempt group with VAT", "no_group": "No VAT group, no exemption",
           "buyer_id": "Buyer NUIS not valid", "b2b_cash": "Business buyer without an e-invoice",
           "not_in_vat": "Issuer not in VAT on the invoice", "corrective": "Negative invoice not corrective",
-          "no_fic": "No FIC", "no_detail": "No VAT groups from the fiscalization service"}
+          "no_fic": "No FIC", "no_detail": "VAT groups not given by Billy (split from the totals)",
+          "mixed": "More than one VAT rate: groups needed"}
+INFO = ("no_fic", "no_detail")                      # not a mapping error of the book
 KEEP = 900
 LATE_LIMIT = 72 * 3600          # a check is looked for in invoices fiscalized up to three days after it closed
 _results, _jobs, _lock, _db_lock = {}, {}, threading.Lock(), threading.Lock()
@@ -201,7 +203,7 @@ def _ts(s):
         return None
 
 
-def _match(checks, invs, S, used):
+def _match(checks, invs, S, used, late_step=True):
     """Pairs checks with invoices (in place: c['inv'] = invoice key); returns the pairs."""
     pairs = []
     by_key = {}
@@ -240,7 +242,7 @@ def _match(checks, invs, S, used):
         used.add(i["_k"]); c["inv"] = i["_k"]; c["how"] = "amount and time"; pairs.append((c, i))
     # 3. fiscalized late: the same total, issued after the window and up to three days after the closing
     late = []
-    for c in checks:
+    for c in (checks if late_step else ()):
         if c.get("inv") or c["_t"] is None:
             continue
         for a in range(round(c["total"] - S["tol"]) - 1, round(c["total"] + S["tol"]) + 2):
@@ -259,7 +261,9 @@ def _match(checks, invs, S, used):
 
 
 def _place(invs, checks_by_ref, M, S):
-    """Each invoice → (restaurant ref, how): the mapping of its till, else of its unit, else proposed by matching."""
+    """Each invoice → (restaurant ref, how): the mapping of its till, else of its unit, else proposed by matching.
+    Proposals go till by till (a unit can hold the tills of several restaurants): the restaurant whose checks its
+    invoices match best, when it holds at least 15% of them and twice as many as the next restaurant."""
     loc = {}
     unmapped = defaultdict(list)
     for i in invs:
@@ -267,20 +271,20 @@ def _place(invs, checks_by_ref, M, S):
         if hit:
             loc[i["_k"]] = (hit[0], "mapped")
         else:
-            unmapped[i["bu"] or i["tcr"] or "?"].append(i)
+            unmapped[i["tcr"] or i["bu"] or "?"].append(i)
     proposals = {}
     for code, lst in unmapped.items():
-        best, score = None, 0
+        scores = []
         for ref, checks in checks_by_ref.items():
             used = set()
             cs = [dict(c, inv=None) for c in checks]
-            n = len(_match(cs, lst, S, used))
-            if n > score:
-                best, score = ref, n
-        if best and score >= max(3, 0.3 * len(lst)):
-            proposals[code] = (best, score, len(lst))
+            scores.append((len(_match(cs, lst, S, used, late_step=False)), ref))
+        scores.sort(reverse=True)
+        best, second = (scores + [(0, None), (0, None)])[:2]
+        if best[1] and best[0] >= max(3, 0.15 * len(lst)) and best[0] >= 2 * second[0]:
+            proposals[code] = (best[1], best[0], len(lst))
             for i in lst:
-                loc[i["_k"]] = (best, "proposed")
+                loc[i["_k"]] = (best[1], "proposed")
         else:
             for i in lst:
                 loc[i["_k"]] = ("", "unmapped")
@@ -298,17 +302,18 @@ def book_row(i, S):
     tot, wo, vat = i.get("total"), i.get("wo_vat"), i.get("vat")
     taxes = i.get("taxes") or []
     if not taxes:
-        if i["src"] == "fiscal":
-            errs.append("no_group")
-        else:
-            errs.append("no_detail")
+        errs.append("no_detail")                         # Billy's list gives no VAT groups: split from the totals
         if tot is not None and vat:
             base = tot - vat
-            r = round(vat / base * 100) if base else None
-            if r in rates and r:
-                cols[f"b{r:g}"] += base; cols[f"v{r:g}"] += vat
+            r = vat / base * 100 if base else None
+            near = min((x for x in rates if x > 0), key=lambda x: abs(x - r), default=None) if r is not None else None
+            if near is not None and abs(near - r) <= 0.6:
+                cols[f"b{near:g}"] += base; cols[f"v{near:g}"] += vat
             else:
-                errs.append("rate")
+                errs.append("mixed")                     # more than one rate on the invoice: the groups are needed
+                top = max((x for x in rates if x > 0), default=None)
+                if top is not None:
+                    cols[f"b{top:g}"] += base; cols[f"v{top:g}"] += vat
         elif tot is not None:
             cols["no_vat" if i.get("in_vat") is False else "zero"] += tot
     for rate, exempt, base, v, _n in taxes:
@@ -436,7 +441,8 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
             inv[k] = merged
         else:
             inv[k] = dict(x, _k=k, in_bridge=False)
-    invs = list(inv.values())
+    orders = [x for x in inv.values() if x.get("order")]       # payment method ORDER: an order, not an invoice
+    invs = [x for x in inv.values() if not x.get("order")]
     for i in invs:
         i["_t"] = _ts(i["issue"])
     for ref, lst in checks.items():
@@ -572,6 +578,20 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
                      "buyer": i["buyer"], "buyer_id": i["buyer_id"], "type": i["type"], "total": i["total"],
                      "bu": i["bu"], "tcr": i["tcr"], "op": i["op"], "ref": i["loc"], "einv": i["einv"], "eic": i["eic"],
                      **cols, "errors": errs})
+    # orders: placed like invoices, and whether an invoice of the same total follows on the same till
+    oloc, _p = _place(orders, {}, M, S) if orders else ({}, {})
+    by_till_total = defaultdict(list)
+    for i in invs:
+        if i["_t"] is not None and i["total"] is not None:
+            by_till_total[(i["tcr"], round(i["total"]))].append(i["_t"])
+    out_orders, till_ref = [], {t["tcr"]: t["ref"] for t in tills.values()}
+    for o in sorted(orders, key=lambda x: x["issue"] or ""):
+        t0 = _ts(o["issue"])
+        nxt = [t for t in by_till_total.get((o["tcr"], round(o["total"] or 0)), []) if t0 is not None and 0 <= t - t0 <= 24 * 3600]
+        out_orders.append({"issue": o["issue"], "num": o["num"], "iic": o["iic"], "fic": o["fic"], "total": o["total"],
+                           "tcr": o["tcr"], "bu": o["bu"], "op": o["op"], "ref": till_ref.get(o["tcr"]) or oloc.get(o["_k"], ("", ""))[0],
+                           "pays": ", ".join(p[0] for p in o.get("pays") or []), "invoiced": bool(nxt),
+                           "after_min": round((min(nxt) - t0) / 60) if nxt else None})
     # restaurants and days
     locs = []
     for ref in sorted(set(checks) | {i["loc"] for i in invs if i["loc"]}):
@@ -605,7 +625,10 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
             "no_fic": sum(1 for i in invs if i["status"] == "no_fic"),
             "no_fic_value": round(sum(i["total"] or 0 for i in invs if i["status"] == "no_fic"), 2),
             "other_till": sum(1 for i in invs if i["status"] == "other_till"),
-            "summary": len(summary), "book_errors": sum(1 for x in book if [e for e in x["errors"] if e != "no_fic"]),
+            "summary": len(summary), "book_errors": sum(1 for x in book if [e for e in x["errors"] if e not in INFO]),
+            "book_nodetail": sum(1 for x in book if "no_detail" in x["errors"]),
+            "orders": len(out_orders), "orders_value": round(sum(o["total"] or 0 for o in out_orders), 2),
+            "orders_open": sum(1 for o in out_orders if not o["invoiced"]),
             "unmapped": sum(1 for t in tills.values() if not t["ref"]), "proposed": len(proposals)}
     no_check = sorted(({"iic": i["iic"], "fic": i["fic"], "num": i["num"], "issue": i["issue"], "total": i["total"],
                         "tcr": i["tcr"], "bu": i["bu"], "op": i["op"], "ref": i["loc"], "status": i["status"],
@@ -614,7 +637,8 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
     return {"company": company, "nuis": nuis, "days": [d.isoformat() for d in days], "settings": {k: v for k, v in S.items() if k != "shifts"} | {"shift_names": [s[2] for s in S["shifts"]]},
             "kpis": kpis, "locations": locs, "checks": out_checks, "invoices": no_check, "tills": sorted(tills.values(), key=lambda t: (t["ref"], t["tcr"])),
             "proposals": {k: {"ref": v[0], "matched": v[1], "invoices": v[2]} for k, v in proposals.items()},
-            "operators": ops, "summary": summary, "book": book, "book_errors": dict(err_count),
+            "operators": ops, "summary": summary, "book": book, "book_errors": dict(err_count), "orders": out_orders,
+            "info_errors": list(INFO),
             "status": STATUS, "inv_status": INV_STATUS, "error_labels": ERRORS, "rates": S["rates"],
             "definitions": DEFINITIONS}
 
@@ -663,7 +687,7 @@ def cut(r, allowed):
     return dict(r, locations=[L for L in r["locations"] if L["ref"] in keep], checks=[c for c in r["checks"] if ok(c)],
                 invoices=[i for i in r["invoices"] if ok(i)], tills=[t for t in r["tills"] if ok(t)],
                 operators=[o for o in r["operators"] if ok(o)], summary=[s for s in r["summary"] if ok(s)],
-                book=[b for b in r["book"] if ok(b)], proposals={}, cut=True,
+                book=[b for b in r["book"] if ok(b)], orders=[o for o in r.get("orders") or [] if ok(o)], proposals={}, cut=True,
                 kpis=dict(r["kpis"], **_kpis_of(r, keep)))
 
 
@@ -680,7 +704,10 @@ def _kpis_of(r, keep):
             "no_fic_value": round(sum(i["total"] or 0 for i in iv if i["status"] == "no_fic"), 2),
             "invoices": sum(1 for b in r["book"] if b["ref"] in keep), "unmapped": 0, "proposed": 0,
             "summary": sum(1 for s in r["summary"] if s["ref"] in keep),
-            "book_errors": sum(1 for b in r["book"] if b["ref"] in keep and [e for e in b["errors"] if e != "no_fic"])}
+            "book_errors": sum(1 for b in r["book"] if b["ref"] in keep and [e for e in b["errors"] if e not in INFO]),
+            "orders": sum(1 for o in r.get("orders") or [] if o["ref"] in keep),
+            "orders_value": round(sum(o["total"] or 0 for o in r.get("orders") or [] if o["ref"] in keep), 2),
+            "orders_open": sum(1 for o in r.get("orders") or [] if o["ref"] in keep and not o["invoiced"])}
 
 
 # ---------------------------------------------------------------- held results and background reads
@@ -751,7 +778,7 @@ def findings(r):
     errs = defaultdict(list)
     for b in r["book"]:
         for e in b["errors"]:
-            if e not in ("no_fic", "no_detail"):
+            if e not in INFO:
                 errs[e].append(b)
     for e, lst in errs.items():
         out.append({"subject": f"book {e} {r['days'][0]}", "kind": "book_" + e, "location": "",
@@ -806,6 +833,11 @@ def render_xlsx(r):
     for o in r["operators"]:
         w4.append([o["ref"], o["shift"], o["op"], ", ".join(o["emps"]), o["checks"], o["sim"], o["fisc"], o["diff"],
                    o["not_fisc"], o["no_check"]])
+    w6 = wb.create_sheet("Orders")
+    w6.append(["Issued", "Number", "IIC", "FIC", "Total", "Till", "Operator", "Restaurant", "Payment", "Invoice after (min)"])
+    for x in r.get("orders") or []:
+        w6.append([x["issue"], x["num"], x["iic"], x["fic"], x["total"], x["tcr"], x["op"], x["ref"], x["pays"],
+                   x["after_min"] if x["invoiced"] else "no invoice of the same total"])
     w5 = wb.create_sheet("Tills")
     w5.append(["Till (TCR)", "Business unit", "Restaurant", "Placed", "Label", "Kind", "Invoices", "Value", "With a check", "No FIC"])
     for t in r["tills"]:

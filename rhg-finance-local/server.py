@@ -2475,6 +2475,21 @@ class Handler(BaseHTTPRequestHandler):
                     r = {"available": False, "error": str(exc)}
                 self._send(200, dict(r, companies=billyrec.companies(), connection=billy.info()["configured"],
                                      can_settings=auth.can(user, "settings")) if isinstance(r, dict) else r)
+            elif url.path == "/api/billy/sample":
+                # Settings: the first invoices of a day as Billy gives them, to check how its fields come (read-only)
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role does not include Settings."})
+                    return
+                acct = billy.account(q.get("company") or "")
+                if not acct:
+                    self._send(200, {"error": "This company has no Billy account with a password."})
+                    return
+                try:
+                    day = date.fromisoformat(q.get("day") or (date.today() - timedelta(days=1)).isoformat())
+                    self._send(200, billy.sample(acct, "fiscal" if q.get("src") == "fiscal" else "bridge", day,
+                                                 max(1, min(int(q.get("n") or 3), 10))))
+                except (ValueError, billy.BillyError) as exc:
+                    self._send(200, {"error": str(exc)[:300]})
             elif url.path == "/api/billy/settings":
                 if not auth.can(user, "settings"):
                     self._send(403, {"error": "Your role does not include Settings."})

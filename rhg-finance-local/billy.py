@@ -29,7 +29,7 @@ import requests
 import store
 
 CONFIG_FILE = store.DATA_DIR / "billy.json"
-DB_PATH = store.DATA_DIR / "billy.db"
+DB_PATH = store.DATA_DIR / "billy_v2.db"          # v2: the invoices as Billy gives them
 TIMEOUT = 90
 KEEP = 900
 ALLOWED = ("auth", "get-sales-invoices", "get-invoices")          # reading only: nothing is ever fiscalized from here
@@ -225,20 +225,44 @@ def _f(v):
         return None
 
 
+def _list(v, inner):
+    """Billy nests lists two ways ({"sameTax": [...]} or [...]) and sometimes gives one object alone."""
+    if isinstance(v, dict):
+        v = v.get(inner, v)
+    if isinstance(v, dict):
+        v = [v]
+    return [x for x in (v or []) if isinstance(x, dict)] if isinstance(v, list) else []
+
+
+def _pay_types(x):
+    """Every payment type an invoice names: payMethods (any nesting) and the other keys Billy may use."""
+    out = []
+    for p in _list(x.get("payMethods") or x.get("paymentMethods"), "payMethod"):
+        t = p.get("type") or p.get("Type") or p.get("payType") or p.get("paymentType") or p.get("method")
+        if t:
+            out.append([str(t).upper(), _f(p.get("amt") or p.get("amount")) or 0.0])
+    for k in ("paymentMethod", "payMethod", "paymentType", "payType", "PaymentMethod"):
+        v = x.get(k)
+        if isinstance(v, str) and v:
+            out.append([v.upper(), _f(x.get("totPrice")) or 0.0])
+    return out
+
+
 def compact(x, source):
     """A Billy invoice (either method) → the fields the reconciliation and the sales book use."""
     buyer = x.get("buyer") or {}
     taxes = []
-    for t in ((x.get("sameTaxes") or {}).get("sameTax") or []) if isinstance(x.get("sameTaxes"), dict) else []:
-        taxes.append([_f(t.get("vatrate")), t.get("exemptFromVAT"), _f(t.get("priceBefVAT")) or 0.0,
-                      _f(t.get("vatamt")) or 0.0, t.get("numOfItems")])
+    for t in _list(x.get("sameTaxes"), "sameTax"):
+        taxes.append([_f(t.get("vatrate") if t.get("vatrate") is not None else t.get("VATRate")), t.get("exemptFromVAT"),
+                      _f(t.get("priceBefVAT")) or 0.0, _f(t.get("vatamt") if t.get("vatamt") is not None else t.get("VATAmt")) or 0.0,
+                      t.get("numOfItems")])
     refs = x.get("sumInvIICRefs")
     if isinstance(refs, dict):
         refs = refs.get("sumInvIICRef") or []
-    refs = [str(r.get("iic") if isinstance(r, dict) else r) for r in (refs or []) if r]
-    pays = []
-    for p in ((x.get("payMethods") or {}).get("payMethod") or []) if isinstance(x.get("payMethods"), dict) else []:
-        pays.append([p.get("type") or "", _f(p.get("amt")) or 0.0])
+    if isinstance(refs, dict):
+        refs = [refs]
+    refs = [str(r.get("iic") or r.get("IIC") if isinstance(r, dict) else r) for r in (refs or []) if r]
+    pays = _pay_types(x)
     return {"src": source, "iic": (x.get("iic") or "").upper(), "fic": x.get("fic") or "", "num": x.get("invNum") or "",
             "ord": x.get("invOrdNum"), "issue": local(x.get("issueDateTime")), "sent": local(x.get("sendDateTime")),
             "total": _f(x.get("totPrice")), "wo_vat": _f(x.get("totPriceWoVAT")), "vat": _f(x.get("totVATAmt")),
@@ -248,9 +272,16 @@ def compact(x, source):
             "buyer_type": (buyer.get("idtype") or "") if isinstance(buyer, dict) else "",
             "buyer": (buyer.get("name") or "") if isinstance(buyer, dict) else "",
             "einv": bool(x.get("isEinvoice")), "eic": x.get("eic") or "", "corr": bool(x.get("correctiveInv")),
-            "refs": refs, "taxes": taxes, "pays": pays, "reverse": bool(x.get("isReverseCharge")),
+            "refs": refs, "taxes": taxes, "pays": pays, "order": any("ORDER" in p[0] for p in pays),
+            "reverse": bool(x.get("isReverseCharge")),
             "simplified": bool(x.get("isSimplifiedInv")), "in_vat": x.get("isIssuerInVAT"),
             "tax_free": _f(x.get("taxFreeAmt")), "markup": _f(x.get("markUpAmt"))}
+
+
+def _keep(x):
+    """The invoice as Billy gave it, without its items and PDF: parsed again on every read, so a change in how
+    the tower reads it needs no new call to Billy."""
+    return {k: v for k, v in x.items() if k not in ("items", "Pdf", "pdf", "fees")}
 
 
 # ---------------------------------------------------------------- the daily store
@@ -290,7 +321,7 @@ def read_day(acct, src, day, today=None):
         c = compact(x, src)
         k = c["iic"] or c["fic"] or c["num"]
         if k:
-            keep.append((acct["nuis"], src, (c["issue"] or day.isoformat())[:10], k, json.dumps(c, separators=(",", ":"))))
+            keep.append((acct["nuis"], src, (c["issue"] or day.isoformat())[:10], k, json.dumps(_keep(x), separators=(",", ":"))))
     final = day <= today - timedelta(days=2)
     with _db_lock:
         db = _db()
@@ -307,4 +338,16 @@ def held(nuis, src, a, b):
     with _db_lock:
         rows = _db().execute("SELECT j FROM inv WHERE nuis=? AND src=? AND day>=? AND day<=?",
                              (nuis, src, a.isoformat(), b.isoformat())).fetchall()
-    return [json.loads(j) for (j,) in rows]
+    return [compact(json.loads(j), src) for (j,) in rows]
+
+
+def sample(acct, src, day, n=3):
+    """The first invoices of a day as Billy gives them (Settings → connection check): read-only, nothing kept."""
+    if src == "bridge":
+        rows = _post(acct, "get-sales-invoices", {"FIC": None, "TimeFrom": _stamp(day), "TimeTo": _stamp(day, True)})
+    else:
+        rows = _post(acct, "get-invoices", {"FIC": None, "Type": "SALES", "Start": _stamp(day), "End": _stamp(day, True)})
+    lst = rows if isinstance(rows, list) else (rows.get("invoices") or rows.get("Invoices") or rows.get("data") or [rows])
+    return {"count": len(lst), "shape": type(rows).__name__, "rows": [_keep(x) for x in lst[:n] if isinstance(x, dict)],
+            "keys": sorted({k for x in lst[:200] if isinstance(x, dict) for k in x}),
+            "pay_types": sorted({p[0] for x in lst if isinstance(x, dict) for p in _pay_types(x)})}

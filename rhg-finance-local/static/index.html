@@ -1430,7 +1430,7 @@ td.num,th.num{text-align:right}
         <p class="hint" id="biNote"><span>Every Simphony check against the invoice Billy fiscalized for it: whether, with which IIC and FIC and at what time; the tills and units (kiosks included), shifts and operators, the summary invoices, and the sales book in the columns of the law in place of the Self-Care download.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <button class="mini dark" id="biRead">Read again</button><button class="mini" id="biXlsx">Sales book (Excel)</button><button class="mini" id="biSetBtn" style="display:none">Connection &amp; mapping</button></div></div>
-      <div class="kpis six" id="biKpis" style="margin-top:14px"></div>
+      <div class="kpis" id="biKpis" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
       <p class="meta" id="biStatus"></p>
     </div>
     <div class="card" id="biSet" style="display:none">
@@ -1451,7 +1451,7 @@ td.num,th.num{text-align:right}
       <label class="field" style="margin-top:8px">Operators → employees <span class="meta">optional, one per line: operator code = Simphony employee number</span><textarea id="biSOps" spellcheck="false" style="min-height:60px"></textarea></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="biSave">Save</button><span class="meta" id="biMsg"></span></div>
     </div>
-    <div class="fc-seg bi-seg" id="biSeg" role="tablist"><button data-b="checks" class="on">Checks</button><button data-b="days">Restaurants &amp; days</button><button data-b="tills">Tills &amp; units</button><button data-b="ops">Shift &amp; operator</button><button data-b="summary">Summary invoices</button><button data-b="book">Sales book</button></div>
+    <div class="fc-seg bi-seg" id="biSeg" role="tablist"><button data-b="checks" class="on">Checks</button><button data-b="days">Restaurants &amp; days</button><button data-b="tills">Tills &amp; units</button><button data-b="ops">Shift &amp; operator</button><button data-b="orders">Orders</button><button data-b="summary">Summary invoices</button><button data-b="book">Sales book</button></div>
     <div class="bi-p" data-p="checks">
       <div class="card"><div class="card-head"><div><h2>Every check</h2><p class="hint"><span>Each Simphony check with its invoice: number, IIC, FIC, the time it was fiscalized and how long after the check closed.</span></p></div></div>
         <div class="filters" style="margin:0 0 10px"><label>Restaurant<select id="biFLoc"><option value="">All</option></select></label>
@@ -1469,6 +1469,10 @@ td.num,th.num{text-align:right}
     <div class="bi-p" data-p="ops" hidden><div class="card"><div class="card-head"><div><h2>Shift and operator</h2>
       <p class="hint"><span>Simphony checks by the employee who closed them against the invoices of their operator code, shift by shift. The difference is fiscalized less Simphony.</span></p></div></div>
       <div class="scroll" style="max-height:620px"><table id="biOps"></table></div></div></div>
+    <div class="bi-p" data-p="orders" hidden><div class="card"><div class="card-head"><div><h2>Orders</h2>
+      <p class="hint"><span>Documents of Billy with the payment method ORDER: orders, kept apart from the invoices (cash or account) so they are not matched to the checks or put in the sales book.</span> <span>For each order, whether an invoice of the same total follows on the same till within a day.</span></p></div></div>
+      <div class="sk-chips" id="biOrdChips"></div>
+      <div class="scroll" style="max-height:620px"><table id="biOrd"></table></div><p class="meta" id="biOrdMore"></p></div></div>
     <div class="bi-p" data-p="summary" hidden><div class="card"><div class="card-head"><div><h2>Summary invoices</h2>
       <p class="hint"><span>Invoices that sum up other invoices (their IIC references): fiscalized or not, and which of the invoices they refer to are found in Billy for the period.</span></p></div></div>
       <div class="scroll"><table id="biSum"></table></div></div></div>
@@ -4648,7 +4652,8 @@ function renderBilly(){
     card("Fiscalized late", fmt(k.late + k.late48), fcSp(`${fmt(k.late48)} after 48 hours · late after ${fmt(d.settings.late)} min`), k.late48 ? "up" : k.late ? "warn" : "") +
     card("Invoices without a check", fmt(k.no_check), fcSp(`${biM(k.no_check_value)} · ${fmt(k.other_till || 0)} on tills without Simphony`), k.no_check ? "warn" : "") +
     card("No FIC in Billy", fmt(k.no_fic), fcSp(`${biM(k.no_fic_value)} not fiscalized`), k.no_fic ? "up" : "down") +
-    card("Sales book cases", fmt(k.book_errors), fcSp(`of ${fmt(k.invoices)} invoices${k.unmapped ? ` · ${k.unmapped} tills not mapped` : ""}`), k.book_errors ? "warn" : "down");
+    card("Sales book cases", fmt(k.book_errors), fcSp(`of ${fmt(k.invoices)} invoices${k.unmapped ? ` · ${k.unmapped} tills not mapped` : ""}`), k.book_errors ? "warn" : "down") +
+    card("Orders", fmt(k.orders || 0), fcSp(`${biM(k.orders_value || 0)} · ${fmt(k.orders_open || 0)} without an invoice after`), k.orders_open ? "warn" : "");
   $("biStatus").innerHTML = esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
     + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
     + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
@@ -4657,7 +4662,7 @@ function renderBilly(){
   $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
   $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
-  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook();
+  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders();
 }
 function biChecks(){
   const d = biData, L = $("biFLoc").value, st = $("biFSt").value || "missing", q = ($("biFQ").value || "").trim().toUpperCase();
@@ -4704,6 +4709,18 @@ function biOps(){
       <td class="num">${o.not_fisc ? `${fmt(o.not_fisc, 0)} <span class="meta">(${o.not_fisc_n})</span>` : ""}</td><td class="num">${o.no_check ? `${fmt(o.no_check, 0)} <span class="meta">(${o.no_check_n})</span>` : ""}</td></tr>`).join("")
       || `<tr><td class="meta">${fcSp("No check or invoice in the period.")}</td></tr>`);
 }
+let biOrdF = "open";
+function biOrders(){
+  const d = biData, O = d.orders || [], rows = O.filter(o => biOrdF === "all" || (biOrdF === "open" ? !o.invoiced : o.invoiced));
+  $("biOrdChips").innerHTML = [["open", "Without an invoice after", O.filter(o => !o.invoiced).length], ["done", "Invoiced after", O.filter(o => o.invoiced).length], ["all", "Every order", O.length]]
+    .map(([k, l, n]) => `<button data-bof="${k}" class="${biOrdF === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
+  $("biOrdChips").querySelectorAll("[data-bof]").forEach(b => b.onclick = () => { biOrdF = b.dataset.bof; biOrders(); });
+  $("biOrd").innerHTML = `<tr><th>Issued</th><th>Order</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Payment</th><th>Invoice after</th><th>IIC</th></tr>` +
+    (rows.slice(0, 400).map(o => `<tr><td>${esc((o.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(o.num || "")}</b></td><td class="num">${fmt(o.total, 2)}</td><td>${esc(o.ref || "–")}</td><td>${esc(o.tcr)}</td><td>${esc(o.op)}</td><td class="meta">${esc(o.pays)}</td>
+      <td>${o.invoiced ? `<span class="rhg-pill low">${fmt(o.after_min)} min</span>` : `<span class="rhg-pill medium">${fcSp("none")}</span>`}</td><td class="meta" title="${esc(o.iic)}">${esc((o.iic || "").slice(0, 12))}…</td></tr>`).join("")
+      || `<tr><td colspan="9" class="meta">${fcSp(O.length ? "No order with this filter." : "No document with the payment method ORDER in the period.")}</td></tr>`);
+  $("biOrdMore").textContent = rows.length > 400 ? `${fmt(rows.length)} orders; 400 are shown, the Excel has every one.` : "";
+}
 function biSum(){
   const d = biData;
   $("biSum").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Type</th><th>Till</th><th>Restaurant</th><th>Fiscalized</th><th class="num">Invoices referred</th><th class="num">Found</th><th>Not found</th></tr>` +
@@ -4718,10 +4735,11 @@ function biBook(){
   $("biBookK").innerHTML = card("Total with VAT", sum("total")) + card("Exempt", sum("exempt")) + card("Without VAT", sum("no_vat")) + card("Zero rate and exports", sum("zero")) +
     rates.map(r => card(`Taxable ${r}%`, sum("b" + r)) + card(`VAT ${r}%`, sum("v" + r))).join("");
   const counts = d.book_errors || {}, keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-  $("biBookChips").innerHTML = [["", "Every invoice", B.length], ["*", "With a case", B.filter(b => b.errors.length).length], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
+  const info = d.info_errors || ["no_fic", "no_detail"], isCase = b => b.errors.some(e => !info.includes(e));
+  $("biBookChips").innerHTML = [["", "Every invoice", B.length], ["*", "With a case", B.filter(isCase).length], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
     .map(([k, l, n]) => `<button data-be="${esc(k)}" class="${biBookErr === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
   $("biBookChips").querySelectorAll("[data-be]").forEach(b => b.onclick = () => { biBookErr = b.dataset.be; biBook(); });
-  const rows = B.filter(b => !biBookErr || (biBookErr === "*" ? b.errors.length : b.errors.includes(biBookErr)));
+  const rows = B.filter(b => !biBookErr || (biBookErr === "*" ? isCase(b) : b.errors.includes(biBookErr)));
   $("biBook").innerHTML = `<tr><th>Date</th><th>No.</th><th>Invoice</th><th>Buyer</th><th class="num">Total</th><th class="num">Exempt</th><th class="num">No VAT</th><th class="num">0% / export</th>${rates.map(r => `<th class="num">Taxable ${r}%</th><th class="num">VAT ${r}%</th>`).join("")}<th>Till</th><th>Cases</th></tr>` +
     (rows.slice(0, 400).map(b => `<tr><td>${esc((b.issue || "").slice(0, 16).replace("T", " "))}</td><td>${esc(b.ord ?? "")}</td><td><b>${esc(b.num)}</b>${b.eic ? `<div class="meta">EIC</div>` : ""}</td><td>${esc(b.buyer || "")}${b.buyer_id ? `<div class="meta">${esc(b.buyer_id)}</div>` : ""}</td>
       <td class="num">${fmt(b.total, 2)}</td><td class="num">${b.exempt ? fmt(b.exempt, 2) : ""}</td><td class="num">${b.no_vat ? fmt(b.no_vat, 2) : ""}</td><td class="num">${b.zero ? fmt(b.zero, 2) : ""}</td>
