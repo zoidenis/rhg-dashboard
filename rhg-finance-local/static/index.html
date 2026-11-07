@@ -114,7 +114,21 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
 .up{color:var(--up)}.down{color:var(--down)}.warn{color:var(--warn)}
 .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:15px;margin-bottom:15px}
 @media(max-width:1000px){.grid{grid-template-columns:1fr}}
-@media(max-width:760px){aside{display:none}main{padding:16px}}
+/* phone: the side menu becomes a drawer, opened by the Menu button at the top (Finance, Purchasing, Sales…) */
+.mnav-btn,.mnav-bd{display:none}
+@media(max-width:760px){
+  aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;
+        transform:translateX(-105%);transition:transform .2s ease}
+  body.mnav-open aside{transform:none;box-shadow:0 0 32px rgba(0,0,0,.35)}
+  body.mnav-open{overflow:hidden}
+  .mnav-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}
+  body.mnav-open .mnav-bd{display:block}
+  .mnav-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+            border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px;align-self:flex-start}
+  .mnav-btn svg{width:18px;height:18px}
+  main{padding:16px}
+}
+@media (prefers-reduced-motion: reduce){aside{transition:none}}
 h2{font-size:15px;margin:0;font-weight:700}
 .hint{color:var(--sub);font-size:12.5px;margin:3px 0 12px}
 .sub-h{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:4px 0 8px}
@@ -557,8 +571,10 @@ td.num,th.num{text-align:right}
   <div class="side-foot">Reads Business Central directly, on this PC. BC stays read-only; actions and thresholds live here.</div>
   <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
+<div class="mnav-bd no-report" id="mnavBd"></div>
 
 <main>
+  <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
   <header>
     <div><div class="eyebrow">RHG Finance / Business Central, read-only</div>
       <h1 id="title">Executive overview</h1><div class="period" id="period">Loading your data…</div></div>
@@ -8128,5 +8144,18 @@ document.addEventListener("keydown", e => {
 <script src="layout.js" data-app="finance"></script>
 <script src="recipients.js"></script>
 <script src="/reports.js"></script><!-- scheduled reports: any screen by email (identity) -->
+<script>
+// phone: the side menu as a drawer (Control center, Purchasing, Finance, Inventory, Sales and every screen)
+(() => {
+  const btn = document.getElementById("mnavBtn"), body = document.body;
+  if (!btn) return;
+  const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
+  document.getElementById("mnavBd").addEventListener("click", () => set(false));
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("#nav button, .towers a, a")) set(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
+})();
+</script>
 </body>
 </html>

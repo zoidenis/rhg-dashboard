@@ -73,7 +73,22 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .cc-viz{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}}
 :root[data-theme="dark"] .cc-viz{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.towers-grid{grid-template-columns:1fr}}
-@media(max-width:760px){aside{display:none}.kpis{grid-template-columns:1fr}}
+/* phone: the side menu becomes a drawer, opened by the Menu button at the top (Finance, Purchasing, Sales…) */
+.mnav-btn,.mnav-bd{display:none}
+@media(max-width:760px){
+  aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;
+        transform:translateX(-105%);transition:transform .2s ease}
+  body.mnav-open aside{transform:none;box-shadow:0 0 32px rgba(0,0,0,.35)}
+  body.mnav-open{overflow:hidden}
+  .mnav-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}
+  body.mnav-open .mnav-bd{display:block}
+  .mnav-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+            border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px;align-self:flex-start}
+  .mnav-btn svg{width:18px;height:18px}
+  main{padding:16px}
+}
+@media (prefers-reduced-motion: reduce){aside{transition:none}}
+@media(max-width:760px){.kpis{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -89,8 +104,10 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
   <div class="adminlink" id="adminLink"></div>
   <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
+<div class="mnav-bd no-report" id="mnavBd"></div>
 
 <main>
+  <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
   <header>
     <div>
       <div class="eyebrow">RHG Control towers / Business Central, live</div>
@@ -561,5 +578,18 @@ $("logoutBtn").onclick = signOut;
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 <script src="/tables.js"></script>
+<script>
+// phone: the side menu as a drawer (Control center, Purchasing, Finance, Inventory, Sales and every screen)
+(() => {
+  const btn = document.getElementById("mnavBtn"), body = document.body;
+  if (!btn) return;
+  const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
+  document.getElementById("mnavBd").addEventListener("click", () => set(false));
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("a, nav button")) set(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
+})();
+</script>
 </body>
 </html>
