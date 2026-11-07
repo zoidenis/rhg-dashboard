@@ -28,6 +28,7 @@ The sales book: every invoice of the fiscalization service in the columns of the
 and exports, taxable and VAT by rate), with the checks of its mapping: the totals, the VAT groups, the rates and the
 buyer. Nothing is written to Simphony, Billy or the Tax Administration.
 """
+import gzip
 import io
 import json
 import re
@@ -61,7 +62,8 @@ ERRORS = {"total": "Total ≠ value without VAT + VAT", "base_sum": "VAT groups 
 INFO = ("no_fic", "no_detail")                      # not a mapping error of the book
 KEEP = 900
 DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
-LATE_LIMIT = 72 * 3600          # a check is looked for in invoices fiscalized up to three days after it closed
+LATE_LIMIT = 72 * 3600
+_TOKEN = re.compile(r"[A-Z0-9][A-Z0-9/_-]{5,}")          # a check is looked for in invoices fiscalized up to three days after it closed
 _results, _jobs, _lock, _db_lock = {}, {}, threading.Lock(), threading.Lock()
 _conn = None
 on_built = None
@@ -217,9 +219,9 @@ def _match(checks, invs, S, used, late_step=True):
     for c in checks:                                    # 1. the fiscal reference written on the check
         if c.get("inv") or not c["info"]:
             continue
-        up = c["info"].upper()
-        for k, i in by_key.items():
-            if i["_k"] not in used and k in up:
+        for tok in _TOKEN.findall(c["info"].upper()):     # each word of the check's lines looked up, not scanned
+            i = by_key.get(tok)
+            if i and i["_k"] not in used:
                 used.add(i["_k"]); c["inv"] = i["_k"]; c["how"] = "reference"; pairs.append((c, i))
                 break
     win = S["window"] * 60
@@ -383,36 +385,43 @@ def build(company, latest_fn, progress=None, today=None):
     say = progress or (lambda *_: None)
     errors = []
     # Billy: both methods, day by day
-    for src in ("bridge", "fiscal"):
-        say(f"Billy · {'invoices of the bridge' if src == 'bridge' else 'invoices of the fiscalization service'}")
-        for d in days:
-            try:
-                billy.read_day(acct, src, d, today)
-            except billy.BillyError as exc:
-                errors.append(f"Billy {src} {d}: {str(exc)[:160]}")
-                if "address" in str(exc) or "did not accept" in str(exc):
-                    raise ValueError(str(exc)) from exc
-    # Simphony: the closed checks of the company's restaurants
+    # Billy (both methods, day by day) and Simphony (each restaurant's checks, day by day) read at the same time
     sim_on = bool(simphony.info().get("configured"))
     latest = {}
     if sim_on and regs:
-        say("Simphony · guest checks by day")
         for r in regs:
             try:
                 latest[r["ref"]] = latest_fn(r["ref"])
             except Exception:                                       # noqa: BLE001
                 latest[r["ref"]] = None
-        jobs = [(r["ref"], d.isoformat()) for r in regs for d in days if not latest.get(r["ref"]) or d.isoformat() <= latest[r["ref"]]]
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futs = {pool.submit(read_checks, ref, d, latest.get(ref)): (ref, d) for ref, d in jobs}
-            for n, f in enumerate(as_completed(futs), 1):
-                try:
-                    f.result()
-                except Exception as exc:                            # noqa: BLE001
-                    if len(errors) < 12:
-                        errors.append(f"Simphony {futs[f][0]} {futs[f][1]}: {str(exc)[:140]}")
-                if n % 10 == 0:
-                    say(f"Simphony · guest checks by day ({n} of {len(jobs)})")
+    try:
+        billy._token(acct)                                          # one sign-in before the reads in parallel
+    except billy.BillyError as exc:
+        raise ValueError(str(exc)) from exc
+    jobs = [("billy", src, d) for d in days for src in ("bridge", "fiscal")]
+    if sim_on:
+        jobs += [("sim", r["ref"], d.isoformat()) for r in regs for d in days
+                 if not latest.get(r["ref"]) or d.isoformat() <= latest[r["ref"]]]
+    say(f"Billy and Simphony · {len(jobs)} days")
+
+    def run(job):
+        kind, x, d = job
+        if kind == "billy":
+            return billy.read_day(acct, x, d, today)
+        return read_checks(x, d, latest.get(x))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futs = {pool.submit(run, j): j for j in jobs}
+        for n, f in enumerate(as_completed(futs), 1):
+            kind, x, d = futs[f]
+            try:
+                f.result()
+            except billy.BillyError as exc:
+                errors.append(f"Billy {x} {d}: {str(exc)[:160]}")
+            except Exception as exc:                                # noqa: BLE001
+                if len(errors) < 12:
+                    errors.append(f"{'Simphony' if kind == 'sim' else 'Billy'} {x} {d}: {str(exc)[:140]}")
+            if n % 10 == 0:
+                say(f"Billy and Simphony · {n} of {len(jobs)} days")
     a_, b_ = days[0].isoformat(), days[-1].isoformat()
     bridge = billy.held(acct["nuis"], "bridge", days[0], days[-1])
     fiscal = billy.held(acct["nuis"], "fiscal", days[0], days[-1])
@@ -443,7 +452,7 @@ def build(company, latest_fn, progress=None, today=None):
 
             def one(k):
                 billy.keep_detail(acct["nuis"], k, billy.detail(acct, cand[k]))
-            with ThreadPoolExecutor(max_workers=3) as pool:
+            with ThreadPoolExecutor(max_workers=6) as pool:
                 futs = [pool.submit(one, k) for k in todo]
                 for n, f in enumerate(as_completed(futs), 1):
                     try:
@@ -765,45 +774,92 @@ def _kpis_of(r, keep):
 
 
 # ---------------------------------------------------------------- held results and background reads
+def _file(company):
+    return store.DATA_DIR / f"billyrec_{re.sub(r'[^A-Za-z0-9_-]+', '_', company)}.json.gz"
+
+
 def held(company):
     with _lock:
         hit = _results.get(company)
-    return hit[1] if hit else None
+    if hit:
+        return hit[1]
+    try:                                                     # the last read, kept on disk across restarts
+        with gzip.open(_file(company), "rt", encoding="utf-8") as f:
+            r = json.load(f)
+        with _lock:
+            _results.setdefault(company, (0.0, r))          # age 0: shown at once, read again in the background
+        return r
+    except (OSError, ValueError):
+        return None
 
 
 def remember(company, r):
     with _lock:
         _results[company] = (time.time(), r)
+    try:
+        tmp = _file(company).with_suffix(".tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=5) as f:
+            json.dump(r, f, default=str)
+        tmp.replace(_file(company))
+    except OSError:
+        traceback.print_exc()
 
 
 def request(company, latest_fn, refresh=False):
+    """The last read at once; a new read in the background when it is older than KEEP or asked for. While it runs
+    the last read comes back with reading: True (the screen keeps showing it and asks again)."""
+    last = held(company)
     with _lock:
         hit = _results.get(company)
         job = _jobs.get(company)
-        if hit and not refresh and time.time() - hit[0] < KEEP and not (job and job["state"] == "running"):
-            return hit[1]
-        if job and job["state"] == "running":
-            return {"pending": True, "stage": job["stage"]}
+        running = bool(job and job["state"] == "running")
+        fresh = hit and time.time() - hit[0] < KEEP
         if job and job["state"] == "failed" and not refresh and time.time() - job["at"] < 60:
             _jobs.pop(company, None)
-            return {"available": False, "error": job["error"]}
-        job = _jobs[company] = {"state": "running", "stage": "starting", "at": time.time(), "error": ""}
+            if not last:
+                return {"available": False, "error": job["error"]}
+            return dict(last, reading=False, read_error=job["error"])
+        if not running and (refresh or not fresh):
+            job = _jobs[company] = {"state": "running", "stage": "starting", "at": time.time(), "error": ""}
+            running = True
 
-    def go():
-        try:
-            r = build(company, latest_fn, progress=lambda st: job.update(stage=st))
-            if on_built:
+            def go():
                 try:
-                    r["register"] = on_built(company, r)
-                except Exception:                                  # noqa: BLE001
+                    r = build(company, latest_fn, progress=lambda st: job.update(stage=st))
+                    if on_built:
+                        try:
+                            r["register"] = on_built(company, r)
+                        except Exception:                          # noqa: BLE001
+                            traceback.print_exc()
+                    remember(company, r)
+                    job["state"] = "done"
+                except Exception as exc:                           # noqa: BLE001
                     traceback.print_exc()
-            remember(company, r)
-            job["state"] = "done"
-        except Exception as exc:                                   # noqa: BLE001
-            traceback.print_exc()
-            job.update(state="failed", error=str(exc)[:300], at=time.time())
-    threading.Thread(target=go, daemon=True, name=f"billyrec-{company}").start()
-    return {"pending": True, "stage": "starting"}
+                    job.update(state="failed", error=str(exc)[:300], at=time.time())
+            threading.Thread(target=go, daemon=True, name=f"billyrec-{company}").start()
+        stage = job["stage"] if running and job else ""
+    if last:
+        return dict(last, reading=running, stage=stage)
+    return {"pending": True, "stage": stage or "starting"} if running else {"available": False, "error": "Not read yet."}
+
+
+def public(r):
+    """What the screen needs: the sales book's totals over every invoice, and its rows with a case (plus the first
+    ones); the whole book stays on the server for the Excel."""
+    if not isinstance(r, dict) or not isinstance(r.get("book"), list):
+        return r
+    B = r["book"]
+    cols = sorted({k for b in B[:50] for k in b if k in ("total", "exempt", "no_vat", "zero") or re.fullmatch(r"[bv]\d+(\.\d+)?", k)})
+    tot = {k: round(sum(b.get(k) or 0 for b in B), 2) for k in cols}
+    cases = [b for b in B if any(e not in INFO for e in b["errors"])]
+    seen, rows = set(), []
+    for b in cases[:3000] + B[:400]:
+        k = b["iic"] or b["num"]
+        if k not in seen:
+            seen.add(k)
+            rows.append(b)
+    rows.sort(key=lambda b: b["issue"] or "")
+    return dict(r, book=rows, book_count=len(B), book_totals=tot, book_cases=len(cases))
 
 
 # ---------------------------------------------------------------- the register

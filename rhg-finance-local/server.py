@@ -6,6 +6,7 @@ application's own and live under ./data.
 import access
 import base64
 import hmac
+import gzip
 import html
 import json
 import re
@@ -2084,8 +2085,14 @@ class Handler(BaseHTTPRequestHandler):
         if status == 200 and getattr(self, "_scope_filter", None) and isinstance(body, dict):
             body = self._scope_filter(body)
         payload = body if isinstance(body, bytes) else json.dumps(body, default=str).encode("utf-8")
+        zipped = len(payload) > 64 * 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "") and ctype.startswith("application/json")
+        if zipped:                                       # a large answer (Simphony ↔ Billy, movement…) travels compressed
+            payload = gzip.compress(payload, compresslevel=5)
         self.send_response(status)
         self.send_header("Content-Type", ctype)
+        if zipped:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
@@ -2473,6 +2480,9 @@ class Handler(BaseHTTPRequestHandler):
                     r = billyrec.request(company, _latest, q.get("refresh") == "1")
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
+                if isinstance(r, dict) and isinstance(r.get("book"), list):
+                    r = billyrec.public(billyrec.cut(r, self._allowed))     # cut first: the totals are the scope's
+                    self._scope_filter = None
                 self._send(200, dict(r, companies=billyrec.companies(), connection=billy.info()["configured"],
                                      can_settings=auth.can(user, "settings")) if isinstance(r, dict) else r)
             elif url.path == "/api/billy/sample":

@@ -4636,7 +4636,10 @@ async function loadBilly(refresh){
     $("biSetBtn").style.display = j.can_settings ? "" : "none";
     if (j.pending) { $("biStatus").textContent = `Reading Simphony and Billy… ${j.stage || ""}`; biTimer = setTimeout(() => loadBilly(false), 4000); return; }
     if (j.available === false || j.error) throw Object.assign(new Error(j.error || "not available"), {companies: j.companies || []});
-    biData = j; renderBilly();
+    // the last read is shown at once; a new one may be running behind it
+    const same = biData && biData.checked_at === j.checked_at && biData.company === j.company;
+    biData = j; if (!same) renderBilly(); else biStatusLine();
+    if (j.reading) biTimer = setTimeout(() => loadBilly(false), 5000);
   }catch(e){
     const cos = (e.companies || []).filter(c => c !== $("company").value);
     $("biStatus").innerHTML = esc("Could not read: " + e.message) + (cos.length ? ` · ${fcSp("Billy is set for")} ` + cos.map(c => `<button class="mini" data-bico="${esc(c)}" type="button">${esc(c)}</button>`).join(" ") : "");
@@ -4655,17 +4658,22 @@ function renderBilly(){
     card("No FIC in Billy", fmt(k.no_fic), fcSp(`${biM(k.no_fic_value)} not fiscalized`), k.no_fic ? "up" : "down") +
     card("Sales book cases", fmt(k.book_errors), fcSp(`of ${fmt(k.invoices)} invoices${k.unmapped ? ` · ${k.unmapped} tills not mapped` : ""}`), k.book_errors ? "warn" : "down") +
     card("Orders", fmt(k.orders || 0), fcSp(`${biM(k.orders_value || 0)} · ${fmt(k.orders_open || 0)} without an invoice after`), k.orders_open ? "warn" : "");
-  $("biStatus").innerHTML = esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
-    + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
-    + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
-    + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
-    + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
+  biStatusLine();
   const locs = [...new Set(d.checks.map(c => c.ref))].sort(), lv = $("biFLoc").value, sv = $("biFSt").value || "missing";
   $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
   $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
   biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders();
 }
+function biStatusLine(){
+  const d = biData;
+  $("biStatus").innerHTML = (d.reading ? `<b>${fcSp("Reading the new figures…")}</b> ${esc(d.stage || "")} · ${fcSp("shown: the last read")} · ` : "") + (d.read_error ? `<span class="warn">${esc("Last read failed: " + d.read_error)}</span> · ` : "") + esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
+    + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
+    + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
+    + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
+    + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
+}
+
 function biChecks(){
   const d = biData, L = $("biFLoc").value, st = $("biFSt").value || "missing", q = ($("biFQ").value || "").trim().toUpperCase();
   const rows = d.checks.filter(c => (!L || c.ref === L) && (st === "all" || c.status === st) && (!q || [c.num, c.iic, c.fic, c.inv_num].some(v => String(v || "").toUpperCase().includes(q))))
@@ -4732,13 +4740,13 @@ function biSum(){
 }
 function biBook(){
   const d = biData, B = d.book, rates = d.rates.filter(r => r > 0).sort((a, b) => b - a);
-  const sum = k => B.reduce((a, b) => a + (b[k] || 0), 0);
+  const sum = k => d.book_totals ? (d.book_totals[k] || 0) : B.reduce((a, b) => a + (b[k] || 0), 0);
   const card = (l, v) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v">${biM(v)}</div></div>`;
   $("biBookK").innerHTML = card("Total with VAT", sum("total")) + card("Exempt", sum("exempt")) + card("Without VAT", sum("no_vat")) + card("Zero rate and exports", sum("zero")) +
     rates.map(r => card(`Taxable ${r}%`, sum("b" + r)) + card(`VAT ${r}%`, sum("v" + r))).join("");
   const counts = d.book_errors || {}, keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const info = d.info_errors || ["no_fic", "no_detail"], isCase = b => b.errors.some(e => !info.includes(e));
-  $("biBookChips").innerHTML = [["", "Every invoice", B.length], ["*", "With a case", B.filter(isCase).length], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
+  $("biBookChips").innerHTML = [["", "Every invoice", d.book_count || B.length], ["*", "With a case", d.book_cases != null ? d.book_cases : B.filter(isCase).length], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
     .map(([k, l, n]) => `<button data-be="${esc(k)}" class="${biBookErr === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
   $("biBookChips").querySelectorAll("[data-be]").forEach(b => b.onclick = () => { biBookErr = b.dataset.be; biBook(); });
   const rows = B.filter(b => !biBookErr || (biBookErr === "*" ? isCase(b) : b.errors.includes(biBookErr)));
@@ -4748,7 +4756,7 @@ function biBook(){
       ${rates.map(r => `<td class="num">${b["b" + r] ? fmt(b["b" + r], 2) : ""}</td><td class="num">${b["v" + r] ? fmt(b["v" + r], 2) : ""}</td>`).join("")}<td>${esc(b.tcr)}</td>
       <td>${b.errors.map(e => `<span class="rhg-pill ${e === "no_fic" ? "critical" : e === "no_detail" ? "" : "medium"}" style="margin:1px">${esc(d.error_labels[e] || e)}</span>`).join("")}</td></tr>`).join("")
       || `<tr><td colspan="${10 + rates.length * 2}" class="meta">${fcSp("No invoice with this filter.")}</td></tr>`);
-  $("biBookMore").textContent = rows.length > 400 ? `${fmt(rows.length)} invoices; 400 are shown, the Excel has every one.` : "";
+  $("biBookMore").textContent = (rows.length > 400 ? `${fmt(rows.length)} invoices here; 400 are shown.` : "") + ((d.book_count || 0) > B.length ? ` The screen holds the invoices with a case and the first ones; the Excel has all ${fmt(d.book_count)}.` : "");
 }
 $("biSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
   biTab = b.dataset.b;
