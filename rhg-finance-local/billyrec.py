@@ -441,7 +441,9 @@ def build(company, latest_fn, progress=None, today=None):
     note = ""
     nochk = Counter(i["ref"] for i in r["invoices"] if i["status"] == "no_check")
     nchk = Counter(c["ref"] for c in r["checks"] if c["status"] != "zero")
-    rest = {ref for ref, n in nochk.items() if ref and n >= max(20, 0.05 * nchk.get(ref, 0))}
+    # table service: documents without a check at least half the checks (SALT, Vesper, LIFT have three to four
+    # per check; the fast-food tills a few in a hundred, which are not orders)
+    rest = {ref for ref, n in nochk.items() if ref and n >= max(20, 0.5 * nchk.get(ref, 0))}
     cand = {c["iic"]: c["fic"] for c in r["checks"] if c["ref"] in rest and c["fic"] and c["iic"]}
     if cand:
         have = billy.details_held(acct["nuis"], cand)
