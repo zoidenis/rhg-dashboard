@@ -253,8 +253,9 @@ def _sum(rows_in, key_fn, keep=None):
     return out
 
 
-def item_attributes(client, company, settings=None):
-    """{item: (category code, purchase type)} from the item cards and the tower's mapping."""
+def item_attributes(client, company, settings=None, subs=None):
+    """{item: (category code, purchase type)} from the item cards and the tower's mapping; with subs (a dict), it
+    is filled with {item: (sub-category, "3" | "4" | "")}."""
     settings = settings or store.get_settings()
     try:
         catalog = client.item_catalog(company)
@@ -265,13 +266,18 @@ def item_attributes(client, company, settings=None):
     for no, card in catalog.items():
         ptype, _, _ = classify.classify_item(card, maps)
         out[no] = (card.get("code") or "", ptype)
+    if subs is not None:      # the sub-category of each item: category group 3, else group 4 (as Location intelligence)
+        for no, card in catalog.items():
+            g3, g4 = (card.get("g3") or "").strip(), (card.get("g4") or "").strip()
+            subs[no] = (g3, "3") if g3 else (g4, "4") if g4 else ("", "")
     return out
 
 
 def report(client, company, a, b, location="", vendor="", category="", stream="", q="", today=None):
     """The full report for any date range against the same dates last year."""
     la, lb = last_year(a), last_year(b)
-    attrs = item_attributes(client, company)
+    subs = {}
+    attrs = item_attributes(client, company, subs=subs)
     item_names, vendor_names = names(company, "item"), names(company, "vendor")
     ql = (q or "").strip().lower()
 
@@ -306,6 +312,7 @@ def report(client, company, a, b, location="", vendor="", category="", stream=""
         cat, typ = attrs.get(it, ("", "Unclassified"))
         top_v = sorted((item_vendors.get(it) or {}).items(), key=lambda kv: -kv[1])
         items.append({"item": it, "desc": item_names.get(it, ""), "category": cat, "stream": typ,
+                      "sub": (subs.get(it) or ("", ""))[0] or NO_SUB,
                       "cur_cost": round(c[0], 2), "cur_qty": round(c[1], 3),
                       "cur_avg": round(c[0] / c[1], 4) if c[1] > 0 else None,
                       "ly_cost": round(p[0], 2), "ly_qty": round(p[1], 3),
@@ -339,6 +346,31 @@ def report(client, company, a, b, location="", vendor="", category="", stream=""
 
     categories = sorted(group(lambda it: attrs.get(it, ("", ""))[0] or "(no category)"), key=lambda g: g["net"])
     streams = sorted(group(lambda it: attrs.get(it, ("", "Unclassified"))[1]), key=lambda g: g["net"])
+
+    # purchase type → sub-category (item category group 3, else 4) → items: where the price saved or cost
+    def stream_of(it):
+        return attrs.get(it, ("", "Unclassified"))[1]
+
+    def sub_of(it):
+        return (subs.get(it) or ("", ""))[0] or NO_SUB
+    by_pair_sub = group(lambda it: (stream_of(it), sub_of(it)))
+    level = {}
+    for it in set(by_item_c) | set(by_item_l):
+        x = subs.get(it) or ("", "")
+        level.setdefault((stream_of(it), sub_of(it)), set()).add(x[1])
+    counts = {}
+    for it in set(by_item_c) | set(by_item_l):
+        k = (stream_of(it), sub_of(it))
+        counts[k] = counts.get(k, 0) + 1
+    tree = []
+    for t in streams:
+        kids = [dict(g, key=g["key"][1], volume=round((g["cur"] - g["ly"]) - g["net"], 0), all_items=counts.get(g["key"], 0),
+                     level="3" if level.get(g["key"]) == {"3"} else "4" if level.get(g["key"]) == {"4"} else
+                     "3/4" if level.get(g["key"], set()) >= {"3", "4"} else "")
+                for g in by_pair_sub if g["key"][0] == t["key"]]
+        kids.sort(key=lambda g: (g["net"], -g["cur"]))
+        tree.append(dict(t, volume=round((t["cur"] - t["ly"]) - t["net"], 0),
+                         all_items=sum(k["all_items"] for k in kids), subs=kids))
 
     # suppliers and locations: the price effect on what was bought from that supplier /
     # at that location in both periods, so a change of supplier shows as volume there
@@ -379,7 +411,7 @@ def report(client, company, a, b, location="", vendor="", category="", stream=""
         "filters": {"location": location, "vendor": vendor, "category": category, "stream": stream, "q": q},
         "summary": {k: (round(v, 0) if isinstance(v, float) else v) for k, v in total.items()},
         "items": items[:3000], "items_total": len(items),
-        "vendors": vendors, "categories": categories, "streams": streams, "locations": locations,
+        "vendors": vendors, "categories": categories, "streams": streams, "locations": locations, "tree": tree,
         "months": months, "max_jump_pct": MAX_PRICE_JUMP * 100,
         "options": {
             "locations": sorted({r[0] for r in all_c if r[0]}),
@@ -392,6 +424,8 @@ def report(client, company, a, b, location="", vendor="", category="", stream=""
     }
 
 
+NO_SUB = "(no category 3 or 4)"
+
 DEFINITIONS = {
     "method": "Savings and extra spending are the price effect against the same dates last year: for each "
               "item bought in both periods, (this period's average unit cost - last year's) x this period's "
@@ -403,6 +437,8 @@ DEFINITIONS = {
               "only one of the two periods (new or dropped).",
     "excluded": "An item whose unit cost moved more than four times either way is left out of the price "
                 "effect as a likely unit of measure or entry error, and counted in volume and mix.",
+    "tree": "Purchase type comes from the tower's mapping of the item card; the sub-category is the item's category "
+            "group 3, or group 4 where the item has no group 3, as in Location intelligence.",
     "suppliers": "By supplier and by location, only what was bought from that supplier or at that location "
                  "in both periods is compared, so moving an item to another supplier shows as volume there; "
                  "the total above compares each item across all suppliers.",

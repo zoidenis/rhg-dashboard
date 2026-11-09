@@ -174,6 +174,16 @@ def render_pdf(r, currency):
                           [78 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 32 * mm, 18 * mm], num_cols=range(1, 7),
                           color_col=5))
     group_table("By purchase type", r["streams"], "Type")
+    if r.get("tree"):
+        story.append(Paragraph("By purchase type and sub-category", st["h2"]))
+        rows_t = [["Type / sub-category", "Last year", "This year", "Savings", "Extra", "Net price effect", "Volume and mix"]]
+        for t in r["tree"]:
+            rows_t.append([Paragraph(f"<b>{e(t['key'])}</b>", st["c"]), _m(t["ly"]), _m(t["cur"]), _m(t["save"]),
+                           _m(t["extra"]), _m(t["net"]), _m(t["volume"])])
+            rows_t += [[Paragraph("&nbsp;&nbsp;&nbsp;" + e(g["key"]), st["c"]), _m(g["ly"]), _m(g["cur"]), _m(g["save"]),
+                        _m(g["extra"]), _m(g["net"]), _m(g["volume"])] for g in t["subs"]]
+        story.append(grid(rows_t, [78 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 32 * mm, 30 * mm],
+                          num_cols=range(1, 7), color_col=5))
     group_table("By supplier", r["vendors"], "Supplier", lambda g: f"{g['name']} ({g['key']})")
     group_table("By item category", r["categories"], "Category")
     group_table("By location", r["locations"], "Location", lambda g: g["key"] or "(no location)")
@@ -270,15 +280,15 @@ def render_xlsx(r, currency):
     status_label = {"both": "compared", "new": "new this period", "dropped": "not bought this period",
                     "excluded": "left out", "other": ""}
     sheet(wb.create_sheet("Items"),
-          ["Item", "Description", "Category", "Purchase type", "Status", "Qty last year", "Spend last year",
+          ["Item", "Description", "Category", "Purchase type", "Sub-category", "Status", "Qty last year", "Spend last year",
            "Unit cost last year", "Qty this period", "Spend this period", "Unit cost this period", "Change %",
            "Price effect (negative = saving)", "Main suppliers"],
-          [[i["item"], i["desc"], i["category"], i["stream"], status_label.get(i["status"], i["status"]),
+          [[i["item"], i["desc"], i["category"], i["stream"], i.get("sub", ""), status_label.get(i["status"], i["status"]),
             i["ly_qty"], i["ly_cost"], i["ly_avg"], i["cur_qty"], i["cur_cost"], i["cur_avg"],
             (i["pct"] / 100) if i["pct"] is not None else None, i["effect"], ", ".join(i["vendors"])]
            for i in r["items"]],
-          [None, None, None, None, None, unit, money, unit, unit, money, unit, pct, money, None],
-          [12, 40, 12, 18, 16, 12, 15, 14, 12, 15, 14, 10, 18, 40])
+          [None, None, None, None, None, None, unit, money, unit, unit, money, unit, pct, money, None],
+          [12, 40, 12, 18, 24, 16, 12, 15, 14, 12, 15, 14, 10, 18, 40])
 
     def group_sheet(name, rows_in, label, with_name=False):
         sheet(wb.create_sheet(name),
@@ -290,6 +300,12 @@ def render_xlsx(r, currency):
               [18] + ([40] if with_name else []) + [16] * 6)
     group_sheet("Suppliers", r["vendors"], "Supplier", True)
     group_sheet("Purchase types", r["streams"], "Type")
+    sheet(wb.create_sheet("Types & sub-categories"),
+          ["Purchase type", "Sub-category", "Spend last year", "Spend this period", "Savings", "Extra spending",
+           "Net price effect", "Volume and mix", "Items compared", "Items"],
+          [[t["key"], g["key"], g["ly"], g["cur"], g["save"], g["extra"], g["net"], g["volume"], g["items"],
+            g.get("all_items")] for t in r.get("tree") or [] for g in t["subs"]],
+          [None, None] + [money] * 6 + [None, None], [20, 30] + [16] * 6 + [10, 10])
     group_sheet("Categories", r["categories"], "Category")
     group_sheet("Locations", r["locations"], "Location")
     sheet(wb.create_sheet("Months"),

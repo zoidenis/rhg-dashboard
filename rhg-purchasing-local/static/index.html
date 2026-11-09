@@ -73,6 +73,57 @@ h1{font-size:23px;margin:0;font-weight:800;letter-spacing:-.01em}
 .kpi .s{font-size:12.5px;color:var(--sub)}
 .up{color:var(--up)} .down{color:var(--down)}
 .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
+.sv-top{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.sv-two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.sv-two .card{min-width:0} .sv-top .card{min-width:0}
+@media(max-width:1000px){.sv-top,.sv-two{grid-template-columns:1fr}}
+.sv-cap{max-height:420px;overflow:auto}
+.sv-h3{font-size:13px;margin:16px 0 8px;font-weight:700}
+.sv-bridge{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.sv-br{display:grid;grid-template-columns:minmax(150px,190px) 1fr 96px;align-items:center;gap:10px;font-size:13px}
+.sv-br.b span{font-weight:700} .sv-br b{text-align:right;font-variant-numeric:tabular-nums}
+.sv-track{position:relative;height:14px;background:var(--line);border-radius:3px;opacity:1}
+.sv-track i{position:absolute;top:0;bottom:0;border-radius:3px}
+.sv-base{background:var(--sub)} .sv-save{background:var(--down)} .sv-extra{background:var(--up)} .sv-vol{background:#8a93a0}
+.sv-months{display:flex;gap:6px;align-items:flex-end;overflow-x:auto;padding-bottom:2px}
+.sv-mo{flex:1 0 44px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px}
+.sv-mbar{height:70px;width:22px;display:flex;align-items:flex-end} .sv-mbar i{width:100%;border-radius:3px 3px 0 0;min-height:2px}
+.sv-mo span{color:var(--sub)}
+.sv-movers{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:560px){.sv-movers{grid-template-columns:1fr}.sv-br{grid-template-columns:110px 1fr 84px;font-size:12px}}
+.sv-movers h3{margin-top:4px}
+.sv-mv{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);
+       background:none;padding:7px 2px;cursor:pointer;font:inherit;font-size:12.5px;color:inherit}
+.sv-mv:hover{background:rgba(127,127,127,.08)}
+.sv-mv span{min-width:0} .sv-mv span b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.sv-mv small{display:block;color:var(--sub);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv-mv em{font-style:normal;font-size:11.5px} .sv-mv > b{font-variant-numeric:tabular-nums}
+.sv-split{display:flex;flex-direction:column;gap:2px}
+.sv-sp{display:grid;grid-template-columns:minmax(120px,170px) 1fr 96px;gap:10px;align-items:center;border:0;background:none;padding:5px 0;
+       font:inherit;font-size:13px;color:inherit;text-align:left;cursor:pointer;border-radius:6px}
+.sv-sp:hover{background:rgba(127,127,127,.08)} .sv-sp > b{text-align:right;font-variant-numeric:tabular-nums}
+.sv-sp span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv-spb{display:grid;grid-template-columns:1fr 1fr;height:12px}
+.sv-spb > div{position:relative;background:var(--line)} .sv-spb > div:first-child{border-right:2px solid var(--card);border-radius:3px 0 0 3px}
+.sv-spb > div:last-child{border-radius:0 3px 3px 0}
+.sv-spb i{position:absolute;top:0;bottom:0} .sv-spb > div:first-child i{right:0;border-radius:3px 0 0 3px} .sv-spb > div:last-child i{left:0;border-radius:0 3px 3px 0}
+.sv-spk{display:grid;grid-template-columns:minmax(120px,170px) 1fr 1fr 96px;gap:10px;font-size:11px}
+.sv-spk span:first-child{grid-column:2;text-align:right;padding-right:6px} .sv-spk span:last-child{grid-column:3;padding-left:6px}
+@media(max-width:560px){.sv-sp,.sv-spk{grid-template-columns:90px 1fr 80px;font-size:12px}.sv-spk{grid-template-columns:90px 1fr 1fr 80px}}
+#svOpenAll,#svCloseAll{white-space:nowrap}
+@media(max-width:560px){#svBody .kpis{grid-template-columns:1fr 1fr;gap:10px}}
+.sv-tree td,.sv-tree th{white-space:nowrap}
+.sv-tree td:first-child{white-space:normal;min-width:330px}
+.sv-tree tr[data-svt]{cursor:pointer}
+.sv-tree tr.sv-l1 td{background:rgba(127,127,127,.06);border-top:1px solid var(--line)}
+.sv-tree tr.sv-l1:hover td,.sv-tree tr.sv-l2:hover td{background:rgba(127,127,127,.12)}
+.sv-tree tr.sv-l2 td:first-child{padding-left:28px}
+.sv-tree tr.sv-l3 td{font-size:12.5px} .sv-tree tr.sv-l3 td:first-child{padding-left:54px}
+.sv-tree tr.hit td{background:rgba(232,179,57,.22)}
+.sv-car{display:inline-block;width:16px;color:var(--sub)}
+.sv-nbc{width:90px;padding-left:4px!important}
+.sv-nb{display:block;width:80px;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.sv-nb i{display:block;height:100%;border-radius:4px}
 @media(max-width:1000px){.grid{grid-template-columns:1fr}}
 /* phone: the side menu becomes a drawer, opened by the Menu button at the top (Finance, Purchasing, Sales…) */
 .mnav-btn,.mnav-bd{display:none}
@@ -214,7 +265,7 @@ td.num,th.num{text-align:right}
   body.printing th{position:static}
   body.printing tr{break-inside:avoid}
   body.printing thead{display:table-header-group}
-  body.printing .grid{display:block}
+  body.printing .grid,body.printing .sv-top,body.printing .sv-two{display:block}
   body.printing .kpis{display:grid !important;grid-template-columns:repeat(4,1fr)}
   body.printing .kpi .v{font-size:17px}
   body.printing .act, body.printing .qcheck, body.printing .brief{break-inside:avoid}
@@ -3599,28 +3650,53 @@ function renderSavings(){
   const status = {both: "compared", new: "new", dropped: "not bought now", excluded: "left out", other: ""};
   const items = d.items.slice().sort((a, b) => svSort === "spend" ? b.cur_cost - a.cur_cost
     : svSort === "pct" ? Math.abs(b.pct || 0) - Math.abs(a.pct || 0) : Math.abs(b.effect || 0) - Math.abs(a.effect || 0));
-  $("svBody").innerHTML = `<div class="kpis">` +
+  const C2 = esc(C), tree = d.tree || [];
+  // how spend moved, as a bridge: last year → savings → extra → volume and mix → this period
+  const steps = [["Spend, same dates last year", 0, s.ly, "base", s.ly], ["Savings from lower prices", s.ly - s.save, s.ly, "save", -s.save],
+    ["Extra from higher prices", s.ly - s.save, s.ly - s.save + s.extra, "extra", s.extra],
+    ["Volume and mix", Math.min(s.ly + s.net, s.ly + s.net + s.volume), Math.max(s.ly + s.net, s.ly + s.net + s.volume), "vol", s.volume],
+    ["Spend, this period", 0, s.cur, "base", s.cur]];
+  const top = Math.max(1, ...steps.map(x => x[2]));
+  const bridge = `<div class="sv-bridge">` + steps.map(([l, x0, x1, k, v], i) => `<div class="sv-br${k === "base" ? " b" : ""}"><span>${l}</span>
+      <div class="sv-track"><i class="sv-${k}" style="left:${Math.max(0, x0) / top * 100}%;width:${Math.max(0.4, (x1 - Math.max(0, x0)) / top * 100)}%"></i></div>
+      <b class="${k === "save" ? "down" : k === "extra" ? "up" : ""}">${k === "base" ? fmt(v) : sign(v)}</b></div>`).join("") + `</div>`;
+  // savings (left, green) and extra (right, red) of each purchase type around one centre line
+  const mxSE = Math.max(1, ...tree.map(t => Math.max(t.save, t.extra)));
+  const split = tree.length ? `<h3 class="sv-h3">Savings and extra by purchase type</h3><div class="sv-split">` + tree.map(t => `<button class="sv-sp" type="button" data-svgo="${esc(t.key)}" title="Open ${esc(t.key)} in the table below">
+      <span>${esc(t.key)}</span><div class="sv-spb"><div><i class="sv-save" style="width:${t.save / mxSE * 100}%"></i></div><div><i class="sv-extra" style="width:${t.extra / mxSE * 100}%"></i></div></div>
+      <b class="${t.net <= 0 ? "down" : "up"}">${sign(t.net)}</b></button>`).join("") + `<div class="sv-spk meta"><span class="down">◀ savings</span><span class="up">extra ▶</span></div></div>` : "";
+  const months = d.months.length > 1 ? (() => {
+    const mx = Math.max(1, ...d.months.map(m => Math.abs(m.net)));
+    return `<h3 class="sv-h3">Net price effect by month</h3><div class="sv-months">` + d.months.map(m => `<div class="sv-mo" title="${esc(m.month)}: savings ${fmt(m.save)}, extra ${fmt(m.extra)}, net ${sign(m.net)} ${C2}">
+      <div class="sv-mbar"><i class="${m.net <= 0 ? "sv-save" : "sv-extra"}" style="height:${Math.abs(m.net) / mx * 100}%"></i></div><b class="${m.net <= 0 ? "down" : "up"}">${sign(Math.round(m.net / 1000))}k</b><span>${esc(m.month.slice(5))}/${esc(m.month.slice(2, 4))}</span></div>`).join("") + `</div>`;
+  })() : "";
+  // the items that moved the price most, either way
+  const cmp = d.items.filter(i => i.effect != null);
+  const best = cmp.filter(i => i.effect < 0).sort((x, y) => x.effect - y.effect).slice(0, 7);
+  const worst = cmp.filter(i => i.effect > 0).sort((x, y) => y.effect - x.effect).slice(0, 7);
+  const mover = i => `<button class="sv-mv" type="button" data-svgo="${esc(i.stream)}\u0001${esc(i.sub)}\u0001${esc(i.item)}" title="Show in the purchase type table">
+      <span><b>${esc(i.desc || i.item)}</b><small title="${esc(i.stream)}">${esc(i.sub)}</small></span>
+      <em class="${i.pct <= 0 ? "down" : "up"}">${i.pct == null ? "" : (i.pct > 0 ? "+" : "") + fmt(i.pct, 1) + "%"}</em><b class="${i.effect <= 0 ? "down" : "up"}">${sign(i.effect)}</b></button>`;
+  const movers = `<div class="sv-movers"><div><h3 class="sv-h3 down">Largest savings</h3>${best.map(mover).join("") || `<p class="meta">None.</p>`}</div>
+      <div><h3 class="sv-h3 up">Largest extra spending</h3>${worst.map(mover).join("") || `<p class="meta">None.</p>`}</div></div>`;
+  $("svBody").innerHTML = `<div class="kpis five">` +
     stockCard("Savings from lower prices", `<span class="down">${fmt(s.save)}</span>`, [`${C} · items now bought cheaper`]) +
     stockCard("Extra from higher prices", `<span class="up">${fmt(s.extra)}</span>`, [`${C} · items now bought dearer`]) +
     stockCard(netGood ? "Net saving on price" : "Net extra on price", net(s.net), [s.ly ? `${fmt(Math.abs(s.net) / s.ly * 100, 1)}% of last year's spend` : "", "negative = saving"]) +
     stockCard("Volume and mix", sign(s.volume), ["more or less bought, items new or dropped"]) +
     stockCard("Items compared", fmt(s.items), [`${all(s.matched)} of ${all(s.cur)} spend`, s.excluded ? `${fmt(s.excluded)} left out (unit cost moved over 4×)` : ""]) + `</div>` +
-    `<div class="grid"><div class="card"><h2>How spend moved</h2><p class="hint">Last year → this period, ${esc(C)}</p><div class="scroll"><table>
-      <tr><td><b>Spend, same dates last year</b></td><td class="num"><b>${fmt(s.ly)}</b></td></tr>
-      <tr><td>Savings from lower prices</td><td class="num">${g(-s.save)}</td></tr>
-      <tr><td>Extra from higher prices</td><td class="num">${r(s.extra)}</td></tr>
-      <tr><td>Volume and mix</td><td class="num">${sign(s.volume)}</td></tr>
-      <tr><td><b>Spend, this period</b></td><td class="num"><b>${fmt(s.cur)}</b></td></tr></table></div>
-      ${d.months.length > 1 ? `<h2 style="margin-top:16px">By month</h2><div class="scroll"><table><tr><th>Month</th><th class="num">Last year</th><th class="num">This year</th><th class="num">Savings</th><th class="num">Extra</th><th class="num">Net</th></tr>` +
-        d.months.map(m => `<tr><td>${esc(m.month)}</td><td class="num">${fmt(m.ly)}</td><td class="num">${fmt(m.cur)}</td><td class="num">${g(m.save)}</td><td class="num">${r(m.extra)}</td><td class="num"><b>${net(m.net)}</b></td></tr>`).join("") + `</table></div>` : ""}</div>
-      <div class="card"><h2>By purchase type</h2><div class="scroll">${grpTable(d.streams, "Type", x => esc(x.key))}</div>
-        <h2 style="margin-top:16px">By location</h2><div class="scroll">${grpTable(d.locations, "Location", x => esc(x.key || "(none)"))}</div></div></div>` +
-    `<div class="card" style="margin-bottom:16px"><h2>By supplier</h2><p class="hint">${esc(d.definitions.suppliers)}</p><div class="scroll">${grpTable(d.vendors, "Supplier", x => `${esc(x.name)} <span class="meta">${esc(x.key)}</span>`)}</div></div>` +
-    `<div class="card" style="margin-bottom:16px"><h2>By item category</h2><div class="scroll">${grpTable(d.categories, "Category", x => esc(x.key))}</div></div>` +
+    `<div class="sv-top"><div class="card"><h2>How spend moved</h2><p class="hint">Last year → this period, ${C2}</p>${bridge}${split}${months}</div>
+      <div class="card"><h2>Where the price saved and where it cost</h2><p class="hint">The items with the largest price effect; click one to open it in the table below.</p>${movers}</div></div>` +
+    `<div class="card" style="margin-bottom:16px" id="svTreeCard"><div class="card-head"><div><h2>By purchase type, sub-category and item</h2>
+        <p class="hint">Click a purchase type to see its sub-categories, and a sub-category to see its items. The sub-category is the item's category group 3, or group 4 where the item has no group 3 (as in Location intelligence).</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="mini" id="svOpenAll" type="button">Open all types</button><button class="mini" id="svCloseAll" type="button">Close all</button></div></div>
+      <div class="scroll"><table class="sv-tree" data-nosort id="svTree"></table></div></div>` +
+    `<div class="sv-two"><div class="card"><h2>By location</h2><div class="scroll sv-cap">${grpTable(d.locations, "Location", x => esc(x.key || "(none)"))}</div></div>
+      <div class="card"><h2>By supplier</h2><p class="hint">${esc(d.definitions.suppliers)}</p><div class="scroll sv-cap">${grpTable(d.vendors, "Supplier", x => `${esc(x.name)} <span class="meta">${esc(x.key)}</span>`)}</div></div></div>` +
     `<div class="card"><div class="card-head"><div><h2>Items (${fmt(d.items_total)})</h2><p class="hint">Showing ${fmt(Math.min(300, items.length))}; the Excel file has every item. Sort by:
        <button class="mini" data-svsort="effect">price effect</button> <button class="mini" data-svsort="pct">change %</button> <button class="mini" data-svsort="spend">spend</button></p></div></div>
-      <div class="scroll"><table><tr><th>Item</th><th>Category</th><th>Status</th><th class="num">Unit cost LY</th><th class="num">Now</th><th class="num">Change</th><th class="num">Quantity</th><th class="num">Spend now</th><th class="num">Price effect</th><th>Suppliers</th></tr>` +
-      items.slice(0, 300).map(i => `<tr><td>${esc(i.desc || i.item)} <span class="meta">${esc(i.item)}</span></td><td class="meta">${esc(i.category)}</td><td class="meta">${status[i.status] || ""}</td>
+      <div class="scroll"><table><tr><th>Item</th><th>Sub-category</th><th>Status</th><th class="num">Unit cost LY</th><th class="num">Now</th><th class="num">Change</th><th class="num">Quantity</th><th class="num">Spend now</th><th class="num">Price effect</th><th>Suppliers</th></tr>` +
+      items.slice(0, 300).map(i => `<tr><td>${esc(i.desc || i.item)} <span class="meta">${esc(i.item)}</span></td><td class="meta">${esc(i.sub || i.category)}</td><td class="meta">${status[i.status] || ""}</td>
         <td class="num">${i.ly_avg == null ? "–" : fmt(i.ly_avg, 2)}</td><td class="num">${i.cur_avg == null ? "–" : fmt(i.cur_avg, 2)}</td>
         <td class="num">${i.pct == null ? "" : (i.pct <= 0 ? `<span class="down">${fmt(i.pct, 1)}%</span>` : `<span class="up">+${fmt(i.pct, 1)}%</span>`)}</td>
         <td class="num">${fmt(i.cur_qty, 1)}</td><td class="num">${fmt(i.cur_cost)}</td><td class="num">${i.effect == null ? "" : `<b>${net(i.effect)}</b>`}</td>
@@ -3628,7 +3704,67 @@ function renderSavings(){
       <p class="hint" style="margin-top:10px">${esc(d.definitions.method)} ${esc(d.definitions.source)} ${esc(d.definitions.volume)} ${esc(d.definitions.excluded)}</p></div>` +
     ((d.errors || []).length ? `<p class="hint up">Some months could not be read: ${esc(d.errors.join("; "))}</p>` : "");
   document.querySelectorAll("[data-svsort]").forEach(b => { b.classList.toggle("dark", b.dataset.svsort === svSort); b.onclick = () => { svSort = b.dataset.svsort; renderSavings(); }; });
+  $("svOpenAll").onclick = () => { tree.forEach(t => svOpen.add("t\u0001" + t.key)); svTree(); };
+  $("svCloseAll").onclick = () => { svOpen.clear(); svTree(); };
+  svTree();
 }
+// the purchase type → sub-category → item table; svOpen holds what is open ("t␁type", "s␁type␁sub", "a␁type␁sub" = every item)
+const svOpen = new Set();
+let svHit = "";
+function svTree(){
+  const d = svData, T = $("svTree"); if (!d || !T) return;
+  const tree = d.tree || [], SEP = "\u0001";
+  const net = v => v <= 0 ? `<span class="down">${sign(v)}</span>` : `<span class="up">${sign(v)}</span>`;
+  const z = (v, cls) => v ? `<span class="${cls}">${fmt(v)}</span>` : `<span class="meta">0</span>`;
+  const bar = (v, mx) => `<span class="sv-nb"><i class="${v <= 0 ? "sv-save" : "sv-extra"}" style="width:${Math.min(100, Math.abs(v) / Math.max(1, mx) * 100)}%"></i></span>`;
+  const mxT = Math.max(1, ...tree.map(t => Math.abs(t.net)));
+  const head = `<tr><th>Purchase type / sub-category / item</th><th class="num">Last year</th><th class="num">This period</th><th class="num">Savings</th><th class="num">Extra</th><th class="num" colspan="2">Net price effect</th><th class="num">Volume and mix</th><th class="num">Items</th></tr>`;
+  let rows = "";
+  for (const t of tree) {
+    const kt = "t" + SEP + t.key, ot = svOpen.has(kt);
+    rows += `<tr class="sv-l1${ot ? " open" : ""}" data-svt="${esc(kt)}" tabindex="0"><td><span class="sv-car">${ot ? "▾" : "▸"}</span><b>${esc(t.key)}</b> <span class="meta">${fmt(t.subs.length)} sub-categories</span></td>
+      <td class="num">${fmt(t.ly)}</td><td class="num">${fmt(t.cur)}</td><td class="num">${z(t.save, "down")}</td><td class="num">${z(t.extra, "up")}</td>
+      <td class="num"><b>${net(t.net)}</b></td><td class="sv-nbc">${bar(t.net, mxT)}</td><td class="num">${sign(t.volume)}</td><td class="num">${fmt(t.items)}<span class="meta"> / ${fmt(t.all_items)}</span></td></tr>`;
+    if (!ot) continue;
+    const mxS = Math.max(1, ...t.subs.map(x => Math.abs(x.net)));
+    for (const g of t.subs) {
+      const ks = "s" + SEP + t.key + SEP + g.key, os = svOpen.has(ks);
+      rows += `<tr class="sv-l2${os ? " open" : ""}" data-svt="${esc(ks)}" tabindex="0"><td><span class="sv-car">${os ? "▾" : "▸"}</span>${esc(g.key)}${g.level === "4" ? ` <small class="meta" title="category group 4: the items have no group 3">gr. 4</small>` : ""}</td>
+        <td class="num">${fmt(g.ly)}</td><td class="num">${fmt(g.cur)}</td><td class="num">${z(g.save, "down")}</td><td class="num">${z(g.extra, "up")}</td>
+        <td class="num"><b>${net(g.net)}</b></td><td class="sv-nbc">${bar(g.net, mxS)}</td><td class="num">${sign(g.volume)}</td><td class="num">${fmt(g.items)}<span class="meta"> / ${fmt(g.all_items)}</span></td></tr>`;
+      if (!os) continue;
+      const its = d.items.filter(i => i.stream === t.key && i.sub === g.key)
+        .sort((x, y) => (x.effect == null) - (y.effect == null) || Math.abs(y.effect || 0) - Math.abs(x.effect || 0) || y.cur_cost - x.cur_cost);
+      const ka = "a" + SEP + t.key + SEP + g.key, lim = svOpen.has(ka) ? its.length : 25;
+      const mxI = Math.max(1, ...its.map(i => Math.abs(i.effect || 0)));
+      const st = {new: "new this period", dropped: "not bought this period", excluded: "left out: unit cost moved over 4×"};
+      rows += its.slice(0, lim).map(i => {
+        const vol = (i.cur_cost - i.ly_cost) - (i.effect || 0);
+        const hit = svHit === t.key + SEP + g.key + SEP + i.item;
+        return `<tr class="sv-l3${hit ? " hit" : ""}"${hit ? ` id="svHitRow"` : ""}><td><b>${esc(i.desc || i.item)}</b> <span class="meta">${esc(i.item)}</span>
+          <div class="meta">${i.ly_avg != null && i.cur_avg != null ? `unit cost ${fmt(i.ly_avg, 2)} → ${fmt(i.cur_avg, 2)}${i.pct != null ? ` (<span class="${i.pct <= 0 ? "down" : "up"}">${i.pct > 0 ? "+" : ""}${fmt(i.pct, 1)}%</span>)` : ""}` : ""}${st[i.status] ? (i.ly_avg != null && i.cur_avg != null ? " · " : "") + st[i.status] : ""}${i.vendors.length ? ` · ${esc(i.vendors.join(", "))}` : ""}</div></td>
+          <td class="num">${fmt(i.ly_cost)}</td><td class="num">${fmt(i.cur_cost)}</td><td class="num">${i.effect < 0 ? z(-i.effect, "down") : ""}</td><td class="num">${i.effect > 0 ? z(i.effect, "up") : ""}</td>
+          <td class="num">${i.effect == null ? `<span class="meta">–</span>` : `<b>${net(i.effect)}</b>`}</td><td class="sv-nbc">${i.effect == null ? "" : bar(i.effect, mxI)}</td><td class="num">${sign(vol)}</td><td class="num meta">${fmt(i.cur_qty, 1)} qty</td></tr>`;
+      }).join("");
+      if (its.length > lim) rows += `<tr class="sv-l3"><td colspan="9"><button class="linkbtn" type="button" data-svt="${esc(ka)}">Show all ${fmt(its.length)} items ›</button></td></tr>`;
+      if (!its.length) rows += `<tr class="sv-l3"><td colspan="9" class="meta">The items of this sub-category are beyond the ${fmt(d.items.length)} listed; the Excel file has every item.</td></tr>`;
+      else if (g.all_items > its.length) rows += `<tr class="sv-l3"><td colspan="9" class="meta">${fmt(g.all_items - its.length)} more items with small spend are only in the Excel file.</td></tr>`;
+    }
+  }
+  T.innerHTML = head + (rows || `<tr><td colspan="9" class="meta">Nothing for this selection.</td></tr>`);
+  const h = $("svHitRow"); if (h) { h.scrollIntoView({block: "center", behavior: "smooth"}); setTimeout(() => { svHit = ""; h.classList.remove("hit"); }, 2500); }
+}
+document.addEventListener("click", e => {
+  const go = e.target.closest("[data-svgo]");
+  if (go) {
+    const [t, g] = go.dataset.svgo.split("\u0001"); svOpen.add("t\u0001" + t);
+    if (g == null) { svTree(); const r = document.querySelector(`#svTree tr[data-svt="t\u0001${CSS.escape(t)}"]`); if (r) r.scrollIntoView({block: "start", behavior: "smooth"}); return; }
+    svOpen.add("s\u0001" + t + "\u0001" + g); svOpen.add("a\u0001" + t + "\u0001" + g); svHit = go.dataset.svgo; svTree(); return; }
+  const r = e.target.closest("#svTree [data-svt]"); if (!r) return;
+  const k = r.dataset.svt; if (svOpen.has(k) && k[0] !== "a") { svOpen.delete(k); if (k[0] === "t") [...svOpen].forEach(x => { if (x.startsWith("s" + k.slice(1) + "\u0001") || x.startsWith("a" + k.slice(1) + "\u0001")) svOpen.delete(x); }); } else svOpen.add(k);
+  svTree();
+});
+document.addEventListener("keydown", e => { const r = e.target.closest && e.target.closest("#svTree tr[data-svt]"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); r.click(); } });
 // ---------- printing any screen to PDF ----------
 const SCREEN_NOTE = {
   prices: "Average unit cost is the period's cost divided by the period's quantity, so a change in pack size or unit of measure reads as a price change.",
