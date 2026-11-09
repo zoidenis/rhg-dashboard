@@ -73,6 +73,40 @@ h1{font-size:23px;margin:0;font-weight:800;letter-spacing:-.01em}
 .kpi .s{font-size:12.5px;color:var(--sub)}
 .up{color:var(--up)} .down{color:var(--down)}
 .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
+.ng-pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sky,#efede6);color:var(--sub);white-space:nowrap;vertical-align:middle}
+.ng-pill.up{background:var(--up-bg);color:var(--up)} .ng-pill.warn{background:var(--warn-bg);color:var(--warn)} .ng-pill.good{background:var(--down-bg);color:var(--down)}
+.ng-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0 0}
+.ng-filters .ng-search{grid-column:span 2}
+#v-negotiations .kpis .ng-big{grid-column:span 2}
+.ng-total{color:var(--down)} .ng-total small{font-size:13px;color:var(--sub);font-weight:600}
+.ng-cons{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)}
+.ng-bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px;padding:12px 18px}
+.ng-bar label{display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px}
+.ng-bar select{font:inherit;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card);color:var(--ink)}
+.ng-why{margin:0 0 12px}
+table.ng-t td{vertical-align:middle}
+table.ng-t tr.ng-it td{background:rgba(127,127,127,.06);border-top:1px solid var(--line);cursor:pointer}
+table.ng-t tr.ng-it:hover td{background:rgba(127,127,127,.12)}
+table.ng-t tr.ng-v td:first-child,table.ng-t tr.ng-sw td:first-child{padding-left:26px}
+table.ng-t tr.ng-sw td{font-size:12.5px;background:rgba(12,71,94,.05)}
+table.ng-t td{white-space:normal} table.ng-t td.num{white-space:nowrap}
+table.ng-t td.meta{font-size:12px} table.ng-t td.ng-ct{min-width:150px}
+table.ng-t td.ng-fl{min-width:120px} table.ng-t td.ng-fl .ng-pill{white-space:normal;margin:1px 0}
+table.ng-t td:first-child{min-width:180px}
+.ng-in{width:84px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;text-align:right;background:var(--card);color:var(--ink)}
+.ng-in:disabled{background:transparent;border-color:transparent}
+.ng-in.bad{border-color:var(--up);outline:1px solid var(--up)}
+.ng-qb{height:8px;background:var(--accent,#0c475e);border-radius:4px;min-width:2px}
+.ng-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--card)}
+.ng-ch{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.ng-cv{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.ng-cg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ng-cg>div,.ng-cg>label{background:var(--bg);border-radius:8px;padding:6px 10px;display:flex;flex-direction:column;gap:2px}
+.ng-cg .ng-in{width:100%;box-sizing:border-box;min-height:36px;font-weight:700}
+.ng-phone-only{display:none}
+@media(max-width:760px){.ng-filters .ng-search{grid-column:auto} .ng-phone-only{display:inline-flex}
+  #v-negotiations .ng-filters{display:none} #v-negotiations .ng-filters.open{display:grid}
+  #v-negotiations .kpis{grid-template-columns:1fr 1fr;gap:10px} #v-negotiations .kpis .ng-big{grid-column:span 2}}
 .sv-top{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .sv-two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .sv-two .card{min-width:0} .sv-top .card{min-width:0}
@@ -418,6 +452,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <button data-view="savings" data-parent="compare" data-tab="Price savings" style="display:none">Price savings</button>
     <button data-view="prices" data-parent="compare" data-tab="Price changes" style="display:none">Price changes</button>
     <button data-view="locations" data-parent="compare" data-tab="Location prices" style="display:none">Location prices</button>
+    <button data-view="negotiations" data-parent="compare" data-tab="Negotiations" style="display:none">Negotiations</button>
     <!-- Stock & working capital is a tab of Finance → Inventory now (this view, embedded); #stock still opens it here -->
     <button data-view="stock" style="display:none">Stock &amp; working capital</button>
 
@@ -532,7 +567,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-compare">
-    <div class="ov-tabs" id="pcTabs" role="tablist"><button data-t="compare" class="on" role="tab" aria-selected="true">Comparisons</button><button data-t="contracts" role="tab" aria-selected="false">Contract prices</button><button data-t="savings" role="tab" aria-selected="false">Price savings</button><button data-t="prices" role="tab" aria-selected="false">Price changes</button><button data-t="locations" role="tab" aria-selected="false">Location prices</button></div>
+    <div class="ov-tabs" id="pcTabs" role="tablist"><button data-t="compare" class="on" role="tab" aria-selected="true">Comparisons</button><button data-t="contracts" role="tab" aria-selected="false">Contract prices</button><button data-t="savings" role="tab" aria-selected="false">Price savings</button><button data-t="prices" role="tab" aria-selected="false">Price changes</button><button data-t="locations" role="tab" aria-selected="false">Location prices</button><button data-t="negotiations" role="tab" aria-selected="false">Negotiations</button></div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-head"><div><h2>Equivalent period comparisons</h2>
         <p class="hint" id="cmpHint">Every comparison uses the same weekdays, so trading days match. Loaded on demand and cached for 15 minutes.</p></div>
@@ -687,6 +722,32 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <p class="meta" id="svRecip" style="margin:10px 0 0"></p>
     </div>
     <div id="svBody"></div>
+  </section>
+
+  <section class="view" id="v-negotiations">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Negotiations <span class="ng-pill warn" title="Until the reconciliation is approved">Pilot</span></h2>
+        <p class="hint" id="ngNote">A proposed supplier price against the volume bought in a period. A scenario: nothing is written to Business Central and nothing here is a realized saving.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mini" data-ngq="lastmonth" type="button">Last month</button><button class="mini" data-ngq="3m" type="button">Last 3 months</button>
+          <button class="mini" data-ngq="ytd" type="button">Year to date</button><button class="mini" id="ngRefresh" type="button">Read again</button><button class="mini ng-phone-only" id="ngFiltBtn" type="button" aria-expanded="false" aria-controls="ngFilters">Filters</button></div></div>
+      <div class="filters ng-filters" id="ngFilters">
+        <label>From<input type="date" id="ngFrom"></label>
+        <label>To<input type="date" id="ngTo"></label>
+        <label>Brand<select id="ngBrand"><option value="">All brands</option></select></label>
+        <label>Location<select id="ngLoc"><option value="">All locations</option></select></label>
+        <label>Department<select id="ngDept"><option value="">All departments</option></select></label>
+        <label>Purchaser<select id="ngPur"><option value="">All purchasers</option></select></label>
+        <label>Vendor<select id="ngVendor"><option value="">All vendors</option></select></label>
+        <label>Purchase type<select id="ngType"><option value="">All types</option></select></label>
+        <label>Sub-category<select id="ngSub"><option value="">All sub-categories</option></select></label>
+        <label>Contract<select id="ngContract"><option value="">All items</option><option value="with">With an active contract</option><option value="without">Without a contract</option><option value="scenario">In this scenario</option></select></label>
+        <label>Currency<select id="ngCur"><option value="">All currencies</option></select></label>
+        <label class="ng-search">Search<input id="ngQ" placeholder="item name, code or barcode"></label>
+      </div>
+      <p class="meta" id="ngMsg" style="margin:8px 0 0"></p>
+    </div>
+    <div id="ngBody"></div>
   </section>
 
   <section class="view" id="v-prices">
@@ -1140,6 +1201,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 
 <div class="pl-bd" id="prBd"><div class="pl-pop" id="prPop" role="dialog" aria-modal="true" aria-label="Purchaser"></div></div>
 <div class="pl-bd" id="spBd"><div class="pl-pop" id="spPop" role="dialog" aria-modal="true" aria-label="Suppliers of a location"></div></div>
+<div class="pl-bd" id="ngBd"><div class="pl-pop" id="ngPop" role="dialog" aria-modal="true" aria-label="Negotiations"></div></div>
 <div class="pl-bd" id="byBd"><div class="pl-pop" id="byPop" role="dialog" aria-modal="true" aria-label="Buying at a location"></div></div>
 <div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
 <div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
@@ -2111,6 +2173,7 @@ const THRESHOLD_LABELS = {
   location_spread_pct:"Location price gap (%)",
   supplier_concentration_pct:"Supplier concentration warning (%)",
   price_above_contract_pct:"Paid above contracted price, tolerance (%)",
+  contract_expiry_days:"Negotiations: contract ending within (days)",
   requisition_warning_hours:"Requisition open, warning (hours)",
   requisition_critical_hours:"Requisition open, critical (hours)"
 };
@@ -3421,7 +3484,7 @@ function pcPareto(){
 window.addEventListener("resize", () => { if ($("v-buycharts") && $("v-buycharts").classList.contains("on") && data) { pcVariance(); pcPareto(); } });
 // Buying and Prices & contracts: views under one menu item each, with one tab bar on top of the open one
 var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services", "buyloc", "buycharts"],
-                pcTabs: ["compare", "contracts", "savings", "prices", "locations"],
+                pcTabs: ["compare", "contracts", "savings", "prices", "locations", "negotiations"],
                 spTabs: ["suppliers", "suploc", "supco"]};
 function pcTabsSync(view){
   for (const [id, views] of Object.entries(TAB_BARS)) {
@@ -3445,6 +3508,7 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   if (b.dataset.view === "compliance" && !$("cplMonth").value) $("cplMonth").value = stockMonthDefault();
   if (b.dataset.view === "savings" && !svData) svQuick("lastmonth");
   if (b.dataset.view === "prices" && !pqData) pqWeek("1");
+  if (b.dataset.view === "negotiations" && !ngData) ngQuick("lastmonth");
   // the screen is part of the address, so a link from the control center can open it
   if (history.replaceState) history.replaceState(null, "", (b.dataset.view === "overview" ? location.pathname : "#" + b.dataset.view).replace(/^#/, location.search + "#"));
   pcTabsSync(b.dataset.view);
@@ -3768,6 +3832,327 @@ document.addEventListener("click", e => {
   svTree();
 });
 document.addEventListener("keydown", e => { const r = e.target.closest && e.target.closest("#svTree tr[data-svt]"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); r.click(); } });
+// ---------- Prices & contracts → Negotiations (negotiations.py) ----------
+let ngData = null, ngTimer = null, ngScen = 0, ngSort = "savings", ngSaveT = {};
+const ngOpen = new Set();
+const NG_SEP = "\u0001";
+const NG_SRC = {contract: "Active contracted price", average: "Weighted average purchase price", ambiguous: "Ambiguous contract"};
+const NG_FLAG = {above_contract: ["Paid above contract", "up"], ambiguous: ["Ambiguous contract", "up"], below_min: ["Below the contract's minimum quantity", "warn"],
+  other_vendor: ["Contract with another vendor", "warn"], ends_soon: ["Contract ends soon", "warn"], unit_missing: ["Lines without a unit conversion", "warn"], above_base: ["Proposed above baseline", "warn"]};
+const ngKey = r => [r.item, r.variant, r.vendor, r.currency].join(NG_SEP);
+const ngP = (v, d = 2) => v == null ? "–" : fmt(v, d);
+const ngS = v => v == null ? "" : `<span class="${v >= 0 ? "down" : "up"}">${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v))}</span>`;
+function ngIso(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function ngQuick(kind){
+  const t = new Date(); let a, b = new Date(t.getFullYear(), t.getMonth(), 0);
+  if (kind === "3m") a = new Date(t.getFullYear(), t.getMonth() - 3, 1);
+  else if (kind === "ytd") { a = new Date(t.getFullYear(), 0, 1); b = t; }
+  else a = new Date(t.getFullYear(), t.getMonth() - 1, 1);
+  $("ngFrom").value = ngIso(a); $("ngTo").value = ngIso(b);
+  ngLoad(false);
+}
+document.querySelectorAll("[data-ngq]").forEach(b => b.onclick = () => ngQuick(b.dataset.ngq));
+function ngParams(){
+  return new URLSearchParams({company: $("company").value || "", from: $("ngFrom").value, to: $("ngTo").value, brand: $("ngBrand").value,
+    location: $("ngLoc").value, dept: $("ngDept").value, purchaser: $("ngPur").value, vendor: $("ngVendor").value, ptype: $("ngType").value,
+    sub: $("ngSub").value, contract: $("ngContract").value === "scenario" ? "" : $("ngContract").value, currency: $("ngCur").value, q: $("ngQ").value.trim()});
+}
+async function ngLoad(refresh){
+  clearTimeout(ngTimer);
+  if (!$("ngFrom").value) { ngQuick("lastmonth"); return; }
+  $("ngMsg").textContent = "Reading…";
+  try {
+    const r = await fetch("/api/negotiations?" + ngParams() + (refresh ? "&refresh=1" : ""));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "failed");
+    if (j.pending) { $("ngMsg").textContent = `${j.note} ${fmt(j.progress.done)} of ${fmt(j.progress.total)} months read.`; ngTimer = setTimeout(() => ngLoad(false), 4000); return; }
+    ngData = j;
+    if (!ngData.scenarios.some(s => s.id === ngScen)) ngScen = ngData.scenarios.length ? ngData.scenarios[ngData.scenarios.length - 1].id : 0;
+    $("ngMsg").textContent = (j.errors || []).length ? "Some months could not be read: " + j.errors.join("; ") : "";
+    ngRender();
+  } catch (e) { $("ngMsg").textContent = "Could not read: " + e.message; }
+}
+$("ngRefresh").onclick = () => ngLoad(true);
+$("ngFiltBtn").onclick = () => { const o = $("ngFilters").classList.toggle("open"); $("ngFiltBtn").setAttribute("aria-expanded", o); };
+["ngBrand","ngLoc","ngDept","ngPur","ngVendor","ngType","ngSub","ngCur","ngFrom","ngTo"].forEach(id => $(id).onchange = () => ngLoad(false));
+$("ngContract").onchange = () => { if ($("ngContract").value === "scenario" && ngData) ngRender(); else ngLoad(false); };
+$("ngQ").onkeydown = e => { if (e.key === "Enter") ngLoad(false); };
+function ngFill(sel, list, label){
+  const v = sel.value;
+  sel.innerHTML = `<option value="">${label}</option>` + list.map(x => typeof x === "string" ? `<option value="${esc(x)}">${esc(x)}</option>` : `<option value="${esc(x.no)}">${esc(x.name)} (${esc(x.no)})</option>`).join("");
+  sel.value = v;
+}
+const ngScenario = () => (ngData && ngData.scenarios.find(s => s.id === ngScen)) || null;
+function ngPriceMap(sc){ const m = {}; (sc ? sc.prices : []).forEach(p => m[[p.item, p.variant, p.vendor, p.currency].join(NG_SEP)] = p); return m; }
+function ngCalc(r, p){
+  if (p == null || p === "" || r.baseline == null || !r.qty) return null;
+  const diff = r.baseline - p;
+  return {diff, sav: diff * r.qty, pct: r.baseline ? (p - r.baseline) / r.baseline * 100 : null};
+}
+// every saving of the scenario on screen: the vendor rows' and the switches', per currency
+function ngTotals(rows, sc){
+  const pm = ngPriceMap(sc), by = {}, cur = {};
+  let n = 0;
+  rows.forEach(r => { const p = pm[ngKey(r)], c = p ? ngCalc(r, p.price) : null; if (c) { n++; by[r.currency] = (by[r.currency] || 0) + c.sav; } });
+  const idx = {}; rows.forEach(r => idx[ngKey(r)] = r);
+  (sc ? sc.switches : []).forEach(s => s.from.forEach(v => { const r = idx[[s.item, s.variant, v, s.currency].join(NG_SEP)]; if (r && r.baseline != null) { n++; by[s.currency] = (by[s.currency] || 0) + (r.baseline - s.price) * r.qty; } }));
+  return {by, n};
+}
+function ngGroups(){
+  const d = ngData, sc = ngScenario(), pm = ngPriceMap(sc), g = {};
+  let rows = d.rows;
+  if ($("ngContract").value === "scenario") rows = rows.filter(r => pm[ngKey(r)] || (sc && sc.switches.some(s => s.item === r.item && s.from.includes(r.vendor))));
+  rows.forEach(r => { const k = r.item + NG_SEP + r.variant; (g[k] = g[k] || {item: r.item, variant: r.variant, desc: r.desc, sub: r.sub, parent: r.parent, ptype: r.ptype, unit: r.unit, rows: []}).rows.push(r); });
+  const list = Object.values(g);
+  list.forEach(x => {
+    x.qty = x.rows.reduce((a, r) => a + (r.qty || 0), 0); x.net = x.rows.reduce((a, r) => a + (r.net || 0), 0);
+    const t = ngTotals(x.rows, sc ? {prices: sc.prices, switches: sc.switches.filter(s => s.item === x.item && s.variant === x.variant)} : null);
+    x.sav = Object.values(t.by).reduce((a, v) => a + v, 0); x.has = t.n > 0;
+    x.pct = Math.max(0, ...x.rows.map(r => { const p = pm[ngKey(r)], c = p ? ngCalc(r, p.price) : null; return c && c.pct != null ? Math.abs(c.pct) : 0; }));
+    x.vendors = x.rows.map(r => r.vendor_name).join(", ");
+  });
+  const cmp = {savings: (a, b) => (b.has - a.has) || (b.sav - a.sav) || (b.net - a.net), volume: (a, b) => b.net - a.net,
+    pct: (a, b) => b.pct - a.pct, vendor: (a, b) => a.vendors.localeCompare(b.vendors), category: (a, b) => (a.sub + a.desc).localeCompare(b.sub + b.desc)};
+  return {list: list.sort(cmp[ngSort] || cmp.savings), rows};
+}
+function ngFlags(r, p){
+  const f = r.flags.slice(), c = p ? ngCalc(r, p.price) : null;
+  if (c && c.diff < 0) f.push("above_base");
+  return f.map(k => `<span class="ng-pill ${NG_FLAG[k] ? NG_FLAG[k][1] : ""}">${esc(NG_FLAG[k] ? NG_FLAG[k][0] : k)}</span>`).join(" ");
+}
+function ngContractText(r){
+  const c = r.contracts.find(x => x.price != null && Math.abs(x.price - (r.contract ?? -1)) < 1e-4) || r.contracts[0];
+  if (!c) return "none";
+  return `${esc(c.list || "price list")} · ${fmt(c.as_listed, 2)}/${esc(c.uom)}${c.vat_pct ? ` incl. VAT ${fmt(c.vat_pct, 0)}%` : ""}${c.line_disc ? ` −${fmt(c.line_disc, 1)}%` : ""}<br>from ${esc(c.starting || "–")}${c.ending && c.ending.slice(0, 4) > "0001" ? " to " + esc(c.ending) : ""}${c.min_qty ? ` · min ${fmt(c.min_qty, 2)}` : ""}${r.contracts.length > 1 ? ` · ${r.contracts.length} lines` : ""}`;
+}
+function ngRender(){
+  const d = ngData; if (!d) return;
+  const sc = ngScenario(), pm = ngPriceMap(sc), o = d.options, C = d.currency;
+  ngFill($("ngBrand"), o.brands, "All brands"); ngFill($("ngLoc"), o.locations, "All locations"); ngFill($("ngDept"), o.depts, "All departments");
+  ngFill($("ngPur"), o.purchasers, "All purchasers"); ngFill($("ngVendor"), o.vendors, "All vendors"); ngFill($("ngType"), o.ptypes, "All types");
+  ngFill($("ngSub"), o.subs, "All sub-categories"); ngFill($("ngCur"), o.currencies, "All currencies");
+  $("ngBrand").disabled = !o.brands.length; $("ngBrand").title = d.brand_error || "";
+  $("ngNote").innerHTML = `Period <b>${esc(d.period.from)} – ${esc(d.period.to)}</b> · contract validity on <b>${esc(d.today)} (today)</b> · read from Business Central <b>${esc(d.read_at)}</b> · ${esc(d.company)}, amounts excluding VAT`;
+  const {list, rows} = ngGroups(), edit = d.can_edit && !!sc;
+  const t = ngTotals(d.rows, sc), curs = Object.keys(t.by).sort();
+  const src = rows.reduce((a, r) => (a[r.source] = (a[r.source] || 0) + 1, a), {});
+  const nflag = rows.filter(r => r.flags.length).length, nun = rows.filter(r => r.baseline == null).length;
+  let consolidated = "";
+  if (curs.length > 1 || (curs.length === 1 && curs[0] !== C)) {
+    const miss = curs.filter(c => c !== C && !(d.fx.rates || {})[c]);
+    const tot = curs.filter(c => !miss.includes(c)).reduce((a, c) => a + t.by[c] * (c === C ? 1 : d.fx.rates[c]), 0);
+    consolidated = `<div class="ng-cons">Consolidated in ${esc(C)}: <b>${ngS(tot)}</b> · ${Object.entries(d.fx.rates || {}).map(([c, r]) => `1 ${esc(c)} = ${fmt(r, 4)} ${esc(C)}`).join(", ")} (${esc(d.fx.source)}, Pilot)${miss.length ? ` · <span class="up">no rate for ${esc(miss.join(", "))}: left out</span>` : ""}</div>`;
+  }
+  const scOpts = d.scenarios.map(s => `<option value="${s.id}" ${s.id === ngScen ? "selected" : ""}>${esc(s.name)}</option>`).join("");
+  const tiles = `<div class="kpis five">
+    <div class="card kpi ng-big"><div class="l">Potential Savings at Historical Volume</div>
+      <div class="v ng-total">${curs.length ? curs.map(c => `${ngS(t.by[c])} <small>${esc(c)}</small>`).join("<br>") : `<span class="meta">enter a proposed price</span>`}</div>
+      <div class="s">${fmt(t.n)} rows with a proposed price · positive = saving, negative = cost increase. On Price savings a negative figure is the saving.</div>${consolidated}</div>
+    <div class="card kpi"><div class="l">Baseline source</div><div class="v">${fmt(src.contract || 0)} · ${fmt(src.average || 0)}</div><div class="s">rows on an active contract · on the weighted average${src.ambiguous ? ` · ${fmt(src.ambiguous)} ambiguous` : ""}</div></div>
+    <div class="card kpi"><div class="l">Flags</div><div class="v ${nflag ? "up" : ""}">${fmt(nflag)}</div><div class="s">rows: paid above contract, ambiguous, another vendor's contract, minimum quantity, ending within ${fmt(d.expiry_days)} days</div></div>
+    <div class="card kpi"><div class="l">Calculation unavailable</div><div class="v">${fmt(nun)}</div><div class="s">rows with no baseline, each with its reason; never counted as 0</div></div></div>`;
+  const bar = `<div class="card ng-bar">
+    <label>Scenario <select id="ngScen">${scOpts || `<option value="0">none yet</option>`}</select></label>
+    ${sc ? `<span class="ng-pill ${sc.status === "Agreed" ? "good" : sc.status === "Rejected" ? "up" : ""}">${esc(sc.status)}</span>
+      <span class="meta">Owner <b>${esc(sc.owner || "–")}</b> · target ${esc(sc.target || "–")} · edited ${esc(sc.edited_at || "")} by ${esc(sc.edited_by || "")}</span>` : `<span class="meta">${d.can_edit ? "Create a scenario to enter proposed prices." : "No scenario yet."}</span>`}
+    <span style="flex:1"></span>
+    ${d.can_edit ? `<button class="mini" type="button" id="ngNew">New scenario</button>${sc ? `<button class="mini" type="button" id="ngEditSc">Edit scenario</button>` : ""}` : ""}
+    <button class="mini" type="button" id="ngCompare" ${d.scenarios.length < 2 ? "disabled" : ""}>Compare scenarios</button>
+    <button class="mini" type="button" id="ngXlsx">Excel</button></div>`;
+  const note = `<p class="hint ng-why">Scenario based on quantities purchased in the selected period. Actual savings depend on future purchase volume, effective date, supplier terms, and implementation. Freight, item charges and rebates are excluded from both prices. “Agreed” does not mean a BC price list or a signed contract has been updated.${sc && sc.status === "Agreed" ? " <b>This scenario is Agreed: not yet in a BC price list or a signed contract.</b>" : ""}</p>`;
+  const phone = window.innerWidth <= 760;
+  let body = "";
+  if (!rows.length) body = `<p class="hint">Nothing was bought with these filters in the period.</p>`;
+  else if (phone) body = list.slice(0, 120).map(g => ngCard(g, pm, edit, sc)).join("");
+  else {
+    const head = `<tr><th>Item / vendor</th><th class="num">Quantity</th><th class="num">Baseline / unit</th><th>Contract</th><th class="num">Proposed / unit</th><th class="num">Difference / unit</th><th class="num">Potential savings · % change</th><th>Flags</th></tr>`;
+    body = `<div class="scroll"><table class="ng-t" data-nosort>${head}` + list.slice(0, 400).map(g => ngGroupRows(g, pm, edit, sc)).join("") + `</table></div>`
+      + (list.length > 400 ? `<p class="meta">The 400 first items of ${fmt(list.length)}; narrow the filters or use the Excel file.</p>` : "");
+  }
+  $("ngBody").innerHTML = tiles + bar + note + `<div class="card"><div class="card-head"><div><h2>Items and vendors (${fmt(list.length)} items, ${fmt(rows.length)} vendor rows)</h2>
+      <p class="hint">Click an item to see its vendors; a vendor row's details open the side panel. Sort by:
+      ${[["savings","potential savings"],["volume","volume"],["pct","% change"],["vendor","vendor"],["category","category"]].map(([k, l]) => `<button class="mini ${ngSort === k ? "dark" : ""}" data-ngsort="${k}" type="button">${l}</button>`).join(" ")}</p></div></div>${body}</div>`;
+  $("ngScen") && ($("ngScen").onchange = () => { ngScen = +$("ngScen").value; ngRender(); });
+  $("ngNew") && ($("ngNew").onclick = () => ngScenDlg(null));
+  $("ngEditSc") && ($("ngEditSc").onclick = () => ngScenDlg(sc));
+  $("ngCompare").onclick = ngCompareDlg;
+  $("ngXlsx").onclick = () => { location.href = "/api/negotiations/xlsx?" + ngParams() + "&scenario=" + ngScen; };
+  document.querySelectorAll("[data-ngsort]").forEach(b => b.onclick = () => { ngSort = b.dataset.ngsort; ngRender(); });
+}
+function ngRowCells(r, p, edit){
+  const c = p ? ngCalc(r, p.price) : null, k = esc(ngKey(r));
+  const input = `<input class="ng-in" data-ngk="${k}" inputmode="decimal" aria-label="Proposed price ${esc(r.item)} ${esc(r.vendor)}" value="${p && p.price != null ? p.price : ""}" placeholder="${edit ? "—" : ""}" ${edit && r.baseline != null ? "" : "disabled"}>`;
+  return `<td class="num">${input}</td><td class="num" data-ngc="diff">${c ? ngP(c.diff) : ""}</td><td class="num"><b data-ngc="sav">${c ? ngS(c.sav) : ""}</b><div class="meta" data-ngc="pct">${c && c.pct != null ? (c.pct > 0 ? "+" : "") + fmt(c.pct, 1) + "%" : ""}</div></td>`;
+}
+function ngGroupRows(g, pm, edit, sc){
+  const k = g.item + NG_SEP + g.variant, open = ngOpen.has(k) || g.rows.length === 1;
+  const sw = sc ? sc.switches.filter(s => s.item === g.item && s.variant === g.variant) : [];
+  let h = `<tr class="ng-it" data-ngg="${esc(k)}" tabindex="0"><td>${g.rows.length > 1 ? (open ? "▾ " : "▸ ") : ""}<b>${esc(g.item)}${g.variant ? "/" + esc(g.variant) : ""}</b> ${esc(g.desc)}${g.rows.length > 1 ? ` <span class="meta">${g.rows.length} vendors</span>` : ""}<div class="meta">${esc(g.parent ? g.parent + " › " : "")}${esc(g.sub)}</div></td>
+    <td class="num">${fmt(g.qty, 2)} ${esc(g.unit)}</td><td colspan="4">${edit ? `<button class="linkbtn" type="button" data-ngsw="${esc(k)}">Switch supplier…</button>` : ""}</td>
+    <td class="num" data-ngg-sav="${esc(k)}"><b>${g.has ? ngS(g.sav) : ""}</b></td><td></td></tr>`;
+  if (open) h += g.rows.map(r => { const p = pm[ngKey(r)];
+    return `<tr class="ng-v" data-ngrow="${esc(ngKey(r))}"><td><button class="linkbtn" type="button" data-ngd="${esc(ngKey(r))}">${esc(r.vendor)} ${esc(r.vendor_name)}</button>${r.currency !== ngData.currency ? ` <span class="meta">${esc(r.currency)}</span>` : ""}</td>
+      <td class="num">${fmt(r.qty, 2)}</td><td class="num"><b>${ngP(r.baseline)}</b><div class="meta">${r.baseline == null ? `<span class="up">${esc(r.reason)}</span>` : esc(r.source === "contract" ? "contract" : r.source === "average" ? "weighted average" : r.source) + (r.source === "contract" && r.avg != null ? ` · paid ${ngP(r.avg)}` : "")}</div></td>
+      <td class="meta ng-ct">${ngContractText(r)}</td>${ngRowCells(r, p, edit)}<td class="ng-fl">${ngFlags(r, p)}</td></tr>`; }).join("");
+  h += sw.map(s => { const lines = s.from.map(v => ngData.rows.find(r => r.item === s.item && r.variant === s.variant && r.vendor === v && r.currency === s.currency)).filter(Boolean);
+    const tot = lines.reduce((a, r) => a + (r.baseline != null ? (r.baseline - s.price) * r.qty : 0), 0);
+    return `<tr class="ng-sw"><td colspan="4">⇄ Switch to <b>${esc(s.to_vendor || s.to_name)}</b> at ${ngP(s.price)} from ${esc(s.from.join(", "))}${s.note ? ` · ${esc(s.note)}` : ""}</td><td class="num">${ngP(s.price)}</td><td></td><td class="num"><b>${ngS(tot)}</b></td><td>${edit ? `<button class="linkbtn" type="button" data-ngswx="${esc(k)}" data-cur="${esc(s.currency)}">Remove</button>` : ""}</td></tr>`; }).join("");
+  return h;
+}
+function ngCard(g, pm, edit, sc){
+  const k = g.item + NG_SEP + g.variant;
+  return `<div class="ng-card"><div class="ng-ch"><b>${esc(g.item)} ${esc(g.desc)}</b><b data-ngg-sav="${esc(k)}">${g.has ? ngS(g.sav) : ""}</b></div><div class="meta">${esc(g.sub)} · ${fmt(g.qty, 2)} ${esc(g.unit)}</div>`
+    + g.rows.map(r => { const p = pm[ngKey(r)], c = p ? ngCalc(r, p.price) : null;
+      return `<div class="ng-cv" data-ngrow="${esc(ngKey(r))}"><button class="linkbtn" type="button" data-ngd="${esc(ngKey(r))}">${esc(r.vendor_name)}</button>
+        <div class="ng-cg"><div><span class="meta">Baseline · ${esc(r.source === "contract" ? "contract" : r.source === "average" ? "average" : "ambiguous")}</span><b>${ngP(r.baseline)}</b></div>
+        <label><span class="meta">Proposed</span><input class="ng-in" data-ngk="${esc(ngKey(r))}" inputmode="decimal" value="${p && p.price != null ? p.price : ""}" ${edit && r.baseline != null ? "" : "disabled"}></label></div>
+        <div class="meta"><span data-ngc="diff">${c ? ngP(c.diff) + " per unit" : ""}</span> <b data-ngc="sav">${c ? ngS(c.sav) : ""}</b> <span data-ngc="pct">${c && c.pct != null ? fmt(c.pct, 1) + "%" : ""}</span></div>${r.baseline == null ? `<div class="up meta">${esc(r.reason)}</div>` : ""}${ngFlags(r, p)}</div>`; }).join("")
+    + `</div>`;
+}
+// typing a price: the row, its item and the totals follow at once; the price is saved when the field is left
+function ngTyped(inp){
+  const sc = ngScenario(); if (!sc) return;
+  const key = inp.dataset.ngk, r = ngData.rows.find(x => ngKey(x) === key); if (!r) return;
+  const v = inp.value.trim() === "" ? null : Number(inp.value.replace(",", "."));
+  if (v != null && (isNaN(v) || v < 0)) { inp.classList.add("bad"); return; }
+  inp.classList.remove("bad");
+  const i = sc.prices.findIndex(p => [p.item, p.variant, p.vendor, p.currency].join(NG_SEP) === key);
+  if (v == null) { if (i >= 0) sc.prices.splice(i, 1); } else if (i >= 0) sc.prices[i].price = v; else sc.prices.push({item: r.item, variant: r.variant, vendor: r.vendor, currency: r.currency, price: v, note: ""});
+  const row = inp.closest("[data-ngrow]"), c = v == null ? null : ngCalc(r, v);
+  if (row) { const set = (n, h) => { const e = row.querySelector(`[data-ngc="${n}"]`); if (e) e.innerHTML = h; };
+    set("diff", c ? ngP(c.diff) : ""); set("sav", c ? ngS(c.sav) : ""); set("pct", c && c.pct != null ? (c.pct > 0 ? "+" : "") + fmt(c.pct, 1) + "%" : ""); }
+  const g = ngGroups().list.find(x => x.item === r.item && x.variant === r.variant);
+  document.querySelectorAll(`[data-ngg-sav="${CSS.escape(r.item + NG_SEP + r.variant)}"]`).forEach(e => e.innerHTML = g && g.has ? (e.tagName === "TD" ? `<b>${ngS(g.sav)}</b>` : ngS(g.sav)) : "");
+  const t = ngTotals(ngData.rows, sc), curs = Object.keys(t.by).sort(), tot = document.querySelector(".ng-total");
+  if (tot) tot.innerHTML = curs.length ? curs.map(c2 => `${ngS(t.by[c2])} <small>${esc(c2)}</small>`).join("<br>") : `<span class="meta">enter a proposed price</span>`;
+}
+async function ngSavePrice(inp){
+  const sc = ngScenario(); if (!sc || inp.classList.contains("bad")) return;
+  const r = ngData.rows.find(x => ngKey(x) === inp.dataset.ngk); if (!r) return;
+  const p = sc.prices.find(x => [x.item, x.variant, x.vendor, x.currency].join(NG_SEP) === inp.dataset.ngk);
+  await ngPost("price", {scenario: sc.id, item: r.item, variant: r.variant, vendor: r.vendor, currency: r.currency, price: p ? p.price : null, note: p ? p.note : ""}, false);
+}
+async function ngPost(what, body, rerender = true){
+  try {
+    const res = await fetch("/api/negotiations/" + what, {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Purchasing"},
+      body: JSON.stringify(Object.assign({company: $("company").value || ""}, body))});
+    const j = await res.json(); if (!res.ok) throw new Error(j.error || "failed");
+    ngData.scenarios = j.scenarios; ngScen = j.scenario || ngScen;
+    $("ngMsg").textContent = "Saved " + new Date().toLocaleTimeString("en-GB");
+    if (rerender) ngRender();
+    return true;
+  } catch (e) { $("ngMsg").textContent = "Could not save: " + e.message; return false; }
+}
+document.addEventListener("input", e => { if (e.target.classList && e.target.classList.contains("ng-in")) ngTyped(e.target); });
+document.addEventListener("change", e => { if (e.target.classList && e.target.classList.contains("ng-in")) ngSavePrice(e.target); });
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-ngg]");
+  if (g && !e.target.closest("button")) { const k = g.dataset.ngg; ngOpen.has(k) ? ngOpen.delete(k) : ngOpen.add(k); ngRender(); return; }
+  const d = e.target.closest("[data-ngd]"); if (d) { ngPanel(d.dataset.ngd); return; }
+  const s = e.target.closest("[data-ngsw]"); if (s) { ngSwitchDlg(s.dataset.ngsw); return; }
+  const x = e.target.closest("[data-ngswx]"); if (x) { const [item, variant] = x.dataset.ngswx.split(NG_SEP); ngPost("switch", {scenario: ngScen, item, variant, currency: x.dataset.cur, remove: true}); return; }
+  if (e.target.closest("[data-ngclose]") || e.target === $("ngBd")) { $("ngBd").classList.remove("show"); }
+});
+document.addEventListener("keydown", e => { const g = e.target.closest && e.target.closest("tr[data-ngg]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); g.click(); } });
+function ngDlg(html, label){ $("ngPop").setAttribute("aria-label", label); $("ngPop").innerHTML = html; $("ngBd").classList.add("show"); }
+const ngHead = (t, sub) => `<div class="ph"><div><h2>${esc(t)}</h2><div class="sub">${esc(sub)}</div></div><div class="sp"></div><button class="close" type="button" data-ngclose="1">Close ✕</button></div>`;
+function ngScenDlg(sc){
+  ngDlg(ngHead(sc ? "Edit scenario" : "New scenario", ngData.company) + `<div class="pl-body"><div class="formgrid">
+    <label class="field">Name<input id="ngsName" value="${esc(sc ? sc.name : "")}" placeholder="e.g. Supplier first offer"></label>
+    <label class="field">Owner<input id="ngsOwner" value="${esc(sc ? sc.owner : (me && me.name) || "")}"></label>
+    <label class="field">Target date<input id="ngsTarget" type="date" value="${esc(sc ? sc.target : "")}"></label>
+    <label class="field">Status<select id="ngsStatus">${ngData.statuses.map(s => `<option value="${esc(s)}" ${sc && sc.status === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label></div>
+    <label class="field">Notes<textarea id="ngsNotes" rows="3">${esc(sc ? sc.notes : "")}</textarea></label>
+    <p class="hint">“Agreed” records the outcome of the negotiation only: the BC price list and the signed contract are changed in BC, not here.</p>
+    <div style="display:flex;gap:8px;align-items:center"><button class="btn dark" id="ngsSave" type="button">Save</button>${sc ? `<button class="btn" id="ngsHist" type="button">History</button>` : ""}<span class="meta" id="ngsMsg"></span></div><div id="ngsAudit"></div></div>`, "Scenario");
+  $("ngsSave").onclick = async () => { const ok = await ngPost("scenario", {id: sc ? sc.id : null, name: $("ngsName").value, owner: $("ngsOwner").value, target: $("ngsTarget").value, status: $("ngsStatus").value, notes: $("ngsNotes").value}); if (ok) $("ngBd").classList.remove("show"); };
+  $("ngsHist") && ($("ngsHist").onclick = () => ngAudit(sc.id, "", $("ngsAudit")));
+}
+async function ngAudit(sid, target, box){
+  box.innerHTML = `<p class="meta">Reading…</p>`;
+  try { const r = await fetch(`/api/negotiations/audit?company=${encodeURIComponent($("company").value || "")}&scenario=${sid}&target=${encodeURIComponent(target)}`); const j = await r.json(); if (!r.ok) throw new Error(j.error);
+    box.innerHTML = j.audit.length ? `<table data-nosort><tr><th>When</th><th>Who</th><th>What</th><th>Field</th><th>Old</th><th>New</th></tr>` + j.audit.map(a => `<tr><td>${esc(a.at)}</td><td>${esc(a.who)}</td><td>${esc(a.target)}</td><td>${esc(a.field)}</td><td>${esc(a.old ?? "–")}</td><td>${esc(a.new ?? "–")}</td></tr>`).join("") + `</table>` : `<p class="meta">No change yet.</p>`;
+  } catch (e) { box.innerHTML = `<p class="up">${esc(e.message)}</p>`; }
+}
+async function ngPanel(key){
+  const r = ngData.rows.find(x => ngKey(x) === key); if (!r) return;
+  const sc = ngScenario(), p = sc ? sc.prices.find(x => [x.item, x.variant, x.vendor, x.currency].join(NG_SEP) === key) : null;
+  ngDlg(ngHead(`${r.item} ${r.desc}`, `${r.vendor} ${r.vendor_name} · ${ngData.company} · ${ngData.period.from} – ${ngData.period.to} · ${r.currency}, excluding VAT · base unit ${r.unit}`) + `<div class="pl-body" id="ngPb"><p class="meta">Reading…</p></div>`, "Row detail");
+  const qs = new URLSearchParams({company: $("company").value || "", from: ngData.period.from, to: ngData.period.to, item: r.item, variant: r.variant, vendor: r.vendor, currency: r.currency});
+  let det;
+  try { const res = await fetch("/api/negotiations/detail?" + qs); det = await res.json(); if (!res.ok) throw new Error(det.error); } catch (e) { $("ngPb").innerHTML = `<p class="up">${esc(e.message)}</p>`; return; }
+  const c = p ? ngCalc(r, p.price) : null, mx = Math.max(1, ...det.series.map(s => Math.abs(s.qty)));
+  const tile = (l, v, s, cls) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("ngPb").innerHTML = `<div class="pl-tiles">${tile(esc(NG_SRC[r.source] || r.source), ngP(r.baseline), "baseline per " + esc(r.unit))}${tile("Paid, weighted average", ngP(r.avg), r.contract != null && r.avg != null ? `${r.avg >= r.contract ? "+" : ""}${fmt((r.avg - r.contract) / r.contract * 100, 1)}% against the contract` : "net of credit memos", r.flags.includes("above_contract") ? "up" : "")}
+      ${tile("Proposed", p && p.price != null ? ngP(p.price) : "–", c ? `${ngS(c.sav)} at this volume` : (sc ? esc(sc.name) : "no scenario"))}${tile("Quantity", fmt(r.qty, 2), esc(r.unit) + " in the period")}</div>
+    ${r.baseline == null ? `<p class="up">Calculation unavailable: ${esc(r.reason)}</p>` : ""}
+    <div class="pl-cols"><div class="pl-panel"><div class="ttl"><h3>Contract lines</h3></div>${r.contracts.length ? `<table data-nosort><tr><th>List</th><th>Vendor</th><th class="num">As listed</th><th>Unit</th><th class="num">VAT</th><th class="num">Per base unit, excl. VAT</th><th>Valid</th><th class="num">Min. qty</th></tr>` + r.contracts.map(x => `<tr><td>${esc(x.list)}</td><td>${esc(x.vendor || "every vendor")}</td><td class="num">${ngP(x.as_listed)}</td><td>${esc(x.uom)}</td><td class="num">${x.vat_pct ? fmt(x.vat_pct, 0) + "%" : "excl."}</td><td class="num">${x.price == null ? `<span class="up">no unit conversion</span>` : ngP(x.price, 4)}</td><td>${esc(x.starting || "–")}${x.ending && x.ending.slice(0, 4) > "0001" ? " – " + esc(x.ending) : ", no end"}</td><td class="num">${x.min_qty ? fmt(x.min_qty, 2) : "0"}</td></tr>`).join("") + `</table>` : `<p class="meta">No active contract line for this vendor, item and currency.</p>`}
+      <h3>What the average is made of</h3><table data-nosort><tr><th></th><th class="num">Lines</th><th class="num">${esc(r.unit)}</th><th class="num">Amount</th><th class="num">Per ${esc(r.unit)}</th></tr>
+      <tr><td>Invoices</td><td class="num">${fmt(r.inv[2])}</td><td class="num">${fmt(r.inv[0], 2)}</td><td class="num">${fmt(r.inv[1], 2)}</td><td class="num">${r.inv[0] ? ngP(r.inv[1] / r.inv[0]) : "–"}</td></tr>
+      <tr><td>Credit memos</td><td class="num">${fmt(r.cr[2])}</td><td class="num">${r.cr[0] ? "−" + fmt(r.cr[0], 2) : "0"}</td><td class="num">${r.cr[1] ? "−" + fmt(r.cr[1], 2) : "0"}</td><td class="num">${r.cr[0] ? ngP(r.cr[1] / r.cr[0]) : "–"}</td></tr>
+      <tr><td><b>Net</b></td><td></td><td class="num"><b>${fmt(r.qty, 2)}</b></td><td class="num"><b>${fmt(r.net, 2)}</b></td><td class="num"><b>${ngP(r.avg)}</b></td></tr></table>
+      ${r.blank_unit ? `<p class="meta">${fmt(r.blank_unit)} lines had no unit of measure and were taken in the base unit.</p>` : ""}${r.no_unit ? `<p class="up">${fmt(r.no_unit)} lines have a unit with no conversion to ${esc(r.unit)} and are left out.</p>` : ""}
+      <div>${ngFlags(r, p)}</div></div>
+      <div class="pl-panel"><div class="ttl"><h3>By ${det.by}</h3></div><table data-nosort><tr><th>${det.by === "week" ? "Week from" : "Month"}</th><th class="num">${esc(r.unit)}</th><th class="num">Per ${esc(r.unit)}</th><th style="width:40%">Quantity</th></tr>`
+      + det.series.map(s => `<tr><td>${esc(s.key)}</td><td class="num">${fmt(s.qty, 2)}</td><td class="num">${ngP(s.avg)}</td><td><div class="ng-qb" style="width:${Math.max(0, s.qty) / mx * 100}%"></div></td></tr>`).join("") + `</table>
+      <h3>Posted lines behind the average</h3><table data-nosort><tr><th>Date</th><th>Document</th><th>Location</th><th class="num">Qty</th><th>Unit</th><th class="num">Amount</th><th class="num">Per ${esc(r.unit)}</th></tr>`
+      + det.lines.slice(0, 60).map(l => `<tr><td>${esc(l.day)}</td><td>${l.kind === "cr" ? "CM " : ""}${esc(l.doc)}</td><td>${esc(l.location)}</td><td class="num">${l.kind === "cr" ? "−" : ""}${fmt(l.qty, 2)}</td><td>${esc(l.uom)}</td><td class="num">${l.kind === "cr" ? "−" : ""}${fmt(l.amount, 2)}</td><td class="num">${l.unit_ok && l.base_qty ? ngP(l.amount / l.base_qty) : `<span class="up">no conversion</span>`}</td></tr>`).join("") + `</table>
+      <p class="meta">${det.count > 60 ? `The 60 latest of ${fmt(det.count)} lines; the Excel file has the rows.` : `${fmt(det.count)} lines.`}</p>
+      ${sc ? `<h3>Note and history</h3><label class="field">Note on this row<textarea id="ngNoteTa" rows="2" ${ngData.can_edit ? "" : "disabled"}>${esc(p ? p.note : "")}</textarea></label>${ngData.can_edit ? `<button class="mini" type="button" id="ngNoteSave">Save the note</button>` : ""}<div id="ngRowAudit"></div>` : ""}</div></div>`;
+  if (sc) {
+    ngAudit(sc.id, r.item, $("ngRowAudit"));
+    $("ngNoteSave") && ($("ngNoteSave").onclick = async () => { const pp = sc.prices.find(x => [x.item, x.variant, x.vendor, x.currency].join(NG_SEP) === key);
+      await ngPost("price", {scenario: sc.id, item: r.item, variant: r.variant, vendor: r.vendor, currency: r.currency, price: pp ? pp.price : null, note: $("ngNoteTa").value}, false); ngAudit(sc.id, r.item, $("ngRowAudit")); });
+  }
+}
+function ngSwitchDlg(k){
+  const [item, variant] = k.split(NG_SEP), sc = ngScenario(); if (!sc) return;
+  const rows = ngData.rows.filter(r => r.item === item && r.variant === variant);
+  const curs = [...new Set(rows.map(r => r.currency))];
+  ngDlg(ngHead(`Switch supplier · ${item} ${rows[0] ? rows[0].desc : ""}`, `${ngData.company} · ${ngData.period.from} – ${ngData.period.to} · per ${rows[0] ? rows[0].unit : "base unit"}, excluding VAT`) + `<div class="pl-body">
+    <div class="formgrid"><label class="field">Proposed vendor<select id="ngwVendor"><option value="">New supplier, not in BC yet…</option>${ngData.options.vendors.map(v => `<option value="${esc(v.no)}">${esc(v.name)} (${esc(v.no)})</option>`).join("")}</select></label>
+    <label class="field">New supplier's name<input id="ngwName" placeholder="only for a supplier not in BC"></label>
+    <label class="field">Proposed price per ${esc(rows[0] ? rows[0].unit : "unit")}<input id="ngwPrice" inputmode="decimal"></label>
+    <label class="field">Currency<select id="ngwCur">${curs.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></label></div>
+    <div id="ngwRows"></div><label class="field">Note<input id="ngwNote"></label>
+    <p class="hint">Each current vendor is compared with its own baseline, at its own volume. Vendors in another currency than the proposal are left out.</p>
+    <div style="display:flex;gap:8px"><button class="btn dark" id="ngwSave" type="button">Add to scenario</button><span class="meta" id="ngwMsg"></span></div></div>`, "Switch supplier");
+  const draw = () => {
+    const cur = $("ngwCur").value, to = $("ngwVendor").value, price = Number(($("ngwPrice").value || "").replace(",", "."));
+    const list = rows.filter(r => r.currency === cur);
+    let tot = 0;
+    $("ngwRows").innerHTML = `<table data-nosort><tr><th>Move</th><th>Current vendor</th><th class="num">Quantity</th><th class="num">Baseline</th><th>Source</th><th class="num">Potential savings</th></tr>` + list.map(r => {
+      const own = r.vendor === to, ok = !own && r.baseline != null, sav = ok && $("ngwPrice").value ? (r.baseline - price) * r.qty : null;
+      const box = document.querySelector(`[data-ngwv="${CSS.escape(r.vendor)}"]`), checked = box ? box.checked : ok;
+      if (sav != null && checked) tot += sav;
+      return `<tr><td><input type="checkbox" data-ngwv="${esc(r.vendor)}" ${checked && ok ? "checked" : ""} ${ok ? "" : "disabled"} aria-label="Move ${esc(r.vendor)}"></td><td>${esc(r.vendor)} ${esc(r.vendor_name)}${own ? " (the proposed vendor)" : ""}</td><td class="num">${fmt(r.qty, 2)}</td><td class="num">${ngP(r.baseline)}</td><td class="meta">${esc(NG_SRC[r.source] || r.source)}</td><td class="num">${sav != null ? ngS(sav) : ""}</td></tr>`; }).join("")
+      + `<tr><td colspan="5"><b>Potential Savings at Historical Volume</b></td><td class="num"><b>${$("ngwPrice").value ? ngS(tot) : ""}</b></td></tr></table>`;
+    $("ngwRows").querySelectorAll("input").forEach(i => i.onchange = draw);
+  };
+  ["ngwVendor","ngwCur"].forEach(id => $(id).onchange = draw); $("ngwPrice").oninput = draw; draw();
+  $("ngwSave").onclick = async () => {
+    const from = [...$("ngwRows").querySelectorAll("input[data-ngwv]:checked")].map(i => i.dataset.ngwv);
+    const ok = await ngPost("switch", {scenario: sc.id, item, variant, currency: $("ngwCur").value, to_vendor: $("ngwVendor").value, to_name: $("ngwName").value, price: $("ngwPrice").value, from, note: $("ngwNote").value});
+    if (ok) $("ngBd").classList.remove("show"); else $("ngwMsg").textContent = $("ngMsg").textContent;
+  };
+}
+function ngCompareDlg(){
+  const d = ngData, sel = d.scenarios.slice(-3).map(s => s.id);
+  const draw = () => {
+    const ids = [...document.querySelectorAll("[data-ngcmp]:checked")].map(i => +i.dataset.ngcmp).slice(0, 3), scs = d.scenarios.filter(s => ids.includes(s.id));
+    const keys = new Set(); scs.forEach(s => s.prices.forEach(p => keys.add([p.item, p.variant, p.vendor, p.currency].join(NG_SEP))));
+    const rows = d.rows.filter(r => keys.has(ngKey(r)));
+    const tot = scs.map(s => ngTotals(d.rows, s));
+    $("ngcT").innerHTML = `<table data-nosort><tr><th>Item / vendor</th><th class="num">Quantity</th><th class="num">Baseline</th>${scs.map(s => `<th class="num" colspan="2">${esc(s.name)} · ${esc(s.status)}</th>`).join("")}</tr>`
+      + rows.map(r => `<tr><td>${esc(r.item)} ${esc(r.desc)} · ${esc(r.vendor)}</td><td class="num">${fmt(r.qty, 2)}</td><td class="num">${ngP(r.baseline)}</td>${scs.map(s => { const p = ngPriceMap(s)[ngKey(r)], c = p ? ngCalc(r, p.price) : null; return `<td class="num">${p ? ngP(p.price) : ""}</td><td class="num">${c ? ngS(c.sav) : ""}</td>`; }).join("")}</tr>`).join("")
+      + `<tr><td colspan="3"><b>Potential Savings at Historical Volume</b> (switches included)</td>${tot.map(t => `<td></td><td class="num"><b>${Object.keys(t.by).sort().map(c => `${ngS(t.by[c])} ${esc(c)}`).join("<br>") || "–"}</b></td>`).join("")}</tr>`
+      + `<tr><td colspan="3" class="meta">Owner · target</td>${scs.map(s => `<td colspan="2" class="meta">${esc(s.owner || "–")} · ${esc(s.target || "–")}</td>`).join("")}</tr></table>`;
+  };
+  ngDlg(ngHead("Compare scenarios", `${d.company} · volumes of ${d.period.from} – ${d.period.to}`) + `<div class="pl-body"><p>${d.scenarios.map(s => `<label style="margin-right:14px"><input type="checkbox" data-ngcmp="${s.id}" ${sel.includes(s.id) ? "checked" : ""}> ${esc(s.name)}</label>`).join("")}</p><div class="scroll" id="ngcT"></div>
+    <p class="hint">Up to three side by side. “Agreed” does not mean the BC price list or a signed contract has been updated.</p></div>`, "Compare scenarios");
+  document.querySelectorAll("[data-ngcmp]").forEach(i => i.onchange = draw); draw();
+}
+window.addEventListener("resize", () => { if (ngData && $("v-negotiations").classList.contains("on")) { const phone = window.innerWidth <= 760; if (phone !== ngData._phone) { ngData._phone = phone; ngRender(); } } });
 // ---------- printing any screen to PDF ----------
 const SCREEN_NOTE = {
   prices: "Average unit cost is the period's cost divided by the period's quantity, so a change in pack size or unit of measure reads as a price change.",

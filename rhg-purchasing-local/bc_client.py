@@ -302,7 +302,7 @@ class BCClient:
                                              "Item_Category_Group_2,Item_Category_Group_3,"
                                              "Item_Category_Group_4,Item_Category_Group_5,"
                                              "Base_Unit_of_Measure,Purch_Unit_of_Measure,Vendor_No,"
-                                             "Gen_Prod_Posting_Group,VAT_Prod_Posting_Group,Blocked"})
+                                             "Gen_Prod_Posting_Group,VAT_Prod_Posting_Group,Barcode,GTIN,Blocked"})
             return {str(r.get("No")): {
                 "desc": (r.get("Description") or "").strip(),
                 "code": (r.get("Item_Category_Code") or "").strip(),
@@ -315,6 +315,8 @@ class BCClient:
                 "vendor": (r.get("Vendor_No") or "").strip(),
                 "posting_group": (r.get("Gen_Prod_Posting_Group") or "").strip(),
                 "vat_prod": (r.get("VAT_Prod_Posting_Group") or "").strip(),
+                "barcode": " ".join(x for x in ((r.get("Barcode") or "").strip(), (r.get("GTIN") or "").strip())
+                                    if x and x != str(r.get("No"))),
             } for r in rows}
         return self._cached_value(("catalog", company), max_age, go)
 
@@ -387,6 +389,7 @@ class BCClient:
         cached = self._price_fields.get(company)
         if cached and time.time() - cached[0] < 600:
             return cached[1], cached[2]
+        self._price_lines.pop(company, None)
         names = [n for n in (config.BC_PRICE_ENTITIES or []) if n] or [config.BC_PRICE_ENTITY]
         attempts, prices, status = [], None, None
         for entity in names:
@@ -400,6 +403,7 @@ class BCClient:
                 continue
             vat_of, vat_note = self._price_vat(company, rows)
             prices, status = self._parse_price_rows(rows, entity, vat_of)
+            self._price_lines[company] = (status.pop("_lines", []), status.pop("_zero", []))
             status["attempts"] = attempts
             if status.get("available"):
                 status["vat_note"] = vat_note
@@ -413,6 +417,19 @@ class BCClient:
                                    "lists, so the 'Price List Lines' page has to be the one published.")}
         self._price_fields[company] = (time.time(), prices, status)
         return prices, status
+
+    _price_lines = {}
+
+    def price_lines(self, company):
+        """(lines, zero): every purchase price line valid today, one dict per line (price excluding VAT, in the
+        line's unit and currency, its vendor, variant, minimum quantity, discount, dates and list), and the
+        lines of price 0, for the Negotiations tab, which needs each vendor's own price, not one per item."""
+        prices, status = self.price_list(company)
+        if company not in self._price_lines:                # a cached price list read before this was kept
+            self._price_fields.pop(company, None)
+            prices, status = self.price_list(company)
+        lines, zero = self._price_lines.get(company) or ([], [])
+        return lines, zero, status
 
     def _price_vat(self, company, rows):
         """(vat_of, note). vat_of(list code, vendor, item) is the VAT % to take a price back to excluding VAT:
@@ -468,13 +485,13 @@ class BCClient:
                 "asset_type": ["assettype", "producttype"],
                 "price_type": ["pricetype"], "status": ["status"],
                 "amount_type": ["amounttype"], "list_code": ["pricelistcode"],
-                "variant": ["variantcode"]}
+                "variant": ["variantcode"], "line_disc": ["linediscountpercent", "purchlinediscountpct"]}
         fmap = {role: next((normed[c] for c in cands if c in normed), None) for role, cands in want.items()}
         if not (fmap["item"] and fmap["price"]):
             return None, {"available": False,
                           "reason": f"{entity} has no item/price columns. Found: " + ", ".join(keys)}
         today = date.today().isoformat()
-        candidates = {}
+        candidates, zero = {}, []
         skipped = {"expired": 0, "not_started": 0, "no_price": 0, "not_item": 0,
                    "not_purchase": 0, "not_active": 0, "vat_unknown": 0}
         converted = 0
@@ -493,6 +510,10 @@ class BCClient:
             item, price = val("item"), val("price")
             if not item or price in (None, "", 0):
                 skipped["no_price"] += 1
+                if item:
+                    zero.append({"item": str(item), "vendor": str((val("vendor") or "") if fmap["vendor"] else ""),
+                                 "list": str((val("list_code") or "") if fmap["list_code"] else ""),
+                                 "min_qty": float(val("min_qty") or 0) if fmap["min_qty"] else 0})
                 continue
             start = str(val("starting") or "")[:10]
             end = str(val("ending") or "")[:10]
@@ -519,6 +540,7 @@ class BCClient:
                 "list": (val("list_code") or "") if fmap["list_code"] else "",
                 "starting": start, "ending": end,
                 "min_qty": float(val("min_qty") or 0) if fmap["min_qty"] else 0,
+                "line_disc": float(val("line_disc") or 0) if fmap["line_disc"] else 0.0,
             })
         prices = {}
         for item, rows_for_item in candidates.items():
@@ -530,6 +552,7 @@ class BCClient:
                         "rows_read": len(rows), "skipped": skipped,
                         "multi_price_items": sum(1 for p in prices.values() if p["alternatives"]),
                         "vat_converted": converted,
+                        "_lines": [dict(x, item=it) for it, xs in candidates.items() for x in xs], "_zero": zero,
                         "note": f"Read from {entity}. Only purchase lines that are active today are used; "
                                 f"where an item has several valid prices the local-currency, lowest-minimum "
                                 f"line is taken and the others are counted."}
@@ -644,6 +667,18 @@ class BCClient:
                               "$select": "No,Order_No,Buy_from_Vendor_No,Buy_from_Vendor_Name,Posting_Date,"
                                          "Amount,Currency_Code,Location_Code,Shortcut_Dimension_1_Code,"
                                          "Cancelled,Corrective"})
+
+    def posted_crmemo_headers(self, company, date_from, date_to):
+        """Posted purchase credit memos (page 147) of a period, the same fields as the invoice headers."""
+        return self._get_all(self._url(company, config.BC_PCR_ENTITY),
+                             {"$filter": f"Posting_Date ge {date_from} and Posting_Date le {date_to}",
+                              "$select": "No,Buy_from_Vendor_No,Buy_from_Vendor_Name,Posting_Date,Currency_Code,"
+                                         "Location_Code,Shortcut_Dimension_1_Code,Cancelled,Corrective"})
+
+    def exchange_rates(self, company, max_age=3600):
+        """Currency Exchange Rates of a company (page 483), every row as published; fx.py reads the columns."""
+        return self._cached_value(("fx", company), max_age,
+                                  lambda: self._get_all(self._url(company, config.BC_FX_ENTITY)))
 
     def invoice_lines_without_order(self, company, first_doc, last_doc, max_age=900):
         """Invoice lines carrying no order number, within a range of document numbers.

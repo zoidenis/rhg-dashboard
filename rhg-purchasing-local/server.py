@@ -33,6 +33,7 @@ import executive
 import notify
 import savings
 import savings_report
+import negotiations
 import pricechg
 import purchasers
 import weekly_report
@@ -1323,7 +1324,10 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx", "/api/purchasers/xlsx", "/api/price-changes/xlsx"}
+EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx", "/api/purchasers/xlsx", "/api/price-changes/xlsx",
+                "/api/negotiations/xlsx"}
+NEGOTIATIONS_SCREEN = "purchasing.s.compare.negotiations"
+NEGOTIATIONS_EDIT = "purchasing.negotiations.edit"
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/users", "/api/cache",
                "/api/notify/status", "/api/weekly/status"}
 # read for one location (the "location" parameter) by a person limited to some locations of the company
@@ -1396,6 +1400,115 @@ class Handler(BaseHTTPRequestHandler):
             return json.loads(self.rfile.read(length).decode("utf-8"))
         except ValueError:
             return {}
+
+    # ---- Purchasing → Prices & contracts → Negotiations (negotiations.py)
+    def _negotiations_get(self, url, q, user):
+        if not auth.can(user, NEGOTIATIONS_SCREEN):
+            self._send(403, {"error": "Your role does not hold the Negotiations screen."})
+            return
+        company = q.get("company") or config.BC_COMPANY
+        try:
+            a, b = savings_report.parse_range(q.get("from"), q.get("to"))
+        except ValueError as exc:
+            self._send(400, {"error": str(exc)})
+            return
+        local_cur = company_currency(company)
+        if url.path == "/api/negotiations/audit":
+            try:
+                self._send(200, {"audit": negotiations.audit_of(company, int(q.get("scenario") or 0), q.get("target") or "")})
+            except ValueError as exc:
+                self._send(404, {"error": str(exc)})
+            return
+        if url.path == "/api/negotiations/detail":
+            self._send(200, negotiations.detail(company, a, b, q.get("item") or "", q.get("variant") or "",
+                                                q.get("vendor") or "", q.get("currency") or local_cur, local_cur))
+            return
+        progress = negotiations.ensure(client, company, a, b, q.get("refresh") == "1" and url.path == "/api/negotiations")
+        period = {"from": a.isoformat(), "to": b.isoformat()}
+        if progress:
+            if url.path == "/api/negotiations/xlsx":
+                self._send(409, {"error": "The months are still being read; try again in a moment."})
+            else:
+                self._send(200, {"pending": True, "progress": progress, "period": period,
+                                 "note": "Reading the posted purchase invoices and credit memos of these months from "
+                                         "Business Central. A month is read once; the next view is immediate."})
+            return
+        f = {k: (q.get(k) or "")[:120] for k in ("location", "dept", "brand", "vendor", "purchaser", "currency",
+                                                  "contract", "ptype", "sub", "q")}
+        f["_company_currency"] = local_cur
+        view = negotiations.build(client, company, a, b, f)
+        rates, no_rate, fx_err = negotiations.fx_rates(client, company, local_cur,
+                                                       {r["currency"] for r in view["rows"]}, a, b)
+        scen = negotiations.scenarios(company)
+        if url.path == "/api/negotiations/xlsx":
+            sid = int(q.get("scenario") or 0)
+            sc = next((x for x in scen if x["id"] == sid), None)
+            meta = {"company": company, "assumptions": [
+                ("Company", company), ("Period (posting date)", f"{a.isoformat()} to {b.isoformat()}"),
+                ("Contract validity checked on", date.today().isoformat()),
+                ("Scenario", f"{sc['name']} · {sc['status']} · owner {sc['owner'] or '-'} · target {sc['target'] or '-'}"
+                 if sc else "none"),
+                ("Filters", ", ".join(f"{k}={v}" for k, v in f.items() if v and not k.startswith("_")) or "none"),
+                ("Quantity", "Posted purchase invoices minus posted credit memos (Type = Item), in the item's base unit"),
+                ("Paid price", "Amount excluding VAT after line and invoice discounts ÷ base quantity, in the document's "
+                               "currency. Freight, item charges and rebates are not included"),
+                ("Contract", "Price list lines active today, of the vendor (or every vendor), item, variant and currency; "
+                             "taken back to excluding VAT when the price list includes VAT; per base unit after the "
+                             "line discount; minimum quantity per invoice line"),
+                ("Baseline", "The contract when exactly one price applies, else the weighted average; several prices = "
+                             "ambiguous, no baseline"),
+                ("Potential Savings at Historical Volume", "(Baseline − proposed price) × quantity of the period. "
+                                                           "Positive = saving, negative = cost increase"),
+                ("Note", "Scenario based on quantities purchased in the selected period. Actual savings depend on future "
+                         "purchase volume, effective date, supplier terms, and implementation. 'Agreed' does not mean a "
+                         "BC price list or a signed contract has been updated."),
+                ("Exchange rates", ", ".join(f"1 {c} = {r:g} {local_cur}" for c, r in rates.items()) +
+                 " (period average of BC Currency Exchange Rates, page 483)" if rates else "none needed"),
+                ("Calculated at", time.strftime("%Y-%m-%d %H:%M")),
+                ("Read from Business Central", "Posted purchase invoices and credit memos, price lists, item cards")]}
+            body = negotiations.render_xlsx(view, sc, meta)
+            store.audit("export", "negotiations", user["username"], {}, {"company": company, "scenario": sid}, "")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", f'attachment; filename="Negotiations_{company}_{a.isoformat()}_{b.isoformat()}.xlsx"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        view.update(period=period, company=company, scenarios=scen, can_edit=auth.can(user, NEGOTIATIONS_EDIT),
+                    fx={"rates": rates, "missing": no_rate, "error": fx_err,
+                        "source": "period average of BC Currency Exchange Rates (page 483), as the Executive group view"},
+                    errors=negotiations.last_errors(company), today=date.today().isoformat(),
+                    read_at=time.strftime("%Y-%m-%d %H:%M"), statuses=list(negotiations.STATUSES))
+        self._send(200, view)
+
+    def _negotiations_post(self, url, body, user):
+        if not (auth.can(user, NEGOTIATIONS_SCREEN) and auth.can(user, NEGOTIATIONS_EDIT)):
+            self._send(403, {"error": "Your role can read Negotiations but not change proposed prices."})
+            return
+        if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+            self._send(403, {"error": "This request must come from the Purchasing tower."})
+            return
+        company = str(body.get("company") or config.BC_COMPANY)
+        who = user.get("name") or user["username"]
+        try:
+            if url.path == "/api/negotiations/scenario":
+                sid = negotiations.save_scenario(company, body, who)
+            elif url.path == "/api/negotiations/price":
+                negotiations.set_price(company, body, who)
+                sid = int(body.get("scenario"))
+            elif url.path == "/api/negotiations/switch":
+                negotiations.set_switch(company, body, who)
+                sid = int(body.get("scenario"))
+            else:
+                self._send(404, {"error": "Not found"})
+                return
+        except (ValueError, TypeError) as exc:
+            self._send(400, {"error": str(exc)})
+            return
+        self._send(200, {"ok": True, "scenario": sid,
+                         "scenarios": negotiations.scenarios(company)})
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -1557,6 +1670,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path.startswith("/api/negotiations"):
+                self._negotiations_get(url, q, user)
             elif url.path in ("/api/price-changes", "/api/price-changes/xlsx"):
                 # Purchase price changes (pricechg.py): against the last purchase and the contract, by purchaser
                 company = q.get("company") or config.BC_COMPANY
@@ -1885,6 +2000,9 @@ class Handler(BaseHTTPRequestHandler):
                 store.audit("user updated", target, user["username"], {},
                             {k: v for k, v in body.items() if k != "password"}, err or "")
                 self._send(200 if updated else 400, updated or {"error": err})
+            return
+        if url.path.startswith("/api/negotiations/"):
+            self._negotiations_post(url, body, user)
             return
         needed = WRITE_PERMISSIONS.get(url.path) or ("actions" if url.path.startswith("/api/actions") else None)
         if needed and not auth.can(user, needed):

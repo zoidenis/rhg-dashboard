@@ -39,6 +39,8 @@ DEFAULT_SETTINGS = {
         "requisition_warning_hours": 24,
         "requisition_critical_hours": 48,
         "price_above_contract_pct": 2,
+        # Negotiations: a contract line ending within this many days is flagged
+        "contract_expiry_days": 30,
         # Purchase price changes (pricechg.py): a line when the price moved this much against the last purchase
         "price_change_pct": 2,
         "stock_cover_days": 45,

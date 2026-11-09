@@ -100,7 +100,8 @@ PURCHASING = [
         ("contracts", "Contract prices", "location", ["purchasing.prices.view"]),
         ("savings", "Price savings", "location", ["purchasing.prices.view"]),
         ("prices", "Price changes", "location", ["purchasing.prices.view"]),
-        ("locations", "Location prices", "location", ["purchasing.prices.view"])]),
+        ("locations", "Location prices", "location", ["purchasing.prices.view"]),
+        ("negotiations", "Negotiations", "company", ["purchasing.prices.view"])]),
     ("actions", "Action center", "Control", None, [], "location", []),
     ("exceptions", "Exceptions", "Control", "exTabs", [
         ("list", "Exceptions", "location", ["purchasing.quality.view"]),

@@ -36,6 +36,7 @@ PERMISSIONS = {
     "purchasing.actions.manage":  "Create and update purchasing actions",
     "purchasing.settings.manage": "Change purchasing thresholds",
     "purchasing.export":          "Export purchasing data",
+    "purchasing.negotiations.edit": "Enter proposed prices and negotiation scenarios",
 
     # --- Layout of the towers (drag and drop, hiding sections)
     "layout.personal":       "Rearrange and hide sections for yourself",
@@ -69,6 +70,7 @@ ACTIONS = {
     "purchasing.export": "Purchasing: export (CSV, Excel, PDF)",
     "purchasing.actions.manage": "Purchasing: create and update actions",
     "purchasing.settings.manage": "Purchasing: change thresholds and email settings",
+    "purchasing.negotiations.edit": "Purchasing: enter proposed prices and negotiation scenarios (Negotiations)",
     "unicorn.use": "Unicorn, the business analyst: the morning brief and the chat",
     "reports.manage": "Scheduled reports: send screens by email, choose how often and to whom",
     "layout.personal": "Rearrange and hide sections for yourself",
@@ -271,6 +273,10 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "purchasing.s.suppliers.suppliers": "purchasing.s.suppliers",
                  "purchasing.s.suppliers.suploc": "purchasing.s.suppliers",
                  "purchasing.s.suppliers.supco": "purchasing.s.suppliers",
+                 # Prices & contracts → Negotiations: whoever reads Price savings; proposed prices: whoever manages
+                 # purchasing actions (the Purchasing roles), Finance and management stay read-only
+                 "purchasing.s.compare.negotiations": "purchasing.s.compare.savings",
+                 "purchasing.negotiations.edit": "purchasing.actions.manage",
                  # scheduled reports: whoever sets the towers' email settings
                  "reports.manage": ("finance.settings.manage", "purchasing.settings.manage")}
 

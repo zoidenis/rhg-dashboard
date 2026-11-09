@@ -2115,6 +2115,14 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         self._scope_filter = None
         self._allowed = None
+        if url.path == "/internal/registry":
+            # Purchasing → Negotiations: the restaurants' brand, BC location and department, to filter by brand
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, {"registry": [{k: r.get(k) or "" for k in ("ref", "name", "brand", "company", "bc", "dept")}
+                                              for r in locintel.registry()]})
+            return
         if url.path == "/internal/scope-options":
             # identity's Admin → Accounts → access: the companies and their locations to choose from
             if not self._service_call():
