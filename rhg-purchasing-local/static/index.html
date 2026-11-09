@@ -2398,6 +2398,8 @@ function renderContract(){
       + (st.skipped && st.skipped.not_purchase ? ` ${fmt(st.skipped.not_purchase)} sales lines and ${fmt(st.skipped.not_active||0)} draft lines were left out.` : "")
       + (st.multi_price_items ? ` ${fmt(st.multi_price_items)} of them have more than one valid price; the lowest-minimum local-currency row is used.` : "")
       + (st.skipped ? ` Skipped: ${fmt(st.skipped.expired||0)} expired, ${fmt(st.skipped.not_started||0)} not yet started, ${fmt(st.skipped.no_price||0)} without a price.` : "")
+      + (st.vat_note ? ` ${esc(st.vat_note)}` : "")
+      + (st.skipped && st.skipped.vat_unknown ? ` <span class="up">${fmt(st.skipped.vat_unknown)} prices including VAT were left out: no VAT rate for their vendor and item in the VAT Posting Setup.</span>` : "")
       + " Prices are compared per unit; BC does not publish the unit of measure on value entries, so a price agreed per case against buying per kilo will look wrong."
     : `<span class="up">${esc(st.reason || "No price list is published.")}</span>`;
   $("contractTable").innerHTML = st.available
@@ -2536,7 +2538,8 @@ function renderContracts(){
       ["Usually a discount or a price that has fallen", "Worth updating the list to the real price"]),
   ].join("");
   $("ctDefs").innerHTML = `<b>Coverage:</b> ${esc(c.definitions.coverage)}<br>`
-    + `<b>Adherence:</b> ${esc(c.definitions.adherence)}<br><b>Limits:</b> ${esc(c.definitions.limits)}`;
+    + `<b>Adherence:</b> ${esc(c.definitions.adherence)}<br><b>Limits:</b> ${esc(c.definitions.limits)}`
+    + (c.definitions.vat ? `<br><b>VAT:</b> ${esc(c.definitions.vat.trim())}` : "");
   $("ctSup").innerHTML = `<tr><th>Supplier</th><th class="num">Under contract</th><th class="num">No contract</th><th class="num">Coverage</th><th class="num">Above agreed</th></tr>` +
     c.suppliers.map(s=>`<tr class="${s.share<50?"warnrow":""}"><td class="name">${esc(s.supplier)}</td>
       <td class="num">${fmt(s.covered)}</td><td class="num">${fmt(s.uncovered)}</td>

@@ -113,6 +113,10 @@ def build(rows, prices, price_status, catalog, settings, period_label=""):
             "limits": "Unit of measure is not reconciled between the price list and the posting, so an "
                       "agreed price per case compared with a cost per kilo would show a false gap. "
                       "Suppliers come from the item card, not from the invoice.",
+            "vat": (price_status.get("vat_note") or "")
+                   + (f" {price_status['skipped']['vat_unknown']} prices including VAT were left out: no VAT rate "
+                      f"for their vendor and item in the VAT Posting Setup."
+                      if (price_status.get("skipped") or {}).get("vat_unknown") else ""),
         },
         "suppliers": suppliers, "categories": categories,
         "biggest_uncovered": uncovered[:8],

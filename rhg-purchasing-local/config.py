@@ -51,6 +51,8 @@ BC_GL_ENTITY = get("BC_GL_ENTITY", "G_LEntries")
 BC_PRICE_ENTITY = get("BC_PRICE_ENTITY", "PurchasePrices")
 BC_PRICE_ENTITIES = [e.strip() for e in get(
     "BC_PRICE_ENTITIES", "PriceListLines,PurchasePrices").split(",") if e.strip()]
+# the price list card (page 7016): its "Price Includes VAT" decides whether its prices are taken back to excluding VAT
+BC_PRICE_HEADER_ENTITY = get("BC_PRICE_HEADER_ENTITY", "PurchasePriceList")
 BC_ITEMS_ENTITY = get("BC_ITEMS_ENTITY", "PbItems")
 BC_ILE_ENTITY = get("BC_ILE_ENTITY", "ItemLedgerEntries")
 BC_LOCATIONS_ENTITY = get("BC_LOCATIONS_ENTITY", "NavLocations")

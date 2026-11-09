@@ -255,7 +255,7 @@ class BCClient:
             return cached[1]
         rows = self._get_all(self._url(company, config.BC_VENDOR_CARD_ENTITY),
                              {"$select": "No,Name,Purchaser_Code,Blocked,Balance_LCY,Balance_Due_LCY,"
-                                         "Payment_Terms_Code,Currency_Code"})
+                                         "Payment_Terms_Code,Currency_Code,VAT_Bus_Posting_Group"})
         self._vendor_cache[company] = (time.time(), rows)
         return rows
 
@@ -302,7 +302,7 @@ class BCClient:
                                              "Item_Category_Group_2,Item_Category_Group_3,"
                                              "Item_Category_Group_4,Item_Category_Group_5,"
                                              "Base_Unit_of_Measure,Purch_Unit_of_Measure,Vendor_No,"
-                                             "Gen_Prod_Posting_Group,Blocked"})
+                                             "Gen_Prod_Posting_Group,VAT_Prod_Posting_Group,Blocked"})
             return {str(r.get("No")): {
                 "desc": (r.get("Description") or "").strip(),
                 "code": (r.get("Item_Category_Code") or "").strip(),
@@ -314,6 +314,7 @@ class BCClient:
                 "purch_uom": (r.get("Purch_Unit_of_Measure") or "").strip(),
                 "vendor": (r.get("Vendor_No") or "").strip(),
                 "posting_group": (r.get("Gen_Prod_Posting_Group") or "").strip(),
+                "vat_prod": (r.get("VAT_Prod_Posting_Group") or "").strip(),
             } for r in rows}
         return self._cached_value(("catalog", company), max_age, go)
 
@@ -397,8 +398,11 @@ class BCClient:
             attempts.append({"entity": entity, "rows": len(rows)})
             if not rows:
                 continue
-            prices, status = self._parse_price_rows(rows, entity)
+            vat_of, vat_note = self._price_vat(company, rows)
+            prices, status = self._parse_price_rows(rows, entity, vat_of)
             status["attempts"] = attempts
+            if status.get("available"):
+                status["vat_note"] = vat_note
             break
         if prices is None:
             status = {"available": False, "attempts": attempts,
@@ -410,7 +414,48 @@ class BCClient:
         self._price_fields[company] = (time.time(), prices, status)
         return prices, status
 
-    def _parse_price_rows(self, rows, entity):
+    def _price_vat(self, company, rows):
+        """(vat_of, note). vat_of(list code, vendor, item) is the VAT % to take a price back to excluding VAT:
+        0.0 for a price list that excludes VAT, the percent of the VAT Posting Setup for one that includes it
+        (the vendor card's VAT business group × the item card's VAT product group), None when that rate is not
+        found. A price list card that cannot be read counts as excluding VAT, and the note says so."""
+        codes = {str(r.get("Price_List_Code") or "") for r in rows} - {""}
+        if not codes:
+            return (lambda *_: 0.0), ""
+        try:
+            heads = self._get_all(self._url(company, config.BC_PRICE_HEADER_ENTITY),
+                                  {"$select": "Code,PriceIncludesVAT"})
+        except BCError as exc:
+            return (lambda *_: 0.0), (f"Whether the price lists include VAT could not be read ({config.BC_PRICE_HEADER_ENTITY}: "
+                                      f"{str(exc)[:120]}); their prices are taken as excluding VAT.")
+        incl = {str(h.get("Code") or "") for h in heads if h.get("PriceIncludesVAT") in (True, "true", "True", 1)}
+        incl &= codes
+        if not incl:
+            return (lambda *_: 0.0), "The price lists exclude VAT."
+        rates = self.vat_rates(company)
+        try:
+            vbus = {str(v.get("No") or ""): (v.get("VAT_Bus_Posting_Group") or "") for v in self.vendor_cards(company)}
+        except BCError:
+            vbus = {}
+        try:
+            vprod = {no: c.get("vat_prod") or "" for no, c in self.item_catalog(company).items()}
+        except BCError:
+            vprod = {}
+
+        def vat_of(code, vendor, item):
+            if code not in incl:
+                return 0.0
+            bus, prod = vbus.get(vendor), vprod.get(item)
+            if bus is None or prod is None or (bus, prod) not in rates:
+                return None
+            pct = rates[(bus, prod)]
+            return pct if 0 <= pct <= 30 else None        # a full-VAT setup (100%) carries no price rate
+        return vat_of, (f"Price list{'s' if len(incl) > 1 else ''} {', '.join(sorted(incl))} include{'' if len(incl) > 1 else 's'} VAT: "
+                        f"each price is taken back to excluding VAT with the VAT % of the VAT Posting Setup for the "
+                        f"vendor's VAT business group and the item's VAT product group, so it compares with what was "
+                        f"paid excluding VAT.")
+
+    def _parse_price_rows(self, rows, entity, vat_of=None):
         keys = [k for k in rows[0].keys() if not k.startswith("@")]
         normed = {_norm(k): k for k in keys}
         want = {"item": ["assetno", "productno", "itemno", "no", "code"],
@@ -431,7 +476,8 @@ class BCClient:
         today = date.today().isoformat()
         candidates = {}
         skipped = {"expired": 0, "not_started": 0, "no_price": 0, "not_item": 0,
-                   "not_purchase": 0, "not_active": 0}
+                   "not_purchase": 0, "not_active": 0, "vat_unknown": 0}
+        converted = 0
         for r in rows:
             def val(role):
                 return r.get(fmap[role]) if fmap[role] else None
@@ -456,8 +502,16 @@ class BCClient:
             if end and end[:4] > "0001" and end < today:
                 skipped["expired"] += 1
                 continue
+            vendor = str((val("vendor") or "") if fmap["vendor"] else "")
+            pct = vat_of(str(val("list_code") or "") if fmap["list_code"] else "", vendor, str(item)) if vat_of else 0.0
+            if pct is None:
+                skipped["vat_unknown"] += 1               # a price including VAT whose rate is not known: not used
+                continue
+            if pct:
+                converted += 1
             candidates.setdefault(str(item), []).append({
-                "price": float(price),
+                "price": float(price) / (1 + pct / 100),
+                "price_as_listed": float(price), "vat_pct": pct,
                 "vendor": (val("vendor") or "") if fmap["vendor"] else "",
                 "uom": (val("uom") or "") if fmap["uom"] else "",
                 "currency": (val("currency") or "") if fmap["currency"] else "",
@@ -475,6 +529,7 @@ class BCClient:
         return prices, {"available": True, "entity": entity, "count": len(prices), "fields": keys,
                         "rows_read": len(rows), "skipped": skipped,
                         "multi_price_items": sum(1 for p in prices.values() if p["alternatives"]),
+                        "vat_converted": converted,
                         "note": f"Read from {entity}. Only purchase lines that are active today are used; "
                                 f"where an item has several valid prices the local-currency, lowest-minimum "
                                 f"line is taken and the others are counted."}
