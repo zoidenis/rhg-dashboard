@@ -986,19 +986,20 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <p class="meta" id="rcStatus"></p>
     </div>
     <div class="card"><h2>Coverage by location</h2>
-      <p class="hint">Items sold at each location in the period and the state of their recipe. Click a number to see the items. Coverage = valid / items that require a recipe.</p>
-      <div class="scroll"><table id="rcMatrix"></table></div></div>
+      <p class="hint">Items sold at each location in the period and the state of their recipe. Click a location, a status or an item for its pop-up. Coverage = valid / items that require a recipe.</p>
+      <div id="rcBars"></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="rcMatrix"></table></div></details></div>
     <div class="card" id="rcDrillCard" style="display:none"><div class="card-head"><h2 id="rcDrillTitle"></h2><button class="mini" id="rcDrillClose">Close</button></div>
       <div class="scroll"><table id="rcDrill"></table></div></div>
     <div class="card"><h2>Missing recipes</h2>
       <p class="hint" id="rcMissHint">Items that need a recipe and have no Assembly BOM, sold or not, most sold first. In Business Central they sell with no ingredient consumption.</p>
-      <div class="scroll"><table id="rcMissing"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="rcMissing"></table></div></details></div>
     <div class="card"><h2>Incomplete and inactive recipes</h2>
       <p class="hint">A BOM exists but a component is missing or blocked, a quantity is zero, a unit has no conversion or a sub-recipe is broken.</p>
-      <div class="scroll"><table id="rcIncomplete"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="rcIncomplete"></table></div></details></div>
     <div class="card"><h2>Pending review</h2>
       <p class="hint">Sold items whose need for a recipe cannot be confirmed. Most are set up as sold as purchased but have no unit cost, which usually means a combo or menu item without a recipe.</p>
-      <div class="scroll"><table id="rcPending"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="rcPending"></table></div></details></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
       <div class="hint" id="rcDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
@@ -1033,11 +1034,12 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <p class="meta" id="mvStatus"></p>
     </div>
     <div class="card"><h2>By location</h2>
-      <p class="hint">Items with stock on hand and their value at item unit cost (estimated), by movement class. Click a number for the items.</p>
-      <div class="scroll"><table id="mvLoc"></table></div></div>
+      <p class="hint">Stock on hand at item unit cost (estimated), by movement class. Click a location for its classes and items; a figure above for that class everywhere.</p>
+      <div id="mvLocBars"></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="mvLoc"></table></div></details></div>
     <div class="card"><h2>Stock aging</h2>
       <p class="hint">Value on hand by days since the last qualifying consumption.</p>
-      <div class="scroll"><table id="mvAging"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="mvAging"></table></div></details></div>
     <div class="card">
       <div class="card-head"><div><h2 id="mvItemsTitle">Items</h2><p class="hint" id="mvItemsHint"></p></div></div>
       <div class="filters" style="margin:4px 0 10px">
@@ -1048,10 +1050,11 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <label>Show<select id="mvFRnc"><option value="">All items</option><option value="1">Received, never used</option></select></label>
         <label>Sort<select id="mvFSort"><option value="value">Value</option><option value="days">Days without use</option><option value="qty">Quantity</option></select></label>
       </div>
-      <div class="scroll"><table id="mvItems"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="mvItems"></table></div></details></div>
     <div class="card"><h2>Adjustments by location</h2>
       <p class="hint">Positive and negative adjustments in the history read, kept apart until it is agreed which are counts, corrections or waste. They do not count as consumption unless Settings says so.</p>
-      <div class="scroll"><table id="mvAdj"></table></div></div>
+      <div id="mvAdjBars"></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="mvAdj"></table></div></details></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
       <div class="hint" id="mvDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
@@ -1287,13 +1290,13 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     </div>
     <div class="card" id="shOvCard" hidden><div class="card-head"><div><h2>Every location</h2>
       <p class="hint" id="shOvNote"></p></div><button class="mini exp" type="button" data-shx="ov" hidden>Export ▾</button></div>
-      <div class="scroll"><table id="shOv"></table></div></div>
+      <div id="shOvBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="shOv"></table></div></details></div>
     <div class="card" id="shMonthsCard" hidden><div class="card-head"><div><h2>By month</h2>
       <p class="hint">A month is in the KPIs once its count form is uploaded here, or its count is posted in Business Central. Click a month to open it.</p></div><button class="mini exp" type="button" data-shx="months" hidden>Export ▾</button></div>
-      <div class="scroll"><table id="shMonths"></table></div></div>
+      <div id="shMonthsViz"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="shMonths"></table></div></details></div>
     <div class="card" id="shCatCard" hidden><div class="card-head"><div><h2 id="shCatT">By category</h2>
       <p class="hint" id="shCatNote"></p></div><button class="mini exp" type="button" data-shx="cats" hidden>Export ▾</button></div>
-      <div class="scroll"><table id="shCats"></table></div></div>
+      <div id="shCatBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="shCats"></table></div></details></div>
     <div class="card" id="shByCard" hidden><div class="card-head"><div><h2 id="shByT">By item</h2>
       <p class="hint" id="shByNote"></p></div><button class="mini exp" type="button" data-shx="by" hidden>Export ▾</button></div>
       <div class="filters sh-by-f">
@@ -4804,7 +4807,7 @@ function rcTrackBtn(i, loc){
   return `<button class="mini" data-rctrack="${esc(i.item)}" data-rckey="${esc(key)}" ${done || !can("actions") ? "disabled" : ""}>${done ? "Tracked" : "Track"}</button>`;
 }
 function rcItemRows(list, max){
-  return list.slice(0, max).map(i => `<tr><td><b>${esc(i.item)}</b> ${esc(i.desc)}</td><td>${rcPill(i.status)}</td><td class="meta">${esc(i.policy)} · ${esc(i.category)}${i.pn ? " · PN" : ""}</td>
+  return list.slice(0, max).map(i => `<tr data-pulse="item|${esc(i.item)}" tabindex="0" style="cursor:pointer"><td><b>${esc(i.item)}</b> ${esc(i.desc)}</td><td>${rcPill(i.status)}</td><td class="meta">${esc(i.policy)} · ${esc(i.category)}${i.pn ? " · PN" : ""}</td>
     <td class="num">${fmt(i.qty_sold)}</td><td class="num">${fmt(i.sale_entries)}</td><td class="meta">${esc(i.last_sale || "–")}</td>
     <td class="num">${i.components || "–"}</td><td class="num">${i.recipe_cost == null ? "–" : fmt(i.recipe_cost, 2)}</td>
     <td class="meta">${esc((i.issues || []).slice(0, 3).join("; "))}${(i.issues || []).length > 3 ? ` … +${i.issues.length - 3}` : ""}</td><td class="meta">${esc((i.locations || []).join(", "))}</td><td>${rcTrackBtn(i)}</td></tr>`).join("");
@@ -4814,7 +4817,8 @@ function renderRecipes(){
   const d = rcData; if (!d) return;
   const k = d.kpis, cov = k.coverage;
   const covCls = cov == null ? "" : cov < 95 ? "up" : cov < 98 ? "warn" : "down";
-  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const RC_GO = {"Missing recipes, sold": "MISSING", "Incomplete or inactive, sold": "INCOMPLETE", "Pending review, sold": "PENDING REVIEW"};
+  const card = (l, v, s, cls) => `<div class="card kpi"${RC_GO[l] ? ` data-pulse="rcstatus|${RC_GO[l]}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
   $("rcKpis").innerHTML =
     card("Recipe coverage", cov == null ? "–" : fmt(cov, 1) + "%", `${fmt(k.valid)} valid of ${fmt(k.required)} sold items that need one · target 98%`, covCls) +
     card("Missing recipes, sold", fmt(k.missing), `${fmt(k.missing_sold_qty)} units sold with no consumption`, k.missing ? "up" : "") +
@@ -4842,11 +4846,13 @@ function renderRecipes(){
       <td class="num">${fmt(i.sale_entries)}</td><td class="meta">${esc(i.last_sale || "–")}</td><td class="meta">${esc(i.why)}</td><td class="meta">${esc((i.locations || []).join(", "))}</td><td>${rcTrackBtn(i)}</td></tr>`).join("")
       || `<tr><td colspan="8" class="meta">None.</td></tr>`);
   $("rcDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
+  rcViz();
 }
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-rcloc]");
   if (a) {
     e.preventDefault();
+    rcLocPop(a.dataset.rcloc, a.dataset.rcst === "*" ? "" : a.dataset.rcst); return;
     const loc = rcData.coverage.find(c => c.location === a.dataset.rcloc), st = a.dataset.rcst;
     const rows = loc.rows.filter(r => st === "*" || r[1] === st).sort((x, y) => y[2] - x[2]);
     const byItem = {}; [...rcData.missing, ...rcData.incomplete, ...(rcData.review || [])].forEach(i => byItem[i.item] = i);
@@ -5133,11 +5139,12 @@ $("mvRead").onclick = () => { mvData = null; loadMovement(true); };
 $("mvDays").onchange = () => { mvData = null; loadMovement(false); };
 $("mvAsOf").onchange = () => { mvData = null; loadMovement(false); };
 $("mvXlsx").onclick = () => { if (mvData) exportGo("/api/movement/xlsx?" + mvQs()); };
-["mvFLoc","mvFClass","mvFCat","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => loadMvRows());
+["mvFLoc","mvFClass","mvFCat","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => { $("mvItems").closest("details").open = true; loadMvRows(); });
 $("mvFQ").onkeydown = e => { if (e.key === "Enter") loadMvRows(); };
 function renderMovement(){
   const d = mvData, t = d.totals, c = t.classes;
-  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const MV_GO = {"Slow moving": "SLOW MOVING", "Non-moving": "NON-MOVING", "Dead stock": "DEAD STOCK", "Received, never used": "rnc", "Negative stock": "NEGATIVE"};
+  const card = (l, v, s, cls) => `<div class="card kpi"${MV_GO[l] ? ` data-pulse="mvclass|${MV_GO[l]}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
   const lim = d.rules.limits;
   $("mvKpis").innerHTML =
     card("Stock value (estimated)", fmt(t.value), `${fmt(t.items)} item-location lines with stock`) +
@@ -5166,6 +5173,7 @@ function renderMovement(){
   if (mvWantLoc && locs.includes(mvWantLoc)) $("mvFLoc").value = mvWantLoc;
   mvWantLoc = "";
   $("mvFClass").innerHTML = `<option value="">All</option>` + MV_CLASSES.map(x => `<option value="${x}">${x.toLowerCase()}</option>`).join("");
+  mvViz();
   $("mvDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("") +
     `<p class="meta">Thresholds (days): monitor ${lim[0]}, slow ${lim[1]}, non-moving ${lim[2]}, dead ${lim[3]}; perishable ${d.rules.perishable_limits.join(", ")} for ${esc((d.rules.perishable || []).join(", ") || "no category set")}. Distribution locations: ${esc((d.rules.distribution || []).join(", "))}. Negative adjustments count as consumption: ${d.rules.count_negative_adjustments ? "yes" : "no"}.</p>`;
 }
@@ -5183,7 +5191,7 @@ async function loadMvRows(){
     $("mvItemsTitle").textContent = `Items · ${fmt(j.total)} lines · ${fmt(j.value)}`;
     $("mvItemsHint").textContent = `Showing ${fmt(j.rows.length)}; the Excel file has every line. Use = qualifying consumption in the window.`;
     $("mvItems").innerHTML = `<tr><th>Location</th><th>Item</th><th class="num">On hand</th><th class="num">Value</th><th class="num">Used 7d</th><th class="num">30d</th><th class="num">90d</th><th class="num">180d</th><th>Last receipt</th><th>Last use</th><th class="num">Days without use</th><th>Class</th><th></th></tr>` +
-      j.rows.map(r => `<tr><td>${esc(r[ix("location")])}</td><td><b>${esc(r[ix("item")])}</b> ${esc(j.names[r[ix("item")]] || "")} <span class="meta">${esc(r[ix("category")])}${r[ix("perishable")] ? " · perishable" : ""}</span></td>
+      j.rows.map(r => `<tr data-pulse="item|${esc(r[ix("item")])}" tabindex="0" style="cursor:pointer"><td>${esc(r[ix("location")])}</td><td><b>${esc(r[ix("item")])}</b> ${esc(j.names[r[ix("item")]] || "")} <span class="meta">${esc(r[ix("category")])}${r[ix("perishable")] ? " · perishable" : ""}</span></td>
         <td class="num">${fmt(r[ix("qty")], 2)}</td><td class="num">${fmt(r[ix("value")])}</td><td class="num">${fmt(r[ix("c7")], 1)}</td><td class="num">${fmt(r[ix("c30")], 1)}</td><td class="num">${fmt(r[ix("c90")], 1)}</td><td class="num">${fmt(r[ix("c180")], 1)}</td>
         <td class="meta">${esc(r[ix("last_receipt")] || "–")}</td><td class="meta">${esc(r[ix("last_consumption")] || "–")}</td><td class="num">${r[ix("days_without")] == null ? `> ${mvData.history_days}` : fmt(r[ix("days_without")])}</td>
         <td><span class="rhg-pill ${MV_PILL[r[ix("class")]] || "info"}">${esc(r[ix("class")].toLowerCase())}</span>${r[ix("received_not_used")] ? ` <span class="rhg-pill ${r[ix("received_not_used")] === "critical" ? "critical" : "warning"}">never used</span>` : ""}</td>
@@ -5199,7 +5207,7 @@ function mvTrackBtn(r, ix, names){
 }
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-mvloc]");
-  if (a) { e.preventDefault(); $("mvFLoc").value = a.dataset.mvloc; $("mvFClass").value = a.dataset.mvcls || ""; $("mvFRnc").value = a.dataset.mvrnc || "";
+  if (a) { e.preventDefault(); $("mvItems").closest("details").open = true; $("mvFLoc").value = a.dataset.mvloc; $("mvFClass").value = a.dataset.mvcls || ""; $("mvFRnc").value = a.dataset.mvrnc || "";
     loadMvRows(); $("mvItems").scrollIntoView({behavior: "smooth", block: "start"}); return; }
   const t = e.target.closest("[data-mvtrack]");
   if (t) { const [key, loc, item, desc, cls, rnc, qty, value, lr, lc, dw] = JSON.parse(t.dataset.mvtrack);
@@ -5208,6 +5216,125 @@ document.addEventListener("click", e => {
       source_exception: key, company: mvData.company, location: loc, impact: Math.abs(value || 0),
       priority: cls === "DEAD STOCK" || cls === "NEGATIVE" || rnc === "critical" ? "High" : "Medium", bc_document: item, document_type: "Item"}); }
 });
+// ---- Inventory: an item, a movement class, a location's stock, a recipe status as Pulse pop-ups
+const MV_COL = {ACTIVE: "var(--ch-0)", "NEW ITEM": "var(--ch-0)", MONITOR: "var(--ch-3)", "SLOW MOVING": "var(--ch-1)", "NON-MOVING": "var(--ch-2)", "DEAD STOCK": "var(--up)", SEASONAL: "var(--ch-4)", NEGATIVE: "var(--ch-4)"};
+const MV_LG = () => MV_CLASSES.filter(c => c !== "NEW ITEM").map(c => [MV_COL[c], c.charAt(0) + c.slice(1).toLowerCase()]);
+const mvRowObj = (j, r) => Object.fromEntries(j.cols.map((c, i) => [c, r[i]]));
+async function mvRowsOf(extra){ const j = await readJSON(await fetch("/api/movement/rows?" + mvQs(extra))); if (j.error) throw new Error(j.error); return j; }
+const MV_HEAD = [["Location"], ["Item"], ["On hand", 1], ["Value", 1], ["Used 30d", 1], ["Last use"], ["Days without use", 1], ["Class"]];
+const mvListRow = (j, r) => { const x = mvRowObj(j, r);
+  return {cells: [esc(x.location), `<b>${esc(x.item)}</b> ${esc(j.names[x.item] || "")}`, fmt(x.qty, 2), fmt(x.value), fmt(x.c30, 1), `<span class="meta">${esc(x.last_consumption || "–")}</span>`,
+    x.days_without == null ? `> ${mvData.history_days}` : fmt(x.days_without), `<span class="rhg-pill ${MV_PILL[x.class] || "info"}">${esc(String(x.class).toLowerCase())}</span>${x.received_not_used ? ` <span class="rhg-pill warning">never used</span>` : ""}`],
+    open: `item|${x.item}`}; };
+// an item: where it is, how much, how it moves, its recipe; from Movement & dead stock when read, else the item cards
+async function itemPop(no){
+  const rc = rcData ? [...rcData.missing, ...rcData.incomplete, ...(rcData.review || [])].find(i => i.item === no) : null;
+  Pulse.pop({title: esc(no), sub: fcSp("Item"), icon: IL_GLYPH.BOX, body: async el => {
+    el.innerHTML = `<p class="meta">${fcSp("Reading…")}</p>`;
+    const pop = el.closest(".pl-pop");
+    try {
+      let html = "";
+      if (mvData) {
+        const j = await mvRowsOf({q: no, limit: 500}), rows = j.rows.filter(r => mvRowObj(j, r).item === no).map(r => mvRowObj(j, r));
+        const name = j.names[no] || ""; if (name) pop.querySelector("h2").textContent = `${no} · ${name}`;
+        pop.querySelector(".sub").textContent = `${(rows[0] || {}).category || ""} · as of ${mvData.as_of} · ${mvData.history_days} days of history`;
+        const s = f => rows.reduce((a, x) => a + (x[f] || 0), 0), last = rows.map(x => x.last_consumption).filter(Boolean).sort().pop();
+        html += Pulse.tiles([{l: "On hand", v: fmt(s("qty"), 2), s: `${fmt(rows.length)} locations`}, {l: "Value", v: fmt(s("value")), s: "at item unit cost"},
+          {l: "Used, 30 days", v: fmt(s("c30"), 1), s: `7 d ${fmt(s("c7"), 1)} · 90 d ${fmt(s("c90"), 1)}`}, {l: "Last use", v: esc(last || "none"), cls: last ? "" : "warn"},
+          {l: "Never used", v: fmt(rows.filter(x => x.received_not_used).length), s: "locations that received it, no use", cls: rows.some(x => x.received_not_used) ? "up" : ""}]);
+        html += Pulse.panel("By location", Pulse.bars(rows.sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).map(x => ({key: x.location, segs: [[Math.abs(x.value), MV_COL[x.class] || "var(--ch-0)", String(x.class).toLowerCase()]],
+          text: `${fmt(x.qty, 2)} · ${fmt(x.value)} <span class="meta">${x.days_without == null ? "no use" : fmt(x.days_without) + " d"}</span>`, open: `mvloc|${x.location}`})), MV_LG(), {none: "No stock of it."}));
+        html += Pulse.panel("Use by window", Pulse.cols([["7 days", "c7"], ["30 days", "c30"], ["90 days", "c90"], ["180 days", "c180"]].map(([l, f]) => ({label: l, segs: [[s(f), "var(--ch-0)", "used"]]})), null, {h: 130, maxLabel: m => fmt(m, 1)}));
+      } else {
+        if (!isData) { const q = new URLSearchParams({company: $("company").value || "", date: ""}); const j = await readJSON(await fetch("/api/inventory/items?" + q));
+          if (j.pending || j.available === false) { el.innerHTML = `<p class="meta">${fcSp("The item cards are being read; open the item again in a minute.")}</p>`; return; }
+          isData = j; isData.rows = j.items.map(a => Object.fromEntries(j.columns.map((c, i) => [c, a[i]]))); }
+        const r = isData.rows.find(x => x.no === no);
+        if (!r) { el.innerHTML = `<p class="meta">${fcSp("Not among the item cards.")}</p>`; return; }
+        pop.querySelector("h2").textContent = `${no} · ${r.desc}`;
+        pop.querySelector(".sub").textContent = `${[r.group3, r.group4].filter(Boolean).join(" › ")} · ${r.unit} · on ${isData.as_of}`;
+        const L = Object.entries(r.locations).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+        html += Pulse.tiles([{l: "On hand", v: isFmtQ(r.qty), s: r.unit}, {l: "Value", v: fmt(r.value), s: "quantity × unit cost"}, {l: "Unit cost", v: fmt(r.unit_cost, 2)}, {l: "Blocked", v: r.blocked ? "yes" : "no", cls: r.blocked ? "up" : ""}]);
+        html += Pulse.panel("By location", Pulse.bars(L.map(([c, q]) => ({key: c, segs: [[Math.abs(q), q < 0 ? "var(--up)" : "var(--ch-0)", q < 0 ? "below zero" : "on hand"]], text: isFmtQ(q)})), [["var(--ch-0)", "on hand"], ["var(--up)", "below zero"]], {none: "No stock of it."}));
+        html += `<p class="meta" style="margin:10px 0 0">${fcSp("Read Inventory → Movement & dead stock for its use and days without use.")}</p>`;
+      }
+      if (rc) html += Pulse.panel("Recipe", `<p style="margin:0">${rcPill(rc.status)} <span class="meta">${esc(rc.policy)} · ${esc(rc.category)}</span></p>`
+        + `<p class="hint" style="margin:6px 0 0">${esc((rc.issues || []).join("; ") || rc.why || "")}</p><p class="meta" style="margin:4px 0 0">${fcSp(`Sold ${fmt(rc.qty_sold)} units in the period`)}</p>`);
+      el.innerHTML = html;
+    } catch (e) { el.innerHTML = `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+  }});
+}
+Pulse.on("item", no => itemPop(no));
+// a location's stock by movement class, its largest lines
+async function mvLocPop(loc, cls){
+  const L = mvData && mvData.locations.find(x => x.location === loc); if (!L) return;
+  Pulse.pop({title: esc(loc), sub: esc(`${cls ? cls.toLowerCase() + " · " : ""}stock as of ${mvData.as_of}`), body: async el => {
+    const head = Pulse.tiles([{l: "Stock value", v: fmt(L.value)}, ...["SLOW MOVING", "NON-MOVING", "DEAD STOCK"].map(c => ({l: c.charAt(0) + c.slice(1).toLowerCase(), v: fmt(L[c][1]), s: `${fmt(L[c][0])} lines`, open: `mvloc|${loc}|${c}`, cls: L[c][1] ? "warn" : ""})),
+        {l: "Received, never used", v: fmt(L.rnc[1]), s: `${fmt(L.rnc[0])} lines`, cls: L.rnc[0] ? "up" : ""}])
+      + Pulse.panel("By class", Pulse.bars(MV_CLASSES.filter(c => L[c] && L[c][0]).map(c => ({key: c.toLowerCase(), segs: [[Math.abs(L[c][1]), MV_COL[c], "value"]], text: `${fmt(L[c][1])} <span class="meta">${fmt(L[c][0])} lines</span>`, open: `mvloc|${loc}|${c}`}))));
+    el.innerHTML = head + `<p class="meta">${fcSp("Reading the items…")}</p>`;
+    try { const j = await mvRowsOf({location: loc, class: cls || "", limit: 200});
+      el.innerHTML = head + Pulse.panel(`The items · ${fmt(j.total)} · ${fmt(j.value)}`, Pulse.list(MV_HEAD, j.rows.map(r => mvListRow(j, r)), {max: 480, limit: 200})); }
+    catch (e) { el.innerHTML = head + `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+  }});
+}
+Pulse.on("mvloc", v => { const [loc, cls] = v.split("|"); mvLocPop(loc, cls || ""); });
+// a movement class (or received, never used) in every location
+async function mvClassPop(cls){
+  const rnc = cls === "rnc", t = mvData.totals, c = t.classes;
+  Pulse.pop({title: fcSp(rnc ? "Received, never used" : cls.charAt(0) + cls.slice(1).toLowerCase()), sub: esc(`as of ${mvData.as_of} · ${mvData.history_days} days of history`), body: async el => {
+    const by = mvData.locations.map(L => [L.location, rnc ? L.rnc : L[cls]]).filter(([, x]) => x && x[0]).sort((a, b) => Math.abs(b[1][1]) - Math.abs(a[1][1]));
+    const head = Pulse.panel("By location", Pulse.bars(by.map(([l, x]) => ({key: l, segs: [[Math.abs(x[1]), rnc ? "var(--up)" : MV_COL[cls], "value"]], text: `${fmt(x[1])} <span class="meta">${fmt(x[0])} lines</span>`, open: `mvloc|${l}|${rnc ? "" : cls}`})), null, {none: "None."}));
+    el.innerHTML = head;
+    try { const j = await mvRowsOf(rnc ? {rnc: "1", limit: 200} : {class: cls, limit: 200});
+      el.innerHTML = head + Pulse.panel(`The largest items · ${fmt(j.total)} lines · ${fmt(j.value)}`, Pulse.list(MV_HEAD, j.rows.map(r => mvListRow(j, r)), {max: 480, limit: 200})); }
+    catch (e) { el.innerHTML = head + `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+  }});
+}
+Pulse.on("mvclass", c => mvClassPop(c));
+function mvViz(){
+  const d = mvData;
+  $("mvLocBars").innerHTML = Pulse.bars(d.locations.slice().sort((a, b) => b.value - a.value).map(L => ({key: L.location,
+    segs: MV_CLASSES.filter(c => c !== "NEGATIVE").map(c => [Math.max(0, (L[c] || [0, 0])[1]), MV_COL[c], c.toLowerCase()]),
+    text: `<b>${fmt(L.value)}</b>${L["DEAD STOCK"][1] + L["NON-MOVING"][1] > 0 ? ` <span class="meta">${fmt(L["DEAD STOCK"][1] + L["NON-MOVING"][1])} not moving</span>` : ""}`, open: `mvloc|${L.location}`})), MV_LG());
+  const A = d.adjustments || [];
+  $("mvAdjBars").innerHTML = A.length ? Pulse.bars(A.map(a => ({key: a.location || "(none)", segs: [[Math.abs(a.pos_cost || 0), "var(--ch-0)", "positive"], [Math.abs(a.neg_cost || 0), "var(--ch-1)", "negative"]],
+    text: `${fmt((a.pos_cost || 0) + (a.neg_cost || 0))} <span class="meta">net</span>`, open: a.location ? `mvloc|${a.location}` : null})), [["var(--ch-0)", "positive adjustments"], ["var(--ch-1)", "negative adjustments"]]) : "";
+}
+// recipes: coverage by location as bars, a location's items, a status's items
+const RC_COL = {VALID: "var(--ch-0)", MISSING: "var(--up)", INCOMPLETE: "var(--ch-1)", INACTIVE: "var(--ch-2)", "PENDING REVIEW": "var(--ch-4)"};
+const RC_HEAD2 = [["Item"], ["Status"], ["Qty sold", 1], ["Last sale"], ["Issues"], ["Locations"]];
+const rcRow = i => ({cells: [`<b>${esc(i.item)}</b> ${esc(i.desc || "")}`, rcPill(i.status), fmt(i.qty_sold), `<span class="meta">${esc(i.last_sale || "–")}</span>`,
+  `<span class="meta">${esc((i.issues || []).slice(0, 2).join("; ") || i.why || "")}</span>`, `<span class="meta">${esc((i.locations || []).join(", "))}</span>`], open: `item|${i.item}`});
+function rcViz(){
+  const d = rcData, k = d.kpis;
+  $("rcBars").innerHTML = Pulse.bars(d.coverage.map(c => ({key: c.location, segs: Object.keys(RC_COL).map(s => [c[s] || 0, RC_COL[s], s.toLowerCase()]),
+      text: `<span class="${c.coverage == null ? "" : c.coverage < 95 ? "up" : c.coverage < 98 ? "warn" : "down"}"><b>${c.coverage == null ? "–" : fmt(c.coverage, 1) + "%"}</b></span> <span class="meta">${fmt(c.sold_items)} sold</span>`, open: `rcloc|${c.location}`})),
+    Object.entries(RC_COL).map(([s, c]) => [c, s.toLowerCase()]))
+    + `<div style="margin-top:14px">${Pulse.cases([{n: k.missing, t: "Missing recipes, sold", w: `${fmt(k.missing_sold_qty)} units sold with no consumption`, open: "rcstatus|MISSING"},
+      {n: k.incomplete + k.inactive, t: "Incomplete or inactive, sold", w: `${fmt(k.incomplete_sold_qty)} units on a broken recipe`, open: "rcstatus|INCOMPLETE"},
+      {n: k.pending_review, t: "Pending review, sold", w: "likely combos or menu items without a recipe", open: "rcstatus|PENDING REVIEW"}])}</div>`;
+}
+function rcLocPop(loc, st){
+  const L = rcData.coverage.find(c => c.location === loc); if (!L) return;
+  const byItem = {}; [...rcData.missing, ...rcData.incomplete, ...(rcData.review || [])].forEach(i => byItem[i.item] = i);
+  const rows = L.rows.filter(r => !st || r[1] === st).sort((x, y) => y[2] - x[2]);
+  Pulse.pop({title: esc(loc), sub: esc(`${st ? st.toLowerCase() + " · " : ""}${rcData.period.from} to ${rcData.period.to}`),
+    body: Pulse.tiles([{l: "Recipe coverage", v: L.coverage == null ? "–" : fmt(L.coverage, 1) + "%", cls: L.coverage == null ? "" : L.coverage < 95 ? "up" : L.coverage < 98 ? "warn" : "down", s: `${fmt(L.VALID)} valid of ${fmt(L.required)}`},
+        ...["MISSING", "INCOMPLETE", "PENDING REVIEW"].map(s => ({l: s.charAt(0) + s.slice(1).toLowerCase(), v: fmt(L[s]), open: `rcloc|${loc}|${s}`, cls: L[s] ? "warn" : ""}))])
+      + Pulse.panel(`Items sold here · ${fmt(rows.length)}`, Pulse.list([["Item"], ["Status"], ["Qty sold here", 1], ["Sale entries", 1], ["Last sale"], ["Issues"]],
+        rows.map(([it, s, q, n, last]) => ({cells: [`<b>${esc(it)}</b> ${esc(rcData.names[it] || "")}`, rcPill(s), fmt(q), fmt(n), `<span class="meta">${esc(last || "")}</span>`,
+          `<span class="meta">${esc(byItem[it] ? (byItem[it].issues || []).slice(0, 2).join("; ") : "")}</span>`], open: `item|${it}`})), {max: 480, limit: 400}))});
+}
+function rcStatusPop(st){
+  const L = st === "MISSING" ? rcData.missing : st === "INCOMPLETE" ? rcData.incomplete : rcData.review || [];
+  const by = {}; L.forEach(i => (i.locations || []).forEach(l => by[l] = (by[l] || 0) + 1));
+  Pulse.pop({title: fcSp({MISSING: "Missing recipes", INCOMPLETE: "Incomplete and inactive recipes", "PENDING REVIEW": "Pending review"}[st]), sub: esc(`${rcData.period.from} to ${rcData.period.to}`),
+    body: Pulse.panel("By location", Pulse.bars(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([l, n]) => ({key: l, segs: [[n, RC_COL[st], "items"]], text: fmt(n), open: `rcloc|${l}|${st}`})), null, {none: "None."}))
+      + Pulse.panel(`The items · ${fmt(L.length)}`, Pulse.list(RC_HEAD2, L.map(rcRow), {max: 480, limit: 400}))});
+}
+Pulse.on("rcloc", v => { const [l, s] = v.split("|"); rcLocPop(l, s || ""); });
+Pulse.on("rcstatus", s => rcStatusPop(s));
 // ---------- stock position (finance summary) ----------
 async function loadStockSummary(){
   $("ssNote").style.display = "";
@@ -7037,6 +7164,10 @@ function shRender(){
   $("shMonths").innerHTML = `<tr><th>Month</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">KMSH / Dalje</th><th class="num">Diferenca / Dalje</th><th class="num">Investigate</th><th class="num">Unjustified</th><th class="num">Unjustified (Excel)</th></tr>` +
     d.months.slice().reverse().map(m => mrow(m.month, (d.per_month[m.month] || {}).totals, shMonth(m.month), shMon === m.month)).join("") +
     (d.ytd.totals ? mrow("ytd", d.ytd.totals, "Year to date", shMon === "ytd") : "");
+  $("shMonthsViz").innerHTML = Pulse.cols(d.months.map(m => { const T = (d.per_month[m.month] || {}).totals;
+      return {label: shMonth(m.month), segs: T ? [[Math.max(0, (T.unjust || 0)), "var(--up)", "unjustified"], [Math.max(0, Math.abs(T.losses || 0) - (T.unjust || 0)), "var(--ch-1)", "losses within the waste"]] : [], open: T ? `data-shmbar="${m.month}"` : null,
+        tip: T ? `${shMonth(m.month)}: losses ${fmt(T.losses)}, unjustified ${fmt(T.unjust)}, ${fmt(T.investigate)} categories to investigate` : `${shMonth(m.month)}: no count posted`}; }),
+    [["var(--up)", "unjustified (beyond the % Waste)"], ["var(--ch-1)", "losses within the waste"]], {h: 150, labels: 12});
   $("shMonths").querySelectorAll("tr[data-shm]").forEach(tr => tr.onclick = () => {
     const m = tr.dataset.shm; if (m !== "ytd" && !(d.per_month[m] || {}).totals) return;
     shMon = m; shCat = ""; shRender();
@@ -7056,6 +7187,9 @@ function shRender(){
       <td><span class="sh-pill ${x.target === "Investigate" ? "inv" : ""}">${esc(x.target)}${shMon === "ytd" && x.months_investigate ? " · " + fmt(x.months_investigate) : ""}</span></td>
       <td class="num">${fmt(x.allowed)}</td><td class="num"><b>${x.unjust ? `<span class="neg">${fmt(x.unjust)}</span>` : "–"}</b></td><td class="num">${x.unjust_excel ? fmt(x.unjust_excel) : "–"}</td></tr>`).join("") +
     `<tr><td><b>Total</b></td><td></td><td></td><td></td><td></td><td class="num"><b>${shV(P.totals.net)}</b></td><td class="num"><b>${fmt(P.totals.kmsh)}</b></td><td class="num"><b>${shPct(P.totals.ratio)}</b></td><td></td><td class="num">${fmt(P.totals.allowed)}</td><td class="num"><b>${fmt(P.totals.unjust)}</b></td><td class="num"><b>${fmt(P.totals.unjust_excel)}</b></td></tr>`;
+  $("shCatBars").innerHTML = Pulse.bars(P.rows.slice(0, 15).map(x => ({key: x.kat2, segs: [[Math.max(0, x.unjust || 0), "var(--up)", "unjustified"], [Math.max(0, Math.abs(Math.min(0, x.net || 0)) - (x.unjust || 0)), "var(--ch-1)", "loss within the waste"]],
+    text: `<b>${shV(x.net)}</b> <span class="meta">${shPct(x.ratio)} · waste ${fmt(x.waste_pct, x.waste_pct % 1 ? 1 : 0)}%</span>`, open: `data-shcatbar="${esc(x.kat2)}"`})),
+    [["var(--up)", "unjustified"], ["var(--ch-1)", "loss within the waste"]], {none: "No difference."});
   $("shCats").querySelectorAll("tr[data-shcat]").forEach(tr => tr.onclick = () => {
     shCat = tr.dataset.shcat; shOpenIt = ""; $("shQ").value = ""; $("shPShow").value = "diff";
     $("shCats").querySelectorAll("tr.on").forEach(x => x.classList.remove("on")); tr.classList.add("on"); shItems(); });
@@ -7256,10 +7390,19 @@ function shRenderOv(){
     (L.map(x => `<tr data-shloc="${esc(x.location)}"><td><b>${esc(x.location)}</b>${x.analysis_read_at ? `<div class="meta">KPIs read ${esc(x.analysis_read_at.replace("T", " ").slice(0, 16))}</div>` : ""}</td>
       ${x.net == null ? `<td colspan="4" class="meta">count form uploaded, not yet posted in BC: open the location for its KPIs</td>` : `<td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.losses)}</td><td class="num">${fmt(x.surpluses)}</td><td class="num">${fmt(x.items)}</td>`}
       <td class="meta">${x.form ? `<span class="sh-pill">count form</span> ` : ""}${esc(x.docs.join(", "))}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No count adjustment posted in ${esc(shMonth(j.month))}.</td></tr>`);
+  $("shOvBars").innerHTML = Pulse.bars(L.filter(x => x.net != null).map(x => ({key: x.location, segs: [[Math.abs(x.losses || 0), "var(--ch-1)", "losses"], [Math.abs(x.surpluses || 0), "var(--ch-0)", "surpluses"]],
+    text: `<b>${shV(x.net)}</b> <span class="meta">${fmt(x.items)} items</span>`, open: `data-shlocbar="${esc(x.location)}"`})), [["var(--ch-1)", "losses"], ["var(--ch-0)", "surpluses"]], {none: "No count adjustment posted."});
   $("shOv").querySelectorAll("tr[data-shloc]").forEach(tr => tr.onclick = () => {
     $("shLoc").value = tr.dataset.shloc; $("shYear").value = j.month.slice(0, 4); shMon = j.month; shCat = ""; loadSh(false);
   });
 }
+// the bars of Shrinkage do what their table rows do
+document.addEventListener("click", ev => {
+  const l = ev.target.closest("[data-shlocbar]"), m = ev.target.closest("[data-shmbar]"), c = ev.target.closest("[data-shcatbar]");
+  const row = l ? `#shOv tr[data-shloc="${CSS.escape(l.dataset.shlocbar)}"]` : m ? `#shMonths tr[data-shm="${CSS.escape(m.dataset.shmbar)}"]` : c ? `#shCats tr[data-shcat="${CSS.escape(c.dataset.shcatbar)}"]` : "";
+  const tr = row && document.querySelector(row); if (tr) tr.click();
+});
+document.addEventListener("keydown", ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && (ev.target.dataset.shlocbar || ev.target.dataset.shmbar || ev.target.dataset.shcatbar)) { ev.preventDefault(); ev.target.click(); } });
 // ---- Categories & waste
 async function shCfgLoad(){
   $("shCfgCard").hidden = false; shCfgOpen = true;
@@ -7754,7 +7897,7 @@ function renderDcLines(){
     && (!q || x.item.toLowerCase().includes(q) || (x.desc || "").toLowerCase().includes(q)));
   $("dcLinesNote").textContent = `${fmt(rows.length)} lines · received, made, discharged by recipes, sold as it is and shipped out in the period, in the item's base unit.`;
   $("dcLines").innerHTML = rows.length ? `<tr><th>Location</th><th>Item</th><th>Signal</th><th class="num">Received</th><th class="num">Made</th><th class="num">By recipes</th><th class="num">Sold</th><th class="num">Shipped</th><th class="num">Opening</th><th class="num">Closing</th><th class="num">Discharged / in</th><th>Why</th></tr>` +
-    rows.slice(0, 400).map(x => `<tr><td>${esc(x.location)}</td><td class="it"><b>${esc(x.item)}</b> ${esc(x.desc)} <span class="meta">${esc(x.unit)}</span>${x.pair ? `<div class="dc-pair">↔ ${esc(x.pair.item)} ${esc(x.pair.desc)} · match ${Math.round(x.pair.score * 100)}%</div>` : ""}</td><td>${dcSt1(x.status)}</td>
+    rows.slice(0, 400).map(x => `<tr data-pulse="item|${esc(x.item)}" tabindex="0" style="cursor:pointer"><td>${esc(x.location)}</td><td class="it"><b>${esc(x.item)}</b> ${esc(x.desc)} <span class="meta">${esc(x.unit)}</span>${x.pair ? `<div class="dc-pair">↔ ${esc(x.pair.item)} ${esc(x.pair.desc)} · match ${Math.round(x.pair.score * 100)}%</div>` : ""}</td><td>${dcSt1(x.status)}</td>
       <td class="num">${dcQ(x.received)}</td><td class="num">${x.made ? dcQ(x.made) : ""}</td><td class="num">${x.consumed ? dcQ(x.consumed) : ""}</td><td class="num">${x.sold ? dcQ(x.sold) : ""}</td><td class="num">${x.shipped ? dcQ(x.shipped) : ""}</td>
       <td class="num">${dcQ(x.opening)}</td><td class="num">${dcQ(x.closing)}</td><td class="num">${x.ratio == null ? "–" : Math.round(x.ratio * 100) + "%"}</td>
       <td class="w">${esc(x.note)}${x.action ? `<div class="meta">${esc(x.action)}</div>` : ""}</td></tr>`).join("")
@@ -7934,7 +8077,7 @@ function tyItems(){
   const list = d.items.filter(x => (!loc || x[0] === loc) && (!nat || x[5] === nat) && (!only || x[15]));
   $("tyItemsNote").textContent = `Lines covering more than 3× their target, fresh lines to count, and stock of ${fmt(100000)} or more with no use, ordered by value above target · ${fmt(list.length)} of ${fmt(d.items_total)} lines${d.items_total > d.items.length ? " (the Excel file has them all)" : ""}`;
   $("tyItems").innerHTML = `<tr><th>Location</th><th>Item</th><th>Description</th><th>Family</th><th class="num">Qty on hand</th><th class="num">Value</th><th class="num">Used, ${d.history_days} days</th><th class="num">Days of cover</th><th class="num">Delivery every</th><th class="num">Target</th><th class="num">Above target</th><th></th></tr>` +
-    (list.slice(0, 100).map(x => `<tr><td>${esc(x[0])}</td><td>${esc(x[1])}</td><td>${esc(x[2])}</td><td class="meta">${esc(x[4])}</td>
+    (list.slice(0, 100).map(x => `<tr data-pulse="item|${esc(x[1])}" tabindex="0" style="cursor:pointer"><td>${esc(x[0])}</td><td>${esc(x[1])}</td><td>${esc(x[2])}</td><td class="meta">${esc(x[4])}</td>
       <td class="num">${fmt(x[6], x[6] % 1 ? 2 : 0)} ${esc(x[7])}</td><td class="num">${tyM(x[8])}</td><td class="num">${fmt(x[9], x[9] % 1 ? 2 : 0)} ${esc(x[7])}</td>
       <td class="num"><b>${x[10] == null ? "no use" : fmt(x[10])}</b></td><td class="num">${x[13] != null ? x[13] : "–"}</td>
       <td class="num">${x[11] != null ? fmt(x[11]) + (x[12] === "settings" ? " ⚙" : "") : "–"}</td><td class="num">${x[14] ? tyM(x[14]) : "–"}</td>

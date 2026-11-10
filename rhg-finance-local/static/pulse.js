@@ -154,7 +154,9 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
     return open(i < 0 ? v : v.slice(0, i), i < 0 ? "" : v.slice(i + 1), el);
   }
   document.addEventListener("click", ev => {
-    const el = ev.target.closest("[data-pulse]"); if (!el || ev.target.closest("a[href],input,select,textarea")) return;
+    const el = ev.target.closest("[data-pulse]"); if (!el) return;
+    const ctl = ev.target.closest("a[href],input,select,textarea,button,label");     // a control of its own inside the row
+    if (ctl && ctl !== el && el.contains(ctl)) return;
     if (act(el)) ev.preventDefault();
   });
   document.addEventListener("keydown", ev => {
