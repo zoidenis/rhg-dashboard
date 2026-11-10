@@ -48,6 +48,7 @@ import simphony
 import store
 
 DB_PATH = store.DATA_DIR / "guest_checks.db"
+CHECK_VERSION = 2               # 2: the cancel, return, void, error correct, reopen, transfer and split marks of a check
 DEFAULTS = {"days": "7", "window": "20", "tol": "1", "late": "60", "rates": "20, 10, 6, 0",
             "shifts": "06:00-16:00 Morning; 16:00-06:00 Evening", "map": "", "operators": "", "exclude": "", "read_time": "07:30"}
 STATUS = {"ok": "Fiscalized", "late": "Fiscalized late", "late48": "Fiscalized after 48 h", "missing": "Not fiscalized",
@@ -145,7 +146,13 @@ def _db():
         _conn.executescript("""
             CREATE TABLE IF NOT EXISTS chk (ref TEXT, day TEXT, id TEXT, j TEXT, PRIMARY KEY (ref, day, id));
             CREATE TABLE IF NOT EXISTS chkdays (ref TEXT, day TEXT, final INTEGER, at REAL, PRIMARY KEY (ref, day));
+            CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
         """)
+        v = _conn.execute("SELECT v FROM meta WHERE k='check_version'").fetchone()
+        if not v or int(v[0]) < CHECK_VERSION:          # the checks kept before carry fewer fields: read the days again
+            _conn.execute("UPDATE chkdays SET final=0, at=0")
+            _conn.execute("INSERT OR REPLACE INTO meta VALUES ('check_version', ?)", (str(CHECK_VERSION),))
+            _conn.commit()
     return _conn
 
 
@@ -159,11 +166,29 @@ def _txt(v):
     return str(v)
 
 
+def _flag(v):
+    return v is True or str(v).lower() in ("true", "1", "y", "yes")
+
+
 def check_of(g):
-    """A Simphony guest check → the fields the match uses."""
+    """A Simphony guest check → the fields the match uses, and what was voided, returned, error corrected, reopened,
+    transferred or split on it (Returns tracking)."""
     lines = g.get("detailLines") or []
     tenders, ws, info = Counter(), None, [_txt(g.get("chkInfo")), _txt(g.get("chkRef")), _txt(g.get("posChkGUID"))]
+    ev = {"vd": 0.0, "vd_n": 0, "rt": 0.0, "rt_n": 0, "ec": 0.0, "ec_n": 0, "reasons": set(), "mgr": set()}
     for d in lines:
+        mi = d.get("menuItem") if isinstance(d.get("menuItem"), dict) else {}
+        amt = abs(float(d.get("dspTtl") or 0))
+        kind = ("rt" if _flag(mi.get("returnFlag")) or _flag(d.get("returnFlag")) or _flag(d.get("rtrnFlag"))
+                else "vd" if _flag(d.get("vdFlag")) else "ec" if d.get("errorCorrect") or _flag(d.get("errCorFlag")) else "")
+        if kind:
+            ev[kind] += amt
+            ev[kind + "_n"] += 1
+            r = d.get("reasonCodeNum") or d.get("rsnCodeNum") or d.get("reasonCode")
+            if r not in (None, ""):
+                ev["reasons"].add(str(r))
+            if d.get("mgrEmpNum") not in (None, ""):
+                ev["mgr"].add(str(d.get("mgrEmpNum")))
         if ws is None and d.get("wsNum") is not None:
             ws = d.get("wsNum")
         tm = d.get("tenderMedia")
@@ -173,7 +198,24 @@ def check_of(g):
                 ws = d.get("wsNum")
         if d.get("refInfo1") or d.get("refInfo2"):
             info.append(_txt(d.get("refInfo1")) + " " + _txt(d.get("refInfo2")))
-    return {"id": str(g.get("guestCheckId") or g.get("chkNum")), "num": g.get("chkNum"), "name": g.get("chkName") or "",
+    # the check's own totals of returns and error corrects, by any of the names the API versions use
+    for k, v in g.items():
+        kl = str(k).lower()
+        if kl.endswith("ttl") and isinstance(v, (int, float)):
+            if "rtrn" in kl or "return" in kl:
+                ev["rt"] = max(ev["rt"], abs(float(v)))
+            elif "errcor" in kl:
+                ev["ec"] = max(ev["ec"], abs(float(v)))
+            elif kl == "vdttl":
+                ev["vd"] = max(ev["vd"], abs(float(v)))
+    mark = {"vd": round(ev["vd"], 2), "vd_n": ev["vd_n"], "rt": round(ev["rt"], 2), "rt_n": ev["rt_n"],
+            "ec": round(ev["ec"], 2), "ec_n": ev["ec_n"], "reasons": sorted(ev["reasons"])[:6], "mgr": sorted(ev["mgr"])[:4],
+            "reopen": _flag(g.get("reopnClsdChkFlag")), "reopen_at": (g.get("reopnClsdChkOpnLcl") or "")[:19],
+            "from": g.get("reopnFrmChk"), "to": g.get("reopnToChk"), "xfer": g.get("xferStatus") or "",
+            "xfer_to": g.get("xferToChkNum"), "split": g.get("splitOut") or 0, "added": g.get("addedIn") or 0,
+            "upd": (g.get("lastUpdatedLcl") or g.get("lastTransLcl") or "")[:19], "prints": g.get("numChkPrntd") or 0}
+    return {"v": CHECK_VERSION, **{k: v for k, v in mark.items() if v not in (0, 0.0, "", None, [], False)},
+            "id": str(g.get("guestCheckId") or g.get("chkNum")), "num": g.get("chkNum"), "name": g.get("chkName") or "",
             "opn": (g.get("opnLcl") or "")[:19], "clsd": (g.get("clsdLcl") or g.get("reopnClsdChkClsdLcl") or "")[:19],
             "total": float(g.get("chkTtl") or 0), "sub": float(g.get("subTtl") or 0), "tax": float(g.get("taxCollTtl") or 0),
             "disc": float(g.get("dscTtl") or 0), "rvc": g.get("rvcNum"), "emp": g.get("empNum"), "ws": ws,
@@ -685,6 +727,7 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
                            "pays": ", ".join(p[0] for p in o.get("pays") or []) or ("ORDER" if o.get("closed_by") else ""),
                            "closed_by": closer["num"] or closer["iic"][:12] if closer else "", "invoiced": bool(nxt),
                            "after_min": round((min(nxt) - t0) / 60) if nxt else None})
+    returns = track_returns(checks, invs, inv_by, S, latest, last_day)
     # restaurants and days
     locs = []
     for ref in sorted(set(checks) | {i["loc"] for i in invs if i["loc"]}):
@@ -731,9 +774,161 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
             "kpis": kpis, "locations": locs, "checks": out_checks, "invoices": no_check, "tills": sorted(tills.values(), key=lambda t: (t["ref"], t["tcr"])),
             "proposals": {k: {"ref": v[0], "matched": v[1], "invoices": v[2]} for k, v in proposals.items()},
             "operators": ops, "summary": summary, "book": book, "book_errors": dict(err_count), "orders": out_orders,
+            "returns": returns,
             "info_errors": list(INFO),
             "status": STATUS, "inv_status": INV_STATUS, "error_labels": ERRORS, "rates": S["rates"],
             "definitions": DEFINITIONS}
+
+# ---------------------------------------------------------------- returns tracking
+RET_STATUS = {"closed_ref": "Closed: corrective invoice refers to the original", "closed_self": "Closed: the return check's own corrective invoice",
+              "closed_amount": "Closed: corrective invoice of the same amount", "unfiscalized": "Unfiscalized return",
+              "pending": "Pending", "no_effect": "No fiscal effect"}
+RET_KIND = {"return": "Return", "cancel": "Cancel", "reopen": "Reopen", "change": "Change", "void": "Void before closing",
+            "ec": "Error correct before closing"}
+
+
+def track_returns(checks, invs, inv_by, S, latest, last_day):
+    """Every cancel, return, reopen or change of a Simphony check, and the corrective invoice in Billy that closes it.
+
+    Needs a corrective (the invoice already fiscalized must be corrected):
+      * return: a check with returned items (Simphony's return flag, or the check's returns total) or a negative total;
+        the amount returned;
+      * cancel: a cancelled check that has an invoice (its IIC or number on the check);
+      * reopen: a closed check reopened (to a new check, or reopened in place) whose first invoice exists: that invoice;
+      * change: a check whose invoice is larger than the check (beyond the tolerance): the difference.
+    A corrective is a Billy invoice marked corrective or with a negative total. It closes the event:
+      1. by reference: its correctiveInv names the IIC of the event's invoice;
+      2. the return check's own invoice, when it is a corrective (a return fiscalized at closing);
+      3. by amount: a corrective of the same restaurant, issued from an hour before to 72 hours after, of the same
+         amount within the tolerance (nearest first; a lead, not a proof).
+    None: "Unfiscalized return" (Pending on the last business day). Voids and error corrects before closing are
+    listed with no fiscal effect: nothing was fiscalized yet."""
+    tol = S["tol"]
+    corr = [i for i in invs if i.get("corr") or (i.get("total") or 0) < -0.005]
+    corr_keys = {i["_k"] for i in corr}
+    by_ref = defaultdict(list)
+    for i in corr:
+        if i.get("corr_ref"):
+            by_ref[i["corr_ref"].upper()].append(i)
+    key_of = {}
+    for i in invs:
+        for k in (i["iic"], i["fic"], i["num"]):
+            if k and len(k) >= 6:
+                key_of[k.upper()] = i
+    by_num = {(ref, c["day"], c["num"]): c for ref, lst in checks.items() for c in lst}
+    events = []
+
+    def ev(ref, c, kind, amount, orig=None, note=""):
+        events.append({"ref": ref, "day": c["day"], "num": c["num"], "id": c["id"], "name": c.get("name") or "",
+                       "opn": c.get("opn") or "", "clsd": c.get("clsd") or "", "at": c.get("reopen_at") or c.get("clsd") or "",
+                       "_t": _ts(c.get("reopen_at") or c.get("clsd") or ""), "emp": c.get("emp"), "kind": kind,
+                       "amount": round(amount, 2), "check_total": round(c["total"], 2), "orig": orig, "note": note,
+                       "reasons": c.get("reasons") or [], "mgr": c.get("mgr") or [], "self": None})
+
+    for ref, lst in checks.items():
+        for c in lst:
+            own = inv_by.get(c["inv"]) if c.get("inv") else None
+            if own is None and c["cancel"] and c["info"]:          # a cancelled check is not matched: its IIC on it
+                own = next((key_of[t] for t in _TOKEN.findall(c["info"].upper()) if t in key_of), None)
+            neg = c["total"] < -tol
+            if neg or c.get("rt", 0) > tol:
+                e_amt = max(-c["total"] if neg else 0.0, c.get("rt", 0.0))
+                ev(ref, c, "return", e_amt, note=" · ".join(x for x in ("negative check" if neg else "",
+                                                                         f"{c['rt_n']} returned items" if c.get("rt_n") else "") if x))
+                if own is not None and own["_k"] in corr_keys:
+                    events[-1]["self"] = own
+            if c["cancel"]:
+                if own is not None and own["_k"] not in corr_keys:
+                    ev(ref, c, "cancel", own["total"] or 0, own, "cancelled after its invoice")
+                else:
+                    ev(ref, c, "cancel", abs(c["total"]), None, "nothing fiscalized for it")
+            if c.get("to") or c.get("reopen"):
+                first = None
+                if c.get("to"):                          # reopened to a new check: this check's invoice is the first
+                    first = own
+                    nxt = by_num.get((ref, c["day"], c["to"]))
+                    note = f"reopened as check {c['to']}" + ("" if nxt else " (not in the days read)")
+                else:                                    # reopened in place: an invoice of the restaurant with no check,
+                    t0, t1 = _ts(c.get("opn") or ""), _ts(c.get("reopen_at") or "")    # issued before the reopening
+                    if t0 is not None and t1 is not None:
+                        cand = [i for i in invs if i["loc"] == ref and i.get("status") == "no_check" and i["_t"] is not None
+                                and t0 <= i["_t"] <= t1 + S["window"] * 60 and i["_k"] not in corr_keys]
+                        cand.sort(key=lambda i: abs((i["total"] or 0) - c["total"]))
+                        first = cand[0] if cand else None
+                    note = "reopened after closing" + (f" at {c['reopen_at'][11:16]}" if c.get("reopen_at") else "")
+                if first is not None:
+                    ev(ref, c, "reopen", first["total"] or 0, first, note)
+                else:
+                    ev(ref, c, "reopen", c["total"], None, note + "; no invoice before the reopening")
+            if own is not None and own["_k"] not in corr_keys and not c["cancel"] and (own["total"] or 0) - c["total"] > tol:
+                ev(ref, c, "change", (own["total"] or 0) - c["total"], own, "the invoice is larger than the check")
+            if c.get("vd", 0) > tol and not (c["cancel"] or c.get("to") or c.get("reopen")):
+                ev(ref, c, "void", c["vd"], None, f"{c.get('vd_n') or ''} voided lines".strip())
+            if c.get("ec", 0) > tol and not (c["cancel"] or c.get("to") or c.get("reopen")):
+                ev(ref, c, "ec", c["ec"], None, f"{c.get('ec_n') or ''} error corrected lines".strip())
+    # what closes each event
+    used = set()
+    for e in events:
+        if e["kind"] in ("void", "ec") or (e["kind"] in ("cancel", "reopen") and e["orig"] is None):
+            e["status"] = "no_effect"
+            continue
+        e["status"] = None
+        o = e["orig"]
+        if o is not None:
+            hit = next((i for k in (o["iic"], o["fic"]) if k for i in by_ref.get(k.upper(), []) if i["_k"] not in used), None)
+            if hit is not None:
+                used.add(hit["_k"])
+                e["status"], e["corr"] = "closed_ref", hit
+                continue
+        if e["self"] is not None and e["self"]["_k"] not in used:
+            used.add(e["self"]["_k"])
+            e["status"], e["corr"] = "closed_self", e["self"]
+    for e in sorted((e for e in events if e["status"] is None), key=lambda e: e["_t"] or 0):
+        cand = [i for i in corr if i["_k"] not in used and i["loc"] in (e["ref"], "") and i["_t"] is not None
+                and e["_t"] is not None and -3600 <= i["_t"] - e["_t"] <= LATE_LIMIT
+                and abs(abs(i["total"] or 0) - e["amount"]) <= tol]
+        if cand:
+            hit = min(cand, key=lambda i: abs(i["_t"] - e["_t"]))
+            used.add(hit["_k"])
+            e["status"], e["corr"] = "closed_amount", hit
+        else:
+            e["status"] = "pending" if e["day"] >= (latest.get(e["ref"]) or last_day) else "unfiscalized"
+    # correctives no event accounts for (and no check took as its own invoice)
+    took = {c["inv"] for lst in checks.values() for c in lst if c.get("inv")}
+    loose = [i for i in corr if i["_k"] not in used and i["_k"] not in took]
+    out = []
+    for e in events:
+        o, k = e.pop("orig"), e.pop("corr", None)
+        e.pop("self", None)
+        e.pop("_t", None)
+        e["orig_num"], e["orig_iic"], e["orig_total"] = (o["num"], o["iic"], o["total"]) if o else ("", "", None)
+        if k is not None:
+            e.update(corr_num=k["num"], corr_iic=k["iic"], corr_fic=k["fic"], corr_issue=k["issue"], corr_total=k["total"],
+                     corr_marked=bool(k.get("corr")), corr_ref=k.get("corr_ref") or "")
+        out.append(e)
+    out.sort(key=lambda e: (e["status"] != "unfiscalized", e["day"], e["ref"], str(e["num"])))
+    need = [e for e in out if e["status"] != "no_effect"]
+    unf = [e for e in need if e["status"] == "unfiscalized"]
+    kpis = {"events": len(need), "closed": sum(1 for e in need if e["status"].startswith("closed")),
+            "closed_ref": sum(1 for e in need if e["status"] == "closed_ref"),
+            "closed_amount": sum(1 for e in need if e["status"] == "closed_amount"),
+            "closed_self": sum(1 for e in need if e["status"] == "closed_self"),
+            "unfiscalized": len(unf), "unfiscalized_value": round(sum(e["amount"] for e in unf), 2),
+            "pending": sum(1 for e in need if e["status"] == "pending"),
+            "no_effect": len(out) - len(need), "loose": len(loose),
+            "loose_value": round(sum(i["total"] or 0 for i in loose), 2),
+            "by_kind": dict(Counter(e["kind"] for e in need)),
+            # whether Simphony gave the marks at all in these days (they need Reporting and Analytics 20.1.16 or later)
+            "marked_checks": sum(1 for lst in checks.values() for c in lst if c.get("v") == CHECK_VERSION),
+            "with_marks": sum(1 for lst in checks.values() for c in lst
+                              if any(c.get(k) for k in ("rt", "vd", "ec", "reopen", "to", "from")))}
+    loose_rows = sorted(({"iic": i["iic"], "fic": i["fic"], "num": i["num"], "issue": i["issue"], "total": i["total"],
+                          "ref": i["loc"], "tcr": i["tcr"], "op": i["op"], "marked": bool(i.get("corr")),
+                          "corr_ref": i.get("corr_ref") or "",
+                          "refers_to": (key_of.get((i.get("corr_ref") or "").upper()) or {}).get("num") or ""}
+                         for i in loose), key=lambda x: x["issue"] or "")
+    return {"events": out, "kpis": kpis, "loose": loose_rows, "status": RET_STATUS, "kinds": RET_KIND}
+
 
 
 def _cell(ref, shift, op):
@@ -768,6 +963,13 @@ DEFINITIONS = {
             "exports, and the taxable value and VAT of each rate in the law. Checked: total = value + VAT, the VAT "
             "groups add up, VAT = value × rate, the rate is in the law, an exempt group carries no VAT, a buyer's NUIS "
             "is valid and a business buyer gets an e-invoice, a negative invoice is corrective, every invoice has a FIC.",
+    "returns": "Returns tracking: every cancel, return, reopen or change of a Simphony check (its cancel flag, returned "
+               "items or negative total, reopened after closing or to a new check, an invoice larger than the check), "
+               "and the corrective invoice in Billy that closes it: first one whose reference (correctiveInv) names the "
+               "IIC of the check's invoice; then the return check's own corrective invoice; then a corrective of the same "
+               "restaurant and amount issued from an hour before to 72 hours after (a lead, not a proof). None: an "
+               "unfiscalized return. A cancel or reopen with nothing fiscalized before it, and voids or error corrects "
+               "before closing, have no fiscal effect. The marks need Simphony Reporting and Analytics 20.1.16 or later.",
 }
 
 
@@ -782,7 +984,24 @@ def cut(r, allowed):
                 invoices=[i for i in r["invoices"] if ok(i)], tills=[t for t in r["tills"] if ok(t)],
                 operators=[o for o in r["operators"] if ok(o)], summary=[s for s in r["summary"] if ok(s)],
                 book=[b for b in r["book"] if ok(b)], orders=[o for o in r.get("orders") or [] if ok(o)], proposals={}, cut=True,
-                kpis=dict(r["kpis"], **_kpis_of(r, keep)))
+                kpis=dict(r["kpis"], **_kpis_of(r, keep)), returns=_returns_cut(r.get("returns"), keep))
+
+
+def _returns_cut(R, keep):
+    if not isinstance(R, dict):
+        return R
+    ev = [e for e in R["events"] if e["ref"] in keep]
+    lo = [x for x in R["loose"] if x["ref"] in keep]
+    need = [e for e in ev if e["status"] != "no_effect"]
+    unf = [e for e in need if e["status"] == "unfiscalized"]
+    k = dict(R["kpis"], events=len(need), closed=sum(1 for e in need if e["status"].startswith("closed")),
+             closed_ref=sum(1 for e in need if e["status"] == "closed_ref"),
+             closed_amount=sum(1 for e in need if e["status"] == "closed_amount"),
+             closed_self=sum(1 for e in need if e["status"] == "closed_self"), unfiscalized=len(unf),
+             unfiscalized_value=round(sum(e["amount"] for e in unf), 2), pending=sum(1 for e in need if e["status"] == "pending"),
+             no_effect=len(ev) - len(need), loose=len(lo), loose_value=round(sum(x["total"] or 0 for x in lo), 2),
+             by_kind=dict(Counter(e["kind"] for e in need)))
+    return dict(R, events=ev, loose=lo, kpis=k)
 
 
 def _kpis_of(r, keep):
@@ -916,6 +1135,19 @@ def findings(r):
                     "detail": "Issued at the till, not fiscalized with the Tax Administration: " +
                               ", ".join(f"{x['num'] or x['iic'][:10]} {x['total'] or 0:,.0f}" for x in lst[:8]),
                     "severity": "critical", "value": abs(sum(x["total"] or 0 for x in lst))})
+    unf = defaultdict(list)                              # returns tracking: unfiscalized returns by restaurant and day
+    for e in (r.get("returns") or {}).get("events") or []:
+        if e["status"] == "unfiscalized":
+            unf[(e["ref"], e["day"])].append(e)
+    names = {L["ref"]: (L["name"], L["bc"] or L["ref"]) for L in r["locations"]}
+    for (ref, d), lst in unf.items():
+        nm, loc = names.get(ref, (ref, ref))
+        out.append({"subject": f"{d} unfisc_return {ref}", "kind": "unfisc_return", "location": loc,
+                    "title": f"{nm} {d}: {len(lst)} unfiscalized returns",
+                    "detail": "Cancelled, returned, reopened or changed in Simphony with no corrective invoice in Billy: " +
+                              ", ".join(f"check {e['num']} {(r.get('returns') or {}).get('kinds', {}).get(e['kind'], e['kind']).lower()} "
+                                        f"{e['amount']:,.0f}" for e in lst[:8]),
+                    "severity": "critical", "value": round(sum(e["amount"] for e in lst), 2)})
     errs = defaultdict(list)
     for b in r["book"]:
         for e in b["errors"]:
@@ -979,6 +1211,21 @@ def render_xlsx(r):
     for x in r.get("orders") or []:
         w6.append([x["issue"], x["num"], x["iic"], x["fic"], x["total"], x["tcr"], x["op"], x["ref"], x["pays"],
                    x["after_min"] if x["invoiced"] else "no invoice of the same total"])
+    R = r.get("returns") or {}
+    w7 = wb.create_sheet("Returns tracking")
+    w7.append(["Restaurant", "Business day", "Check", "Name", "Closed", "Event", "Note", "Amount", "Check total", "Invoice",
+               "Invoice IIC", "Corrective invoice", "Corrective IIC", "Corrective issued", "Corrective total",
+               "Marked corrective", "Status", "Reason codes", "Manager"])
+    for e in R.get("events") or []:
+        w7.append([e["ref"], e["day"], e["num"], e["name"], e["clsd"], (R.get("kinds") or {}).get(e["kind"], e["kind"]), e["note"],
+                   e["amount"], e["check_total"], e["orig_num"], e["orig_iic"], e.get("corr_num", ""), e.get("corr_iic", ""),
+                   e.get("corr_issue", ""), e.get("corr_total"), ("yes" if e.get("corr_marked") else "no") if e.get("corr_iic") else "",
+                   (R.get("status") or {}).get(e["status"], e["status"]), ", ".join(e["reasons"]), ", ".join(e["mgr"])])
+    w8 = wb.create_sheet("Correctives without event")
+    w8.append(["Issued", "Number", "IIC", "FIC", "Total", "Restaurant", "Till", "Operator", "Marked corrective", "Refers to IIC", "Refers to invoice"])
+    for x in R.get("loose") or []:
+        w8.append([x["issue"], x["num"], x["iic"], x["fic"], x["total"], x["ref"], x["tcr"], x["op"], "yes" if x["marked"] else "no",
+                   x["corr_ref"], x["refers_to"]])
     w5 = wb.create_sheet("Tills")
     w5.append(["Till (TCR)", "Business unit", "Restaurant", "Placed", "Label", "Kind", "Invoices", "Value", "With a check", "No FIC"])
     for t in r["tills"]:

@@ -248,6 +248,18 @@ def _pay_types(x):
     return out
 
 
+def corrective_of(x):
+    """(the IIC of the invoice a corrective invoice corrects, its type): correctiveInv as Billy gives it, any casing."""
+    c = x.get("correctiveInv") or x.get("CorrectiveInv") or x.get("corrInv")
+    if isinstance(c, list):
+        c = c[0] if c else None
+    if not isinstance(c, dict):
+        return "", ""
+    low = {str(k).lower(): v for k, v in c.items()}
+    ref = low.get("iicref") or low.get("iic_ref") or low.get("iic") or low.get("refiic") or ""
+    return str(ref or "").upper(), str(low.get("type") or "")
+
+
 def compact(x, source):
     """A Billy invoice (either method) → the fields the reconciliation and the sales book use."""
     buyer = x.get("buyer") or {}
@@ -272,6 +284,7 @@ def compact(x, source):
             "buyer_type": (buyer.get("idtype") or "") if isinstance(buyer, dict) else "",
             "buyer": (buyer.get("name") or "") if isinstance(buyer, dict) else "",
             "einv": bool(x.get("isEinvoice")), "eic": x.get("eic") or "", "corr": bool(x.get("correctiveInv")),
+            "corr_ref": corrective_of(x)[0], "corr_type": corrective_of(x)[1],
             "refs": refs, "taxes": taxes, "pays": pays, "order": any("ORDER" in p[0] for p in pays),
             "reverse": bool(x.get("isReverseCharge")),
             "simplified": bool(x.get("isSimplifiedInv")), "in_vat": x.get("isIssuerInVAT"),

@@ -1651,7 +1651,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <label class="field" style="margin-top:8px">Operators → employees <span class="meta">optional, one per line: operator code = Simphony employee number</span><textarea id="biSOps" spellcheck="false" style="min-height:60px"></textarea></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="biSave">Save</button><span class="meta" id="biMsg"></span></div>
     </div>
-    <div class="fc-seg bi-seg no-report" id="biSeg" role="tablist"><button data-b="checks" class="on">Checks</button><button data-b="days">Restaurants &amp; days</button><button data-b="tills">Tills &amp; units</button><button data-b="ops">Shift &amp; operator</button><button data-b="orders">Orders</button><button data-b="summary">Summary invoices</button><button data-b="book">Sales book</button></div>
+    <div class="fc-seg bi-seg no-report" id="biSeg" role="tablist"><button data-b="checks" class="on">Checks</button><button data-b="returns">Returns tracking</button><button data-b="days">Restaurants &amp; days</button><button data-b="tills">Tills &amp; units</button><button data-b="ops">Shift &amp; operator</button><button data-b="orders">Orders</button><button data-b="summary">Summary invoices</button><button data-b="book">Sales book</button></div>
     <div class="bi-p" data-p="checks">
       <div class="card"><div class="card-head"><div><h2>Every check</h2><p class="hint"><span>Each Simphony check with its invoice: number, IIC, FIC, the time it was fiscalized and how long after the check closed.</span></p></div></div>
         <div class="filters" style="margin:0 0 10px"><label>Restaurant<select id="biFLoc"><option value="">All</option></select></label>
@@ -1659,6 +1659,18 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div class="scroll" style="max-height:620px"><table id="biChecks"></table></div><p class="meta" id="biChecksMore"></p></div>
       <div class="card"><div class="card-head"><div><h2>Invoices without a check, and without a FIC</h2><p class="hint"><span>Fiscalized invoices no Simphony check accounts for (issued by hand, another till, or a check changed after it was fiscalized), and invoices of the bridge that never got a FIC.</span></p></div></div>
         <div class="scroll" style="max-height:480px"><table id="biInv"></table></div></div>
+    </div>
+    <div class="bi-p" data-p="returns" hidden>
+      <div class="card"><div class="card-head"><div><h2>Returns tracking</h2><p class="hint"><span>Every cancel, return, reopen or change of a Simphony check, and the corrective invoice in Billy that closes it.</span> <span>None: the check is an unfiscalized return.</span> <span>Voids and error corrects before closing are listed with no fiscal effect: nothing had been fiscalized.</span></p></div>
+        <button class="mini exp" type="button" id="biRetExp">Export ▾</button></div>
+        <div class="kpis" id="biRetK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
+        <p class="meta" id="biRetNote"></p>
+        <div class="sk-chips" id="biRetChips"></div>
+        <div class="filters" style="margin:0 0 10px"><label>Restaurant<select id="biRetLoc"><option value="">All</option></select></label>
+          <label>Event<select id="biRetKind"><option value="">All</option></select></label><label>Find<input id="biRetQ" placeholder="check, invoice, IIC"></label></div>
+        <div class="scroll" style="max-height:620px"><table id="biRet"></table></div><p class="meta" id="biRetMore"></p></div>
+      <div class="card"><div class="card-head"><div><h2>Corrective invoices with no Simphony event</h2><p class="hint"><span>Corrective or negative invoices in Billy that no cancel, return, reopen or change of a check accounts for: a correction made at the till without Simphony, or of a check outside the days read.</span></p></div></div>
+        <div class="scroll" style="max-height:420px"><table id="biRetLoose"></table></div></div>
     </div>
     <div class="bi-p report-show" data-p="days" hidden><div class="card"><div class="card-head"><div><h2>Every restaurant, every day</h2>
       <p class="hint"><span>Checks not fiscalized in the square; green when every check has its invoice. Hover for Simphony against fiscalized.</span></p></div></div>
@@ -5341,14 +5353,77 @@ function renderBilly(){
     card("Invoices without a check", fmt(k.no_check), fcSp(`${biM(k.no_check_value)} · ${fmt(k.other_till || 0)} on tills without Simphony`), k.no_check ? "warn" : "") +
     card("No FIC in Billy", fmt(k.no_fic), fcSp(`${biM(k.no_fic_value)} not fiscalized`), k.no_fic ? "up" : "down") +
     card("Sales book cases", fmt(k.book_errors), fcSp(`of ${fmt(k.invoices)} invoices${k.unmapped ? ` · ${k.unmapped} tills not mapped` : ""}`), k.book_errors ? "warn" : "down") +
-    card("Orders", fmt(k.orders || 0), fcSp(`${biM(k.orders_value || 0)} · ${fmt(k.orders_open || 0)} without an invoice after`), k.orders_open ? "warn" : "");
+    card("Orders", fmt(k.orders || 0), fcSp(`${biM(k.orders_value || 0)} · ${fmt(k.orders_open || 0)} without an invoice after`), k.orders_open ? "warn" : "") +
+    (d.returns ? `<div class="card kpi clickable" id="biRetCard" role="button" tabindex="0" title="Open Returns tracking"><div class="l">${fcSp("Unfiscalized returns")}</div><div class="v ${d.returns.kpis.unfiscalized ? "up" : "down"}">${fmt(d.returns.kpis.unfiscalized)}</div><div class="s">${fcSp(`${biM(d.returns.kpis.unfiscalized_value)} · of ${fmt(d.returns.kpis.events)} cancels, returns, reopens and changes`)}</div></div>` : "");
   biStatusLine();
   const locs = [...new Set(d.checks.map(c => c.ref))].sort(), lv = $("biFLoc").value, sv = $("biFSt").value || "missing";
   $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
   $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
-  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders();
+  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders(); biRet();
+  const rc = $("biRetCard"); if (rc) { const go = () => $("biSeg").querySelector('[data-b="returns"]').click(); rc.onclick = go; rc.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } }; }
 }
+// ---- Returns tracking (billyrec.track_returns)
+let biRetF = "need";
+const BI_RET_PILL = {closed_ref: "low", closed_self: "low", closed_amount: "medium", unfiscalized: "critical", pending: "", no_effect: ""};
+function biRetRows(){
+  const R = biData.returns, L = $("biRetLoc").value, K = $("biRetKind").value, q = ($("biRetQ").value || "").trim().toUpperCase();
+  const f = {need: e => e.status !== "no_effect", unfiscalized: e => e.status === "unfiscalized", pending: e => e.status === "pending",
+    closed: e => e.status === "closed_ref" || e.status === "closed_self", amount: e => e.status === "closed_amount", no_effect: e => e.status === "no_effect", all: () => true}[biRetF];
+  return R.events.filter(e => f(e) && (!L || e.ref === L) && (!K || e.kind === K) &&
+    (!q || [e.num, e.orig_num, e.orig_iic, e.corr_num, e.corr_iic, e.name].some(v => String(v || "").toUpperCase().includes(q))));
+}
+function biRet(){
+  const d = biData, R = d.returns;
+  if (!R) { $("biRetK").innerHTML = ""; $("biRetNote").textContent = "This read was made before Returns tracking: Read again."; $("biRet").innerHTML = ""; $("biRetLoose").innerHTML = ""; $("biRetChips").innerHTML = ""; return; }
+  const k = R.kpis, card = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  $("biRetK").innerHTML = card("Cancels, returns, reopens, changes", fmt(k.events), fcSp(Object.entries(k.by_kind || {}).map(([x, n]) => `${(R.kinds[x] || x).toLowerCase()} ${n}`).join(" · ") || "none in the days read")) +
+    card("Closed by a corrective", fmt(k.closed), fcSp(`${fmt(k.closed_ref)} by reference · ${fmt(k.closed_self || 0)} the return's own · ${fmt(k.closed_amount)} by amount only`), k.closed_amount ? "warn" : "") +
+    card("Unfiscalized returns", fmt(k.unfiscalized), fcSp(`${biM(k.unfiscalized_value)} with no corrective invoice`), k.unfiscalized ? "up" : "down") +
+    card("Pending", fmt(k.pending), fcSp("the last business day: Billy may still follow")) +
+    card("Correctives without an event", fmt(k.loose), fcSp(biM(k.loose_value)), k.loose ? "warn" : "");
+  $("biRetNote").textContent = !k.marked_checks ? "The checks of these days were read before Returns tracking: Read again reads them with their marks."
+    : !k.with_marks ? "Simphony gave no void, return or reopen mark on these days' checks: the marks need Reporting and Analytics 20.1.16 or later; cancels and negative checks are still tracked." : "";
+  const ev = R.events, n = f => ev.filter(f).length;
+  $("biRetChips").innerHTML = [["need", "Needs a corrective", n(e => e.status !== "no_effect")], ["unfiscalized", "Unfiscalized returns", n(e => e.status === "unfiscalized")],
+    ["pending", "Pending", n(e => e.status === "pending")], ["closed", "Closed by a corrective", n(e => e.status === "closed_ref" || e.status === "closed_self")],
+    ["amount", "Closed by amount only", n(e => e.status === "closed_amount")], ["no_effect", "No fiscal effect", n(e => e.status === "no_effect")], ["all", "All", ev.length]]
+    .map(([x, l, c]) => `<button data-brf="${x}" class="${biRetF === x ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(c)}</button>`).join("");
+  $("biRetChips").querySelectorAll("[data-brf]").forEach(b => b.onclick = () => { biRetF = b.dataset.brf; biRet(); });
+  const lv = $("biRetLoc").value, kv = $("biRetKind").value, locs = [...new Set(ev.map(e => e.ref))].sort();
+  $("biRetLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
+  $("biRetKind").innerHTML = `<option value="">All</option>` + Object.entries(R.kinds).map(([x, l]) => `<option value="${x}"${x === kv ? " selected" : ""}>${esc(l)}</option>`).join("");
+  const rows = biRetRows();
+  $("biRet").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th>Check</th><th>Event</th><th class="num">Amount</th><th>Status</th><th>Invoice of the check</th><th>Corrective invoice</th><th>Issued</th><th>Reason · manager</th></tr>` +
+    (rows.slice(0, 500).map(e => `<tr><td>${esc(e.ref)}</td><td>${esc(e.day)}</td><td><b>${esc(e.num)}</b><div class="meta">${esc([(e.clsd || "").slice(11, 16), e.name].filter(Boolean).join(" · "))}</div></td>
+      <td>${esc(R.kinds[e.kind] || e.kind)}${e.note ? `<div class="meta">${fcSp(e.note)}</div>` : ""}</td><td class="num"><b>${fmt(e.amount, 2)}</b>${e.check_total !== e.amount ? `<div class="meta">check ${fmt(e.check_total, 2)}</div>` : ""}</td>
+      <td><span class="rhg-pill ${BI_RET_PILL[e.status] || ""}">${esc(R.status[e.status])}</span></td>
+      <td>${e.orig_num ? `${esc(e.orig_num)}<div class="meta" title="${esc(e.orig_iic)}">${esc((e.orig_iic || "").slice(0, 12))}… · ${fmt(e.orig_total, 2)}</div>` : `<span class="meta">–</span>`}</td>
+      <td>${e.corr_num || e.corr_iic ? `<b>${esc(e.corr_num || "")}</b> ${fmt(e.corr_total, 2)}<div class="meta" title="${esc(e.corr_iic)}">${esc((e.corr_iic || "").slice(0, 12))}…${e.corr_marked ? "" : ` · ${fcSp("negative, not marked corrective")}`}</div>` : `<span class="meta">–</span>`}</td>
+      <td>${esc((e.corr_issue || "").replace("T", " ").slice(5, 16))}</td>
+      <td class="meta">${esc([e.reasons.length ? "reason " + e.reasons.join(", ") : "", e.mgr.length ? "manager " + e.mgr.join(", ") : ""].filter(Boolean).join(" · "))}</td></tr>`).join("")
+      || `<tr><td colspan="10" class="meta">${fcSp(ev.length ? "No event with this filter." : "No cancel, return, reopen or change in the days read.")}</td></tr>`);
+  $("biRetMore").textContent = rows.length > 500 ? `${fmt(rows.length)} events; 500 are shown, the Excel has every one.` : "";
+  $("biRetLoose").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Marked corrective</th><th>Refers to</th><th>IIC</th></tr>` +
+    (R.loose.map(x => `<tr><td>${esc((x.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(x.num)}</b></td><td class="num">${fmt(x.total, 2)}</td><td>${esc(x.ref || "–")}</td><td>${esc(x.tcr)}</td><td>${esc(x.op)}</td>
+      <td>${fcSp(x.marked ? "Yes" : "No")}</td><td>${esc(x.refers_to || (x.corr_ref ? x.corr_ref.slice(0, 12) + "…" : "–"))}</td><td class="meta" title="${esc(x.iic)}">${esc((x.iic || "").slice(0, 12))}…</td></tr>`).join("")
+      || `<tr><td colspan="9" class="meta">${fcSp("Every corrective invoice of the period has its Simphony event.")}</td></tr>`);
+}
+$("biRetLoc").onchange = $("biRetKind").onchange = () => biData && biRet();
+$("biRetQ").oninput = () => biData && biRet();
+$("biRetExp").onclick = () => {
+  if (!biData || !biData.returns) return;
+  const R = biData.returns, rows = biRetRows();
+  return xlsxTable(`RHG ${biData.company} returns tracking ${biData.days[0]} ${biData.days[biData.days.length - 1]}`, [{title: "Returns tracking",
+    formats: ["text", "date", "text", "text", "text", "text", "text", "num", "num", "text", "text", "num", "text", "text", "text", "num", "text", "text", "text"],
+    header: ["Restaurant", "Business day", "Check", "Name", "Closed", "Event", "Note", "Amount", "Check total", "Invoice", "Invoice IIC", "Invoice total",
+      "Corrective invoice", "Corrective IIC", "Corrective issued", "Corrective total", "Marked corrective", "Status", "Reason · manager"],
+    rows: rows.map(e => [e.ref, e.day, String(e.num), e.name, e.clsd, R.kinds[e.kind] || e.kind, e.note, e.amount, e.check_total, e.orig_num, e.orig_iic, e.orig_total,
+      e.corr_num || "", e.corr_iic || "", e.corr_issue || "", e.corr_total, e.corr_iic ? (e.corr_marked ? "yes" : "no") : "", R.status[e.status],
+      [e.reasons.join(", "), e.mgr.join(", ")].filter(Boolean).join(" · ")])}],
+    [`Returns tracking · ${biData.company} · NUIS ${biData.nuis} · ${biData.days[0]} to ${biData.days[biData.days.length - 1]}; Simphony and Billy, read only.`,
+     biData.definitions.returns || ""]);
+};
 function biStatusLine(){
   const d = biData;
   $("biStatus").innerHTML = (d.reading ? `<b>${fcSp("Reading the new figures…")}</b> ${esc(d.stage || "")} · ${fcSp("shown: the last read")} · ` : "") + (d.read_error ? `<span class="warn">${esc("Last read failed: " + d.read_error)}</span> · ` : "") + esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
