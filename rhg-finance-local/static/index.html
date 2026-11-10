@@ -455,7 +455,13 @@ td.num,th.num{text-align:right}
 .sh-up.drag{border-color:var(--accent,#2f80ed);background:var(--card)}
 .sh-up label.mini{display:inline-flex;align-items:center;cursor:pointer}
 .sh-pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--down-bg);color:var(--down)}
-.sh-pill.inv{background:var(--up-bg);color:var(--up)}.sh-pill.st{background:var(--bg);color:var(--sub)}
+.sh-pill.inv{background:var(--up-bg);color:var(--up)}
+.sh-by-f{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+#shPopKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+@media (max-width:640px){#shPopKpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#shPopKpis .kpi{padding:10px 12px}#shPopKpis .v{font-size:22px}#shPop .modal{padding:14px}#shPop{padding:12px 8px}}
+.sh-by-f select{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
+.sh-det td{background:var(--bg);font-size:12.5px}.sh-det table{width:100%}.sh-det th{font-size:11.5px}.sh-pill.st{background:var(--bg);color:var(--sub)}
 #shCfgCard table input{width:100%;min-width:60px}#shCfgCard td.c{text-align:center}
 .sh-cfg-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 @media(max-width:700px){#shCats td:nth-child(4),#shCats th:nth-child(4),#shCats td:nth-child(5),#shCats th:nth-child(5){display:none}}
@@ -1231,10 +1237,15 @@ td.num,th.num{text-align:right}
     <div class="card" id="shCatCard" hidden><div class="card-head"><div><h2 id="shCatT">By category</h2>
       <p class="hint" id="shCatNote"></p></div></div>
       <div class="scroll"><table id="shCats"></table></div></div>
-    <div class="card" id="shItemsCard" hidden><div class="card-head"><div><h2 id="shItemsT">Items</h2>
-      <p class="hint" id="shItemsNote"></p></div><button class="mini" id="shItemsClose" type="button">Close</button></div>
-      <div class="filters" style="margin:0 0 10px"><label>Item<input id="shQ" placeholder="number or name"></label></div>
-      <div class="scroll"><table id="shItems"></table></div></div>
+    <div class="card" id="shByCard" hidden><div class="card-head"><div><h2 id="shByT">By item</h2>
+      <p class="hint" id="shByNote"></p></div></div>
+      <div class="filters sh-by-f">
+        <label>Item<input id="shBQ" placeholder="number or name"></label>
+        <label>Category<select id="shBCat"></select></label>
+        <label>Show<select id="shBShow"><option value="diff">With a difference</option><option value="loss">Losses</option><option value="beyond">Beyond % Waste</option><option value="nc">Not counted</option><option value="all">All items</option></select></label>
+        <label>Order<select id="shBSort"><option value="val">Largest loss first</option><option value="beyond">Most beyond % Waste</option><option value="ratio">Highest Diferenca / Dalje</option><option value="kmsh">Largest KMSH / Dalje</option><option value="no">Item number</option></select></label></div>
+      <p class="meta" id="shByCount" style="margin:0 0 8px"></p>
+      <div class="scroll"><table id="shBy"></table></div></div>
     <div class="card" id="shCfgCard" hidden><div class="card-head"><div><h2>Categories &amp; waste</h2>
       <p class="hint" id="shCfgNote"></p></div><button class="mini" id="shCfgClose" type="button">Close</button></div>
       <div class="sh-cfg-grid" id="shCfg"></div></div>
@@ -2029,6 +2040,13 @@ td.num,th.num{text-align:right}
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
 
+<div class="modal-bg" id="shPop" role="dialog" aria-modal="true" aria-labelledby="shPopT"><div class="modal" style="max-width:1400px">
+  <div class="mhead"><div><h2 id="shPopT">Items</h2><p class="hint" id="shPopNote" style="margin:0"></p></div>
+    <div style="display:flex;gap:8px"><button class="mini dark" id="shPopClose" type="button">Close</button></div></div>
+  <div class="kpis" id="shPopKpis" style="margin:12px 0"></div>
+  <div class="filters sh-by-f"><label>Item<input id="shQ" placeholder="number or name"></label>
+    <label>Show<select id="shPShow"><option value="diff">With a difference</option><option value="loss">Losses</option><option value="beyond">Beyond % Waste</option><option value="nc">Not counted</option><option value="all">All items</option></select></label></div>
+  <div class="scroll"><table id="shItems"></table></div></div></div>
 <div class="modal-bg" id="modalBg"><div class="modal">
   <div class="mhead"><div><h2 id="modalTitle">Records</h2><p class="hint" id="modalHint" style="margin:0"></p></div>
     <div style="display:flex;gap:8px"><button class="mini" id="modalCsv">Export CSV</button><button class="mini dark" id="modalClose">Close</button></div></div>
@@ -5567,7 +5585,8 @@ function shCard(l, v, sub, cls, full){
   return `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}" title="${full == null ? "" : fmt(full)}">${v}</div><div class="s">${sub}</div></div>`;
 }
 function shRender(){
-  ["shOvCard", "shMonthsCard", "shCatCard", "shItemsCard"].forEach(id => $(id).hidden = true);
+  ["shOvCard", "shMonthsCard", "shCatCard", "shByCard"].forEach(id => $(id).hidden = true);
+  if (!shCat || shOvData) $("shPop").classList.remove("on");
   $("shXlsx").style.display = shSetup && shSetup.can_export && $("shLoc").value ? "" : "none";
   $("shYear").style.display = $("shLoc").value ? "" : "none";
   if (shOvData) return shRenderOv();
@@ -5616,7 +5635,7 @@ function shRender(){
   if (!P.rows.length) return;
   $("shCatCard").hidden = false;
   $("shCatT").textContent = `By category · ${shMonth(shMon)}`;
-  $("shCatNote").innerHTML = `<span>Worst first. Click a category for its items.</span> <span>% Delta = count difference ÷ out, in quantity (hover for each unit).</span>` +
+  $("shCatNote").innerHTML = `<span>Worst first. Click a category for the analysis of its items.</span> <span>% Delta = count difference ÷ out, in quantity (hover for each unit).</span>` +
     (P.rows.some(x => x.from_bc) ? ` <span>"from BC": items the map does not reach, by their card's group in Business Central; no % Waste until one is set in Categories &amp; waste.</span>` : "") +
     (shMon === "ytd" ? ` <span>Year to date: the unjustified values are the sum of the months; Investigate counts the months above the threshold.</span>` : "");
   $("shCats").innerHTML = `<tr><th>Category</th><th>CHECK</th><th class="num">% Waste</th><th class="num">Items</th><th class="num">% Delta</th><th class="num">Net difference</th><th class="num">KMSH / Dalje</th><th class="num">Diferenca / Dalje</th><th>Target</th><th class="num">Allowed waste</th><th class="num">Unjustified</th><th class="num">Unjustified (Excel)</th></tr>` +
@@ -5627,26 +5646,106 @@ function shRender(){
       <td><span class="sh-pill ${x.target === "Investigate" ? "inv" : ""}">${esc(x.target)}${shMon === "ytd" && x.months_investigate ? " · " + fmt(x.months_investigate) : ""}</span></td>
       <td class="num">${fmt(x.allowed)}</td><td class="num"><b>${x.unjust ? `<span class="neg">${fmt(x.unjust)}</span>` : "–"}</b></td><td class="num">${x.unjust_excel ? fmt(x.unjust_excel) : "–"}</td></tr>`).join("") +
     `<tr><td><b>Total</b></td><td></td><td></td><td></td><td></td><td class="num"><b>${shV(P.totals.net)}</b></td><td class="num"><b>${fmt(P.totals.kmsh)}</b></td><td class="num"><b>${shPct(P.totals.ratio)}</b></td><td></td><td class="num">${fmt(P.totals.allowed)}</td><td class="num"><b>${fmt(P.totals.unjust)}</b></td><td class="num"><b>${fmt(P.totals.unjust_excel)}</b></td></tr>`;
-  $("shCats").querySelectorAll("tr[data-shcat]").forEach(tr => tr.onclick = () => { shCat = shCat === tr.dataset.shcat ? "" : tr.dataset.shcat; shRender(); });
+  $("shCats").querySelectorAll("tr[data-shcat]").forEach(tr => tr.onclick = () => {
+    shCat = tr.dataset.shcat; shOpenIt = ""; $("shQ").value = ""; $("shPShow").value = "diff";
+    $("shCats").querySelectorAll("tr.on").forEach(x => x.classList.remove("on")); tr.classList.add("on"); shItems(); });
+  shBy();
   if (shCat) shItems();
 }
-function shItems(){
-  const d = shData, months = shMon === "ytd" ? d.ytd.months : [shMon];
-  const q = $("shQ").value.trim().toLowerCase();
-  const rows = d.items.filter(it => it.kat2 === shCat && months.some(m => it.m[m]) && (!q || (it.no + " " + it.desc).toLowerCase().includes(q))).map(it => {
-    const a = {op: null, in: 0, out: 0, cnt: 0, val: 0, kmsh: 0, cl: null};
-    months.forEach((m, i) => { const v = it.m[m]; if (!v) return; if (a.op == null) a.op = v[0]; a.in += v[1]; a.out += -v[3]; a.kmsh += -v[4]; a.cnt += v[5]; a.val += v[6]; a.cl = v[7]; });
-    return Object.assign({it}, a);
-  }).sort((x, y) => x.val - y.val);
-  $("shItemsCard").hidden = false;
-  $("shItemsT").textContent = `${shCat} · ${shMonth(shMon)} · ${fmt(rows.length)} items`;
-  $("shItemsNote").innerHTML = `<span>Largest loss first.</span> <span>Difference = the count adjustment posted in Business Central; its value is the cost BC posted.</span>` +
-    (shMon === "ytd" ? ` <span>Year to date: opening of the first counted month, closing of the last, ins, outs and differences summed.</span>` : "");
-  $("shItems").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">Opening</th><th class="num">In</th><th class="num">Out</th><th class="num">Theoretical</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Unit cost</th><th class="num">Difference value</th><th class="num">KMSH / Dalje</th></tr>` +
-    (rows.slice(0, 400).map(r => `<tr><td><b>${esc(r.it.no)}</b> ${esc(r.it.desc)}${r.it.exception ? ` <span class="sh-pill st" title="Category set by an exception, not by the map">exception</span>` : ""}${months.some(m => (r.it.not_counted || []).includes(m)) ? ` <span class="sh-pill inv" title="Stock in BC, not counted on the form: no difference taken">not counted</span>` : ""}<div class="meta">${esc([r.it.g4, r.it.g5].filter(Boolean).join(" · "))}</div></td>
-      <td>${esc(r.it.unit)}</td><td class="num">${cnN(r.op)}</td><td class="num">${cnN(r.in)}</td><td class="num">${cnN(r.out)}</td><td class="num">${cnN((r.op || 0) + r.in - r.out)}</td><td class="num">${cnN(r.cl)}</td>
-      <td class="num"><b class="${r.cnt < 0 ? "neg" : ""}">${cnN(r.cnt)}</b></td><td class="num">${r.cnt ? fmt(r.val / r.cnt, 2) : "–"}</td><td class="num"><b>${shV(r.val)}</b></td><td class="num">${fmt(r.kmsh)}</td></tr>`).join("")
-      || `<tr><td colspan="11" class="meta">No item.</td></tr>`);
+const SH_CLS = [["purchase", "Purchases"], ["transfer_in", "Transfers in"], ["output", "Output"], ["transfer_out", "Transfers out"], ["consumption", "Consumption (recipes)"],
+  ["sale", "Sales"], ["staff", "Staff consumption"], ["waste", "Declared waste (FIRO)"], ["adjustment", "Other adjustments"], ["other", "Other"]];
+var shOpenIt = "";
+function shWaste(){                                    // % Waste of every category; categories from BC have none
+  const w = {}; (shData.config.categories || []).forEach(c => w[c.kat2] = c.waste_pct || 0); return w;
+}
+function shAgg(it, months, waste){
+  const a = {it, op: null, in: 0, out: 0, cnt: 0, val: 0, kmsh: 0, cl: null, beyond: 0, nc: false};
+  const w = (waste[it.kat2] || 0) / 100;
+  months.forEach(m => { const v = it.m[m]; if (!v) return; if (a.op == null) a.op = v[0];
+    a.in += v[1]; a.out += -v[3]; a.kmsh += -v[4]; a.cnt += v[5]; a.val += v[6]; a.cl = v[7];
+    a.beyond += Math.max(0, -v[6] - w * -v[4]);                // per month, as the thresholds are monthly
+    if ((it.not_counted || []).includes(m)) a.nc = true; });
+  a.ratio = a.kmsh > 0 && a.val < 0 ? -a.val / a.kmsh : null;
+  a.waste = waste[it.kat2]; a.over = a.beyond > 0.5;
+  return a;
+}
+function shRows(months, opt){
+  const waste = shWaste(), q = (opt.q || "").trim().toLowerCase();
+  const rows = shData.items.filter(it => (!opt.cat || it.kat2 === opt.cat) && months.some(m => it.m[m]) && (!q || (it.no + " " + it.desc).toLowerCase().includes(q)))
+    .map(it => shAgg(it, months, waste))
+    .filter(r => opt.show === "all" ? true : opt.show === "loss" ? r.val < -0.5 : opt.show === "beyond" ? r.over : opt.show === "nc" ? r.nc : Math.abs(r.cnt) > 1e-6 || Math.abs(r.val) > 0.5 || r.nc);
+  const by = {val: (x, y) => x.val - y.val, beyond: (x, y) => y.beyond - x.beyond || x.val - y.val, ratio: (x, y) => (y.ratio || 0) - (x.ratio || 0) || x.val - y.val,
+    kmsh: (x, y) => y.kmsh - x.kmsh, no: (x, y) => x.it.no.localeCompare(y.it.no)}[opt.sort || "val"];
+  return rows.sort(by);
+}
+function shDetail(it, months, span){
+  const per = months.filter(m => it.m[m]);
+  const cls = SH_CLS.filter(([k]) => per.some(m => (it.cls[m] || {})[k]));
+  const head = `<tr><th>Month</th><th class="num">Opening</th>` + cls.map(([, l]) => `<th class="num">${l}</th>`).join("") +
+    `<th class="num">Theoretical</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Difference value</th><th class="num">KMSH / Dalje</th></tr>`;
+  const body = per.map(m => { const v = it.m[m], c = it.cls[m] || {}, x = shData.months.find(y => y.month === m) || {};
+    return `<tr><td>${esc(shMonth(m))} <span class="meta">${x.source === "form" ? "count form" : x.source === "bc" ? "posted in BC" : ""}</span>${(it.not_counted || []).includes(m) ? ` <span class="sh-pill inv">not counted</span>` : ""}</td><td class="num">${cnN(v[0])}</td>` +
+      cls.map(([k]) => `<td class="num" title="${c[k] ? fmt(c[k][1]) + " at cost" : ""}">${c[k] ? cnN(c[k][0]) : "–"}</td>`).join("") +
+      `<td class="num">${cnN(v[0] + v[1] + v[3])}</td><td class="num">${cnN(v[7])}</td><td class="num"><b class="${v[5] < 0 ? "neg" : ""}">${cnN(v[5])}</b></td><td class="num">${shV(v[6])}</td><td class="num">${fmt(-v[4])}</td></tr>`; }).join("");
+  return `<tr class="sh-det"><td colspan="${span}"><div class="scroll"><table>${head}${body}</table></div>
+    <p class="meta" style="margin:6px 0 0"><span>Quantities in ${esc(it.unit)}; hover a movement for its cost.</span> <span>Card:</span> <span data-no-i18n>${esc([it.g4, it.g5].filter(Boolean).join(" · ") || "–")}</span>${it.exception ? ` · <span>category set by an exception</span>` : it.from === "bc" ? ` · <span>category from its BC group</span>` : ""}</p></td></tr>`;
+}
+function shTable(rows, months, withCat){
+  const span = withCat ? 13 : 12;
+  return `<tr><th>Item</th>${withCat ? "<th>Category</th>" : ""}<th>Unit</th><th class="num">Opening</th><th class="num">In</th><th class="num">Out</th><th class="num">Theoretical</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Difference value</th><th class="num">KMSH / Dalje</th><th class="num" title="Loss ÷ KMSH / Dalje of the item, against the % Waste of its category">Diferenca / Dalje</th><th class="num" title="Loss − % Waste × KMSH / Dalje of the item, month by month, never below zero">Beyond % Waste</th></tr>` +
+    (rows.slice(0, 400).map(r => { const k = (withCat ? "b" : "p") + r.it.no;
+      return `<tr class="sh-it${shOpenIt === k ? " on" : ""}" data-shit="${esc(k)}"><td><b>${esc(r.it.no)}</b> ${esc(r.it.desc)}${r.it.exception ? ` <span class="sh-pill st" title="Category set by an exception, not by the map">exception</span>` : ""}${r.nc ? ` <span class="sh-pill inv" title="Stock in BC, not counted on the form: no difference taken">not counted</span>` : ""}</td>
+      ${withCat ? `<td>${esc(r.it.kat2)}</td>` : ""}<td>${esc(r.it.unit)}</td><td class="num">${cnN(r.op)}</td><td class="num">${cnN(r.in)}</td><td class="num">${cnN(r.out)}</td><td class="num">${cnN((r.op || 0) + r.in - r.out)}</td><td class="num">${cnN(r.cl)}</td>
+      <td class="num"><b class="${r.cnt < 0 ? "neg" : ""}">${cnN(r.cnt)}</b></td><td class="num"><b>${shV(r.val)}</b></td><td class="num">${fmt(r.kmsh)}</td>
+      <td class="num"><span class="${r.ratio != null && r.ratio * 100 > (r.waste || 0) ? "neg" : ""}">${shPct(r.ratio)}</span>${r.ratio != null ? `<div class="meta">${r.waste ? "waste " + fmt(r.waste, r.waste % 1 ? 1 : 0) + "%" : "no % Waste"}</div>` : ""}</td>
+      <td class="num">${r.beyond > 0.5 ? `<b class="neg">${fmt(r.beyond)}</b>` : "–"}</td></tr>` + (shOpenIt === k ? shDetail(r.it, months, span) : ""); }).join("")
+      || `<tr><td colspan="${span}" class="meta">No item.</td></tr>`);
+}
+function shWire(tb, again){
+  tb.querySelectorAll("tr[data-shit]").forEach(tr => tr.onclick = () => { shOpenIt = shOpenIt === tr.dataset.shit ? "" : tr.dataset.shit; again(); });
+}
+function shPerMonths(){ return shMon === "ytd" ? shData.ytd.months : [shMon]; }
+function shSrcNote(months){
+  const src = new Set(months.map(m => (shData.months.find(x => x.month === m) || {}).source));
+  return src.has("form") && !src.has("bc") ? "Difference = counted − theoretical from the uploaded count form, at the item's KMSH."
+    : src.has("bc") && !src.has("form") ? "Difference = the count adjustment posted in Business Central, at the cost BC posted."
+    : "Difference = counted − theoretical where the count form was uploaded, else the count adjustment posted in Business Central.";
+}
+function shItems(){                                    // the pop-up: the items of one category
+  if (!shData || !shCat) return;
+  const months = shPerMonths(), P = shMon === "ytd" ? shData.ytd : shData.per_month[shMon] || {rows: []};
+  const c = P.rows.find(x => x.kat2 === shCat) || {};
+  const rows = shRows(months, {cat: shCat, q: $("shQ").value, show: $("shPShow").value, sort: "val"});
+  $("shPopT").textContent = `${shCat} · ${shMonth(shMon)}`;
+  const all = shData.items.filter(it => it.kat2 === shCat && months.some(m => it.m[m])).length;
+  $("shPopNote").innerHTML = `${esc(shData.location)} · <span>${fmt(rows.length)} items shown of ${fmt(all)}.</span> <span>Largest loss first; click an item for its months and movements.</span> <span>${shSrcNote(months)}</span>` +
+    ` <span>Beyond % Waste is per item, before the surpluses of other items are netted: the category's Unjustified nets them.</span>`;
+  $("shPopKpis").innerHTML = c.kat2 ? shCard("Net difference", ilM(c.net), `<span>losses ${fmt(c.losses)}</span> · <span>surpluses ${fmt(c.surpluses)}</span>`, c.net < 0 ? "up" : "", c.net) +
+    shCard("KMSH / Dalje", ilM(c.kmsh), `<span>the cost of the outs</span>`, "", c.kmsh) +
+    shCard("Diferenca / Dalje", shPct(c.ratio), `<span>% Waste ${fmt(c.waste_pct, c.waste_pct % 1 ? 1 : 0)}%</span>${c.from_bc ? ` <span>(from BC, not set)</span>` : ""}`, c.target === "Investigate" ? "up" : "") +
+    shCard("Unjustified", ilM(c.unjust), `<span>Excel method ${fmt(c.unjust_excel)}</span>`, c.unjust ? "up" : "", c.unjust) : "";
+  $("shItems").innerHTML = shTable(rows, months, false);
+  shWire($("shItems"), shItems);
+  $("shPop").classList.add("on");
+}
+function shPopClose(){ $("shPop").classList.remove("on"); shCat = ""; shOpenIt = ""; $("shQ").value = "";
+  document.querySelectorAll("#shCats tr.on").forEach(tr => tr.classList.remove("on")); }
+function shBy(){                                       // every item of the period
+  const d = shData, months = shPerMonths(), P = shMon === "ytd" ? d.ytd : d.per_month[shMon] || {rows: []};
+  if (!P.rows.length) return;
+  $("shByCard").hidden = false;
+  const sel = $("shBCat"), want = sel.value;
+  sel.innerHTML = `<option value="">Every category</option>` + P.rows.map(x => `<option value="${esc(x.kat2)}">${esc(x.kat2)}</option>`).join("");
+  sel.value = P.rows.some(x => x.kat2 === want) ? want : "";
+  const rows = shRows(months, {cat: sel.value, q: $("shBQ").value, show: $("shBShow").value, sort: $("shBSort").value});
+  const sum = k => rows.reduce((a, r) => a + r[k], 0);
+  $("shByT").textContent = `By item · ${shMonth(shMon)}`;
+  $("shByNote").innerHTML = `<span>Every item of ${esc(d.location)} in the period, with its category; click an item for its months and movements (purchases, transfers, consumption by the recipes, staff, FIRO).</span> <span>${shSrcNote(months)}</span>` +
+    ` <span>Diferenca / Dalje of an item = its loss ÷ its KMSH / Dalje, red above the % Waste of its category; Beyond % Waste = loss − % Waste × KMSH / Dalje, month by month, before the surpluses of other items are netted.</span>` +
+    (shMon === "ytd" ? ` <span>Year to date: opening of the first counted month, counted of the last, ins, outs and differences summed.</span>` : "");
+  $("shByCount").textContent = `${fmt(rows.length)} items · difference value ${fmt(sum("val"))}` + (rows.length > 400 ? " · the first 400 shown; the Excel has every item" : "");
+  $("shBy").innerHTML = shTable(rows, months, true);
+  shWire($("shBy"), shBy);
 }
 function shRenderOv(){
   const j = shOvData;
@@ -5773,15 +5872,19 @@ $("shUpSheet").onchange = () => { if (shCntLast) shCount(shCntLast.f, $("shUpShe
   ["dragleave", "drop"].forEach(t => z.addEventListener(t, ev => { ev.preventDefault(); z.classList.remove("drag"); }));
   z.addEventListener("drop", ev => { const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) shCount(f); });
 })();
-$("shLoc").onchange = () => { shUpHint(); shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shItemsCard").hidden = true; loadSh(false); };
+$("shLoc").onchange = () => { shUpHint(); shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shByCard").hidden = true; $("shPop").classList.remove("on"); loadSh(false); };
 $("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
 $("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
 $("shRead").onclick = () => $("shLoc").value ? loadSh(true) : loadShOv(true);
 $("shXlsx").onclick = () => { if (shData) location.href = "/api/shrinkage/xlsx?" + shQs(); };
 $("shCfgBtn").onclick = () => { if (shCfgOpen && !$("shCfgCard").hidden) { $("shCfgCard").hidden = true; shCfgOpen = false; } else { shCfgLoad(); $("shCfgCard").scrollIntoView({behavior: "smooth", block: "start"}); } };
 $("shCfgClose").onclick = () => { $("shCfgCard").hidden = true; shCfgOpen = false; };
-$("shItemsClose").onclick = () => { shCat = ""; shRender(); };
-$("shQ").oninput = () => { if (shCat) shItems(); };
+$("shQ").oninput = () => shItems();
+$("shPShow").onchange = () => shItems();
+$("shPopClose").onclick = shPopClose;
+$("shPop").onclick = e => { if (e.target === $("shPop")) shPopClose(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("shPop").classList.contains("on")) shPopClose(); });
+["shBQ", "shBCat", "shBShow", "shBSort"].forEach(id => $(id)[id === "shBQ" ? "oninput" : "onchange"] = () => { shOpenIt = ""; if (shData) shBy(); });
 $("company").addEventListener("change", () => { $("shLoc").dataset.co = ""; $("shMonth").dataset.mode = ""; shData = shOvData = null; shCfg = null; $("shCfgCard").hidden = true; if ($("v-shrinkage").classList.contains("on")) loadSh(false); });
 
 // ---------- Inventory → Stock count analysis (stockcount.py) ----------
