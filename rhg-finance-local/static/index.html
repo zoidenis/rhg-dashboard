@@ -773,9 +773,10 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Balance sheet</h2><p class="hint" id="bsNote"></p></div>
       <button class="mini dark" id="bsLoad">Read again</button></div>
       <div class="money" id="bsTotals"></div><p class="meta" id="bsCheck" style="margin:6px 0 0"></p></div>
-    <div class="card"><div class="card-head"><div><h2>By line</h2><p class="hint" id="bsDates">Click a line for its accounts, an account for its ledger entries</p></div>
+    <div class="card"><div class="card-head"><div><h2>By line</h2><p class="hint" id="bsDates">Click a line for its accounts and its three dates, an account for its ledger entries</p></div>
       <button class="mini" data-drill="bs">Open all accounts</button></div>
-      <div class="scroll"><table id="bsTable" data-nosort></table></div></div>
+      <div id="bsViz"></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="bsTable" data-nosort></table></div></details></div>
   </section>
 
   <section class="view" id="v-liquidity">
@@ -784,16 +785,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="lq-grid" id="lqKpis"></div></div>
     <div class="grid">
       <div class="card"><h2>Equity bridge</h2><p class="hint" id="lqEqNote"></p>
-        <div class="scroll"><table id="lqEquity"></table></div><ul class="hint" id="lqEqNotes" style="margin:10px 0 0;padding-left:18px"></ul></div>
+        <div id="lqEqBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="lqEquity"></table></div></details><ul class="hint" id="lqEqNotes" style="margin:10px 0 0;padding-left:18px"></ul></div>
       <div class="card"><h2>What we owe suppliers, by due date</h2><p class="hint" id="lqMatNote"></p>
         <div id="lqBuckets"></div></div>
     </div>
     <div class="card" style="margin-bottom:15px"><h2>By supplier</h2><p class="hint">The 25 largest, group companies apart</p>
       <div id="lqVendBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="lqVendors"></table></div></details></div>
     <div class="grid">
-      <div class="card"><h2>By currency</h2><div class="scroll"><table id="lqCcy"></table></div></div>
+      <div class="card"><h2>By currency</h2><div id="lqCcyBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="lqCcy"></table></div></details></div>
       <div class="card"><h2>Group companies</h2><p class="hint">Suppliers whose name is a company in Business Central: intercompany, kept out of the supplier figures</p>
-        <div class="scroll"><table id="lqIc"></table></div></div>
+        <div id="lqIcBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="lqIc"></table></div></details></div>
     </div>
   </section>
 
@@ -801,9 +802,9 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="ov-tabs" id="clTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Cash &amp; bank</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
     <div id="clMain">
     <div class="card" style="margin-bottom:15px"><h2>Cash and bank</h2><p class="hint" id="cashNote"></p>
-      <div class="scroll"><table id="cashTable"></table></div></div>
+      <div id="cashBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="cashTable"></table></div></details></div>
     <div class="card"><h2>Bank movements in the period</h2><p class="hint">From the bank ledger entries</p>
-      <div class="scroll"><table id="bankTable"></table></div></div>
+      <div id="bankBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="bankTable"></table></div></details></div>
     </div>
     <div id="clView" style="display:none">
       <div class="card">
@@ -972,7 +973,8 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <label class="field">From amount<input type="number" id="glTh" value="100000" step="10000" style="width:130px"></label>
       <button class="mini dark" id="glLoad">Read entries</button>
       <button class="mini" data-drill="gl">Open all</button></div></div>
-    <div class="scroll"><table id="glTable"></table></div></div></section>
+    <div id="glViz"></div>
+    <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="glTable"></table></div></details></div></section>
 
   <section class="view" id="v-recipes">
     <div class="card">
@@ -1326,7 +1328,8 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Month-end close</h2><p class="hint" id="closeNote"></p></div>
       <button class="mini dark" id="closeLoad">Refresh checks</button></div>
       <div class="money" id="closeProgress"></div>
-      <div class="scroll"><table id="closeChecks"></table></div></div>
+      <div id="closeCases" style="margin-top:12px"></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="closeChecks"></table></div></details></div>
     <div class="card"><h2>Checklist</h2><p class="hint">Owner, status and comments are stored by this application.</p>
       <div class="scroll"><table id="closeTable"></table></div></div>
   </section>
@@ -1335,14 +1338,14 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="money" id="trsKpis"></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Cash flow, indirect</h2><p class="hint" id="trsNote"></p></div>
       <button class="mini dark" id="trsLoad">Read</button></div>
-      <div class="scroll"><table id="trsFlow"></table></div></div>
+      <div id="trsFlowBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="trsFlow"></table></div></details></div>
     <div class="grid">
       <div class="card"><div class="card-head"><div><h2>Due in the next seven days</h2><p class="hint" id="trsDueNote"></p></div>
         <button class="mini" data-drill="payments">Open</button></div>
-        <div class="scroll"><table id="trsDue"></table></div></div>
+        <div id="trsDueBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="trsDue"></table></div></details></div>
       <div class="card"><div class="card-head"><div><h2>Bank activity in the period</h2><p class="hint">From the bank ledger</p></div>
         <button class="mini" data-drill="cashflow">Cash flow detail</button></div>
-        <div class="scroll"><table id="trsBank"></table></div></div>
+        <div id="trsBankBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="trsBank"></table></div></details></div>
     </div>
   </section>
 
@@ -2763,7 +2766,80 @@ function renderBSLines(){
     document.querySelectorAll(`#bsTable tr[data-of="${r.dataset.bsl}"]`).forEach(x => x.hidden = !open);
   });
   document.querySelectorAll("#bsTable .acc").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("account", a.dataset.acc); });
+  bsViz();
 }
+// ---- Statements: the balance sheet by line, liquidity, cash, treasury, G/L and close as bars with pop-ups
+const ST_SEC = ["var(--ch-0)", "var(--ch-1)", "var(--ch-2)", "var(--ch-3)"];
+const stSign = (v, pos) => [[Math.max(0, pos ? v : -v), "var(--ch-0)", "in"], [Math.max(0, pos ? -v : v), "var(--ch-1)", "out"]];
+function bsViz(){
+  const c = capData; if (!c || !c.statement) { $("bsViz").innerHTML = ""; return; }
+  const D = c.dates;
+  $("bsViz").innerHTML = `<div class="sv-two">` + c.statement.map((sec, si) => `<div class="sv-sec"><h3>${esc(sec.section)} · ${fmt(sec.current)}</h3>` +
+    Pulse.bars(sec.lines.filter(l => l.current != null && Math.abs(l.current) > 0.5).map(l => { const li = sec.lines.indexOf(l);
+      return {key: l.label, segs: [[Math.abs(l.current), ST_SEC[si % 4], dmy(D.current)]], text: `<b>${fmt(l.current)}</b>${l.vs_month ? ` <span class="meta">${sign(l.vs_month)}</span>` : ""}`, open: `bsline|${si}|${li}`}; }),
+      null, {none: "None."}) + `</div>`).join("") + `</div>`;
+}
+function bsLinePop(si, li){
+  const c = capData, sec = c.statement[si], l = sec && sec.lines[li]; if (!l) return;
+  const D = c.dates, A = (l.accounts || []).filter(a => Math.abs(a.value) > 0.5).sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  Pulse.pop({title: esc(l.label), sub: esc(`${sec.section} · ${c.company} · ${dmy(D.current)}`),
+    body: Pulse.tiles([{l: dmy(D.current), v: fmt(l.current)}, {l: dmy(D.month_end), v: l.month_end == null ? "–" : fmt(l.month_end), s: l.vs_month == null ? "" : sign(l.vs_month) + " since"},
+        {l: dmy(D.year_end), v: l.year_end == null ? "–" : fmt(l.year_end), s: l.vs_year == null ? "" : sign(l.vs_year) + " since"}])
+      + Pulse.panel("At the three dates", Pulse.cols([[dmy(D.year_end), l.year_end], [dmy(D.month_end), l.month_end], [dmy(D.current), l.current]].map(([k, v]) => ({label: k, segs: [[Math.abs(v || 0), ST_SEC[si % 4], "balance"]]})), null, {h: 130}))
+      + Pulse.panel(`The accounts · ${fmt(A.length)}`, Pulse.bars(A.map(a => ({key: `${a.account === "—" ? "" : a.account + " "}${a.name}`, segs: [[Math.abs(a.value), a.value < 0 ? "var(--ch-1)" : ST_SEC[si % 4], "balance"]], text: fmt(a.value),
+        open: a.account && a.account !== "—" ? `account|${a.account}` : null})), null, {none: "No account with a balance."}), "click an account for its entries")});
+}
+Pulse.on("bsline", v => { const [si, li] = v.split("|"); bsLinePop(+si, +li); });
+function lqViz(){
+  const c = capData; if (!c) return;
+  const E = c.equity_bridge;
+  $("lqEqBars").innerHTML = E ? Pulse.bars([["Profit or loss of the year", E.profit], ["Capital contributions", E.contributions], ["Distributions (dividends)", E.distributions], ["Other movements", E.other]]
+      .filter(([, v]) => v != null).map(([k, v]) => ({key: k, segs: [[Math.abs(v), v >= 0 ? "var(--ch-0)" : "var(--ch-1)", v >= 0 ? "adds" : "takes away"]], text: sign(v)})), [["var(--ch-0)", "adds to equity"], ["var(--ch-1)", "takes from it"]])
+    + `<p class="meta" style="margin:6px 0 0">${esc(`${fmt(E.opening)} → ${fmt(E.closing)}`)}</p>` : "";
+  const M = c.maturity || {};
+  const PN = Object.fromEntries(((data.payables || {}).parties || []).map(p => [p.party, p.no]));
+  $("lqCcyBars").innerHTML = Pulse.bars((M.currencies || []).map(x => ({key: x.currency, segs: [[Math.max(0, x["Overdue"] || 0), "var(--ch-1)", "overdue"], [Math.max(0, x.total - Math.max(0, x["Overdue"] || 0)), "var(--ch-0)", "due later"]], text: `<b>${fmt(x.total)}</b>`})), null, {none: "None."});
+  $("lqIcBars").innerHTML = Pulse.bars((M.intercompany || []).map(x => ({key: x.vendor, segs: [[Math.max(0, x["Overdue"] || 0), "var(--ch-1)", "overdue"], [Math.max(0, x.total - Math.max(0, x["Overdue"] || 0)), "var(--ch-0)", "due later"]], text: `<b>${fmt(x.total)}</b>`,
+    open: PN[x.vendor] ? `ap|${PN[x.vendor]}` : null})), null, {none: "None."});
+}
+function cashViz(){
+  const c = data.cash; if (!c) return;
+  $("cashBars").innerHTML = Pulse.bars(c.accounts.slice().sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).map(a => ({key: `${a.account} ${a.name}`, segs: [[Math.abs(a.balance), a.balance < 0 ? "var(--ch-1)" : "var(--ch-0)", "balance"]],
+    text: `<b>${fmt(a.balance)}</b> <span class="meta">${sign(a.movement)}</span>`, open: `account|${a.account}`})), [["var(--ch-0)", "balance"], ["var(--ch-1)", "overdrawn"]], {none: "No account is identified as cash or bank."});
+  $("bankBars").innerHTML = Pulse.bars(c.bank_movements.map(b => ({key: b.bank, segs: [[Math.abs(b.in), "var(--ch-0)", "in"], [Math.abs(b.out), "var(--ch-1)", "out"]], text: `<b>${sign(b.net)}</b> <span class="meta">${esc(b.currency || "")}</span>`})),
+    [["var(--ch-0)", "in"], ["var(--ch-1)", "out"]], {none: "No bank movement in this period."});
+}
+function trsViz(){
+  const t = data.treasury; if (!t || !t.loaded) return;
+  $("trsFlowBars").innerHTML = Pulse.bars(t.flow.lines.map(l => ({key: l.label, segs: [[Math.abs(l.value), l.value >= 0 ? "var(--ch-0)" : "var(--ch-1)", l.value >= 0 ? "cash in" : "cash out"]], text: `<b>${sign(l.value)}</b>`})),
+    [["var(--ch-0)", "brings cash in"], ["var(--ch-1)", "takes cash out"]]);
+  const PN = Object.fromEntries(((data.payables || {}).parties || []).map(p => [p.party, p.no])), by = {};
+  t.obligations.payments.forEach(p => { const b = by[p.party] = by[p.party] || {late: 0, due: 0}; b[p.days > 0 ? "late" : "due"] += p.amount; });
+  $("trsDueBars").innerHTML = Pulse.bars(Object.entries(by).sort((a, b) => (b[1].late + b[1].due) - (a[1].late + a[1].due)).slice(0, 12).map(([k, b]) => ({key: k, segs: [[b.late, "var(--ch-1)", "late"], [b.due, "var(--ch-0)", "due in 7 days"]],
+    text: `<b>${fmt(b.late + b.due)}</b>`, open: PN[k] ? `ap|${PN[k]}` : null})), [["var(--ch-1)", "late"], ["var(--ch-0)", "due in 7 days"]], {none: "Nothing falls due in the next seven days."});
+  $("trsBankBars").innerHTML = Pulse.bars(t.activity.accounts.map(a => ({key: a.name, segs: [[Math.abs(a.in), "var(--ch-0)", "in"], [Math.abs(a.out), "var(--ch-1)", "out"]], text: `<b>${sign(a.net)}</b>`})),
+    [["var(--ch-0)", "in"], ["var(--ch-1)", "out"]], {none: "No bank movement in this period."});
+}
+function glViz(){
+  const g = data.gl; if (!g || !g.loaded || !g.entries.length) { $("glViz").innerHTML = ""; return; }
+  const day = {}, acc = {};
+  g.entries.forEach(e => { const d = (e.posting || "").slice(0, 10); day[d] = day[d] || [0, 0]; day[d][e.manual ? 1 : 0] += Math.abs(e.amount);
+    const a = acc[e.account] = acc[e.account] || {name: e.account_name || "", v: 0, n: 0, m: 0}; a.v += Math.abs(e.amount); a.n++; a.m += e.manual ? 1 : 0; });
+  $("glViz").innerHTML = Pulse.panel("By day", Pulse.cols(Object.keys(day).sort().map(d => ({label: d.slice(5), segs: [[day[d][0], "var(--ch-0)", "posted"], [day[d][1], "var(--ch-1)", "manual journal"]]})),
+      [["var(--ch-0)", "posted"], ["var(--ch-1)", "manual journal"]], {h: 140}))
+    + Pulse.panel("By account", Pulse.bars(Object.entries(acc).sort((a, b) => b[1].v - a[1].v).slice(0, 12).map(([no, a]) => ({key: `${no} ${a.name}`, segs: [[a.v, a.m ? "var(--ch-1)" : "var(--ch-0)", "amount"]],
+      text: `${fmt(a.v)} <span class="meta">${fmt(a.n)} entries${a.m ? ` · ${fmt(a.m)} manual` : ""}</span>`, open: `account|${no}`}))), "click an account for its entries");
+}
+function closeViz(){
+  const c = data.closing; if (!c) return;
+  const n = s => c.checks.filter(x => x.status === s).length;
+  $("closeCases").innerHTML = Pulse.cases([{n: n("critical"), t: "Critical", w: "checks to clear before the close", open: "closecheck|critical"}, {n: n("warning"), t: "Warning", w: "checks to look at", open: "closecheck|warning"},
+    {n: c.progress.open, t: "Tasks still open", w: `${c.progress.done} of ${c.progress.total} done`, open: "closecheck|tasks"}]);
+}
+Pulse.on("closecheck", s => { const c = data.closing;
+  Pulse.pop({title: fcSp(s === "tasks" ? "Tasks still open" : s.charAt(0).toUpperCase() + s.slice(1)), sub: esc(`${c.company} · period ${c.period}`),
+    body: s === "tasks" ? Pulse.list([["Task"], ["Area"], ["Owner"], ["Status"], ["Comment"]], c.tasks.filter(t => !/done|complete/i.test(t.status)).map(t => ({cells: [esc(t.task), esc(t.area), esc(t.owner), esc(t.status), esc(t.comment)]})), {none: "None."})
+      : Pulse.list([["Automatic check"], ["Value"], ["What it means"]], c.checks.filter(x => x.status === s).map(x => ({cells: [`<b>${esc(x.check)}</b>`, esc(x.value), `<span class="meta">${esc(x.detail)}</span>`]})), {none: "None."})}); });
 function renderLiquidity(){
   const c = capData; if (!c) return;
   const D = c.dates, mp = c.mapping || {};
@@ -2801,6 +2877,7 @@ function renderLiquidity(){
         open: PN[v.vendor] ? `ap|${PN[v.vendor]}` : null}; }), [["var(--ch-1)", "overdue"], ["var(--ch-0)", "due later"]], {none: "None."});
   $("lqCcy").innerHTML = tbl(M.currencies || [], "Currency", "currency");
   $("lqIc").innerHTML = tbl(M.intercompany || [], "Group company", "vendor");
+  lqViz();
 }
 
 function renderCash(){
@@ -2815,6 +2892,7 @@ function renderCash(){
       <td class="num down">${fmt(b.in)}</td><td class="num up">${fmt(b.out)}</td><td class="num"><b>${sign(b.net)}</b></td></tr>`).join("")
       : `<tr><td colspan="5" class="empty">No bank movement in this period.</td></tr>`);
   document.querySelectorAll("#cashTable .acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
+  cashViz();
 }
 
 // ---------- Kartela · Accounts payable / receivable: every open party, smart filters, the entries of one, a selection
@@ -2987,6 +3065,7 @@ function renderGL(){
       <td class="meta">${e.manual?"manual journal":""}</td></tr>`).join("")
       : `<tr><td colspan="6" class="empty">No entry reached the materiality threshold in this period.</td></tr>`);
   document.querySelectorAll("#glTable .acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
+  glViz();
 }
 
 function renderExceptions(){
@@ -5430,6 +5509,7 @@ function renderClosing(){
     c.checks.map(x=>`<tr><td class="name">${esc(x.check)}</td><td class="num">${esc(x.value)}</td>
       <td><span class="sev ${x.status==="critical"?"critical":x.status==="warning"?"warning":"info"}"></span>${esc(x.status)}</td>
       <td class="meta">${esc(x.detail)}</td></tr>`).join("");
+  closeViz();
   $("closeTable").innerHTML = `<tr><th>Task</th><th>Area</th><th>Owner</th><th>Status</th><th>Comment</th><th>Completed</th></tr>` +
     c.tasks.map(t=>`<tr><td class="name">${esc(t.task)}</td><td class="meta">${esc(t.area)}</td>
       <td><input value="${esc(t.owner)}" data-ct="owner" data-id="${t.id}" style="width:120px"></td>
@@ -5485,6 +5565,7 @@ function renderTreasury(){
     (t.activity.accounts.length ? t.activity.accounts.map(a=>`<tr><td class="name">${esc(a.name)}</td><td>${esc(a.currency||"–")}</td>
       <td class="num down">${fmt(a.in)}</td><td class="num up">${fmt(a.out)}</td><td class="num"><b>${sign(a.net)}</b></td></tr>`).join("")
       : `<tr><td colspan="5" class="empty">No bank movement in this period.</td></tr>`);
+  trsViz();
 }
 
 function renderAssets(){
