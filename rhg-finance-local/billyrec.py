@@ -66,6 +66,7 @@ INFO = ("no_fic", "no_detail")                      # not a mapping error of the
 KEEP = 3 * 3600                 # the days end yesterday: a read holds for three hours (Read again reads at once)
 DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
 LATE_LIMIT = 72 * 3600
+SIM_WORKERS = 6                 # Simphony days read at the same time (Reporting and Analytics answers each in seconds)
 _billy_gate = threading.Semaphore(3)
 _TOKEN = re.compile(r"[A-Z0-9][A-Z0-9/_-]{5,}")          # a check is looked for in invoices fiscalized up to three days after it closed
 _results, _jobs, _lock, _db_lock = {}, {}, threading.Lock(), threading.Lock()
@@ -230,7 +231,8 @@ def read_checks(ref, day, latest=None):
         return False
     j = simphony.call("getGuestChecks", {"locRef": ref, "clsdBusDt": day, "clsdGuestChecksOnly": True}) or {}
     rows = [check_of(g) for g in j.get("guestChecks") or [] if isinstance(g, dict)]
-    final = bool(latest and day <= (date.fromisoformat(latest) - timedelta(days=2)).isoformat())
+    # closed: two days before the restaurant's latest business date (today when Simphony could not say), never read again
+    final = day <= ((date.fromisoformat(latest) if latest else date.today()) - timedelta(days=2)).isoformat()
     with _db_lock:
         db = _db()
         db.execute("DELETE FROM chk WHERE ref=? AND day=?", (ref, day))
@@ -273,20 +275,24 @@ def _match(checks, invs, S, used, late_step=True):
                 break
     win = S["window"] * 60
     cand = []                                            # 2. the same total, issued near the closing
+    # the invoices by rounded amount and hour: a check looks only at the hours its window covers, so the work grows
+    # with the days read, not with their square (a common amount gathers thousands of invoices over 30 days)
     by_amt = defaultdict(list)
     for i in invs:
-        if i["_k"] not in used and i["total"] is not None:
-            by_amt[round(i["total"])].append(i)
+        if i["_k"] not in used and i["total"] is not None and i["_t"] is not None:
+            by_amt[(round(i["total"]), int(i["_t"] // 3600))].append(i)
     for c in checks:
         if c.get("inv") or c["_t"] is None:
             continue
+        h0, h1 = int((c["_t"] - win) // 3600), int((c["_t"] + win) // 3600)
         for a in range(round(c["total"] - S["tol"]) - 1, round(c["total"] + S["tol"]) + 2):
-            for i in by_amt.get(a, ()):
-                if i["_t"] is None or abs(i["total"] - c["total"]) > S["tol"] + 0.005:
-                    continue
-                dt = i["_t"] - c["_t"]
-                if abs(dt) <= win:
-                    cand.append((abs(dt), c["id"], i["_k"], c, i))
+            for h in range(h0, h1 + 1):
+                for i in by_amt.get((a, h), ()):
+                    if abs(i["total"] - c["total"]) > S["tol"] + 0.005:
+                        continue
+                    dt = i["_t"] - c["_t"]
+                    if abs(dt) <= win:
+                        cand.append((abs(dt), c["id"], i["_k"], c, i))
     cand.sort(key=lambda x: (x[0], x[1], x[2]))
     for _d, _cid, _ik, c, i in cand:
         if c.get("inv") or i["_k"] in used:
@@ -297,13 +303,15 @@ def _match(checks, invs, S, used, late_step=True):
     for c in (checks if late_step else ()):
         if c.get("inv") or c["_t"] is None:
             continue
+        h0, h1 = int((c["_t"] + win) // 3600), int((c["_t"] + LATE_LIMIT) // 3600)
         for a in range(round(c["total"] - S["tol"]) - 1, round(c["total"] + S["tol"]) + 2):
-            for i in by_amt.get(a, ()):
-                if i["_k"] in used or i["_t"] is None or abs(i["total"] - c["total"]) > S["tol"] + 0.005:
-                    continue
-                dt = i["_t"] - c["_t"]
-                if win < dt <= LATE_LIMIT:
-                    late.append((dt, c["id"], i["_k"], c, i))
+            for h in range(h0, h1 + 1):
+                for i in by_amt.get((a, h), ()):
+                    if i["_k"] in used or abs(i["total"] - c["total"]) > S["tol"] + 0.005:
+                        continue
+                    dt = i["_t"] - c["_t"]
+                    if win < dt <= LATE_LIMIT:
+                        late.append((dt, c["id"], i["_k"], c, i))
     late.sort(key=lambda x: (x[0], x[1], x[2]))
     for _d, _cid, _ik, c, i in late:
         if c.get("inv") or i["_k"] in used:
@@ -460,8 +468,11 @@ def build(company, latest_fn, progress=None, today=None):
             with _billy_gate:                 # a Billy day is ~5,000 invoices in memory: three at a time at most
                 return billy.read_day(acct, x, d, today)
         return read_checks(x, d, latest.get(x))
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futs = {pool.submit(run, j): j for j in jobs}
+    # Billy and Simphony each in their own pool, side by side: in one shared pool the Billy days waiting for the
+    # gate held workers the Simphony days could have used. The newest days first: they are the ones read again.
+    jobs.sort(key=lambda j: str(j[2]), reverse=True)
+    with ThreadPoolExecutor(max_workers=3) as bpool, ThreadPoolExecutor(max_workers=SIM_WORKERS) as spool:
+        futs = {(bpool if j[0] == "billy" else spool).submit(run, j): j for j in jobs}
         for n, f in enumerate(as_completed(futs), 1):
             kind, x, d = futs[f]
             try:
@@ -733,14 +744,24 @@ def analyse(company, nuis, regs, days, bridge, fiscal, checks, latest, S, today)
     returns = track_returns(checks, invs, inv_by, S, latest, last_day)
     # restaurants and days
     locs = []
+    checks_of_ref, invs_of_ref = defaultdict(list), defaultdict(list)
+    for c in out_checks:
+        checks_of_ref[c["ref"]].append(c)
+    for i in invs:
+        invs_of_ref[i["loc"]].append(i)
     for ref in sorted(set(checks) | {i["loc"] for i in invs if i["loc"]}):
-        cs = [c for c in out_checks if c["ref"] == ref]
-        iv = [i for i in invs if i["loc"] == ref]
+        cs = checks_of_ref.get(ref, [])
+        iv = invs_of_ref.get(ref, [])
+        cd, idd = defaultdict(list), defaultdict(list)          # by day once, not the whole list for every day
+        for c in cs:
+            if c["status"] != "zero":
+                cd[c["day"]].append(c)
+        for i in iv:
+            idd[(i["issue"] or "")[:10]].append(i)
         cells = {}
         for d in days:
             ds = d.isoformat()
-            dc = [c for c in cs if c["day"] == ds and c["status"] != "zero"]
-            di = [i for i in iv if (i["issue"] or "")[:10] == ds]
+            dc, di = cd.get(ds, []), idd.get(ds, [])
             cells[ds] = {"checks": len(dc), "sim": round(sum(c["total"] for c in dc), 2),
                          "fisc": round(sum(i["total"] or 0 for i in di if i.get("fic") and i["status"] not in ("other_till", "summary")), 2),
                          "missing": sum(1 for c in dc if c["status"] == "missing"),
