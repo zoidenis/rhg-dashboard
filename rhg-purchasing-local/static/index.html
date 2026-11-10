@@ -416,6 +416,31 @@ td.num,th.num{text-align:right}
 .pr-q b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
 .pr-q span{font-size:12px;color:var(--sub)}
 tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
+/* the exceptions register: the same screen as Finance's */
+.rg-st{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sub);background:var(--bg)}
+.rg-st.s-open{color:var(--warn);background:var(--warn-bg)}.rg-st.s-progress{color:var(--ink);background:var(--bg)}
+.rg-st.s-awaiting{color:var(--down);background:var(--down-bg)}.rg-st.s-closed{color:var(--down);background:var(--down-bg)}
+.rg-st.s-overdue{color:var(--up);background:var(--up-bg)}
+.rg-sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--sub)}
+.rg-sev.critical{background:var(--up)}.rg-sev.warning{background:var(--warn)}
+#rgKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#icKpis,#icActK{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#rgItems tr.rg-row{cursor:pointer}#rgItems tr.rg-row:hover td{background:var(--bg)}
+#rgItems tr.rg-open td{background:var(--bg)}
+#rgItems .rg-det td{background:var(--bg);padding:12px 14px;white-space:normal}
+.rg-panel,.rg-panel *{white-space:normal;overflow-wrap:anywhere}
+.rg-panel{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.rg-panel textarea{width:100%;min-height:58px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card);color:var(--ink);box-sizing:border-box}
+.rg-panel input{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card);color:var(--ink);min-width:0}
+.rg-btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.rg-hist{list-style:none;margin:0;padding:0;font-size:12px;max-height:220px;overflow:auto}
+.rg-hist li{padding:5px 0;border-bottom:1px solid var(--line)}.rg-hist li b{font-weight:600}
+.sk-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.sk-chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+.sk-chips button.on{border-color:var(--ink);font-weight:600}
+.rg-sec{margin:6px 0 18px}.rg-sec>h3{margin:0 0 4px;font-size:14px}
+.rg-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:8px 24px}
+@media (max-width:760px){.rg-panel{grid-template-columns:minmax(0,1fr)}}
 </style>
 <!-- brand layer last, so the Revo tokens override the built-in defaults -->
 <link rel="stylesheet" href="/brand.css">
@@ -457,8 +482,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <button data-view="stock" style="display:none">Stock &amp; working capital</button>
 
     <div class="grp">Control</div>
-    <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
-    <button data-view="exceptions">Exceptions <span class="count" id="exCount">0</span></button>
+    <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
     <button data-view="compliance">Invoices without PO</button>
     <button data-view="feed">Posting follow-up</button>
 
@@ -524,7 +548,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <div class="card kpi clickable" data-drill="purchases"><div class="l" id="kTotalL">Purchase spend this week</div><div class="v" id="kTotal">–</div><div class="s" id="kTotalS"></div></div>
       <div class="card kpi clickable" data-goto-view="po"><div class="l">Open purchase orders</div><div class="v" id="kPo">–</div><div class="s" id="kPoS"></div></div>
       <div class="card kpi clickable" data-drill="po_pending"><div class="l">Awaiting invoice</div><div class="v" id="kPend">–</div><div class="s" id="kPendS"></div></div>
-      <div class="card kpi clickable" data-goto-view="exceptions"><div class="l">Open exceptions</div><div class="v" id="kExc">–</div><div class="s" id="kExcS"></div></div>
+      <div class="card kpi clickable" data-goto-view="register"><div class="l">Open exceptions</div><div class="v" id="kExc">–</div><div class="s" id="kExcS"></div></div>
       <div class="card kpi"><div class="l">Data updated at</div><div class="v" id="kTime">–</div><div class="s" id="kTimeS"></div></div>
     </div>
     <div class="grid">
@@ -535,7 +559,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
         <p class="hint">Ranked by money impact on this period's volumes</p>
         <div class="scroll"><table id="moversMini"></table></div></div>
     </div>
-    <div class="card"><div class="card-head"><h2 id="ovExcTitle">Exceptions</h2><button class="mini" data-goto-view="exceptions">All exceptions</button></div>
+    <div class="card"><div class="card-head"><h2 id="ovExcTitle">Exceptions</h2><button class="mini" data-goto-view="register">Exceptions register</button></div>
       <div class="rhg-list" id="ovExc" style="margin-top:12px"></div></div>
     <div class="card"><h2 id="ovPfTitle">Posting follow-up</h2>
       <div class="rhg-headline" id="ovPf" style="margin-top:12px"></div>
@@ -973,19 +997,6 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <div id="spcTr"></div></div>
   </section>
 
-  <section class="view" id="v-actions">
-    <div class="card" style="margin-bottom:16px" id="untrackedCard">
-      <div class="card-head"><div><h2>Not yet tracked</h2><p class="hint" id="untrackedNote"></p></div>
-        <button class="mini dark" id="trackCritical">Track all critical</button></div>
-      <div class="scroll"><table id="untrackedTable"></table></div>
-    </div>
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-head"><div><h2>Action center</h2><p class="hint">Actions live in this app only. Business Central stays read-only.</p></div>
-        <div style="display:flex;gap:8px"><button class="mini" id="actFilter">Show overdue only</button><button class="mini dark" id="actNew">New action</button></div></div>
-      <div id="actionList"></div>
-    </div>
-  </section>
-
   <section class="view" id="v-quality">
     <div class="kpis five">
       <div class="card kpi"><div class="l">Findings</div><div class="v" id="qAll">–</div><div class="s">Records that need correcting in BC</div></div>
@@ -1155,20 +1166,54 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     </div>
   </section>
 
-  <section class="view" id="v-exceptions">
-    <div class="ov-tabs" id="exTabs" role="tablist"><button data-t="list" class="on" role="tab" aria-selected="true">Exceptions</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
-    <div id="exMain">
-    <div class="card" style="margin-bottom:16px"><h2>Service-level exceptions</h2>
-      <p class="hint">Rules applied to live BC records, using the thresholds in Settings. Each exception can be turned into a tracked action.</p>
-      <div id="slaList"></div></div>
-    <div class="card"><h2>Price and stock signals</h2><p class="hint">Movements worth a look that are not threshold breaches</p><div id="exList"></div></div>
+  <section class="view" id="v-register">
+    <div class="card">
+      <div class="card-head"><div><h2>Exceptions register</h2>
+        <p class="hint" id="rgNote">Every exception the rules find in Business Central, read every day for the month in progress, with an owner from Email recipients by company, a due date and a status, until the data shows it is gone. An item the next run no longer finds closes by itself as verified; one that comes back is reopened. It also holds what was tracked by hand (the Action center of before) and the rules of the screens (the Exceptions of before).</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="mini dark" id="rgRead">Read again</button><button class="mini" id="rgNew">Track something new</button><button class="mini" id="rgRun">Run the controls now</button></div></div>
+      <div class="kpis six" id="rgKpis" style="margin-top:14px"></div>
+      <p class="meta" id="rgStatus"></p>
     </div>
-    <div id="exLocView" style="display:none">
-      <div class="pl-bar"><div><h2 style="margin:0">Exceptions by location</h2><p class="hint" style="margin:4px 0 0" id="exlNote">Every location as a square with the exceptions that concern it, for the period chosen above. An exception that names several locations counts at each. Click a location for its list.</p></div>
-        <label class="field" style="flex-direction:row;align-items:center;gap:6px">Order <select id="exlSort"><option value="severity">by severity</option><option value="count">by number</option><option value="impact">by impact</option><option value="untracked">by not tracked</option><option value="name">by code</option></select></label></div>
-      <div class="kpis five" id="exlTotals"></div>
-      <div id="exlGrid"></div>
+    <div class="card"><div class="card-head"><div><h2>Where the items are</h2>
+      <p class="hint">The items of the filter below by control, location and owner: overdue, open in time, awaiting verification. Click a bar to see only its items; click it again for all.</p></div></div>
+      <div id="rgViz"></div></div>
+    <div class="card"><div class="card-head"><div><h2>Owners</h2>
+      <p class="hint">Who holds what: open and overdue items, the oldest, the value at stake and what they closed in the last 7 days. Click an owner to see only their items; click again for all.</p></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="rgOwners"></table></div></details></div>
+    <div class="card"><div class="card-head"><div><h2>Items</h2><p class="hint" id="rgItemsNote"></p></div></div>
+      <div class="sk-chips" id="rgChips"></div>
+      <div class="filters" style="margin:0 0 10px">
+        <label>Owner<select id="rgOwner"><option value="">Everyone</option></select></label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="rgMine" style="width:auto"> My items</label>
+        <label>Source<select id="rgSource"><option value="">All controls</option></select></label>
+        <label>Company<select id="rgCompany"><option value="">All</option></select></label>
+        <label>Location<select id="rgLoc"><option value="">All</option></select></label>
+        <label>Search<input id="rgQ" placeholder="item, number or text"></label></div>
+      <div class="scroll"><table id="rgItems"></table></div><p class="meta" id="rgMore"></p></div>
+    <div class="card" id="rgSetCard" style="display:none">
+      <div class="card-head"><div><h2>Daily controls and the owners' email</h2>
+        <p class="hint">At the time set, the rules are read for the month in progress for every company of the daily notice (Settings → Email notifications) and the default one, and the register is synced. The owners' email lists each owner's open items, overdue first; items overdue beyond the days set put the escalation roles of Email recipients in Cc.</p></div>
+        <span class="rhg-pill" id="rgPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">Time<input id="rgTime" type="time" value="08:20"></label>
+        <label class="field">Escalate after (days overdue)<input id="rgEsc" type="number" min="0" max="60" value="3"></label>
+        <label class="field">Escalate to (roles)<input id="rgRoles" placeholder="coo, cfo"></label>
+        <label class="field">Send a test to<input id="rgTestTo" placeholder="you@rhg.al"></label>
+        <label class="field">Test: the email of<select id="rgTestOwner"><option value="">the first owner</option></select></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 4px"><input type="checkbox" id="rgCtl" style="width:auto"> Run the controls every day</label>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:0 0 12px"><input type="checkbox" id="rgOn" style="width:auto"> Email every owner their open items every day</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="rgSave">Save</button>
+        <button class="btn" id="rgTest">Send a test</button>
+        <span class="meta" id="rgMsg"></span>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table id="rgRuns"></table></div>
     </div>
+    <div class="card"><details class="pz-fold"><summary>Price and stock signals of the period: movements worth a look that are not threshold breaches</summary><div id="exList" style="margin-top:8px"></div></details></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the register works</summary>
+      <div class="hint" id="rgDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-feed">
@@ -1204,7 +1249,6 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 <div class="pl-bd" id="ngBd"><div class="pl-pop" id="ngPop" role="dialog" aria-modal="true" aria-label="Negotiations"></div></div>
 <div class="pl-bd" id="byBd"><div class="pl-pop" id="byPop" role="dialog" aria-modal="true" aria-label="Buying at a location"></div></div>
 <div class="pl-bd" id="tdBd"><div class="pl-pop" id="tdPop" role="dialog" aria-modal="true" aria-label="Location today"></div></div>
-<div class="pl-bd" id="exlBd"><div class="pl-pop" id="exlPop" role="dialog" aria-modal="true" aria-label="Exceptions of a location"></div></div>
 <div class="pl-bd" id="plBd"><div class="pl-pop" id="plPop" role="dialog" aria-modal="true"></div></div>
 <div class="modal-bg" id="modalBg">
   <div class="modal">
@@ -1468,13 +1512,13 @@ function render(){
   $("kExcS").textContent = `${fmt(sla.filter(e=>e.severity==="critical").length)} critical · ${fmt(sla.filter(e=>e.severity==="warning").length)} warning`;
   $("kTime").textContent = new Date(m.checked_at).toLocaleTimeString("en-GB");
   $("kTimeS").textContent = `Every ${m.refresh_seconds || 30} seconds`;
-  $("exCount").textContent = k.exceptions;
+  { const R = Object.values(data.register || {}); $("regCount").textContent = R.filter(x => x.overdue).length || R.length; }
 
   renderDaily(); renderMini(); renderBars("topSpend", data.top_spend.slice(0,10).map(t => ({l:t.desc||t.item_no, v:t.cost, p:t.prev_cost})));
   renderBars("byLoc", data.locations.slice(0,12).map(t => ({l:t.code, v:t.cur, p:t.prev})));
   renderOvExceptions(); renderOvPostings(); bindGotoViews($("v-overview"));
   renderMovers(); renderSpreads(); renderExceptions(); renderPostings(); renderContracts(); renderInvoices(); renderUsers();
-  renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderSla(); renderActions(); renderUntracked(); renderGaps(); renderSettings();
+  renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderGaps(); renderSettings();
   plRender();
   if ($("v-buyloc").classList.contains("on")) { byRender(); if (!streams) loadStreams(false); }
   if ($("v-buycharts").classList.contains("on")) renderBuyCharts();
@@ -1567,13 +1611,14 @@ async function openException(i){
   const on = document.querySelector("#nav button.on");
   exReturn = (on && on.dataset.view) || "overview";
   document.querySelectorAll("#nav button").forEach(x => x.classList.remove("on"));
-  const ex = document.querySelector('#nav button[data-view="exceptions"]'); if (ex) ex.classList.add("on");
+  const ex = document.querySelector('#nav button[data-view="register"]'); if (ex) ex.classList.add("on");
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-exdetail"));
   $("title").textContent = "Exception detail · " + (e.document || e.rule);
   $("period").textContent = `Purchasing / Exceptions / ${e.rule}`;
-  $("exBack").textContent = "← " + (exReturn === "exceptions" ? "Exceptions" : "Overview");
-  const tracked = (data.action_keys || []).includes(e.code);
-  const act = (actions || []).find(a => a.source_exception === e.code);
+  $("exBack").textContent = "← " + (exReturn === "register" ? "Exceptions register" : exReturn === "overview" ? "Overview" : "Back");
+  // its item in the Exceptions register (the daily run puts it there; Track if it appeared since)
+  const act0 = (data.register || {})[e.code], tracked = !!act0;
+  const act = act0 ? {owner: act0.owner, status: act0.status, due_date: act0.due, history: []} : null;
   const mover = e.document_type === "Item" ? (data.movers||[]).find(m => m.item_no === e.document) : null;
   const ctx = [data.meta.company, e.location, e.supplier && "Supplier: " + e.supplier, e.document && `${e.document_type || "Document"} ${e.document}`].filter(Boolean);
   $("exHead").innerHTML = `<div class="brief" style="border:0;padding:0"><div class="head"><h2>${esc(e.title)}</h2>
@@ -1587,7 +1632,7 @@ async function openException(i){
     mover ? kpi("Affected quantity", fmt(mover.cur_qty, mover.cur_qty%1?1:0), `Bought in this period at ${(mover.locations||[]).length} location${(mover.locations||[]).length===1?"":"s"}`)
           : kpi("Severity", SEV_LABEL[e.severity] || e.severity, "From the thresholds in Settings", e.severity==="critical"?"up":"warn"),
     mover ? kpi("Previous unit cost", fmt(mover.prev_avg, 2), `${CUR} · comparison period average`)
-          : kpi("Owner", esc(act && act.owner || e.owner || "Unassigned"), tracked ? "Tracked in the Action center" : "Not tracked yet"),
+          : kpi("Owner", esc(act && act.owner || e.owner || "Unassigned"), tracked ? "In the Exceptions register" : "Not in the register yet"),
     mover ? kpi("Current unit cost", fmt(mover.cur_avg, 2), `${CUR} · ${mover.pct>0?"+":"−"}${fmt(Math.abs(mover.pct),1)}%`, mover.pct>0?"up":"down")
           : kpi("Status", esc(act ? act.status : "Open"), act ? `Due ${act.due_date}` : "Identified on this refresh"),
   ].join("");
@@ -1597,13 +1642,15 @@ async function openException(i){
     <p style="margin:12px 0 0;color:var(--rhg-primary)">Evidence → ${esc((exDrill(e) ? "Business Central records below" : "the rule's own figures"))} · rule “${esc(e.rule)}”</p>
     <p class="hint" style="margin:12px 0 0">Next step: ${esc(e.next_action || "Review the records and decide.")}</p>
     <div style="margin-top:12px;display:flex;gap:8px">${tracked
-      ? `<button class="mini" data-goto-view="actions">Open in Action center</button>`
-      : `<button class="mini dark" id="exTrack">Track as action</button>`}</div>`;
+      ? `<button class="mini" id="exReg">Open in the register</button>`
+      : `<button class="mini dark" id="exTrack">Track in the register</button>`}</div>`;
   const hist = act && act.history || [];
   $("exActivity").innerHTML = `<h2>Activity</h2><div class="hint" style="margin:12px 0 0;font-size:13px;line-height:1.5">${
     [`${new Date(data.meta.checked_at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})} · Rule “${esc(e.rule)}” identified this case on the latest refresh.`]
       .concat(hist.map(h => `${esc((h.ts||"").replace("T"," ").slice(0,16))} · ${esc(h.from?h.from+" → ":"")}${esc(h.to||"")}${h.comment?" · "+esc(h.comment):""}${h.actor?" · "+esc(h.actor):""}`))
-      .concat(tracked ? [] : ["Pending · not yet tracked as an action."]).join("<br>")}</div>`;
+      .concat(tracked ? [] : ["Pending · not in the Exceptions register yet."]).join("<br>")}</div>`;
+  if ($("exReg")) $("exReg").onclick = () => { rgOpen = act0.id; rgStatus = "active"; $("rgQ").value = e.code;
+    const b = document.querySelector('#nav button[data-view="register"]'); if (b) b.click(); loadRegister(); };
   if ($("exTrack")) $("exTrack").onclick = async () => {
     await createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
       bc_document:e.document||"", document_type:e.document_type||"", company:data.meta.company, location:e.location||"",
@@ -2036,251 +2083,222 @@ function renderSuppliers(){
   document.querySelectorAll(".supdrill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("suppliers", ""); });
 }
 
-// ---------- SLA exceptions ----------
-function renderSla(){
-  const sla = (data.operations||{}).sla || [];
-  const tracked = data.action_keys || [];
-  $("exCount").textContent = sla.length;
-  $("slaList").innerHTML = sla.length ? sla.map((e,i) => `<div class="act">
-      <div class="row1"><h4><span class="sev ${e.severity}"></span>${esc(e.title)}</h4><span class="meta">${esc(e.rule)}</span></div>
-      <p class="hint" style="margin:6px 0">${esc(e.detail)}</p>
-      <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action||"")}${e.owner?` · <b>Owner:</b> ${esc(e.owner)}`:""}${e.impact?` · <b>Impact:</b> ${sign(e.impact)} ${CUR}`:""}</p>
-      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="mini" data-exopen="${i}">Open detail</button>
-        ${e.document?`<button class="mini" data-sladrill="${i}">Supporting records</button>`:""}
-        <button class="mini dark" data-slaaction="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
-      </div></div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
-  document.querySelectorAll("#slaList [data-exopen]").forEach(b => b.onclick = () => openException(+b.dataset.exopen));
-  if (exlTab === "loc") exlRender();
-  document.querySelectorAll("[data-sladrill]").forEach(b => b.onclick = () => {
-    const e = sla[+b.dataset.sladrill];
-    const kind = e.drill ? e.drill.kind : (e.document_type==="Purchase Order" ? "po" : "document");
-    openDrill(kind, e.drill ? e.drill.key : e.document, e.rule);
-  });
-  document.querySelectorAll("[data-slaaction]").forEach(b => b.onclick = () => {
-    const e = sla[+b.dataset.slaaction];
-    createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
-      bc_document:e.document||"", document_type:e.document_type||"", company:data.meta.company, location:e.location||"",
-      supplier:e.supplier||"", impact:e.impact||0, priority:e.severity==="critical"?"Critical":e.severity==="warning"?"High":"Medium",
-      owner:e.owner||"", confidence:"high",
-      evidence:[{entity:"Business Central", key:e.document||"", period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});
-  });
-}
-
-// ---------- Exceptions → Location intelligence ----------
-// The exceptions of the period on screen, tied to the location they concern: every location as a square
-// (by severity, impact and whether an action tracks them), grouped like the overview's squares; a click
-// opens that location's list with the same buttons as the Exceptions tab.
-let exlTab = "list", exlSort = "severity";
-function exlShowTab(tab){
-  exlTab = tab;
-  document.querySelectorAll("#exTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("exMain").style.display = tab === "loc" ? "none" : "";
-  $("exLocView").style.display = tab === "loc" ? "" : "none";
-  if (tab === "loc") { plLoadNames(); exlRender(); }
-}
-document.querySelectorAll("#exTabs button").forEach(b => b.onclick = () => exlShowTab(b.dataset.t));
-$("exlSort").onchange = () => { exlSort = $("exlSort").value; exlRender(); };
-const EXL_NONE = "(no location)";
-const exlLocs = e => { const l = String(e.location || "").split(",").map(x => x.trim()).filter(Boolean); return l.length ? l : [EXL_NONE]; };
-function exlModel(){
-  const sla = (data && data.operations || {}).sla || [], tracked = new Set(data && data.action_keys || []);
-  const B = {};
-  sla.forEach((e, i) => exlLocs(e).forEach(loc => {
-    const x = B[loc] = B[loc] || {items: [], critical: 0, warning: 0, info: 0, impact: 0, untracked: 0, rules: {}, owners: {}};
-    x.items.push(i);
-    const sv = e.severity === "critical" || e.severity === "warning" ? e.severity : "info";
-    x[sv]++; x.impact += Math.abs(e.impact || 0);
-    if (!tracked.has(e.code)) x.untracked++;
-    x.rules[e.rule || "Other"] = (x.rules[e.rule || "Other"] || 0) + 1;
-    if (e.owner) x.owners[e.owner] = (x.owners[e.owner] || 0) + 1;
-  }));
-  return {sla, tracked, B};
-}
-function exlSquare(code, x){
-  const n = x.items.length, top = Object.entries(x.rules).sort((a, b) => b[1] - a[1]);
-  const first = (data.operations.sla[x.items.find(i => data.operations.sla[i].severity === "critical") ?? x.items[0]] || {});
-  const flag = x.critical ? ["crit", first.title || `${x.critical} critical`] : x.warning ? ["warn", first.title || `${x.warning} to review`] : ["info", first.title || "To look at"];
-  const stat = (l, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
-  const none = code === EXL_NONE, name = none ? "No location" : plName(code);
-  return `<div class="pl-sq" role="button" tabindex="0" data-exlloc="${esc(code)}" aria-label="${esc(name || code)}: ${n} exceptions">
-    <div class="hd"><div class="ic">${none ? PL_GLYPH.WH : plGlyph(code)}</div><div class="nm"><b>${esc(name || code)}</b><span>${esc(name && !none ? code : none ? "the exception names none" : "")}</span></div></div>
-    <div class="big"><span class="v ${x.critical ? "up" : ""}">${fmt(n)}</span><span class="cmp">exception${n === 1 ? "" : "s"} · ${x.critical ? `<b class="up">${x.critical} critical</b>` : "none critical"}${x.warning ? ` · ${x.warning} warning` : ""}</span></div>
-    <div class="st">${stat("Critical", fmt(x.critical), x.critical ? "up" : "")}${stat("Warning", fmt(x.warning), x.warning ? "warn" : "")}
-      ${stat("Impact", x.impact ? plM(x.impact) : "–", "", `${CUR}, where the rule measures one`)}${stat("Not tracked", fmt(x.untracked), x.untracked ? "up" : "", "With no action in the Action center")}</div>
-    <div class="sup" title="${esc(top.map(r => `${r[0]} ${r[1]}`).join(" · "))}">${top[0] ? `<b>${esc(top[0][0])}</b> ${top[0][1]}${top.length > 1 ? ` · +${top.length - 1} rule${top.length > 2 ? "s" : ""}` : ""}` : "&nbsp;"}</div>
-    <div class="al ${flag[0]}" title="${esc(flag[1])}"><i></i><span>${esc(flag[1])}</span></div>
-  </div>`;
-}
-function exlRender(){
-  if (exlTab !== "loc" || !$("exlGrid")) return;
-  if (!data) { $("exlGrid").innerHTML = `<p class="hint">Reading…</p>`; return; }
-  const {sla, tracked, B} = exlModel(), codes = Object.keys(B);
-  const per = {week: "this week", month: "this month", ytd: "this year"}[data.meta.mode] || "this period";
-  $("exlNote").innerHTML = `Every location as a square with the exceptions that concern it, ${per}${data.meta.location ? ` — the Location filter shows <b>${esc(data.meta.location)}</b> only <button class="mini" id="exlClear">Show all locations</button>` : ""}. An exception that names several locations counts at each. Click a location for its list.`;
-  if ($("exlClear")) $("exlClear").onclick = () => { $("location").value = ""; load(true); };
-  const crit = sla.filter(e => e.severity === "critical").length, untr = sla.filter(e => !tracked.has(e.code)).length;
-  const withLoc = codes.filter(c => c !== EXL_NONE), worst = withLoc.sort((a, b) => B[b].critical - B[a].critical || B[b].items.length - B[a].items.length)[0];
-  const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
-  $("exlTotals").innerHTML = k("Exceptions", fmt(sla.length), `${per} · ${withLoc.length} location${withLoc.length === 1 ? "" : "s"} concerned`) +
-    k("Critical", fmt(crit), "by the rules in Settings", crit ? "up" : "") +
-    k("Not tracked", fmt(untr), "no action in the Action center yet", untr ? "up" : "") +
-    k("Most exposed", worst ? esc(plName(worst) || worst) : "–", worst ? `${B[worst].items.length} exceptions · ${B[worst].critical} critical` : "") +
-    k("No location", fmt((B[EXL_NONE] || {items: []}).items.length), "exceptions that name no location");
-  const key = {severity: c => -(B[c].critical * 1e6 + B[c].warning * 1e3 + B[c].items.length), count: c => -B[c].items.length,
-    impact: c => -B[c].impact, untracked: c => -B[c].untracked, name: c => 0}[exlSort];
-  const sorted = list => [...list].sort((a, b) => key(a) - key(b) || a.localeCompare(b));
-  const groups = plGroups(codes.filter(c => c !== EXL_NONE));
-  if (B[EXL_NONE]) groups.push({t: "Not tied to a location", c: [EXL_NONE]});
-  $("exlGrid").innerHTML = codes.length ? groups.map(g => {
-    const n = g.c.reduce((a, c) => a + B[c].items.length, 0), cr = g.c.reduce((a, c) => a + B[c].critical, 0);
-    return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${n} exception${n === 1 ? "" : "s"}${cr ? ` · <b class="up">${cr} critical</b>` : ""}</span></div>
-      <div class="pl-grid">${sorted(g.c).map(c => exlSquare(c, B[c])).join("")}</div>`; }).join("")
-    : `<p class="hint">No rule was breached in this period.</p>`;
-  if ($("exlBd").classList.contains("show") && $("exlPop").dataset.code) exlDraw($("exlPop").dataset.code);
-}
-function exlOpen(code){ $("exlPop").dataset.code = code; exlDraw(code); $("exlBd").classList.add("show"); }
-function exlDraw(code){
-  const {sla, tracked, B} = exlModel(), x = B[code];
-  const none = code === EXL_NONE, name = none ? "Exceptions with no location" : (plName(code) || code);
-  if (!x) { $("exlPop").innerHTML = `<div class="ph"><div><h2>${esc(name)}</h2></div><div class="sp"></div><button class="close" data-exlclose="1">Close ✕</button></div><div class="pl-body"><p class="hint">No exception left here in this period.</p></div>`; return; }
-  const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
-  const rules = Object.entries(x.rules).sort((a, b) => b[1] - a[1]), owners = Object.entries(x.owners).sort((a, b) => b[1] - a[1]);
-  const m = data.meta;
-  $("exlPop").innerHTML = `<div class="ph"><div class="ic">${none ? PL_GLYPH.WH : plGlyph(code)}</div><div><h2>${esc(name)}</h2><div class="sub">${esc(none ? "" : code + " · ")}${esc(m.company || "")} · ${esc(m.current ? m.current[0] + " → " + m.current[1] : "")}</div></div><div class="sp"></div>
-      ${none ? "" : `<button class="close" data-exlfilter="${esc(code)}" title="Set the Location filter of the tower to this location">Filter the tower ›</button>`}<button class="close" data-exlclose="1">Close ✕</button></div>
-    <div class="pl-body">
-      <div class="pl-tiles">${tile("Exceptions", fmt(x.items.length), "concerning this location")}${tile("Critical", fmt(x.critical), "", x.critical ? "up" : "")}${tile("Impact", x.impact ? plM(x.impact) + " " + CUR : "–", "where the rule measures one")}${tile("Not tracked", fmt(x.untracked), "no action yet", x.untracked ? "up" : "")}</div>
-      <div class="pl-cols" style="margin-bottom:12px">
-        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">By rule</h3><table data-nosort>${rules.map(r => `<tr><td>${esc(r[0])}</td><td class="num"><b>${r[1]}</b></td></tr>`).join("")}</table></div>
-        <div class="pl-panel"><h3 style="margin:0 0 6px;font-size:14px">By owner</h3><table data-nosort>${owners.length ? owners.map(r => `<tr><td>${esc(r[0])}</td><td class="num"><b>${r[1]}</b></td></tr>`).join("") : `<tr><td class="empty">No owner named by the rules</td></tr>`}</table></div>
-      </div>
-      <div class="pl-panel">${x.items.map(i => { const e = sla[i]; return `<div class="act">
-        <div class="row1"><h4><span class="sev ${esc(e.severity)}"></span>${esc(e.title)}</h4><span class="meta">${esc(e.rule)}</span></div>
-        <p class="hint" style="margin:6px 0">${esc(e.detail)}${String(e.location || "").includes(",") ? ` <span class="meta">(also ${esc(String(e.location).split(",").map(s => s.trim()).filter(s => s !== code).join(", "))})</span>` : ""}</p>
-        <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action || "")}${e.owner ? ` · <b>Owner:</b> ${esc(e.owner)}` : ""}${e.impact ? ` · <b>Impact:</b> ${sign(e.impact)} ${CUR}` : ""}</p>
-        <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="mini" data-exlopen="${i}">Open detail</button>
-          ${e.document ? `<button class="mini" data-exldrill="${i}">Supporting records</button>` : ""}
-          <button class="mini dark" data-exlaction="${i}" ${tracked.has(e.code) ? "disabled" : ""}>${tracked.has(e.code) ? "Already tracked" : "Create action"}</button>
-        </div></div>`; }).join("")}</div>
-    </div>`;
-}
-document.addEventListener("click", ev => {
-  const t = ev.target;
-  if (t.closest("[data-exlclose]") || t === $("exlBd")) { $("exlBd").classList.remove("show"); return; }
-  const f = t.closest("[data-exlfilter]"); if (f) { $("exlBd").classList.remove("show"); $("location").value = f.dataset.exlfilter; load(true); return; }
-  const o = t.closest("[data-exlopen]"); if (o) { $("exlBd").classList.remove("show"); openException(+o.dataset.exlopen); return; }
-  // the same records and actions as the Exceptions tab: its buttons do the work
-  const d = t.closest("[data-exldrill]"); if (d) { const b = document.querySelector(`#slaList [data-sladrill="${d.dataset.exldrill}"]`); if (b) b.click(); return; }
-  const a = t.closest("[data-exlaction]"); if (a) { $("exlBd").classList.remove("show"); const b = document.querySelector(`#slaList [data-slaaction="${a.dataset.exlaction}"]`); if (b) b.click(); return; }
-  const s = t.closest("[data-exlloc]"); if (s) exlOpen(s.dataset.exlloc);
-});
-document.addEventListener("keydown", ev => {
-  if (ev.key === "Escape" && $("exlBd").classList.contains("show")) { $("exlBd").classList.remove("show"); return; }
-  if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.exlloc) { ev.preventDefault(); exlOpen(ev.target.dataset.exlloc); }
-});
-// ---------- action center ----------
-let actions = [], overdueOnly = false;
+// Track (an exception, the brief, an invoice without a PO, a data quality finding): an item of the Exceptions register,
+// tracked by hand, owned by who tracks it; something the register holds already is handed over instead (exreg.track)
 async function createAction(payload){
   try{
     const r = await fetch("/api/actions", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
-    if (!r.ok) throw new Error((await r.json()).error || "save failed");
-    await load(true);
-    document.querySelector('#nav button[data-view="actions"]').click();
-  }catch(e){ alert("Could not save the action: " + e.message); }
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || "save failed");
+    if (payload.source_exception && data) { (data.action_keys = data.action_keys || []).push(payload.source_exception);
+      (data.register = data.register || {})[payload.source_exception] = {id: j.id, status: j.status, owner: j.owner, due: j.due, source: j.source}; }
+    rgOpen = j.id || ""; rgStatus = "active";
+    const b = document.querySelector('#nav button[data-view="register"]'); if (b) b.click();
+    loadRegister();
+  }catch(e){ alert("Could not track it: " + e.message); }
 }
-async function patchAction(id, patch){
-  try{
-    const r = await fetch(`/api/actions/${id}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(patch)});
-    if (!r.ok) throw new Error("update failed");
-    const updated = await r.json();
-    actions = actions.map(a => a.id === id ? updated : a);
-    data.actions = actions; renderActions(); renderUntracked();
-  }catch(e){ alert("Could not update the action: " + e.message); }
-}
-function renderUntracked(){
-  const u = data.untracked || {counts:{critical:0,warning:0,impact:0}, critical:[], warning:[], note:""};
-  const rows = (u.critical||[]).concat(u.warning||[]);
-  $("untrackedNote").textContent =
-    `${fmt(u.counts.critical)} critical and ${fmt(u.counts.warning)} warning exceptions in this period have no owner`
-    + ` · ${all(u.counts.impact)} at stake. ${u.note || ""}`;
-  $("trackCritical").disabled = !u.counts.critical || !can("actions");
-  $("untrackedTable").innerHTML = rows.length
-    ? `<tr><th>Exception</th><th>Rule</th><th class="num">At stake</th><th></th></tr>` +
-      rows.slice(0,25).map((e,i) => `<tr><td class="name"><span class="sev ${e.severity}"></span>${esc(e.title)}
-        <div class="meta">${esc(e.detail || "")}</div></td>
-        <td class="meta">${esc(e.rule)}</td><td class="num"><b>${fmt(Math.abs(e.impact||0))}</b></td>
-        <td><button class="mini" data-ut="${i}" ${can("actions")?"":"disabled"}>Track</button></td></tr>`).join("")
-    : `<tr><td class="empty">Every exception in this period has an action against it.</td></tr>`;
-  document.querySelectorAll("[data-ut]").forEach(b => b.onclick = () => trackException(rows[+b.dataset.ut]));
-}
-function exceptionPayload(e){
-  return {title: e.title, description: `${e.detail}\nRecommended: ${e.next_action || ""}`,
-          source_exception: e.code, bc_document: e.document || "", document_type: e.document_type || "",
-          company: data.meta.company, location: e.location || "", supplier: e.supplier || "",
-          impact: Math.abs(e.impact || 0),
-          priority: e.severity === "critical" ? "Critical" : e.severity === "warning" ? "High" : "Medium",
-          owner: e.owner || "", confidence: "high",
-          evidence: [{entity: "Business Central", key: e.document || "",
-                      period: `${data.meta.current[0]}..${data.meta.current[1]}`}]};
-}
-async function trackException(e){ if (e) await createAction(exceptionPayload(e)); }
-$("trackCritical").onclick = async () => {
-  const list = (data.untracked || {}).critical || [];
-  if (!list.length) return;
-  if (!confirm(`Create ${list.length} action(s) from the critical exceptions of this period?`)) return;
-  $("trackCritical").disabled = true;
-  for (const e of list) {
-    try {
-      await fetch("/api/actions", {method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(exceptionPayload(e))});
-    } catch (err) { /* keep going; the load below shows what landed */ }
-  }
-  await load(true);
-  document.querySelector('#nav button[data-view="actions"]').click();
-};
 
-function renderActions(){
-  actions = data.actions || [];
-  const open = actions.filter(a => !["Resolved","Dismissed"].includes(a.status));
-  $("actCount").textContent = open.length;
-  const rows = overdueOnly ? actions.filter(a => a.status === "Overdue") : actions;
-  const statuses = ["New","Acknowledged","In progress","Waiting for approval","Waiting for supplier","Resolved","Dismissed"];
-  $("actionList").innerHTML = rows.length ? rows.map(a => `<div class="act">
-    <div class="row1"><h4>${esc(a.title)}</h4>
-      <div style="display:flex;gap:8px;align-items:center"><span class="prio ${a.priority}">${a.priority}</span>
-      <span class="chip ${a.status==="Overdue"?"up":a.status==="Resolved"?"down":""}">${esc(a.status)}</span></div></div>
-    <p class="hint" style="margin:6px 0;white-space:pre-wrap">${esc(a.description)}</p>
-    <p class="hint" style="margin:0">${a.bc_document?`<b>BC document:</b> ${esc(a.bc_document)} (${esc(a.document_type)}) · `:""}${a.supplier?`<b>Supplier:</b> ${esc(a.supplier)} · `:""}${a.location?`<b>Location:</b> ${esc(a.location)} · `:""}<b>Impact:</b> ${fmt(a.impact)} ${CUR} · <b>Created:</b> ${esc(a.created_at)} · <b>Confidence:</b> ${esc(a.confidence)}</p>
-    <div class="formgrid" style="margin-top:10px">
-      <label class="field">Owner<input value="${esc(a.owner)}" data-f="owner" data-id="${a.id}"></label>
-      <label class="field">Due date<input type="date" value="${esc(a.due_date)}" data-f="due_date" data-id="${a.id}"></label>
-      <label class="field">Status<select data-f="status" data-id="${a.id}">${statuses.map(s=>`<option ${s===a.status?"selected":""}>${s}</option>`).join("")}</select></label>
-      <label class="field">Comment<input placeholder="Add a comment" data-f="comment" data-id="${a.id}"></label>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${a.bc_document?`<button class="mini" data-actdrill="${a.id}">Open BC records</button>`:""}
-      <button class="mini" data-history="${a.id}">History (${a.history.length})</button></div>
-    <div id="hist-${a.id}" style="display:none;margin-top:10px">${a.history.map(h=>`<div class="meta">${esc(h.ts)} · ${esc(h.actor)} · ${esc(h.from||"—")} → ${esc(h.to)}${h.comment?` · ${esc(h.comment)}`:""}</div>`).join("")}</div>
-  </div>`).join("") : '<div class="empty">No actions yet. Create them from the brief or from any exception.</div>';
-  document.querySelectorAll("#actionList [data-f]").forEach(el => el.onchange = () => {
-    const patch = {}; patch[el.dataset.f] = el.value;
-    if (el.dataset.f === "comment"){ patch.comment = el.value; delete patch.status; el.value = ""; }
-    patchAction(el.dataset.id, patch);
-  });
-  document.querySelectorAll("[data-actdrill]").forEach(b => b.onclick = () => {
-    const a = actions.find(x => x.id === b.dataset.actdrill);
-    openDrill(a.document_type === "Item" ? "item" : a.document_type === "Purchase Order" ? "po" : "document", a.bc_document, a.title);
-  });
-  document.querySelectorAll("[data-history]").forEach(b => b.onclick = () => {
-    const el = $("hist-" + b.dataset.history); el.style.display = el.style.display === "none" ? "block" : "none";
-  });
+// ---------------------------------------------------------------- exceptions register (exreg.py)
+// What Exceptions and the Action center were: the rules of the screens, read every day for the month in progress,
+// and what people track by hand. Same screen as Finance's register.
+const rgJSON = async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; };
+async function rgPost(path, body){
+  return rgJSON(await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Purchasing"}, body: JSON.stringify(body)}));
 }
-$("actFilter").onclick = () => { overdueOnly = !overdueOnly; $("actFilter").textContent = overdueOnly ? "Show all" : "Show overdue only"; renderActions(); };
-$("actNew").onclick = () => {
-  const title = prompt("Action title");
-  if (title) createAction({title, description:"Created manually by the Purchasing Director.", company:data.meta.company, priority:"Medium"});
+const rgSp = t => `<span>${esc(t)}</span>`;
+const rgSla = code => ((data && data.operations || {}).sla || []).findIndex(e => e.code === code);
+let rgData = null, rgStatus = "active", rgOpen = "", rgJobTimer = null, rgSetLoaded = false;
+const RG_CHIPS = [["active", "Active"], ["overdue", "Overdue"], ["Open", "Open"], ["In progress", "In progress"],
+  ["Awaiting verification", "Awaiting verification"], ["Closed", "Closed"], ["Dismissed", "Dismissed"], ["all", "All"]];
+const RG_CLS = {"Open": "s-open", "In progress": "s-progress", "Awaiting verification": "s-awaiting", "Closed": "s-closed", "Dismissed": ""};
+const rgM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
+const rgWhen = t => (t || "").replace("T", " ").slice(0, 16);
+function rgQuery(){
+  const p = new URLSearchParams({status: rgStatus});
+  if ($("rgMine").checked) p.set("mine", "1"); else if ($("rgOwner").value) p.set("owner", $("rgOwner").value);
+  [["source", "rgSource"], ["company", "rgCompany"], ["location", "rgLoc"], ["q", "rgQ"]].forEach(([k, id]) => { const v = $(id).value.trim(); if (v) p.set(k, v); });
+  return p.toString();
+}
+async function loadRegister(){
+  $("rgStatus").textContent = "Reading…";
+  try{
+    const j = await rgJSON(await fetch("/api/register?" + rgQuery()));
+    if (j.error) throw new Error(j.error);
+    rgData = j; renderRegister();
+  }catch(e){ $("rgStatus").textContent = "Could not read: " + e.message; }
+}
+function rgFill(id, values, first, label){
+  const el = $(id), keep = el.value;
+  el.innerHTML = `<option value="">${first}</option>` + values.map(v => `<option value="${esc(v)}">${esc(label ? label(v) : v)}</option>`).join("");
+  el.value = values.includes(keep) ? keep : "";
+}
+function renderRegister(){
+  const d = rgData, k = d.kpis;
+  $("regCount").textContent = k.overdue || k.open || 0;
+  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  $("rgKpis").innerHTML =
+    card("Open", fmt(k.open), `${rgM(k.value_open)} at stake`, k.open ? "warn" : "") +
+    card("Overdue", fmt(k.overdue), "past their due date", k.overdue ? "up" : "") +
+    card("New today", fmt(k.new_today), "found by today's controls") +
+    card("Awaiting verification", fmt(k.awaiting), "marked fixed, the next run checks") +
+    card("Closed in 7 days", fmt(k.closed_7), "verified by the data", k.closed_7 ? "down" : "") +
+    card("Median days to close", k.median_days == null ? "–" : fmt(k.median_days), `${fmt(k.reopened)} open again after a close`, k.reopened ? "warn" : "");
+  const runs = d.runs || [];
+  const src = s => (d.sources || {})[s] || s;
+  $("rgStatus").textContent = runs.length ? "Last control runs: " + runs.map(r => `${src(r.source)} · ${r.company} ${rgWhen(r.at)}`).join(" · ")
+    : "No control has run yet: Run the controls now, or wait for the daily run.";
+  // owners
+  const ow = d.owners || [], cur = $("rgMine").checked ? d.me : $("rgOwner").value;
+  $("rgOwners").innerHTML = ow.length ? `<tr><th>Owner</th><th class="num">Open</th><th class="num">Overdue</th><th class="num">Oldest (days)</th><th class="num">Value at stake</th><th class="num">Closed in 7 days</th></tr>` +
+    ow.map(o => `<tr data-owner="${esc(o.owner)}" class="${o.owner === cur ? "on" : ""}"><td>${esc(o.owner)}</td><td class="num">${fmt(o.open)}</td>
+      <td class="num">${o.overdue ? `<span class="rg-st s-overdue">${fmt(o.overdue)}</span>` : "0"}</td><td class="num">${fmt(o.oldest)}</td>
+      <td class="num">${rgM(o.value)}</td><td class="num">${fmt(o.closed_7)}</td></tr>`).join("")
+    : `<tr><td class="meta">Nobody holds an open item.</td></tr>`;
+  $("rgOwners").querySelectorAll("tr[data-owner]").forEach(tr => tr.onclick = () => {
+    const o = tr.dataset.owner; $("rgMine").checked = false;
+    $("rgOwner").value = $("rgOwner").value === o ? "" : o; loadRegister(); });
+  rgFill("rgOwner", ow.map(o => o.owner), "Everyone");
+  rgFill("rgSource", Object.keys(d.sources || {}), "All controls", src);
+  rgFill("rgCompany", d.companies || [], "All");
+  rgFill("rgLoc", d.locations || [], "All");
+  $("rgChips").innerHTML = RG_CHIPS.map(([key, l]) => `<button data-st="${esc(key)}" class="${key === rgStatus ? "on" : ""}">${esc(l)}</button>`).join("");
+  $("rgChips").querySelectorAll("button").forEach(b => b.onclick = () => { rgStatus = b.dataset.st; loadRegister(); });
+  renderRgItems(); rgViz();
+  $("rgRun").disabled = !d.can_settings || (d.job && d.job.state === "running");
+  $("rgRun").title = d.can_settings ? "Reads Business Central for every company of the daily notice and syncs the register." : "Your role cannot run the controls (needs purchasing.settings.manage).";
+  if (d.job && d.job.state !== "running") $("rgStatus").textContent += ` · Run by ${d.job.by} at ${rgWhen(d.job.ended)}: ` + (d.job.state === "failed" ? "failed, " + (d.job.error || "")
+    : (d.job.result || []).map(r => `${r.control === "sales_rec" ? "Simphony ↔ BC " : r.control === "rules" ? "Rules " : ""}${r.company} ${r.status}` + (r.rules ? ` (${Object.values(r.rules).reduce((a, x) => a + (x.found || 0), 0)} found, ${Object.values(r.rules).reduce((a, x) => a + (x.opened || 0), 0)} opened, ${Object.values(r.rules).reduce((a, x) => a + (x.closed || 0), 0)} closed)` : r.sales_rec ? ` (${r.sales_rec.found} found, ${r.sales_rec.opened} opened, ${r.sales_rec.closed} closed)` : r.negative_stock ? ` (${r.negative_stock.found} + ${(r.discharge || {}).found || 0} found, ${r.negative_stock.opened + ((r.discharge || {}).opened || 0)} opened, ${r.negative_stock.closed + ((r.discharge || {}).closed || 0)} closed)` : r.detail ? ` (${r.detail})` : "")).join(" · "));
+  if (d.job && d.job.state === "running") { $("rgStatus").textContent = `Controls running since ${rgWhen(d.job.started)}… several minutes.`; clearTimeout(rgJobTimer); rgJobTimer = setTimeout(loadRegister, 8000); }
+  $("rgSetCard").style.display = d.can_settings ? "" : "none";
+  if (d.can_settings) renderRgSettings();
+  const sla = d.sla || {};
+  $("rgDefs").innerHTML = `<p><b>Where the items come from.</b> Every day at the time set, the rules of the Exceptions screen (the thresholds of Settings) are read for the month in progress, company by company. Purchase orders: goods received and not invoiced, orders open too long → Purchasing coordinator. Requisitions not turned into orders → Purchasing coordinator. Prices &amp; contracts: price rises above the threshold, paid above the contracted price → Purchasing manager. Invoice postings: negative or zero-cost lines, lines with no location, invoices posted late or with no vendor match → Inputer. A group whose Business Central read failed is left as it was.</p>
+    <p><b>Leaving the month.</b> An invoice posting item closes when the invoice is no longer in the month read (posted before it), with that note; a price rise belongs to its month and closes when a new one starts.</p>
+    <p><b>Tracked by hand</b> (what the Action center held, moved in with their history): Track on any screen (an invoice without a PO, a data quality finding, the brief), or Track something new here. The person who tracks it owns it until they hand it over; no run closes it: its owner marks it Done, or Dismissed with a reason. The daily email of invoices without a PO leaves out an invoice once its item is Done or Dismissed.</p>
+    <p><b>Owner.</b> The people in that role at the item's location in Email recipients by company, else at the company, else in the group row. An owner can hand an item to someone else; it then keeps that owner. Blank hands it back to the role.</p>
+    <p><b>Due date.</b> From the day it is found: critical ${sla.critical} days, warning ${sla.warning} days, info ${sla.info} days.</p>
+    <p><b>Statuses.</b> Open → In progress → Fixed – verify (Awaiting verification). Only the data closes an item: the next run that no longer finds it closes it as verified; if it still finds it, it goes back to Open with a note. Dismissed needs a reason and stays out of the counts. A closed item found again is reopened and counted.</p>
+    <p><b>Who can change an item.</b> Its owner, and the roles with actions. Every change is in the item's history and in the audit trail. Nothing is written to Business Central.</p>`;
+}
+// ---- Exceptions register: who holds what and where the items are, as bars; a bar narrows the items to it
+const RG_LG = [["var(--ch-1)", "overdue"], ["var(--ch-0)", "open, in time"], ["var(--ch-4)", "awaiting verification"]];
+function rgViz(){
+  const d = rgData, items = d.items || [], src = s => (d.sources || {})[s] || s;
+  const group = key => { const by = {}; items.forEach(x => { const k = key(x) || "–"; const b = by[k] = by[k] || {od: 0, open: 0, aw: 0, v: 0};
+    if (x.status === "Awaiting verification") b.aw++; else if (x.overdue) b.od++; else if (["Open", "In progress"].includes(x.status)) b.open++; b.v += x.value || 0; }); return by; };
+  const bars = (by, kind, label) => Pulse.bars(Object.entries(by).sort((a, b) => (b[1].od + b[1].open + b[1].aw) - (a[1].od + a[1].open + a[1].aw)).slice(0, 12)
+    .map(([k, b]) => ({key: k, label: label ? label(k) : k, segs: [[b.od, "var(--ch-1)", "overdue"], [b.open, "var(--ch-0)", "open"], [b.aw, "var(--ch-4)", "awaiting verification"]],
+      text: `${fmt(b.od + b.open + b.aw)} · ${rgM(b.v)}`, open: `data-rgf="${kind}|${esc(k)}"`})), RG_LG, {none: "No item matches."});
+  const ow = (d.owners || []).map(o => [o.owner, {od: o.overdue, open: Math.max(0, o.open - o.overdue), aw: 0, v: o.value}]);
+  $("rgViz").innerHTML = `<div class="rg-two"><div class="rg-sec"><h3>${rgSp("By control")}</h3>${bars(group(x => x.source), "source", src)}</div>
+      <div class="rg-sec"><h3>${rgSp("By location")}</h3>${bars(group(x => x.location || "company"), "location")}</div></div>
+    <div class="rg-sec"><h3>${rgSp("By owner")}</h3>${bars(Object.fromEntries(ow), "owner")}</div>`;
+}
+document.addEventListener("click", ev => { const el = ev.target.closest("[data-rgf]"); if (!el) return;
+  const [kind, v] = el.dataset.rgf.split("|"), set = (id, val) => { const s = $(id); if (![...s.options].some(o => o.value === val)) s.insertAdjacentHTML("beforeend", `<option value="${esc(val)}">${esc(val)}</option>`); s.value = s.value === val ? "" : val; };
+  if (kind === "source") set("rgSource", v); else if (kind === "location") set("rgLoc", v === "company" ? "" : v);
+  else { $("rgMine").checked = false; set("rgOwner", v); }
+  loadRegister(); $("rgItems").scrollIntoView({behavior: "smooth", block: "start"}); });
+document.addEventListener("keydown", ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.rgf) { ev.preventDefault(); ev.target.click(); } });
+function renderRgItems(){
+  const d = rgData, items = d.items || [];
+  const canAll = d.can_manage, me = (d.me || "").toLowerCase();
+  const src = s => (d.sources || {})[s] || s;
+  $("rgItemsNote").textContent = `${fmt(d.total)} items${d.total > items.length ? `, the first ${fmt(items.length)} shown` : ""} · overdue first, then by severity and value.`;
+  $("rgMore").textContent = "";
+  if (!items.length) { $("rgItems").innerHTML = `<tr><td class="meta">No item matches.</td></tr>`; return; }
+  const head = `<tr><th>Due</th><th>Where</th><th>Exception</th><th>Owner</th><th>Status</th><th class="num">Age</th><th class="num">Value</th></tr>`;
+  $("rgItems").innerHTML = head + items.map(x => {
+    const mine = canAll || (me && (x.owner || "").toLowerCase().split(", ").includes(me));
+    const st = `<span class="rg-st ${RG_CLS[x.status] || ""}">${esc(x.status)}</span>${x.reopened ? ` <span class="rg-st s-open" title="Found again after it was closed">reopened ${x.reopened}×</span>` : ""}`;
+    const due = x.overdue ? `<span class="rg-st s-overdue">${esc(x.due)}</span>` : `<span class="meta">${esc(x.due || "")}</span>`;
+    const row = `<tr class="rg-row${rgOpen === x.id ? " rg-open" : ""}" data-id="${esc(x.id)}"><td>${due}</td><td>${esc(x.company)}<div class="meta">${esc(x.location || "company")}</div></td>
+      <td><span class="rg-sev ${esc(x.severity)}" title="${esc(x.severity)}"></span><b>${esc(x.title)}</b><div class="meta">${esc(src(x.source))} · ${esc(x.subject)}</div></td>
+      <td class="meta">${esc(x.owner || "nobody: set the role in Email recipients")}${x.owner_set ? " · handed over" : ""}</td><td>${st}</td>
+      <td class="num">${fmt(x.age)} d</td><td class="num">${rgM(x.value)}</td></tr>`;
+    if (rgOpen !== x.id) return row;
+    const act = (s, l, cls) => `<button class="mini ${cls || ""}" data-act="${esc(s)}" ${mine ? "" : "disabled"}>${l}</button>`;
+    const active = ["Open", "In progress", "Awaiting verification"].includes(x.status);
+    const btns = active
+      ? (x.status !== "In progress" ? act("In progress", "In progress", "dark") : "")
+        + (x.manual ? act("Closed", "Done") : x.status !== "Awaiting verification" ? act("Awaiting verification", "Fixed – verify") : "") + act("Dismissed", "Dismiss") + act("", "Comment")
+      : act("Open", "Reopen") + act("", "Comment");
+    const ex = x.extra || {}, here = data && data.meta && data.meta.company === x.company;
+    const more = (here && rgSla(x.subject) >= 0 ? `<button class="mini" data-rgdetail="1">Details and records</button>` : ex.drill && here ? `<button class="mini" data-rgdrill="1">Supporting records</button>` : "")
+      + (x.manual && active ? `<input type="date" id="rgDue" value="${esc(x.due || "")}" ${mine ? "" : "disabled"} aria-label="Due date"><button class="mini" data-act="due" ${mine ? "" : "disabled"}>Set the due date</button>` : "");
+    const hist = (x.history || []).slice().reverse().map(h => `<li><b>${esc(rgWhen(h.ts))}</b> · ${esc(h.by)} → ${esc(h.to)}${h.note ? `: ${esc(h.note)}` : ""}</li>`).join("");
+    return row + `<tr class="rg-det"><td colspan="7"><div class="rg-panel"><div>
+        <div class="hint" style="margin:0 0 8px">${esc(x.detail)}</div>
+        <div class="meta">First seen ${esc(rgWhen(x.first_seen))} · last seen ${esc(rgWhen(x.last_seen))}${x.closed_at ? ` · ${x.status === "Dismissed" ? "dismissed" : "closed"} ${esc(rgWhen(x.closed_at))} by ${esc(x.closed_by || "")}` : ""}</div>
+        <textarea id="rgComment" placeholder="${mine ? "What was done, or why it is dismissed" : "Only its owner or a role with actions can change this item"}" ${mine ? "" : "disabled"}></textarea>
+        <div class="rg-btns">${btns}</div>${more ? `<div class="rg-btns">${more}</div>` : ""}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input id="rgNewOwner" placeholder="hand over to name@rhg.al" value="${x.owner_set ? esc(x.owner) : ""}" ${mine ? "" : "disabled"} style="flex:1 1 220px">
+          <button class="mini" data-act="owner" ${mine ? "" : "disabled"}>Hand over</button></div>
+        <p class="meta" id="rgItemMsg"></p></div>
+      <div><div class="meta" style="font-weight:600;margin-bottom:4px">History</div><ul class="rg-hist">${hist}</ul></div></div></td></tr>`;
+  }).join("");
+  $("rgItems").querySelectorAll("tr.rg-row").forEach(tr => tr.onclick = () => { rgOpen = rgOpen === tr.dataset.id ? "" : tr.dataset.id; renderRgItems(); });
+  $("rgItems").querySelectorAll("[data-act]").forEach(b => b.onclick = ev => { ev.stopPropagation(); rgAct(b.dataset.act); });
+  const cur = items.find(x => x.id === rgOpen);
+  $("rgItems").querySelectorAll("[data-rgdetail]").forEach(b => b.onclick = ev => { ev.stopPropagation(); openException(rgSla(cur.subject)); });
+  $("rgItems").querySelectorAll("[data-rgdrill]").forEach(b => b.onclick = ev => { ev.stopPropagation(); const e = cur.extra.drill; openDrill(e.kind, e.key || "", cur.extra.rule); });
+}
+async function rgAct(a){
+  const body = {id: rgOpen, comment: ($("rgComment") || {}).value || ""};
+  if (a === "owner") { body.owner = $("rgNewOwner").value.trim(); delete body.comment; }
+  else if (a === "due") { if (!$("rgDue").value) { $("rgItemMsg").textContent = "Choose the date first."; return; } body.due = $("rgDue").value; }
+  else if (a) body.status = a;
+  else if (!body.comment.trim()) { $("rgItemMsg").textContent = "Write the comment first."; return; }
+  if (a === "Dismissed" && !body.comment.trim()) { $("rgItemMsg").textContent = "Say why it is dismissed."; return; }
+  $("rgItemMsg").textContent = "Saving…";
+  try{ await rgPost("/api/register/update", body); await loadRegister(); }
+  catch(e){ $("rgItemMsg").textContent = "Could not save: " + e.message; }
+}
+function renderRgSettings(){
+  const d = rgData, s = d.settings || {}, m = d.mail || {};
+  if (!rgSetLoaded) {
+    rgSetLoaded = true;
+    $("rgTime").value = s.time || "08:15"; $("rgEsc").value = s.escalate_days ?? 3; $("rgRoles").value = s.escalate_roles || "";
+    $("rgCtl").checked = !!s.controls; $("rgOn").checked = !!s.enabled;
+    if (!$("rgTestTo").value) $("rgTestTo").value = d.me || "";
+  }
+  rgFill("rgTestOwner", (d.owners || []).filter(o => o.open && o.owner !== "(nobody)").map(o => o.owner), "the first owner");
+  $("rgPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : s.controls ? "info" : "info");
+  $("rgPill").textContent = s.enabled ? (m.configured ? `Email on · ${s.time}` : "On · mail server not ready") : s.controls ? `Controls daily · ${s.time} · no email` : "Off";
+  const r = d.recent || [];
+  $("rgRuns").innerHTML = r.length ? `<tr><th>When</th><th>Control</th><th>Company</th><th class="num">Found</th><th class="num">Opened</th><th class="num">Closed</th><th class="num">Reopened</th></tr>` +
+    r.slice(0, 12).map(x => `<tr><td class="meta">${esc(rgWhen(x.at))}</td><td>${esc((d.sources || {})[x.source] || x.source)}</td><td>${esc(x.company)}</td>
+      <td class="num">${fmt(x.found)}</td><td class="num">${fmt(x.opened)}</td><td class="num">${fmt(x.closed)}</td><td class="num">${fmt(x.reopened)}</td></tr>`).join("") : "";
+}
+$("rgRead").onclick = () => loadRegister();
+$("rgNew").onclick = () => {
+  const t = prompt("What to track (a title)"); if (!t || !t.trim()) return;
+  createAction({title: t.trim(), description: "Created in the register.", company: $("rgCompany").value || (data && data.meta ? data.meta.company : ""),
+    location: $("rgLoc").value || "", priority: "Medium"});
+};
+["rgOwner", "rgSource", "rgCompany", "rgLoc"].forEach(id => $(id).onchange = () => loadRegister());
+$("rgMine").onchange = () => { if ($("rgMine").checked) $("rgOwner").value = ""; loadRegister(); };
+let rgQT = null; $("rgQ").oninput = () => { clearTimeout(rgQT); rgQT = setTimeout(loadRegister, 350); };
+$("rgRun").onclick = async () => {
+  $("rgStatus").textContent = "Starting the controls…";
+  try{ await rgPost("/api/register/run", {}); setTimeout(loadRegister, 1500); }
+  catch(e){ $("rgStatus").textContent = "Could not start: " + e.message; }
+};
+$("rgSave").onclick = async () => {
+  $("rgMsg").textContent = "Saving…";
+  try{
+    const st = await rgPost("/api/register/settings", {time: $("rgTime").value, escalate_days: $("rgEsc").value,
+      escalate_roles: $("rgRoles").value, controls: $("rgCtl").checked, enabled: $("rgOn").checked});
+    rgData.settings = st.settings; rgSetLoaded = false; renderRgSettings();
+    $("rgMsg").textContent = st.settings.enabled ? "Saved. Every owner gets their open items every day." : "Saved.";
+  }catch(e){ $("rgMsg").textContent = "Could not save: " + e.message; }
+};
+$("rgTest").onclick = async () => {
+  const to = $("rgTestTo").value.trim(); if (!to) { $("rgMsg").textContent = "Enter an address for the test."; return; }
+  $("rgMsg").textContent = "Sending…";
+  try{ const j = await rgPost("/api/register/test", {to, owner: $("rgTestOwner").value});
+    const x = (j.sent || [])[0] || {};
+    $("rgMsg").textContent = x.status === "sent" ? `Sent to ${to}: the email of ${x.owner} (${x.items} open, ${x.overdue} overdue).` : "Failed: " + (x.detail || ""); }
+  catch(e){ $("rgMsg").textContent = "Could not send: " + e.message; }
 };
 
 // ---------- data gaps ----------
@@ -2908,7 +2926,7 @@ function renderCompliance(){
   const cplKey = i => `nopo-${d.company}-${i.invoice}`;
   $("cplList").innerHTML = `<tr><th>Invoice</th><th>Supplier</th><th>Posted</th><th>Unit</th><th>Category</th><th>Lines</th><th class="num">Value</th><th>Follow-up</th></tr>` +
     d.invoices.map((i,n)=>{
-      const act = ((data && data.actions) || actions || []).find(a => a.source_exception === cplKey(i));
+      const act = ((data && data.register) || {})[cplKey(i)];
       const follow = act ? `<span class="chip">${esc(act.status)}</span><div class="meta">${esc(act.owner||"")}</div>`
         : `<button class="mini" data-cpltrack="${n}" ${can("actions")?"":"disabled"}>Track</button>`;
       return `<tr><td class="name">${esc(i.invoice)}<div class="meta">${esc(i.reference)}${i.vendor_invoice?` · supplier ref ${esc(i.vendor_invoice)}`:""}</div></td>
@@ -2921,7 +2939,7 @@ function renderCompliance(){
     const services = /SHERBIME|INVESTIME/i.test(i.category||"") && i.state === "No order";
     createAction({title:`Invoice ${i.invoice} without a PO: ${i.vendor}`,
       description:`Posted ${i.posted} with no purchase order (${i.state}). ${i.unit} · ${i.category}. `
-        + `Record who approved it, then mark this Resolved; it stops appearing in the daily email.`,
+        + `Record who approved it, then mark it Done; it stops appearing in the daily email.`,
       source_exception: cplKey(i), bc_document: i.invoice, document_type: "Posted purchase invoice",
       company: d.company, supplier: i.vendor, impact: i.unlinked_value, priority: big ? "High" : "Medium",
       owner: (data && data.settings && (data.settings.owners.invoices || data.settings.owners.default))
@@ -3720,7 +3738,8 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   setHeader();
 });
 function openFromHash(){
-  const v = (location.hash || "").slice(1);
+  let v = (location.hash || "").slice(1);
+  if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();
 }
@@ -5018,9 +5037,7 @@ const LOC_AREAS = [
   {k: "by", t: "Buying", bar: "byTabs", tab: "buyloc", draw: "byDraw", pop: "byPop", ready: () => !!data,
     find: ids => locKeyIn(byLocs(), ids), open: k => byOpen(k)},
   {k: "sp", t: "Suppliers", bar: "spTabs", tab: "suploc", draw: "spDraw", pop: "spPop", keyOf: () => spSel && spSel.loc, ready: () => !!spData && spKey === spQs(),
-    find: ids => locKeyIn(spAgg().L, ids), load: () => loadSp(false), open: k => spOpen(k)},
-  {k: "exl", t: "Exceptions", bar: "exTabs", tab: "loc", draw: "exlDraw", pop: "exlPop", ready: () => !!data,
-    find: ids => locKeyIn(exlModel().B, ids), open: k => exlOpen(k)}];
+    find: ids => locKeyIn(spAgg().L, ids), load: () => loadSp(false), open: k => spOpen(k)}];
 LOC_AREAS.forEach(a => { a.holds = () => scrOn(a.bar, a.tab); });
 Pulse.places({areas: LOC_AREAS,
   ids: (a, key) => new Set([String(key == null ? "" : key).toUpperCase()].filter(k => k && k !== "?")),

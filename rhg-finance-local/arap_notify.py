@@ -184,7 +184,7 @@ def render(d, test=False):
     navy, primary, ink, muted, line, sky = "#08303f", "#0c475e", "#0e2733", "#5c7482", "#d9dcdd", "#e4f3f9"
     red, redbg, amber, amberbg = "#c0392b", "#fbecea", "#b26a00", "#fdf3e2"
     cur = d["currency"]
-    link = f"{config.PUBLIC_URL.rstrip('/')}/finance/#exceptions" if config.PUBLIC_URL else ""
+    link = f"{config.PUBLIC_URL.rstrip('/')}/finance/#register" if config.PUBLIC_URL else ""
     th = (f"text-align:left;padding:8px 10px;background:{sky};color:{ink};font-size:12px;font-weight:600;"
           f"border-bottom:1px solid {line}")
     thn = th.replace("text-align:left", "text-align:right")

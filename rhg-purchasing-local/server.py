@@ -50,6 +50,7 @@ import requisitions as requisition_view
 import memuse
 import stock
 import currency
+import exreg
 import history
 import invoices
 import operations
@@ -267,7 +268,7 @@ def _contract_above(rows, settings):
                       for r in sorted(up, key=lambda r: -r["overpaid"])[:25]]}
 
 
-def _dashboard_build(company, week, location, mode="week"):
+def _dashboard_build(company, week, location, mode="week", remember=True):
     location, only = _scope_of(location)
     c_from, c_to, p_from, p_to, like_for_like, label = _period(week, mode)
     cur_age = max(config.REFRESH_SECONDS - 5, 5) if like_for_like else 600
@@ -521,15 +522,21 @@ def _dashboard_build(company, week, location, mode="week"):
         gaps = [g for g in gaps if g is not operations.CONTRACT_PRICE_GAP]
     data["gaps"] = gaps
     data["settings"] = settings
-    actions = store.list_actions()
-    if only is not None:
-        actions = [a for a in actions if _in_scope(only, a.get("location"))]
-    data["actions"] = actions
-    tracked = {a.get("source_exception") for a in actions if a.get("source_exception")}
-    live_codes = {e["code"] for e in (ops.get("sla") or [])}
-    for a in actions:
-        src = a.get("source_exception") or ""
-        a["still_open"] = (src in live_codes) if src and not src.startswith("group-") else None
+    # the Exceptions register: what it holds of the company (found by the daily run or tracked by hand)
+    week_ago = (date.today() - timedelta(days=7)).isoformat()
+    reg_all = [x for x in exreg.query("all", company=company, limit=100000)["items"]
+               if (only is None or _in_scope(only, x.get("location")))
+               and (x["status"] in exreg.ACTIVE or (x["closed_at"] or "") >= week_ago)]
+    reg = [x for x in reg_all if x["status"] in exreg.ACTIVE]
+    data["register"] = {x["subject"]: {"id": x["id"], "status": x["status"], "owner": x["owner"], "due": x["due"],
+                                       "source": x["source"], "overdue": x["overdue"]} for x in reg}
+    tracked = set(data["register"])
+    # the reports read the register as they read the Action center (title, owner, priority, due, status)
+    pri = {"critical": "Critical", "warning": "High", "info": "Low"}
+    data["actions"] = [{"title": x["title"], "owner": x["owner"], "priority": pri.get(x["severity"], "Medium"),
+                        "due_date": x["due"], "source_exception": x["subject"], "id": x["id"],
+                        "status": "Overdue" if x["overdue"] else {"Closed": "Resolved"}.get(x["status"], x["status"])}
+                       for x in reg_all]
     untracked = [e for e in (ops.get("sla") or []) if e["code"] not in tracked]
     data["untracked"] = {
         "critical": [e for e in untracked if e["severity"] == "critical"][:40],
@@ -538,17 +545,16 @@ def _dashboard_build(company, week, location, mode="week"):
                    "warning": sum(1 for e in untracked if e["severity"] == "warning"),
                    "impact": sum(abs(e.get("impact") or 0) for e in untracked
                                  if e["severity"] in ("critical", "warning"))},
-        "note": "Exceptions from the selected period that nobody has turned into an action yet. "
-                "The action list itself is not automatic: an action exists only when someone decides "
-                "to own it.",
+        "note": "Exceptions of the selected period that the Exceptions register does not hold yet: the daily run "
+                "reads the month in progress, so another period, or what appeared since this morning, is not in it.",
     }
-    data["action_keys"] = sorted(store.open_keys())
+    data["action_keys"] = sorted(tracked)
     if "error" not in ops:
         data["brief"] = brief.build(data, inv_data, ops, settings, meta, len(operations.DATA_GAPS))
     meta["query_ms"] = int((time.time() - t0) * 1000)
     data["meta"] = meta
 
-    if only is not None:                    # the drill-down keeps the read of every location
+    if only is not None or not remember:    # the drill-down (and the daily run) keep the read of every location
         return data
     with _last_lock:
         _last["rows"] = ve_cur
@@ -1320,6 +1326,7 @@ def drill(kind, key):
 
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
+                     "/api/register/settings": "settings", "/api/register/run": "settings", "/api/register/test": "settings",
                      "/api/notify/test": "settings", "/api/notify/smtp": "settings",
                      "/api/savings/send": "export", "/api/weekly/job": "settings", "/api/recipients": "settings",
                      "/api/price-changes/send": "settings",
@@ -1333,7 +1340,9 @@ EXPORT_PATHS = {"/api/savings/pdf", "/api/savings/xlsx", "/api/purchasers/xlsx",
 NEGOTIATIONS_SCREEN = "purchasing.s.compare.negotiations"
 NEGOTIATIONS_EDIT = "purchasing.negotiations.edit"
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/users", "/api/cache",
-               "/api/notify/status", "/api/weekly/status"}
+               "/api/notify/status", "/api/weekly/status",
+               # the exceptions register cuts every answer to the person's scope itself (register_allow)
+               "/api/register", "/api/register/update"}
 # read for one location (the "location" parameter) by a person limited to some locations of the company
 ACCESS_ONE_LOCATION = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/savings", "/api/savings/pdf",
                        "/api/savings/xlsx", "/api/stock", "/api/report"}
@@ -1342,6 +1351,118 @@ ACCESS_ONE_LOCATION = {"/api/dashboard", "/api/streams", "/api/comparisons", "/a
 ACCESS_SCOPE_SET = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/report", "/api/suppliers/locations"}
 # answered cut to the locations in scope
 ACCESS_FILTERED = {"/api/today/locations", "/api/locations", "/api/recipients/locations"}
+
+
+# ---------------------------------------------------------------- the exceptions register (exreg.py)
+# What Exceptions and the Action center were: the rules of the screens, read every day for the month in progress
+# and kept until the data shows them gone, and what people track by hand. Owners come from Email recipients.
+exreg.configure(
+    sources={"orders": "Purchase orders", "requisitions": "Requisitions", "prices": "Prices & contracts",
+             "invoices": "Invoice postings", "manual": "Tracked by hand"},
+    owner_role={("orders", "*"): "purchasing_coordinator", ("requisitions", "*"): "purchasing_coordinator",
+                ("prices", "*"): "purchasing_manager", ("invoices", "*"): "inputer",
+                ("manual", "*"): "purchasing_coordinator"},
+    role_label=dict(recipients.ROLES), default_role="purchasing_coordinator", tower="Purchasing",
+    link="/purchasing/#register", mailer=lambda to, cc, subject, body, text: notify.send_mail(to, cc, subject, body, text))
+RULE_GROUP = (("po-", "orders"), ("req-", "requisitions"), ("price-", "prices"), ("contract-", "prices"),
+              ("neg-", "invoices"), ("zero-", "invoices"), ("noloc-", "invoices"), ("late-", "invoices"),
+              ("nosup-", "invoices"))
+
+
+def register_rules(company, actor="control run"):
+    """The rules of the month in progress into the register, by group; a group whose Business Central read failed
+    is not synced, so nothing closes for a failed read. Invoice postings close only for invoices still inside the
+    month read (those posted before it leave the register with a note); a price rise belongs to its month."""
+    d = _dashboard_build(company, None, "", "month", remember=False)
+    ops = d.get("operations") or {}
+    if ops.get("error"):
+        return {"skipped": "Business Central did not answer: " + str(ops["error"])[:200]}
+    c_from = (d.get("meta") or {}).get("current", [""])[0]
+    posted = {x["no"]: x.get("posting") or "" for x in ops.get("documents") or []}
+    groups = {g: [] for _, g in RULE_GROUP}
+    for e in ops.get("sla") or []:
+        code = str(e.get("code") or "")
+        g = next((g for p, g in RULE_GROUP if code.startswith(p)), None)
+        if g is None:
+            continue
+        locs = [x.strip() for x in str(e.get("location") or "").split(",") if x.strip()]
+        extra = {k: e.get(k) for k in ("rule", "next_action", "document", "document_type", "supplier", "drill") if e.get(k)}
+        if len(locs) > 1:
+            extra["locations"] = locs
+        if g == "invoices":
+            extra["posting"] = posted.get(code.split("-", 1)[1], "")
+        if code.startswith("price-"):
+            extra["period"] = c_from
+        groups[g].append({"subject": code, "kind": e.get("rule") or g, "location": locs[0] if len(locs) == 1 else "",
+                          "title": e.get("title") or code,
+                          "detail": " · ".join(x for x in (e.get("detail"), ("To do: " + e["next_action"]) if e.get("next_action") else "") if x),
+                          "severity": e.get("severity"), "value": abs(float(e.get("impact") or 0)), "extra": extra})
+    failed = {"orders": bool(ops.get("po_error")),
+              "requisitions": not (ops.get("requisition_status") or {}).get("available"),
+              "prices": not (ops.get("price_status") or {}).get("available"), "invoices": False}
+    out = {}
+    for g, found in groups.items():
+        if failed[g]:
+            out[g] = {"skipped": "Business Central did not answer for this group"}
+            continue
+        scope = None
+        if g == "invoices":
+            scope = lambda x: (x["extra"].get("posting") or c_from) >= c_from
+        elif g == "prices":
+            scope = lambda x: not x["subject"].startswith("price-") or x["extra"].get("period") == c_from
+        out[g] = exreg.sync(g, company, found, actor=actor, in_scope=scope)
+        if g == "invoices":
+            out[g]["left"] = exreg.retire(g, company, lambda x: (x["extra"].get("posting") or c_from) < c_from,
+                                          f"Left the month the control reads (posted before {c_from})", actor)
+        elif g == "prices":
+            out[g]["left"] = exreg.retire(g, company, lambda x: x["subject"].startswith("price-")
+                                          and x["extra"].get("period") != c_from,
+                                          "A new month: price rises are read again for it", actor)
+    return out
+
+
+def register_controls(actor="scheduler", force=False):
+    """The daily run: every company of the daily notice, and the default one."""
+    out = []
+    for c in dict.fromkeys([config.BC_COMPANY] + list(notifier.companies())):
+        if not force and exreg.synced_today("invoices", c):
+            out.append({"company": c, "control": "rules", "status": "already read today"})
+            continue
+        try:
+            out.append({"company": c, "control": "rules", "status": "synced", "rules": register_rules(c)})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "control": "rules", "status": "failed", "detail": str(exc)[:300]})
+    store.audit("controls", "exceptions register", actor, {}, {"companies": len(out)}, "")
+    return out
+
+
+def register_allow(user):
+    """What a person limited to some companies or locations may see of the register; None = everything."""
+    if not access.limited(user):
+        return None
+
+    def ok(company, location):
+        if not access.company_ok(user, company):
+            return False
+        L = access.locations(user, company)
+        return L is None or (location or "").upper() in L
+    return ok
+
+
+def register_status(user):
+    return {"settings": exreg.settings(), "job": exreg.job(), "recent": exreg.recent_runs(),
+            "mail": {"configured": bool(notify.smtp_info().get("configured"))}, "me": (user.get("email") or "").strip().lower(),
+            "can_manage": auth.can(user, "actions") or auth.can(user, "settings"), "can_settings": auth.can(user, "settings")}
+
+
+def register_as_actions():
+    """The register as the daily notice reads the Action center: an invoice without a PO is closed when its item is."""
+    return [{"source_exception": x["subject"], "status": {"Closed": "Resolved"}.get(x["status"], x["status"]),
+             "owner": x["owner"], "due_date": x["due"]} for x in exreg.query("all", limit=100000)["items"]]
+
+
+notify.ACTIONS = register_as_actions
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1877,8 +1998,20 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/drill":
                 self._send(200, drill(q.get("kind", "purchases"), q.get("key", "")))
             elif url.path == "/api/actions":
-                self._send(200, {"actions": store.list_actions(), "statuses": store.STATUSES,
-                                 "priorities": store.PRIORITIES})
+                # the Action center is the Exceptions register now: its items tracked by hand
+                d = exreg.query("all", source="manual", allow=register_allow(user))
+                self._send(200, {"actions": d["items"], "moved": "The actions are in the Exceptions register.",
+                                 "statuses": exreg.STATUSES})
+            elif url.path == "/api/register":
+                if not auth.can(user, "purchasing.s.register"):
+                    self._send(403, {"error": "Your role does not include the Exceptions register."})
+                    return
+                owner = q.get("owner") or ""
+                if q.get("mine") == "1":
+                    owner = (user.get("email") or "").strip() or "(nobody has this address)"
+                d = exreg.query(q.get("status") or "active", owner, q.get("source") or "", q.get("company") or "",
+                                q.get("location") or "", q.get("q") or "", register_allow(user))
+                self._send(200, dict(d, **register_status(user)))
             elif url.path == "/api/settings":
                 self._send(200, store.get_settings())
             elif url.path == "/api/notify/status":
@@ -2123,10 +2256,54 @@ class Handler(BaseHTTPRequestHandler):
         actor = user["username"]
         try:
             if url.path == "/api/actions":
-                self._send(200, store.create_action(body, actor))
+                # Track: an item of the Exceptions register, tracked by hand (or the one already there)
+                try:
+                    self._send(200, exreg.track(body or {}, actor, user.get("email") or ""))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path.startswith("/api/actions/"):
-                updated = store.update_action(url.path.rsplit("/", 1)[-1], body, actor)
-                self._send(200 if updated else 404, updated or {"error": "Action not found"})
+                self._send(410, {"error": "The Action center is now the Exceptions register: change the item there."})
+            elif url.path == "/api/register/update":
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                if not auth.can(user, "purchasing.s.register"):
+                    self._send(403, {"error": "Your role does not include the Exceptions register."})
+                    return
+                allow = register_allow(user)
+                item = exreg.get(str(body.get("id") or ""))
+                if not item or (allow is not None and not allow(item["company"], item["location"])):
+                    self._send(404, {"error": "This exception is not in the register, or not in your scope."})
+                    return
+                me = (user.get("email") or "").strip().lower()
+                mine = bool(me) and me in [o.lower() for o in (item["owner"] or "").split(", ")]
+                if not mine and not (auth.can(user, "actions") or auth.can(user, "settings")):
+                    self._send(403, {"error": "Only its owner, or a role with actions, can change this item."})
+                    return
+                patch = {k: body[k] for k in ("status", "comment", "owner", "due") if k in body}
+                try:
+                    self._send(200, {"item": exreg.update(item["id"], patch, actor)})
+                except (KeyError, ValueError) as exc:
+                    self._send(400, {"error": str(exc).strip("'\"")})
+            elif url.path in ("/api/register/settings", "/api/register/run", "/api/register/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                if url.path.endswith("/settings"):
+                    store.save_settings({"exception_register": body}, actor)
+                    self._send(200, register_status(user))
+                elif url.path.endswith("/run"):
+                    self._send(202, {"job": exreg.start_job(actor)})
+                else:
+                    to, bad = notify.parse_emails(body.get("to") or user.get("email") or "")
+                    if bad or not to:
+                        self._send(400, {"error": "Give the address to send the test to."
+                                         if not bad else "Not an email address: " + ", ".join(bad)})
+                        return
+                    try:
+                        self._send(200, {"sent": exreg.send_digests(to, body.get("owner") or None, actor)})
+                    except ValueError as exc:
+                        self._send(400, {"error": str(exc)})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
             elif url.path == "/api/export/email":
@@ -2291,6 +2468,13 @@ def main():
     notifier.start()
     savings_report.Monthly(client, lambda: notifier.companies(), company_currency).start()
     weekly.start()
+    try:
+        moved = exreg.migrate_actions(store.list_actions())
+        if moved:
+            print(f"Exceptions register: {moved} actions of the Action center moved in.")
+    except Exception:                                               # noqa: BLE001
+        traceback.print_exc()
+    exreg.start(register_controls)
     pricechg.Weekly(client, lambda: notifier.companies(), company_currency).start()
     smtp = notify.smtp_info()
     print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]

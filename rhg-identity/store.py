@@ -148,8 +148,9 @@ def _seed_roles(conn):
         for r in conn.execute("SELECT name, permissions FROM roles WHERE system=0").fetchall():
             held = json.loads(r["permissions"] or "[]")
             likes = like if isinstance(like, (list, tuple)) else (like,)
-            if any(x in held for x in likes) and new not in held:
-                conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + [new]), r["name"]))
+            screen = new.split("#")[0]
+            if any(x in held for x in likes) and screen not in held:
+                conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + [screen]), r["name"]))
         given.append(new)
         _added_write(given)
     # screens taken out of the catalogue (after ADDED_SCREENS gave their holders the screen that replaces them)

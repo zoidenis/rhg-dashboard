@@ -652,8 +652,6 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 
     <div class="grp">Control</div>
     <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
-    <button data-view="actions">Action center <span class="count" id="actCount">0</span></button>
-    <button data-view="exceptions">Exceptions <span class="count" id="excCount">0</span></button>
     <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
     <button data-view="salesrec">Simphony ↔ BC</button>
     <button data-view="receipts">Takings POS ↔ BC</button>
@@ -1660,16 +1658,12 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <details class="card" id="slHow" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
   </section>
 
-  <section class="view" id="v-exceptions"><div class="card"><h2>Exceptions</h2>
-    <p class="hint">Rules applied to live BC records using the thresholds in Settings. Each one can become a tracked action.</p>
-    <div id="excList"></div></div></section>
-
   <section class="view" id="v-register">
     <div class="card">
       <div class="card-head"><div><h2>Exceptions register</h2>
-        <p class="hint" id="rgNote">Every exception the daily controls find in Business Central, with an owner from Email recipients by company, a due date and a status, until the data shows it is gone. An item the next run no longer finds closes by itself as verified; one that comes back is reopened.</p></div>
+        <p class="hint" id="rgNote">Every exception the daily controls find in Business Central, with an owner from Email recipients by company, a due date and a status, until the data shows it is gone. An item the next run no longer finds closes by itself as verified; one that comes back is reopened. It also holds what was tracked by hand (the Action center of before) and the rules of the screens (the Exceptions of before).</p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button class="mini dark" id="rgRead">Read again</button><button class="mini" id="rgRun">Run the controls now</button></div></div>
+          <button class="mini dark" id="rgRead">Read again</button><button class="mini" id="rgNew">Track something new</button><button class="mini" id="rgRun">Run the controls now</button></div></div>
       <div class="kpis six" id="rgKpis" style="margin-top:14px"></div>
       <p class="meta" id="rgStatus"></p>
     </div>
@@ -1691,7 +1685,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="scroll"><table id="rgItems"></table></div><p class="meta" id="rgMore"></p></div>
     <div class="card" id="rgSetCard" style="display:none">
       <div class="card-head"><div><h2>Daily controls and the owners' email</h2>
-        <p class="hint">At the time set, the controls read every company of the negative stock email (Settings → Negative stock daily email) unless the 07:30 email has already read it that day, and sync the register: negative stock lines and the recipe interventions of Received vs discharged (30 days); and the sales reconciliation Simphony ↔ BC of every company with restaurants. Then, if switched on, every owner gets one email with their open items, overdue first; items overdue longer than the escalation days put the roles below (of Email recipients by company) in Cc.</p></div>
+        <p class="hint">At the time set, the controls read every company of the negative stock email (Settings → Negative stock daily email) unless the 07:30 email has already read it that day, and sync the register: negative stock lines and the recipe interventions of Received vs discharged (30 days); and the sales reconciliation Simphony ↔ BC of every company with restaurants. Then, if switched on, every owner gets one email with their open items, overdue first; items overdue longer than the escalation days put the roles below (of Email recipients by company) in Cc. The rules of the screens (payables &amp; receivables, P&amp;L and balance sheet, G/L control, cash &amp; treasury) are read too, for the default company and every company of the other controls.</p></div>
         <span class="rhg-pill" id="rgPill">Off</span></div>
       <div class="formgrid">
         <label class="field">Time<input id="rgTime" type="time" value="08:15"></label>
@@ -1901,11 +1895,6 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
       <div class="hint" id="tkDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
-
-  <section class="view" id="v-actions"><div class="card">
-    <div class="card-head"><div><h2>Action center</h2><p class="hint">Actions live in this application only; Business Central stays read-only.</p></div>
-      <button class="mini dark" id="actNew">New action</button></div>
-    <div id="actionList"></div></div></section>
 
   <section class="view" id="v-gaps">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Data quality &amp; reconciliation</h2><p class="hint" id="dqNote">Choose a company and a month above, then Check.</p></div>
@@ -2462,10 +2451,9 @@ function render(){
   const closeOpen = data.closing && data.closing.progress ? data.closing.progress.open : null;
   $("focusNext").textContent = `${closeOpen==null ? "Month-end close: open the checklist to see the tasks" : `Month-end close: ${fmt(closeOpen)} tasks open`} · Exceptions: ${fmt(k.exceptions)} (${fmt(k.critical)} critical)`
     + (v.length ? " · Resolve validation before distributing the pack." : " · Figures are ready to distribute once the exceptions are reviewed.");
-  $("excCount").textContent = k.critical;
   renderSources(); renderBrief(); renderPL(); renderBS(); renderCash(); renderLedger("ap"); renderLedger("ar"); renderGL();
   fcWaterfall();
-  renderExceptions(); renderActions(); renderGaps(); renderSettings(); renderInventory();
+  renderGaps(); renderSettings(); renderInventory();
   if(!spLoaded) loadSimphony();
   if(!arLoaded) loadArap();
   if(!crLoaded) loadCostReport();
@@ -3068,47 +3056,30 @@ function renderGL(){
   glViz();
 }
 
-function renderExceptions(){
-  const list = data.exceptions, tracked = data.action_keys||[];
-  $("excList").innerHTML = list.length ? list.map((e,i)=>`<div class="act">
-    <div class="row1"><h4><span class="sev ${e.severity}"></span>${esc(e.title)}</h4><span class="meta">${esc(e.area||"")} · ${esc(e.rule)}</span></div>
-    <p class="hint" style="margin:6px 0">${esc(e.detail)}</p>
-    <p class="hint" style="margin:0"><b>Do:</b> ${esc(e.next_action||"")}${e.impact?` · <b>Impact:</b> ${cur(Math.abs(e.impact))}`:""}</p>
-    <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
-      ${e.drill?`<button class="mini" data-ed="${i}">Supporting records</button>`:""}
-      <button class="mini dark" data-ea="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
-      <button class="mini" data-em="${i}" type="button">Send by email</button>
-    </div>${emSentLine(e.code)}</div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
-  document.querySelectorAll("[data-em]").forEach(b=>b.onclick=()=>emOpen(list[+b.dataset.em]));
-  emLoad(false);
-  document.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{const e=list[+b.dataset.ed]; openDrill(e.drill.kind, e.drill.key||"", e.rule);});
-  document.querySelectorAll("[data-ea]").forEach(b=>b.onclick=()=>{const e=list[+b.dataset.ea];
-    createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
-      bc_document:e.document||"", document_type:e.area||"", company:data.meta.company, impact:Math.abs(e.impact||0),
-      priority:e.severity==="critical"?"Critical":e.severity==="warning"?"High":"Medium", confidence:"high",
-      evidence:[{entity:"Business Central", key:e.document||"", period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});});
+// an item of the Exceptions register found by a rule of the screens, as the exception Send by email takes
+function rgExc(x){
+  const e = x.extra || {};
+  return {code: x.subject, severity: x.severity, area: e.area || "", rule: e.rule || "", title: x.title, detail: x.detail,
+    next_action: e.next_action || "", impact: x.value, document: e.document || "", drill: e.drill || null};
 }
-
-
 // ---------- Exceptions → Send by email (exmail.py): to roles of Email recipients by company and / or addresses
 let emData = null, emCompany = "";
-async function emLoad(force){
-  const co = data && data.meta ? data.meta.company : "";
+async function emLoad(force, co){
+  co = co || (data && data.meta ? data.meta.company : "");
   if (!co || (!force && emData && emCompany === co)) return;
   try { const r = await fetch("/api/exceptions/email?company=" + encodeURIComponent(co)); const j = await r.json(); if (!r.ok) throw new Error(j.error);
     emData = j; emCompany = co;
-    document.querySelectorAll("#excList .act").forEach((el, i) => { const e = (data.exceptions || [])[i], old = el.querySelector(".em-sent"); if (!e) return;
-      if (old) old.remove(); el.insertAdjacentHTML("beforeend", emSentLine(e.code)); });
   } catch (e) { emData = null; }
 }
-function emSentLine(code){
-  const l = emData && emCompany === (data && data.meta && data.meta.company) ? (emData.log || {})[code] : null;
+function emSentLine(code, co){
+  const l = emData && emCompany === (co || (data && data.meta && data.meta.company)) ? (emData.log || {})[code] : null;
   if (!l || !l.length) return "";
   const x = l[l.length - 1];
   return `<p class="meta em-sent" style="margin:8px 0 0">✉ Sent ${esc(x.at)} by ${esc(x.by)} to ${esc((x.to || []).join(", "))}${(x.cc || []).length ? ` · Cc ${esc(x.cc.join(", "))}` : ""}${l.length > 1 ? ` · ${l.length} sends` : ""}${x.action ? " · tracked as an action" : ""}</p>`;
 }
-async function emOpen(e){
-  await emLoad(true);
+async function emOpen(e, co){
+  co = co || co;
+  await emLoad(true, co);
   const d = emData, P = $("emPop");
   if (!d) { alert("The email recipients could not be read."); return; }
   const area = String(e.area || "").toUpperCase(), sug = d.by_area[area] || d.default;
@@ -3119,7 +3090,7 @@ async function emOpen(e){
     ${d.mail && d.mail.configured === false ? `<p class="up">The mail server is not ready: ${esc(d.mail.error || "set it up in Purchasing → Settings")}.</p>` : ""}
     ${!d.can_send ? `<p class="up">Your role cannot send exceptions by email (it needs the Finance actions right).</p>` : ""}
     ${d.error ? `<p class="up">${esc(d.error)}</p>` : ""}
-    <p class="hint">${esc(data.meta.company)} · ${esc(e.area || "")} · ${esc(e.rule || "")}. The roles and their addresses are those of Settings → Email recipients by company (${esc(data.meta.company)} and the whole group). Suggested for ${esc(e.area || "this area")}: To ${esc(sug.to.map(k => (d.roles.find(r => r.key === k) || {label: k}).label).join(", ") || "–")}${sug.cc.length ? ", Cc " + esc(sug.cc.map(k => (d.roles.find(r => r.key === k) || {label: k}).label).join(", ")) : ""}.</p>
+    <p class="hint">${esc(co)} · ${esc(e.area || "")} · ${esc(e.rule || "")}. The roles and their addresses are those of Settings → Email recipients by company (${esc(co)} and the whole group). Suggested for ${esc(e.area || "this area")}: To ${esc(sug.to.map(k => (d.roles.find(r => r.key === k) || {label: k}).label).join(", ") || "–")}${sug.cc.length ? ", Cc " + esc(sug.cc.map(k => (d.roles.find(r => r.key === k) || {label: k}).label).join(", ")) : ""}.</p>
     <div class="scroll" style="max-height:340px"><table class="em-roles" data-nosort><tr><th>Role and addresses</th><th class="num">To</th><th class="num">Cc</th></tr>
       ${roles.map(r => `<tr class="${r.emails.length ? "" : "meta"}"><td style="white-space:normal">${esc(r.label)}<div class="meta">${r.emails.length ? esc(r.emails.join(", ")) : "no address"}</div></td>
         <td class="num"><input type="checkbox" data-emto="${esc(r.key)}" ${r.emails.length ? "" : "disabled"} ${r.emails.length && sug.to.includes(r.key) ? "checked" : ""} aria-label="To ${esc(r.label)}"></td>
@@ -3131,7 +3102,7 @@ async function emOpen(e){
     <div style="display:flex;flex-direction:column;gap:6px;margin:10px 0 12px;font-size:13px">
       ${d.me.email ? `<label><input type="checkbox" id="emMe" checked> Copy me (${esc(d.me.email)}); answers come back to me</label>` : `<span class="meta">Your account has no email address, so answers go to the sending address.</span>`}
       ${e.drill ? `<label><input type="checkbox" id="emRec" checked> Attach the supporting records (Excel)</label>` : ""}
-      <label><input type="checkbox" id="emAssign" checked> ${tracked ? "Update the tracked action: owner = the recipients in To" : "Track it as an action owned by the recipients in To"}</label></div>
+      <label><input type="checkbox" id="emAssign" checked> ${tracked ? "Hand its register item to the recipients in To" : "Track it in the register, owned by the recipients in To"}</label></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn dark" id="emSend" type="button" ${d.can_send ? "" : "disabled"}>Send</button><span class="meta" id="emMsg"></span></div>
     <div id="emWho" class="meta" style="margin-top:8px"></div>
     ${((d.log || {})[e.code] || []).length ? `<h3 style="font-size:13.5px;margin:16px 0 6px">Sent before</h3><table data-nosort>${d.log[e.code].slice().reverse().map(x => `<tr><td>${esc(x.at)}</td><td>${esc(x.by)}</td><td class="meta" style="white-space:normal">To ${esc((x.to || []).join(", "))}${(x.cc || []).length ? " · Cc " + esc(x.cc.join(", ")) : ""}</td></tr>`).join("")}</table>` : ""}
@@ -3151,57 +3122,29 @@ async function emOpen(e){
     const ccEmails = $("emCc").value.split(/[,;\s]+/).filter(Boolean).concat($("emMe") && $("emMe").checked ? [d.me.email] : []);
     try {
       const r = await fetch("/api/exceptions/email", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
-        company: data.meta.company, code: e.code, period: data.meta.current,
+        company: co, code: e.code, period: co === data.meta.company ? data.meta.current : null,
         exception: {code: e.code, severity: e.severity, area: e.area, rule: e.rule, title: e.title, detail: e.detail, next_action: e.next_action, impact: e.impact, document: e.document},
         to_roles: [...P.querySelectorAll("[data-emto]:checked")].map(i => i.dataset.emto), cc_roles: [...P.querySelectorAll("[data-emcc]:checked")].map(i => i.dataset.emcc),
         to_emails: $("emTo").value.split(/[,;\s]+/).filter(Boolean), cc_emails: ccEmails, note: $("emNote").value,
         records: !!($("emRec") && $("emRec").checked), assign: $("emAssign").checked})});
       const j = await r.json(); if (!r.ok) throw new Error(j.error || "failed");
       emData.log = j.log; $("emMsg").textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc.length ? " · Cc " + j.sent.cc.join(", ") : ""}${j.sent.records ? ` · ${j.sent.records} records attached` : ""}.`;
-      renderExceptions(); if (j.sent.action) load();
+      if (j.sent.action) { if (!(data.action_keys || []).includes(e.code)) (data.action_keys = data.action_keys || []).push(e.code); } if (rgData) loadRegister();
       setTimeout(() => $("emBd").classList.remove("show"), 1600);
     } catch (err) { $("emMsg").textContent = "Could not send: " + err.message; $("emSend").disabled = false; }
   };
 }
 document.addEventListener("click", ev => { if (ev.target.closest("[data-emclose]") || ev.target === $("emBd")) $("emBd").classList.remove("show"); });
-let actions=[];
+// Track (the brief, Movement, Recipe integrity…): an item of the Exceptions register, tracked by hand, owned by who
+// tracks it; something the register holds already is handed over instead (exreg.track)
 async function createAction(payload){
   try{
     const r = await fetch("/api/actions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-    if(!r.ok) throw new Error("save failed");
-    await load(); document.querySelector('#nav button[data-view="actions"]').click();
-  }catch(e){ alert("Could not save the action: "+e.message); }
+    const j = await r.json(); if(!r.ok) throw new Error(j.error || "save failed");
+    if (payload.source_exception && data) (data.action_keys = data.action_keys || []).push(payload.source_exception);
+    rgOpen = j.id || ""; rgStatus = "active"; navTo("register"); loadRegister();
+  }catch(e){ alert("Could not track it: "+e.message); }
 }
-async function patchAction(id,patch){
-  try{
-    const r = await fetch(`/api/actions/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
-    if(!r.ok) throw new Error("update failed");
-    const u = await r.json(); actions = actions.map(a=>a.id===id?u:a); data.actions=actions; renderActions();
-  }catch(e){ alert("Could not update the action: "+e.message); }
-}
-function renderActions(){
-  actions = data.actions||[];
-  const open = actions.filter(a=>!["Resolved","Dismissed"].includes(a.status));
-  $("actCount").textContent = open.length;
-  const statuses = ["New","Acknowledged","In progress","Waiting for information","Waiting for approval","Resolved","Dismissed"];
-  $("actionList").innerHTML = actions.length ? actions.map(a=>`<div class="act">
-    <div class="row1"><h4>${esc(a.title)}</h4><div style="display:flex;gap:8px;align-items:center">
-      <span class="prio ${a.priority}">${a.priority}</span><span class="chip ${a.status==="Overdue"?"up":a.status==="Resolved"?"down":""}">${esc(a.status)}</span></div></div>
-    <p class="hint" style="margin:6px 0;white-space:pre-wrap">${esc(a.description)}</p>
-    <p class="hint" style="margin:0">${a.bc_document?`<b>Document:</b> ${esc(a.bc_document)} · `:""}<b>Impact:</b> ${cur(a.impact)} · <b>Created:</b> ${esc(a.created_at)}</p>
-    <div class="formgrid" style="margin-top:10px">
-      <label class="field">Owner<input value="${esc(a.owner)}" data-f="owner" data-id="${a.id}"></label>
-      <label class="field">Due date<input type="date" value="${esc(a.due_date)}" data-f="due_date" data-id="${a.id}"></label>
-      <label class="field">Status<select data-f="status" data-id="${a.id}">${statuses.map(s=>`<option ${s===a.status?"selected":""}>${s}</option>`).join("")}</select></label>
-      <label class="field">Comment<input placeholder="Add a comment" data-f="comment" data-id="${a.id}"></label></div>
-    <div class="meta">${a.history.map(h=>`${esc(h.ts)} · ${esc(h.actor)} · ${esc(h.from||"—")} → ${esc(h.to)}${h.comment?" · "+esc(h.comment):""}`).join("<br>")}</div>
-  </div>`).join("") : '<div class="empty">No actions yet. Create them from the brief or from any exception.</div>';
-  document.querySelectorAll("#actionList [data-f]").forEach(el=>el.onchange=()=>{
-    const patch={}; patch[el.dataset.f]=el.value;
-    if(el.dataset.f==="comment"){ patch.comment=el.value; delete patch.status; el.value=""; }
-    patchAction(el.dataset.id,patch);});
-}
-$("actNew").onclick = ()=>{ const t = prompt("Action title"); if(t) createAction({title:t, description:"Created manually.", company:data.meta.company, priority:"Medium"}); };
 
 function renderGaps(){
   if ($("v-gaps").classList.contains("on")) loadDq(false);
@@ -6388,12 +6331,14 @@ function renderRegister(){
   $("rgRun").disabled = !d.can_settings || (d.job && d.job.state === "running");
   $("rgRun").title = d.can_settings ? "Reads Business Central for every company of the negative stock email and syncs the register." : "Your role cannot run the controls (needs finance.settings.manage).";
   if (d.job && d.job.state !== "running") $("rgStatus").textContent += ` · Run by ${d.job.by} at ${rgWhen(d.job.ended)}: ` + (d.job.state === "failed" ? "failed, " + (d.job.error || "")
-    : (d.job.result || []).map(r => `${r.control === "sales_rec" ? "Simphony ↔ BC " : ""}${r.company} ${r.status}` + (r.sales_rec ? ` (${r.sales_rec.found} found, ${r.sales_rec.opened} opened, ${r.sales_rec.closed} closed)` : r.negative_stock ? ` (${r.negative_stock.found} + ${(r.discharge || {}).found || 0} found, ${r.negative_stock.opened + ((r.discharge || {}).opened || 0)} opened, ${r.negative_stock.closed + ((r.discharge || {}).closed || 0)} closed)` : r.detail ? ` (${r.detail})` : "")).join(" · "));
+    : (d.job.result || []).map(r => `${r.control === "sales_rec" ? "Simphony ↔ BC " : r.control === "rules" ? "Rules " : ""}${r.company} ${r.status}` + (r.rules ? ` (${Object.values(r.rules).reduce((a, x) => a + (x.found || 0), 0)} found, ${Object.values(r.rules).reduce((a, x) => a + (x.opened || 0), 0)} opened, ${Object.values(r.rules).reduce((a, x) => a + (x.closed || 0), 0)} closed)` : r.sales_rec ? ` (${r.sales_rec.found} found, ${r.sales_rec.opened} opened, ${r.sales_rec.closed} closed)` : r.negative_stock ? ` (${r.negative_stock.found} + ${(r.discharge || {}).found || 0} found, ${r.negative_stock.opened + ((r.discharge || {}).opened || 0)} opened, ${r.negative_stock.closed + ((r.discharge || {}).closed || 0)} closed)` : r.detail ? ` (${r.detail})` : "")).join(" · "));
   if (d.job && d.job.state === "running") { $("rgStatus").textContent = `Controls running since ${rgWhen(d.job.started)}… several minutes.`; clearTimeout(rgJobTimer); rgJobTimer = setTimeout(loadRegister, 8000); }
   $("rgSetCard").style.display = d.can_settings ? "" : "none";
   if (d.can_settings) renderRgSettings();
   const sla = d.sla || {};
   $("rgDefs").innerHTML = `<p><b>Where the items come from.</b> Negative stock: every item below zero at a location at the end of the day before (the same lines as the negative stock email), owned by its likely cause: receipt not posted → Stock manager, recipe wrong → Cost controller, sold without purchase → Purchasing manager. Received vs discharged: every recipe intervention over the last 30 days → Cost controller. Simphony ↔ BC: every restaurant and day where Simphony, the POS import and the invoice do not meet → Chief accountant (takings not settled → Finance; menu item problems → Cost controller).</p>
+    <p><b>The rules of the screens</b> (what Exceptions showed): Payables &amp; receivables (balances overdue beyond the limits, supplier accounts in debit, concentration on one party, as of the run) and Cash &amp; treasury → Finance; P&amp;L and balance sheet (the month in progress) and G/L control (the material entries of its last days) → Chief accountant. The limits are those of Settings; a group whose Business Central read failed is left as it was. An item of these has <i>Send by email</i> and, for the company on screen, its supporting records.</p>
+    <p><b>Tracked by hand</b> (what the Action center held, moved in with their history): Track on any screen, or Track something new here. The person who tracks it owns it until they hand it over; no run closes it: its owner marks it Done, or Dismissed with a reason. Tracking something the register holds already hands that item over instead of opening a second one.</p>
     <p><b>Owner.</b> The people in that role at the item's location in Email recipients by company, else at the company, else in the group row. An owner can hand an item to someone else; it then keeps that owner. Blank hands it back to the role.</p>
     <p><b>Due date.</b> From the day it is found: critical ${sla.critical} days, warning ${sla.warning} days, info ${sla.info} days. A negative stock line below zero for more than 3 days is critical, as are a recipe code not received and a discharge far above what came in.</p>
     <p><b>Statuses.</b> Open → In progress → Fixed – verify (Awaiting verification). Only the data closes an item: the next run that no longer finds it closes it as verified; if it still finds it, it goes back to Open with a note. Dismissed needs a reason and stays out of the counts. A closed item found again is reopened and counted.</p>
@@ -6439,14 +6384,18 @@ function renderRgItems(){
     const act = (s, l, cls) => `<button class="mini ${cls || ""}" data-act="${esc(s)}" ${mine ? "" : "disabled"}>${l}</button>`;
     const active = ["Open", "In progress", "Awaiting verification"].includes(x.status);
     const btns = active
-      ? (x.status !== "In progress" ? act("In progress", "In progress", "dark") : "") + (x.status !== "Awaiting verification" ? act("Awaiting verification", "Fixed – verify") : "") + act("Dismissed", "Dismiss") + act("", "Comment")
+      ? (x.status !== "In progress" ? act("In progress", "In progress", "dark") : "")
+        + (x.manual ? act("Closed", "Done") : x.status !== "Awaiting verification" ? act("Awaiting verification", "Fixed – verify") : "") + act("Dismissed", "Dismiss") + act("", "Comment")
       : act("Open", "Reopen") + act("", "Comment");
+    const ex = x.extra || {}, here = data && data.meta && data.meta.company === x.company;
+    const more = (ex.rule ? `<button class="mini" data-rgmail="1">Send by email</button>` : "") + (ex.drill && here ? `<button class="mini" data-rgdrill="1">Supporting records</button>` : "")
+      + (x.manual && active ? `<input type="date" id="rgDue" value="${esc(x.due || "")}" ${mine ? "" : "disabled"} aria-label="Due date"><button class="mini" data-act="due" ${mine ? "" : "disabled"}>Set the due date</button>` : "");
     const hist = (x.history || []).slice().reverse().map(h => `<li><b>${esc(rgWhen(h.ts))}</b> · ${esc(h.by)} → ${esc(h.to)}${h.note ? `: ${esc(h.note)}` : ""}</li>`).join("");
     return row + `<tr class="rg-det"><td colspan="7"><div class="rg-panel"><div>
         <div class="hint" style="margin:0 0 8px">${esc(x.detail)}</div>
         <div class="meta">First seen ${esc(rgWhen(x.first_seen))} · last seen ${esc(rgWhen(x.last_seen))}${x.closed_at ? ` · ${x.status === "Dismissed" ? "dismissed" : "closed"} ${esc(rgWhen(x.closed_at))} by ${esc(x.closed_by || "")}` : ""}</div>
         <textarea id="rgComment" placeholder="${mine ? "What was done, or why it is dismissed" : "Only its owner or a role with actions can change this item"}" ${mine ? "" : "disabled"}></textarea>
-        <div class="rg-btns">${btns}</div>
+        <div class="rg-btns">${btns}</div>${more ? `<div class="rg-btns">${more}</div>` : ""}${ex.rule ? emSentLine(x.subject, x.company) : ""}
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input id="rgNewOwner" placeholder="hand over to name@rhg.al" value="${x.owner_set ? esc(x.owner) : ""}" ${mine ? "" : "disabled"} style="flex:1 1 220px">
           <button class="mini" data-act="owner" ${mine ? "" : "disabled"}>Hand over</button></div>
         <p class="meta" id="rgItemMsg"></p></div>
@@ -6454,10 +6403,16 @@ function renderRgItems(){
   }).join("");
   $("rgItems").querySelectorAll("tr.rg-row").forEach(tr => tr.onclick = () => { rgOpen = rgOpen === tr.dataset.id ? "" : tr.dataset.id; renderRgItems(); });
   $("rgItems").querySelectorAll("[data-act]").forEach(b => b.onclick = ev => { ev.stopPropagation(); rgAct(b.dataset.act); });
+  const cur = items.find(x => x.id === rgOpen);
+  $("rgItems").querySelectorAll("[data-rgmail]").forEach(b => b.onclick = ev => { ev.stopPropagation(); emOpen(rgExc(cur), cur.company); });
+  $("rgItems").querySelectorAll("[data-rgdrill]").forEach(b => b.onclick = ev => { ev.stopPropagation(); const e = cur.extra.drill; openDrill(e.kind, e.key || "", cur.extra.rule); });
+  if (cur && (cur.extra || {}).rule && (!emData || emCompany !== cur.company)) emLoad(false, cur.company).then(() => {
+    const p = $("rgItems").querySelector(".rg-det .rg-panel > div"); if (p && !p.querySelector(".em-sent")) { const h = emSentLine(cur.subject, cur.company); if (h) p.querySelector(".rg-btns").insertAdjacentHTML("afterend", h); } });
 }
 async function rgAct(a){
   const body = {id: rgOpen, comment: ($("rgComment") || {}).value || ""};
   if (a === "owner") { body.owner = $("rgNewOwner").value.trim(); delete body.comment; }
+  else if (a === "due") { if (!$("rgDue").value) { $("rgItemMsg").textContent = "Choose the date first."; return; } body.due = $("rgDue").value; }
   else if (a) body.status = a;
   else if (!body.comment.trim()) { $("rgItemMsg").textContent = "Write the comment first."; return; }
   if (a === "Dismissed" && !body.comment.trim()) { $("rgItemMsg").textContent = "Say why it is dismissed."; return; }
@@ -6482,6 +6437,11 @@ function renderRgSettings(){
       <td class="num">${fmt(x.found)}</td><td class="num">${fmt(x.opened)}</td><td class="num">${fmt(x.closed)}</td><td class="num">${fmt(x.reopened)}</td></tr>`).join("") : "";
 }
 $("rgRead").onclick = () => loadRegister();
+$("rgNew").onclick = () => {
+  const t = prompt("What to track (a title)"); if (!t || !t.trim()) return;
+  createAction({title: t.trim(), description: "Created in the register.", company: $("rgCompany").value || (data && data.meta ? data.meta.company : ""),
+    location: $("rgLoc").value || "", priority: "Medium"});
+};
 ["rgOwner", "rgSource", "rgCompany", "rgLoc"].forEach(id => $(id).onchange = () => loadRegister());
 $("rgMine").onchange = () => { if ($("rgMine").checked) $("rgOwner").value = ""; loadRegister(); };
 let rgQT = null; $("rgQ").oninput = () => { clearTimeout(rgQT); rgQT = setTimeout(loadRegister, 350); };
@@ -8739,7 +8699,8 @@ function urlFilters(){
   rangeSync();
 }
 function openFromHash(){
-  const v = (location.hash || "").slice(1);
+  let v = (location.hash || "").slice(1);
+  if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
   if (v === "stockstop") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("stockstop"); return; }
   if (v === "sevenrooms") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("sevenrooms"); return; }

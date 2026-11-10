@@ -6,8 +6,8 @@ sent once a day to the people named in Settings → Email notifications.
 What each email holds:
 - New since the last notice: invoices the tower has not reported before.
 - Still open: invoices already reported that nobody has closed yet. An invoice
-  counts as closed when its tracked action in the Action center is Resolved or
-  Dismissed; nothing is written back to Business Central.
+  counts as closed when its item in the Exceptions register (tracked by hand) is
+  Done or Dismissed; nothing is written back to Business Central.
 
 The mail server can be entered in Settings and is kept in a private data file.
 The .env values remain defaults until someone saves the form. Recipients, the
@@ -134,6 +134,10 @@ def _log_run(entry):
 
 
 # ---------------------------------------------------------------- the digest
+
+# what the notice reads as the tracked actions: the Exceptions register (the server sets it), else the old list
+ACTIONS = None
+
 
 def action_key(company, invoice):
     return f"nopo-{company}-{invoice}"
@@ -279,7 +283,7 @@ def render_email(d, recipients, test=False):
     if d["still"]:
         still_block = (f"<h3 style='font-size:15px;color:{ink};margin:26px 0 4px'>Earlier, still open</h3>"
                        f"<p style='color:{muted};font-size:12px;margin:0 0 10px'>Posted before the last notice "
-                       f"in the last {d['window_days']} days and not yet closed. Track each one in the Action center and mark it Resolved once the approval is "
+                       f"in the last {d['window_days']} days and not yet closed. Track each one in the Exceptions register and mark it Done once the approval is "
                        f"recorded; it then leaves this list.</p>" + table(d["still"], still=True))
     button = (f"<p style='margin:24px 0 0'><a href='{e(link)}' style='background:{primary};color:#fff;"
               f"text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;"
@@ -413,7 +417,7 @@ class Notifier:
             state = _read_state()
         comp = state.get("seen", {}).get(company)
         first_run = comp is None
-        d = build_digest(company, cpl, comp or {}, store.list_actions(), today, s, first_run)
+        d = build_digest(company, cpl, comp or {}, ACTIONS() if ACTIONS else store.list_actions(), today, s, first_run)
         d["first_run"] = first_run
         return d
 

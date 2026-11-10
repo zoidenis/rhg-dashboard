@@ -71,8 +71,6 @@ FINANCE = [
         ("main", "Fixed assets", "company", ["finance.assets.view"]),
         ("loc", "Location intelligence", "location", ["finance.assets.view"])]),
     ("closing", "Month-end close", "Control", None, [], "company", []),
-    ("actions", "Action center", "Control", None, [], "company", []),
-    ("exceptions", "Exceptions", "Control", None, [], "company", []),
     ("register", "Exceptions register", "Control", None, [], "location", []),
     ("salesrec", "Simphony ↔ BC", "Control", None, [], "location", []),
     ("receipts", "Takings POS ↔ BC", "Control", None, [], "location", ["finance.cash.view"]),
@@ -103,10 +101,7 @@ PURCHASING = [
         ("prices", "Price changes", "location", ["purchasing.prices.view"]),
         ("locations", "Location prices", "location", ["purchasing.prices.view"]),
         ("negotiations", "Negotiations", "company", ["purchasing.prices.view"])]),
-    ("actions", "Action center", "Control", None, [], "location", []),
-    ("exceptions", "Exceptions", "Control", "exTabs", [
-        ("list", "Exceptions", "location", ["purchasing.quality.view"]),
-        ("loc", "Location intelligence", "location", ["purchasing.quality.view"])]),
+    ("register", "Exceptions register", "Control", None, [], "location", []),
     ("compliance", "Invoices without PO", "Control", None, [], "company", ["purchasing.invoices.view"]),
     ("feed", "Posting follow-up", "Control", None, [], "location", ["purchasing.invoices.view"]),
     ("suppliers", "Supplier performance", "Performance", "spTabs", [

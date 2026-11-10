@@ -4,7 +4,7 @@ The roles and their addresses come from the directory kept in Purchasing (Settin
 recipients.py): the company's row plus the whole group's. The person sending picks roles, adds addresses, writes
 a note; the email carries the exception (what, impact, what to do, the rule, period), a link to the screen and,
 when the screen holds them, the supporting records as an Excel file. It goes out through Purchasing's mail server,
-answers going back to the sender. Optionally the exception becomes (or updates) a tracked action owned by those
+answers going back to the sender. Optionally the exception's item in the Exceptions register (or a new one tracked by hand) is owned by those
 it was sent to. Every send is kept in data/exception_emails.json and the audit trail. Nothing touches BC.
 """
 import html
@@ -97,7 +97,7 @@ def compose(exc, company, period, currency, sender, note, drill_count):
     impact = exc.get("impact")
     imp = f"{abs(float(impact)):,.0f} {currency}" if impact not in (None, "") else ""
     sev = {"critical": ("#c2412d", "Critical"), "warning": ("#b86e0e", "Warning")}.get(exc.get("severity"), ("#5f636b", "Info"))
-    link = f"{config.PUBLIC_URL.rstrip('/')}/finance/#exceptions" if config.PUBLIC_URL else ""
+    link = f"{config.PUBLIC_URL.rstrip('/')}/finance/#register" if config.PUBLIC_URL else ""
     rows = [("Company", company), ("Period", period), ("Area", exc.get("area")), ("Rule", exc.get("rule")),
             ("Document", exc.get("document")), ("Impact", imp)]
     subject = f"[{company}] Exception: {exc.get('title') or ''}"[:250]
@@ -119,7 +119,7 @@ def compose(exc, company, period, currency, sender, note, drill_count):
 
 
 def send(exc, company, period, currency, to_roles, to_emails, cc_roles, cc_emails, note, user, drill=None,
-         assign=False, action_id=None):
+         assign=False, on_assign=None):
     """Sends one exception; returns the log entry. Raises ValueError for a choice that cannot be sent."""
     roles, _err = targets(company)
     by_role = {r["key"]: r for r in roles}
@@ -146,22 +146,8 @@ def send(exc, company, period, currency, to_roles, to_emails, cc_roles, cc_email
               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", _xlsx(drill))] if drill_rows else []
     arap_notify.send_mail(to, cc, subject, body, text, files, source="Finance · exceptions", reply_to=reply or None)
     action = None
-    if assign:
-        owner = ", ".join(to)[:300]
-        comment = f"Sent by email to {', '.join(to)}" + (f" (Cc {', '.join(cc)})" if cc else "")
-        if action_id:
-            a = store.update_action(action_id, {"owner": owner, "comment": comment}, user.get("username", ""))
-            action = a["id"] if a else None
-        if not action:
-            a = store.create_action({"title": exc.get("title"), "description": f"{exc.get('detail') or ''}\nRecommended: {exc.get('next_action') or ''}",
-                                     "source_exception": exc.get("code") or "", "bc_document": exc.get("document") or "",
-                                     "document_type": exc.get("area") or "", "company": company,
-                                     "impact": abs(float(exc.get("impact") or 0)), "owner": owner,
-                                     "priority": "Critical" if exc.get("severity") == "critical" else "High" if exc.get("severity") == "warning" else "Medium",
-                                     "confidence": "high", "management_comment": comment,
-                                     "evidence": [{"entity": "Business Central", "key": exc.get("document") or "", "period": period}]},
-                                    user.get("username", ""))
-            action = a["id"]
+    if assign and on_assign:            # the recipients in To own it in the Exceptions register
+        action = on_assign(", ".join(to)[:300], f"Sent by email to {', '.join(to)}" + (f" (Cc {', '.join(cc)})" if cc else ""))
     entry = {"at": time.strftime("%Y-%m-%d %H:%M"), "company": company, "code": exc.get("code") or "",
              "title": exc.get("title") or "", "by": sender, "to": to, "cc": cc, "roles": list(to_roles) + list(cc_roles),
              "action": action, "records": len(drill_rows)}

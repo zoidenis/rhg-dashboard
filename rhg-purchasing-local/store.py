@@ -49,6 +49,9 @@ DEFAULT_SETTINGS = {
         "adjustment_pct": 5,
     },
     "owners": {"default": "", "price": "", "invoices": "", "data_quality": "", "requisitions": ""},
+    # the Exceptions register (exreg.py): the rules read every day at time, the owners' email (off until set)
+    "exception_register": {"controls": True, "enabled": False, "time": "08:20", "escalate_days": "3",
+                           "escalate_roles": "coo, cfo"},
     "budget": {"name": "", "cogs_accounts": "6051,60111"},
     # Business Central holds each company's amounts in that company's own currency,
     # so this map only decides the label; nothing is converted.
@@ -115,6 +118,7 @@ def get_settings():
     merged["stock"].update(s.get("stock", {}))
     merged["notifications"].update(s.get("notifications", {}))
     merged["purchasers"].update(s.get("purchasers", {}))
+    merged["exception_register"].update(s.get("exception_register", {}))
     for k in ("exclude_weekends", "updated_at"):
         if k in s:
             merged[k] = s[k]
@@ -175,6 +179,20 @@ def save_settings(patch, actor="director"):
             else:
                 v = str(v)[:2000]
             current.setdefault("purchasers", {})[k] = v
+        for k, v in (patch.get("exception_register") or {}).items():
+            if k in DEFAULT_SETTINGS["exception_register"]:
+                if isinstance(DEFAULT_SETTINGS["exception_register"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "08:20"
+                elif k == "escalate_days":
+                    try:
+                        v = str(max(0, min(60, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "3"
+                else:
+                    v = ", ".join(r for r in re.split(r"[,;\s]+", str(v)[:200]) if r)
+                current.setdefault("exception_register", {})[k] = v
         if "exclude_weekends" in patch:
             current["exclude_weekends"] = bool(patch["exclude_weekends"])
         current["updated_at"] = _now()

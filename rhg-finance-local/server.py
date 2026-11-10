@@ -301,7 +301,7 @@ def _refresh_dashboard(key, company, anchor, mode, dimension, compare="prior"):
             _dash_building.discard(key)
 
 
-def _dashboard_build(company, anchor, mode, dimension, compare="prior"):
+def _dashboard_build(company, anchor, mode, dimension, compare="prior", remember=True):
     t0 = time.time()
     settings = store.get_settings()
     c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, method = periods(anchor, mode)
@@ -372,17 +372,19 @@ def _dashboard_build(company, anchor, mode, dimension, compare="prior"):
     data = {"pl": pl, "balance_sheet": bs, "payables": ap, "receivables": ar, "cash": cash, "gl": gl,
             "exceptions": exceptions, "gaps": DATA_GAPS, "settings": settings, "sources": sources,
             "inventory": inv_placeholder,
-            "actions": store.list_actions(), "action_keys": sorted(store.open_keys()), "meta": meta}
+            # what is in the Exceptions register already (found by a control or tracked by hand): the screens' Track
+            "action_keys": sorted(exreg.tracked_keys(company)), "meta": meta}
     data["kpis"] = _headline(pl, bs, ap, ar, cash, exceptions)
     data["brief"] = brief.build(data, settings, meta)
     meta["query_ms"] = int((time.time() - t0) * 1000)
-    with _last_lock:
-        _last["data"] = data
-        _last["company"] = company
+    if remember:
+        with _last_lock:
+            _last["data"] = data
+            _last["company"] = company
     return data
 
 
-def gl_screen(company, anchor, mode, window_days=None, threshold=None):
+def gl_screen(company, anchor, mode, window_days=None, threshold=None, remember=True):
     """G/L control, loaded on demand: a short window, capped rows, so BC is not asked to
     scan a month of a ledger that grows by ~38,000 entries a day."""
     settings = store.get_settings()
@@ -403,6 +405,8 @@ def gl_screen(company, anchor, mode, window_days=None, threshold=None):
     out = finance.gl_control(entries, settings, win_from.isoformat(), c_to.isoformat(), closed_before)
     out.update({"loaded": True, "window": [win_from.isoformat(), c_to.isoformat()], "days": days,
                 "threshold": th, "capped": len(entries) >= config.GL_MAX_ROWS, "sources": sources})
+    if not remember:
+        return out
     with _last_lock:
         d = _last.get("data")
         if d is not None:
@@ -896,8 +900,9 @@ def closing_screen(company, anchor, mode):
                     "written to; the automatic checks above read it."}
 
 
-def treasury_screen(company, anchor, mode, dimension):
-    """Cash flow, bank activity and what falls due next. Read on demand."""
+def treasury_screen(company, anchor, mode, dimension, held=None):
+    """Cash flow, bank activity and what falls due next. Read on demand. held: the company's dashboard figures
+    (cash, payables, receivables) for the daily control run; else those on screen."""
     settings = store.get_settings()
     c_from, c_to, *_ = periods(anchor, mode)
     sources = []
@@ -905,8 +910,11 @@ def treasury_screen(company, anchor, mode, dimension):
                      lambda: client.accounts(company, c_from.isoformat(), c_to.isoformat(), dimension, 900), [])
     bank = _safe(sources, "Bank ledger entries",
                  lambda: client.bank_entries(company, c_from.isoformat(), c_to.isoformat()), [], False)
-    with _last_lock:
-        d = _last.get("data") or {}
+    if held is None:
+        with _last_lock:
+            d = _last.get("data") or {}
+    else:
+        d = held
     cash_total = (d.get("cash") or {}).get("total", 0.0)
     ap_detail = (d.get("payables") or {}).get("detail", [])
     ar_detail = (d.get("receivables") or {}).get("detail", [])
@@ -916,7 +924,8 @@ def treasury_screen(company, anchor, mode, dimension):
     out = {"flow": flow, "activity": activity, "obligations": obl, "sources": sources, "loaded": True,
            "period": [c_from.isoformat(), c_to.isoformat()],
            "exceptions": treasury.exceptions(flow, obl, settings)}
-    _merge_exceptions("treasury", out)
+    if held is None:
+        _merge_exceptions("treasury", out)
     return out
 
 
@@ -1575,14 +1584,18 @@ def send_exception_email(body, user):
             records = drill(exc["drill"].get("kind"), exc["drill"].get("key") or "")
         except Exception:                                          # noqa: BLE001
             records = None
-    tracked = next((a for a in store.list_actions() if a.get("source_exception") == code
-                    and a.get("status") not in ("Resolved", "Dismissed")), None)
+    def assign(owner, comment):
+        """The recipients own it in the Exceptions register: the item a control found, else one tracked by hand."""
+        return exreg.track({"title": exc.get("title"), "description": f"{exc.get('detail') or ''}\nRecommended: {exc.get('next_action') or ''}",
+                            "source_exception": code, "bc_document": exc.get("document") or "", "document_type": exc.get("area") or "",
+                            "company": company, "impact": abs(float(exc.get("impact") or 0)), "owner": owner,
+                            "priority": "Critical" if exc.get("severity") == "critical" else "High" if exc.get("severity") == "warning" else "Medium",
+                            "management_comment": comment}, user.get("username", ""), user.get("email") or "")["id"]
     try:
         entry = exmail.send(exc, company, period, meta.get("currency") or company_currency(company),
                             [str(x) for x in body.get("to_roles") or []], [str(x) for x in body.get("to_emails") or []],
                             [str(x) for x in body.get("cc_roles") or []], [str(x) for x in body.get("cc_emails") or []],
-                            str(body.get("note") or ""), user, records, bool(body.get("assign")),
-                            tracked["id"] if tracked else None)
+                            str(body.get("note") or ""), user, records, bool(body.get("assign")), assign)
     except ValueError as exc_:
         return 400, {"error": str(exc_)}
     except RuntimeError as exc_:
@@ -1776,6 +1789,46 @@ def register_after_receipts(company, r):
 rcpt.on_built = register_after_receipts
 
 
+RULE_SOURCES = {"ap_ar": ("Open supplier entries", "Open customer entries"),
+                "statements": ("Chart of accounts, current period",),
+                "gl": ("General ledger entries",), "treasury": ("Chart of accounts, current period", "Bank ledger entries")}
+
+
+def _rule_findings(exceptions, location=""):
+    """The exceptions of the Finance screens' rules as findings of the register: subject = the rule's code."""
+    out = []
+    for e in exceptions:
+        code = str(e.get("code") or "")
+        if not code:
+            continue
+        out.append({"subject": code, "kind": str(e.get("area") or code.split("-")[0])[:40], "location": location,
+                    "title": e.get("title") or e.get("rule") or code,
+                    "detail": " · ".join(x for x in (e.get("rule"), e.get("detail"),
+                                                      ("To do: " + e["next_action"]) if e.get("next_action") else "") if x),
+                    "severity": e.get("severity"), "value": abs(float(e.get("impact") or 0)),
+                    "extra": {k: e.get(k) for k in ("area", "rule", "next_action", "document", "drill") if e.get(k)}})
+    return out
+
+
+def register_finance_rules(company, actor="control run"):
+    """What Exceptions showed, kept in the register: the rules on the open supplier and customer entries (as of
+    today), the P&L and balance sheet and the cash of the month in progress, and the material G/L entries of its
+    last days. A group whose Business Central read failed is not synced, so nothing closes for a failed read."""
+    d = _dashboard_build(company, None, "month", "", remember=False)
+    gl = gl_screen(company, None, "month", remember=False)
+    tr = treasury_screen(company, None, "month", "", held=d)
+    failed = {x["source"] for part in (d, gl, tr) for x in part.get("sources") or [] if x.get("status") != "ok"}
+    groups = {"ap_ar": [e for e in d["exceptions"] if str(e.get("code", "")).startswith(("ap-", "ar-"))],
+              "statements": [e for e in d["exceptions"] if not str(e.get("code", "")).startswith(("ap-", "ar-"))],
+              "gl": gl.get("exceptions") or [], "treasury": tr.get("exceptions") or []}
+    out = {}
+    for src, ex in groups.items():
+        miss = [x for x in RULE_SOURCES[src] if x in failed]
+        out[src] = ({"skipped": "Business Central did not answer: " + ", ".join(miss)} if miss
+                    else exreg.sync(src, company, _rule_findings(ex), actor=actor))
+    return out
+
+
 def register_controls(actor="scheduler", force=False):
     """The daily control run: every company of the negative stock email, read once a day (the 07:30 email has
     usually read it already), the sales reconciliation Simphony ↔ BC of every company with restaurants, and
@@ -1850,6 +1903,20 @@ def register_controls(actor="scheduler", force=False):
         except Exception as exc:                                    # noqa: BLE001
             traceback.print_exc()
             out.append({"company": c, "control": "sevenrooms", "status": "failed", "detail": str(exc)[:300]})
+    # the rules of the Finance screens (Exceptions before): every company of the other controls, and the default one
+    rule_cos = list(dict.fromkeys([config.BC_COMPANY] + list(negrep.companies()) + list(salesrec.companies())))
+    for c in rule_cos:
+        if known is not None and c.upper() not in known:
+            continue
+        if not force and exreg.synced_today("ap_ar", c):
+            out.append({"company": c, "control": "rules", "status": "already read today"})
+            continue
+        try:
+            reg = register_finance_rules(c)
+            out.append({"company": c, "control": "rules", "status": "synced", "rules": reg})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "control": "rules", "status": "failed", "detail": str(exc)[:300]})
     for c in negrep.companies():
         if not force and exreg.synced_today("negative_stock", c):
             out.append({"company": c, "status": "already read today"})
@@ -3360,8 +3427,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"companies": client.companies(), "default": config.BC_COMPANY,
                                  "dimensions": client.dimension_values(q.get("company") or config.BC_COMPANY)})
             elif url.path == "/api/actions":
-                self._send(200, {"actions": store.list_actions(), "statuses": store.STATUSES,
-                                 "priorities": store.PRIORITIES})
+                # the Action center is the Exceptions register now: its items tracked by hand
+                d = exreg.query("all", source="manual", allow=register_allow(user))
+                self._send(200, {"actions": d["items"], "moved": "The actions are in the Exceptions register.",
+                                 "statuses": exreg.STATUSES})
             elif url.path == "/api/settings":
                 self._send(200, dict(store.get_settings(), locations_registry_default=locintel.DEFAULT_REGISTRY))
             elif url.path == "/api/audit":
@@ -3500,10 +3569,13 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
             elif url.path == "/api/actions":
-                self._send(200, store.create_action(body, actor))
+                # Track: an item of the Exceptions register, tracked by hand (or the one already there)
+                try:
+                    self._send(200, exreg.track(body or {}, actor, user.get("email") or ""))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path.startswith("/api/actions/"):
-                updated = store.update_action(url.path.rsplit("/", 1)[-1], body, actor)
-                self._send(200 if updated else 404, updated or {"error": "Action not found"})
+                self._send(410, {"error": "The Action center is now the Exceptions register: change the item there."})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
             elif url.path == "/api/sales/channel-profit/params":
@@ -3667,7 +3739,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not mine and not (auth.can(user, "actions") or auth.can(user, "settings")):
                     self._send(403, {"error": "Only its owner, or a role with actions, can change this item."})
                     return
-                patch = {k: body[k] for k in ("status", "comment", "owner") if k in body}
+                patch = {k: body[k] for k in ("status", "comment", "owner", "due") if k in body}
                 try:
                     self._send(200, {"item": exreg.update(body.get("id"), patch, actor)})
                 except (KeyError, ValueError) as exc:
@@ -4032,6 +4104,14 @@ def main():
     negrep.start()
     ssrep.start()
     srrep.start()
+    exreg.configure(mailer=lambda to, cc, subject, body, text: arap_notify.send_mail(
+        to, cc, subject, body, text, source="Finance · exceptions register"))
+    try:
+        moved = exreg.migrate_actions(store.list_actions())
+        if moved:
+            print(f"Exceptions register: {moved} actions of the Action center moved in.")
+    except Exception:                                               # noqa: BLE001
+        traceback.print_exc()
     exreg.start(register_controls)
     billyrec.start(_latest)                 # Simphony ↔ Billy: the daily read before the 08:00 reports
     brandrep.start()

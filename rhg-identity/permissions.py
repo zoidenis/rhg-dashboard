@@ -157,7 +157,7 @@ DEFAULT_ROLES = {
     "Accountant": {"department": "Finance", "system": False,
                    "description": "Statements, G/L, Kartela, fiscal and fixed assets; actions; no closing.",
                    "permissions": _s("finance.s.pl", "finance.s.gl", "finance.s.kartela", "finance.s.fiscal",
-                                     "finance.s.assets", "finance.s.actions", "finance.s.exceptions", "finance.s.gaps",
+                                     "finance.s.assets", "finance.s.gaps",
                                      "finance.s.salesrec", "finance.s.register")
                                   + ["finance.export", "finance.actions.manage"]},
     "AP & AR accountant": {"department": "Finance", "system": False,
@@ -166,7 +166,7 @@ DEFAULT_ROLES = {
                            "permissions": ["finance.s.kartela.ap", "finance.s.kartela.ar", "finance.s.kartela.sup",
                                            "finance.s.kartela.loc", "finance.s.overview.today",
                                            "finance.s.fiscal.fiscal", "finance.s.fiscal.fsales",
-                                           "finance.s.sales.main", "finance.s.sales.loc", "finance.s.actions",
+                                           "finance.s.sales.main", "finance.s.sales.loc",
                                            "finance.s.salesrec", "finance.s.register",
                                            "purchasing.s.compliance", "purchasing.s.reqs.invoices",
                                            "finance.export", "finance.actions.manage"]},
@@ -187,17 +187,17 @@ DEFAULT_ROLES = {
     "Purchasing coordinator": {"department": "Purchasing", "system": False,
                                "description": "Requisitions, orders, invoices without PO, exceptions.",
                                "permissions": _s("purchasing.s.overview", "purchasing.s.reqs",
-                                                 "purchasing.s.exceptions", "purchasing.s.compliance",
-                                                 "purchasing.s.feed", "purchasing.s.actions")
+                                                 "purchasing.s.register", "purchasing.s.compliance",
+                                                 "purchasing.s.feed")
                                               + ["purchasing.export", "purchasing.actions.manage"]},
     "Buyer": {"department": "Purchasing", "system": False,
               "description": "Buying, prices and contracts, supplier performance; actions.",
               "permissions": _s("purchasing.s.overview", "purchasing.s.reqs", "purchasing.s.compare",
-                                "purchasing.s.suppliers", "purchasing.s.actions")
+                                "purchasing.s.suppliers", "purchasing.s.register")
                              + ["purchasing.export", "purchasing.actions.manage"]},
     "Cost controller": {"department": "Purchasing", "system": False,
                         "description": "Prices, savings, inventory, recipes, movement and SKU planning.",
-                        "permissions": _s("purchasing.s.compare", "purchasing.s.overview", "purchasing.s.exceptions")
+                        "permissions": _s("purchasing.s.compare", "purchasing.s.overview", "purchasing.s.register")
                                        + _s("finance.s.inventory") + ["finance.s.budget.budget", "finance.s.register",
                                                                        "platform.s.executive.food"]
                                        + ["finance.export", "purchasing.export"]},
@@ -255,7 +255,13 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # Sales → Menu & food cost: whoever reads Menu engineering
                  "finance.s.sales.menucost": "finance.s.sales.menu",
                  # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing
-                 "finance.s.register": ("finance.s.actions", "finance.s.inventory.recipes", "purchasing.s.compare"),
+                 "finance.s.register": ("finance.s.actions", "finance.s.exceptions", "finance.s.inventory.recipes",
+                                        "purchasing.s.compare"),
+                 # Exceptions + Action center → the Exceptions register (both towers); "#…" gives a screen given
+                 # before once more, to the holders of other screens
+                 "finance.s.register#merge": ("finance.s.actions", "finance.s.exceptions"),
+                 "purchasing.s.register": ("purchasing.s.actions", "purchasing.s.exceptions", "purchasing.s.exceptions.list",
+                                           "purchasing.s.exceptions.loc"),
                  # the sales reconciliation: whoever reads receivables or fiscal sales
                  "finance.s.salesrec": ("finance.s.kartela.ar", "finance.s.fiscal.fsales"),
                  # Liquidity & capital: whoever reads the balance sheet
@@ -299,7 +305,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
 # Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
 REMOVED_SCREENS = ("finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
                    "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",
-                   "finance.s.pl.charts")
+                   "finance.s.pl.charts", "finance.s.actions", "finance.s.exceptions", "purchasing.s.actions",
+                   "purchasing.s.exceptions", "purchasing.s.exceptions.list", "purchasing.s.exceptions.loc")
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 

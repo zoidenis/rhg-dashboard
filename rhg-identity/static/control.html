@@ -303,8 +303,8 @@ function render(p, f){
   // priority worklist: the most serious items of both towers
   // the most serious items of each tower, taken in turn so neither crowds the other out
   const bySev = (a,b) => (RANK[a.e.severity]??3) - (RANK[b.e.severity]??3) || Math.abs(b.e.impact||0) - Math.abs(a.e.impact||0);
-  const pq = sla.map(e => ({e, tower: "Purchasing", href: "/purchasing/#exceptions"})).sort(bySev);
-  const fq = fx.map(e => ({e, tower: "Finance", href: "/finance/#exceptions"})).sort(bySev);
+  const pq = sla.map(e => ({e, tower: "Purchasing", href: "/purchasing/#register"})).sort(bySev);
+  const fq = fx.map(e => ({e, tower: "Finance", href: "/finance/#register"})).sort(bySev);
   const items = [];
   for (let i = 0; i < Math.max(pq.length, fq.length) && items.length < 8; i++) { if (pq[i]) items.push(pq[i]); if (fq[i]) items.push(fq[i]); }
   if (validation.length) items.splice(Math.min(1, items.length), 0, {e: {severity: "warning", title: "Validate cost of goods sold before reporting margin",

@@ -148,7 +148,8 @@ def build(company, read_dashboard, client, currency, today=None, location=None):
     suppliers = ops.get("suppliers") or []
     sla = ops.get("sla") or []
     untracked = data.get("untracked") or {}
-    crit = untracked.get("critical") or [e for e in sla if e.get("severity") == "critical"]
+    crit = (untracked["critical"] if "critical" in untracked
+            else [e for e in sla if e.get("severity") == "critical"])
     conc = float(th.get("supplier_concentration_pct") or 40)
 
     # ---- what needs action, in sentences
@@ -191,7 +192,7 @@ def build(company, read_dashboard, client, currency, today=None, location=None):
         acts.append(("info", f"{top_sup['supplier']} holds {top_sup['share']:.0f}% of last week's supplier spend."))
     if crit:
         acts.append(("crit", f"{(untracked.get('counts') or {}).get('critical', len(crit))} critical exception(s) "
-                             f"with no owner in the Action center."))
+                             f"not yet in the Exceptions register."))
 
     return {
         "company": company, "location": location or "", "label": f"{company} · {location}" if location else company,
@@ -372,7 +373,7 @@ def render_email(r):
 {table([("Item", 0), ("Cheapest", 0), ("Dearest", 0), ("Spread", 1), (f"Extra paid {C}", 1)], spread_rows, "") if spread_rows else ''}
 {h3("Spend by location")}{table([("Location", 0), ("Last week", 1), ("Week before", 1), ("Change", 1), ("Price rises", 1)], loc_spend, "No purchases last week.")}
 {h3("Largest suppliers", f"Share of last week's supplier invoices; red from {r['concentration']:.0f}%.")}{table([("Supplier", 0), (f"Spend {C}", 1), ("Share", 1), ("Invoices", 1)], sup_rows, "No supplier invoice last week.")}
-{h3("Critical exceptions with no owner", "Turn them into actions in the Action center so somebody owns them.")}{link("exceptions", "Exceptions")}
+{h3("Critical exceptions not in the register yet", "The daily run puts them in the Exceptions register with an owner; these appeared since.")}{link("register", "Exceptions")}
 {table([("Exception", 0), ("Location", 0), (f"Impact {C}", 1)], exc_rows, "Every critical exception has an owner.")}
 <p style="color:{muted};font-size:12px;margin:18px 0 0"><b>The attached Excel file lists every open order, price change, contract gap, saving and exception.</b> Amounts in {e(C)}; purchase cost excludes VAT.</p>
 {button}

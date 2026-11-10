@@ -12,7 +12,11 @@ until the data shows it is gone.
     someone else; every change is in its history and in the audit trail.
   * A daily email to every owner lists their open items, overdue first; items overdue beyond the escalation days
     go to the management roles in Cc.
+  * Items tracked by hand (source "manual", what the Action center held): a person opens one from any screen
+    (Track) or in the register (New item); no run closes it, its owner marks it Done or Dismissed. Tracking
+    something already in the register hands that item over instead of opening a second one.
 Kept in data/exceptions.db. Nothing is written to Business Central or Simphony.
+Same file in Finance and Purchasing: each tower's server names its controls, owners and mailer (configure).
 """
 import html
 import json
@@ -22,7 +26,8 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 
-import arap_notify
+import uuid
+
 import config
 import recipients
 import store
@@ -35,7 +40,8 @@ SLA = {"critical": 2, "warning": 5, "info": 10}
 # source → label, and type → the role that owns it (Email recipients roles)
 SOURCES = {"negative_stock": "Negative stock", "discharge": "Received vs discharged", "sales_rec": "Simphony ↔ BC",
            "data_quality": "Data quality", "receipts_rec": "Takings POS ↔ BC", "billy_rec": "Simphony ↔ Billy",
-           "sevenrooms": "SevenRooms ↔ Simphony"}
+           "sevenrooms": "SevenRooms ↔ Simphony", "ap_ar": "Payables & receivables", "statements": "P&L and balance sheet",
+           "gl": "G/L control", "treasury": "Cash & treasury", "manual": "Tracked by hand"}
 OWNER_ROLE = {
     ("negative_stock", "stock"): "stock_manager", ("negative_stock", "cost"): "cost_controller",
     ("negative_stock", "purchasing"): "purchasing_manager",
@@ -53,11 +59,41 @@ OWNER_ROLE = {
     ("billy_rec", "*"): "accounting",
     # SevenRooms ↔ Simphony: a reservation's tables against the checks (the takings of the restaurant) to finance
     ("sevenrooms", "*"): "finance",
+    # the rules of the Finance screens (what Exceptions showed): suppliers and customers, cash to finance; the
+    # statements and the ledger to the chief accountant
+    ("ap_ar", "*"): "finance", ("treasury", "*"): "finance", ("statements", "*"): "accounting", ("gl", "*"): "accounting",
+    # tracked by hand: the person who tracks it, else finance
+    ("manual", "*"): "finance",
 }
 ROLE_LABEL = {"stock_manager": "Stock manager", "cost_controller": "Cost controller",
               "purchasing_manager": "Purchasing manager", "finance": "Finance", "accounting": "Chief accountant"}
+DEFAULT_ROLE = "cost_controller"
+TOWER = {"name": "Finance", "link": "/finance/#register", "mailer": None}
 _lock = threading.Lock()
 _conn = None
+
+
+def configure(sources=None, owner_role=None, role_label=None, default_role=None, tower=None, link=None, mailer=None):
+    """The tower's controls and owners (Purchasing names its own; Finance keeps the ones above) and its mailer:
+    mailer(to, cc, subject, html, text)."""
+    global DEFAULT_ROLE
+    if sources is not None:
+        SOURCES.clear(); SOURCES.update(sources); SOURCES.setdefault("manual", "Tracked by hand")
+    if owner_role is not None:
+        OWNER_ROLE.clear(); OWNER_ROLE.update(owner_role)
+    if role_label is not None:
+        ROLE_LABEL.clear(); ROLE_LABEL.update(role_label)
+    if default_role:
+        DEFAULT_ROLE = default_role
+    TOWER.update({k: v for k, v in (("name", tower), ("link", link), ("mailer", mailer)) if v})
+
+
+def _directory():
+    fn = getattr(recipients, "directory", None) or getattr(recipients, "load")
+    try:
+        return fn() or {}
+    except Exception:                                              # noqa: BLE001
+        return {}
 
 
 def _db():
@@ -75,7 +111,11 @@ def _db():
             CREATE INDEX IF NOT EXISTS ex_scope ON ex (source, company, status);
             CREATE TABLE IF NOT EXISTS runs (source TEXT, company TEXT, at TEXT, found INTEGER, opened INTEGER,
                                              closed INTEGER, reopened INTEGER);
+            CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
         """)
+        if "extra" not in [r[1] for r in _conn.execute("PRAGMA table_info(ex)").fetchall()]:
+            _conn.execute("ALTER TABLE ex ADD COLUMN extra TEXT DEFAULT '{}'")     # what a screen needs (rule, records)
+            _conn.commit()
     return _conn
 
 
@@ -86,8 +126,8 @@ def _now():
 def owner_of(source, kind, company, location):
     """(role, "email, email") of a finding: the role of its type at its location in Email recipients, else at the
     company (the company row and the group row)."""
-    role = OWNER_ROLE.get((source, kind)) or OWNER_ROLE.get((source, "*")) or "cost_controller"
-    d = recipients.directory() or {}
+    role = OWNER_ROLE.get((source, kind)) or OWNER_ROLE.get((source, "*")) or DEFAULT_ROLE
+    d = _directory()
     emails = []
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).upper() == str(company or "").upper()), {})
     row = next((v for k, v in locs.items() if str(k).upper() == str(location or "").upper()), {}) if location else {}
@@ -102,16 +142,27 @@ def owner_of(source, kind, company, location):
 def _row(r):
     keys = ("id", "source", "kind", "company", "location", "subject", "title", "detail", "severity", "value", "role",
             "owner", "owner_set", "status", "first_seen", "last_seen", "due", "closed_at", "closed_by", "note",
-            "reopened", "history")
+            "reopened", "history", "extra")
     x = dict(zip(keys, r))
     x["history"] = json.loads(x["history"] or "[]")
+    try:
+        x["extra"] = json.loads(x.get("extra") or "{}")
+    except ValueError:
+        x["extra"] = {}
+    x["manual"] = x["source"] == "manual"
     return x
+
+
+COLS = "id, source, kind, company, location, subject, title, detail, severity, value, role, owner, owner_set, status, " \
+       "first_seen, last_seen, due, closed_at, closed_by, note, reopened, history, extra"
 
 
 def sync(source, company, findings, locations=None, actor="control run", in_scope=None):
     """findings: [{"subject", "kind", "title", "detail", "severity", "value", "location"}] of one run. locations: the
     locations the run read (None = the whole company); in_scope(item) → bool: the items the run covered (its days);
     only items of that scope are closed when not found."""
+    if source == "manual":                                         # tracked by hand: no run closes them
+        return {"found": 0, "opened": 0, "closed": 0, "reopened": 0}
     now, today = _now(), date.today()
     opened = closed = reopened = 0
     seen, best = set(), {}
@@ -127,14 +178,15 @@ def sync(source, company, findings, locations=None, actor="control run", in_scop
             eid = f"{source}:{company}:{loc}:{f['subject']}"
             seen.add(eid)
             sev = f.get("severity") if f.get("severity") in SEVERITY else "warning"
-            old = db.execute("SELECT * FROM ex WHERE id=?", (eid,)).fetchone()
+            old = db.execute(f"SELECT {COLS} FROM ex WHERE id=?", (eid,)).fetchone()
+            extra = json.dumps(f.get("extra") or {})
             if old is None:
                 role, owner = owner_of(source, f.get("kind") or "", company, loc)
                 hist = [{"ts": now, "by": actor, "to": "Open", "note": "Found"}]
-                db.execute("INSERT INTO ex VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,'Open',?,?,?,NULL,NULL,'',0,?)",
+                db.execute(f"INSERT INTO ex ({COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,'Open',?,?,?,NULL,NULL,'',0,?,?)",
                            (eid, source, f.get("kind") or "", company, loc, str(f["subject"]), f.get("title") or "",
                             f.get("detail") or "", sev, float(f.get("value") or 0), role, owner, now, now,
-                            (today + timedelta(days=SLA[sev])).isoformat(), json.dumps(hist)))
+                            (today + timedelta(days=SLA[sev])).isoformat(), json.dumps(hist), extra))
                 opened += 1
                 continue
             x = _row(old)
@@ -153,10 +205,10 @@ def sync(source, company, findings, locations=None, actor="control run", in_scop
             if not x["owner_set"]:
                 role, owner = owner_of(source, f.get("kind") or x["kind"], company, loc)
             db.execute("UPDATE ex SET kind=?, title=?, detail=?, severity=?, value=?, role=?, owner=?, status=?, "
-                       "last_seen=?, due=?, reopened=?, history=? WHERE id=?",
+                       "last_seen=?, due=?, reopened=?, history=?, extra=? WHERE id=?",
                        (f.get("kind") or x["kind"], f.get("title") or x["title"], f.get("detail") or "", sev,
-                        float(f.get("value") or 0), role, owner, status, now, due, rp, json.dumps(hist[-60:]), eid))
-        q = "SELECT * FROM ex WHERE source=? AND company=? AND status IN ('Open','In progress','Awaiting verification')"
+                        float(f.get("value") or 0), role, owner, status, now, due, rp, json.dumps(hist[-60:]), extra, eid))
+        q = f"SELECT {COLS} FROM ex WHERE source=? AND company=? AND status IN ('Open','In progress','Awaiting verification')"
         for r in db.execute(q, (source, company)).fetchall():
             x = _row(r)
             if x["id"] in seen or (locations is not None and x["location"] not in locations) \
@@ -172,9 +224,28 @@ def sync(source, company, findings, locations=None, actor="control run", in_scop
     return {"found": len(findings), "opened": opened, "closed": closed, "reopened": reopened}
 
 
+def retire(source, company, test, note, actor="control run"):
+    """Closes the active items of a source that test(item) says the control no longer reads (an invoice posted
+    before its window, a price rise of a month gone): not verified by the data, so the note says why."""
+    now, n = _now(), 0
+    with _lock:
+        db = _db()
+        for r in db.execute(f"SELECT {COLS} FROM ex WHERE source=? AND company=? AND status IN (?,?,?)",
+                            (source, company, *ACTIVE)).fetchall():
+            x = _row(r)
+            if not test(x):
+                continue
+            x["history"].append({"ts": now, "by": actor, "to": "Closed", "note": note})
+            db.execute("UPDATE ex SET status='Closed', closed_at=?, closed_by=?, note=?, history=? WHERE id=?",
+                       (now, actor, note[:300], json.dumps(x["history"][-60:]), x["id"]))
+            n += 1
+        db.commit()
+    return n
+
+
 def get(eid):
     with _lock:
-        r = _db().execute("SELECT * FROM ex WHERE id=?", (eid,)).fetchone()
+        r = _db().execute(f"SELECT {COLS} FROM ex WHERE id=?", (eid,)).fetchone()
     return _row(r) if r else None
 
 
@@ -183,7 +254,7 @@ def update(eid, patch, actor):
     now = _now()
     with _lock:
         db = _db()
-        r = db.execute("SELECT * FROM ex WHERE id=?", (eid,)).fetchone()
+        r = db.execute(f"SELECT {COLS} FROM ex WHERE id=?", (eid,)).fetchone()
         if r is None:
             raise KeyError("This exception is no longer in the register.")
         x = _row(r)
@@ -191,14 +262,17 @@ def update(eid, patch, actor):
         status = patch.get("status")
         sets = {}
         if status and status != x["status"]:
-            if status not in ("Open", "In progress", "Awaiting verification", "Dismissed"):
+            if x["manual"]:                                        # by hand: its owner says when it is done
+                if status not in ("Open", "In progress", "Closed", "Dismissed"):
+                    raise ValueError("An item tracked by hand can be Open, In progress, Done or Dismissed.")
+            elif status not in ("Open", "In progress", "Awaiting verification", "Dismissed"):
                 raise ValueError("A status can be Open, In progress, Awaiting verification or Dismissed; the data closes an item.")
             if status == "Dismissed" and not comment:
                 raise ValueError("Say why it is dismissed.")
             if x["status"] in ("Closed",) and status != "Open":
                 raise ValueError("A closed item can only be opened again.")
             sets["status"] = status
-            if status == "Dismissed":
+            if status in ("Dismissed", "Closed"):
                 sets.update(closed_at=now, closed_by=actor, note=comment)
             elif x["status"] in ("Closed", "Dismissed"):
                 sev = x["severity"] if x["severity"] in SLA else "warning"
@@ -207,6 +281,11 @@ def update(eid, patch, actor):
             x["history"].append({"ts": now, "by": actor, "to": status, "note": comment})
         elif comment:
             x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": comment})
+        if patch.get("due"):
+            try:
+                sets["due"] = date.fromisoformat(str(patch["due"])[:10]).isoformat()
+            except ValueError:
+                raise ValueError("The due date must be a date, e.g. 2026-11-20.") from None
         if "owner" in patch and str(patch["owner"]).strip() != x["owner"]:
             good, bad = recipients.parse(str(patch["owner"]))
             if bad:
@@ -220,9 +299,128 @@ def update(eid, patch, actor):
         sets["history"] = json.dumps(x["history"][-60:])
         db.execute(f"UPDATE ex SET {', '.join(k + '=?' for k in sets)} WHERE id=?", (*sets.values(), eid))
         db.commit()
-        r = db.execute("SELECT * FROM ex WHERE id=?", (eid,)).fetchone()
+        r = db.execute(f"SELECT {COLS} FROM ex WHERE id=?", (eid,)).fetchone()
     store.audit("exception", eid, actor, {"status": x["status"]}, {k: v for k, v in sets.items() if k != "history"}, comment)
     return _row(r)
+
+
+PRIORITY_SEVERITY = {"Critical": "critical", "High": "warning", "Medium": "warning", "Low": "info"}
+
+
+def find_active(company, subject):
+    """The active item of a company about this subject (a rule's code, a document, an item…), from any control."""
+    with _lock:
+        r = _db().execute(f"SELECT {COLS} FROM ex WHERE UPPER(company)=? AND subject=? AND status IN (?,?,?) "
+                          "ORDER BY source='manual'", (str(company or "").upper(), str(subject), *ACTIVE)).fetchone()
+    return _row(r) if r else None
+
+
+def tracked_keys(company=None):
+    """The subjects of the active items (of a company): what the screens show as already tracked."""
+    with _lock:
+        if company:
+            rows = _db().execute("SELECT subject FROM ex WHERE UPPER(company)=? AND status IN (?,?,?)",
+                                 (str(company).upper(), *ACTIVE)).fetchall()
+        else:
+            rows = _db().execute("SELECT subject FROM ex WHERE status IN (?,?,?)", ACTIVE).fetchall()
+    return {r[0] for r in rows if r[0]}
+
+
+def track(payload, actor, actor_email=""):
+    """Track something by hand (a screen's Track, the register's New item, an exception sent by email). payload as
+    the Action center took it: title, description, source_exception (the key), bc_document, document_type, company,
+    location, impact, priority, owner, due_date, management_comment. Already in the register (found by a control or
+    tracked before): that item gets the owner and the comment instead."""
+    company = str(payload.get("company") or "")
+    key = str(payload.get("source_exception") or payload.get("bc_document") or "").strip()[:200]
+    comment = str(payload.get("management_comment") or "").strip()[:1000]
+    good, bad = recipients.parse(str(payload.get("owner") or ""))
+    if bad:                         # a name (Settings → owners), not an address: kept in the history, the role owns it
+        comment = (comment + " · " if comment else "") + "Suggested owner: " + ", ".join(bad)[:120]
+    if key:
+        x = find_active(company, key)
+        if x:
+            patch = {"comment": comment or "Tracked again from the screen"}
+            if good:
+                patch["owner"] = ", ".join(good)
+            return update(x["id"], patch, actor)
+    now, today = _now(), date.today()
+    sev = PRIORITY_SEVERITY.get(payload.get("priority"), "warning")
+    loc = str(payload.get("location") or "")[:80]
+    subject = key or uuid.uuid4().hex[:10]
+    eid = f"manual:{company}:{loc}:{subject}"
+    try:
+        due = date.fromisoformat(str(payload.get("due_date") or "")[:10]).isoformat()
+    except ValueError:
+        due = (today + timedelta(days=SLA[sev])).isoformat()
+    me, _ = recipients.parse(actor_email or "")
+    if good:
+        role, owner, owner_set = "", ", ".join(good), 1
+    elif me:
+        role, owner, owner_set = "", ", ".join(me), 1             # who tracks it owns it until handed over
+    else:
+        (role, owner), owner_set = owner_of("manual", str(payload.get("document_type") or ""), company, loc), 0
+    hist = [{"ts": now, "by": actor, "to": "Open", "note": comment or "Tracked by hand"}]
+    extra = {k: payload.get(k) for k in ("bc_document", "document_type", "supplier", "priority", "confidence", "evidence")
+             if payload.get(k)}
+    with _lock:
+        db = _db()
+        if db.execute("SELECT 1 FROM ex WHERE id=?", (eid,)).fetchone():
+            eid += ":" + uuid.uuid4().hex[:6]
+        db.execute(f"INSERT INTO ex ({COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'Open',?,?,?,NULL,NULL,'',0,?,?)",
+                   (eid, "manual", str(payload.get("document_type") or "")[:60], company, loc, subject,
+                    str(payload.get("title") or "Untitled")[:160], str(payload.get("description") or "")[:2000], sev,
+                    abs(float(payload.get("impact") or 0)), role, owner, owner_set, now, now, due, json.dumps(hist),
+                    json.dumps(extra)))
+        db.commit()
+    store.audit("exception", eid, actor, {}, {"status": "Open", "title": payload.get("title") or ""}, comment)
+    return get(eid)
+
+
+ACTION_STATUS = {"New": "Open", "Acknowledged": "Open", "Overdue": "Open", "In progress": "In progress",
+                 "Waiting for information": "In progress", "Waiting for approval": "In progress",
+                 "Resolved": "Closed", "Dismissed": "Dismissed"}
+
+
+def migrate_actions(actions, tag="actions"):
+    """Once: the actions of the Action center (store's actions.json, kept as it was) become items tracked by hand,
+    with their status, owner, due date and history. Returns how many were moved (0 when done before)."""
+    with _lock:
+        db = _db()
+        if db.execute("SELECT 1 FROM meta WHERE k=?", ("migrated:" + tag,)).fetchone():
+            return 0
+        n = 0
+        for a in actions or []:
+            eid = f"manual:{a.get('company') or ''}:{a.get('location') or ''}:action-{a.get('id')}"
+            if db.execute("SELECT 1 FROM ex WHERE id=?", (eid,)).fetchone():
+                continue
+            st = ACTION_STATUS.get(a.get("status"), "Open")
+            sev = PRIORITY_SEVERITY.get(a.get("priority"), "warning")
+            good, _ = recipients.parse(str(a.get("owner") or ""))
+            hist = [{"ts": h.get("ts") or "", "by": h.get("actor") or "", "to": ACTION_STATUS.get(h.get("to"), h.get("to") or ""),
+                     "note": h.get("comment") or ""} for h in a.get("history") or []]
+            hist.append({"ts": _now(), "by": "Pulse", "to": st, "note": "Moved from the Action center"
+                         + (f" (owner there: {a.get('owner')})" if a.get("owner") and not good else "")})
+            if a.get("management_comment"):
+                hist.append({"ts": _now(), "by": "Pulse", "to": st, "note": "Management comment: " + str(a["management_comment"])[:500]})
+            if a.get("resolution_comment"):
+                hist.append({"ts": _now(), "by": "Pulse", "to": st, "note": "Resolution: " + str(a["resolution_comment"])[:500]})
+            role, owner = ("", ", ".join(good)) if good else owner_of("manual", a.get("document_type") or "", a.get("company") or "", a.get("location") or "")
+            done = st in ("Closed", "Dismissed")
+            last = (a.get("history") or [{}])[-1].get("ts") or a.get("created_at") or _now()
+            extra = {k: a.get(k) for k in ("bc_document", "document_type", "supplier", "priority", "confidence", "evidence", "id") if a.get(k)}
+            db.execute(f"INSERT INTO ex ({COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?)",
+                       (eid, "manual", str(a.get("document_type") or "")[:60], a.get("company") or "", a.get("location") or "",
+                        str(a.get("source_exception") or a.get("bc_document") or "action-" + str(a.get("id")))[:200],
+                        str(a.get("title") or "Untitled")[:160], str(a.get("description") or "")[:2000], sev,
+                        abs(float(a.get("impact") or 0)), role, owner, 1 if good else 0, st,
+                        a.get("created_at") or _now(), last, a.get("due_date") or date.today().isoformat(),
+                        last if done else None, "Action center" if done else None,
+                        str(a.get("resolution_comment") or "")[:500] if done else "", json.dumps(hist[-60:]), json.dumps(extra)))
+            n += 1
+        db.execute("INSERT INTO meta VALUES (?,?)", ("migrated:" + tag, _now() + f" · {n}"))
+        db.commit()
+    return n
 
 
 def counts_by_location(company):
@@ -246,7 +444,7 @@ def query(status="active", owner="", source="", company="", location="", q="", a
     limited to some companies or locations may see; None = everything."""
     today = date.today().isoformat()
     with _lock:
-        rows = [_row(r) for r in _db().execute("SELECT * FROM ex").fetchall()]
+        rows = [_row(r) for r in _db().execute(f"SELECT {COLS} FROM ex").fetchall()]
         runs = _db().execute("SELECT source, company, MAX(at) FROM runs GROUP BY source, company").fetchall()
     if allow is not None:
         rows = [x for x in rows if allow(x["company"], x["location"])]
@@ -341,7 +539,7 @@ def _digest(owner, items, public_url):
         f"<td style='{td}'><b>{e(x['title'])}</b><div style='color:{muted}'>{e(x['detail'][:300])}</div></td>"
         f"<td style='{td};white-space:nowrap'>{e(x['status'])}</td><td style='{td};white-space:nowrap'>{e(x['due'] or '')}</td>"
         f"<td style='{td};text-align:right'>{x['age']} d</td></tr>" for x in items[:150])
-    link = (f"<p style='margin:18px 0 0'><a href='{e(public_url)}/finance/#register' style='background:#0c475e;color:#fff;"
+    link = (f"<p style='margin:18px 0 0'><a href='{e(public_url)}{e(TOWER['link'])}' style='background:#0c475e;color:#fff;"
             f"text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600'>Open the register</a></p>") if public_url else ""
     body = f"""<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#ecebeb;font-family:Figtree,Segoe UI,Arial,sans-serif">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px">
@@ -351,7 +549,7 @@ def _digest(owner, items, public_url):
 <div style="font-size:20px;font-weight:700;margin-top:4px">Your open exceptions</div>
 <div style="font-size:12px;color:#cfe3ea;margin-top:4px">{len(items)} open · {len(over)} overdue · {date.today():%d %b %Y}</div></td></tr>
 <tr><td style="background:#fff;padding:20px 22px;border-radius:0 0 12px 12px">
-<p style="font-size:13px;color:{ink};margin:0 0 12px">Each item closes by itself when Business Central or Simphony no longer show it. Mark it in progress, or fixed so the next run can verify it, from the register.</p>
+<p style="font-size:13px;color:{ink};margin:0 0 12px">Each item a control found closes by itself when Business Central or Simphony no longer show it: mark it in progress, or fixed so the next run can verify it. An item tracked by hand closes when you mark it done. All from the register.</p>
 <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;border:1px solid {line}">
 <tr>{''.join(f"<th style='text-align:left;padding:6px 8px;background:#e4f3f9;font-size:11.5px'>{h}</th>" for h in ('', 'Where', 'Exception', 'Status', 'Due', 'Age'))}</tr>{rows}</table>
 {f"<p style='font-size:12px;color:{muted}'>{len(items) - 150} more in the register.</p>" if len(items) > 150 else ''}{link}
@@ -400,7 +598,7 @@ def send_digests(test_to=None, owner=None, actor="scheduler"):
             raise ValueError("No open item has an owner yet: set the roles in Settings → Email recipients by company.")
         by = {pick: by[pick]}
     public = (config.PUBLIC_URL or "").rstrip("/")
-    d = recipients.directory() or {}
+    d = _directory()
     people = {str(k).strip().upper(): v for k, v in (d.get("people") or {}).items()}
     roles = [r.strip() for r in s["escalate_roles"].replace(";", ",").split(",") if r.strip()]
     limit = (date.today() - timedelta(days=s["escalate_days"])).isoformat()
@@ -417,10 +615,13 @@ def send_digests(test_to=None, owner=None, actor="scheduler"):
         over = sum(1 for x in items if x["overdue"])
         subject = f"[Pulse RHG] Your exceptions: {len(items)} open, {over} overdue"
         try:
+            mail = TOWER["mailer"]
+            if mail is None:
+                raise RuntimeError("No mail server is set for this tower.")
             if test_to:
-                arap_notify.send_mail(test_to, [], "[TEST] " + subject + f" ({who})", body, text)
+                mail(test_to, [], "[TEST] " + subject + f" ({who})", body, text)
             else:
-                arap_notify.send_mail([who], cc, subject, body, text)
+                mail([who], cc, subject, body, text)
             sent.append({"to": ", ".join(test_to) if test_to else who, "owner": who, "items": len(items),
                          "overdue": over, "cc": [] if test_to else cc, "status": "sent"})
         except Exception as exc:                                   # noqa: BLE001
