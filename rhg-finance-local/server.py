@@ -1956,7 +1956,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          # Sales → Blocked by stock: cut to the person's locations
                          "/api/sales/stockstop", "/api/sales/stockstop/xlsx",
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
-                         "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx",
+                         "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx", "/api/billyrec/rows",
                          # Budget & forecast → Location intelligence, by department
                          "/api/executive"}
 
@@ -2083,6 +2083,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: salesrec.cut(b, self._allowed)
         elif path == "/api/billyrec":
             self._scope_filter = lambda b: billyrec.cut(b, self._allowed)
+        elif path in ("/api/billyrec/rows", "/api/billyrec/xlsx"):
+            self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path == "/api/receipts":
             self._scope_filter = lambda b: dict(rcpt.cut(b, self._allowed), can_settings=False)
         else:
@@ -2743,33 +2745,52 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
                 self._send(200, dict(r, companies=salesrec.companies()) if isinstance(r, dict) else r)
-            elif url.path in ("/api/billyrec", "/api/billyrec/xlsx"):
+            elif url.path in ("/api/billyrec", "/api/billyrec/xlsx", "/api/billyrec/rows"):
                 # Control → Simphony ↔ Billy: every check against its fiscalized invoice, tills, shifts, sales book
                 if not auth.can(user, "finance.s.billyrec"):
                     self._send(403, {"error": "Your role does not include Simphony ↔ Billy."})
                     return
                 company = q.get("company") or (billyrec.companies() or [config.BC_COMPANY])[0]
-                if url.path.endswith("xlsx"):
+                if url.path.endswith(("xlsx", "rows")):
                     r = billyrec.held(company)
                     if not r:
                         self._send(409, {"error": "Read Simphony ↔ Billy first."})
                         return
-                    r = billyrec.cut(r, self._allowed)
-                    body = billyrec.render_xlsx(r)
+                    keep = billyrec._keep_of(r, self._allowed)
+                    f = {k: q.get(k) or "" for k in ("ref", "st", "k", "q")}
+                    if url.path.endswith("rows"):
+                        # a page of one table; a newer read than the screen's: the screen reads the totals again
+                        if q.get("gen") and q.get("gen") != r["gen"]:
+                            self._send(409, {"error": "A newer read is in.", "stale": True})
+                            return
+                        try:
+                            self._send(200, billyrec.rows(r, q.get("kind") or "", keep, offset=q.get("offset") or 0,
+                                                          limit=q.get("limit") or 400, **f))
+                        except ValueError as exc:
+                            self._send(400, {"error": str(exc)})
+                        return
+                    if q.get("part") == "returns":           # Returns tracking with its filters (its Export)
+                        body = billyrec.render_returns_xlsx(r, keep, **f)
+                        name = xlsxtable.filename(f"RHG {company} returns tracking {r['days'][0]} {r['days'][-1]}")
+                        what = f"returns tracking Billy · {company}"
+                    else:
+                        body = billyrec.render_xlsx(r, keep)
+                        name = f"RHG_libri_shitjes_billy_{re.sub(r'[^A-Za-z0-9_-]+', '_', company)}_{r['days'][0]}_{r['days'][-1]}.xlsx"
+                        what = f"sales book Billy · {company}"
                     self.send_response(200)
                     self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                    self.send_header("Content-Disposition", f'attachment; filename="RHG_libri_shitjes_billy_{re.sub(r"[^A-Za-z0-9_-]+", "_", company)}_{r["days"][0]}_{r["days"][-1]}.xlsx"')
+                    self.send_header("Content-Disposition", f'attachment; filename="{name}"')
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
-                    store.audit("export", f"sales book Billy · {company}", user["username"], {}, {}, r["days"][0])
+                    store.audit("export", what, user["username"], {}, {}, r["days"][0])
                     return
                 try:
                     r = billyrec.request(company, _latest, q.get("refresh") == "1")
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
-                if isinstance(r, dict) and isinstance(r.get("book"), list):
+                if isinstance(r, dict) and r.get("gen"):
                     r = billyrec.public(billyrec.cut(r, self._allowed))     # cut first: the totals are the scope's
                     self._scope_filter = None
                 self._send(200, dict(r, companies=billyrec.companies(), connection=billy.info()["configured"],

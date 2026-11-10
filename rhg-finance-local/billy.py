@@ -363,6 +363,42 @@ def held(nuis, src, a, b):
     return [compact(json.loads(j), src) for (j,) in rows]
 
 
+def iter_held(nuis, src, a, b, where=""):
+    """held(), one invoice at a time with its Tirana day, from a connection of its own: a part of a long period is
+    loaded without holding every row's text at once. where: an extra SQL condition on the row (j), a filter only."""
+    _db()                                                # the tables exist
+    con = sqlite3.connect(DB_PATH, timeout=30)
+    try:
+        cur = con.execute("SELECT day, j FROM inv WHERE nuis=? AND src=? AND day>=? AND day<=?" + (f" AND ({where})" if where else ""),
+                          (nuis, src, a.isoformat(), b.isoformat()))
+        while True:
+            part = cur.fetchmany(500)
+            if not part:
+                break
+            for day, j in part:
+                yield day, compact(json.loads(j), src)
+    finally:
+        con.close()
+
+
+def number_of(nuis, iic, a, b):
+    """The number of an invoice held between two days, by its IIC ("" when none)."""
+    for src in ("fiscal", "bridge"):                     # by the key of the table (nuis, src, k)
+        with _db_lock:
+            hit = _db().execute("SELECT j FROM inv WHERE nuis=? AND src=? AND k=? AND day>=? AND day<=?",
+                                (nuis, src, str(iic or "").upper(), a.isoformat(), b.isoformat())).fetchone()
+        if hit:
+            return compact(json.loads(hit[0]), src)["num"]
+    return ""
+
+
+# a corrective (marked, or negative): the rows that may be one, found by their text before they are read (a superset:
+# each is then read and checked; with or without a space after the colon)
+CORRECTIVE_SQL = " OR ".join(
+    [f"(j LIKE '%\"{k}\":%' AND j NOT LIKE '%\"{k}\":null%' AND j NOT LIKE '%\"{k}\": null%')" for k in ("correctiveinv", "corrinv")]
+    + [f"j LIKE '%\"totprice\":{sp}{q}-%'" for sp in ("", " ") for q in ("", '"')])
+
+
 def detail(acct, fic):
     """One invoice in full (Billy's lists leave out the payment methods and the VAT groups): get-invoices by FIC."""
     rows = _post(acct, "get-invoices", {"FIC": fic, "Type": "SALES", "Start": None, "End": None})

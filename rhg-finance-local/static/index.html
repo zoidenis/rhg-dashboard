@@ -1697,7 +1697,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <label>Status<select id="biFSt"></select></label><label>Find<input id="biFQ" placeholder="check, IIC, FIC, invoice number"></label></div>
         <div class="scroll" style="max-height:620px"><table id="biChecks"></table></div><p class="meta" id="biChecksMore"></p></div>
       <div class="card"><div class="card-head"><div><h2>Invoices without a check, and without a FIC</h2><p class="hint"><span>Fiscalized invoices no Simphony check accounts for (issued by hand, another till, or a check changed after it was fiscalized), and invoices of the bridge that never got a FIC.</span></p></div></div>
-        <div class="scroll" style="max-height:480px"><table id="biInv"></table></div></div>
+        <div class="scroll" style="max-height:480px"><table id="biInv"></table></div><p class="meta" id="biInvMore"></p></div>
     </div>
     <div class="bi-p" data-p="returns" hidden>
       <div class="card"><div class="card-head"><div><h2>Returns tracking</h2><p class="hint"><span>Every cancel, return, reopen or change of a Simphony check, and the corrective invoice in Billy that closes it.</span> <span>None: the check is an unfiscalized return.</span> <span>Voids and error corrects before closing are listed with no fiscal effect: nothing had been fiscalized.</span></p></div>
@@ -1709,7 +1709,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <label>Event<select id="biRetKind"><option value="">All</option></select></label><label>Find<input id="biRetQ" placeholder="check, invoice, IIC"></label></div>
         <div class="scroll" style="max-height:620px"><table id="biRet"></table></div><p class="meta" id="biRetMore"></p></div>
       <div class="card"><div class="card-head"><div><h2>Corrective invoices with no Simphony event</h2><p class="hint"><span>Corrective or negative invoices in Billy that no cancel, return, reopen or change of a check accounts for: a correction made at the till without Simphony, or of a check outside the days read.</span></p></div></div>
-        <div class="scroll" style="max-height:420px"><table id="biRetLoose"></table></div></div>
+        <div class="scroll" style="max-height:420px"><table id="biRetLoose"></table></div><p class="meta" id="biRetLooseMore"></p></div>
     </div>
     <div class="bi-p report-show" data-p="days" hidden><div class="card"><div class="card-head"><div><h2>Every restaurant, every day</h2>
       <p class="hint"><span>Checks not fiscalized in the square; green when every check has its invoice. Hover for Simphony against fiscalized.</span></p></div></div>
@@ -5517,22 +5517,48 @@ function renderBilly(){
     card("Orders", fmt(k.orders || 0), fcSp(`${biM(k.orders_value || 0)} · ${fmt(k.orders_open || 0)} without an invoice after`), k.orders_open ? "warn" : "") +
     (d.returns ? `<div class="card kpi clickable" id="biRetCard" role="button" tabindex="0" title="Open Returns tracking"><div class="l">${fcSp("Unfiscalized returns")}</div><div class="v ${d.returns.kpis.unfiscalized ? "up" : "down"}">${fmt(d.returns.kpis.unfiscalized)}</div><div class="s">${fcSp(`${biM(d.returns.kpis.unfiscalized_value)} · of ${fmt(d.returns.kpis.events)} cancels, returns, reopens and changes`)}</div></div>` : "");
   biStatusLine();
-  const locs = [...new Set(d.checks.map(c => c.ref))].sort(), lv = $("biFLoc").value, sv = $("biFSt").value || "missing";
+  const locs = d.refs || [], lv = $("biFLoc").value, sv = $("biFSt").value || "missing";
   $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
   $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
   biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders(); biRet();
   const rc = $("biRetCard"); if (rc) { const go = () => $("biSeg").querySelector('[data-b="returns"]').click(); rc.onclick = go; rc.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } }; }
 }
+// ---- the tables of a read come from the server a page at a time (billyrec.rows), filtered there: the screen holds
+// what it shows, whatever the days read. "Show more" adds the next page; an answer to an older filter is dropped.
+const biPg = {};
+async function biTable(kind, params, draw, more){
+  const d = biData; if (!d) return;
+  const P = biPg[kind] || (biPg[kind] = {seq: 0, rows: []}), key = JSON.stringify(params) + d.gen;
+  if (!more || P.key !== key) { P.key = key; P.rows = []; P.total = 0; }
+  const seq = ++P.seq;
+  const p = new URLSearchParams({company: d.company, gen: d.gen || "", kind, offset: String(P.rows.length), limit: "400"});
+  Object.entries(params).forEach(([k, v]) => { if (v) p.set(k, v); });
+  try{
+    const j = await readJSON(await fetch("/api/billyrec/rows?" + p.toString()));
+    if (seq !== P.seq) return;
+    if (j.stale) { loadBilly(false); return; }                   // a newer read is in: its totals first
+    if (j.error) throw new Error(j.error);
+    P.rows = P.rows.concat(j.rows); P.total = j.total;
+    draw(P.rows, P.total, "");
+  }catch(e){ if (seq === P.seq) draw([], 0, e.message); }
+}
+function biMore(id, kind, rows, total, note){
+  $(id).innerHTML = (total > rows.length ? `${fcSp(`${fmt(rows.length)} of ${fmt(total)} shown`)} <button class="mini" type="button" data-bimore="${kind}">${fcSp("Show more")}</button> ` : "") + (note && total > 400 ? fcSp(note) : "");
+}
+const biErrRow = (n, err) => `<tr><td colspan="${n}" class="meta">${esc("Could not read: " + err)}</td></tr>`;
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-bimore]"); if (!b || !biData) return;
+  b.disabled = true;
+  ({checks: biChecks, invoices: biInv, events: biRetTable, loose: biLoose, orders: biOrders, book: biBook})[b.dataset.bimore](true);
+});
+let biQT = null;
+const biLater = fn => { clearTimeout(biQT); biQT = setTimeout(() => biData && fn(), 300); };
 // ---- Returns tracking (billyrec.track_returns)
 let biRetF = "need";
 const BI_RET_PILL = {closed_ref: "low", closed_self: "low", closed_amount: "medium", unfiscalized: "critical", pending: "", no_effect: ""};
-function biRetRows(){
-  const R = biData.returns, L = $("biRetLoc").value, K = $("biRetKind").value, q = ($("biRetQ").value || "").trim().toUpperCase();
-  const f = {need: e => e.status !== "no_effect", unfiscalized: e => e.status === "unfiscalized", pending: e => e.status === "pending",
-    closed: e => e.status === "closed_ref" || e.status === "closed_self", amount: e => e.status === "closed_amount", no_effect: e => e.status === "no_effect", all: () => true}[biRetF];
-  return R.events.filter(e => f(e) && (!L || e.ref === L) && (!K || e.kind === K) &&
-    (!q || [e.num, e.orig_num, e.orig_iic, e.corr_num, e.corr_iic, e.name].some(v => String(v || "").toUpperCase().includes(q))));
+function biRetParams(){
+  return {st: biRetF, ref: $("biRetLoc").value, k: $("biRetKind").value, q: ($("biRetQ").value || "").trim()};
 }
 function biRet(){
   const d = biData, R = d.returns;
@@ -5545,45 +5571,47 @@ function biRet(){
     card("Correctives without an event", fmt(k.loose), fcSp(biM(k.loose_value)), k.loose ? "warn" : "");
   $("biRetNote").textContent = !k.marked_checks ? "The checks of these days were read before Returns tracking: Read again reads them with their marks."
     : !k.with_marks ? "Simphony gave no void, return or reopen mark on these days' checks: the marks need Reporting and Analytics 20.1.16 or later; cancels and negative checks are still tracked." : "";
-  const ev = R.events, n = f => ev.filter(f).length;
-  $("biRetChips").innerHTML = [["need", "Needs a corrective", n(e => e.status !== "no_effect")], ["unfiscalized", "Unfiscalized returns", n(e => e.status === "unfiscalized")],
-    ["pending", "Pending", n(e => e.status === "pending")], ["closed", "Closed by a corrective", n(e => e.status === "closed_ref" || e.status === "closed_self")],
-    ["amount", "Closed by amount only", n(e => e.status === "closed_amount")], ["no_effect", "No fiscal effect", n(e => e.status === "no_effect")], ["all", "All", ev.length]]
-    .map(([x, l, c]) => `<button data-brf="${x}" class="${biRetF === x ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(c)}</button>`).join("");
+  const c = R.chips || {};
+  $("biRetChips").innerHTML = [["need", "Needs a corrective"], ["unfiscalized", "Unfiscalized returns"], ["pending", "Pending"], ["closed", "Closed by a corrective"],
+    ["amount", "Closed by amount only"], ["no_effect", "No fiscal effect"], ["all", "All"]]
+    .map(([x, l]) => `<button data-brf="${x}" class="${biRetF === x ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(c[x] || 0)}</button>`).join("");
   $("biRetChips").querySelectorAll("[data-brf]").forEach(b => b.onclick = () => { biRetF = b.dataset.brf; biRet(); });
-  const lv = $("biRetLoc").value, kv = $("biRetKind").value, locs = [...new Set(ev.map(e => e.ref))].sort();
+  const lv = $("biRetLoc").value, kv = $("biRetKind").value, locs = R.refs || [];
   $("biRetLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
   $("biRetKind").innerHTML = `<option value="">All</option>` + Object.entries(R.kinds).map(([x, l]) => `<option value="${x}"${x === kv ? " selected" : ""}>${esc(l)}</option>`).join("");
-  const rows = biRetRows();
-  $("biRet").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th>Check</th><th>Event</th><th class="num">Amount</th><th>Status</th><th>Invoice of the check</th><th>Corrective invoice</th><th>Issued</th><th>Reason · manager</th></tr>` +
-    (rows.slice(0, 500).map(e => `<tr><td>${esc(e.ref)}</td><td>${esc(e.day)}</td><td><b>${esc(e.num)}</b><div class="meta">${esc([(e.clsd || "").slice(11, 16), e.name].filter(Boolean).join(" · "))}</div></td>
-      <td>${esc(R.kinds[e.kind] || e.kind)}${e.note ? `<div class="meta">${fcSp(e.note)}</div>` : ""}</td><td class="num"><b>${fmt(e.amount, 2)}</b>${e.check_total !== e.amount ? `<div class="meta">check ${fmt(e.check_total, 2)}</div>` : ""}</td>
-      <td><span class="rhg-pill ${BI_RET_PILL[e.status] || ""}">${esc(R.status[e.status])}</span></td>
-      <td>${e.orig_num ? `${esc(e.orig_num)}<div class="meta" title="${esc(e.orig_iic)}">${esc((e.orig_iic || "").slice(0, 12))}… · ${fmt(e.orig_total, 2)}</div>` : `<span class="meta">–</span>`}</td>
-      <td>${e.corr_num || e.corr_iic ? `<b>${esc(e.corr_num || "")}</b> ${fmt(e.corr_total, 2)}<div class="meta" title="${esc(e.corr_iic)}">${esc((e.corr_iic || "").slice(0, 12))}…${e.corr_marked ? "" : ` · ${fcSp("negative, not marked corrective")}`}</div>` : `<span class="meta">–</span>`}</td>
-      <td>${esc((e.corr_issue || "").replace("T", " ").slice(5, 16))}</td>
-      <td class="meta">${esc([e.reasons.length ? "reason " + e.reasons.join(", ") : "", e.mgr.length ? "manager " + e.mgr.join(", ") : ""].filter(Boolean).join(" · "))}</td></tr>`).join("")
-      || `<tr><td colspan="10" class="meta">${fcSp(ev.length ? "No event with this filter." : "No cancel, return, reopen or change in the days read.")}</td></tr>`);
-  $("biRetMore").textContent = rows.length > 500 ? `${fmt(rows.length)} events; 500 are shown, the Excel has every one.` : "";
-  $("biRetLoose").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Marked corrective</th><th>Refers to</th><th>IIC</th></tr>` +
-    (R.loose.map(x => `<tr><td>${esc((x.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(x.num)}</b></td><td class="num">${fmt(x.total, 2)}</td><td>${esc(x.ref || "–")}</td><td>${esc(x.tcr)}</td><td>${esc(x.op)}</td>
-      <td>${fcSp(x.marked ? "Yes" : "No")}</td><td>${esc(x.refers_to || (x.corr_ref ? x.corr_ref.slice(0, 12) + "…" : "–"))}</td><td class="meta" title="${esc(x.iic)}">${esc((x.iic || "").slice(0, 12))}…</td></tr>`).join("")
-      || `<tr><td colspan="9" class="meta">${fcSp("Every corrective invoice of the period has its Simphony event.")}</td></tr>`);
+  biRetTable(); biLoose();
 }
-$("biRetLoc").onchange = $("biRetKind").onchange = () => biData && biRet();
-$("biRetQ").oninput = () => biData && biRet();
+function biRetTable(more){
+  const R = biData.returns;
+  biTable("events", biRetParams(), (rows, total, err) => {
+    $("biRet").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th>Check</th><th>Event</th><th class="num">Amount</th><th>Status</th><th>Invoice of the check</th><th>Corrective invoice</th><th>Issued</th><th>Reason · manager</th></tr>` +
+      (err ? biErrRow(10, err) : rows.map(e => `<tr><td>${esc(e.ref)}</td><td>${esc(e.day)}</td><td><b>${esc(e.num)}</b><div class="meta">${esc([(e.clsd || "").slice(11, 16), e.name].filter(Boolean).join(" · "))}</div></td>
+        <td>${esc(R.kinds[e.kind] || e.kind)}${e.note ? `<div class="meta">${fcSp(e.note)}</div>` : ""}</td><td class="num"><b>${fmt(e.amount, 2)}</b>${e.check_total !== e.amount ? `<div class="meta">check ${fmt(e.check_total, 2)}</div>` : ""}</td>
+        <td><span class="rhg-pill ${BI_RET_PILL[e.status] || ""}">${esc(R.status[e.status])}</span></td>
+        <td>${e.orig_num ? `${esc(e.orig_num)}<div class="meta" title="${esc(e.orig_iic)}">${esc((e.orig_iic || "").slice(0, 12))}… · ${fmt(e.orig_total, 2)}</div>` : `<span class="meta">–</span>`}</td>
+        <td>${e.corr_num || e.corr_iic ? `<b>${esc(e.corr_num || "")}</b> ${fmt(e.corr_total, 2)}<div class="meta" title="${esc(e.corr_iic)}">${esc((e.corr_iic || "").slice(0, 12))}…${e.corr_marked ? "" : ` · ${fcSp("negative, not marked corrective")}`}</div>` : `<span class="meta">–</span>`}</td>
+        <td>${esc((e.corr_issue || "").replace("T", " ").slice(5, 16))}</td>
+        <td class="meta">${esc([e.reasons.length ? "reason " + e.reasons.join(", ") : "", e.mgr.length ? "manager " + e.mgr.join(", ") : ""].filter(Boolean).join(" · "))}</td></tr>`).join("")
+        || `<tr><td colspan="10" class="meta">${fcSp((R.chips || {}).all ? "No event with this filter." : "No cancel, return, reopen or change in the days read.")}</td></tr>`);
+    biMore("biRetMore", "events", rows, total, "The Export has every one.");
+  }, more);
+}
+function biLoose(more){
+  biTable("loose", {}, (rows, total, err) => {
+    $("biRetLoose").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Marked corrective</th><th>Refers to</th><th>IIC</th></tr>` +
+      (err ? biErrRow(9, err) : rows.map(x => `<tr><td>${esc((x.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(x.num)}</b></td><td class="num">${fmt(x.total, 2)}</td><td>${esc(x.ref || "–")}</td><td>${esc(x.tcr)}</td><td>${esc(x.op)}</td>
+        <td>${fcSp(x.marked ? "Yes" : "No")}</td><td>${esc(x.refers_to || (x.corr_ref ? x.corr_ref.slice(0, 12) + "…" : "–"))}</td><td class="meta" title="${esc(x.iic)}">${esc((x.iic || "").slice(0, 12))}…</td></tr>`).join("")
+        || `<tr><td colspan="9" class="meta">${fcSp("Every corrective invoice of the period has its Simphony event.")}</td></tr>`);
+    biMore("biRetLooseMore", "loose", rows, total, "");
+  }, more);
+}
+$("biRetLoc").onchange = $("biRetKind").onchange = () => biData && biRetTable();
+$("biRetQ").oninput = () => biLater(biRetTable);
 $("biRetExp").onclick = () => {
   if (!biData || !biData.returns) return;
-  const R = biData.returns, rows = biRetRows();
-  return xlsxTable(`RHG ${biData.company} returns tracking ${biData.days[0]} ${biData.days[biData.days.length - 1]}`, [{title: "Returns tracking",
-    formats: ["text", "date", "text", "text", "text", "text", "text", "num", "num", "text", "text", "num", "text", "text", "text", "num", "text", "text", "text"],
-    header: ["Restaurant", "Business day", "Check", "Name", "Closed", "Event", "Note", "Amount", "Check total", "Invoice", "Invoice IIC", "Invoice total",
-      "Corrective invoice", "Corrective IIC", "Corrective issued", "Corrective total", "Marked corrective", "Status", "Reason · manager"],
-    rows: rows.map(e => [e.ref, e.day, String(e.num), e.name, e.clsd, R.kinds[e.kind] || e.kind, e.note, e.amount, e.check_total, e.orig_num, e.orig_iic, e.orig_total,
-      e.corr_num || "", e.corr_iic || "", e.corr_issue || "", e.corr_total, e.corr_iic ? (e.corr_marked ? "yes" : "no") : "", R.status[e.status],
-      [e.reasons.join(", "), e.mgr.join(", ")].filter(Boolean).join(" · ")])}],
-    [`Returns tracking · ${biData.company} · NUIS ${biData.nuis} · ${biData.days[0]} to ${biData.days[biData.days.length - 1]}; Simphony and Billy, read only.`,
-     biData.definitions.returns || ""]);
+  const p = new URLSearchParams({company: biData.company, part: "returns"});
+  Object.entries(biRetParams()).forEach(([k, v]) => { if (v) p.set(k, v); });
+  exportGo("/api/billyrec/xlsx?" + p.toString());
 };
 function biStatusLine(){
   const d = biData;
@@ -5591,29 +5619,31 @@ function biStatusLine(){
     + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
     + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
     + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
-    + (d.days_note ? ` · <span class="warn">${fcSp(d.days_note)}</span>` : "")
     + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
 }
 
-function biChecks(){
-  const d = biData, L = $("biFLoc").value, st = $("biFSt").value || "missing", q = ($("biFQ").value || "").trim().toUpperCase();
-  const rows = d.checks.filter(c => (!L || c.ref === L) && (st === "all" || c.status === st) && (!q || [c.num, c.iic, c.fic, c.inv_num].some(v => String(v || "").toUpperCase().includes(q))))
-    .sort((a, b) => (b.day + b.clsd).localeCompare(a.day + a.clsd));
-  $("biChecks").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th>Check</th><th>Closed</th><th class="num">Total</th><th>Employee</th><th>Shift</th><th>Status</th><th>Invoice</th><th>IIC</th><th>FIC</th><th>Fiscalized</th><th class="num">After (min)</th><th>Till</th><th>Operator</th></tr>` +
-    (rows.slice(0, 400).map(c => `<tr><td>${esc(c.ref)}</td><td>${esc(c.day)}</td><td><b>${esc(c.num)}</b></td><td>${esc((c.clsd || "").slice(11, 16))}</td><td class="num">${fmt(c.total, 2)}</td><td>${esc(c.emp ?? "")}</td><td>${esc(c.shift)}</td>
-      <td><span class="rhg-pill ${BL_PILL[c.status] || ""}">${esc(d.status[c.status])}</span>${c.how ? `<div class="meta">${fcSp(c.how)}</div>` : ""}</td><td>${esc(c.inv_num)}</td>
-      <td class="meta" title="${esc(c.iic)}">${esc((c.iic || "").slice(0, 12))}${c.iic ? "…" : ""}</td><td class="meta" title="${esc(c.fic)}">${esc((c.fic || "").slice(0, 13))}${c.fic ? "…" : ""}</td>
-      <td>${esc((c.issued || "").replace("T", " ").slice(5, 16))}</td><td class="num">${c.delay_min == null ? "" : fmt(c.delay_min, 0)}</td><td>${esc(c.tcr)}</td><td>${esc(c.op)}</td></tr>`).join("")
-      || `<tr><td colspan="15" class="meta">${fcSp("No check with this filter.")}</td></tr>`);
-  $("biChecksMore").textContent = rows.length > 400 ? `${fmt(rows.length)} checks; the latest 400 are shown. The Excel has the checks not fiscalized.` : "";
+function biChecks(more){
+  const d = biData, st = $("biFSt").value || "missing";
+  biTable("checks", {ref: $("biFLoc").value, st, q: ($("biFQ").value || "").trim()}, (rows, total, err) => {
+    $("biChecks").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th>Check</th><th>Closed</th><th class="num">Total</th><th>Employee</th><th>Shift</th><th>Status</th><th>Invoice</th><th>IIC</th><th>FIC</th><th>Fiscalized</th><th class="num">After (min)</th><th>Till</th><th>Operator</th></tr>` +
+      (err ? biErrRow(15, err) : rows.map(c => `<tr><td>${esc(c.ref)}</td><td>${esc(c.day)}</td><td><b>${esc(c.num)}</b></td><td>${esc((c.clsd || "").slice(11, 16))}</td><td class="num">${fmt(c.total, 2)}</td><td>${esc(c.emp ?? "")}</td><td>${esc(c.shift)}</td>
+        <td><span class="rhg-pill ${BL_PILL[c.status] || ""}">${esc(d.status[c.status])}</span>${c.how ? `<div class="meta">${fcSp(c.how)}</div>` : ""}</td><td>${esc(c.inv_num)}</td>
+        <td class="meta" title="${esc(c.iic)}">${esc((c.iic || "").slice(0, 12))}${c.iic ? "…" : ""}</td><td class="meta" title="${esc(c.fic)}">${esc((c.fic || "").slice(0, 13))}${c.fic ? "…" : ""}</td>
+        <td>${esc((c.issued || "").replace("T", " ").slice(5, 16))}</td><td class="num">${c.delay_min == null ? "" : fmt(c.delay_min, 0)}</td><td>${esc(c.tcr)}</td><td>${esc(c.op)}</td></tr>`).join("")
+        || `<tr><td colspan="15" class="meta">${fcSp("No check with this filter.")}</td></tr>`);
+    biMore("biChecksMore", "checks", rows, total, "The newest first. The Excel has the checks not fiscalized.");
+  }, more);
 }
-function biInv(){
-  const d = biData, L = $("biFLoc").value, rows = d.invoices.filter(i => !L || i.ref === L);
-  $("biInv").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Status</th><th>Restaurant</th><th>Unit</th><th>Till</th><th>Operator</th><th>Shift</th><th>IIC</th><th>FIC</th></tr>` +
-    (rows.slice(0, 300).map(i => `<tr><td>${esc((i.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(i.num)}</b></td><td class="num">${fmt(i.total, 2)}</td>
-      <td><span class="rhg-pill ${i.status === "no_fic" ? "critical" : "medium"}">${esc(d.inv_status[i.status])}</span></td><td>${esc(i.ref || "–")}</td><td>${esc(i.bu)}</td><td>${esc(i.tcr)}</td><td>${esc(i.op)}</td><td>${esc(i.shift)}</td>
-      <td class="meta" title="${esc(i.iic)}">${esc((i.iic || "").slice(0, 12))}…</td><td class="meta">${esc((i.fic || "–").slice(0, 13))}</td></tr>`).join("")
-      || `<tr><td colspan="11" class="meta">${fcSp("Every fiscalized invoice has its Simphony check, and every invoice of the bridge has a FIC.")}</td></tr>`);
+function biInv(more){
+  const d = biData;
+  biTable("invoices", {ref: $("biFLoc").value}, (rows, total, err) => {
+    $("biInv").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Status</th><th>Restaurant</th><th>Unit</th><th>Till</th><th>Operator</th><th>Shift</th><th>IIC</th><th>FIC</th></tr>` +
+      (err ? biErrRow(11, err) : rows.map(i => `<tr><td>${esc((i.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(i.num)}</b></td><td class="num">${fmt(i.total, 2)}</td>
+        <td><span class="rhg-pill ${i.status === "no_fic" ? "critical" : "medium"}">${esc(d.inv_status[i.status])}</span></td><td>${esc(i.ref || "–")}</td><td>${esc(i.bu)}</td><td>${esc(i.tcr)}</td><td>${esc(i.op)}</td><td>${esc(i.shift)}</td>
+        <td class="meta" title="${esc(i.iic)}">${esc((i.iic || "").slice(0, 12))}…</td><td class="meta">${esc((i.fic || "–").slice(0, 13))}</td></tr>`).join("")
+        || `<tr><td colspan="11" class="meta">${fcSp("Every fiscalized invoice has its Simphony check, and every invoice of the bridge has a FIC.")}</td></tr>`);
+    biMore("biInvMore", "invoices", rows, total, "The Excel has every one.");
+  }, more);
 }
 function biGrid(){
   const d = biData, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -5641,16 +5671,18 @@ function biOps(){
       || `<tr><td class="meta">${fcSp("No check or invoice in the period.")}</td></tr>`);
 }
 let biOrdF = "open";
-function biOrders(){
-  const d = biData, O = d.orders || [], rows = O.filter(o => biOrdF === "all" || (biOrdF === "open" ? !o.invoiced : o.invoiced));
-  $("biOrdChips").innerHTML = [["open", "Without an invoice after", O.filter(o => !o.invoiced).length], ["done", "Invoiced after", O.filter(o => o.invoiced).length], ["all", "Every order", O.length]]
-    .map(([k, l, n]) => `<button data-bof="${k}" class="${biOrdF === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
+function biOrders(more){
+  const d = biData, n = d.orders_n || {};
+  $("biOrdChips").innerHTML = [["open", "Without an invoice after"], ["done", "Invoiced after"], ["all", "Every order"]]
+    .map(([k, l]) => `<button data-bof="${k}" class="${biOrdF === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n[k] || 0)}</button>`).join("");
   $("biOrdChips").querySelectorAll("[data-bof]").forEach(b => b.onclick = () => { biOrdF = b.dataset.bof; biOrders(); });
-  $("biOrd").innerHTML = `<tr><th>Issued</th><th>Order</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Payment</th><th>Invoice after</th><th>IIC</th></tr>` +
-    (rows.slice(0, 400).map(o => `<tr><td>${esc((o.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(o.num || "")}</b></td><td class="num">${fmt(o.total, 2)}</td><td>${esc(o.ref || "–")}</td><td>${esc(o.tcr)}</td><td>${esc(o.op)}</td><td class="meta">${esc(o.pays)}</td>
-      <td>${o.invoiced ? `<span class="rhg-pill low">${fmt(o.after_min)} min</span>${o.closed_by ? `<div class="meta">${esc(o.closed_by)}</div>` : ""}` : `<span class="rhg-pill medium">${fcSp("none")}</span>`}</td><td class="meta" title="${esc(o.iic)}">${esc((o.iic || "").slice(0, 12))}…</td></tr>`).join("")
-      || `<tr><td colspan="9" class="meta">${fcSp(O.length ? "No order with this filter." : "No document with the payment method ORDER in the period.")}</td></tr>`);
-  $("biOrdMore").textContent = rows.length > 400 ? `${fmt(rows.length)} orders; 400 are shown, the Excel has every one.` : "";
+  biTable("orders", {st: biOrdF}, (rows, total, err) => {
+    $("biOrd").innerHTML = `<tr><th>Issued</th><th>Order</th><th class="num">Total</th><th>Restaurant</th><th>Till</th><th>Operator</th><th>Payment</th><th>Invoice after</th><th>IIC</th></tr>` +
+      (err ? biErrRow(9, err) : rows.map(o => `<tr><td>${esc((o.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(o.num || "")}</b></td><td class="num">${fmt(o.total, 2)}</td><td>${esc(o.ref || "–")}</td><td>${esc(o.tcr)}</td><td>${esc(o.op)}</td><td class="meta">${esc(o.pays)}</td>
+        <td>${o.invoiced ? `<span class="rhg-pill low">${fmt(o.after_min)} min</span>${o.closed_by ? `<div class="meta">${esc(o.closed_by)}</div>` : ""}` : `<span class="rhg-pill medium">${fcSp("none")}</span>`}</td><td class="meta" title="${esc(o.iic)}">${esc((o.iic || "").slice(0, 12))}…</td></tr>`).join("")
+        || `<tr><td colspan="9" class="meta">${fcSp(n.all ? "No order with this filter." : "No document with the payment method ORDER in the period.")}</td></tr>`);
+    biMore("biOrdMore", "orders", rows, total, "The Excel has every one.");
+  }, more);
 }
 function biSum(){
   const d = biData;
@@ -5659,25 +5691,24 @@ function biSum(){
       <td><span class="rhg-pill ${x.fiscalized ? "low" : "critical"}">${fcSp(x.fiscalized ? "Yes" : "No FIC")}</span></td><td class="num">${fmt(x.refs)}</td><td class="num">${fmt(x.found)}</td><td class="meta">${esc(x.missing.slice(0, 4).map(m => m.slice(0, 10) + "…").join(", "))}${x.missing.length > 4 ? ` +${x.missing.length - 4}` : ""}</td></tr>`).join("")
       || `<tr><td class="meta">${fcSp("No summary invoice in the period.")}</td></tr>`);
 }
-function biBook(){
-  const d = biData, B = d.book, rates = d.rates.filter(r => r > 0).sort((a, b) => b - a);
-  const sum = k => d.book_totals ? (d.book_totals[k] || 0) : B.reduce((a, b) => a + (b[k] || 0), 0);
+function biBook(more){
+  const d = biData, rates = d.rates.filter(r => r > 0).sort((a, b) => b - a), T = d.book_totals || {};
   const card = (l, v) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v">${biM(v)}</div></div>`;
-  $("biBookK").innerHTML = card("Total with VAT", sum("total")) + card("Exempt", sum("exempt")) + card("Without VAT", sum("no_vat")) + card("Zero rate and exports", sum("zero")) +
-    rates.map(r => card(`Taxable ${r}%`, sum("b" + r)) + card(`VAT ${r}%`, sum("v" + r))).join("");
-  const counts = d.book_errors || {}, keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-  const info = d.info_errors || ["no_fic", "no_detail"], isCase = b => b.errors.some(e => !info.includes(e));
-  $("biBookChips").innerHTML = [["", "Every invoice", d.book_count || B.length], ["*", "With a case", d.book_cases != null ? d.book_cases : B.filter(isCase).length], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
+  $("biBookK").innerHTML = card("Total with VAT", T.total || 0) + card("Exempt", T.exempt || 0) + card("Without VAT", T.no_vat || 0) + card("Zero rate and exports", T.zero || 0) +
+    rates.map(r => card(`Taxable ${r}%`, T["b" + r] || 0) + card(`VAT ${r}%`, T["v" + r] || 0)).join("");
+  const counts = d.book_errors || {}, keys = Object.keys(counts).filter(k => counts[k]).sort((a, b) => counts[b] - counts[a]);
+  $("biBookChips").innerHTML = [["", "Every invoice", d.book_count || 0], ["*", "With a case", d.book_cases || 0], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
     .map(([k, l, n]) => `<button data-be="${esc(k)}" class="${biBookErr === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
   $("biBookChips").querySelectorAll("[data-be]").forEach(b => b.onclick = () => { biBookErr = b.dataset.be; biBook(); });
-  const rows = B.filter(b => !biBookErr || (biBookErr === "*" ? isCase(b) : b.errors.includes(biBookErr)));
-  $("biBook").innerHTML = `<tr><th>Date</th><th>No.</th><th>Invoice</th><th>Buyer</th><th class="num">Total</th><th class="num">Exempt</th><th class="num">No VAT</th><th class="num">0% / export</th>${rates.map(r => `<th class="num">Taxable ${r}%</th><th class="num">VAT ${r}%</th>`).join("")}<th>Till</th><th>Cases</th></tr>` +
-    (rows.slice(0, 400).map(b => `<tr><td>${esc((b.issue || "").slice(0, 16).replace("T", " "))}</td><td>${esc(b.ord ?? "")}</td><td><b>${esc(b.num)}</b>${b.eic ? `<div class="meta">EIC</div>` : ""}</td><td>${esc(b.buyer || "")}${b.buyer_id ? `<div class="meta">${esc(b.buyer_id)}</div>` : ""}</td>
-      <td class="num">${fmt(b.total, 2)}</td><td class="num">${b.exempt ? fmt(b.exempt, 2) : ""}</td><td class="num">${b.no_vat ? fmt(b.no_vat, 2) : ""}</td><td class="num">${b.zero ? fmt(b.zero, 2) : ""}</td>
-      ${rates.map(r => `<td class="num">${b["b" + r] ? fmt(b["b" + r], 2) : ""}</td><td class="num">${b["v" + r] ? fmt(b["v" + r], 2) : ""}</td>`).join("")}<td>${esc(b.tcr)}</td>
-      <td>${b.errors.map(e => `<span class="rhg-pill ${e === "no_fic" ? "critical" : e === "no_detail" ? "" : "medium"}" style="margin:1px">${esc(d.error_labels[e] || e)}</span>`).join("")}</td></tr>`).join("")
-      || `<tr><td colspan="${10 + rates.length * 2}" class="meta">${fcSp("No invoice with this filter.")}</td></tr>`);
-  $("biBookMore").textContent = (rows.length > 400 ? `${fmt(rows.length)} invoices here; 400 are shown.` : "") + ((d.book_count || 0) > B.length ? ` The screen holds the invoices with a case and the first ones; the Excel has all ${fmt(d.book_count)}.` : "");
+  biTable("book", {st: biBookErr}, (rows, total, err) => {
+    $("biBook").innerHTML = `<tr><th>Date</th><th>No.</th><th>Invoice</th><th>Buyer</th><th class="num">Total</th><th class="num">Exempt</th><th class="num">No VAT</th><th class="num">0% / export</th>${rates.map(r => `<th class="num">Taxable ${r}%</th><th class="num">VAT ${r}%</th>`).join("")}<th>Till</th><th>Cases</th></tr>` +
+      (err ? biErrRow(10 + rates.length * 2, err) : rows.map(b => `<tr><td>${esc((b.issue || "").slice(0, 16).replace("T", " "))}</td><td>${esc(b.ord ?? "")}</td><td><b>${esc(b.num)}</b>${b.eic ? `<div class="meta">EIC</div>` : ""}</td><td>${esc(b.buyer || "")}${b.buyer_id ? `<div class="meta">${esc(b.buyer_id)}</div>` : ""}</td>
+        <td class="num">${fmt(b.total, 2)}</td><td class="num">${b.exempt ? fmt(b.exempt, 2) : ""}</td><td class="num">${b.no_vat ? fmt(b.no_vat, 2) : ""}</td><td class="num">${b.zero ? fmt(b.zero, 2) : ""}</td>
+        ${rates.map(r => `<td class="num">${b["b" + r] ? fmt(b["b" + r], 2) : ""}</td><td class="num">${b["v" + r] ? fmt(b["v" + r], 2) : ""}</td>`).join("")}<td>${esc(b.tcr)}</td>
+        <td>${b.errors.map(e => `<span class="rhg-pill ${e === "no_fic" ? "critical" : e === "no_detail" ? "" : "medium"}" style="margin:1px">${esc(d.error_labels[e] || e)}</span>`).join("")}</td></tr>`).join("")
+        || `<tr><td colspan="${10 + rates.length * 2}" class="meta">${fcSp("No invoice with this filter.")}</td></tr>`);
+    biMore("biBookMore", "book", rows, total, "The Excel has the whole book.");
+  }, more);
 }
 $("biSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
   biTab = b.dataset.b;
@@ -5686,7 +5717,7 @@ $("biSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
 });
 $("biFLoc").onchange = () => { if (biData) { biChecks(); biInv(); } };
 $("biFSt").onchange = () => biData && biChecks();
-$("biFQ").oninput = () => biData && biChecks();
+$("biFQ").oninput = () => biLater(biChecks);
 $("biRead").onclick = () => loadBilly(true);
 $("biXlsx").onclick = () => { if (biData) exportGo("/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company)); };
 // connection and mapping (Settings permission): the passwords are typed here and never shown back

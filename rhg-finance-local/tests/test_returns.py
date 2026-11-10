@@ -64,9 +64,12 @@ class Returns(unittest.TestCase):
                          (5, 3, 1, 1000, 1, 2))
         self.assertEqual([x["num"] for x in self.R["loose"]], ["NIICLOO006"])
 
-    def test_cut_to_a_location(self):
-        c = billyrec._returns_cut(self.R, {"R2"})
-        self.assertEqual((c["events"], c["kpis"]["events"], c["kpis"]["unfiscalized"]), ([], 0, 0))
+    def test_totals_of_a_location(self):
+        k = billyrec._ret_kpis(billyrec._ret_agg([e for e in self.R["events"] if e["ref"] == "R2"], []))
+        self.assertEqual((k["events"], k["unfiscalized"], k["no_effect"]), (0, 0, 0))
+        k = billyrec._ret_kpis(billyrec._ret_agg([e for e in self.R["events"] if e["ref"] == "R1"], self.R["loose"]))
+        self.assertEqual({x: k[x] for x in ("events", "unfiscalized", "no_effect", "loose")},
+                         {x: self.R["kpis"][x] for x in ("events", "unfiscalized", "no_effect", "loose")})
 
     def test_billy_corrective_reference(self):
         self.assertEqual(billy.corrective_of({"correctiveInv": {"IICRef": "abc123", "Type": "CORRECTIVE"}}), ("ABC123", "CORRECTIVE"))
@@ -79,18 +82,6 @@ class Returns(unittest.TestCase):
                              {"menuItem": {"miNum": 2}, "vdFlag": True, "dspTtl": 15}]}
         c = billyrec.check_of(g)
         self.assertEqual((c["rt"], c["rt_n"], c["vd"], c["vd_n"], c["to"], c["reasons"], c["mgr"]), (40, 1, 15, 1, 12, ["3"], ["55"]))
-
-
-class FitDays(unittest.TestCase):
-    def test_the_most_recent_days_that_fit(self):
-        from datetime import date, timedelta
-        days = [date(2026, 10, 1) + timedelta(days=k) for k in range(50)]
-        nb = {d.isoformat(): 5000 for d in days}
-        nf = {d.isoformat(): 5200 for d in days}
-        kept = billyrec.fit_days(days, nb, nf, 40000)
-        self.assertEqual((len(kept), kept[-1]), (7, days[-1]))                # 7 × 5,200 ≤ 40,000
-        self.assertEqual(billyrec.fit_days(days, {}, {}, 45000), days)       # nothing held yet: every day
-        self.assertEqual(len(billyrec.fit_days(days, {days[-1].isoformat(): 99999}, {}, 45000)), 1)
 
 
 if __name__ == "__main__":

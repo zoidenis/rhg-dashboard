@@ -39,6 +39,26 @@ class XlsxPdf(unittest.TestCase):
         finally:
             xlsxpdf.MAX_ROWS = old
 
+    def test_large_workbook_is_streamed(self):
+        """Above BIG_BYTES the workbook is read as a stream: the first rows shown, the rest counted in its XML."""
+        from openpyxl import Workbook
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet("Book")
+        ws.append(["Libri i Shitjes · test"])
+        ws.append(["Issued", "Invoice", "Total"])
+        for i in range(260):
+            ws.append([f"2026-11-0{i % 9 + 1} 10:00", f"N{i}", 100.0 + i])
+        buf = io.BytesIO()
+        wb.save(buf)
+        old = (xlsxpdf.MAX_ROWS, xlsxpdf.BIG_BYTES)
+        xlsxpdf.MAX_ROWS, xlsxpdf.BIG_BYTES = 40, 1000
+        try:
+            self.assertEqual(xlsxpdf._count_rows(buf.getvalue(), "xl/worksheets/sheet1.xml"), 262)
+            pdf = xlsxpdf.render(buf.getvalue(), "Sales book")
+            self.assertTrue(pdf.startswith(b"%PDF"))
+        finally:
+            xlsxpdf.MAX_ROWS, xlsxpdf.BIG_BYTES = old
+
 
 if __name__ == "__main__":
     unittest.main()
