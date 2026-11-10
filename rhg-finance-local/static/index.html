@@ -1229,16 +1229,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <p class="meta" id="shStatus">Reading…</p>
     </div>
     <div class="card" id="shOvCard" hidden><div class="card-head"><div><h2>Every location</h2>
-      <p class="hint" id="shOvNote"></p></div></div>
+      <p class="hint" id="shOvNote"></p></div><button class="mini" type="button" data-shx="ov" hidden>Excel</button></div>
       <div class="scroll"><table id="shOv"></table></div></div>
     <div class="card" id="shMonthsCard" hidden><div class="card-head"><div><h2>By month</h2>
-      <p class="hint">A month is in the KPIs once its count form is uploaded here, or its count is posted in Business Central. Click a month to open it.</p></div></div>
+      <p class="hint">A month is in the KPIs once its count form is uploaded here, or its count is posted in Business Central. Click a month to open it.</p></div><button class="mini" type="button" data-shx="months" hidden>Excel</button></div>
       <div class="scroll"><table id="shMonths"></table></div></div>
     <div class="card" id="shCatCard" hidden><div class="card-head"><div><h2 id="shCatT">By category</h2>
-      <p class="hint" id="shCatNote"></p></div></div>
+      <p class="hint" id="shCatNote"></p></div><button class="mini" type="button" data-shx="cats" hidden>Excel</button></div>
       <div class="scroll"><table id="shCats"></table></div></div>
     <div class="card" id="shByCard" hidden><div class="card-head"><div><h2 id="shByT">By item</h2>
-      <p class="hint" id="shByNote"></p></div></div>
+      <p class="hint" id="shByNote"></p></div><button class="mini" type="button" data-shx="by" hidden>Excel</button></div>
       <div class="filters sh-by-f">
         <label>Item<input id="shBQ" placeholder="number or name"></label>
         <label>Category<select id="shBCat"></select></label>
@@ -2065,7 +2065,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 
 <div class="modal-bg" id="shPop" role="dialog" aria-modal="true" aria-labelledby="shPopT"><div class="modal" style="max-width:1400px">
   <div class="mhead"><div><h2 id="shPopT">Items</h2><p class="hint" id="shPopNote" style="margin:0"></p></div>
-    <div style="display:flex;gap:8px"><button class="mini dark" id="shPopClose" type="button">Close</button></div></div>
+    <div style="display:flex;gap:8px"><button class="mini" type="button" data-shx="pop" hidden>Excel</button><button class="mini dark" id="shPopClose" type="button">Close</button></div></div>
   <div class="kpis" id="shPopKpis" style="margin:12px 0"></div>
   <div class="filters sh-by-f"><label>Item<input id="shQ" placeholder="number or name"></label>
     <label>Show<select id="shPShow"><option value="diff">With a difference</option><option value="loss">Losses</option><option value="beyond">Beyond % Waste</option><option value="nc">Not counted</option><option value="all">All items</option></select></label></div>
@@ -4265,6 +4265,15 @@ function renderSimphony(st){
   ["spSave","spTest"].forEach(id => { $(id).disabled = !can("settings");
     $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
 }
+// one table as an Excel file (xlsxtable.py): the screen sends the rows it shows, numbers unformatted
+async function xlsxTable(name, sheets, notes){
+  const r = await fetch("/api/xlsx/table", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"},
+    body: JSON.stringify({name, sheets, notes: notes || []})});
+  if (!r.ok) { const j = await readJSON(r).catch(() => ({})); throw new Error(j.error || `failed (${r.status})`); }
+  const url = URL.createObjectURL(await r.blob()), a = document.createElement("a");
+  a.href = url; a.download = name.replace(/[^A-Za-z0-9._ -]+/g, "").replace(/ /g, "_") + ".xlsx";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
 async function simphonyPost(path, body){
   const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json", "X-Requested-With":"RHG-Finance"},
     body: JSON.stringify(body || {})});
@@ -5610,6 +5619,7 @@ function shCard(l, v, sub, cls, full){
 }
 function shRender(){
   ["shOvCard", "shMonthsCard", "shCatCard", "shByCard"].forEach(id => $(id).hidden = true);
+  document.querySelectorAll("[data-shx]").forEach(b => b.hidden = !(shSetup && shSetup.can_export));
   if (!shCat || shOvData) $("shPop").classList.remove("on");
   $("shXlsx").style.display = shSetup && shSetup.can_export && $("shLoc").value ? "" : "none";
   $("shYear").style.display = $("shLoc").value ? "" : "none";
@@ -5771,6 +5781,88 @@ function shBy(){                                       // every item of the peri
   $("shBy").innerHTML = shTable(rows, months, true);
   shWire($("shBy"), shBy);
 }
+// ---- each table as an Excel file: the rows on the screen, with the filters chosen, numbers unformatted
+function shItemSheets(rows, months){
+  const T = "text", N = "num", Q = "qty", P = "pct";
+  const items = {title: "Items", formats: [T, T, T, T, T, T, T, Q, Q, Q, Q, Q, Q, N, "qty", N, P, P, N, T],
+    widths: [11, 34, 16, 16, 14, 12, 8],
+    header: ["Item", "Description", "Category", "Group 4", "Group 5", "Category from", "Unit", "Opening", "In", "Out", "Theoretical",
+      "Counted", "Difference", "Difference value", "Unit cost", "KMSH / Dalje", "Diferenca / Dalje", "% Waste of the category",
+      "Beyond % Waste", "Not counted"],
+    rows: rows.map(r => [r.it.no, r.it.desc, r.it.kat2, r.it.g4, r.it.g5, {exception: "exception", map: "map", bc: "BC group"}[r.it.from] || "",
+      r.it.unit, r.op, r.in, r.out, (r.op || 0) + r.in - r.out, r.cl, r.cnt, r.val, r.cnt ? r.val / r.cnt : null, r.kmsh, r.ratio,
+      r.waste == null ? null : r.waste / 100, r.beyond, r.nc ? "yes" : ""])};
+  const cls = SH_CLS.filter(([k]) => rows.some(r => months.some(m => ((r.it.cls || {})[m] || {})[k])));
+  const mv = {title: "Months & movements", widths: [11, 34, 16, 10, 12],
+    header: ["Item", "Description", "Category", "Month", "Count from", "Opening", ...cls.map(([, l]) => l), "Theoretical", "Counted",
+      "Difference", "Difference value", "KMSH / Dalje"],
+    formats: ["text", "text", "text", "text", "text", "qty", ...cls.map(() => "qty"), "qty", "qty", "qty", "num", "num"], rows: []};
+  rows.forEach(r => months.forEach(m => { const v = r.it.m[m]; if (!v) return; const c = (r.it.cls || {})[m] || {}, x = shData.months.find(y => y.month === m) || {};
+    mv.rows.push([r.it.no, r.it.desc, r.it.kat2, m, x.source === "form" ? "count form" : x.source === "bc" ? "posted in BC" : "", v[0],
+      ...cls.map(([k]) => c[k] ? c[k][0] : null), v[0] + v[1] + v[3], v[7], v[5], v[6], -v[4]]); }));
+  return [items, mv];
+}
+function shNotes(what, extra){
+  const d = shData || shOvData;
+  return [`Shrinkage KPIs · ${what} · ${d.company}${shData ? " · " + d.location : ""} · ${shOvData ? shMonth(shOvData.month) : shMonth(shMon)}`,
+    `Read from Business Central ${String(d.read_at || "").replace("T", " ").slice(0, 16)} (read only); exported ${new Date().toLocaleString("en-GB")}, as shown on the screen.`,
+    ...(extra || [])].filter(Boolean);
+}
+async function shExport(what, btn){
+  const d = shData, T = "text", N = "num", P = "pct", I = "int";
+  const co = (d || shOvData || {}).company || "", base = `RHG ${co} ${d ? d.location + " " : ""}shrinkage`;
+  const per = shOvData ? shOvData.month : shMon === "ytd" ? `YTD ${d.year}` : shMon;
+  let name, sheets, notes;
+  if (what === "ov") {
+    const L = shOvData.locations;
+    name = `${base} every location ${per}`;
+    sheets = [{title: "Every location", formats: [T, N, N, N, I, T, T, T], widths: [12, 14, 14, 14, 10, 12, 50, 18],
+      header: ["Location", "Net difference", "Losses", "Surpluses", "Items", "Count form", "Count documents", "KPIs read"],
+      rows: L.map(x => [x.location, x.net, x.losses, x.surpluses, x.items, x.form ? "yes" : "", (x.docs || []).join(", "), (x.analysis_read_at || "").replace("T", " ").slice(0, 16)])}];
+    notes = shNotes("every location", [`The count adjustments by location: documents starting with ${(shOvData.prefixes || []).join(", ")}.`]);
+  } else if (what === "months") {
+    const row = (m, Tt, label) => { const x = d.months.find(y => y.month === m) || {};
+      return [label, m === "ytd" ? "" : x.source === "form" ? "count form" : x.source === "bc" ? "posted in BC" : "no count",
+        Tt ? Tt.net : null, Tt ? Tt.losses : null, Tt ? Tt.surpluses : null, Tt ? Tt.kmsh : null, Tt ? Tt.ratio : null, Tt ? Tt.investigate : null,
+        Tt ? Tt.unjust : null, Tt ? Tt.unjust_excel : null, m === "ytd" ? null : x.not_counted || null, m === "ytd" ? null : x.not_counted_value || null]; };
+    name = `${base} by month ${d.year}`;
+    sheets = [{title: "By month", formats: [T, T, N, N, N, N, P, I, N, N, I, N], widths: [16, 14],
+      header: ["Month", "Count from", "Net difference", "Losses", "Surpluses", "KMSH / Dalje", "Diferenca / Dalje", "Categories to investigate",
+        "Unjustified", "Unjustified (Excel)", "Items not counted", "Not counted value"],
+      rows: d.months.map(m => row(m.month, (d.per_month[m.month] || {}).totals, shMonth(m.month))).concat(d.ytd.totals ? [row("ytd", d.ytd.totals, "Year to date")] : [])}];
+    notes = shNotes("by month", [d.notes.difference, d.notes.kmsh, d.notes.unjust]);
+  } else if (what === "cats") {
+    const Pp = shMon === "ytd" ? d.ytd : d.per_month[shMon], t = Pp.totals;
+    name = `${base} by category ${per}`;
+    sheets = [{title: "By category", formats: [T, T, T, T, P, I, P, N, N, N, N, P, T, N, N, N], widths: [18, 14, 10, 8],
+      header: ["Category", "Kat. 1", "From BC", "CHECK", "% Waste", "Items", "% Delta", "Net difference", "Losses", "Surpluses", "KMSH / Dalje",
+        "Diferenca / Dalje", "Target", "Allowed waste", "Unjustified", "Unjustified (Excel)"],
+      rows: Pp.rows.map(x => [x.kat2, x.kat1, x.from_bc ? "yes" : "", x.check ? "YES" : "NO", x.waste_pct / 100, x.items, x.delta_all, x.net,
+        x.losses, x.surpluses, x.kmsh, x.ratio, x.target + (shMon === "ytd" && x.months_investigate ? ` · ${x.months_investigate} months` : ""),
+        x.allowed, x.unjust, x.unjust_excel]).concat([["Total", "", "", "", null, null, null, t.net, t.losses, t.surpluses, t.kmsh, t.ratio, "",
+        t.allowed, t.unjust, t.unjust_excel]])}];
+    notes = shNotes("by category", [d.notes.difference, d.notes.kmsh, d.notes.unjust,
+      "% Delta = count difference ÷ out, in quantity; Diferenca / Dalje = −net ÷ KMSH / Dalje."]);
+  } else if (what === "by" || what === "pop") {
+    const months = shPerMonths();
+    const opt = what === "by" ? {cat: $("shBCat").value, q: $("shBQ").value, show: $("shBShow").value, sort: $("shBSort").value}
+      : {cat: shCat, q: $("shQ").value, show: $("shPShow").value, sort: "val"};
+    const rows = shRows(months, opt);
+    const show = (what === "by" ? $("shBShow") : $("shPShow")).selectedOptions[0].text;
+    name = `${base} ${what === "pop" ? shCat + " items" : "by item"} ${per}`;
+    sheets = shItemSheets(rows, months);
+    notes = shNotes(what === "pop" ? `items of ${shCat}` : "by item", [
+      `Filters: ${opt.cat ? "category " + opt.cat : "every category"} · ${show}${opt.q ? " · item \"" + opt.q + "\"" : ""} · ${rows.length} items.`,
+      shSrcNote(months),
+      "Diferenca / Dalje of an item = its loss ÷ its KMSH / Dalje; Beyond % Waste = loss − % Waste × KMSH / Dalje, month by month, before the surpluses of other items are netted (the category's Unjustified nets them).",
+      "Months & movements: quantities in the item's base unit; purchases, transfers, consumption by the recipes, sales, staff, FIRO and other adjustments as posted in the month."]);
+  } else return;
+  const old = btn.textContent; btn.disabled = true; btn.textContent = "Excel…";
+  try { await xlsxTable(name, sheets, notes); }
+  catch (e) { $(what === "pop" ? "shPopNote" : "shStatus").textContent = "Could not export: " + e.message; }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+document.querySelectorAll("[data-shx]").forEach(b => b.onclick = ev => { ev.stopPropagation(); shExport(b.dataset.shx, b); });
 function shRenderOv(){
   const j = shOvData;
   $("shKpis").innerHTML = "";

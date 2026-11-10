@@ -43,6 +43,7 @@ import itemstock
 import shrinkage
 import salestop
 import salestop_report
+import xlsxtable
 import requests
 import cost_report
 import negstock
@@ -3453,6 +3454,28 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path == "/api/xlsx/table":
+                # one table of a screen, as the person sees it (xlsxtable.py): nothing is read from BC here
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if not auth.can(user, "export"):
+                    self._send(403, {"error": "Your role cannot export (needs finance.export)."})
+                    return
+                try:
+                    data = xlsxtable.render(body.get("sheets"), body.get("notes") or [])
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", f'attachment; filename="{xlsxtable.filename(body.get("name"))}"')
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                store.audit("export", "table · " + str(body.get("name") or "")[:120], actor, {},
+                            {"rows": sum(len(x.get("rows") or []) for x in body.get("sheets") or [] if isinstance(x, dict))}, "")
             elif url.path in ("/api/stockstop-report/settings", "/api/stockstop-report/job"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
