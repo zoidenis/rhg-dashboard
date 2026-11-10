@@ -7,6 +7,7 @@ import access
 import base64
 import hmac
 import gzip
+import io
 import html
 import json
 import re
@@ -18,9 +19,10 @@ import webbrowser
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse
 
 import arap_notify
+import xlsxpdf
 import brand_report
 import sales_report
 import channels
@@ -2252,7 +2254,54 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return {}
 
+    # ---- Export → PDF: any Excel export (an address ending in /xlsx) asked with format=pdf is built as usual and
+    # handed back as a PDF of the same workbook (xlsxpdf.py); an answer that is not a workbook passes unchanged
+    def _as_pdf(self, url):
+        rest = [(k, v) for k, v in parse_qsl(url.query, keep_blank_values=True) if k != "format"]
+        self.path = url.path + ("?" + urlencode(rest) if rest else "")
+        cap = {"status": 200, "headers": []}
+        real = (self.wfile, self.send_response, self.send_header, self.end_headers)
+        buf = io.BytesIO()
+        self.wfile = buf
+        self.send_response = lambda code, message=None: cap.update(status=code)
+        self.send_header = lambda k, v: cap["headers"].append((k, v))
+        self.end_headers = lambda: None
+        self._pdf_inner = True
+        try:
+            self.do_GET()
+        finally:
+            self.wfile, self.send_response, self.send_header, self.end_headers = real
+            self._pdf_inner = False
+        h = {k.lower(): v for k, v in cap["headers"]}
+        body = buf.getvalue()
+        if cap["status"] != 200 or not str(h.get("content-type", "")).startswith(xlsxpdf.XLSX):
+            self.send_response(cap["status"])
+            for k, v in cap["headers"]:
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        m = re.search(r'filename="([^"]+)"', h.get("content-disposition", ""))
+        name = m.group(1) if m else "export.xlsx"
+        try:
+            pdf = xlsxpdf.render(body, re.sub(r"\.xlsx$", "", name, flags=re.I).replace("_", " "))
+        except Exception:                                          # noqa: BLE001
+            traceback.print_exc()
+            self._send(500, {"error": "The PDF could not be made from this export; Export → Excel gives the same data."})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/pdf")
+        self.send_header("Content-Disposition", f'attachment; filename="{xlsxpdf.pdf_name(name)}"')
+        self.send_header("Content-Length", str(len(pdf)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(pdf)
+
     def do_GET(self):
+        if not getattr(self, "_pdf_inner", False) and "format=pdf" in self.path:
+            u = urlparse(self.path)
+            if u.path.endswith("/xlsx") and parse_qs(u.query).get("format", [""])[0] == "pdf":
+                return self._as_pdf(u)
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         self._scope_filter = None
@@ -3462,14 +3511,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.can(user, "export"):
                     self._send(403, {"error": "Your role cannot export (needs finance.export)."})
                     return
+                fname = xlsxtable.filename(body.get("name"))
+                ctype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 try:
                     data = xlsxtable.render(body.get("sheets"), body.get("notes") or [])
+                    if body.get("format") == "pdf":             # Export → PDF: the same workbook laid out (xlsxpdf.py)
+                        data = xlsxpdf.render(data, str(body.get("name") or "")[:150])
+                        fname, ctype = xlsxpdf.pdf_name(fname), "application/pdf"
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
                     return
                 self.send_response(200)
-                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                self.send_header("Content-Disposition", f'attachment; filename="{xlsxtable.filename(body.get("name"))}"')
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()

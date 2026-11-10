@@ -713,7 +713,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="mini dark" id="svRead">Read report</button>
         <button class="mini" id="svPdf">PDF</button>
-        <button class="mini" id="svXlsx">Excel</button>
+        <button class="mini exp" id="svXlsx">Export ▾</button>
         <button class="mini dark" id="svSend">Send to Manager &amp; Coordinator</button>
         <input id="svTestTo" placeholder="or send a test to…" style="width:200px;padding:6px 10px;border:1px solid var(--line);border-radius:8px">
         <button class="mini" id="svTest">Send test</button>
@@ -762,7 +762,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
         <label>Purchaser<select id="pqWho"><option value="*">All purchasers</option></select></label>
         <label>Show<select id="pqShow"><option value="">Every line</option><option value="up">Dearer</option><option value="down">Cheaper</option><option value="above">Above the contract</option><option value="check">To check</option></select></label>
         <label>Search<input id="pqQ" placeholder="item or supplier"></label>
-        <div style="display:flex;gap:6px;align-items:flex-end"><button class="mini dark" id="pqRead">Read</button><button class="mini" id="pqXlsx">Excel</button></div></div>
+        <div style="display:flex;gap:6px;align-items:flex-end"><button class="mini dark" id="pqRead">Read</button><button class="mini exp" id="pqXlsx">Export ▾</button></div></div>
       <div class="kpis five" id="pqKpis"></div>
       <p class="meta" id="pqMsg"></p>
     </div>
@@ -928,7 +928,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="mini dark" id="prRead">Read</button>
-        <button class="mini" id="prXlsx">Excel</button>
+        <button class="mini exp" id="prXlsx">Export ▾</button>
         <span class="meta" id="prMsg"></span>
       </div>
     </div>
@@ -1216,6 +1216,60 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 
 <script>
 const $ = id => document.getElementById(id);
+// ---------- Export: every export of the tower as Excel or PDF ----------
+// A button or link with class "exp" opens a small menu, Excel (.xlsx) or PDF; the choice runs the export the
+// button already does, with format=pdf for a PDF: the server builds the same workbook and lays it out (xlsxpdf.py).
+var exportFmt = "xlsx";
+function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ? "&" : "?") + "format=pdf" : url; }
+(function(){
+  const st = document.createElement("style");
+  st.textContent = `.exp{white-space:nowrap}
+.exp-menu{position:absolute;z-index:90;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:4px;min-width:170px}
+.exp-menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 12px;border-radius:7px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
+.exp-menu button:hover,.exp-menu button:focus-visible{background:var(--bg);outline:none}
+.exp-menu .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--sub,var(--muted))}`;
+  document.head.appendChild(st);
+  let menu = null, owner = null, openedAt = 0;
+  const close = () => { if (menu) { menu.remove(); menu = null; if (owner) owner.setAttribute("aria-expanded", "false"); owner = null; } };
+  function run(el, f){
+    if (el.tagName === "A") {
+      const h = el.getAttribute("href");
+      if (h && h !== "#") location.href = f === "pdf" ? h + (h.includes("?") ? "&" : "?") + "format=pdf" : h;
+      return;
+    }
+    exportFmt = f; el.__expRun = true;
+    try { el.click(); } finally { el.__expRun = false; exportFmt = "xlsx"; }
+  }
+  function open(el){
+    close();
+    owner = el; el.setAttribute("aria-expanded", "true");
+    menu = document.createElement("div");
+    menu.className = "exp-menu"; menu.setAttribute("role", "menu");
+    menu.innerHTML = `<button type="button" role="menuitem" data-f="xlsx"><span class="k">XLSX</span><span>Excel</span></button>` +
+      `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button>`;
+    (el.closest(".modal-bg") || document.body).appendChild(menu);
+    const r = el.getBoundingClientRect(), host = menu.offsetParent || document.body, hr = host === document.body ? {top: -window.scrollY, left: -window.scrollX} : host.getBoundingClientRect();
+    menu.style.top = (r.bottom - hr.top + 4) + "px";
+    menu.style.left = Math.max(8, Math.min(r.left - hr.left, document.documentElement.clientWidth - hr.left - menu.offsetWidth - 8)) + "px";
+    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); run(el, f); });
+    menu.querySelector("button").focus({preventScroll: true});
+    openedAt = Date.now();
+  }
+  document.addEventListener("click", ev => {
+    const t = ev.target, el = t.closest && t.closest(".exp");
+    if (menu && !(t.closest && t.closest(".exp-menu")) && !(el && el.__expRun)) { const same = el === owner; close(); if (same) { ev.preventDefault(); ev.stopPropagation(); return; } }
+    if (!el || el.__expRun || el.disabled) return;
+    ev.preventDefault(); ev.stopPropagation();
+    open(el);
+  }, true);
+  document.addEventListener("keydown", ev => {
+    if (!menu) return;
+    if (ev.key === "Escape") { const o = owner; close(); if (o) o.focus(); ev.stopPropagation(); }
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") { const bs = [...menu.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (ev.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); ev.preventDefault(); }
+  }, true);
+  window.addEventListener("resize", close);
+  document.addEventListener("scroll", ev => { if (menu && Date.now() - openedAt > 300 && !menu.contains(ev.target)) close(); }, true);
+})();
 const fmt = (n, d=0) => n == null || isNaN(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 let CUR = "ALL";
 const all = n => fmt(n) + " " + CUR;
@@ -3615,7 +3669,7 @@ function renderPqMail(){
 $("pqRead").onclick = () => loadPq(true);
 ["pqWho", "pqShow"].forEach(id => $(id).onchange = () => pqData && renderPq());
 $("pqQ").oninput = () => pqData && renderPqLines();
-$("pqXlsx").onclick = () => { if (pqData) location.href = "/api/price-changes/xlsx?" + pqParams().toString() + "&purchaser=" + encodeURIComponent($("pqWho").value); };
+$("pqXlsx").onclick = () => { if (pqData) location.href = exportUrl("/api/price-changes/xlsx?" + pqParams().toString() + "&purchaser=" + encodeURIComponent($("pqWho").value)); };
 $("pqSave").onclick = async () => {
   $("pqMailMsg").textContent = "Saving…";
   try{
@@ -3680,7 +3734,7 @@ $("svRead").onclick = () => loadSavings(false);
 ["svLoc","svVendor","svCat","svStream"].forEach(id => $(id).onchange = () => loadSavings(false));
 $("svQ").onkeydown = e => { if (e.key === "Enter") loadSavings(false); };
 $("svPdf").onclick = () => window.open("/api/savings/pdf?" + svParams().toString(), "_blank", "noopener");
-$("svXlsx").onclick = () => { location.href = "/api/savings/xlsx?" + svParams().toString(); };
+$("svXlsx").onclick = () => { location.href = exportUrl("/api/savings/xlsx?" + svParams().toString()); };
 async function svSendTo(onlyTo){
   if (!svData) { $("svMsg").textContent = "Read the report first."; return; }
   $("svMsg").textContent = "Sending…";
@@ -3958,7 +4012,7 @@ function ngRender(){
     <span style="flex:1"></span>
     ${d.can_edit ? `<button class="mini" type="button" id="ngNew">New scenario</button>${sc ? `<button class="mini" type="button" id="ngEditSc">Edit scenario</button>` : ""}` : ""}
     <button class="mini" type="button" id="ngCompare" ${d.scenarios.length < 2 ? "disabled" : ""}>Compare scenarios</button>
-    <button class="mini" type="button" id="ngXlsx">Excel</button></div>`;
+    <button class="mini exp" type="button" id="ngXlsx">Export ▾</button></div>`;
   const note = `<p class="hint ng-why">Scenario based on quantities purchased in the selected period. Actual savings depend on future purchase volume, effective date, supplier terms, and implementation. Freight, item charges and rebates are excluded from both prices. “Agreed” does not mean a BC price list or a signed contract has been updated.${sc && sc.status === "Agreed" ? " <b>This scenario is Agreed: not yet in a BC price list or a signed contract.</b>" : ""}</p>`;
   const phone = window.innerWidth <= 760;
   let body = "";
@@ -3976,7 +4030,7 @@ function ngRender(){
   $("ngNew") && ($("ngNew").onclick = () => ngScenDlg(null));
   $("ngEditSc") && ($("ngEditSc").onclick = () => ngScenDlg(sc));
   $("ngCompare").onclick = ngCompareDlg;
-  $("ngXlsx").onclick = () => { location.href = "/api/negotiations/xlsx?" + ngParams() + "&scenario=" + ngScen; };
+  $("ngXlsx").onclick = () => { location.href = exportUrl("/api/negotiations/xlsx?" + ngParams() + "&scenario=" + ngScen); };
   document.querySelectorAll("[data-ngsort]").forEach(b => b.onclick = () => { ngSort = b.dataset.ngsort; ngRender(); });
 }
 function ngRowCells(r, p, edit){
@@ -4822,7 +4876,7 @@ function prQuick(kind){
 document.querySelectorAll("[data-prq]").forEach(b => b.onclick = () => prQuick(b.dataset.prq));
 const prQs = () => new URLSearchParams({company: $("company").value || "", from: $("prFrom").value, to: $("prTo").value}).toString();
 $("prRead").onclick = () => prLoad();
-$("prXlsx").onclick = () => { location.href = "/api/purchasers/xlsx?" + prQs(); };
+$("prXlsx").onclick = () => { location.href = exportUrl("/api/purchasers/xlsx?" + prQs()); };
 async function prLoad(quiet){
   clearTimeout(prTimer);
   if (prBusy) return;

@@ -835,7 +835,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <p class="hint" id="fsNote">The invoices fiscalized to us at the Tax Administration (what Self-Care shows) next to the purchase invoices posted in BC, by e-invoice code (EIC = NIVF), then by supplier NIPT and amount. Business Central is only read.</p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <span class="meta">Invoices from</span><input type="date" id="fsFrom"><span class="meta">to</span><input type="date" id="fsTo">
-          <button class="mini dark" id="fsRead">Read</button><button class="mini" id="fsXlsx">Excel</button></div></div>
+          <button class="mini dark" id="fsRead">Read</button><button class="mini exp" id="fsXlsx">Export ▾</button></div></div>
       <div class="kpis six" id="fsKpis" style="margin-top:14px"></div>
       <p class="meta" id="fsStatus"></p>
     </div>
@@ -891,7 +891,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <p class="hint" id="fxNote">The e-invoices we issued to businesses and public bodies, as the Tax Administration lists them for our NIPT as seller, next to the sales invoices and credit memos posted in BC, by e-invoice code (EIC = NIVF), then by buyer NIPT and amount. Sales to individuals at the till are fiscalized by the till and are not in this list. Business Central is only read.</p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <span class="meta">From</span><input type="date" id="fxFrom"><span class="meta">to</span><input type="date" id="fxTo">
-          <button class="mini dark" id="fxRead">Read</button><button class="mini" id="fxXlsx">Excel</button></div></div>
+          <button class="mini dark" id="fxRead">Read</button><button class="mini exp" id="fxXlsx">Export ▾</button></div></div>
       <div class="kpis six" id="fxKpis" style="margin-top:14px"></div>
       <p class="meta" id="fxStatus"></p>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">
@@ -927,7 +927,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <input type="date" id="rcFrom"> <span class="meta">to</span> <input type="date" id="rcTo">
           <button class="mini" data-rcq="30">Last 30 days</button><button class="mini" data-rcq="lastmonth">Last month</button>
-          <button class="mini dark" id="rcRead">Read</button><button class="mini" id="rcXlsx">Excel</button></div></div>
+          <button class="mini dark" id="rcRead">Read</button><button class="mini exp" id="rcXlsx">Export ▾</button></div></div>
       <div class="kpis" id="rcKpis"></div>
       <p class="meta" id="rcStatus"></p>
     </div>
@@ -974,7 +974,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <span class="meta">As of</span><input type="date" id="mvAsOf">
           <select id="mvDays" title="Longer histories read the older months of the item ledger from Business Central once; best started outside working hours"><option value="90" selected>90 days of history</option><option value="180">180 days of history</option><option value="365">365 days of history</option></select>
-          <button class="mini dark" id="mvRead">Read</button><button class="mini" id="mvXlsx">Excel</button></div></div>
+          <button class="mini dark" id="mvRead">Read</button><button class="mini exp" id="mvXlsx">Export ▾</button></div></div>
       <div class="kpis" id="mvKpis"></div>
       <p class="meta" id="mvStatus"></p>
     </div>
@@ -1010,7 +1010,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <p class="hint" id="isNote">Every item card and the quantity each warehouse holds, as Business Central calculates it. Every warehouse is shown, so stock can be asked for from the one that holds it.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
             <label class="field" style="flex-direction:row;align-items:center;gap:6px">On<input type="date" id="isDate"></label>
-            <button class="mini" id="isToday" type="button">Today</button><button class="mini" id="isXlsx" type="button">Excel</button><button class="mini dark" id="isRead" type="button">Read again</button></div></div>
+            <button class="mini" id="isToday" type="button">Today</button><button class="mini exp" id="isXlsx" type="button">Export ▾</button><button class="mini dark" id="isRead" type="button">Read again</button></div></div>
         <p class="meta" id="isStatus" style="margin:6px 0 0"></p></div>
       <div class="kpis" id="isKpis"></div>
       <div class="card"><div class="card-head"><div><h2>Warehouses</h2><p class="hint">Click a warehouse to see what it holds; click it again for every warehouse.</p></div></div>
@@ -1034,7 +1034,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="card">
       <div class="card-head"><div><h2>Item cards · card checks</h2>
         <p class="hint" id="imNote">Configuration checks on the item cards and recipes, for the items in use in the period of Recipe integrity.</p></div>
-        <div style="display:flex;gap:6px"><button class="mini" id="imRead">Read</button><button class="mini" id="imXlsx">Excel</button></div></div>
+        <div style="display:flex;gap:6px"><button class="mini" id="imRead">Read</button><button class="mini exp" id="imXlsx">Export ▾</button></div></div>
       <div class="kpis" id="imKpis"></div></div>
     <div class="card"><h2>Checks</h2><p class="hint">Click a check to list its items. An item can fail several checks; each list counts it once.</p>
       <div class="scroll"><table id="imChecks"></table></div></div>
@@ -1065,7 +1065,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <p class="hint" id="skNote">Every location as a square: its SKU cards in Business Central against what it actually used in the last weeks (sales and recipe consumption; transfers out at the warehouses). For each item a recommendation for the card: reordering policy, reorder point, maximum, safety stock, replenishment and transfer-from. Click a location for its items; the Excel holds the lines to create or update, in the columns of the SKU list, to check and import. Business Central is read only.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <label class="meta" for="skSort">Order</label><select id="skSort"><option value="fix">by cards to fix</option><option value="cover">by lowest coverage</option><option value="value">by value used</option><option value="name">by name</option></select>
-            <a class="mini" id="skXlsx" href="#" download>Excel · all locations</a>
+            <a class="mini exp" id="skXlsx" href="#" download>Export · all locations ▾</a>
             <button class="mini dark" id="skRead">Read again</button></div></div>
         <p class="meta" id="skStatus" style="margin:6px 0 0"></p>
       </div>
@@ -1117,7 +1117,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <select id="tyNat"><option value="">All natures</option></select>
           <span class="meta">As of</span><input type="date" id="tyAsOf">
           <select id="tyDays"><option value="90" selected>90 days of history</option><option value="180">180 days of history</option><option value="365">365 days of history</option></select>
-          <button class="mini dark" id="tyRead">Read</button><button class="mini" id="tyXlsx">Excel</button></div></div>
+          <button class="mini dark" id="tyRead">Read</button><button class="mini exp" id="tyXlsx">Export ▾</button></div></div>
       <div class="kpis six" id="tyKpis" style="margin-top:14px"></div>
       <p class="meta" id="tyStatus"></p>
       <div class="ty-callout" id="tyCallout" style="display:none"></div>
@@ -1147,7 +1147,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <select id="dcLocSel"><option value="">All locations</option></select>
           <select id="dcDays"><option value="30" selected>Last 30 days</option><option value="60">Last 60 days</option><option value="90">Last 90 days</option></select>
-          <button class="mini dark" id="dcRead">Read again</button><button class="mini" id="dcXlsx">Excel</button></div></div>
+          <button class="mini dark" id="dcRead">Read again</button><button class="mini exp" id="dcXlsx">Export ▾</button></div></div>
       <div class="kpis six" id="dcKpis" style="margin-top:14px"></div>
       <p class="meta" id="dcStatus"></p>
     </div>
@@ -1177,7 +1177,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <button class="mini dark" id="cnWiz">New count analysis</button>
           <select id="cnLoc" aria-label="Location"><option value="">Choose a location</option></select>
           <select id="cnMonth" aria-label="Month"></select>
-          <button class="mini dark" id="cnRead">Read BC again</button><button class="mini" id="cnXlsx">Excel</button></div></div>
+          <button class="mini dark" id="cnRead">Read BC again</button><button class="mini exp" id="cnXlsx">Export ▾</button></div></div>
       <div class="cn-up" id="cnUp">
         <label class="mini dark" style="cursor:pointer">Upload the count form (Excel)<input type="file" id="cnFile" accept=".xlsx" hidden></label>
         <select id="cnSheet" hidden aria-label="Sheet of the form"></select>
@@ -1222,7 +1222,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <select id="shLoc" aria-label="Location"><option value="">All locations</option></select>
           <select id="shYear" aria-label="Year"></select>
           <select id="shMonth" aria-label="Month"></select>
-          <button class="mini dark" id="shRead" type="button">Read again</button><button class="mini" id="shXlsx" type="button">Excel</button><button class="mini" id="shCfgBtn" type="button">Categories &amp; waste</button></div></div>
+          <button class="mini dark" id="shRead" type="button">Read again</button><button class="mini exp" id="shXlsx" type="button">Export ▾</button><button class="mini" id="shCfgBtn" type="button">Categories &amp; waste</button></div></div>
       <div class="sh-up" id="shUp" hidden>
         <label class="mini dark">Upload the count<input type="file" id="shCntFile" accept=".xlsx" hidden></label>
         <select id="shUpMonth" aria-label="Month the count closes"></select>
@@ -1232,16 +1232,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <p class="meta" id="shStatus">Reading…</p>
     </div>
     <div class="card" id="shOvCard" hidden><div class="card-head"><div><h2>Every location</h2>
-      <p class="hint" id="shOvNote"></p></div><button class="mini" type="button" data-shx="ov" hidden>Excel</button></div>
+      <p class="hint" id="shOvNote"></p></div><button class="mini exp" type="button" data-shx="ov" hidden>Export ▾</button></div>
       <div class="scroll"><table id="shOv"></table></div></div>
     <div class="card" id="shMonthsCard" hidden><div class="card-head"><div><h2>By month</h2>
-      <p class="hint">A month is in the KPIs once its count form is uploaded here, or its count is posted in Business Central. Click a month to open it.</p></div><button class="mini" type="button" data-shx="months" hidden>Excel</button></div>
+      <p class="hint">A month is in the KPIs once its count form is uploaded here, or its count is posted in Business Central. Click a month to open it.</p></div><button class="mini exp" type="button" data-shx="months" hidden>Export ▾</button></div>
       <div class="scroll"><table id="shMonths"></table></div></div>
     <div class="card" id="shCatCard" hidden><div class="card-head"><div><h2 id="shCatT">By category</h2>
-      <p class="hint" id="shCatNote"></p></div><button class="mini" type="button" data-shx="cats" hidden>Excel</button></div>
+      <p class="hint" id="shCatNote"></p></div><button class="mini exp" type="button" data-shx="cats" hidden>Export ▾</button></div>
       <div class="scroll"><table id="shCats"></table></div></div>
     <div class="card" id="shByCard" hidden><div class="card-head"><div><h2 id="shByT">By item</h2>
-      <p class="hint" id="shByNote"></p></div><button class="mini" type="button" data-shx="by" hidden>Excel</button></div>
+      <p class="hint" id="shByNote"></p></div><button class="mini exp" type="button" data-shx="by" hidden>Export ▾</button></div>
       <div class="filters sh-by-f">
         <label>Item<input id="shBQ" placeholder="number or name"></label>
         <label>Category<select id="shBCat"></select></label>
@@ -1355,7 +1355,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu prices</h2>
           <p class="hint">The active price of every menu item at every Simphony location, by revenue centre and price level, with the cost Simphony holds and that cost as a share of the price (menu prices usually include VAT). Filter here; the Excel holds every price of the filter, and a sheet with one row per item and a column per location.</p></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini dark" id="prxXlsx">Excel</button><button class="mini" id="prxRead">Read again</button></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp dark" id="prxXlsx">Export ▾</button><button class="mini" id="prxRead">Read again</button></div></div>
         <div class="filters" style="margin:6px 0 8px">
           <label>Location<select id="prxLoc"><option value="">All locations</option></select></label>
           <label>Price level<select id="prxLvl"><option value="">All levels</option></select></label>
@@ -1371,7 +1371,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu engineering</h2>
           <p class="hint">Every menu item by popularity and margin, within its menu section: Stars, Plowhorses, Puzzles and Dogs, with what the kitchen and the floor should do. Items sold and sales from Simphony; the portion cost from the recipes and item cards of Business Central. The period is the one chosen above.</p></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="meParBtn" aria-expanded="false" aria-controls="mePar">Parameters</button><button class="mini dark" id="meXlsx">Excel</button><button class="mini" id="meRead">Read again</button></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="meParBtn" aria-expanded="false" aria-controls="mePar">Parameters</button><button class="mini exp dark" id="meXlsx">Export ▾</button><button class="mini" id="meRead">Read again</button></div></div>
         <div class="me-par" id="mePar" hidden>
           <h3>Classification parameters</h3>
           <p class="hint" style="margin:2px 0 10px">They apply to every brand and location and to the Excel file. The class changes at once; nothing is read again from Simphony or Business Central.</p>
@@ -1447,7 +1447,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div class="card-head"><div><h2>Sales blocked by stock</h2>
           <p class="hint"><span>The sales Business Central cannot post because a component is short at the location, and the components today's Simphony sales will run out of before they are imported.</span> <span>Read every few minutes; Business Central and Simphony are only read.</span></p></div>
           <div class="sh-ctl"><select id="stLoc" aria-label="Location"><option value="">All locations</option></select>
-            <button class="mini dark" id="stRead" type="button">Read again</button><button class="mini" id="stXlsx" type="button">Excel</button></div></div>
+            <button class="mini dark" id="stRead" type="button">Read again</button><button class="mini exp" id="stXlsx" type="button">Export ▾</button></div></div>
         <div class="kpis six" id="stKpis" style="margin-top:14px"></div>
         <p class="meta" id="stStatus">Reading…</p></div>
       <div class="card" id="stLocCard" hidden style="margin-bottom:16px"><div class="card-head"><div><h2>By location</h2>
@@ -1472,7 +1472,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Channel profitability</h2>
           <p class="hint">A profit and loss of every sales channel (Simphony order type: dine in, take away, Wolt, Glovo…), on RHG's Wolt template: net sales, the channel's costs, cost of goods, other variable costs, the contribution, then the result after fixed and shared costs. Sales from Simphony; cost of goods from the recipes in Business Central; the rest from BC accounts or from the parameters. The period is the one chosen above.</p></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="cpParBtn" aria-expanded="false" aria-controls="cpPar">Parameters</button><button class="mini dark" id="cpXlsx">Excel</button><button class="mini" id="cpRead">Read again</button></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="cpParBtn" aria-expanded="false" aria-controls="cpPar">Parameters</button><button class="mini exp dark" id="cpXlsx">Export ▾</button><button class="mini" id="cpRead">Read again</button></div></div>
         <div class="me-par" id="cpPar" hidden>
           <h3>Channel profitability parameters</h3>
           <p class="hint" style="margin:2px 0 10px">Per channel, the costs that Simphony does not hold. Amounts per month are per location. Where BC accounts are given, the net change of those accounts on the location's department replaces the amount typed here. Nothing is assumed: an empty commission stays at zero and is flagged.</p>
@@ -1599,7 +1599,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="card-head"><div><h2>Simphony ↔ Billy</h2>
         <p class="hint" id="biNote"><span>Every Simphony check against the invoice Billy fiscalized for it: whether, with which IIC and FIC and at what time; the tills and units (kiosks included), shifts and operators, the summary invoices, and the sales book in the columns of the law in place of the Self-Care download.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button class="mini dark" id="biRead">Read again</button><button class="mini" id="biXlsx">Sales book (Excel)</button><button class="mini" id="biSetBtn" style="display:none">Connection &amp; mapping</button></div></div>
+          <button class="mini dark" id="biRead">Read again</button><button class="mini exp" id="biXlsx">Sales book · Export ▾</button><button class="mini" id="biSetBtn" style="display:none">Connection &amp; mapping</button></div></div>
       <div class="kpis" id="biKpis" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
       <p class="meta" id="biStatus"></p>
     </div>
@@ -2068,7 +2068,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 
 <div class="modal-bg" id="shPop" role="dialog" aria-modal="true" aria-labelledby="shPopT"><div class="modal" style="max-width:1400px">
   <div class="mhead"><div><h2 id="shPopT">Items</h2><p class="hint" id="shPopNote" style="margin:0"></p></div>
-    <div style="display:flex;gap:8px"><button class="mini" type="button" data-shx="pop" hidden>Excel</button><button class="mini dark" id="shPopClose" type="button">Close</button></div></div>
+    <div style="display:flex;gap:8px"><button class="mini exp" type="button" data-shx="pop" hidden>Export ▾</button><button class="mini dark" id="shPopClose" type="button">Close</button></div></div>
   <div class="kpis" id="shPopKpis" style="margin:12px 0"></div>
   <div class="filters sh-by-f"><label>Item<input id="shQ" placeholder="number or name"></label>
     <label>Show<select id="shPShow"><option value="diff">With a difference</option><option value="loss">Losses</option><option value="beyond">Beyond % Waste</option><option value="nc">Not counted</option><option value="all">All items</option></select></label></div>
@@ -3510,7 +3510,7 @@ $("cpKey").onchange = () => cpLoad();
 $("cpView").onchange = () => { $("cpChL").style.display = $("cpView").value === "month" ? "" : "none"; if ($("cpView").value === "month" && !$("cpCh").value && cpData && cpData.channels.length) $("cpCh").value = cpData.channels[0].key; cpLoad(); };
 $("cpCh").onchange = () => cpLoad();
 $("cpRead").onclick = () => cpLoad(true);
-$("cpXlsx").onclick = () => { if (cpData) location.href = "/api/sales/channel-profit/xlsx?" + cpQs(); };
+$("cpXlsx").onclick = () => { if (cpData) location.href = exportUrl("/api/sales/channel-profit/xlsx?" + cpQs()); };
 function cpRender(){
   const d = cpData, T = d.total, C = d.currency;
   const card = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
@@ -3644,7 +3644,7 @@ $("meLevel").onchange = () => {
 $("meKey").onchange = () => meLoad();
 $("meSec").onchange = () => meLoad();
 $("meRead").onclick = () => meLoad(true);
-$("meXlsx").onclick = () => { if (meData) location.href = "/api/sales/menu/xlsx?" + meQs(); };
+$("meXlsx").onclick = () => { if (meData) location.href = exportUrl("/api/sales/menu/xlsx?" + meQs()); };
 $("meChartSec").onchange = () => meData && meChart();
 $("meQ").oninput = () => meData && meItems();
 function meRender(){
@@ -4212,7 +4212,7 @@ function prxRender(){
 ["prxLoc", "prxLvl", "prxGrp"].forEach(id => $(id).onchange = () => prxLoad());
 $("prxQ").oninput = () => { clearTimeout(prxTimer); prxTimer = setTimeout(() => prxLoad(), 400); };
 $("prxRead").onclick = () => prxLoad(true);
-$("prxXlsx").onclick = () => { location.href = "/api/sales/prices/xlsx?" + prxQs(); };
+$("prxXlsx").onclick = () => { location.href = exportUrl("/api/sales/prices/xlsx?" + prxQs()); };
 function slOpen(i){ $("slPop").dataset.i = i; slDraw(i); $("slBd").classList.add("show"); }
 function slDraw(i){
   const d = salesData, l = (d.locations || [])[i]; if (!l) return;
@@ -4268,13 +4268,69 @@ function renderSimphony(st){
   ["spSave","spTest"].forEach(id => { $(id).disabled = !can("settings");
     $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
 }
-// one table as an Excel file (xlsxtable.py): the screen sends the rows it shows, numbers unformatted
+// ---------- Export: every export of the tower as Excel or PDF ----------
+// A button or link with class "exp" opens a small menu, Excel (.xlsx) or PDF; the choice runs the export the
+// button already does, with format=pdf for a PDF: the server builds the same workbook and lays it out (xlsxpdf.py).
+var exportFmt = "xlsx";
+function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ? "&" : "?") + "format=pdf" : url; }
+(function(){
+  const st = document.createElement("style");
+  st.textContent = `.exp{white-space:nowrap}
+.exp-menu{position:absolute;z-index:90;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:4px;min-width:170px}
+.exp-menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 12px;border-radius:7px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
+.exp-menu button:hover,.exp-menu button:focus-visible{background:var(--bg);outline:none}
+.exp-menu .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--sub,var(--muted))}`;
+  document.head.appendChild(st);
+  let menu = null, owner = null, openedAt = 0;
+  const close = () => { if (menu) { menu.remove(); menu = null; if (owner) owner.setAttribute("aria-expanded", "false"); owner = null; } };
+  function run(el, f){
+    if (el.tagName === "A") {
+      const h = el.getAttribute("href");
+      if (h && h !== "#") location.href = f === "pdf" ? h + (h.includes("?") ? "&" : "?") + "format=pdf" : h;
+      return;
+    }
+    exportFmt = f; el.__expRun = true;
+    try { el.click(); } finally { el.__expRun = false; exportFmt = "xlsx"; }
+  }
+  function open(el){
+    close();
+    owner = el; el.setAttribute("aria-expanded", "true");
+    menu = document.createElement("div");
+    menu.className = "exp-menu"; menu.setAttribute("role", "menu");
+    menu.innerHTML = `<button type="button" role="menuitem" data-f="xlsx"><span class="k">XLSX</span><span>Excel</span></button>` +
+      `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button>`;
+    (el.closest(".modal-bg") || document.body).appendChild(menu);
+    const r = el.getBoundingClientRect(), host = menu.offsetParent || document.body, hr = host === document.body ? {top: -window.scrollY, left: -window.scrollX} : host.getBoundingClientRect();
+    const sy = host === document.body ? 0 : host.scrollTop, sx = host === document.body ? 0 : host.scrollLeft;
+    menu.style.top = (r.bottom - hr.top + sy + 4) + "px";
+    menu.style.left = Math.max(8, Math.min(r.left - hr.left + sx, document.documentElement.clientWidth - hr.left + sx - menu.offsetWidth - 8)) + "px";
+    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); run(el, f); });
+    menu.querySelector("button").focus({preventScroll: true});
+    openedAt = Date.now();
+  }
+  document.addEventListener("click", ev => {
+    const t = ev.target, el = t.closest && t.closest(".exp");
+    if (menu && !(t.closest && t.closest(".exp-menu")) && !(el && el.__expRun)) { const same = el === owner; close(); if (same) { ev.preventDefault(); ev.stopPropagation(); return; } }
+    if (!el || el.__expRun || el.disabled) return;
+    ev.preventDefault(); ev.stopPropagation();
+    open(el);
+  }, true);
+  document.addEventListener("keydown", ev => {
+    if (!menu) return;
+    if (ev.key === "Escape") { const o = owner; close(); if (o) o.focus(); ev.stopPropagation(); }
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") { const bs = [...menu.querySelectorAll("button")], i = bs.indexOf(document.activeElement); bs[(i + (ev.key === "ArrowDown" ? 1 : bs.length - 1)) % bs.length].focus(); ev.preventDefault(); }
+  }, true);
+  window.addEventListener("resize", close);
+  document.addEventListener("scroll", ev => { if (menu && Date.now() - openedAt > 300 && !menu.contains(ev.target)) close(); }, true);
+})();
+// one table as an Excel file (xlsxtable.py), or a PDF of it: the screen sends the rows it shows, numbers unformatted
 async function xlsxTable(name, sheets, notes){
+  const fmt = exportFmt;
   const r = await fetch("/api/xlsx/table", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"},
-    body: JSON.stringify({name, sheets, notes: notes || []})});
+    body: JSON.stringify({name, sheets, notes: notes || [], format: fmt})});
   if (!r.ok) { const j = await readJSON(r).catch(() => ({})); throw new Error(j.error || `failed (${r.status})`); }
   const url = URL.createObjectURL(await r.blob()), a = document.createElement("a");
-  a.href = url; a.download = name.replace(/[^A-Za-z0-9._ -]+/g, "").replace(/ /g, "_") + ".xlsx";
+  a.href = url; a.download = name.replace(/[^A-Za-z0-9._ -]+/g, "").replace(/ /g, "_") + (fmt === "pdf" ? ".pdf" : ".xlsx");
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 async function simphonyPost(path, body){
@@ -4382,7 +4438,7 @@ async function loadRecipes(refresh){
 }
 $("rcRead").onclick = () => loadRecipes(true);
 $("imRead").onclick = () => loadRecipes(true);
-$("rcXlsx").onclick = $("imXlsx").onclick = () => { location.href = "/api/recipes/xlsx?" + rcQs(); };
+$("rcXlsx").onclick = $("imXlsx").onclick = () => { location.href = exportUrl("/api/recipes/xlsx?" + rcQs()); };
 $("rcDrillClose").onclick = () => { $("rcDrillCard").style.display = "none"; };
 $("imListClose").onclick = () => { $("imListCard").style.display = "none"; };
 const rcPill = st => `<span class="rhg-pill ${RC_PILL[st] || "info"}">${esc(st.toLowerCase())}</span>`;
@@ -4509,7 +4565,7 @@ async function isLoad(refresh){
 $("isRead").onclick = () => isLoad(true);
 $("isToday").onclick = () => { $("isDate").value = ""; isLoad(false); };
 $("isDate").onchange = () => isLoad(false);
-$("isXlsx").onclick = () => { location.href = "/api/inventory/items/xlsx?" + isQs() + "&location=" + encodeURIComponent($("isLoc").value) + "&show=" + encodeURIComponent($("isShow").value); };
+$("isXlsx").onclick = () => { location.href = exportUrl("/api/inventory/items/xlsx?" + isQs() + "&location=" + encodeURIComponent($("isLoc").value) + "&show=" + encodeURIComponent($("isShow").value)); };
 ["isLoc","isG3","isG4","isShow","isSort","isMode"].forEach(id => $(id).onchange = () => { isLimit = 200; isRender(); });
 $("isQ").oninput = () => { isLimit = 200; isRender(); };
 $("isMore").onclick = () => { isLimit += 400; isRender(); };
@@ -4720,7 +4776,7 @@ window.addEventListener("resize", () => { if ($("v-invcharts") && $("v-invcharts
 $("mvRead").onclick = () => { mvData = null; loadMovement(true); };
 $("mvDays").onchange = () => { mvData = null; loadMovement(false); };
 $("mvAsOf").onchange = () => { mvData = null; loadMovement(false); };
-$("mvXlsx").onclick = () => { if (mvData) location.href = "/api/movement/xlsx?" + mvQs(); };
+$("mvXlsx").onclick = () => { if (mvData) location.href = exportUrl("/api/movement/xlsx?" + mvQs()); };
 ["mvFLoc","mvFClass","mvFCat","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => loadMvRows());
 $("mvFQ").onkeydown = e => { if (e.key === "Enter") loadMvRows(); };
 function renderMovement(){
@@ -5174,7 +5230,7 @@ $("biFLoc").onchange = () => { if (biData) { biChecks(); biInv(); } };
 $("biFSt").onchange = () => biData && biChecks();
 $("biFQ").oninput = () => biData && biChecks();
 $("biRead").onclick = () => loadBilly(true);
-$("biXlsx").onclick = () => { if (biData) location.href = "/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company); };
+$("biXlsx").onclick = () => { if (biData) location.href = exportUrl("/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company)); };
 // connection and mapping (Settings permission): the passwords are typed here and never shown back
 function biAcctRow(a){
   const cos = (biCfg && biCfg.companies) || [];
@@ -5545,7 +5601,7 @@ function stRender(){
 $("stLoc").onchange = () => stRender();
 $("stQ").oninput = () => stRender();
 $("stRead").onclick = () => stLoad(true);
-$("stXlsx").onclick = () => { if (stData) location.href = "/api/sales/stockstop/xlsx?" + new URLSearchParams({company: $("company").value || ""}); };
+$("stXlsx").onclick = () => { if (stData) location.href = exportUrl("/api/sales/stockstop/xlsx?" + new URLSearchParams({company: $("company").value || ""})); };
 $("company").addEventListener("change", () => { stData = null; if ($("slStView").style.display !== "none") stLoad(false); });
 // ---------- Inventory → Shrinkage KPIs (shrinkage.py) ----------
 var shCfgSaved = false;
@@ -5862,7 +5918,7 @@ async function shExport(what, btn){
       "Diferenca / Dalje of an item = its loss ÷ its KMSH / Dalje; Beyond % Waste = loss − % Waste × KMSH / Dalje, month by month, before the surpluses of other items are netted (the category's Unjustified nets them).",
       "Months & movements: quantities in the item's base unit; purchases, transfers, consumption by the recipes, sales, staff, FIRO and other adjustments as posted in the month."]);
   } else return;
-  const old = btn.textContent; btn.disabled = true; btn.textContent = "Excel…";
+  const old = btn.textContent; btn.disabled = true; btn.textContent = exportFmt === "pdf" ? "PDF…" : "Excel…";
   try { await xlsxTable(name, sheets, notes); }
   catch (e) { $(what === "pop" ? "shPopNote" : "shStatus").textContent = "Could not export: " + e.message; }
   finally { btn.disabled = false; btn.textContent = old; }
@@ -6023,7 +6079,7 @@ $("shLoc").onchange = () => { shUpHint(); shMon = ""; shCat = ""; shData = null;
 $("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
 $("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
 $("shRead").onclick = () => $("shLoc").value ? loadSh(true) : loadShOv(true);
-$("shXlsx").onclick = () => { if (shData) location.href = "/api/shrinkage/xlsx?" + shQs(); };
+$("shXlsx").onclick = () => { if (shData) location.href = exportUrl("/api/shrinkage/xlsx?" + shQs()); };
 $("shCfgBtn").onclick = () => { if (shCfgOpen && !$("shCfgCard").hidden) { $("shCfgCard").hidden = true; shCfgOpen = false; } else { shCfgLoad(); $("shCfgCard").scrollIntoView({behavior: "smooth", block: "start"}); } };
 $("shCfgClose").onclick = () => { $("shCfgCard").hidden = true; shCfgOpen = false; };
 $("shQ").oninput = () => shItems();
@@ -6210,7 +6266,7 @@ $("cnSheet").onchange = () => cnUpload($("cnSheet").value);
 $("cnLoc").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; loadCn(false); };
 $("cnMonth").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; loadCn(false); };
 $("cnRead").onclick = () => { cnData = null; loadCn(true); };
-$("cnXlsx").onclick = () => { if (cnData) location.href = "/api/stockcount/xlsx?" + cnQs(); };
+$("cnXlsx").onclick = () => { if (cnData) location.href = exportUrl("/api/stockcount/xlsx?" + cnQs()); };
 $("cnQ").oninput = () => cnData && cnLines();
 // ---------- the window of a new count: location and month → read Business Central → upload the form → Excel
 const cnSp = t => `<span>${esc(t)}</span>`;
@@ -6228,7 +6284,7 @@ async function cnWizShow(){
     step(2, "Read Business Central", `<div class="row"><button class="mini dark" id="cnwRead">Read Business Central</button><button class="mini" id="cnwAgain" hidden>Read again</button></div><div class="msg" id="cnwReadMsg"></div>`, "cnw2") +
     step(3, "Upload the count form", `<label class="cn-drop" id="cnwDrop"><span>Choose the Excel form, or drop it here</span><input type="file" id="cnwFile" accept=".xlsx" hidden></label>
       <div class="row" style="margin-top:8px"><select id="cnwSheet" hidden aria-label="Sheet of the form"></select></div><div class="msg" id="cnwUpMsg"></div>`, "cnw3") +
-    step(4, "Generate the Excel file", `<div class="row"><button class="mini dark" id="cnwXlsx">Generate the Excel file</button><button class="mini" id="cnwSee">See the analysis</button></div><div class="msg" id="cnwXMsg"></div>`, "cnw4") +
+    step(4, "Export the analysis", `<div class="row"><button class="mini dark exp" id="cnwXlsx">Export ▾</button><button class="mini" id="cnwSee">See the analysis</button></div><div class="msg" id="cnwXMsg"></div>`, "cnw4") +
     `</div>`;
   $("cnwLoc").value = $("cnLoc").value || (st.locations.length === 1 ? st.locations[0].code : "");
   $("cnwMonth").value = [...$("cnwMonth").options].some(o => o.value === $("cnMonth").value) ? $("cnMonth").value : (st.month || st.default_month);
@@ -6253,7 +6309,7 @@ async function cnWizShow(){
   drop.ondragleave = () => drop.classList.remove("over");
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (!$("cnw3").classList.contains("off")) take(e.dataTransfer.files[0]); };
   $("cnwSheet").onchange = () => cnUpload($("cnwSheet").value);
-  $("cnwXlsx").onclick = () => { if (!cnWizMine()) return; location.href = "/api/stockcount/xlsx?" + cnQs(); cnWizXlsx = true; cnWizDraw(); };
+  $("cnwXlsx").onclick = () => { if (!cnWizMine()) return; location.href = exportUrl("/api/stockcount/xlsx?" + cnQs()); cnWizXlsx = true; cnWizDraw(); };
   $("cnwSee").onclick = () => { cnWizClose(); window.scrollTo({top: 0, behavior: "smooth"}); };
   cnWizOn = true; $("cnBd").classList.add("show"); cnWizDraw();
   clearInterval(cnWizTimer); cnWizTimer = setInterval(cnWizDraw, 800);
@@ -6294,7 +6350,7 @@ $("dcRead").onclick = () => { dcData = null; loadDischarge(true); };
 $("dcDays").onchange = () => { dcData = null; loadDischarge(false); };
 $("dcLocSel").onchange = () => dcData && renderDischarge();
 $("dcQ").oninput = () => dcData && renderDcLines();
-$("dcXlsx").onclick = () => { if (dcData) location.href = "/api/discharge/xlsx?" + new URLSearchParams({company: $("company").value || "", days: $("dcDays").value}); };
+$("dcXlsx").onclick = () => { if (dcData) location.href = exportUrl("/api/discharge/xlsx?" + new URLSearchParams({company: $("company").value || "", days: $("dcDays").value})); };
 function dcLines(){ const loc = $("dcLocSel").value; return dcData.lines.filter(x => !loc || x.location === loc); }
 function renderDischarge(){
   const d = dcData, loc = $("dcLocSel").value, L = dcLines();
@@ -6430,7 +6486,7 @@ async function loadTypology(refresh){
 $("tyRead").onclick = () => { tyData = null; loadTypology(true); };
 $("tyDays").onchange = () => { tyData = null; loadTypology(false); };
 $("tyAsOf").onchange = () => { tyData = null; loadTypology(false); };
-$("tyXlsx").onclick = () => { if (tyData) location.href = "/api/typology/xlsx?" + tyQs(); };
+$("tyXlsx").onclick = () => { if (tyData) location.href = exportUrl("/api/typology/xlsx?" + tyQs()); };
 ["tyLoc", "tyNat", "tyOnlyCount"].forEach(id => $(id).onchange = () => tyData && renderTypology());
 // sum the (location, type, family) rows; for the whole group the use of distribution locations
 // (their transfers out) is left out, so the restaurants' use is not counted twice
@@ -6691,7 +6747,7 @@ async function fsWait(id, msgEl, done){
 }
 $("fsRead").onclick = () => { fsData = null; loadFiscal(true); };
 $("fsFrom").onchange = $("fsTo").onchange = () => { fsData = null; loadFiscal(false); };
-$("fsXlsx").onclick = () => { if (fsData) location.href = "/api/fiscal/xlsx?" + fsQs(); };
+$("fsXlsx").onclick = () => { if (fsData) location.href = exportUrl("/api/fiscal/xlsx?" + fsQs()); };
 $("fsFilter").onchange = fsRows; $("fsQ").oninput = fsRows;
 $("fsFetch").onclick = async () => {
   $("fsMsg").textContent = "Reading the e-invoices from the Tax Administration…";
@@ -6793,7 +6849,7 @@ function fxRows(){
 }
 $("fxRead").onclick = () => { fxData = null; loadFiscalSales(true); };
 $("fxFrom").onchange = $("fxTo").onchange = () => { fxData = null; loadFiscalSales(false); };
-$("fxXlsx").onclick = () => { if (fxData) location.href = "/api/fiscal/xlsx?" + fxQs(); };
+$("fxXlsx").onclick = () => { if (fxData) location.href = exportUrl("/api/fiscal/xlsx?" + fxQs()); };
 $("fxFilter").onchange = fxRows; $("fxQ").oninput = fxRows;
 $("fxFetch").onclick = async () => {
   $("fxMsg").textContent = "Reading the e-invoices we issued from the Tax Administration…";
@@ -7471,7 +7527,7 @@ function skDraw(code){
   const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
   $("skPop").innerHTML = `<div class="ph"><div class="ic">${ilGlyph(L)}</div>
       <div><h2>${esc(L.name || code)}</h2><div class="sub">${esc(code)} · SKU cards against the use of ${esc(skData.window.from)} → ${esc(skData.window.to)} · lead time ${fmt(L.lead)} days</div></div><div class="sp"></div>
-      <a class="close" href="/api/inventory/sku/xlsx?${skQuery()}&code=${encodeURIComponent(code)}" style="text-decoration:none" download>Excel · this location</a>
+      <a class="close exp" href="/api/inventory/sku/xlsx?${skQuery()}&code=${encodeURIComponent(code)}" style="text-decoration:none" download>Export · this location ▾</a>
       <button class="close" data-skclose>Close ×</button></div>
     <div class="pl-body">
       ${(L.alerts || []).length ? `<div class="pl-panel" style="margin-bottom:12px"><div class="pl-ex">${L.alerts.map(a => `<div><span class="pl-sev ${a[0]}"></span>${esc(a[1])}</div>`).join("")}</div></div>` : ""}
