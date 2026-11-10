@@ -133,6 +133,7 @@ def build(company, frm, to, latest_fn=None, progress=None, today=None):
     today = today or date.today()
     a, b = billyrec.check_range(frm, to, today)
     days = billyrec._dates(a, b)
+    before = billyrec._dates(a - timedelta(days=len(days)), a - timedelta(days=1))     # the period before, as long
     say = progress or (lambda *_: None)
     conn = sevenrooms.info()
     if not conn["configured"]:
@@ -151,20 +152,21 @@ def build(company, frm, to, latest_fn=None, progress=None, today=None):
                 latest[r["ref"]] = latest_fn(r["ref"]) if latest_fn else simphony.latest_business_date(r["ref"])
             except Exception:                                                # noqa: BLE001
                 latest[r["ref"]] = None
-    jobs = [("sr", v["id"], d) for v, r in venues for d in days] + [("fb", v["id"], None) for v, r in venues]
+    every = before + days
+    jobs = [("sr", v["id"], d) for v, r in venues for d in every] + [("fb", v["id"], None) for v, r in venues]
     if sim_on:
         refs = sorted({r["ref"] for v, r in venues})
-        jobs += [("chk", ref, d) for ref in refs for d in days if not latest.get(ref) or d.isoformat() <= latest[ref]]
-        jobs += [("tot", ref, d) for ref in refs for d in days if not latest.get(ref) or d.isoformat() <= latest[ref]]
+        jobs += [("chk", ref, d) for ref in refs for d in every if not latest.get(ref) or d.isoformat() <= latest[ref]]
+        jobs += [("tot", ref, d) for ref in refs for d in every if not latest.get(ref) or d.isoformat() <= latest[ref]]
     errors = []
-    say(f"{len(days)} days · {len(jobs):,} reads ({len(venues)} venues)")
+    say(f"{len(every)} days · {len(jobs):,} reads ({len(venues)} venues)")
 
     def run(job):
         kind, x, d = job
         if kind == "sr":
             return sevenrooms.read_day(x, d, today)
         if kind == "fb":
-            return sevenrooms.read_feedback(x, a, b, today)
+            return sevenrooms.read_feedback(x, before[0], b, today)
         if kind == "chk":
             return billyrec.read_checks(x, d.isoformat(), latest.get(x))
         return simphony.daily_totals(x, d.isoformat(), latest.get(x))
@@ -178,11 +180,13 @@ def build(company, frm, to, latest_fn=None, progress=None, today=None):
                 if len(errors) < 12:
                     errors.append(f"{'SevenRooms' if kind in ('sr', 'fb') else 'Simphony'} {x[:24]} {d or ''}: {str(exc)[:140]}")
             if n % 10 == 0:
-                say(f"{len(days)} days · {n:,} of {len(jobs):,} reads")
+                say(f"{len(every)} days · {n:,} of {len(jobs):,} reads")
     if sim_on:
         simphony.flush_days()
     say("matching the reservations with the checks")
     r = analyse(company, days, venues, placed, regs, latest, today, sim_on)
+    r["prev_agg"] = analyse(company, before, venues, placed, regs, latest, today, sim_on)["agg"]
+    r["prev_range"] = {"from": before[0].isoformat(), "to": before[-1].isoformat()}
     r.update(errors=errors, complete=not errors, checked_at=datetime.now().isoformat(timespec="seconds"),
              simphony=sim_on, connection={k: conn[k] for k in ("env", "configured")})
     return r
@@ -289,7 +293,13 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
                          "tables": x["tables"], "server": x["server"], "vip": x["vip"], "tags": x["tags"],
                          "checks": codes, "found": [str(c["num"]) for c in found], "spend": spend,
                          "sr_spend": round(sum(t["total"] or 0 for t in x["tickets"]), 2) if x["tickets"] else None,
-                         "lead": lead, "link": link, "prepay": x.get("prepay"), "client": x.get("client") or ""})
+                         "lead": lead, "link": link, "prepay": x.get("prepay"), "client": x.get("client") or "",
+                         "created": x.get("created") or "", "seated": x.get("seated") or "", "left": x.get("left") or "",
+                         "duration": x.get("duration"), "real": x.get("real") or "",
+                         "sim": [{"num": c.get("num"), "opn": c.get("opn") or "", "clsd": c.get("clsd") or "", "total": c["total"],
+                                  "emp": c.get("emp"), "rvc": c.get("rvc")} for c in found],
+                         "tickets": [{"code": t["code"] or t["pos_id"], "total": t["total"], "start": t["start"], "end": t["end"],
+                                      "table": t["table"]} for t in x["tickets"]][:6]})
         # Simphony's side of each day: every check, guests, sales; the checks no reservation took
         for d in days:
             ds = d.isoformat()
@@ -388,6 +398,7 @@ def cut(r, allowed):
     ok = lambda x: x.get("ref") in keep
     return dict(r, locations=[L for L in r["locations"] if L["ref"] in keep], rows=[x for x in r["rows"] if ok(x)],
                 feedback=[f for f in r["feedback"] if ok(f)], agg={k: v for k, v in r["agg"].items() if k in keep},
+                prev_agg={k: v for k, v in (r.get("prev_agg") or {}).items() if k in keep},
                 venues=[v for v in r["venues"] if v["ref"] in keep], cut=True)
 
 
@@ -420,13 +431,14 @@ def public(r):
     if not isinstance(r, dict) or "agg" not in r:
         return r
     by = {ref: kpis({ref: k}) for ref, k in r["agg"].items()}
-    locs = [dict(L, k=by.get(L["ref"]) or kpis({})) for L in r["locations"]]
+    P = r.get("prev_agg") or {}
+    locs = [dict(L, k=by.get(L["ref"]) or kpis({}), kp=kpis({L["ref"]: P[L["ref"]]}) if L["ref"] in P else None) for L in r["locations"]]
     rows = r["rows"]
     cases = [x for x in rows if x["link"] in CASES or x["cat"] == "open"]
     rest = sorted((x for x in rows if not (x["link"] in CASES or x["cat"] == "open")), key=lambda x: (x["day"], x["time"]), reverse=True)
     shown = cases[:SHOW_ROWS] + rest[:max(0, SHOW_ROWS - len(cases))]
-    out = {k: v for k, v in r.items() if k not in ("agg", "rows", "mix_raw")}
-    out.update(kpis=kpis(r["agg"]), mixes=mixes(r), locations=locs, rows=shown, rows_count=len(rows), cases_count=len(cases),
+    out = {k: v for k, v in r.items() if k not in ("agg", "rows", "mix_raw", "prev_agg")}
+    out.update(kpis=kpis(r["agg"]), kpis_prev=kpis(P) if "prev_agg" in r else None, mixes=mixes(r), locations=locs, rows=shown, rows_count=len(rows), cases_count=len(cases),
                feedback=r["feedback"][:1500])
     return out
 

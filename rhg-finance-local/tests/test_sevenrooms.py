@@ -158,6 +158,16 @@ class SevenRooms(unittest.TestCase):
         self.assertEqual(p["rows"][0]["link"] in srsim.CASES or p["rows"][0]["cat"] == "open", True)
         self.assertEqual(p["locations"][0]["cells"][D1]["sim_guests"], 20)
 
+    def test_period_before_and_the_popup(self):
+        self.assertEqual(self.r["prev_range"], {"from": "2026-11-03", "to": "2026-11-04"})
+        p = srsim.public(self.r)
+        self.assertEqual(p["kpis_prev"]["res"], 0)                                              # nothing booked before
+        row = next(x for x in p["rows"] if x["res"] == "REF1")
+        self.assertEqual([(c["num"], c["total"]) for c in row["sim"]], [(101, 4000)])
+        self.assertEqual(row["created"], "2026-11-01T10:00:00")
+        row2 = next(x for x in p["rows"] if x["res"] == "REF2")
+        self.assertEqual(row2["tickets"][0]["code"], "102")
+
     def test_excel(self):
         from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(srsim.render_xlsx(self.r)), read_only=True)
