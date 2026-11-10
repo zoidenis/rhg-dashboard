@@ -30,6 +30,7 @@ buyer. Nothing is written to Simphony, Billy or the Tax Administration.
 """
 import ctypes
 import gc
+import os
 import gzip
 import io
 import json
@@ -67,6 +68,10 @@ KEEP = 3 * 3600                 # the days end yesterday: a read holds for three
 DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
 LATE_LIMIT = 72 * 3600
 SIM_WORKERS = 6                 # Simphony days read at the same time (Reporting and Analytics answers each in seconds)
+# The tower has 450 MB (deploy/docker-compose.yml). The analysis holds every invoice and check of the period at once:
+# about 7.3 KB per invoice of one method (with its check), 284 MB at 7 days of SALT (35,000), 1.85 GB at 50 days
+# (measured 10 Nov 2026). Above this many invoices only the most recent days that fit are analysed (all are read).
+MAX_INVOICES = int(os.environ.get("BILLYREC_MAX_INVOICES") or 40000)
 _billy_gate = threading.Semaphore(3)
 _TOKEN = re.compile(r"[A-Z0-9][A-Z0-9/_-]{5,}")          # a check is looked for in invoices fiscalized up to three days after it closed
 _results, _jobs, _lock, _db_lock = {}, {}, threading.Lock(), threading.Lock()
@@ -419,6 +424,17 @@ def book_row(i, S):
 
 
 # ---------------------------------------------------------------- build
+def fit_days(days, nb, nf, cap):
+    """The most recent days whose invoices (the larger of the two methods, day by day) stay within cap; at least one."""
+    keep, total = [], 0
+    for d in reversed(days):
+        total += max(nb.get(d.isoformat(), 0), nf.get(d.isoformat(), 0))
+        if keep and total > cap:
+            break
+        keep.append(d)
+    return sorted(keep)
+
+
 def _dates(a, b):
     out, d = [], a
     while d <= b:
@@ -484,10 +500,20 @@ def build(company, latest_fn, progress=None, today=None):
                     errors.append(f"{'Simphony' if kind == 'sim' else 'Billy'} {x} {d}: {str(exc)[:140]}")
             if n % 10 == 0:
                 say(f"{len(days)} days · {n:,} of {len(jobs):,} reads (days × Billy's two methods and the restaurants)")
+    # what fits in memory: the most recent days up to MAX_INVOICES invoices (the larger of the two methods)
+    asked = len(days)
+    nb = billy.counts(acct["nuis"], "bridge", days[0], days[-1])
+    nf = billy.counts(acct["nuis"], "fiscal", days[0], days[-1])
+    days = fit_days(days, nb, nf, MAX_INVOICES)
+    cut_note = (f"Analysed the last {len(days)} of the {asked} days: more would not fit in the tower's memory "
+                f"({MAX_INVOICES:,} invoices at most; the other days are read and kept for later)." if len(days) < asked else "")
+    if cut_note:
+        say(cut_note)
     a_, b_ = days[0].isoformat(), days[-1].isoformat()
     bridge = billy.held(acct["nuis"], "bridge", days[0], days[-1])
     fiscal = billy.held(acct["nuis"], "fiscal", days[0], days[-1])
     checks = {r["ref"]: checks_held(r["ref"], a_, b_) for r in regs} if sim_on else {}
+    say(f"matching {sum(map(len, checks.values())):,} checks with {len(bridge) + len(fiscal):,} invoices of {len(days)} days")
     r = analyse(company, acct["nuis"], regs, days, bridge, fiscal, checks, latest, S, today)
     # Orders. Billy's lists leave out the payment method and the references (payMethods, sumInvIICRefs null). In
     # full, the invoice that closes a check (cash, card, account) lists the IICs of the orders it closes, and an
@@ -523,7 +549,8 @@ def build(company, latest_fn, progress=None, today=None):
         full = billy.details_held(acct["nuis"], all_iics)    # every invoice read in full so far, any read
         left = len([k for k in cand if k not in full])
         if left:
-            note = f"{left} invoices still to be read in full for their orders; the next read continues."
+            note = (f"{left} invoice{'' if left == 1 else 's'} still to be read in full for their orders; "
+                    f"the next read continues.")
         closes, orders = {}, set()
         for k, d in full.items():
             c = billy.compact(d, "fiscal")
@@ -547,9 +574,10 @@ def build(company, latest_fn, progress=None, today=None):
                         x["refs"] = c["refs"] or x.get("refs") or []
                 if x["iic"] in orders:
                     x["order"], x["closed_by"] = True, closes.get(x["iic"], "")
+            say("matching again, with the orders apart")
             r = analyse(company, acct["nuis"], regs, days, bridge, fiscal, checks, latest, S, today)
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"), complete=not errors,
-             simphony=sim_on, orders_note=note)
+             simphony=sim_on, orders_note=note, days_asked=asked, days_note=cut_note)
     del bridge, fiscal, checks
     _trim()
     return r
@@ -1101,6 +1129,7 @@ def request(company, latest_fn, refresh=False):
                 try:
                     r = build(company, latest_fn, progress=lambda st: job.update(stage=st))
                     if on_built:
+                        job.update(stage="updating the exceptions register")
                         try:
                             r["register"] = on_built(company, r)
                         except Exception:                          # noqa: BLE001

@@ -347,6 +347,14 @@ def read_day(acct, src, day, today=None):
     return len(keep)
 
 
+def counts(nuis, src, a, b):
+    """{day: invoices held} of a NUIS and method between two days: what a read would load, without loading it."""
+    with _db_lock:
+        rows = _db().execute("SELECT day, COUNT(*) FROM inv WHERE nuis=? AND src=? AND day>=? AND day<=? GROUP BY day",
+                             (nuis, src, a.isoformat(), b.isoformat())).fetchall()
+    return {d: n for d, n in rows}
+
+
 def held(nuis, src, a, b):
     """The invoices held of a NUIS and method between two days (Tirana dates)."""
     with _db_lock:

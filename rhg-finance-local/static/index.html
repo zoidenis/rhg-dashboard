@@ -5591,6 +5591,7 @@ function biStatusLine(){
     + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
     + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
     + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
+    + (d.days_note ? ` · <span class="warn">${fcSp(d.days_note)}</span>` : "")
     + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
 }
 

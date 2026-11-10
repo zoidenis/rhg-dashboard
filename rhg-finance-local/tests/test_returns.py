@@ -81,5 +81,17 @@ class Returns(unittest.TestCase):
         self.assertEqual((c["rt"], c["rt_n"], c["vd"], c["vd_n"], c["to"], c["reasons"], c["mgr"]), (40, 1, 15, 1, 12, ["3"], ["55"]))
 
 
+class FitDays(unittest.TestCase):
+    def test_the_most_recent_days_that_fit(self):
+        from datetime import date, timedelta
+        days = [date(2026, 10, 1) + timedelta(days=k) for k in range(50)]
+        nb = {d.isoformat(): 5000 for d in days}
+        nf = {d.isoformat(): 5200 for d in days}
+        kept = billyrec.fit_days(days, nb, nf, 40000)
+        self.assertEqual((len(kept), kept[-1]), (7, days[-1]))                # 7 × 5,200 ≤ 40,000
+        self.assertEqual(billyrec.fit_days(days, {}, {}, 45000), days)       # nothing held yet: every day
+        self.assertEqual(len(billyrec.fit_days(days, {days[-1].isoformat(): 99999}, {}, 45000)), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
