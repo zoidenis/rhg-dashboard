@@ -11,6 +11,7 @@
       opens the same way wherever it is shown.
    4. The pieces: Pulse.tiles, Pulse.panel, Pulse.bars (horizontal bars), Pulse.cols (a column per day or month,
       clickable), Pulse.list (a table whose rows open something), Pulse.fold (a table kept closed under "Table").
+   5. Pulse.places: one pop-up per location, its areas side by side (see below); "loc|code" opens a location.
    Texts are English; the towers' i18n runtime translates them as they are drawn. */
 (function () {
   "use strict";
@@ -45,10 +46,15 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
 .pz-case{all:unset;box-sizing:border-box;display:block;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--card)}
 .pz-case:hover,.pz-case:focus-visible{border-color:var(--accent)}.pz-case .n{font-size:20px;font-weight:700}.pz-case .n.zero{color:var(--sub)}
 .pz-case .t{font-size:13px;font-weight:600;margin:2px 0}.pz-case .w{font-size:12px;color:var(--sub)}
+.pz-areas{display:flex;gap:6px;flex-wrap:wrap;padding:12px 18px 0}
+.pz-areas button{all:unset;box-sizing:border-box;cursor:pointer;font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.pz-areas button:hover{border-color:var(--accent)}.pz-areas button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pz-areas button.on{background:var(--accent);border-color:var(--accent);color:var(--card);cursor:default}
+.pz-areas button.none{opacity:.45;cursor:default}
 :where(:root){--ch-0:#3b6fd8;--ch-1:#c47f1f;--ch-2:#7a5bbf;--ch-3:#00978b;--ch-4:#9a9ca1}
 @media (prefers-color-scheme: dark){:where(:root:not([data-theme="light"])){--ch-0:#5b86e0;--ch-1:#b97a22;--ch-2:#8c72d4;--ch-3:#1aa196;--ch-4:#6b6e74}}
 :where(:root[data-theme="dark"]){--ch-0:#5b86e0;--ch-1:#b97a22;--ch-2:#8c72d4;--ch-3:#1aa196;--ch-4:#6b6e74}
-@media (max-width:640px){.pz-hr{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.pz-hr .b{grid-column:1/-1;grid-row:2}}`;
+@media (max-width:640px){.pz-areas{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:10px 12px 2px}.pz-areas button{flex:none}.pz-hr{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.pz-hr .b{grid-column:1/-1;grid-row:2}}`;
   const st = document.createElement("style");
   st.textContent = CSS;
   (document.head || document.documentElement).appendChild(st);
@@ -228,6 +234,64 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
     return `<div class="pz-cases">${list.map(c => `<button class="pz-case" type="button"${c.open ? (/^data-/.test(c.open) ? ` ${c.open}` : ` data-pulse="${esc(c.open)}"`) : ""}><div class="n ${c.n ? "" : "zero"}">${num(c.n)}</div><div class="t">${esc(c.t)}</div>${c.w ? `<div class="w">${esc(c.w)}</div>` : ""}</button>`).join("")}</div>`;
   }
 
-  window.Pulse = {pop, on, open, tiles, panel, legend, bars, cols, list, fold, foldEl, cases, esc, num, money, scan};
+  // ---- one pop-up per location: its areas side by side
+  // Each location pop-up of a tower (Finance: results, today, sales, stock, cash…; Purchasing: spend, buying,
+  // suppliers…) gets the same row of areas under its header; a click shows the same place in another area, in place
+  // of this one (Back still leads where it led). Pulse.places({ids(area, key) → Set of upper-case codes of the place,
+  // areas: [{k, t, draw, pop, keyOf(args)?, holds(), ready(), find(ids) → key | null, load?() → Promise, open(key)}]}).
+  // draw is the name of the screen's (global) function that draws that pop-up: it is wrapped to add the row.
+  let places = null;
+  const UP = x => String(x == null ? "" : x).toUpperCase();
+  const safe = (f, d) => { try { return f(); } catch (e) { return d; } };
+  function placeIds(a, key){ return safe(() => places.ids(a, key), null) || new Set([UP(key)].filter(Boolean)); }
+  function placeRow(a, key){
+    const pop = document.getElementById(a.pop); if (!pop) return;
+    const old = pop.querySelector(":scope > .pz-areas"); if (old) old.remove();
+    const ph = pop.querySelector(":scope > .ph"); if (!ph || key == null) return;
+    const ids = placeIds(a, key); if (!ids.size) return;
+    const list = places.areas.filter(b => safe(() => b.holds() && (b === a || (b.ready() ? b.find(ids) != null : !!b.load)), false));
+    if (list.length < 2) return;
+    const el = document.createElement("div");
+    el.className = "pz-areas"; el.setAttribute("role", "tablist"); el.setAttribute("aria-label", "Areas of the location"); el.__ids = ids;
+    el.innerHTML = list.map(b => `<button type="button" role="tab" aria-selected="${b === a}" class="${b === a ? "on" : ""}" data-pzarea="${esc(b.k)}">${esc(b.t)}</button>`).join("");
+    ph.insertAdjacentElement("afterend", el);
+  }
+  function placesInit(cfg){
+    places = cfg;
+    cfg.areas.forEach(a => {
+      const fn = window[a.draw]; if (typeof fn !== "function") return;
+      window[a.draw] = function () { const r = fn.apply(this, arguments); safe(() => placeRow(a, a.keyOf ? a.keyOf(arguments) : arguments[0])); return r; };
+    });
+  }
+  async function placeFind(b, ids, btn){
+    if (!safe(() => b.ready(), false) && b.load) {
+      const t = btn ? btn.textContent : "";
+      if (btn) { btn.disabled = true; btn.textContent = "Reading…"; }
+      try { await b.load(); } catch (e) { /* the screen shows why */ }
+      if (btn) { btn.textContent = t; btn.disabled = false; }
+    }
+    return safe(() => b.ready() ? b.find(ids) : null, null);
+  }
+  document.addEventListener("click", async ev => {
+    const btn = ev.target.closest("[data-pzarea]"); if (!btn || !places) return;
+    const row = btn.closest(".pz-areas"), b = places.areas.find(x => x.k === btn.dataset.pzarea);
+    if (!b || btn.classList.contains("on") || btn.classList.contains("none") || btn.disabled) return;
+    const bd = row.closest(".pl-bd"), key = await placeFind(b, row.__ids, btn);
+    if (key == null) { btn.classList.add("none"); btn.title = "Not in this area for the period in view"; return; }
+    if (bd && !bd.classList.contains("show")) return;              // closed while reading
+    if (bd) { bd.__pzQuiet = true; bd.classList.remove("show"); }  // in its place: the trail below stays
+    b.open(key);
+  });
+  // "loc|code": the location in the first area that has it (the screen's own first)
+  on("loc", async code => {
+    if (!places) return;
+    const ids = placeIds(null, code), have = places.areas.filter(b => safe(() => b.holds(), false));
+    const first = places.prefer ? safe(() => places.prefer(), null) : null;
+    have.sort((x, y) => (y.k === first) - (x.k === first));
+    for (const b of have) { const k = safe(() => b.ready() ? b.find(ids) : null, null); if (k != null) { b.open(k); return; } }
+    for (const b of have) { if (!b.load) continue; const k = await placeFind(b, ids); if (k != null) { b.open(k); return; } }
+  });
+
+  window.Pulse = {pop, on, open, tiles, panel, legend, bars, cols, list, fold, foldEl, cases, esc, num, money, scan, places: placesInit};
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan); else scan();
 })();

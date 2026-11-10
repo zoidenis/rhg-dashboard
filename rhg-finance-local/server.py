@@ -1983,6 +1983,7 @@ ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/
 ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/kartela/locations",
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/inventory/items", "/api/inventory/items/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
+                         "/api/locations/registry",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
                          "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
                          "/api/sales/foodcost",
@@ -2695,6 +2696,13 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/sales":
                 self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1",
                                               q.get("compare") or "prior"))
+            elif url.path == "/api/locations/registry":
+                # the restaurants of the company as the registry names them (Settings → Location intelligence): one
+                # place's department, BC location and Simphony reference, so its pop-up finds it in every area
+                co = q.get("company") or config.BC_COMPANY
+                self._send(200, {"company": co, "locations": [
+                    {k: r.get(k) or "" for k in ("ref", "name", "brand", "bc", "dept", "company")}
+                    for r in locintel.registry() if (r.get("company") or "").upper() == co.upper()]})
             elif url.path == "/api/locations":
                 try:
                     c_from, c_to, p_from, p_to, ly_from, ly_to, running, label, _ = periods(q.get("period"), "range" if q.get("mode") == "range" else "month")

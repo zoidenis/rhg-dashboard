@@ -2779,7 +2779,7 @@ async function supPop(name){
           const byLoc = {}; spData.rows.filter(r => r[1] === name).forEach(r => byLoc[r[0]] = (byLoc[r[0]] || 0) + r[4]);
           html += Pulse.tiles([{l: "Purchases", v: plM(y.value), s: `vs before ${y.prev ? plPct(p) : "new"}`, cls: p > 10 ? "up" : ""}, {l: "Share of the company", v: tot ? fmt(y.value / tot * 100, 1) + "%" : "–"},
             {l: "Invoices", v: fmt(y.inv), s: `${fmt(y.cm)} credit memos`}, {l: "Items", v: fmt(D.items), s: `${fmt(D.cats)} categories · ${fmt(D.locN)} locations`}])
-            + Pulse.panel("By location", Pulse.bars(Object.entries(byLoc).sort((a, b) => b[1] - a[1]).map(([l, v]) => ({key: plName(l) || l || "No location", segs: [[Math.abs(v), "var(--ch-0)", "purchases"]], text: plM(v)}))))
+            + Pulse.panel("By location", Pulse.bars(Object.entries(byLoc).sort((a, b) => b[1] - a[1]).map(([l, v]) => ({key: plName(l) || l || "No location", segs: [[Math.abs(v), "var(--ch-0)", "purchases"]], text: plM(v), open: l ? `loc|${l}` : null}))))
             + Pulse.panel("By category", D.catT) + Pulse.panel("By item", `<div class="scroll" style="max-height:360px">${D.itT.replace(/<tr><td><b>([^<]+)<\/b>/g, (m, no) => `<tr data-pulse="pitem|${no}" tabindex="0" style="cursor:pointer"><td><b>${no}</b>`)}</div>`);
         } else html += `<p class="meta">${span("No purchase from this supplier in the period of Supplier performance.")}</p>`;
       }
@@ -5005,6 +5005,26 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("tdBd").classList.contains("show")) { $("tdBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.tdloc != null) { e.preventDefault(); tdOpen(e.target.dataset.tdloc); }
 });
+// ---------- one pop-up per location: its areas side by side (Pulse.places)
+// The location pop-ups of the tower (spend, buying, suppliers, exceptions, today) show the same BC location; the
+// row of areas under the header of each opens the place in another area.
+const locKeyIn = (obj, ids) => { for (const k of Object.keys(obj || {})) if (ids.has(String(k).toUpperCase())) return k; return null; };
+const scrOn = (bar, t) => { const b = document.querySelector(`#${bar} button[data-t="${t}"]`); return !!b && !b.classList.contains("scr-off"); };
+const LOC_AREAS = [
+  {k: "pl", t: "Spend", bar: "ovTabs", tab: "loc", draw: "plDraw", pop: "plPop", ready: () => !!(data && data.by_location),
+    find: ids => locKeyIn(data.by_location, ids), open: k => plOpen(k)},
+  {k: "td", t: "Today", bar: "ovTabs", tab: "today", draw: "tdDraw", pop: "tdPop", ready: () => !!tdState.data[tdQ()],
+    find: ids => locKeyIn(tdState.data[tdQ()].locations, ids), open: k => tdOpen(k)},
+  {k: "by", t: "Buying", bar: "byTabs", tab: "buyloc", draw: "byDraw", pop: "byPop", ready: () => !!data,
+    find: ids => locKeyIn(byLocs(), ids), open: k => byOpen(k)},
+  {k: "sp", t: "Suppliers", bar: "spTabs", tab: "suploc", draw: "spDraw", pop: "spPop", keyOf: () => spSel && spSel.loc, ready: () => !!spData && spKey === spQs(),
+    find: ids => locKeyIn(spAgg().L, ids), load: () => loadSp(false), open: k => spOpen(k)},
+  {k: "exl", t: "Exceptions", bar: "exTabs", tab: "loc", draw: "exlDraw", pop: "exlPop", ready: () => !!data,
+    find: ids => locKeyIn(exlModel().B, ids), open: k => exlOpen(k)}];
+LOC_AREAS.forEach(a => { a.holds = () => scrOn(a.bar, a.tab); });
+Pulse.places({areas: LOC_AREAS,
+  ids: (a, key) => new Set([String(key == null ? "" : key).toUpperCase()].filter(k => k && k !== "?")),
+  prefer(){ const a = LOC_AREAS.find(x => { const b = document.querySelector(`#${x.bar} button[data-t="${x.tab}"]`); return b && b.classList.contains("on") && b.offsetParent; }); return a ? a.k : "pl"; }});
 </script>
 <script>
 // ---------- Purchaser performance (purchasers.py) ----------

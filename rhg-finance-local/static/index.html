@@ -10872,6 +10872,52 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("tdBd").classList.contains("show")) { $("tdBd").classList.remove("show"); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.tdloc != null) { e.preventDefault(); tdOpen(e.target.dataset.tdloc); }
 });
+// ---------- one pop-up per location: its areas side by side (Pulse.places)
+// A restaurant is one place in every area: its department (results, cash, payables, budget), its BC location
+// (stock, SKU cards, fixed assets) and its Simphony reference (sales) come from the registry of Settings →
+// Location intelligence. The row of areas under the header of each location pop-up opens the same place elsewhere.
+let locReg = null, locRegCo = null;
+async function locRegLoad(){
+  const co = $("company").value || "";
+  if (locRegCo === co) return;
+  locRegCo = co;
+  try { const j = await readJSON(await fetch("/api/locations/registry?company=" + encodeURIComponent(co))); if (locRegCo === co) locReg = j.locations || []; }
+  catch (e) { locReg = []; }
+}
+setInterval(() => { if (locRegCo !== ($("company").value || "")) locRegLoad(); }, 3000);   // the company is also set by the code
+const locKeyIn = (obj, ids) => { for (const k of Object.keys(obj || {})) if (ids.has(String(k).toUpperCase())) return k; return null; };
+const scrOn = (bar, t) => { const b = document.querySelector(`#${bar} button[data-t="${t}"]`); return !!b && !b.classList.contains("scr-off"); };
+const LOC_AREAS = [
+  {k: "fl", t: "Results", bar: "ovFTabs", tab: "loc", draw: "flDraw", pop: "flPop", ready: () => !!flData && flKey === flQuery(),
+    find: ids => locKeyIn(flData.locations, ids), load: () => loadFl(false), open: k => flOpen(k)},
+  {k: "td", t: "Today", bar: "ovFTabs", tab: "today", draw: "tdDraw", pop: "tdPop", ready: () => !!tdCur(),
+    find: ids => locKeyIn(tdCur().locations, ids), open: k => tdOpen(k)},
+  {k: "sl", t: "Sales", bar: "slTabs", tab: "loc", draw: "slDraw", pop: "slPop", ready: () => !!salesData && salesData._q === params(),
+    find: ids => { const i = (salesData.locations || []).findIndex(l => ["ref", "bc", "dept"].some(f => l[f] && ids.has(String(l[f]).toUpperCase()))); return i < 0 ? null : i; },
+    load: () => loadSales(), open: i => slOpen(i)},
+  {k: "il", t: "Inventory", bar: "invTabs", tab: "loc", draw: "ilDraw", pop: "ilPop", ready: () => !!ilData && ilKey === ilQuery(),
+    find: ids => locKeyIn(ilData.locations, ids), load: () => loadIl(false), open: k => ilOpen(k)},
+  {k: "sk", t: "SKU planning", bar: "invTabs", tab: "sku", draw: "skDraw", pop: "skPop", ready: () => !!skData && skKey === skQuery(),
+    find: ids => locKeyIn(skData.locations, ids), load: () => loadSk(false), open: k => skOpen(k)},
+  {k: "cl", t: "Cash", bar: "clTabs", tab: "loc", draw: "clDraw", pop: "clPop", ready: () => !!clData && clKey === flQuery(),
+    find: ids => locKeyIn(clData.locations, ids), load: () => loadCl(false), open: k => clOpen(k)},
+  {k: "kl", t: "Payables & receivables", bar: "kaTabs", tab: "loc", draw: "klDraw", pop: "klPop", ready: () => !!klData && klKey === flQuery(),
+    find: ids => locKeyIn(klData.locations, ids), load: () => loadKl(false), open: k => klOpen(k)},
+  {k: "bl", t: "Budget", bar: "bgTabs", tab: "loc", draw: "blDraw", pop: "blPop", ready: () => !!blData && blKey === blQuery(),
+    find: ids => locKeyIn(blModel().L, ids), load: () => loadBl(false), open: k => blOpen(k)},
+  {k: "fa", t: "Fixed assets", bar: "faTabs", tab: "loc", draw: "faDraw", pop: "faPop", ready: () => !!faData && faKey === faQuery(),
+    find: ids => locKeyIn(faData.locations, ids), load: () => loadFa(false), open: k => faOpen(k)}];
+LOC_AREAS.forEach(a => { a.holds = () => scrOn(a.bar, a.tab); });
+Pulse.places({areas: LOC_AREAS,
+  ids(a, key){
+    const s = new Set(), add = x => { if (x != null && x !== "") s.add(String(x).toUpperCase()); };
+    if (a && a.k === "sl") { const l = ((salesData || {}).locations || [])[key] || {}; ["ref", "bc", "dept"].forEach(f => add(l[f])); } else add(key);
+    (locReg || []).forEach(r => { if ([r.ref, r.bc, r.dept].some(x => x && s.has(x.toUpperCase()))) [r.ref, r.bc, r.dept].forEach(add); });
+    return s;
+  },
+  // "loc|code" opens the area of the screen in view first
+  prefer(){ const a = LOC_AREAS.find(x => { const b = document.querySelector(`#${x.bar} button[data-t="${x.tab}"]`); return b && b.classList.contains("on") && b.offsetParent; }); return a ? a.k : "fl"; }});
+locRegLoad();
 </script>
 <script src="tables.js"></script>
 <script src="layout.js" data-app="finance"></script>
