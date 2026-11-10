@@ -435,6 +435,12 @@ td.num,th.num{text-align:right}
 #cnLines td.num,#cnLines th.num{white-space:nowrap}
 .cn-st{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--rhg-sky,#efede6);color:var(--ink)}
 .cn-st.short{background:var(--up-bg);color:var(--up)}.cn-st.surplus{background:var(--warn-bg);color:var(--warn)}
+.cn-bridge{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:14px}
+.cn-bridge>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--card);min-width:0}
+.cn-bridge .l{font-size:12px;color:var(--sub)}.cn-bridge .v{font-size:20px;font-weight:700;margin:2px 0;font-variant-numeric:tabular-nums}
+.cn-bridge .s{font-size:11.5px;color:var(--sub);line-height:1.45}.cn-bridge .op{color:var(--sub);font-weight:600;margin-right:4px}
+.cn-bridge .tot{background:var(--bg)}
+@media(max-width:900px){.cn-bridge{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .cn-st.match,.cn-st.late_match{background:var(--down-bg);color:var(--down)}.cn-st.cutoff{background:#e4ecf9;color:#2f5aa8}
 @media (prefers-color-scheme: dark){.cn-st.cutoff{background:#1d2a40;color:#9db8ea}}
 #v-stockcount .neg{color:var(--up)}
@@ -1151,6 +1157,7 @@ td.num,th.num{text-align:right}
         <label class="mini dark" style="cursor:pointer">Upload the count form (Excel)<input type="file" id="cnFile" accept=".xlsx" hidden></label>
         <select id="cnSheet" hidden aria-label="Sheet of the form"></select>
         <span class="meta" id="cnUpMsg"></span></div>
+      <div class="cn-bridge" id="cnBridge" hidden></div>
       <div class="kpis six" id="cnKpis" style="margin-top:14px"></div>
       <p class="meta" id="cnStatus">Choose the location and the month the count closes.</p>
     </div>
@@ -5392,18 +5399,32 @@ async function loadCn(refresh){
     cnData = j; cnRender();
   } catch (e) { $("cnStatus").textContent = "Could not read: " + e.message; }
 }
+const CN_TYPE = {"Purchase": "Purchases", "Sale": "Sales", "Positive Adjmt.": "Positive adjustments", "Negative Adjmt.": "Negative adjustments",
+  "Transfer": "Transfers", "Consumption": "Consumption", "Output": "Output", "Assembly Consumption": "Assembly consumption", "Assembly Output": "Assembly output"};
+const cnTypes = (types, way) => (types || []).filter(t => t[0] === way && (t[2] || t[3]));
+function cnBridge(d){
+  const t = d.totals, c = d.count, el = $("cnBridge");
+  el.hidden = !c;
+  if (!c) { el.innerHTML = ""; return; }
+  const split = way => cnTypes(t.by_type, way).slice(0, 4).map(x => `<span>${esc(CN_TYPE[x[1]] || x[1])} ${ilM(way === "out" ? -x[2] : x[2])}</span>`).join("<br>");
+  const box = (op, l, v, sub, cls) => `<div class="${cls || ""}"><div class="l">${op ? `<span class="op">${op}</span>` : ""}${l}</div><div class="v ${v < 0 && cls !== "dec" ? "neg" : ""}" title="${fmt(v)}">${ilM(v)}</div><div class="s">${sub}</div></div>`;
+  el.innerHTML = box("", "Opening", t.opening_value, `<span>at ${cnD(d.from)}</span>`) +
+    box("+", "Increases", t.in_value, split("in") || "<span>none in the month</span>") +
+    box("−", "Decreases", -t.out_value, split("out") || "<span>none in the month</span>", "dec") +
+    box("=", "BC closing", t.closing_value, `<span>at ${cnD(d.to)}</span>`, "tot") +
+    box("", "Counted", t.counted_value, `<span>BC for the same lines ${fmt(t.counted_bc_value)}</span>`) +
+    box("", "Net difference", t.net_value, (t.net_pct == null ? "" : `<span>${fmt(t.net_pct, 2)}% of the closing value</span>`)
+      + (t.n_cutoff ? `<br><span>without ${fmt(t.n_cutoff)} lines posted after the form (${fmt(t.cutoff_value)})</span>` : ""), "tot");
+}
 function cnRender(){
   const d = cnData;
   ["cnCatCard", "cnLinesCard", "cnValCard"].forEach(id => $(id).hidden = !d);
-  if (!d) { $("cnKpis").innerHTML = ""; return; }
+  if (!d) { $("cnKpis").innerHTML = ""; $("cnBridge").hidden = true; return; }
   const t = d.totals, c = d.count;
+  cnBridge(d);
   // values in millions on the cards (the full figure in the tooltip and the tables)
   const card = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}" title="${v}">${v === "–" ? v : ilM(+String(v).replace(/,/g, ""))}</div><div class="s">${sub}</div></div>`;
   $("cnKpis").innerHTML = c ?
-    card("BC closing value", fmt(t.closing_value), `<span>${fmt(t.items)} items</span> · <span>at ${cnD(d.to)}</span>`) +
-    card("Counted value", fmt(t.counted_value), `<span>BC for the same lines ${fmt(t.counted_bc_value)}</span>`) +
-    card("Net difference", fmt(t.net_value), (t.net_pct == null ? "" : `<span>${fmt(t.net_pct, 2)}% of the closing value</span>`)
-      + (t.n_cutoff ? `<br><span>without ${fmt(t.n_cutoff)} lines posted after the form (${fmt(t.cutoff_value)})</span>` : ""), t.net_value < 0 ? "up" : t.net_value > 0 ? "warn" : "") +
     card("Shortages", fmt(t.shortage_value), `<span>${fmt(t.n_short)} lines</span>`, t.n_short ? "up" : "") +
     card("Surpluses", fmt(t.surplus_value), `<span>${fmt(t.n_surplus)} lines</span>`, t.n_surplus ? "warn" : "") +
     card("Not counted", fmt(t.not_counted_value), `<span>${fmt(t.n_not_counted)} left blank on the form</span> · <span>${fmt(t.n_not_on_form)} not on the form</span>`, (t.n_not_counted + t.n_not_on_form) ? "warn" : "")
@@ -5421,8 +5442,8 @@ function cnRender(){
   $("cnStatus").innerHTML = parts.join(" · ");
   // by category
   $("cnCatCard").hidden = !c;
-  if (c) $("cnCats").innerHTML = `<tr><th>Category</th><th class="num">Lines</th><th class="num">BC closing value</th><th class="num">Counted value</th><th class="num">Shortages</th><th class="num">Surpluses</th><th class="num">Net difference</th><th class="num">% of BC</th></tr>` +
-    d.categories.map(x => `<tr><td><b>${esc(x.category)}</b></td><td class="num">${fmt(x.lines)}</td><td class="num">${fmt(x.bc_value)}</td><td class="num">${fmt(x.counted_value)}</td><td class="num">${x.shortage ? `<span class="neg">${fmt(x.shortage)}</span>` : "–"}</td><td class="num">${x.surplus ? fmt(x.surplus) : "–"}</td><td class="num"><b>${fmt(x.net)}</b></td><td class="num">${x.bc_value ? fmt(x.net / x.bc_value * 100, 1) + "%" : "–"}</td></tr>`).join("");
+  if (c) $("cnCats").innerHTML = `<tr><th>Category</th><th class="num">Lines</th><th class="num">Opening value</th><th class="num">Increases</th><th class="num">Decreases</th><th class="num">BC closing value</th><th class="num">Counted value</th><th class="num">Shortages</th><th class="num">Surpluses</th><th class="num">Net difference</th><th class="num">% of BC</th></tr>` +
+    d.categories.map(x => `<tr><td><b>${esc(x.category)}</b></td><td class="num">${fmt(x.lines)}</td><td class="num">${fmt(x.opening_value || 0)}</td><td class="num">${fmt(x.in_value || 0)}</td><td class="num">${fmt(-(x.out_value || 0))}</td><td class="num">${fmt(x.bc_value)}</td><td class="num">${fmt(x.counted_value)}</td><td class="num">${x.shortage ? `<span class="neg">${fmt(x.shortage)}</span>` : "–"}</td><td class="num">${x.surplus ? fmt(x.surplus) : "–"}</td><td class="num"><b>${fmt(x.net)}</b></td><td class="num">${x.bc_value ? fmt(x.net / x.bc_value * 100, 1) + "%" : "–"}</td></tr>`).join("");
   // lines
   $("cnLinesCard").hidden = !c;
   if (c) cnLines();
@@ -5450,15 +5471,18 @@ function cnLines(){
   $("cnLinesNote").innerHTML = `<span>Largest difference in value first.</span> <span>Showing ${fmt(Math.min(rows.length, 300))}; the Excel file has every line.</span>`;
   const late = x => (x.late || []).length ? `<div class="meta" style="margin-top:4px" title="${esc(x.late_exact ? "These entries make up the whole change since the form was printed" : "The latest entries of the month")}">${x.late.map(e => `${esc(e.type)} ${esc(e.document)} · ${esc(cnD(e.date))} · ${cnN(e.qty)}`).join("<br>")}</div>` : "";
   const st = x => `<span class="cn-st ${x.status}">${esc(CN_ST[x.status] || "")}</span>` + (x.flags || []).filter(f => f !== "cost" && !(f === "form_system" && (x.status === "cutoff" || x.status === "late_match"))).map(f => ` <span class="cn-st" title="${esc(CN_FLAG[f])}">${esc(f === "unit" ? "Unit" : "Form ≠ BC")}</span>`).join("") + late(x);
-  $("cnLines").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">BC closing</th><th class="num">Form system</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Average cost</th><th class="num">Difference value</th><th>Status</th><th>Comment</th></tr>` +
+  const mv = (x, way) => { const q = way === "in" ? x.in_qty : -x.out_qty, ty = cnTypes(x.types, way);
+    return `<td class="num" title="${esc(ty.map(t => `${CN_TYPE[t[1]] || t[1]} ${cnN(way === "in" ? t[2] : -t[2])}`).join("\n"))}">${q ? cnN(q) : "–"}</td>`; };
+  $("cnLines").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">Opening</th><th class="num">Increases</th><th class="num">Decreases</th><th class="num">BC closing</th><th class="num">Form system</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Average cost</th><th class="num">Difference value</th><th>Status</th><th>Comment</th></tr>` +
     (rows.slice(0, 300).map(x => `<tr><td><b>${esc(x.item)}</b>${x.form_item ? ` <span class="meta">(${esc(x.form_item)} on the form)</span>` : ""} ${esc(x.description)}<div class="meta">${esc(x.category || x.form_category)}</div></td>
       <td>${esc(x.unit || x.form_unit)}${x.flags.includes("unit") ? `<div class="meta neg">${esc(x.form_unit)} on the form</div>` : ""}</td>
-      <td class="num">${cnN(x.bc_qty)}</td><td class="num">${x.form_system == null ? "–" : cnN(x.form_system)}</td><td class="num"><b>${x.counted == null ? "–" : cnN(x.counted)}</b></td>
+      <td class="num">${cnN(x.opening_qty)}</td>${mv(x, "in")}${mv(x, "out")}
+      <td class="num"><b>${cnN(x.bc_qty)}</b></td><td class="num">${x.form_system == null ? "–" : cnN(x.form_system)}</td><td class="num"><b>${x.counted == null ? "–" : cnN(x.counted)}</b></td>
       <td class="num">${x.diff_qty == null ? "–" : `<b class="${x.diff_qty < 0 ? "neg" : ""}">${cnN(x.diff_qty)}</b>`}</td>
       <td class="num">${fmt(x.cost, 2)}${x.cost_source !== "month end" ? `<div class="meta">${esc(x.cost_source === "none" ? "no cost" : x.cost_source)}</div>` : ""}</td>
       <td class="num">${x.diff_value == null ? (x.status === "not_on_form" || x.status === "not_counted" ? `<span class="meta">BC ${fmt(x.bc_value)}</span>` : "–") : `<b class="${x.diff_value < 0 ? "neg" : ""}">${fmt(x.diff_value)}</b>`}</td>
       <td>${st(x)}</td><td class="meta" style="max-width:260px">${esc(x.comment)}</td></tr>`).join("")
-      || `<tr><td colspan="10" class="meta">Nothing for this filter.</td></tr>`);
+      || `<tr><td colspan="13" class="meta">Nothing for this filter.</td></tr>`);
 }
 async function cnUpload(sheet){
   if (!cnFile) return;

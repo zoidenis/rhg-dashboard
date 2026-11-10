@@ -276,7 +276,7 @@ def valuation(client, company, location, month, progress=None):
 
     def it(no):
         return items.setdefault(no, {"now_qty": 0.0, "now_value": 0.0, "after_qty": 0.0, "after_value": 0.0,
-                                     "in_qty": 0.0, "in_value": 0.0, "out_qty": 0.0, "out_value": 0.0})
+                                     "in_qty": 0.0, "in_value": 0.0, "out_qty": 0.0, "out_value": 0.0, "types": {}})
     for r in open_rows:
         q, rem = _f(r.get("Quantity")), _f(r.get("Remaining_Quantity"))
         if not q or not rem:
@@ -296,14 +296,14 @@ def valuation(client, company, location, month, progress=None):
             continue
         # the month's entries of the item (to name what BC posted after the count form was printed)
         month_moves.setdefault(str(r.get("Item_No")), []).append(
-            (int(r.get("Entry_No") or 0), str(r.get("Posting_Date") or "")[:10], str(r.get("Entry_Type") or ""),
+            (int(r.get("Entry_No") or 0), str(r.get("Posting_Date") or "")[:10], etype(r.get("Entry_Type")),
              str(r.get("Document_No") or ""), round(q, 4)))
-        if q > 0 or (q == 0 and v > 0):
-            x["in_qty"] += q
-            x["in_value"] += v
-        else:
-            x["out_qty"] += q
-            x["out_value"] += v
+        way = "in" if q > 0 or (q == 0 and v > 0) else "out"
+        x[way + "_qty"] += q
+        x[way + "_value"] += v
+        t = x["types"].setdefault((way, etype(r.get("Entry_Type"))), [0.0, 0.0])
+        t[0] += q
+        t[1] += v
     for no in bc_qty:
         it(no)
     out, off = {}, []
@@ -314,7 +314,9 @@ def valuation(client, company, location, month, progress=None):
             off.append((no, round(cq, 3), round(bq, 3)))
         row = {"closing_qty": round(bq, 4), "closing_value": round(cv, 2), "rebuilt_qty": round(cq, 4),
                "in_qty": round(x["in_qty"], 4), "in_value": round(x["in_value"], 2),
-               "out_qty": round(x["out_qty"], 4), "out_value": round(x["out_value"], 2)}
+               "out_qty": round(x["out_qty"], 4), "out_value": round(x["out_value"], 2),
+               # the month's entries by direction and BC entry type: [direction, type, quantity, value]
+               "types": [[w, t, round(q, 4), round(v, 2)] for (w, t), (q, v) in sorted(x["types"].items())]}
         row["opening_qty"] = round(bq - x["in_qty"] - x["out_qty"], 4)
         row["opening_value"] = round(cv - x["in_value"] - x["out_value"], 2)
         if any(abs(row[k]) > TOL for k in ("closing_qty", "closing_value", "in_qty", "out_qty", "opening_qty")):
@@ -322,6 +324,12 @@ def valuation(client, company, location, month, progress=None):
     return {"items": out, "moves": month_moves, "first": first.isoformat(), "last": last.isoformat(),
             "entries": {"open": len(open_rows), "moves": len(moves)},
             "qty_check": {"items": len(items), "off": len(off), "examples": off[:10]}}
+
+
+def etype(t):
+    """BC's entry type as it reads in BC ("Positive_x0020_Adjmt_x002E_" or "Positive_Adjmt" → "Positive Adjmt.")."""
+    t = re.sub(r"_x([0-9A-Fa-f]{4})_", lambda m: chr(int(m.group(1), 16)), str(t or "")).replace("_", " ").strip()
+    return {"Positive Adjmt": "Positive Adjmt.", "Negative Adjmt": "Negative Adjmt."}.get(t, t) or "(none)"
 
 
 def client_entity(client):
@@ -389,6 +397,7 @@ def analyse(val, count, master):
                 "opening_qty": v["opening_qty"] if v else 0.0, "opening_value": v["opening_value"] if v else 0.0,
                 "in_qty": v["in_qty"] if v else 0.0, "in_value": v["in_value"] if v else 0.0,
                 "out_qty": v["out_qty"] if v else 0.0, "out_value": v["out_value"] if v else 0.0,
+                "types": v["types"] if v else [],
                 "bc_qty": bq, "bc_value": v["closing_value"] if v else 0.0,
                 "cost": round(cost, 4), "cost_source": src, "form_system": (f or {}).get("system"),
                 "counted": (f or {}).get("counted"), "comment": (f or {}).get("comment") or "",
@@ -433,6 +442,11 @@ def analyse(val, count, master):
            "opening_value": round(sum(x["opening_value"] for x in lines), 2),
            "in_value": round(sum(x["in_value"] for x in lines), 2),
            "out_value": round(sum(x["out_value"] for x in lines), 2), "items": len(lines)}
+    by_type = {}
+    for x in lines:
+        for w, t, q, v in x["types"]:
+            by_type[(w, t)] = by_type.get((w, t), 0.0) + v
+    tot["by_type"] = [[w, t, round(v, 2)] for (w, t), v in sorted(by_type.items(), key=lambda kv: -abs(kv[1]))]
     if count:
         cnt = [x for x in lines if x["diff_value"] is not None and x["status"] != "cutoff"]
         cut = [x for x in lines if x["status"] == "cutoff"]
@@ -452,9 +466,12 @@ def analyse(val, count, master):
     cats = {}
     for x in lines:
         k = x["category"] or x["form_category"] or "(none)"
-        c = cats.setdefault(k, {"category": k, "bc_value": 0.0, "counted_value": 0.0, "shortage": 0.0,
-                                "surplus": 0.0, "net": 0.0, "lines": 0})
+        c = cats.setdefault(k, {"category": k, "opening_value": 0.0, "in_value": 0.0, "out_value": 0.0,
+                                "bc_value": 0.0, "counted_value": 0.0, "shortage": 0.0, "surplus": 0.0, "net": 0.0,
+                                "lines": 0})
         c["bc_value"] += x["bc_value"]
+        for f in ("opening_value", "in_value", "out_value"):
+            c[f] += x[f]
         c["lines"] += 1
         if x["diff_value"] is not None:
             c["counted_value"] += x["counted_value"]
@@ -539,15 +556,17 @@ def render_xlsx(r):
             ws.auto_filter.ref = ws.dimensions
     ws = wb.active
     ws.title = "Count vs BC"
-    sheet(ws, ["Item", "Description", "Category", "Unit (BC)", "Unit (form)", "BC closing qty", "Form system qty",
-               "Counted", "Difference qty", "Average cost", "Cost from", "Difference value", "BC closing value",
-               "Status", "Checks", "BC entries after the form", "Comment"],
-          [[x["item"], x["description"], x["category"] or x["form_category"], x["unit"], x["form_unit"], x["bc_qty"],
-            x["form_system"], x["counted"], x["diff_qty"], x["cost"], x["cost_source"], x["diff_value"],
-            x["bc_value"], STATUSES.get(x["status"], ""), ", ".join(FLAGS.get(f, f) for f in x["flags"]),
+    sheet(ws, ["Item", "Description", "Category", "Unit (BC)", "Unit (form)", "Opening qty", "Increases qty",
+               "Decreases qty", "BC closing qty", "Form system qty", "Counted", "Difference qty", "Average cost",
+               "Cost from", "Opening value", "Increases value", "Decreases value", "BC closing value",
+               "Difference value", "Status", "Checks", "BC entries after the form", "Comment"],
+          [[x["item"], x["description"], x["category"] or x["form_category"], x["unit"], x["form_unit"],
+            x["opening_qty"], x["in_qty"], x["out_qty"], x["bc_qty"], x["form_system"], x["counted"], x["diff_qty"],
+            x["cost"], x["cost_source"], x["opening_value"], x["in_value"], x["out_value"], x["bc_value"],
+            x["diff_value"], STATUSES.get(x["status"], ""), ", ".join(FLAGS.get(f, f) for f in x["flags"]),
             "; ".join(f"{e['type']} {e['document']} {e['date']} {e['qty']:g}" for e in x.get("late") or []),
             x["comment"]] for x in r["lines"]],
-          [12, 40, 16, 9, 9, 12, 12, 11, 12, 12, 14, 14, 15, 18, 14, 40, 40])
+          [12, 40, 16, 9, 9, 12, 12, 12, 12, 12, 11, 12, 12, 14, 14, 14, 14, 15, 14, 18, 14, 40, 40])
     v = wb.create_sheet("Inventory valuation")
     sheet(v, ["Item", "Description", "Category", "Unit", "Opening qty", "Opening value", "Increases qty",
               "Increases value", "Decreases qty", "Decreases value", "Closing qty", "Closing value", "Average cost"],
@@ -555,14 +574,25 @@ def render_xlsx(r):
             x["in_value"], x["out_qty"], x["out_value"], x["bc_qty"], x["bc_value"], x["cost"]]
            for x in sorted(r["lines"], key=lambda y: y["item"]) if x["status"] != "unknown"],
           [12, 40, 16, 9, 12, 14, 12, 14, 12, 14, 12, 14, 12])
+    m = wb.create_sheet("Movements by type")
+    sheet(m, ["Item", "Description", "Unit", "Direction", "BC entry type", "Quantity", "Value"],
+          [[x["item"], x["description"], x["unit"], "Increase" if w == "in" else "Decrease", t, q, v]
+           for x in sorted(r["lines"], key=lambda y: y["item"]) for w, t, q, v in x.get("types") or []],
+          [12, 40, 9, 11, 20, 12, 14])
     c = wb.create_sheet("By category")
-    sheet(c, ["Category", "Lines", "BC closing value", "Counted value", "Shortages", "Surpluses", "Net difference"],
-          [[x["category"], x["lines"], x["bc_value"], x["counted_value"], x["shortage"], x["surplus"], x["net"]]
-           for x in r["categories"]], [24, 8, 16, 16, 14, 14, 16])
+    sheet(c, ["Category", "Lines", "Opening value", "Increases value", "Decreases value", "BC closing value",
+              "Counted value", "Shortages", "Surpluses", "Net difference"],
+          [[x["category"], x["lines"], x.get("opening_value"), x.get("in_value"), x.get("out_value"), x["bc_value"],
+            x["counted_value"], x["shortage"], x["surplus"], x["net"]] for x in r["categories"]],
+          [24, 8, 16, 16, 16, 16, 16, 14, 14, 16])
     rd = wb.create_sheet("Read me")
     for t in (f"Stock count analysis · {r['company']} · {r['location']} · {r['from']} to {r['to']}",
               f"Read from Business Central at {r['read_at']} (read only).",
               "BC closing qty = Inventory by date at the month end (item card, location filter).",
+              "Opening + increases + decreases = BC closing (decreases are negative): the month's Inventory Valuation of "
+              "the location. Increases and decreases are the month's item ledger entries with a positive and a negative "
+              "quantity, at cost; Movements by type splits them by BC entry type (purchase, transfer, sale, consumption, "
+              "adjustments).",
               "Average cost = closing value / closing qty; closing value = remaining cost of the open item ledger "
               "entries (actual + expected) less the entries posted after the month end.",
               "Where the closing quantity is not above zero: the cost of the month's receipts, then the item card's "
