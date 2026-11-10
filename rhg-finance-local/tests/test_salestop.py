@@ -5,9 +5,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import tempfile
+from datetime import datetime
+
+import arap_notify
 import locintel
 import recipes
+import recipients
 import salestop
+import salestop_report
 import simphony
 
 HEADS = [{"No": "A1", "Item_No": "10001", "Description": "Gyros pita", "Due_Date": "2026-11-09", "Location_Code": "OPA1", "Quantity": 40, "Remaining_Quantity": 40},
@@ -83,6 +89,49 @@ class SaleStop(unittest.TestCase):
         self.assertEqual([x["item"] for x in r["now"]], ["C3"])
         self.assertEqual(r["risk"], [])
         self.assertEqual(r["totals"]["components"], 0)
+
+
+class DailyEmail(unittest.TestCase):
+    """Sales blocked by stock · daily: the time, once a day, one email per company and one per location."""
+    S = {"enabled": True, "to": "", "cc": "", "time": "09:30", "days": "daily", "companies": "SALT", "email_lines": "50"}
+    D = {"people": {"SALT": {"cost_controller": "cost@rhg.al", "operations": "ops@rhg.al", "stock_manager": "stock@rhg.al"}},
+         "locations": {"SALT": {"OPA1": {"unit_manager": "opa@rhg.al", "head_chef": "chef@rhg.al"}}},
+         "routing": {"stockstop_daily": {"to": ["cost_controller", "operations"], "cc": ["stock_manager", "unit_manager"]}}}
+
+    def setUp(self):
+        self.sent = []
+        patches = [patch.object(salestop_report, "STATE_FILE", Path(tempfile.mkdtemp()) / "s.json"),
+                   patch.object(salestop_report.Reporter, "settings", staticmethod(lambda: dict(self.S))),
+                   patch.object(recipients, "directory", lambda max_age=60: self.D),
+                   patch.object(salestop_report.store, "audit", lambda *a, **k: None),
+                   patch.object(arap_notify, "send_mail", lambda to, cc, subj, body, text, att=None, **k:
+                                self.sent.append((to, cc, subj, att)))]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.rep = salestop_report.Reporter(Client(), lambda c: "ALL", "SALT")
+        self.rep.build = lambda company: dict(SaleStop().build(), currency="ALL", label=company)
+
+    def test_due_at_the_time_once_a_day(self):
+        self.assertIsNone(self.rep.due(datetime(2026, 11, 11, 9, 29)))
+        self.assertEqual(self.rep.due(datetime(2026, 11, 11, 9, 31)), "2026-11-11")
+        self.rep.run("2026-11-11")
+        self.assertIsNone(self.rep.due(datetime(2026, 11, 11, 9, 45)))
+        self.assertEqual(self.rep.next_run(datetime(2026, 11, 11, 10, 0)), "2026-11-12T09:30")
+
+    def test_company_and_location_emails_with_excel(self):
+        res = self.rep.run("2026-11-11")
+        self.assertEqual([x["status"] for x in res], ["sent", "sent"])
+        (to1, cc1, subj1, att1), (to2, cc2, subj2, att2) = self.sent
+        self.assertEqual((to1, cc1), (["cost@rhg.al", "ops@rhg.al"], ["stock@rhg.al"]))
+        self.assertEqual((to2, cc2), (["opa@rhg.al"], []))
+        self.assertIn("1 component short", subj1)
+        self.assertIn("SALT · OPA1", subj2)
+        self.assertTrue(att1[0][0].endswith(".xlsx") and att1[0][2][:2] == b"PK")
+        import io
+        import openpyxl
+        ws = openpyxl.load_workbook(io.BytesIO(att2[0][2]))["Blocked now"]
+        self.assertEqual({r[0] for r in ws.iter_rows(min_row=2, values_only=True)}, {"OPA1"})   # its location only
 
 
 if __name__ == "__main__":

@@ -123,6 +123,10 @@ DEFAULT_SETTINGS = {
                         # positive adjustments left out of the calculation: "DOCUMENT PREFIX: from..to", several with ";"
                         # (the SHITJE adjustments of October 2026 put back sales that had taken the stock below zero)
                         "exclude_adjustments": "SHITJE: 2026-10-01..2026-10-31"},
+    # daily email of Sales → Blocked by stock (salestop_report.py): the components that stop the sales from posting
+    # now and today's Simphony sales at risk, every line in Excel; email_lines: lines per section (0 = all)
+    "stockstop_report": {"enabled": False, "to": "", "cc": "", "time": "09:30", "days": "daily", "companies": "",
+                         "email_lines": "50"},
     # the exceptions register (exreg.py): the controls run every day at time (negative stock and received vs
     # discharged, synced into the register); enabled: the daily email to every owner of open items; items overdue
     # more than escalate_days put the escalate_roles of Email recipients in Cc
@@ -208,6 +212,7 @@ def get_settings():
     merged["arap_notify"].update(s.get("arap_notify", {}))
     merged["cost_report"].update(s.get("cost_report", {}))
     merged["negative_report"].update(s.get("negative_report", {}))
+    merged["stockstop_report"].update(s.get("stockstop_report", {}))
     merged["exception_register"].update(s.get("exception_register", {}))
     merged["sales_rec"].update(s.get("sales_rec", {}))
     merged["billy_rec"].update(s.get("billy_rec", {}))
@@ -280,6 +285,22 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("negative_report", {})[k] = v
+        for k, v in (patch.get("stockstop_report") or {}).items():
+            if k in DEFAULT_SETTINGS["stockstop_report"]:
+                if isinstance(DEFAULT_SETTINGS["stockstop_report"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "09:30"
+                elif k == "days":
+                    v = str(v) if str(v) in ("daily", "mon_sat", "weekdays") else "daily"
+                elif k == "email_lines":
+                    try:
+                        v = str(max(0, min(1000, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "50"
+                else:
+                    v = str(v)[:400]
+                current.setdefault("stockstop_report", {})[k] = v
         for k, v in (patch.get("sales_rec") or {}).items():
             if k in DEFAULT_SETTINGS["sales_rec"]:
                 try:

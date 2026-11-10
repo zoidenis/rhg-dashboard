@@ -42,6 +42,7 @@ import exmail
 import itemstock
 import shrinkage
 import salestop
+import salestop_report
 import requests
 import cost_report
 import negstock
@@ -99,6 +100,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
+                     "/api/stockstop-report/settings": "settings", "/api/stockstop-report/job": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
@@ -1694,6 +1696,7 @@ def cost_report_status():
 
 
 negrep = negstock.Reporter(client, company_currency, config.BC_COMPANY)
+ssrep = salestop_report.Reporter(client, company_currency, config.BC_COMPANY)
 
 
 # ---------------------------------------------------------------- the exceptions register (exreg.py)
@@ -2708,6 +2711,21 @@ class Handler(BaseHTTPRequestHandler):
                            else html.escape(job.get("detail") or ""))
                     self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
                                      f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path == "/api/stockstop-report":
+                self._send(200, salestop_report.status(ssrep))
+            elif url.path in ("/api/stockstop-report/job", "/api/stockstop-report/preview"):
+                job = ssrep.job(q.get("id") or "", user["username"])
+                if not job:
+                    self._send(404, {"error": "This report is no longer held; build it again."})
+                elif url.path.endswith("/job"):
+                    self._send(200, {k: v for k, v in job.items() if k != "html"})
+                elif job.get("html"):
+                    self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
+                else:
+                    msg = ("Reading the open assembly orders in Business Central and today's sales in Simphony…"
+                           if job["status"] == "running" else html.escape(job.get("detail") or ""))
+                    self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
+                                     f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/api/brand-report":
                 self._send(200, brand_report_status())
             elif url.path == "/api/sales-report":
@@ -3435,6 +3453,28 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/stockstop-report/settings", "/api/stockstop-report/job"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if url.path.endswith("/settings"):
+                    bad = arap_notify.parse_emails(body.get("to"))[1] + arap_notify.parse_emails(body.get("cc"))[1]
+                    if bad:
+                        self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                        return
+                    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(body.get("time") or "")):
+                        self._send(400, {"error": "The time must be HH:MM, for example 09:30."})
+                        return
+                    store.save_settings({"stockstop_report": {k: body.get(k) for k in
+                                                              ("to", "cc", "days", "time", "companies", "email_lines", "enabled")}}, actor)
+                    self._send(200, salestop_report.status(ssrep))
+                    return
+                only, bad = arap_notify.parse_emails(body.get("to"))
+                if bad:
+                    self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
+                    return
+                company = body.get("company") or ssrep.companies()[0]
+                self._send(202, ssrep.start_job(company, actor, only or None))
             elif url.path == "/api/recipients":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -3661,6 +3701,7 @@ def main():
     arap.start()
     costrep.start()
     negrep.start()
+    ssrep.start()
     exreg.start(register_controls)
     billyrec.start(_latest)                 # Simphony ↔ Billy: the daily read before the 08:00 reports
     brandrep.start()

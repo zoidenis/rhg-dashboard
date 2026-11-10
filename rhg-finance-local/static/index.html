@@ -1930,6 +1930,29 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <p class="hint" id="ngInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="ngRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="bxCard">
+      <div class="card-head"><div><h2>Sales blocked by stock daily email</h2>
+        <p class="hint">Every day at the time set, what Sales → Blocked by stock shows, read fresh: the components whose quantity stops the sales from being posted in Business Central now (with the orders, portions and sales held), the ones today's Simphony sales will run out of before they are imported, and the ones BC still flags whose stock has come. The whole report in an Excel file. One email per company (Email recipients by company → Sales blocked by stock · daily: cost control and operations, unless changed there), one per location to the location's own people with that location only. Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="bxPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">To (when Email recipients has nobody)<input id="bxTo" placeholder="cost@rhg.al, operations@rhg.al"></label>
+        <label class="field">Cc (optional)<input id="bxCc" placeholder="name@rhg.al"></label>
+        <label class="field">Days<select id="bxDays"><option value="daily">Every day</option><option value="mon_sat">Monday to Saturday</option><option value="weekdays">Monday to Friday</option></select></label>
+        <label class="field">Time<input id="bxTime" type="time" value="09:30"></label>
+        <label class="field">Companies (blank = default)<input id="bxCo" placeholder="SALT"></label>
+        <label class="field">Lines per section in the email (0 = all)<input id="bxLines" type="number" min="0" max="1000" value="50"></label>
+        <label class="field">Send a test to<input id="bxTestTo" placeholder="you@rhg.al"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="bxOn" style="width:auto"> Send on the days above</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="bxSave">Save</button>
+        <button class="btn" id="bxPreview">Preview</button>
+        <button class="btn" id="bxTest">Send a test</button>
+        <span class="meta" id="bxMsg"></span>
+      </div>
+      <p class="hint" id="bxInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="bxRuns"></table></div>
+    </div>
     <div class="card" style="margin-bottom:15px" id="brCard">
       <div class="card-head"><div><h2>Brand performance email</h2>
         <p class="hint">One email per brand, to the brand's own addresses with finance and operations in Cc. <b>Weekly</b>, for the week before: sales of every location (Simphony, excluding VAT) against the budget, the week before and the same weekdays last year; guests, checks and the average check; sales by day; the month to date with the costs posted so far. <b>Monthly</b>, for the month before, twice: <i>provisional</i> on the first working day and <i>final</i> on the day set below, once payroll and stock usage are posted: the P&amp;L of the brand (sales, food &amp; beverage, labour, prime cost, other costs, EBITDA) against budget and last year, the month and the year to date, every location. Brands and locations come from the registry in Location intelligence. Sent through the Purchasing mail server.</p></div>
@@ -2247,6 +2270,7 @@ function render(){
   if(!arLoaded) loadArap();
   if(!crLoaded) loadCostReport();
   if(!ngLoaded) loadNegReport();
+  if(!bxLoaded) loadBxReport();
   if(!brLoaded) loadBrandReport();
   if(!srLoaded) loadSalesReport();
   if(!pmLoaded) loadPlMemo();
@@ -6926,6 +6950,7 @@ function urlFilters(){
 function openFromHash(){
   const v = (location.hash || "").slice(1);
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
+  if (v === "stockstop") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("stockstop"); return; }
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();
 }
@@ -7700,6 +7725,60 @@ async function pollNegReport(){
 }
 $("ngPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the negative stock report…</p>"); startNegReport("", w); };
 $("ngTest").onclick = () => { const to = $("ngTestTo").value.trim(); if (!to) { $("ngMsg").textContent = "Enter an address for the test."; return; } startNegReport(to, null); };
+// ---------- sales blocked by stock daily email (salestop_report.py) ----------
+let bxLoaded = false, bxJob = null, bxTimer = null;
+async function loadBxReport(){
+  bxLoaded = true;
+  try{ renderBxReport(await readJSON(await fetch("/api/stockstop-report"))); }catch(e){ $("bxMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function renderBxReport(st){
+  const s = st.settings || {}, m = st.mail || {};
+  const dayText = {daily: "Every day", mon_sat: "Monday to Saturday", weekdays: "Monday to Friday"};
+  $("bxTo").value = s.to || ""; $("bxCc").value = s.cc || ""; $("bxDays").value = s.days || "daily"; $("bxTime").value = s.time || "09:30";
+  $("bxCo").value = s.companies || ""; $("bxLines").value = s.email_lines ?? "50"; $("bxOn").checked = !!s.enabled;
+  if (!$("bxTestTo").value) $("bxTestTo").value = (s.to || "").split(",")[0].trim();
+  $("bxPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : "info");
+  $("bxPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : `On · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}`;
+  const r = st.recipients || {};
+  $("bxInfo").textContent = `${dayText[s.days || "daily"]} at ${s.time || "09:30"}. Companies: ${(st.companies || []).join(", ")}. `
+    + "The people come from Email recipients by company (Sales blocked by stock · daily); " + ((r.to || []).length ? `when nobody is set there: ${r.to.join(", ")}${(r.cc || []).length ? " · Cc: " + r.cc.join(", ") : ""}.` : "no address here for when nobody is set there.")
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [];
+  $("bxRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Company</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 10).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.company)}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc((x.to || []).join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["bxSave", "bxTest", "bxPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "bxSave" && !!bxJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("bxSave").onclick = async () => {
+  $("bxMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/stockstop-report/settings", {to: $("bxTo").value, cc: $("bxCc").value, days: $("bxDays").value,
+      time: $("bxTime").value, companies: $("bxCo").value, email_lines: $("bxLines").value, enabled: $("bxOn").checked});
+    renderBxReport(st); $("bxMsg").textContent = st.settings.enabled ? "Saved. The report goes out on the days set." : "Saved. Tick Send on the days above to switch it on.";
+  }catch(e){ $("bxMsg").textContent = "Could not save: " + e.message; }
+};
+async function startBxReport(to, win){
+  $("bxMsg").textContent = "Reading the open assembly orders in Business Central and today's sales in Simphony…";
+  try{
+    const job = await simphonyPost("/api/stockstop-report/job", {company: ($("bxCo").value.split(",")[0] || "").trim() || $("company").value, to});
+    bxJob = job; ["bxTest", "bxPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/stockstop-report/preview?id=" + encodeURIComponent(job.id);
+    pollBxReport();
+  }catch(e){ $("bxMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollBxReport(){
+  clearTimeout(bxTimer);
+  if (!bxJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/stockstop-report/job?id=" + encodeURIComponent(bxJob.id)));
+    if (j.status === "running") { bxTimer = setTimeout(pollBxReport, 5000); return; }
+    $("bxMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("bxMsg").textContent = "Lost track of the report: " + e.message; }
+  bxJob = null; loadBxReport();
+}
+$("bxPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the sales blocked by stock report…</p>"); startBxReport("", w); };
+$("bxTest").onclick = () => { const to = $("bxTestTo").value.trim(); if (!to) { $("bxMsg").textContent = "Enter an address for the test."; return; } startBxReport(to, null); };
 // ---------- brand performance email (weekly and monthly, one email per brand) ----------
 let brLoaded = false, brJob = null, brTimer = null, brBrands = [];
 async function loadBrandReport(){
