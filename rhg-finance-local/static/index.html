@@ -457,6 +457,9 @@ td.num,th.num{text-align:right}
 .sh-pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--down-bg);color:var(--down)}
 .sh-pill.inv{background:var(--up-bg);color:var(--up)}
 .sh-by-f{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.sh-save{position:sticky;top:0;z-index:3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 12px;border-radius:10px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--line)}
+.sh-save[hidden]{display:none}
+tr.sh-dirty td{background:var(--bg)}tr.sh-dirty input[data-f="waste_pct"]{border-color:var(--accent,#2f80ed)}
 #shPopKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 @media (max-width:640px){#shPopKpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#shPopKpis .kpi{padding:10px 12px}#shPopKpis .v{font-size:22px}#shPop .modal{padding:14px}#shPop{padding:12px 8px}}
 .sh-by-f select{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
@@ -5545,6 +5548,7 @@ $("stRead").onclick = () => stLoad(true);
 $("stXlsx").onclick = () => { if (stData) location.href = "/api/sales/stockstop/xlsx?" + new URLSearchParams({company: $("company").value || ""}); };
 $("company").addEventListener("change", () => { stData = null; if ($("slStView").style.display !== "none") stLoad(false); });
 // ---------- Inventory → Shrinkage KPIs (shrinkage.py) ----------
+var shCfgSaved = false;
 var shData = null, shOvData = null, shSetup = null, shTimer = null, shMon = "", shCat = "", shCfg = null, shCfgOpen = false;
 const SH_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const shMonth = m => m === "ytd" ? "Year to date" : (m ? SH_MON[+m.slice(5, 7) - 1] + " " + m.slice(0, 4) : "");
@@ -5584,6 +5588,7 @@ async function loadSh(refresh){
     if (j.pending) { $("shStatus").textContent = `Reading Business Central: ${j.stage || "starting"}…`; shTimer = setTimeout(() => loadSh(false), 3000); return; }
     if (!j.available) throw new Error(j.error || "not available");
     shData = j; shOvData = null;
+    if (shCfgSaved && $("shCfgMsg")) { shCfgSaved = false; $("shCfgMsg").textContent = "Saved. The KPIs above use the new table."; }
     const counted = j.months.filter(m => m.counted).map(m => m.month);
     if (shWant && counted.includes(shWant)) { shMon = shWant; shWant = ""; }
     else if (shWant && j.reading) shMon = shWant;                   // the new count is being read
@@ -5898,14 +5903,22 @@ function shCfgRender(){
   const c = shCfg, ed = c.can_edit, dis = ed ? "" : " disabled";
   $("shCfgNote").innerHTML = `<span>The waste each category is allowed, the map from the item card to the category, and the exceptions per item.</span> <span>Status: <b>${esc(c.status)}</b>${c.updated_by ? ` · last change by ${esc(c.updated_by)}, ${esc((c.updated_at || "").replace("T", " ").slice(0, 16))}` : ""}.</span>` + (ed ? "" : ` <span>Read only: changes need the settings permission.</span>`);
   const catOpts = sel => c.categories.map(x => `<option${x.kat2 === sel ? " selected" : ""}>${esc(x.kat2)}</option>`).join("");
+  // the categories in use that come from the item card's BC group (not in the table yet): their % Waste can be set here
+  const known = new Set(c.categories.map(x => x.kat2.toUpperCase())), fromBc = new Map();
+  if (shData) [shData.ytd.rows, ...Object.values(shData.per_month).map(x => x.rows)].forEach(rows => (rows || []).forEach(x => {
+    if (x.from_bc && !known.has(x.kat2.toUpperCase())) fromBc.set(x.kat2, x.kat1 || ""); }));
+  const wIn = (v, extra) => `<input data-f="waste_pct" type="number" step="any" min="0" max="100" value="${v}"${dis}${extra || ""} style="width:80px">`;
   const box = (title, hint, body) => `<div><h3 style="margin:0 0 4px;font-size:14px">${title}</h3><p class="hint" style="margin:0 0 8px">${hint}</p>${body}</div>`;
   $("shCfg").innerHTML =
     box("Status", "Pilot while the figures are checked against the Excel; Reconciled once they match; Approved by Finance. Reconciled and Approved need a note.",
       `<div class="sh-ctl"><select id="shStSel"${dis}>${["Pilot", "Reconciled", "Approved"].map(x => `<option${x === c.status ? " selected" : ""}>${x}</option>`).join("")}</select><input id="shStNote" placeholder="note"${dis} style="min-width:240px"><button class="mini dark" id="shStSave" type="button"${dis}>Save status</button></div>`) +
     box("Waste by category", "% Waste = the loss a category is allowed, as a share of the cost of its outs (KMSH / Dalje). CHECK = YES: in the subtotal of the categories followed.",
+      (ed ? `<div class="sh-save" id="shCatBar" hidden><span>Unsaved changes to the categories.</span><button class="mini dark" type="button" data-catsave>Save the categories</button><button class="mini" type="button" id="shCatUndo">Discard</button></div>` : "") +
       `<div class="scroll"><table id="shCatEd"><tr><th>Kat. 2</th><th>Kat. 1</th><th class="num">% Waste</th><th>CHECK</th><th>Basis</th><th></th></tr>` +
-      c.categories.map((x, i) => `<tr data-i="${i}"><td><input data-f="kat2" value="${esc(x.kat2)}"${dis}></td><td><input data-f="kat1" value="${esc(x.kat1)}"${dis}></td><td><input data-f="waste_pct" type="number" step="0.5" min="0" max="100" value="${x.waste_pct}"${dis} style="width:80px"></td><td class="c"><input data-f="check" type="checkbox"${x.check ? " checked" : ""}${dis}></td><td><input data-f="basis" value="${esc(x.basis || "")}"${dis} style="min-width:260px"></td><td>${ed ? `<button class="mini" data-rm type="button">Remove</button>` : ""}</td></tr>`).join("") +
-      `</table></div>` + (ed ? `<p style="margin:8px 0 0"><button class="mini" id="shCatAdd" type="button">Add a category</button> <button class="mini dark" id="shCatSave" type="button">Save the categories</button></p>` : "")) +
+      c.categories.map((x, i) => `<tr data-i="${i}"><td><input data-f="kat2" value="${esc(x.kat2)}"${dis}></td><td><input data-f="kat1" value="${esc(x.kat1)}"${dis}></td><td>${wIn(x.waste_pct)}</td><td class="c"><input data-f="check" type="checkbox"${x.check ? " checked" : ""}${dis}></td><td><input data-f="basis" value="${esc(x.basis || "")}"${dis} style="min-width:260px"></td><td>${ed ? `<button class="mini" data-rm type="button">Remove</button>` : ""}</td></tr>`).join("") +
+      [...fromBc].map(([k2, k1]) => `<tr data-bc="1"><td><input data-f="kat2" value="${esc(k2)}" readonly title="The item card's group in Business Central"><div style="margin-top:3px"><span class="sh-pill st">from BC, not set</span></div></td><td><input data-f="kat1" value="${esc(k1)}"${dis}></td><td>${wIn("", ' placeholder="not set"')}</td><td class="c"><input data-f="check" type="checkbox"${dis}></td><td><input data-f="basis"${dis} style="min-width:260px" placeholder="why this % Waste"></td><td></td></tr>`).join("") +
+      `</table></div>` + (fromBc.size ? `<p class="hint" style="margin:6px 0 0">The rows "from BC, not set" are categories in use that the map does not reach (the item card's own group in Business Central). Give one a % Waste and save: it becomes a category of the table.</p>` : "") +
+      (ed ? `<p style="margin:8px 0 0"><button class="mini" id="shCatAdd" type="button">Add a category</button> <button class="mini dark" id="shCatSave" type="button" data-catsave>Save the categories</button></p>` : "")) +
     box("Map from the item card", "Item Category Group 2, 4 and 5 of the card → category; empty = any. The row with more groups filled wins.",
       `<div class="scroll"><table id="shMapEd"><tr><th>Group 2</th><th>Group 4</th><th>Group 5</th><th>Category</th><th></th></tr>` +
       c.map.map(m => `<tr><td><input data-f="g2" value="${esc(m.g2)}"${dis}></td><td><input data-f="g4" value="${esc(m.g4)}"${dis}></td><td><input data-f="g5" value="${esc(m.g5)}"${dis}></td><td><select data-f="kat2"${dis}>${catOpts(m.kat2)}</select></td><td>${ed ? `<button class="mini" data-rm type="button">Remove</button>` : ""}</td></tr>`).join("") +
@@ -5921,15 +5934,33 @@ function shCfgRender(){
       (c.history.map(h => `<tr><td class="meta">${esc((h.at || "").replace("T", " ").slice(0, 16))}</td><td>${esc(h.by || "")}</td><td>${esc((h.changed || []).join(", "))}</td><td>${esc(h.status || "")}</td><td class="meta">${esc(h.note || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="meta">No change yet: the defaults of the KPI workbook.</td></tr>`) + `</table></div>`) +
     `<p class="meta" id="shCfgMsg"></p>`;
   if (!ed) return;
-  const save = async (patch, note) => {
-    $("shCfgMsg").textContent = "Saving…";
-    try { await simphonyPost("/api/shrinkage/config", Object.assign({company: $("company").value || "", note: note || ""}, patch)); await shCfgLoad(); $("shCfgMsg").textContent = "Saved. Read the KPIs again to see the change."; shData = null; }
-    catch (e) { $("shCfgMsg").textContent = "Could not save: " + e.message; }
+  const save = async (patch, note, btn) => {
+    const msg = btn && btn.closest("#shCatBar") ? btn.closest("#shCatBar").querySelector("span") : $("shCfgMsg");
+    msg.textContent = "Saving…"; $("shCfgMsg").textContent = "Saving…";
+    try {
+      await simphonyPost("/api/shrinkage/config", Object.assign({company: $("company").value || "", note: note || ""}, patch));
+      await shCfgLoad();
+      // the KPIs again with the new table: the months already read are kept, only the categories are worked out again
+      if ($("shLoc").value) { $("shCfgMsg").textContent = "Saved. The KPIs are being worked out again with the change…"; shCfgSaved = true; await loadSh(false); }
+      else $("shCfgMsg").textContent = "Saved.";
+    } catch (e) { msg.textContent = "Could not save: " + e.message; if (msg !== $("shCfgMsg")) $("shCfgMsg").textContent = "Could not save: " + e.message; }
   };
   const rowsOf = (id, fields) => [...$(id).querySelectorAll("tr")].slice(1).map(tr => Object.fromEntries(fields.map(f => { const el = tr.querySelector(`[data-f="${f}"]`); return [f, el.type === "checkbox" ? el.checked : el.value]; })));
   $("shCfg").querySelectorAll("#shCatEd [data-rm], #shMapEd [data-rm]").forEach(b => b.onclick = () => b.closest("tr").remove());
-  $("shCatAdd").onclick = () => $("shCatEd").insertAdjacentHTML("beforeend", `<tr><td><input data-f="kat2"></td><td><input data-f="kat1"></td><td><input data-f="waste_pct" type="number" step="0.5" min="0" max="100" value="5" style="width:80px"></td><td class="c"><input data-f="check" type="checkbox"></td><td><input data-f="basis" style="min-width:260px"></td><td></td></tr>`);
-  $("shCatSave").onclick = () => save({categories: rowsOf("#shCatEd", ["kat2", "kat1", "waste_pct", "check", "basis"])}, "categories");
+  const dirty = () => { $("shCatBar").hidden = false; $("shCatBar").querySelector("span").textContent = "Unsaved changes to the categories."; };
+  $("shCatEd").addEventListener("input", ev => { const tr = ev.target.closest("tr"); if (tr) tr.classList.add("sh-dirty"); dirty(); });
+  $("shCatEd").addEventListener("change", ev => { const tr = ev.target.closest("tr"); if (tr) tr.classList.add("sh-dirty"); dirty(); });
+  $("shCatEd").addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.tagName === "INPUT") { ev.preventDefault(); saveCats($("shCatSave")); } });
+  $("shCatEd").querySelectorAll("[data-rm]").forEach(b => b.addEventListener("click", dirty));
+  $("shCatAdd").onclick = () => { $("shCatEd").insertAdjacentHTML("beforeend", `<tr class="sh-dirty"><td><input data-f="kat2"></td><td><input data-f="kat1"></td><td>${wIn(5)}</td><td class="c"><input data-f="check" type="checkbox"></td><td><input data-f="basis" style="min-width:260px"></td><td></td></tr>`); dirty(); };
+  const saveCats = btn => {
+    const rows = [...$("shCatEd").querySelectorAll("tr")].slice(1).filter(tr => !tr.dataset.bc || tr.querySelector('[data-f="waste_pct"]').value.trim() !== "");
+    const bad = rows.find(tr => { const v = tr.querySelector('[data-f="waste_pct"]').value.trim(); return tr.querySelector('[data-f="kat2"]').value.trim() && (v === "" || isNaN(+v) || +v < 0 || +v > 100); });
+    if (bad) { $("shCatBar").hidden = false; $("shCatBar").querySelector("span").textContent = `% Waste of ${bad.querySelector('[data-f="kat2"]').value}: a number from 0 to 100.`; return; }
+    save({categories: rows.map(tr => Object.fromEntries(["kat2", "kat1", "waste_pct", "check", "basis"].map(f => { const el = tr.querySelector(`[data-f="${f}"]`); return [f, el.type === "checkbox" ? el.checked : el.value]; })))}, "categories", btn);
+  };
+  $("shCfg").querySelectorAll("[data-catsave]").forEach(b => b.onclick = () => saveCats(b));
+  $("shCatUndo").onclick = () => shCfgRender();
   $("shMapAdd").onclick = () => $("shMapEd").insertAdjacentHTML("beforeend", `<tr><td><input data-f="g2"></td><td><input data-f="g4"></td><td><input data-f="g5"></td><td><select data-f="kat2">${catOpts("")}</select></td><td></td></tr>`);
   $("shMapSave").onclick = () => save({map: rowsOf("#shMapEd", ["g2", "g4", "g5", "kat2"])}, "map");
   $("shStSave").onclick = () => save({status: $("shStSel").value}, $("shStNote").value);
