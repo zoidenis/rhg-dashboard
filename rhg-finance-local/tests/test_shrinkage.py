@@ -73,6 +73,21 @@ class Shrinkage(unittest.TestCase):
         self.assertFalse(r["months"][0]["counted"])
         self.assertEqual(r["months"][1]["qty_off"], 0)
 
+    def test_count_form_before_it_is_posted(self):
+        c = Client()
+        c.rows = [x for x in Client.rows if not str(x["Document_No"]).startswith("IF")]       # the count not posted
+        form = {"file": "count.xlsx", "rows": [{"item": "A508", "counted": 0.0}, {"item": "A1232", "counted": 830.0}],
+                "counted_lines": 2}
+        with patch.object(shrinkage.stockcount, "get", side_effect=lambda co, loc, m: form if m == "2026-09" else None):
+            r = shrinkage.build(c, "SALT", "SIN", 2026)
+        m = r["months"][1]
+        self.assertEqual((m["source"], m["not_counted"]), ("form", 1))                # AMB1: stock, not on the form
+        it = {x["no"]: x for x in r["items"]}
+        self.assertAlmostEqual(it["A508"]["m"]["2026-09"][5], -34.81, 2)              # 0 − (47.2 − 12.39)
+        self.assertAlmostEqual(it["A508"]["m"]["2026-09"][6], -34.81 * (7800 / 12.39), 1)   # at the cost of its outs
+        self.assertAlmostEqual(it["A1232"]["m"]["2026-09"][5], 830 - (896 - 830), 2)  # 896 opening − 830 out → 66; +764
+        self.assertEqual(it["AMB1"]["not_counted"], ["2026-09"])
+
     def test_exception_and_status(self):
         shrinkage.save_config("SALT", {"overrides": {"A1232": "Soft Drinks"}}, "geri")
         r = shrinkage.build(Client(), "SALT", "SIN", 2026)

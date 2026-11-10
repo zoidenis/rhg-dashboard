@@ -30,6 +30,7 @@ from datetime import date, datetime, timedelta
 
 import config
 import heldjob
+import stockcount
 import store
 from stockcount import etype, month_range
 
@@ -340,7 +341,7 @@ def category_of(card, cfg, company, item):
 # ---------------------------------------------------------------- reading Business Central
 _items_cache = {}
 ITEM_SELECT = ("No,Description,Base_Unit_of_Measure,Item_Category_Code,Item_Category_Group_2,Item_Category_Group_3,"
-               "Item_Category_Group_4,Item_Category_Group_5")
+               "Item_Category_Group_4,Item_Category_Group_5,Unit_Cost")
 
 
 def item_cards(client, company, max_age=6 * 3600):
@@ -497,27 +498,86 @@ def _totals(rows):
     return t
 
 
+def form_counts(form, known):
+    """The uploaded count form of a month (Inventory → Stock count analysis, the same file): {item: counted or None
+    (left blank)}; a code Excel stripped of its leading zeros is matched to the one BC item that has them."""
+    zeros = {}
+    for no in known:
+        if no.isdigit() and no.startswith("0"):
+            zeros.setdefault(no.lstrip("0"), []).append(no)
+    out = {}
+    for r in form.get("rows") or []:
+        no = r["item"]
+        if no not in known and no.isdigit() and len(zeros.get(no.lstrip("0"), [])) == 1:
+            no = zeros[no.lstrip("0")][0]
+        out[no] = r["counted"]
+    return out
+
+
+def _unit_cost(iq, iv, oq, ov, cq, cv, card):
+    """KMSH of an item in a month, from what BC posted: the cost of its outs, else of its ins, else of the count
+    adjustment, else the item card's Unit Cost."""
+    if oq < -1e-9 and ov < 0:
+        return ov / oq
+    if iq > 1e-9 and iv > 0:
+        return iv / iq
+    if abs(cq) > 1e-9 and cv:
+        return cv / cq
+    return _f(card.get("Unit_Cost"))
+
+
 def build(client, company, location, year, refresh=False, progress=lambda s: None):
+    """A location's year. The count of a month is the count form uploaded for it when there is one (theoretical =
+    the count before, or BC's stock, + in − out; difference = counted − theoretical, at KMSH), else the count
+    adjustments posted in BC (documents starting with IF)."""
     cfg = get_config()
     progress("reading the item cards")
     cards = item_cards(client, company)
     yms = months_of(year)
-    months, items = [], {}
+    months, items, prev = [], {}, None
     for ym in yms:
         m = read_month(client, company, location, ym, cfg["prefixes"], refresh, progress)
-        counted = bool(m["docs"])
-        months.append({"month": ym, "counted": counted, "docs": m["docs"], "read_at": m["read_at"],
-                       "entries": m["entries"]})
+        form = stockcount.get(company, location, ym)
+        fc = form_counts(form, set(cards)) if form else None
+        src = "form" if fc is not None else ("bc" if m["docs"] else None)
+        info = {"month": ym, "counted": bool(src), "source": src, "docs": m["docs"], "read_at": m["read_at"],
+                "entries": m["entries"]}
+        if form:
+            info["form"] = {k: form.get(k) for k in ("file", "uploaded_by", "uploaded_at", "sheet", "sheets",
+                                                     "counted_lines")} | {"lines": len(form.get("rows") or [])}
         seen = set(m["items"]) | {k for k, v in m["opening"].items() if v} | {k for k, v in m["closing"].items() if v}
-        off = 0
+        if fc:
+            seen |= set(fc)
+        off = nc = mismatch = 0
+        nc_value = 0.0
         for no in seen:
             iq, iv, oq, ov, cq, cv, cls = m["items"].get(no) or [0, 0, 0, 0, 0, 0, {}]
-            op, cl = m["opening"].get(no, 0.0), m["closing"].get(no, 0.0)
-            if abs(op + iq + oq + cq - cl) > 0.01:
-                off += 1
+            op = prev[no] if prev is not None and no in prev else m["opening"].get(no, 0.0)
+            flag = ""
+            if src == "form":
+                theo = op + iq + oq
+                c = fc.get(no)
+                if c is None:                       # not on the form, or left blank: no difference, said apart
+                    dq, dv, cl = 0.0, 0.0, theo
+                    if abs(theo) > 1e-6:
+                        nc += 1
+                        nc_value += theo * _unit_cost(iq, iv, oq, ov, cq, cv, cards.get(no) or {})
+                        flag = "not counted"
+                else:
+                    uc = _unit_cost(iq, iv, oq, ov, cq, cv, cards.get(no) or {})
+                    dq, cl = c - theo, c
+                    dv = dq * uc
+                    if m["docs"] and abs(dq - cq) > 0.01:
+                        mismatch += 1
+            else:
+                dq, dv, cl = cq, cv, m["closing"].get(no, 0.0)
+                if src == "bc" and abs(op + iq + oq + cq - cl) > 0.01:
+                    off += 1
             it = items.setdefault(no, {})
-            it[ym] = [op, iq, iv, oq, ov, cq, cv, cl, cls]
-        months[-1]["qty_off"] = off
+            it[ym] = [round(op, 4), iq, iv, oq, ov, round(dq, 4), round(dv, 2), round(cl, 4), cls, flag]
+        info.update(qty_off=off, not_counted=nc, not_counted_value=round(nc_value, 2), posted_mismatch=mismatch)
+        months.append(info)
+        prev = {k: v for k, v in fc.items() if v is not None} if fc else None
     # category per item; months with a count only feed the KPIs
     lines_by_month, item_rows = {}, []
     for no, per in items.items():
@@ -527,7 +587,8 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
         item_rows.append({"no": no, "desc": (card.get("Description") or "").strip(), "unit": unit,
                           "kat2": k2, "from": src, "g4": card.get("Item_Category_Group_4") or "",
                           "g5": card.get("Item_Category_Group_5") or "", "exception": src == "exception",
-                          "m": {ym: v[:8] for ym, v in per.items()}, "cls": {ym: v[8] for ym, v in per.items() if v[8]}})
+                          "m": {ym: v[:8] for ym, v in per.items()}, "cls": {ym: v[8] for ym, v in per.items() if v[8]},
+                          "not_counted": [ym for ym, v in per.items() if v[9]]})
         kat1 = str(card.get("Item_Category_Group_3") or "").strip() if src == "bc" else ""
         for ym, v in per.items():
             lines_by_month.setdefault(ym, []).append({"kat2": k2, "kat1_bc": kat1, "unit": unit, "out_q": v[3],
@@ -553,7 +614,10 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
             "items": sorted(item_rows, key=lambda r: r["no"]),
             "config": {k: cfg[k] for k in ("categories", "status", "prefixes", "updated_at", "updated_by")},
             "notes": {
-                "difference": "Difference = the count adjustment posted in Business Central (document starting with "
+                "difference": "Difference = counted − theoretical, where the month's count form was uploaded "
+                              "(theoretical = the count before, or BC's stock, + in − out; value at the item's KMSH: "
+                              "the posted cost of its outs, else of its ins, else the card's Unit Cost); else the count "
+                              "adjustment posted in Business Central (document starting with "
                               + ", ".join(cfg["prefixes"]) + "), quantity and cost as posted.",
                 "in_out": "In and out = the month's other entries of the location by sign; other adjustments (staff "
                           "consumption, FIRO, corrections) netted per item.",
@@ -602,7 +666,14 @@ def overview(client, company, ym):
         x["items"] = len(x["items"])
         out.append({**{k: round(v, 2) if isinstance(v, float) else v for k, v in x.items()},
                     "docs": sorted(x["docs"], key=lambda d: -x["docs"][d])[:6], "analysis_read_at": kept})
-    out.sort(key=lambda x: x["net"])
+    forms = {c["location"]: c for c in stockcount.counts(company) if c.get("month") == ym}
+    for x in out:
+        x["form"] = bool(forms.get(x["location"]))
+    for loc, c in forms.items():
+        if loc not in locs:
+            out.append({"location": loc, "net": None, "losses": None, "surpluses": None, "lines": None, "items": None,
+                        "docs": [], "analysis_read_at": None, "form": True})
+    out.sort(key=lambda x: (x["net"] is None, x["net"] or 0))
     return {"available": True, "company": company, "month": ym, "locations": out,
             "read_at": datetime.now().isoformat(timespec="seconds"), "prefixes": cfg["prefixes"]}
 
@@ -670,11 +741,13 @@ def render_xlsx(r):
     sheet(ws, sh, srows, [18] + [14] * (len(sh) - 1),
           f"Shrinkage KPIs · {r['company']} · {r['location']} · {r['year']} · read {r['read_at']} · "
           f"status {r['config']['status']}")
+    src = {m["month"]: (f"count form {m['form']['file']}" if m.get("source") == "form"
+                        else "count adjustments posted in BC") for m in r["months"] if m["counted"]}
     for ym in reversed(counted):
         pm = r["per_month"][ym]
         w = wb.create_sheet(f"KPI {label(ym).replace(' ', '')}")
         sheet(w, head, [catrow(x) for x in pm["rows"]], [7, 8, 10, 14, 6] + [9] * 5 + [12] * 5 + [12, 13, 11, 12, 12, 14, 14],
-              f"KPI {label(ym)} · {r['location']} · net {pm['totals']['net']:,.0f} · unjustified "
+              f"KPI {label(ym)} · {r['location']} · {src[ym]} · net {pm['totals']['net']:,.0f} · unjustified "
               f"{pm['totals']['unjust']:,.0f} (Excel method {pm['totals']['unjust_excel']:,.0f})")
         for row in w.iter_rows(min_row=4):
             for c in row[5:10]:

@@ -446,7 +446,7 @@ td.num,th.num{text-align:right}
 #v-stockcount .neg{color:var(--up)}
 #v-shrinkage .neg{color:var(--up)}
 .sh-ctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.sh-ctl select,#shCfgCard select,#shCfgCard input:not([type=checkbox]),#shCfgCard textarea{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
+.sh-ctl select,.sh-up select,#shCfgCard select,#shCfgCard input:not([type=checkbox]),#shCfgCard textarea{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
 #shCats tr[data-shcat],#shMonths tr[data-shm],#shOv tr[data-shloc]{cursor:pointer}
 #shCats tr[data-shcat]:hover td,#shMonths tr[data-shm]:hover td,#shOv tr[data-shloc]:hover td{background:var(--bg)}
 #shCats tr.on td,#shMonths tr.on td{background:var(--bg);box-shadow:inset 0 -1px 0 var(--line)}
@@ -1208,15 +1208,17 @@ td.num,th.num{text-align:right}
   <section class="view" id="v-shrinkage">
     <div class="card">
       <div class="card-head"><div><h2>Shrinkage KPIs</h2>
-        <p class="hint"><span>The count differences of a location, month by month and by category, against the waste the category is allowed: what is lost beyond it is the unjustified value.</span> <span>Read from Business Central: the count adjustments, and the month's ins and outs at their posted cost.</span></p></div>
+        <p class="hint"><span>The count differences of a location, month by month and by category, against the waste the category is allowed: what is lost beyond it is the unjustified value.</span> <span>Upload the month's count of a location: the rest (the stock before, the month's ins and outs at their posted cost, the categories) is read from Business Central.</span></p></div>
         <div class="sh-ctl">
           <select id="shLoc" aria-label="Location"><option value="">All locations</option></select>
           <select id="shYear" aria-label="Year"></select>
           <select id="shMonth" aria-label="Month"></select>
           <button class="mini dark" id="shRead" type="button">Read again</button><button class="mini" id="shXlsx" type="button">Excel</button><button class="mini" id="shCfgBtn" type="button">Categories &amp; waste</button></div></div>
       <div class="sh-up" id="shUp" hidden>
-        <label class="mini dark">Upload the Excel KPI analysis<input type="file" id="shImpTop" accept=".xlsx" hidden></label>
-        <span class="meta" id="shUpMsg"><span>Or drop the file here.</span> <span>The categories of its items (Kat. 2) become exceptions where they differ from the map, and its waste table (Firot % Category) the % Waste of the categories.</span></span></div>
+        <label class="mini dark">Upload the count<input type="file" id="shCntFile" accept=".xlsx" hidden></label>
+        <select id="shUpMonth" aria-label="Month the count closes"></select>
+        <select id="shUpSheet" aria-label="Sheet of the form" hidden></select>
+        <span class="meta" id="shUpMsg"></span></div>
       <div class="kpis six" id="shKpis" style="margin-top:14px"></div>
       <p class="meta" id="shStatus">Reading…</p>
     </div>
@@ -1224,7 +1226,7 @@ td.num,th.num{text-align:right}
       <p class="hint" id="shOvNote"></p></div></div>
       <div class="scroll"><table id="shOv"></table></div></div>
     <div class="card" id="shMonthsCard" hidden><div class="card-head"><div><h2>By month</h2>
-      <p class="hint">A month is in the KPIs once its count is posted in Business Central. Click a month to open it.</p></div></div>
+      <p class="hint">A month is in the KPIs once its count form is uploaded here, or its count is posted in Business Central. Click a month to open it.</p></div></div>
       <div class="scroll"><table id="shMonths"></table></div></div>
     <div class="card" id="shCatCard" hidden><div class="card-head"><div><h2 id="shCatT">By category</h2>
       <p class="hint" id="shCatNote"></p></div></div>
@@ -1238,7 +1240,8 @@ td.num,th.num{text-align:right}
       <div class="sh-cfg-grid" id="shCfg"></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
       <div class="hint" style="margin-top:12px;line-height:1.55">
-        <p><span>Difference: the count of the 1st of a month is posted in Business Central as an item adjustment dated the last day of the month before, its document starting with IF (IF 01.10.2026, IFAMB 01/10/2026…). Its quantity is the count difference of each item, its cost amount the difference in value.</span></p>
+        <p><span>Count: the count form uploaded here for the location and month (Kartela, GjendjeFizike; the same file as Stock count analysis).</span> <span>Difference = counted − theoretical, valued at the item's KMSH: the posted cost of its outs in the month, else of its ins, else the item card's Unit Cost.</span> <span>Items with stock not on the form, or left blank, take no difference and are shown apart.</span></p>
+        <p><span>A month with no form uploaded takes the count posted in Business Central: the item adjustment dated the last day of the month, its document starting with IF (IF 01.10.2026, IFAMB 01/10/2026…), quantity and cost as posted.</span></p>
         <p><span>In and out: the month's other entries of the location, by sign (purchases, transfers, consumption by the recipes, sales). Staff consumption, declared waste (FIRO) and corrections that cancel each other are netted per item.</span></p>
         <p><span>Opening = stock at the end of the month before; counted = stock at the month end, with the count posted; theoretical = opening + in − out.</span></p>
         <p><span>KMSH / Dalje = the cost of the month's outs, as posted. Diferenca / Dalje = loss ÷ KMSH / Dalje. % Delta = difference ÷ out, in quantity.</span></p>
@@ -5421,7 +5424,10 @@ function shSetupFill(st){
   if (!yr.options.length) { yr.innerHTML = st.years.map(y => `<option>${y}</option>`).join(""); yr.value = st.years[0]; }
   $("shXlsx").style.display = st.can_export && $("shLoc").value ? "" : "none";
   $("shYear").style.display = $("shLoc").value ? "" : "none";
-  $("shUp").hidden = !st.can_settings;
+  $("shUp").hidden = !st.can_upload;
+  const um = $("shUpMonth");
+  if (!um.options.length) { um.innerHTML = st.months.map(m => `<option value="${m}">${shMonth(m)}</option>`).join(""); um.value = st.default_month; }
+  shUpHint();
 }
 async function loadSh(refresh){
   clearTimeout(shTimer);
@@ -5437,7 +5443,10 @@ async function loadSh(refresh){
     if (!j.available) throw new Error(j.error || "not available");
     shData = j; shOvData = null;
     const counted = j.months.filter(m => m.counted).map(m => m.month);
-    if (!shMon || (shMon !== "ytd" && !counted.includes(shMon))) shMon = counted.length ? counted[counted.length - 1] : "ytd";
+    if (shWant && counted.includes(shWant)) { shMon = shWant; shWant = ""; }
+    else if (shWant && j.reading) shMon = shWant;                   // the new count is being read
+    else shWant = "";
+    if (!shWant && (!shMon || (shMon !== "ytd" && !counted.includes(shMon)))) shMon = counted.length ? counted[counted.length - 1] : "ytd";
     shRender();
     if (j.reading) { $("shStatus").textContent += ` · reading again: ${j.stage || "…"}`; shTimer = setTimeout(() => loadSh(false), 4000); }
   } catch (e) { $("shStatus").textContent = "Could not read: " + e.message; }
@@ -5486,16 +5495,22 @@ function shRender(){
     shCard("Categories to investigate", fmt(t.investigate), `<span>above their % Waste</span>`, t.investigate ? "warn" : "") +
     shCard("Unjustified", ilM(t.unjust), `<span>loss − % Waste × KMSH / Dalje; CHECK = YES ${fmt(t.unjust_yes)}</span><br><span title="The whole loss of the categories to investigate, as the KPI workbook counts it">Excel method ${fmt(t.unjust_excel)}; CHECK = YES ${fmt(t.unjust_excel_yes)}</span>`, t.unjust ? "up" : "", t.unjust)
     : shCard("Count", "–", `<span>No count posted in ${esc(shMonth(shMon))} for ${esc(d.location)}.</span>`, "warn");
-  const docs = shMon !== "ytd" ? Object.keys((d.months.find(m => m.month === shMon) || {}).docs || {}) : [];
+  const mi = shMon !== "ytd" ? (d.months.find(m => m.month === shMon) || {}) : {};
+  const docs = mi.source === "bc" ? Object.keys(mi.docs || {}) : [];
   const off = d.months.reduce((a, m) => a + (m.qty_off || 0), 0);
   $("shStatus").innerHTML = [`${esc(d.company)} · ${esc(d.location)} · ${esc(shMonth(shMon))}${shMon === "ytd" ? ` (${d.ytd.months.length} counted months of ${d.year})` : ""}`,
     `<span>read at ${esc((d.read_at || "").replace("T", " ").slice(0, 16))}</span>`,
-    docs.length ? `<span>count documents: ${esc(docs.slice(0, 4).join(", "))}${docs.length > 4 ? " …" : ""}</span>` : "",
+    docs.length ? `<span>count posted in BC: ${esc(docs.slice(0, 4).join(", "))}${docs.length > 4 ? " …" : ""}</span>` : "",
+    mi.source === "form" ? `<span>count form: ${esc(mi.form.file || "")} · ${fmt(mi.form.counted_lines)} of ${fmt(mi.form.lines)} lines counted · uploaded by ${esc(mi.form.uploaded_by || "")}</span>` : "",
+    mi.not_counted ? `<span class="neg">${fmt(mi.not_counted)} items with stock not counted (${fmt(mi.not_counted_value)}): no difference taken for them</span>` : "",
+    mi.posted_mismatch ? `<span>${fmt(mi.posted_mismatch)} items whose difference is not the one posted in BC</span>` : "",
     off ? `<span class="neg">${fmt(off)} item-months where opening + in + out + difference does not give the closing stock</span>` : "",
     `<span>status of the categories and waste: ${esc(d.config.status)}</span>`].filter(Boolean).join(" · ");
   // by month
   $("shMonthsCard").hidden = false;
-  const mrow = (m, T, label, on) => `<tr data-shm="${m}" class="${on ? "on" : ""}"><td><b>${esc(label)}</b></td>` + (T ?
+  const srcOf = m => { const x = d.months.find(y => y.month === m) || {};
+    return x.source === "form" ? `<span class="sh-pill" title="${esc((x.form || {}).file || "")}">count form</span>` : x.source === "bc" ? `<span class="sh-pill st" title="${esc(Object.keys(x.docs || {}).join(", "))}">posted in BC</span>` : ""; };
+  const mrow = (m, T, label, on) => `<tr data-shm="${m}" class="${on ? "on" : ""}"><td><b>${esc(label)}</b> ${m === "ytd" ? "" : srcOf(m)}</td>` + (T ?
     `<td class="num">${shV(T.net)}</td><td class="num">${fmt(T.losses)}</td><td class="num">${fmt(T.surpluses)}</td><td class="num">${fmt(T.kmsh)}</td><td class="num">${shPct(T.ratio)}</td>
      <td class="num">${fmt(T.investigate)}</td><td class="num"><b>${fmt(T.unjust)}</b></td><td class="num">${fmt(T.unjust_excel)}</td>` :
     `<td colspan="8" class="meta">no count posted</td>`) + `</tr>`;
@@ -5537,7 +5552,7 @@ function shItems(){
   $("shItemsNote").innerHTML = `<span>Largest loss first.</span> <span>Difference = the count adjustment posted in Business Central; its value is the cost BC posted.</span>` +
     (shMon === "ytd" ? ` <span>Year to date: opening of the first counted month, closing of the last, ins, outs and differences summed.</span>` : "");
   $("shItems").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">Opening</th><th class="num">In</th><th class="num">Out</th><th class="num">Theoretical</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Unit cost</th><th class="num">Difference value</th><th class="num">KMSH / Dalje</th></tr>` +
-    (rows.slice(0, 400).map(r => `<tr><td><b>${esc(r.it.no)}</b> ${esc(r.it.desc)}${r.it.exception ? ` <span class="sh-pill st" title="Category set by an exception, not by the map">exception</span>` : ""}<div class="meta">${esc([r.it.g4, r.it.g5].filter(Boolean).join(" · "))}</div></td>
+    (rows.slice(0, 400).map(r => `<tr><td><b>${esc(r.it.no)}</b> ${esc(r.it.desc)}${r.it.exception ? ` <span class="sh-pill st" title="Category set by an exception, not by the map">exception</span>` : ""}${months.some(m => (r.it.not_counted || []).includes(m)) ? ` <span class="sh-pill inv" title="Stock in BC, not counted on the form: no difference taken">not counted</span>` : ""}<div class="meta">${esc([r.it.g4, r.it.g5].filter(Boolean).join(" · "))}</div></td>
       <td>${esc(r.it.unit)}</td><td class="num">${cnN(r.op)}</td><td class="num">${cnN(r.in)}</td><td class="num">${cnN(r.out)}</td><td class="num">${cnN((r.op || 0) + r.in - r.out)}</td><td class="num">${cnN(r.cl)}</td>
       <td class="num"><b class="${r.cnt < 0 ? "neg" : ""}">${cnN(r.cnt)}</b></td><td class="num">${r.cnt ? fmt(r.val / r.cnt, 2) : "–"}</td><td class="num"><b>${shV(r.val)}</b></td><td class="num">${fmt(r.kmsh)}</td></tr>`).join("")
       || `<tr><td colspan="11" class="meta">No item.</td></tr>`);
@@ -5546,6 +5561,7 @@ function shRenderOv(){
   const j = shOvData;
   $("shKpis").innerHTML = "";
   const L = j.locations, tot = k => L.reduce((a, x) => a + (x[k] || 0), 0);
+  shUpHint();
   $("shKpis").innerHTML = shCard("Locations with a count", fmt(L.length), `<span>in ${esc(shMonth(j.month))}</span>`) +
     shCard("Net difference", ilM(tot("net")), `<span>at posted cost</span>`, tot("net") < 0 ? "up" : "", tot("net")) +
     shCard("Losses", ilM(tot("losses")), `<span>items counted below the stock</span>`, tot("losses") ? "up" : "", tot("losses")) +
@@ -5556,8 +5572,8 @@ function shRenderOv(){
   $("shOvNote").innerHTML = `<span>The count adjustments of ${esc(shMonth(j.month))} by location, worst first. Click a location for its KPIs by category: the categories and the unjustified value need the month's ins and outs, read for one location at a time.</span>`;
   $("shOv").innerHTML = `<tr><th>Location</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">Items</th><th>Count documents</th></tr>` +
     (L.map(x => `<tr data-shloc="${esc(x.location)}"><td><b>${esc(x.location)}</b>${x.analysis_read_at ? `<div class="meta">KPIs read ${esc(x.analysis_read_at.replace("T", " ").slice(0, 16))}</div>` : ""}</td>
-      <td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.losses)}</td><td class="num">${fmt(x.surpluses)}</td><td class="num">${fmt(x.items)}</td>
-      <td class="meta">${esc(x.docs.join(", "))}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No count adjustment posted in ${esc(shMonth(j.month))}.</td></tr>`);
+      ${x.net == null ? `<td colspan="4" class="meta">count form uploaded, not yet posted in BC: open the location for its KPIs</td>` : `<td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.losses)}</td><td class="num">${fmt(x.surpluses)}</td><td class="num">${fmt(x.items)}</td>`}
+      <td class="meta">${x.form ? `<span class="sh-pill">count form</span> ` : ""}${esc(x.docs.join(", "))}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No count adjustment posted in ${esc(shMonth(j.month))}.</td></tr>`);
   $("shOv").querySelectorAll("tr[data-shloc]").forEach(tr => tr.onclick = () => {
     $("shLoc").value = tr.dataset.shloc; $("shYear").value = j.month.slice(0, 4); shMon = j.month; shCat = ""; loadSh(false);
   });
@@ -5630,14 +5646,43 @@ async function shImport(f, msg){
     if ($("shLoc").value) loadSh(false);
   } catch (e) { msg.textContent = "Could not import: " + e.message; }
 }
-$("shImpTop").onchange = ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) shImport(f, $("shUpMsg")); };
+// ---- the month's count: the count form of a location (the same file as Stock count analysis); the KPIs follow it
+var shCntLast = null, shWant = "", shUpFor = null;
+function shUpHint(){
+  const loc = $("shLoc").value;
+  if (shUpFor === loc) return;                       // the result of an upload stays until the location changes
+  shUpFor = loc;
+  $("shUpMsg").innerHTML = loc
+    ? `<span>Count of ${esc(loc)} for the month above: the count form (Kartela, GjendjeFizike), or drop it here.</span> <span>The KPIs of the month are built from it and from Business Central.</span>`
+    : `<span>Choose the location of the count first (above), then the month it closes.</span>`;
+}
+async function shCount(f, sheet){
+  const loc = $("shLoc").value, month = $("shUpMonth").value, msg = $("shUpMsg");
+  if (!loc) { shUpHint(); return; }
+  if (!/\.xlsx$/i.test(f.name)) { msg.textContent = "Upload the count form as an Excel file (.xlsx)."; return; }
+  msg.textContent = "Reading the count…";
+  try {
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+    shCntLast = {f, data};
+    const j = await simphonyPost("/api/shrinkage/count", {company: $("company").value || "", location: loc, month, data, filename: f.name, sheet: sheet || ""});
+    const ss = $("shUpSheet");
+    ss.hidden = !(j.sheets && j.sheets.length > 1);
+    if (!ss.hidden) { ss.innerHTML = j.sheets.map(x => `<option${x === j.sheet ? " selected" : ""}>${esc(x)}</option>`).join(""); }
+    msg.innerHTML = `<span>Count of ${esc(loc)}, ${esc(shMonth(month))}: ${esc(f.name)}${j.sheets && j.sheets.length > 1 ? ` (sheet ${esc(j.sheet)})` : ""}</span> · <span>${fmt(j.counted_lines)} of ${fmt(j.lines)} lines counted</span>` +
+      (j.month_on_form && j.month_on_form !== month ? ` · <span class="neg">the form says ${esc(shMonth(j.month_on_form))}</span>` : "") +
+      ((j.warnings || []).length ? ` · <span title="${esc(j.warnings.join("\n"))}">${fmt(j.warnings.length)} notes on reading the form</span>` : "");
+    shUpFor = loc; shWant = month; shMon = month; shCat = ""; $("shYear").value = month.slice(0, 4); shData = null; loadSh(false);
+  } catch (e) { msg.textContent = "Could not read the count: " + e.message; }
+}
+$("shCntFile").onchange = ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) shCount(f); };
+$("shUpSheet").onchange = () => { if (shCntLast) shCount(shCntLast.f, $("shUpSheet").value); };
 (function(){
   const z = $("shUp");
   ["dragenter", "dragover"].forEach(t => z.addEventListener(t, ev => { ev.preventDefault(); z.classList.add("drag"); }));
   ["dragleave", "drop"].forEach(t => z.addEventListener(t, ev => { ev.preventDefault(); z.classList.remove("drag"); }));
-  z.addEventListener("drop", ev => { const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) shImport(f, $("shUpMsg")); });
+  z.addEventListener("drop", ev => { const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) shCount(f); });
 })();
-$("shLoc").onchange = () => { shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shItemsCard").hidden = true; loadSh(false); };
+$("shLoc").onchange = () => { shUpHint(); shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shItemsCard").hidden = true; loadSh(false); };
 $("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
 $("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
 $("shRead").onclick = () => $("shLoc").value ? loadSh(true) : loadShOv(true);

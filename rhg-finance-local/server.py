@@ -110,6 +110,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/recipients": "settings",
                      "/api/exceptions/email": "actions",
                      "/api/shrinkage/config": "settings", "/api/shrinkage/import": "settings",
+                     "/api/shrinkage/count": "actions",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -1941,6 +1942,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
                          "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
                          "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview", "/api/shrinkage/config",
+                         "/api/shrinkage/count",
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
                          "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx",
                          # Budget & forecast → Location intelligence, by department
@@ -2059,7 +2061,7 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: recipeuse.cut(b, self._allowed)
         elif path in ("/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
                       "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx",
-                      "/api/shrinkage/overview", "/api/shrinkage/config"):
+                      "/api/shrinkage/overview", "/api/shrinkage/config", "/api/shrinkage/count"):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
@@ -2163,6 +2165,7 @@ class Handler(BaseHTTPRequestHandler):
                  "years": [today.year - i for i in range(3)], "default_month": stockcount.default_month(),
                  "months": [(today.replace(day=1) - timedelta(days=1 + 31 * i)).strftime("%Y-%m") for i in range(13)],
                  "can_settings": auth.can(user, "settings"), "can_export": auth.can(user, "export"),
+                 "can_upload": auth.can(user, "actions") and A is None,     # as Stock count analysis: not by location
                  "status": shrinkage.get_config()["status"]}
         if path == "/api/shrinkage/overview":
             month = q.get("month") or stockcount.default_month()
@@ -3141,6 +3144,39 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if url.path == "/api/exceptions/email":
                 self._send(*send_exception_email(body, user))
+            elif url.path == "/api/shrinkage/count":
+                # the month's count form of a location (the same file as Stock count analysis): the KPIs follow it
+                if not auth.can(user, "finance.s.inventory.shrinkage"):
+                    self._send(403, {"error": "Your role does not include Shrinkage KPIs."})
+                    return
+                company, location = body.get("company") or config.BC_COMPANY, str(body.get("location") or "").strip()
+                month = str(body.get("month") or "")
+                try:
+                    stockcount.month_range(month)
+                except (ValueError, TypeError):
+                    self._send(400, {"error": "Choose the month the count closes."})
+                    return
+                codes = client.locations(company)
+                if self._allowed is not None:
+                    codes = [c for c in codes if c.upper() in self._allowed]
+                if not location or location not in codes:
+                    self._send(400, {"error": "Choose the location of the count first."})
+                    return
+                if body.get("delete"):
+                    ok = stockcount.delete(company, location, month, actor)
+                    shrinkage._held.forget()
+                    self._send(200, {"ok": ok})
+                    return
+                try:
+                    parsed = stockcount.parse(stockcount.decode(body.get("data")), body.get("sheet") or None)
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                c = stockcount.save(company, location, month, parsed, body.get("filename"), actor)
+                shrinkage._held.forget()
+                self._send(200, {"ok": True, "sheet": c["sheet"], "sheets": c["sheets"], "month_on_form": c["month"],
+                                 "lines": len(c["rows"]), "counted_lines": c["counted_lines"],
+                                 "warnings": c["warnings"][:10]})
             elif url.path in ("/api/shrinkage/config", "/api/shrinkage/import"):
                 company = body.get("company") or config.BC_COMPANY
                 try:
