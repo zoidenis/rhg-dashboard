@@ -152,7 +152,7 @@ DEFAULT_ROLES = {
     "Chief accountant": {"department": "Finance", "system": False,
                          "description": "Statements, working capital, fiscal, fixed assets and closing; no "
                                         "thresholds.",
-                         "permissions": _s("finance.s", but=("finance.s.settings",))
+                         "permissions": _s("finance.s", but=("finance.s.settings", "finance.s.emcpriv"))
                                         + ["finance.export", "finance.actions.manage", "finance.closing.manage"]},
     "Accountant": {"department": "Finance", "system": False,
                    "description": "Statements, G/L, Kartela, fiscal and fixed assets; actions; no closing.",
@@ -249,6 +249,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.sales.chanprofit": "finance.s.sales.main",
                  # Control → Simphony ↔ Billy: whoever reads Simphony ↔ BC
                  "finance.s.billyrec": "finance.s.salesrec",
+                 # Control → EMC privileges (who can do what in Simphony): whoever holds Settings
+                 "finance.s.emcpriv": "finance.s.settings",
                  # Sales → Menu & food cost: whoever reads Menu engineering
                  "finance.s.sales.menucost": "finance.s.sales.menu",
                  # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing

@@ -457,6 +457,11 @@ td.num,th.num{text-align:right}
 .sh-pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--down-bg);color:var(--down)}
 .sh-pill.inv{background:var(--up-bg);color:var(--up)}
 .sh-by-f{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.ep-pick{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:start}
+.ep-pick input,.ep-pick select{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);margin-top:4px}
+.ep-pick select{padding:4px}.ep-pick #epSwap{margin-top:70px}
+.ep-who{font-size:12.5px;margin-top:8px;line-height:1.5}.ep-who .r{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);margin:2px 4px 0 0}
+@media (max-width:700px){.ep-pick{grid-template-columns:1fr}.ep-pick #epSwap{margin:0;justify-self:center}}
 .ka-age .bar{cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px}.ka-age .bar:hover{background:var(--bg)}.ka-age .bar.on{background:var(--bg);box-shadow:inset 3px 0 0 var(--accent)}
 .ka-chips{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
 .ka-chips button{font:inherit;font-size:12.5px;display:inline-flex;gap:6px;align-items:center;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
@@ -624,6 +629,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <button data-view="salesrec">Simphony ↔ BC</button>
     <button data-view="receipts">Takings POS ↔ BC</button>
     <button data-view="billyrec">Simphony ↔ Billy</button>
+    <button data-view="emcpriv">EMC privileges</button>
 
     <div class="grp">System</div>
     <button data-view="gaps">Data quality &amp; reconciliation</button>
@@ -1620,6 +1626,39 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     </div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the register works</summary>
       <div class="hint" id="rgDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-emcpriv">
+    <div class="card">
+      <div class="card-head"><div><h2>EMC privileges</h2>
+        <p class="hint"><span>What one Simphony user can do in EMC and at the POS against another: their roles, and each role's EMC modules (view, edit, add, delete), field controls, actions and operations privileges (voids, returns, reopening closed checks, discounts…) and the hierarchy they see.</span> <span>A user has every right any of their roles gives.</span> <span>Read from the Simphony Configuration API; nothing is changed in Simphony.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="mini dark" id="epRead" type="button">Read again</button><button class="mini exp" id="epExp" type="button">Export ▾</button><button class="mini" id="epSetBtn" type="button" hidden>Connection</button></div></div>
+      <p class="meta" id="epStatus">Reading…</p>
+    </div>
+    <div class="card" id="epSet" hidden>
+      <div class="card-head"><div><h2>Simphony Configuration API: connection</h2>
+        <p class="hint"><span>A separate API account, made in Reporting and Analytics → API account maintenance: API Account Type <b>Simphony Configuration API</b>, with data permissions to read employees and roles. Its password comes by email to the account's address.</span> <span>Type the password here yourself: it stays on the server, the screen only shows whether it is set. The tower only reads (get calls).</span></p></div></div>
+      <div class="formgrid">
+        <label class="field">Configuration API server<input id="epCc" placeholder="https://…oraclerestaurants.com" autocomplete="off"></label>
+        <label class="field">Authentication server<input id="epAuth" autocomplete="off"></label>
+        <label class="field">Enterprise short name<input id="epOrg" autocomplete="off"></label>
+        <label class="field">Client ID<input id="epCid" autocomplete="off"></label>
+        <label class="field">API account name<input id="epUser" autocomplete="off"></label>
+        <label class="field">Password<input id="epPw" type="password" autocomplete="new-password"></label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="epSave" type="button">Save</button><button class="btn" id="epCheck" type="button">Check the connection</button><span class="meta" id="epMsg"></span></div>
+    </div>
+    <div class="card" id="epCmp" hidden>
+      <div class="ep-pick">
+        <div><label class="meta" for="epQa">User A</label><input id="epQa" placeholder="find by name, EMC user or number" autocomplete="off"><select id="epA" size="6" aria-label="User A"></select><div class="ep-who" id="epWa"></div></div>
+        <button class="mini" id="epSwap" type="button" title="Swap A and B" aria-label="Swap A and B">⇄</button>
+        <div><label class="meta" for="epQb">User B</label><input id="epQb" placeholder="find by name, EMC user or number" autocomplete="off"><select id="epB" size="6" aria-label="User B"></select><div class="ep-who" id="epWb"></div></div>
+      </div>
+      <div class="kpis" id="epK" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
+      <div class="sk-chips" id="epChips"></div>
+      <div class="filters" style="margin:0 0 10px"><label>Kind<select id="epCat"><option value="">All</option></select></label><label>Find<input id="epQ" placeholder="privilege or module"></label></div>
+      <div class="scroll" style="max-height:640px"><table id="epT"></table></div><p class="meta" id="epMore"></p>
+    </div>
   </section>
 
   <section class="view" id="v-billyrec">
@@ -5320,6 +5359,128 @@ $("modalCsv").onclick=()=>{
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
 // ---------------------------------------------------------------- Simphony ↔ Billy
+// ---------- Control → EMC privileges (emcpriv.py): one Simphony user against another ----------
+let epData = null, epTimer = null, epF = "diff", epA = "", epB = "";
+const EP_RANK = {view: 1, add: 2, edit: 3, "delete": 4}, EP_FLD = {excluded: 0, "view only": 1, editable: 2};
+async function loadEp(refresh){
+  clearTimeout(epTimer);
+  $("epStatus").textContent = "Reading…";
+  try {
+    const j = await readJSON(await fetch("/api/emcpriv" + (refresh ? "?refresh=1" : "")));
+    $("epSetBtn").hidden = !j.can_settings;
+    epConn(j.connection || {});
+    if (j.pending) { $("epStatus").textContent = `Reading the Simphony Configuration API: ${j.stage || "starting"}…`; epTimer = setTimeout(() => loadEp(false), 3000); return; }
+    if (j.available === false) {
+      $("epCmp").hidden = true;
+      $("epStatus").textContent = j.setup ? (j.can_settings ? "The Simphony Configuration API account is not set yet: fill in the connection below." : "The Simphony Configuration API account is not set yet: someone with the Settings permission enters it here.") : "Could not read: " + (j.error || "");
+      if (j.setup && j.can_settings) $("epSet").hidden = false;
+      return;
+    }
+    epData = j; epRender();
+    if (j.reading) epTimer = setTimeout(() => loadEp(false), 4000);
+  } catch (e) { $("epStatus").textContent = "Could not read: " + e.message; }
+}
+function epConn(c){
+  $("epCc").value = c.cc_server || ""; $("epAuth").value = c.auth_server || ""; $("epAuth").placeholder = c.auth_default ? "as Settings → Simphony: " + c.auth_default : "https://…";
+  $("epOrg").value = c.org || ""; $("epOrg").placeholder = c.org_default ? "as Settings → Simphony: " + c.org_default : "";
+  $("epCid").value = c.client_id || ""; $("epUser").value = c.username || "";
+  $("epPw").value = ""; $("epPw").placeholder = c.has_password ? `saved ${c.password_saved_at || ""} · type to change` : "password";
+}
+function epEff(u){
+  const out = {};
+  (u ? u.roles : []).forEach(r => Object.entries((epData.roles[String(r.num)] || {}).priv || {}).forEach(([k, v]) => {
+    if (Array.isArray(v)) out[k] = [...new Set([...(out[k] || []), ...v])].sort((a, b) => (EP_RANK[a] || 9) - (EP_RANK[b] || 9));
+    else if (typeof v === "string") out[k] = out[k] == null || (EP_FLD[v] ?? -1) > (EP_FLD[out[k]] ?? -1) ? v : out[k];
+    else out[k] = true;
+  }));
+  return out;
+}
+function epRows(){
+  const E = epData.employees, a = E.find(e => String(e.num) === epA), b = E.find(e => String(e.num) === epB);
+  const A = epEff(a), B = epEff(b), same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+  return [...new Set([...Object.keys(A), ...Object.keys(B)])].map(k => { const n = epData.names[k] || ["Other", k];
+    return {k, cat: n[0], name: n[1], a: A[k], b: B[k], st: B[k] == null ? "a" : A[k] == null ? "b" : same(A[k], B[k]) ? "same" : "diff"}; })
+    .sort((x, y) => x.cat.localeCompare(y.cat) || x.name.localeCompare(y.name));
+}
+const epV = v => v == null ? `<span class="meta">–</span>` : v === true ? "✓" : Array.isArray(v) ? esc(v.join(" · ")) : esc(v);
+function epPick(side){
+  const q = ($(side === "a" ? "epQa" : "epQb").value || "").trim().toLowerCase(), cur = side === "a" ? epA : epB, sel = $(side === "a" ? "epA" : "epB");
+  const E = epData.employees.filter(e => !q || `${e.name} ${e.user} ${e.num}`.toLowerCase().includes(q));
+  const opt = e => `<option value="${esc(String(e.num))}"${String(e.num) === cur ? " selected" : ""}>${esc(e.name || "–")}${e.user ? " · " + esc(e.user) : ""} · ${esc(String(e.num))}${e.ended ? " · ended " + esc(e.ended.slice(0, 10)) : ""}</option>`;
+  const emc = E.filter(e => e.emc), pos = E.filter(e => !e.emc);
+  sel.innerHTML = (emc.length ? `<optgroup label="EMC users">${emc.slice(0, 400).map(opt).join("")}</optgroup>` : "") + (pos.length ? `<optgroup label="Other employees">${pos.slice(0, 400).map(opt).join("")}</optgroup>` : "");
+}
+function epWho(u, el){
+  el.innerHTML = u ? `<b>${esc(u.name || "–")}</b>${u.user ? ` · EMC user <b>${esc(u.user)}</b>` : ` · ${fcSp("no EMC user name")}`} · #${esc(String(u.num))}<br>` +
+    (u.roles.length ? u.roles.map(r => `<span class="r">${esc(r.name)}${r.where ? " · " + esc(r.where) : ""}</span>`).join("") : `<span class="meta">${fcSp("no role")}</span>`) : "";
+}
+function epRender(){
+  const d = epData, c = d.counts;
+  $("epStatus").innerHTML = esc(`${fmt(c.emc_users)} EMC users and ${fmt(c.employees - c.emc_users)} other employees · ${fmt(c.roles)} roles · read at ${(d.read_at || "").replace("T", " ").slice(0, 16)}`) + (d.reading ? ` · ${fcSp("reading again…")}` : "");
+  $("epCmp").hidden = false;
+  const E = d.employees;
+  if (!E.some(e => String(e.num) === epA)) epA = E[0] ? String(E[0].num) : "";
+  if (!E.some(e => String(e.num) === epB)) epB = E[1] ? String(E[1].num) : epA;
+  epPick("a"); epPick("b"); epCmp();
+}
+function epCmp(){
+  const d = epData, E = d.employees, a = E.find(e => String(e.num) === epA), b = E.find(e => String(e.num) === epB);
+  epWho(a, $("epWa")); epWho(b, $("epWb"));
+  const all = epRows(), n = f => all.filter(f).length;
+  const card = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  $("epK").innerHTML = card("Only A", fmt(n(r => r.st === "a")), esc(a ? a.name : "–"), n(r => r.st === "a") ? "warn" : "") + card("Only B", fmt(n(r => r.st === "b")), esc(b ? b.name : "–"), n(r => r.st === "b") ? "warn" : "") +
+    card("Different", fmt(n(r => r.st === "diff")), fcSp("e.g. one views, the other edits")) + card("The same", fmt(n(r => r.st === "same")), fcSp("both have it, alike"));
+  $("epChips").innerHTML = [["diff", "Differences", n(r => r.st !== "same")], ["a", "Only A", n(r => r.st === "a")], ["b", "Only B", n(r => r.st === "b")], ["chg", "Different", n(r => r.st === "diff")], ["same", "The same", n(r => r.st === "same")], ["all", "All", all.length]]
+    .map(([k, l, c]) => `<button data-emf="${k}" class="${epF === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(c)}</button>`).join("");
+  $("epChips").querySelectorAll("[data-emf]").forEach(x => x.onclick = () => { epF = x.dataset.emf; epCmp(); });
+  const cv = $("epCat").value, cats = [...new Set(all.map(r => r.cat))].sort();
+  $("epCat").innerHTML = `<option value="">All</option>` + cats.map(x => `<option${x === cv ? " selected" : ""}>${esc(x)}</option>`).join("");
+  const rows = epFiltered(all);
+  const pill = {a: ["medium", "only A"], b: ["medium", "only B"], diff: ["critical", "different"], same: ["low", "same"]};
+  $("epT").innerHTML = `<tr><th>Kind</th><th>Privilege</th><th>A · ${esc(a ? a.name : "")}</th><th>B · ${esc(b ? b.name : "")}</th><th></th></tr>` +
+    (rows.slice(0, 1500).map(r => `<tr><td class="meta">${fcSp(r.cat)}</td><td><b>${esc(r.name)}</b></td><td>${epV(r.a)}</td><td>${epV(r.b)}</td><td><span class="rhg-pill ${pill[r.st][0]}">${fcSp(pill[r.st][1])}</span></td></tr>`).join("")
+      || `<tr><td colspan="5" class="meta">${fcSp(epA === epB ? "Choose two different users." : "No privilege with this filter.")}</td></tr>`);
+  $("epMore").textContent = rows.length > 1500 ? `${fmt(rows.length)} privileges; 1,500 are shown, the Export has every one.` : "";
+}
+function epFiltered(all){
+  const cv = $("epCat").value, q = ($("epQ").value || "").trim().toLowerCase();
+  const f = {diff: r => r.st !== "same", a: r => r.st === "a", b: r => r.st === "b", chg: r => r.st === "diff", same: r => r.st === "same", all: () => true}[epF];
+  return all.filter(r => f(r) && (!cv || r.cat === cv) && (!q || r.name.toLowerCase().includes(q)));
+}
+["a", "b"].forEach(side => {
+  $(side === "a" ? "epQa" : "epQb").oninput = () => epData && epPick(side);
+  $(side === "a" ? "epA" : "epB").onchange = ev => { if (side === "a") epA = ev.target.value; else epB = ev.target.value; epCmp(); };
+});
+$("epSwap").onclick = () => { if (!epData) return; [epA, epB] = [epB, epA]; epPick("a"); epPick("b"); epCmp(); };
+$("epCat").onchange = () => epData && epCmp();
+$("epQ").oninput = () => epData && epCmp();
+$("epRead").onclick = () => loadEp(true);
+$("epSetBtn").onclick = () => { $("epSet").hidden = !$("epSet").hidden; };
+$("epSave").onclick = async () => {
+  $("epMsg").textContent = "Saving…";
+  try {
+    const body = {cc_server: $("epCc").value, auth_server: $("epAuth").value, org: $("epOrg").value, client_id: $("epCid").value, username: $("epUser").value};
+    if ($("epPw").value) body.password = $("epPw").value;
+    const j = await simphonyPost("/api/emcpriv/settings", body);
+    epConn(j.connection); $("epMsg").textContent = j.connection.configured ? "Saved. Check the connection, then Read again." : "Saved. Still missing: " + j.connection.missing.join(", ") + ".";
+  } catch (e) { $("epMsg").textContent = "Could not save: " + e.message; }
+};
+$("epCheck").onclick = async () => {
+  $("epMsg").textContent = "Signing in and reading one role…";
+  try { const j = await simphonyPost("/api/emcpriv/check", {}); $("epMsg").textContent = `Connected: the Configuration API answered${j.roles != null ? ` (${fmt(j.roles)} roles)` : ""}.`; loadEp(true); }
+  catch (e) { $("epMsg").textContent = "Not connected: " + e.message; }
+};
+$("epExp").onclick = () => {
+  if (!epData) return;
+  const E = epData.employees, a = E.find(e => String(e.num) === epA), b = E.find(e => String(e.num) === epB), rows = epFiltered(epRows());
+  const val = v => v == null ? "" : v === true ? "yes" : Array.isArray(v) ? v.join(", ") : v;
+  const who = u => u ? `${u.name}${u.user ? " (" + u.user + ")" : ""} #${u.num}: ` + (u.roles.map(r => r.name + (r.where ? " @ " + r.where : "")).join("; ") || "no role") : "";
+  return xlsxTable(`RHG EMC privileges ${a ? a.name : ""} vs ${b ? b.name : ""}`, [{title: "Privileges", widths: [14, 46, 24, 24, 12],
+    header: ["Kind", "Privilege", "A · " + (a ? a.name : ""), "B · " + (b ? b.name : ""), "Compared"],
+    rows: rows.map(r => [r.cat, r.name, val(r.a), val(r.b), {a: "only A", b: "only B", diff: "different", same: "same"}[r.st]])}],
+    [`EMC privileges: A against B, read from the Simphony Configuration API ${(epData.read_at || "").replace("T", " ").slice(0, 16)} (read only).`,
+     "A · " + who(a), "B · " + who(b), "A user has every right any of their roles gives."]);
+};
 let biData = null, biTimer = null, biTab = "checks", biBookErr = "", biCfg = null;
 const BL_PILL = {ok: "low", late: "medium", late48: "critical", missing: "critical", pending: "", zero: ""};
 async function loadBilly(refresh){
@@ -7323,6 +7484,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="receipts" && (!tkData || tkData.company !== ($("company").value || tkData.company))) loadReceipts(false);
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
   if(b.dataset.view==="billyrec" && (!biData || biData.company !== ($("company").value || biData.company))) loadBilly(false);
+  if(b.dataset.view==="emcpriv" && !epData) loadEp(false);
   if(b.dataset.view==="settings") { liSettings(); loadKm(); loadAc(); }
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);

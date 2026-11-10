@@ -47,6 +47,7 @@ import shrinkage
 import salestop
 import salestop_report
 import xlsxtable
+import emcpriv
 import requests
 import cost_report
 import negstock
@@ -105,6 +106,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/stockstop-report/settings": "settings", "/api/stockstop-report/job": "settings",
+                     "/api/emcpriv/settings": "settings", "/api/emcpriv/check": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
@@ -2822,6 +2824,16 @@ class Handler(BaseHTTPRequestHandler):
                            else html.escape(job.get("detail") or ""))
                     self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
                                      f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path == "/api/emcpriv":
+                # Control → EMC privileges: the Simphony users, their roles and what each role allows (emcpriv.py)
+                if not auth.can(user, "finance.s.emcpriv"):
+                    self._send(403, {"error": "Your role does not include EMC privileges."})
+                    return
+                try:
+                    r = emcpriv.request(q.get("refresh") == "1")
+                except emcpriv.Error as exc:
+                    r = {"available": False, "error": str(exc)}
+                self._send(200, dict(r, connection=emcpriv.info(), can_settings=auth.can(user, "settings")))
             elif url.path == "/api/kartela/entries":
                 # Kartela: the open entries of one supplier or customer, when its row is opened
                 kind = q.get("kind")
@@ -3577,6 +3589,17 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/emcpriv/settings", "/api/emcpriv/check"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                try:
+                    if url.path.endswith("/settings"):
+                        self._send(200, {"connection": emcpriv.save(body, actor)})
+                    else:
+                        self._send(200, emcpriv.check())
+                except (ValueError, emcpriv.Error) as exc:
+                    self._send(400, {"error": str(exc)[:300]})
             elif url.path == "/api/export/email":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

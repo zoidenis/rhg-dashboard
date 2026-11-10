@@ -82,6 +82,7 @@ FINANCE = [
     ("salesrec", "Simphony ↔ BC", "Control", None, [], "location", []),
     ("receipts", "Takings POS ↔ BC", "Control", None, [], "location", ["finance.cash.view"]),
     ("billyrec", "Simphony ↔ Billy", "Control", None, [], "location", []),
+    ("emcpriv", "EMC privileges", "Control", None, [], "company", []),
     ("gaps", "Data quality & reconciliation", "System", None, [], "company", []),
     ("settings", "Settings", "System", None, [], "company", []),
 ]
