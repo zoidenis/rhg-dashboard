@@ -450,6 +450,10 @@ td.num,th.num{text-align:right}
 #shCats tr[data-shcat],#shMonths tr[data-shm],#shOv tr[data-shloc]{cursor:pointer}
 #shCats tr[data-shcat]:hover td,#shMonths tr[data-shm]:hover td,#shOv tr[data-shloc]:hover td{background:var(--bg)}
 #shCats tr.on td,#shMonths tr.on td{background:var(--bg);box-shadow:inset 0 -1px 0 var(--line)}
+.sh-up{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px;padding:14px 16px;border:1.5px dashed var(--line);border-radius:12px;background:var(--bg)}
+.sh-up[hidden]{display:none}
+.sh-up.drag{border-color:var(--accent,#2f80ed);background:var(--card)}
+.sh-up label.mini{display:inline-flex;align-items:center;cursor:pointer}
 .sh-pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--down-bg);color:var(--down)}
 .sh-pill.inv{background:var(--up-bg);color:var(--up)}.sh-pill.st{background:var(--bg);color:var(--sub)}
 #shCfgCard table input{width:100%;min-width:60px}#shCfgCard td.c{text-align:center}
@@ -1210,6 +1214,9 @@ td.num,th.num{text-align:right}
           <select id="shYear" aria-label="Year"></select>
           <select id="shMonth" aria-label="Month"></select>
           <button class="mini dark" id="shRead" type="button">Read again</button><button class="mini" id="shXlsx" type="button">Excel</button><button class="mini" id="shCfgBtn" type="button">Categories &amp; waste</button></div></div>
+      <div class="sh-up" id="shUp" hidden>
+        <label class="mini dark">Upload the Excel KPI analysis<input type="file" id="shImpTop" accept=".xlsx" hidden></label>
+        <span class="meta" id="shUpMsg"><span>Or drop the file here.</span> <span>The categories of its items (Kat. 2) become exceptions where they differ from the map, and its waste table (Firot % Category) the % Waste of the categories.</span></span></div>
       <div class="kpis six" id="shKpis" style="margin-top:14px"></div>
       <p class="meta" id="shStatus">Reading…</p>
     </div>
@@ -5414,6 +5421,7 @@ function shSetupFill(st){
   if (!yr.options.length) { yr.innerHTML = st.years.map(y => `<option>${y}</option>`).join(""); yr.value = st.years[0]; }
   $("shXlsx").style.display = st.can_export && $("shLoc").value ? "" : "none";
   $("shYear").style.display = $("shLoc").value ? "" : "none";
+  $("shUp").hidden = !st.can_settings;
 }
 async function loadSh(refresh){
   clearTimeout(shTimer);
@@ -5540,7 +5548,7 @@ function shRenderOv(){
   const L = j.locations, tot = k => L.reduce((a, x) => a + (x[k] || 0), 0);
   $("shKpis").innerHTML = shCard("Locations with a count", fmt(L.length), `<span>in ${esc(shMonth(j.month))}</span>`) +
     shCard("Net difference", ilM(tot("net")), `<span>at posted cost</span>`, tot("net") < 0 ? "up" : "", tot("net")) +
-    shCard("Losses", ilM(tot("losses")), `<span>items counted below the stock</span>`, "up", tot("losses")) +
+    shCard("Losses", ilM(tot("losses")), `<span>items counted below the stock</span>`, tot("losses") ? "up" : "", tot("losses")) +
     shCard("Surpluses", ilM(tot("surpluses")), `<span>items counted above the stock</span>`, "", tot("surpluses")) +
     shCard("Items counted with a difference", fmt(tot("items")), `<span>in every location</span>`);
   $("shStatus").innerHTML = `${esc(j.company)} · ${esc(shMonth(j.month))} · <span>read at ${esc((j.read_at || "").replace("T", " ").slice(0, 16))}</span> · <span>count documents starting with ${esc(j.prefixes.join(", "))}</span>`;
@@ -5607,19 +5615,28 @@ function shCfgRender(){
   $("shOvAdd").onclick = () => { const no = $("shOvNo").value.trim(); if (no) save({overrides: {[no]: $("shOvKat").value}}); };
   $("shOvEd").querySelectorAll("[data-ov]").forEach(s => s.onchange = () => save({overrides: {[s.closest("tr").dataset.no]: s.value}}));
   $("shOvEd").querySelectorAll("[data-ovrm]").forEach(b => b.onclick = () => save({overrides: {[b.closest("tr").dataset.no]: ""}}));
-  $("shImp").onchange = async ev => {
-    const f = ev.target.files[0]; if (!f) return;
-    $("shCfgMsg").textContent = "Reading the workbook…";
-    try {
-      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
-      const j = await simphonyPost("/api/shrinkage/import", {company: $("company").value || "", data, filename: f.name});
-      await shCfgLoad(); shData = null;
-      const x = j.import;
-      $("shCfgMsg").textContent = `Imported ${f.name}: ${fmt(x.items)} items, ${fmt(x.same_as_map)} already as the map, ${fmt(x.exceptions)} exceptions${x.n_not_found ? `, ${fmt(x.n_not_found)} not found in Business Central` : ""}${x.categories ? `; waste table: ${fmt(x.categories)} categories` : ""}.`;
-    } catch (e) { $("shCfgMsg").textContent = "Could not import: " + e.message; }
-    ev.target.value = "";
-  };
+  $("shImp").onchange = async ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) shImport(f, $("shCfgMsg")); };
 }
+async function shImport(f, msg){
+  if (!/\.xlsx$/i.test(f.name)) { msg.textContent = "Upload the analysis as an Excel file (.xlsx)."; return; }
+  msg.textContent = "Reading the workbook…";
+  try {
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+    const j = await simphonyPost("/api/shrinkage/import", {company: $("company").value || "", data, filename: f.name});
+    const x = j.import;
+    msg.textContent = `Imported ${f.name}: ${fmt(x.items)} items, ${fmt(x.same_as_map)} already as the map, ${fmt(x.exceptions)} exceptions${x.n_not_found ? `, ${fmt(x.n_not_found)} not found in Business Central` : ""}${x.categories ? `; waste table: ${fmt(x.categories)} categories` : ""}.`;
+    shData = null;
+    if (shCfgOpen) { const keep = msg.textContent; await shCfgLoad(); $("shCfgMsg").textContent = keep; }
+    if ($("shLoc").value) loadSh(false);
+  } catch (e) { msg.textContent = "Could not import: " + e.message; }
+}
+$("shImpTop").onchange = ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) shImport(f, $("shUpMsg")); };
+(function(){
+  const z = $("shUp");
+  ["dragenter", "dragover"].forEach(t => z.addEventListener(t, ev => { ev.preventDefault(); z.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach(t => z.addEventListener(t, ev => { ev.preventDefault(); z.classList.remove("drag"); }));
+  z.addEventListener("drop", ev => { const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) shImport(f, $("shUpMsg")); });
+})();
 $("shLoc").onchange = () => { shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shItemsCard").hidden = true; loadSh(false); };
 $("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
 $("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
