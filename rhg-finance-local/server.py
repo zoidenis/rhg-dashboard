@@ -2148,7 +2148,7 @@ class Handler(BaseHTTPRequestHandler):
             for no, o in sorted(ov.items()):
                 card = cards.get(no) or {}
                 rows.append({"no": no, "desc": (card.get("Description") or "").strip(), "kat2": o["kat2"],
-                             "by_map": shrinkage.category(card, cfg, company, overrides=False) or "",
+                             "by_map": shrinkage.category(card, cfg, company, overrides=False) or f"{shrinkage.bc_group(card)} (BC)",
                              "g4": card.get("Item_Category_Group_4") or "", "g5": card.get("Item_Category_Group_5") or "",
                              "source": o.get("source"), "by": o.get("by"), "at": o.get("at")})
             self._send(200, {"company": company, "categories": cfg["categories"], "map": cfg["map"],

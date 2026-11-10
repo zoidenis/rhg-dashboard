@@ -1236,7 +1236,7 @@ td.num,th.num{text-align:right}
         <p><span>Opening = stock at the end of the month before; counted = stock at the month end, with the count posted; theoretical = opening + in − out.</span></p>
         <p><span>KMSH / Dalje = the cost of the month's outs, as posted. Diferenca / Dalje = loss ÷ KMSH / Dalje. % Delta = difference ÷ out, in quantity.</span></p>
         <p><span>Investigate: Diferenca / Dalje above the % Waste of the category. Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero. Unjustified (Excel) = the whole loss of a category marked Investigate, as the KPI workbook counts it.</span></p>
-        <p><span>Category: from the item card (Item Category Group 4 and 5; Group 2 for PN) through the map in Categories &amp; waste, with exceptions per item. Items the map does not reach (packaging, cleaning, uniforms) are out of scope and shown apart.</span></p>
+        <p><span>Category: from the item card (Item Category Group 4 and 5; Group 2 for PN) through the map in Categories &amp; waste, with exceptions per item. An item the map does not reach (packaging, cleaning, uniforms) takes its card's own group in Business Central (Group 4, else Group 3 or 2), marked "from BC", with no % Waste until one is set.</span></p>
         <p><span>Values are exact once the cost adjustment (Adjust Cost – Item Entries) has run for the month.</span></p>
       </div></details></div>
   </section>
@@ -5483,7 +5483,6 @@ function shRender(){
   $("shStatus").innerHTML = [`${esc(d.company)} · ${esc(d.location)} · ${esc(shMonth(shMon))}${shMon === "ytd" ? ` (${d.ytd.months.length} counted months of ${d.year})` : ""}`,
     `<span>read at ${esc((d.read_at || "").replace("T", " ").slice(0, 16))}</span>`,
     docs.length ? `<span>count documents: ${esc(docs.slice(0, 4).join(", "))}${docs.length > 4 ? " …" : ""}</span>` : "",
-    P.out_of_scope ? `<span>out of scope (not in the category map): ${fmt(P.out_of_scope)}</span>` : "",
     off ? `<span class="neg">${fmt(off)} item-months where opening + in + out + difference does not give the closing stock</span>` : "",
     `<span>status of the categories and waste: ${esc(d.config.status)}</span>`].filter(Boolean).join(" · ");
   // by month
@@ -5504,9 +5503,10 @@ function shRender(){
   $("shCatCard").hidden = false;
   $("shCatT").textContent = `By category · ${shMonth(shMon)}`;
   $("shCatNote").innerHTML = `<span>Worst first. Click a category for its items.</span> <span>% Delta = count difference ÷ out, in quantity (hover for each unit).</span>` +
+    (P.rows.some(x => x.from_bc) ? ` <span>"from BC": items the map does not reach, by their card's group in Business Central; no % Waste until one is set in Categories &amp; waste.</span>` : "") +
     (shMon === "ytd" ? ` <span>Year to date: the unjustified values are the sum of the months; Investigate counts the months above the threshold.</span>` : "");
   $("shCats").innerHTML = `<tr><th>Category</th><th>CHECK</th><th class="num">% Waste</th><th class="num">Items</th><th class="num">% Delta</th><th class="num">Net difference</th><th class="num">KMSH / Dalje</th><th class="num">Diferenca / Dalje</th><th>Target</th><th class="num">Allowed waste</th><th class="num">Unjustified</th><th class="num">Unjustified (Excel)</th></tr>` +
-    P.rows.map(x => `<tr data-shcat="${esc(x.kat2)}" class="${shCat === x.kat2 ? "on" : ""}"><td><b>${esc(x.kat2)}</b><div class="meta">${esc(x.kat1)}</div></td>
+    P.rows.map(x => `<tr data-shcat="${esc(x.kat2)}" class="${shCat === x.kat2 ? "on" : ""}"><td><b>${esc(x.kat2)}</b>${x.from_bc ? ` <span class="sh-pill st" title="Category from the item card in Business Central (its group), not in the map: no % Waste set yet; add it in Categories &amp; waste">from BC</span>` : ""}<div class="meta">${esc(x.kat1)}</div></td>
       <td>${x.check ? "YES" : "NO"}</td><td class="num">${fmt(x.waste_pct, x.waste_pct % 1 ? 1 : 0)}%</td><td class="num">${fmt(x.items)}</td>
       <td class="num" title="${esc(Object.entries(x.delta).map(([u, v]) => `${u}: ${shPct(v)}`).join("\n"))}">${shPct(x.delta_all)}</td>
       <td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.kmsh)}</td><td class="num">${shPct(x.ratio)}</td>
@@ -5539,17 +5539,17 @@ function shRenderOv(){
   $("shKpis").innerHTML = "";
   const L = j.locations, tot = k => L.reduce((a, x) => a + (x[k] || 0), 0);
   $("shKpis").innerHTML = shCard("Locations with a count", fmt(L.length), `<span>in ${esc(shMonth(j.month))}</span>`) +
-    shCard("Net difference", ilM(tot("net")), `<span>in scope, at posted cost</span>`, tot("net") < 0 ? "up" : "", tot("net")) +
+    shCard("Net difference", ilM(tot("net")), `<span>at posted cost</span>`, tot("net") < 0 ? "up" : "", tot("net")) +
     shCard("Losses", ilM(tot("losses")), `<span>items counted below the stock</span>`, "up", tot("losses")) +
     shCard("Surpluses", ilM(tot("surpluses")), `<span>items counted above the stock</span>`, "", tot("surpluses")) +
-    shCard("Out of scope", ilM(tot("out_of_scope")), `<span>packaging, cleaning…: not in the category map</span>`, "", tot("out_of_scope"));
+    shCard("Items counted with a difference", fmt(tot("items")), `<span>in every location</span>`);
   $("shStatus").innerHTML = `${esc(j.company)} · ${esc(shMonth(j.month))} · <span>read at ${esc((j.read_at || "").replace("T", " ").slice(0, 16))}</span> · <span>count documents starting with ${esc(j.prefixes.join(", "))}</span>`;
   $("shOvCard").hidden = false;
   $("shOvNote").innerHTML = `<span>The count adjustments of ${esc(shMonth(j.month))} by location, worst first. Click a location for its KPIs by category: the categories and the unjustified value need the month's ins and outs, read for one location at a time.</span>`;
-  $("shOv").innerHTML = `<tr><th>Location</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">Out of scope</th><th class="num">Lines</th><th>Count documents</th></tr>` +
+  $("shOv").innerHTML = `<tr><th>Location</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">Items</th><th>Count documents</th></tr>` +
     (L.map(x => `<tr data-shloc="${esc(x.location)}"><td><b>${esc(x.location)}</b>${x.analysis_read_at ? `<div class="meta">KPIs read ${esc(x.analysis_read_at.replace("T", " ").slice(0, 16))}</div>` : ""}</td>
-      <td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.losses)}</td><td class="num">${fmt(x.surpluses)}</td><td class="num">${fmt(x.out_of_scope)}</td><td class="num">${fmt(x.lines)}</td>
-      <td class="meta">${esc(x.docs.join(", "))}</td></tr>`).join("") || `<tr><td colspan="7" class="meta">No count adjustment posted in ${esc(shMonth(j.month))}.</td></tr>`);
+      <td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.losses)}</td><td class="num">${fmt(x.surpluses)}</td><td class="num">${fmt(x.items)}</td>
+      <td class="meta">${esc(x.docs.join(", "))}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No count adjustment posted in ${esc(shMonth(j.month))}.</td></tr>`);
   $("shOv").querySelectorAll("tr[data-shloc]").forEach(tr => tr.onclick = () => {
     $("shLoc").value = tr.dataset.shloc; $("shYear").value = j.month.slice(0, 4); shMon = j.month; shCat = ""; loadSh(false);
   });
@@ -5582,7 +5582,7 @@ function shCfgRender(){
       `</table></div>` + (ed ? `<p style="margin:8px 0 0"><button class="mini" id="shMapAdd" type="button">Add a row</button> <button class="mini dark" id="shMapSave" type="button">Save the map</button></p>` : "")) +
     box(`Exceptions per item · ${esc(c.company)} · ${fmt(c.overrides.length)}`, "An item whose category is not the one the map gives: by use (barista milk → Kafeteria), or until its card is corrected in Business Central.",
       `<div class="scroll"><table id="shOvEd"><tr><th>Item</th><th>Card (Group 4 · 5)</th><th>By the map</th><th>Category</th><th>Set by</th><th></th></tr>` +
-      (c.overrides.map(o => `<tr data-no="${esc(o.no)}"><td><b>${esc(o.no)}</b> ${esc(o.desc)}</td><td class="meta">${esc([o.g4, o.g5].filter(Boolean).join(" · "))}</td><td>${esc(o.by_map || "out of scope")}</td><td><select data-ov${dis}>${catOpts(o.kat2)}</select></td><td class="meta">${esc(o.source || "")} · ${esc(o.by || "")}</td><td>${ed ? `<button class="mini" data-ovrm type="button">Remove</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No exception.</td></tr>`) +
+      (c.overrides.map(o => `<tr data-no="${esc(o.no)}"><td><b>${esc(o.no)}</b> ${esc(o.desc)}</td><td class="meta">${esc([o.g4, o.g5].filter(Boolean).join(" · "))}</td><td>${esc(o.by_map || "its BC group")}</td><td><select data-ov${dis}>${catOpts(o.kat2)}</select></td><td class="meta">${esc(o.source || "")} · ${esc(o.by || "")}</td><td>${ed ? `<button class="mini" data-ovrm type="button">Remove</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No exception.</td></tr>`) +
       `</table></div>` + (ed ? `<div class="sh-ctl" style="margin-top:8px"><input id="shOvNo" placeholder="item no."><select id="shOvKat">${catOpts("")}</select><button class="mini dark" id="shOvAdd" type="button">Add the exception</button>
         <label class="mini" style="cursor:pointer">Import from the Excel analysis<input type="file" id="shImp" accept=".xlsx" hidden></label></div>` : "")) +
     box("Count documents", "Item adjustments whose document number starts with one of these are the posted counts (comma separated).",

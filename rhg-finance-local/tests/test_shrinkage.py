@@ -60,10 +60,12 @@ class Shrinkage(unittest.TestCase):
         op, iq, iv, oq, ov, cq, cv, cl = it["A508"]["m"]["2026-09"]
         self.assertEqual((op, iq, round(-oq, 2), cq, cl), (47.2, 0, 12.39, -34.81, 0))   # the Excel's September
         self.assertAlmostEqual(-it["A1232"]["m"]["2026-09"][3], 830)                     # 432 + 302 + 96, +200/−200 out
-        self.assertEqual(it["AMB1"]["kat2"], shrinkage.OUT_OF_SCOPE)
+        self.assertEqual((it["AMB1"]["kat2"], it["AMB1"]["from"]), ("AMBALAZH", "bc"))  # not in the map: BC's group
         pm = r["per_month"]["2026-09"]
-        self.assertEqual(pm["out_of_scope"], -5000)
         cats = {x["kat2"]: x for x in pm["rows"]}
+        self.assertTrue(cats["AMBALAZH"]["from_bc"])
+        self.assertEqual((cats["AMBALAZH"]["waste_pct"], cats["AMBALAZH"]["unjust"]), (0, 5000))
+        self.assertAlmostEqual(pm["totals"]["net"], -22053.47 - 5995 - 5000, 2)
         self.assertEqual(cats["Peshk"]["target"], "Investigate")            # 22,053 lost on 7,800 of outs
         self.assertAlmostEqual(cats["Peshk"]["unjust"], 22053.47 - 0.55 * 7800, 2)
         self.assertAlmostEqual(cats["Birre"]["kmsh"], 39240 + 27432 + 8720, 2)

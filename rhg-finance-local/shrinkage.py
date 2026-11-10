@@ -16,7 +16,8 @@ plani i automatizimit", 10 Nov 2026; decisions of Geri the same day):
     ways: the Excel's (the whole loss of a category above its threshold) and the recommended one (loss − % Waste ×
     KMSH / Dalje, never below zero);
   * the category of an item comes from its card (Item Category Group 4 and 5, Group 2 for PN) through a map kept
-    here, with exceptions per item; items the map does not reach are out of scope, listed apart.
+    here, with exceptions per item; an item the map does not reach takes its card's own group in Business Central
+    (Group 4, else Group 3, 2, the item category code), with no % Waste until one is set (Geri, 10 Nov 2026).
 Months are kept on disk once read (data/shrinkage/); the recent ones are read again.
 """
 import io
@@ -38,7 +39,7 @@ _held = heldjob.Held("shrinkage", 900)
 _lock = threading.Lock()
 ADJ = {"Positive Adjmt.", "Negative Adjmt."}
 UNITS = ("KG", "LITER", "COPE", "PAKO")
-OUT_OF_SCOPE = "(not in the category map)"
+NO_BC = "(no category in Business Central)"
 STATUSES = ("Pilot", "Reconciled", "Approved")
 RECENT_DAYS = 62                       # a month that ended within this is read again; older ones are kept
 
@@ -319,6 +320,23 @@ def category(card, cfg, company, overrides=True, item=None):
     return best
 
 
+def bc_group(card):
+    """An item the map does not reach: its card's own category in BC (Group 4, else 3, 2, the category code)."""
+    for f in ("Item_Category_Group_4", "Item_Category_Group_3", "Item_Category_Group_2", "Item_Category_Code"):
+        v = str(card.get(f) or "").strip()
+        if v:
+            return v
+    return NO_BC
+
+
+def category_of(card, cfg, company, item):
+    """(category, from): from = "exception", "map" or "bc" (the card's own group, the map not reaching it)."""
+    if (cfg["overrides"].get(company) or {}).get(item):
+        return cfg["overrides"][company][item]["kat2"], "exception"
+    k = category(card, cfg, company, overrides=False)
+    return (k, "map") if k else (bc_group(card), "bc")
+
+
 # ---------------------------------------------------------------- reading Business Central
 _items_cache = {}
 ITEM_SELECT = ("No,Description,Base_Unit_of_Measure,Item_Category_Code,Item_Category_Group_2,Item_Category_Group_3,"
@@ -434,7 +452,7 @@ def _cat_rows(lines, cfg):
     acc = {}
     for ln in lines:
         a = acc.setdefault(ln["kat2"], {"u": {}, "kmsh": 0.0, "net": 0.0, "loss_items": 0.0, "gain_items": 0.0,
-                                          "items": 0})
+                                          "items": 0, "kat1": ln.get("kat1_bc") or ""})
         u = ln["unit"] if ln["unit"] in UNITS else "Other"
         b = a["u"].setdefault(u, [0.0, 0.0, 0.0])              # count qty, out qty (positive), value
         b[0] += ln["cnt_q"]
@@ -446,7 +464,7 @@ def _cat_rows(lines, cfg):
         a["items"] += 1
     rows = []
     for k2, a in acc.items():
-        c = cats.get(k2) or {"kat1": "", "waste_pct": 0, "check": False}
+        c = cats.get(k2) or {"kat1": a["kat1"], "waste_pct": 0, "check": False, "from_bc": True}
         dq, oq = sum(b[0] for b in a["u"].values()), sum(b[1] for b in a["u"].values())
         loss = max(0.0, -a["net"])
         ratio_signed = -a["net"] / a["kmsh"] if a["kmsh"] > 0 else None
@@ -454,6 +472,7 @@ def _cat_rows(lines, cfg):
         investigate = ratio_signed is not None and ratio_signed > waste or (a["kmsh"] <= 0 and loss > 0)
         allowed = waste * a["kmsh"]
         rows.append({"kat2": k2, "kat1": c["kat1"], "check": c["check"], "waste_pct": c["waste_pct"], "items": a["items"],
+                     "from_bc": bool(c.get("from_bc")),
                      "delta": {u: (round(b[0] / b[1], 4) if b[1] else None) for u, b in a["u"].items()},
                      "delta_all": round(dq / oq, 4) if oq else None,
                      "value": {u: round(b[2], 2) for u, b in a["u"].items()}, "net": round(a["net"], 2),
@@ -500,30 +519,24 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
             it[ym] = [op, iq, iv, oq, ov, cq, cv, cl, cls]
         months[-1]["qty_off"] = off
     # category per item; months with a count only feed the KPIs
-    out_scope, lines_by_month, item_rows = {}, {}, []
+    lines_by_month, item_rows = {}, []
     for no, per in items.items():
         card = cards.get(no) or {}
-        k2 = category(card, cfg, company, item=no)
+        k2, src = category_of(card, cfg, company, no)
         unit = _norm(card.get("Base_Unit_of_Measure"))
         item_rows.append({"no": no, "desc": (card.get("Description") or "").strip(), "unit": unit,
-                          "kat2": k2 or OUT_OF_SCOPE, "g4": card.get("Item_Category_Group_4") or "",
-                          "g5": card.get("Item_Category_Group_5") or "",
-                          "exception": bool((cfg["overrides"].get(company) or {}).get(no)),
+                          "kat2": k2, "from": src, "g4": card.get("Item_Category_Group_4") or "",
+                          "g5": card.get("Item_Category_Group_5") or "", "exception": src == "exception",
                           "m": {ym: v[:8] for ym, v in per.items()}, "cls": {ym: v[8] for ym, v in per.items() if v[8]}})
+        kat1 = str(card.get("Item_Category_Group_3") or "").strip() if src == "bc" else ""
         for ym, v in per.items():
-            if not k2:
-                o = out_scope.setdefault(ym, [0.0, 0])
-                o[0] += v[6]
-                o[1] += 1 if v[5] else 0
-                continue
-            lines_by_month.setdefault(ym, []).append({"kat2": k2, "unit": unit, "out_q": v[3], "out_v": v[4],
-                                                      "cnt_q": v[5], "cnt_v": v[6]})
+            lines_by_month.setdefault(ym, []).append({"kat2": k2, "kat1_bc": kat1, "unit": unit, "out_q": v[3],
+                                                      "out_v": v[4], "cnt_q": v[5], "cnt_v": v[6]})
     per_month = {}
     for mm in months:
         ym = mm["month"]
         rows = _cat_rows(lines_by_month.get(ym, []), cfg) if mm["counted"] else []
-        per_month[ym] = {"rows": rows, "totals": _totals(rows) if rows else None,
-                         "out_of_scope": round((out_scope.get(ym) or [0, 0])[0], 2) if mm["counted"] else None}
+        per_month[ym] = {"rows": rows, "totals": _totals(rows) if rows else None}
     counted = [m["month"] for m in months if m["counted"]]
     ytd_lines = [ln for ym in counted for ln in lines_by_month.get(ym, [])]
     ytd_rows = _cat_rows(ytd_lines, cfg)
@@ -536,8 +549,7 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
     progress("putting it together")
     return {"available": True, "company": company, "location": location, "year": year,
             "read_at": datetime.now().isoformat(timespec="seconds"), "months": months, "per_month": per_month,
-            "ytd": {"rows": ytd_rows, "totals": _totals(ytd_rows) if ytd_rows else None, "months": counted,
-                    "out_of_scope": round(sum((out_scope.get(ym) or [0, 0])[0] for ym in counted), 2)},
+            "ytd": {"rows": ytd_rows, "totals": _totals(ytd_rows) if ytd_rows else None, "months": counted},
             "items": sorted(item_rows, key=lambda r: r["no"]),
             "config": {k: cfg[k] for k in ("categories", "status", "prefixes", "updated_at", "updated_by")},
             "notes": {
@@ -557,10 +569,9 @@ def request(client, company, location, year, refresh=False):
 
 # ---------------------------------------------------------------- every location: the count adjustments only
 def overview(client, company, ym):
-    """Every location's count adjustments of a month (one read of the count entries of the company), in scope by
-    the category map, and the analysis already kept for it."""
+    """Every location's count adjustments of a month (one read of the count entries of the company), and the
+    analysis already kept for it."""
     cfg = get_config()
-    cards = item_cards(client, company)
     first, last = month_range(ym)
     pre = " or ".join(f"startswith(Document_No,'{p}')" for p in cfg["prefixes"])
     rows = client._get_all(client._url(company, config.E_ILE), page_size=5000, params={
@@ -573,13 +584,10 @@ def overview(client, company, ym):
         if not _is_count("Positive Adjmt.", r.get("Document_No"), cfg["prefixes"]):
             continue
         v = _f(r.get("Cost_Amount_Actual")) + _f(r.get("Cost_Amount_Expected"))
-        k2 = category(cards.get(no) or {}, cfg, company, item=no)
-        x = locs.setdefault(loc, {"location": loc, "net": 0.0, "losses": 0.0, "surpluses": 0.0, "out_of_scope": 0.0,
-                                  "lines": 0, "docs": {}})
+        x = locs.setdefault(loc, {"location": loc, "net": 0.0, "losses": 0.0, "surpluses": 0.0, "lines": 0,
+                                  "items": set(), "docs": {}})
         x["docs"][r.get("Document_No")] = x["docs"].get(r.get("Document_No"), 0) + 1
-        if not k2:
-            x["out_of_scope"] += v
-            continue
+        x["items"].add(no)
         x["lines"] += 1
         x["net"] += v
         x["losses" if v < 0 else "surpluses"] += v
@@ -591,6 +599,7 @@ def overview(client, company, ym):
             kept = m.get("read_at")
         except (OSError, ValueError):
             pass
+        x["items"] = len(x["items"])
         out.append({**{k: round(v, 2) if isinstance(v, float) else v for k, v in x.items()},
                     "docs": sorted(x["docs"], key=lambda d: -x["docs"][d])[:6], "analysis_read_at": kept})
     out.sort(key=lambda x: x["net"])
@@ -666,22 +675,22 @@ def render_xlsx(r):
         w = wb.create_sheet(f"KPI {label(ym).replace(' ', '')}")
         sheet(w, head, [catrow(x) for x in pm["rows"]], [7, 8, 10, 14, 6] + [9] * 5 + [12] * 5 + [12, 13, 11, 12, 12, 14, 14],
               f"KPI {label(ym)} · {r['location']} · net {pm['totals']['net']:,.0f} · unjustified "
-              f"{pm['totals']['unjust']:,.0f} (Excel method {pm['totals']['unjust_excel']:,.0f}) · out of scope "
-              f"{pm['out_of_scope']:,.0f}")
+              f"{pm['totals']['unjust']:,.0f} (Excel method {pm['totals']['unjust_excel']:,.0f})")
         for row in w.iter_rows(min_row=4):
             for c in row[5:10]:
                 c.number_format = "0.0%"
             row[1].number_format = "0%"
             row[20].number_format = "0.0%"
     a = wb.create_sheet("Analize")
-    ah = ["Kartela", "Pershkrimi", "Njesia", "Kat. 2", "Group 4", "Group 5", "Exception"]
+    ah = ["Kartela", "Pershkrimi", "Njesia", "Kat. 2", "Group 4", "Group 5", "Category from"]
     for ym in r["months"]:
         L = label(ym["month"])
         ah += [f"{L} Fillim", f"{L} Hyrje", f"{L} Dalje", f"{L} Teorike", f"{L} Fizike", f"{L} Diference",
                f"{L} KMSH", f"{L} Vlere"]
     arows = []
     for it in r["items"]:
-        row = [it["no"], it["desc"], it["unit"], it["kat2"], it["g4"], it["g5"], "yes" if it["exception"] else ""]
+        row = [it["no"], it["desc"], it["unit"], it["kat2"], it["g4"], it["g5"],
+               {"exception": "exception", "map": "map", "bc": "BC group (not in the map)"}.get(it.get("from"), "")]
         for ym in r["months"]:
             v = it["m"].get(ym["month"])
             if not v:
@@ -703,8 +712,9 @@ def render_xlsx(r):
              ["A month is in the KPIs only once its count is posted (a count document in the month).",
               "Teorike = Fillim + Hyrje − Dalje; Diference = Fizike − Teorike = the count adjustment.",
               "% Delta = count difference ÷ Dalje in quantity, per base unit; Diferenca / Dalje = −net value ÷ KMSH.",
-              f"Out of scope = items whose card the category map does not reach (packaging, cleaning…): "
-              f"{r['ytd']['out_of_scope']:,.0f} in the year's counted months."]:
+              "An item the category map does not reach takes its card's own group in Business Central (Group 4, "
+              "else Group 3, 2, the item category code): such a category has no % Waste until one is set in "
+              "Categories & waste, so all of its loss counts as unjustified, and it is not in CHECK = YES."]:
         rd.append([t])
     rd.column_dimensions["A"].width = 130
     buf = io.BytesIO()
