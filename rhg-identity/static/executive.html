@@ -28,6 +28,18 @@ header{display:flex;justify-content:space-between}
 }
 :root[data-theme="dark"]{--c1:#3a95c6;--c2:#c4832a;--c3:#9479d6;--c4:#3aa87a;--grid:#194354;--axis:#93b2bf;--hl:rgba(58,149,198,.12)}
 
+/* the pop-ups (Pulse): the same frame as the towers' */
+.pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
+.pl-bd.show{display:flex}
+.pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.pl-pop .ph{background:var(--side,#08303f);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pl-pop .ph h2{font-size:20px;color:#fff;margin:0}
+.pl-pop .ph .sub{color:#a0d8ea;font-size:12.5px}
+.pl-pop .ph .sp{flex:1}
+.pl-pop .ph .close{background:transparent;border:1px solid #2b5a6c;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}
+.pl-body{padding:16px 18px 18px}
+.pl-body .pz-tile .v small{font-size:12px;font-weight:600;margin-left:3px}
+@media (max-width:600px){.pl-bd{padding:0}.pl-pop{border-radius:0;min-height:100%}}
 .filters{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;margin:-8px 0 12px}
 .filters label{flex:1 1 150px;padding-left:14px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -193,6 +205,7 @@ a.fh-c:hover{border-color:var(--accent)}
 </main>
 </div>
 <div id="tip" role="tooltip"></div>
+<script src="/pulse.js"></script><!-- the shared pop-ups, Back and small charts -->
 <script src="/locintel.js"></script>
 
 <script>
@@ -512,12 +525,12 @@ function viewOverview(){
     `</div>`;
   h += `<div class="grid2">` + chartCard("chRev", "Revenue by month", `${F.year}, ${deptName(F.dept)}; the selected period is shaded`) +
        chartCard("chRatio", "Food and labour as a share of revenue", "Hollow points are provisional months") + `</div>`;
-  h += `<div class="card"><div class="chead"><div><h2>Restaurants</h2><p class="hint">${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a row to filter the whole page.</p></div></div>
+  h += `<div class="card"><div class="chead"><div><h2>Restaurants</h2><p class="hint">${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a row for the restaurant.</p></div></div>
     <div class="scroll" id="tbDept"></div></div>`;
   $("view").innerHTML = h;
   const ms = monthlySeries(t => t.sales, F.compare);
   drawChart($("chRev"), {type: "vbar", cats: ms.cats, series: [{name: "Actual", color: "--c1", values: ms.cur}, {name: ms.h === "budget" ? "Budget" : "Last year", color: "--c2", values: ms.cmp}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   const fp = monthlySeries(t => t.foodPct, F.compare), lp = monthlySeries(t => t.laborPct, F.compare);
   drawChart($("chRatio"), {type: "line", cats: fp.cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
     series: [{name: "Food cost %", color: "--c1", values: fp.cur, hollow: fp.prov, line: true}, {name: "Labour %", color: "--c3", values: lp.cur, hollow: lp.prov, line: true}]});
@@ -560,7 +573,7 @@ function viewSales(){
     tile("Average check", sim.any && t.checks ? fmt(t.net / t.checks) : "–", sim.any ? C() : "", "", sim.any && p.checks ? dl(sd(t.net / t.checks, p.net / p.checks), true, simLbl) : "") +
     tile("Guests", sim.any ? fmt(t.guests) : "–", "", sim.any && t.guests ? `${fmt(t.net / t.guests)} ${C()} per guest` : "", sim.any ? dl(sd(t.guests, p.guests), true, simLbl) : "") +
     tile("Discounts", sim.any && t.gross ? pct(t.discounts / t.gross * 100) : "–", "", "of gross sales", "") + `</div>`;
-  h += `<div class="grid2">` + chartCard("chSalesDept", "Revenue by restaurant", `${esc(periodText(keys))}, actual against ${esc(compName(F.compare))}. Click a bar to filter.`) +
+  h += `<div class="grid2">` + chartCard("chSalesDept", "Revenue by restaurant", `${esc(periodText(keys))}, actual against ${esc(compName(F.compare))}. Click a bar for the restaurant.`) +
        chartCard("chSalesMonth", "Revenue by month", `${F.year}, ${esc(deptName(F.dept))}`) + `</div>`;
   h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Revenue by sales account</h2><p class="hint">Where the revenue is posted in Business Central</p></div></div><div class="scroll" id="tbSalesAcc"></div></div>
     <div class="card"><div class="chead"><div><h2>Simphony by location</h2><p class="hint">${esc(periodText(keys))}. Comparison uses complete months held from Simphony.</p></div></div><div class="scroll" id="tbSim"></div></div></div>`;
@@ -568,14 +581,14 @@ function viewSales(){
   const rows = restaurantsOnly(deptRows(keys)).sort((x, y) => y.a.sales - x.a.sales);
   drawChart($("chSalesDept"), {type: "hbar", cats: rows.map(r => ({key: r.code, label: r.name, hl: F.dept === r.code})),
     series: [{name: "Actual", color: "--c1", values: rows.map(r => r.a.sales)}, {name: cap(compName(F.compare)), color: "--c2", values: rows.map(r => r.c ? r.c.sales : null)}],
-    onClick: c => pickDept(c.key)});
+    onClick: c => Pulse.open("exdept", c.key)});
   const ms = monthlySeries(x => x.sales, F.compare);
   drawChart($("chSalesMonth"), {type: "vbar", cats: ms.cats, series: [{name: "Actual", color: "--c1", values: ms.cur}, {name: ms.h === "budget" ? "Budget" : "Last year", color: "--c2", values: ms.cmp}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   $("tbSalesAcc").innerHTML = accountTable(a, c, ["sales"], true);
   $("tbSim").innerHTML = !sim.locs.length ? `<div class="empty">${simHint()}</div>` :
     `<table><tr><th>Location</th><th class="num">Net sales</th><th class="num">vs ${esc(compName(F.compare === "budget" ? "ly" : F.compare))}</th><th class="num">Checks</th><th class="num">Avg check</th><th class="num">Guests</th><th class="num">Days</th></tr>` +
-    sim.locs.map(l => `<tr><td>${esc(l.name)}${l.dept ? ` <span class="meta">${esc(l.dept)}</span>` : ""}</td><td class="num">${fmt(l.s.net)}${l.currency !== C() ? ` <span class="meta">${esc(l.currency)}</span>` : ""}</td>
+    sim.locs.map(l => `<tr${l.dept ? ` class="click" data-pulse="exdept|${esc(l.dept)}" tabindex="0"` : ""}><td>${esc(l.name)}${l.dept ? ` <span class="meta">${esc(l.dept)}</span>` : ""}</td><td class="num">${fmt(l.s.net)}${l.currency !== C() ? ` <span class="meta">${esc(l.currency)}</span>` : ""}</td>
       <td class="num">${sim.partialCmp ? "–" : dl(delta(l.s.net, l.p.net), true)}</td><td class="num">${fmt(l.s.checks)}</td><td class="num">${l.s.checks ? fmt(l.s.net / l.s.checks) : "–"}</td>
       <td class="num">${fmt(l.s.guests)}</td><td class="num">${fmt(l.s.days)}</td></tr>`).join("") + `</table>`;
 }
@@ -595,7 +608,7 @@ function accountTable(a, c, buckets, income){
   if (!rows.length) return `<div class="empty">No postings on these accounts for this selection.</div>`;
   const tot = rows.reduce((s, r) => s + r.v, 0), totp = c ? rows.reduce((s, r) => s + (r.p || 0), 0) : null;
   return `<table><tr><th>Account</th><th class="num">Amount</th><th class="num">% of revenue</th><th class="num">${esc(cap(compName(F.compare)))}</th><th class="num">Change</th></tr>` +
-    rows.map(r => `<tr><td>${esc(r.no)} <span class="mut">${esc(r.name)}</span></td><td class="num">${fmt(r.v)}</td><td class="num">${a.sales ? pct(r.v / a.sales * 100) : "–"}</td>
+    rows.map(r => `<tr class="click" data-pulse="exacc|${esc(r.no)}" tabindex="0"><td>${esc(r.no)} <span class="mut">${esc(r.name)}</span></td><td class="num">${fmt(r.v)}</td><td class="num">${a.sales ? pct(r.v / a.sales * 100) : "–"}</td>
       <td class="num">${r.p == null ? "–" : fmt(r.p)}</td><td class="num">${dl(delta(r.v, r.p), income)}</td></tr>`).join("") +
     `<tr class="total"><td>Total</td><td class="num">${fmt(tot)}</td><td class="num">${a.sales ? pct(tot / a.sales * 100) : "–"}</td><td class="num">${totp == null ? "–" : fmt(totp)}</td><td class="num">${dl(delta(tot, totp), income)}</td></tr></table>`;
 }
@@ -610,7 +623,7 @@ function viewLabor(){
     tile("Service", compact(a.labor_service), C(), share(a.labor_service) + " of revenue", dl(delta(a.labor_service, c && c.labor_service), false, lbl)) +
     tile("Management", compact(a.labor_management), C(), share(a.labor_management) + " of revenue", dl(delta(a.labor_management, c && c.labor_management), false, lbl)) +
     tile("Revenue per labour " + C(), a.labor ? fmt(a.sales / a.labor, 2) : "–", "", "Revenue earned per unit of labour cost", c && c.labor ? dl(delta(a.sales / a.labor, c.sales / c.labor), true, lbl) : "") + `</div>`;
-  h += `<div class="grid2">` + chartCard("chLabDept", "Labour % of revenue by restaurant", `${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a bar to filter.`) +
+  h += `<div class="grid2">` + chartCard("chLabDept", "Labour % of revenue by restaurant", `${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a bar for the restaurant.`) +
        chartCard("chLabMonth", "Labour cost by month", `${F.year}, ${esc(deptName(F.dept))}, split by the payroll accounts`) + `</div>`;
   h += `<div class="card"><div class="chead"><div><h2>Labour by restaurant</h2><p class="hint">${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbLab"></div></div>
         <div class="card"><div class="chead"><div><h2>Payroll accounts</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbLabAcc"></div></div>`;
@@ -618,12 +631,12 @@ function viewLabor(){
   const rows = restaurantsOnly(deptRows(keys)).sort((x, y) => (y.a.laborPct || 0) - (x.a.laborPct || 0));
   drawChart($("chLabDept"), {type: "hbar", fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v), cats: rows.map(r => ({key: r.code, label: r.name, hl: F.dept === r.code})),
     series: [{name: "Actual", color: "--c1", values: rows.map(r => r.a.laborPct)}, {name: cap(compName(F.compare)), color: "--c2", values: rows.map(r => r.c ? r.c.laborPct : null)}],
-    onClick: c => pickDept(c.key)});
+    onClick: c => Pulse.open("exdept", c.key)});
   const ks = yearKeys(), sel = new Set(keys), ms = ks.map(k => actual(F.dept, [k]));
   drawChart($("chLabMonth"), {type: "stack", cats: ks.map(k => ({key: k, label: mshort(k), title: mlabel(k), hl: sel.has(k)})),
     series: [{name: "Kitchen", color: "--c1", values: ms.map(m => m.labor_kitchen)}, {name: "Service", color: "--c2", values: ms.map(m => m.labor_service)},
              {name: "Management", color: "--c3", values: ms.map(m => m.labor_management)}, {name: "Other staff costs", color: "--c4", values: ms.map(m => m.labor_other)}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   const all = deptRows(keys);
   $("tbLab").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Labour</th><th class="num">% of revenue</th><th class="num">vs ${esc(compName(F.compare))}</th><th class="num">Kitchen</th><th class="num">Service</th><th class="num">Management</th><th class="num">Other</th></tr>` +
     all.filter(r => r.a.labor).map(r => `<tr class="${r.unassigned ? "" : "click"} ${F.dept === r.code ? "sel" : ""}" data-dept="${esc(r.code)}"><td>${esc(r.name)}</td><td class="num">${fmt(r.a.labor)}</td><td class="num">${pct(r.a.laborPct)}</td>
@@ -642,7 +655,7 @@ function viewFood(){
     tile("Gross profit after food", compact(a.sales - a.food), C(), a.sales ? pct((a.sales - a.food) / a.sales * 100) + " of revenue" : "", dl(delta(a.sales - a.food, c && (c.sales - c.food)), true, lbl)) +
     tile("Prime cost %", pct(a.primePct), "", "Food plus labour", dl(delta(a.primePct, c && c.primePct, "pts"), false, lbl)) +
     tile("Purchases invoiced", S.pur ? compact(p.amt) : "–", S.pur ? C() : "", S.pur && a.sales ? `${pct(p.amt / a.sales * 100)} of revenue · all purchases` : "", "") + `</div>`;
-  h += `<div class="grid2">` + chartCard("chFoodDept", "Food cost % by restaurant", `${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a bar to filter.`) +
+  h += `<div class="grid2">` + chartCard("chFoodDept", "Food cost % by restaurant", `${esc(periodText(keys))} against ${esc(compName(F.compare))}. Click a bar for the restaurant.`) +
        chartCard("chFoodMonth", "Food cost % by month", `${F.year}, ${esc(deptName(F.dept))}; hollow points are provisional`) + `</div>`;
   h += `<div class="card"><div class="chead"><div><h2>Food cost accounts</h2><p class="hint">The cost-of-goods accounts set for the dashboard, ${esc(deptName(F.dept))}, ${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbFoodAcc"></div></div>
         <div class="card"><div class="chead"><div><h2>Food cost by restaurant</h2></div></div><div class="scroll" id="tbFood"></div></div>`;
@@ -650,11 +663,11 @@ function viewFood(){
   const rows = restaurantsOnly(deptRows(keys)).sort((x, y) => (y.a.foodPct || 0) - (x.a.foodPct || 0));
   drawChart($("chFoodDept"), {type: "hbar", fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v), cats: rows.map(r => ({key: r.code, label: r.name, hl: F.dept === r.code})),
     series: [{name: "Actual", color: "--c1", values: rows.map(r => r.a.foodPct)}, {name: cap(compName(F.compare)), color: "--c2", values: rows.map(r => r.c ? r.c.foodPct : null)}],
-    onClick: c => pickDept(c.key)});
+    onClick: c => Pulse.open("exdept", c.key)});
   const ms = monthlySeries(x => x.foodPct, F.compare);
   drawChart($("chFoodMonth"), {type: "line", cats: ms.cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
     series: [{name: "Actual", color: "--c1", values: ms.cur, hollow: ms.prov, line: true}, {name: ms.h === "budget" ? "Budget" : "Last year", color: "--c2", values: ms.cmp, dash: true, line: true}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   $("tbFoodAcc").innerHTML = accountTable(a, c, ["food"], false);
   $("tbFood").innerHTML = `<table><tr><th>Restaurant</th><th class="num">Revenue</th><th class="num">Food cost</th><th class="num">Food %</th><th class="num">vs ${esc(compName(F.compare))}</th><th class="num">Purchases</th></tr>` +
     deptRows(keys).filter(r => r.a.food || r.a.sales).map(r => { const pp = purAgg(r.code, keys);
@@ -682,13 +695,13 @@ function viewBudget(){
     ${finHref("pl") ? `<a class="tgl" href="${esc(finHref("pl"))}">P&amp;L in the Finance tower →</a>` : ""}</div><div class="scroll" id="tbBud"></div></div>
     <div class="card"><div class="chead"><div><h2>What moved the net profit</h2><p class="hint">From the net profit of the comparison to the actual one: green added, red took away</p></div>
       <div class="tabs" id="wfHow" style="margin:0"><button data-how="budget">Budget</button><button data-how="ly">Last year</button></div></div><div id="wfBox"></div></div>
-        <div class="card"><div class="chead"><div><h2>Restaurants against budget</h2><p class="hint">Click a row to filter</p></div></div><div class="scroll" id="tbBudDept"></div></div>`;
+        <div class="card"><div class="chead"><div><h2>Restaurants against budget</h2><p class="hint">Click a row for the restaurant</p></div></div><div class="scroll" id="tbBudDept"></div></div>`;
   $("view").innerHTML = h;
   const ms = monthlySeries(x => x.sales, "budget"), me_ = monthlySeries(x => x.ebitda, "budget");
   drawChart($("chBudMonth"), {type: "vbar", cats: ms.cats, series: [{name: "Actual", color: "--c1", values: ms.cur}, {name: "Budget", color: "--c2", values: ms.cmp}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   drawChart($("chBudEbitda"), {type: "vbar", cats: me_.cats, series: [{name: "Actual", color: "--c1", values: me_.cur}, {name: "Budget", color: "--c2", values: me_.cmp}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   $("tbBud").innerHTML = statementBlock(keys);
   drawWaterfall(keys);
   const rows = depts().map(d => ({code: d.code, name: d.name, a: actual(d.code, keys), c: comparison(d.code, keys, "budget")})).filter(r => r.a.sales || r.c.sales || r.a.ebitda);
@@ -949,14 +962,14 @@ function viewPurchasing(){
   h += savingsBlock(keys);
   h += `<div class="grid2">` + chartCard("chPurMonth", "Purchases by month", `${F.year}, ${esc(deptName(F.dept))}, against last year`) +
        chartCard("chPurPo", "Invoices without a purchase order", `${F.year}, share of invoices by month`) + `</div>`;
-  h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Purchases by restaurant</h2><p class="hint">${esc(periodText(keys))}. Click a row to filter.</p></div></div><div class="scroll" id="tbPurDept"></div></div>
+  h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Purchases by restaurant</h2><p class="hint">${esc(periodText(keys))}. Click a row for the restaurant.</p></div></div><div class="scroll" id="tbPurDept"></div></div>
         <div class="card"><div class="chead"><div><h2>Top suppliers</h2><p class="hint">${esc(deptName(F.dept))}, ${esc(periodText(keys))}</p></div></div><div class="scroll" id="tbPurVend"></div></div></div>`;
   $("view").innerHTML = h;
   const ks = yearKeys(), sel = new Set(keys);
   const cats = ks.map(k => ({key: k, label: mshort(k), title: mlabel(k), hl: sel.has(k)}));
   const cur = ks.map(k => purAgg(F.dept, [k])), ly = ks.map(k => purAgg(F.dept, compKeys([k], "ly")));
   drawChart($("chPurMonth"), {type: "vbar", cats, series: [{name: "Actual", color: "--c1", values: cur.map(x => x.missing ? null : x.amt)}, {name: "Last year", color: "--c2", values: ly.map(x => x.missing ? null : x.amt)}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   drawChart($("chPurPo"), {type: "line", cats, fmt: v => fmt(v,0) + "%", tipFmt: v => pct(v),
     series: [{name: "Actual", color: "--c1", values: cur.map(x => x.nopoRate), line: true}, {name: "Last year", color: "--c2", values: ly.map(x => x.nopoRate), dash: true, line: true}]});
   drawSavings(keys);
@@ -970,7 +983,7 @@ function viewPurchasing(){
   const vend = Object.entries(p.vendors).sort((u, v) => v[1][0] - u[1][0]).slice(0, 12);
   $("tbPurVend").innerHTML = !vend.length ? `<div class="empty">No invoices for this selection.</div>` :
     `<table><tr><th>Supplier</th><th class="num">Purchases</th><th class="num">Share</th><th class="num">Invoices</th><th class="num">Without PO</th></tr>` +
-    vend.map(([no, v]) => `<tr><td>${esc((S.pur.vendors || {})[no] || no)} <span class="meta">${esc(no)}</span></td><td class="num">${fmt(v[0])}</td><td class="num">${p.amt ? pct(v[0] / p.amt * 100) : "–"}</td>
+    vend.map(([no, v]) => `<tr class="click" data-pulse="exvend|${esc(no)}" tabindex="0"><td>${esc((S.pur.vendors || {})[no] || no)} <span class="meta">${esc(no)}</span></td><td class="num">${fmt(v[0])}</td><td class="num">${p.amt ? pct(v[0] / p.amt * 100) : "–"}</td>
       <td class="num">${fmt(v[1])}</td><td class="num">${v[2] ? `<span class="dl bad">${fmt(v[2])}</span>` : "0"}</td></tr>`).join("") + `</table>`;
 }
 
@@ -1009,7 +1022,7 @@ function drawSavings(keys){
   drawChart($("chSave"), {type: "vbar", cats: ks.map(k => ({key: k, label: mshort(k), title: mlabel(k), hl: sel.has(k)})),
     series: [{name: "Savings", color: "--c1", values: per.map(x => x.missing || x.none ? null : x.save)},
              {name: "Extra spending", color: "--c2", values: per.map(x => x.missing || x.none ? null : x.extra)}],
-    onClick: c => { F.end = c.key; $("fEnd").value = c.key; render(); }});
+    onClick: c => Pulse.open("exmonth", c.key)});
   const row = (label, v, cls, bold) => `<tr class="${bold ? "total" : ""}"><td>${esc(label)}</td><td class="num">${cls ? `<span class="dl ${cls}">` : ""}${v >= 0 && !bold ? "+" : ""}${fmt(v)}${cls ? "</span>" : ""}</td></tr>`;
   $("tbBridge").innerHTML = `<table><tr><th></th><th class="num">${esc(C())}</th></tr>` +
     row("Invoiced items, same dates last year", sv.ly, "", true) +
@@ -1092,6 +1105,120 @@ function viewLocations(){
   LocIntel.mount($("view"), {company: F.company, period: liMonth() + "-01", finance: liFinance(),
     onState: j => { if (F.tab === "locations") $("periodLabel").textContent = `${j.period.label} · whole days ${j.period.from} → ${j.period.to} · against the month before and the same dates last year`; }});
 }
+/* ------------------------------------------------------------ pop-ups (Pulse): a restaurant, a month, an account, a supplier
+   One opener per object: the rows, bars and month columns of every tab open the same pop-up. Filtering the whole page
+   to a restaurant, or moving "Up to" to a month, is a button in the pop-up. */
+const EX_DIM = "color-mix(in srgb, var(--c1) 35%, var(--card))";     // the months outside the period
+const exMoney = v => `${compact(v)} <small class="meta">${esc(C())}</small>`;
+const exHow = () => F.tab === "budget" ? "budget" : F.tab === "purchasing" && F.compare === "budget" ? "ly" : F.compare;
+const exClose = () => { const b = $("pzBd"); if (b) b.classList.remove("show"); };
+function exPurPanel(code, keys, title){
+  if (!S.pur) return "";
+  const p = purAgg(code, keys), V = Object.entries(p.vendors).filter(([, v]) => v[0]).sort((u, v) => v[1][0] - u[1][0]);
+  if (!p.amt) return "";
+  return Pulse.panel(title || "Top suppliers", Pulse.bars(V.slice(0, 10).map(([no, v]) => ({key: (S.pur.vendors || {})[no] || no,
+      segs: [[v[0] - v[3], "var(--c1)", "with a purchase order"], [v[3], "var(--c2)", "without a purchase order"]],
+      text: `<b>${fmt(v[0])}</b> <span class="meta">${pct(v[0] / p.amt * 100)}</span>`, open: `exvend|${no}`})),
+      [["var(--c1)", "with a purchase order"], ["var(--c2)", "without a purchase order"]]),
+    `${fmt(p.amt)} ${esc(C())} · ${fmt(p.n)} invoices · ${pct(p.nopoRate)} without a PO`);
+}
+function exDeptPop(id){
+  const [code, mk] = String(id).split("@");
+  const keys = mk ? [mk] : rangeKeys(), how = exHow(), lbl = "vs " + compName(how);
+  const nm = deptName(code), per = mk ? mlabel(mk) : periodText(keys);
+  const acts = code && code !== "*" ? `<button class="close" type="button" data-exdept="${esc(code)}">${F.dept === code ? "Show the whole company" : "Filter the page to it"}</button>` : "";
+  Pulse.pop({title: esc(nm), sub: esc(`${code && code !== "*" ? "Restaurant · " : ""}${per} · against ${compName(how)}`), actions: acts, body: el => {
+    let h = "";
+    if (finOK()) {
+      const a = actual(code, keys), c = comparison(code, keys, how);
+      h += Pulse.tiles([{l: "Revenue", v: exMoney(a.sales), s: dl(delta(a.sales, c && c.sales), true, lbl)},
+        {l: "Food cost", v: pct(a.foodPct), s: dl(delta(a.foodPct, c && c.foodPct, "pts"), false, lbl)},
+        {l: "Labour cost", v: pct(a.laborPct), s: dl(delta(a.laborPct, c && c.laborPct, "pts"), false, lbl)},
+        {l: "Prime cost", v: pct(a.primePct), s: dl(delta(a.primePct, c && c.primePct, "pts"), false, lbl)},
+        {l: "EBITDA", v: exMoney(a.ebitda), s: `${pct(a.ebitdaPct)} <span class="meta">of revenue</span> · ` + dl(delta(a.ebitda, c && c.ebitda), true)}]);
+      const sim = simAgg(code, keys);
+      if (sim.any && code !== "") { const t = sim.tot;
+        h += Pulse.panel("Simphony", Pulse.tiles([{l: "Net sales", v: exMoney(t.net)}, {l: "Checks", v: fmt(t.checks)}, {l: "Average check", v: t.checks ? fmt(t.net / t.checks) : "–", s: esc(C())},
+          {l: "Guests", v: fmt(t.guests), s: t.guests ? `${fmt(t.net / t.guests)} ${esc(C())} per guest` : ""}]), `${fmt(t.days)} location-days`); }
+      const ks = yearKeys(), h2 = how === "prior" ? "ly" : how;
+      h += Pulse.panel(`Revenue by month · ${F.year}`, Pulse.cols(ks.map(k => { const x = actual(code, [k]), y = comparison(code, [k], h2);
+          return {label: mshort(k), segs: [[x.sales, keys.includes(k) ? "var(--c1)" : EX_DIM, "actual"]], line: y ? y.sales : null, open: `exdept|${code}@${k}`,
+            tip: `${mlabel(k)}: ${fmt(x.sales)} ${C()}${y ? ` · ${compName(h2)} ${fmt(y.sales)}` : ""}`}; }),
+        [["var(--c1)", "the period"], [EX_DIM, "other months"], ["var(--ink)", `${cap(compName(h2))} (dashed)`]], {h: 150, aria: "Revenue by month"}));
+      const L = plLines(a), Lc = c ? plLines(c) : null, tot = new Set(["gross", "ebitda", "ebit", "net"]);
+      if (L && L.n) h += Pulse.panel("Statement", Pulse.list([["Line"], ["Actual", 1], [cap(compName(how)), 1], ["Change", 1], ["% of revenue", 1]],
+        PL_ROWS.filter(([k]) => tot.has(k) || Math.abs(L[k]) >= 1 || (Lc && Math.abs(Lc[k]) >= 1)).map(([k, label, sg]) => ({cells: [tot.has(k) ? `<b>${esc(label)}</b>` : esc(label),
+          tot.has(k) ? `<b>${fmt(L[k])}</b>` : fmt(L[k]), Lc ? fmt(Lc[k]) : "–", Lc ? dl(delta(L[k], Lc[k]), sg >= 0) : "–", L.revenue > 0 ? pct(L[k] / L.revenue * 100) : "–"]}))));
+      if (a.labor) h += Pulse.panel("Labour", Pulse.bars([["Kitchen", a.labor_kitchen], ["Service", a.labor_service], ["Management", a.labor_management], ["Other staff costs", a.labor_other]]
+        .filter(x => x[1]).map(([k, v]) => ({key: k, segs: [[Math.abs(v), "var(--c3)", k]], text: `<b>${fmt(v)}</b> <span class="meta">${a.sales ? pct(v / a.sales * 100) + " of revenue" : ""}</span>`}))));
+    }
+    h += exPurPanel(code, keys);
+    el.innerHTML = h || `<p class="meta"><span>${esc(S.finErr || "Nothing read for this restaurant yet.")}</span></p>`;
+  }});
+}
+function exMonthPop(k){
+  const how = exHow(), lbl = "vs " + compName(how), keys = [k], run = running();
+  const acts = F.end !== k ? `<button class="close" type="button" data-exmonth="${esc(k)}">Read the page up to this month</button>` : "";
+  Pulse.pop({title: esc(mlabel(k) + (run && k === run.month ? ` to ${run.to.slice(8)}` : "")), sub: esc(`${deptName(F.dept)} · against ${compName(how)}`), actions: acts, body: el => {
+    let h = "";
+    if (((S.fin && S.fin.provisional) || []).includes(k)) h += `<p class="meta"><span class="prov">Provisional</span> <span>inventory may not be posted</span></p>`;
+    if (finOK()) {
+      const a = actual(F.dept, keys), c = comparison(F.dept, keys, how);
+      h += Pulse.tiles([{l: "Revenue", v: exMoney(a.sales), s: dl(delta(a.sales, c && c.sales), true, lbl)},
+        {l: "Food cost", v: pct(a.foodPct), s: dl(delta(a.foodPct, c && c.foodPct, "pts"), false, lbl)},
+        {l: "Labour cost", v: pct(a.laborPct), s: dl(delta(a.laborPct, c && c.laborPct, "pts"), false, lbl)},
+        {l: "EBITDA", v: exMoney(a.ebitda), s: dl(delta(a.ebitda, c && c.ebitda), true, lbl)}]);
+      if (F.dept === "*") { const R = restaurantsOnly(deptRows(keys, how)).sort((x, y) => y.a.sales - x.a.sales);
+        h += Pulse.panel("Restaurants", Pulse.bars(R.map(r => ({key: r.name, segs: [[r.a.sales, "var(--c1)", "revenue"]],
+          text: `<b>${compact(r.a.sales)}</b> ${dl(delta(r.a.sales, r.c && r.c.sales), true)}`, open: r.unassigned ? null : `exdept|${r.code}@${k}`})),
+          null, {none: "No revenue on a restaurant this month."}), "revenue, against " + esc(compName(how))); }
+    }
+    h += exPurPanel(F.dept, keys);
+    el.innerHTML = h || `<p class="meta"><span>${esc(S.finErr || "Nothing read for this month yet.")}</span></p>`;
+  }});
+}
+function exAccPop(no){
+  if (!finOK()) return;
+  const keys = rangeKeys(), how = exHow(), A = S.fin.accounts[no] || [""], b = bucketOf(no), inc = b === "sales";
+  Pulse.pop({title: esc(`${no} · ${A[0] || ""}`), sub: esc(`G/L account · ${deptName(F.dept)} · ${periodText(keys)}`), wide: false, body: el => {
+    const a = actual(F.dept, keys), c = comparison(F.dept, keys, how), v = a.acc[no] || 0, p = c ? (c.acc[no] || 0) : null;
+    let h = Pulse.tiles([{l: "Amount", v: exMoney(v), s: dl(delta(v, p), inc, "vs " + compName(how))}, {l: "% of revenue", v: a.sales ? pct(v / a.sales * 100) : "–"},
+      {l: cap(compName(how)), v: p == null ? "–" : exMoney(p)}]);
+    const ks = yearKeys();
+    h += Pulse.panel(`By month · ${F.year}`, Pulse.cols(ks.map(k => { const x = actual(F.dept, [k]).acc[no] || 0;
+      return {label: mshort(k), segs: [[Math.abs(x), keys.includes(k) ? "var(--c1)" : EX_DIM, "amount"]], open: `exmonth|${k}`, tip: `${mlabel(k)}: ${fmt(x)} ${C()}`}; }),
+      [["var(--c1)", "the period"], [EX_DIM, "other months"]], {h: 140, aria: "The account by month"}));
+    if (F.dept === "*") { const R = depts().map(d => ({d, v: actual(d.code, keys).acc[no] || 0})).filter(r => Math.abs(r.v) >= 0.5).sort((x, y) => Math.abs(y.v) - Math.abs(x.v));
+      h += Pulse.panel("By restaurant", Pulse.bars(R.map(r => ({key: r.d.name, segs: [[Math.abs(r.v), "var(--c1)", "amount"]], text: `<b>${fmt(r.v)}</b> <span class="meta">${v ? pct(r.v / v * 100) : ""}</span>`, open: `exdept|${r.d.code}`})),
+        null, {none: "Not posted on a restaurant."})); }
+    el.innerHTML = h;
+  }});
+}
+function exVendPop(no){
+  if (!S.pur) return;
+  const keys = rangeKeys(), nm = (S.pur.vendors || {})[no] || no;
+  Pulse.pop({title: esc(nm), sub: esc(`Supplier ${no} · ${deptName(F.dept)} · ${periodText(keys)}`), wide: false, body: el => {
+    const p = purAgg(F.dept, keys), v = p.vendors[no] || [0, 0, 0, 0], how = F.compare === "budget" ? "ly" : F.compare, pc = purAgg(F.dept, compKeys(keys, how)), vc = pc.vendors[no];
+    let h = Pulse.tiles([{l: "Purchases", v: exMoney(v[0]), s: dl(delta(v[0], vc ? vc[0] : null), false, "vs " + compName(how))}, {l: "Share of purchases", v: p.amt ? pct(v[0] / p.amt * 100) : "–"},
+      {l: "Invoices", v: fmt(v[1])}, {l: "Without a purchase order", v: fmt(v[2]), s: v[3] ? `${fmt(v[3])} ${esc(C())}` : "", cls: v[2] ? "up" : ""}]);
+    const ks = yearKeys();
+    h += Pulse.panel(`By month · ${F.year}`, Pulse.cols(ks.map(k => { const x = purAgg(F.dept, [k]).vendors[no] || [0, 0, 0, 0], y = purAgg(F.dept, compKeys([k], "ly")).vendors[no];
+      return {label: mshort(k), segs: [[x[0] - x[3], "var(--c1)", "with a purchase order"], [x[3], "var(--c2)", "without a purchase order"]], line: y ? y[0] : null, open: `exmonth|${k}`,
+        tip: `${mlabel(k)}: ${fmt(x[0])} ${C()} · ${fmt(x[1])} invoices${y ? ` · last year ${fmt(y[0])}` : ""}`}; }),
+      [["var(--c1)", "with a purchase order"], ["var(--c2)", "without a purchase order"], ["var(--ink)", "Last year (dashed)"]], {h: 140, aria: "The supplier by month"}));
+    if (F.dept === "*") { const R = Object.keys(S.pur.invoices || {}).map(code => ({code, x: purAgg(code, keys).vendors[no]})).filter(r => r.x && r.x[0]).sort((u, w) => w.x[0] - u.x[0]);
+      h += Pulse.panel("By restaurant", Pulse.bars(R.map(r => ({key: deptName(r.code), segs: [[r.x[0] - r.x[3], "var(--c1)", "with a purchase order"], [r.x[3], "var(--c2)", "without a purchase order"]],
+        text: `<b>${fmt(r.x[0])}</b> <span class="meta">${fmt(r.x[1])} invoices</span>`, open: r.code ? `exdept|${r.code}` : null})), null, {none: "None."})); }
+    el.innerHTML = h;
+  }});
+}
+Pulse.on("exdept", exDeptPop); Pulse.on("exmonth", exMonthPop); Pulse.on("exacc", exAccPop); Pulse.on("exvend", exVendPop);
+document.addEventListener("click", e => {
+  const d = e.target.closest("[data-exdept]"), m = e.target.closest("[data-exmonth]");
+  if (d) { exClose(); pickDept(d.dataset.exdept); }
+  else if (m) { exClose(); F.end = m.dataset.exmonth; $("fEnd").value = F.end; render(); }
+});
+
 function render(){
   CHARTS.clear(); hideTip();
   if (!paintTabs()) { noTabs(); return; }
@@ -1136,7 +1263,7 @@ function renderBanner(){
 }
 document.addEventListener("click", e => {
   const tr = e.target.closest("tr[data-dept]"); if (!tr || !tr.classList.contains("click")) return;
-  pickDept(tr.dataset.dept);
+  exDeptPop(tr.dataset.dept);
 });
 
 /* ------------------------------------------------------------ filters and loading */
