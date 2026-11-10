@@ -277,6 +277,10 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # purchasing actions (the Purchasing roles), Finance and management stay read-only
                  "purchasing.s.compare.negotiations": "purchasing.s.compare.savings",
                  "purchasing.negotiations.edit": "purchasing.actions.manage",
+                 # Inventory → Item cards (was Item master control): with its stock by location it is also for the
+                 # people of the warehouses, so whoever reads an inventory screen by location gets it once
+                 "finance.s.inventory.itemmaster": ("finance.s.inventory.movement", "finance.s.inventory.sku",
+                                                    "finance.s.inventory.loc", "finance.s.inventory.stockcount"),
                  # scheduled reports: whoever sets the towers' email settings
                  "reports.manage": ("finance.settings.manage", "purchasing.settings.manage")}
 

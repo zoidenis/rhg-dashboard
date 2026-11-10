@@ -56,7 +56,8 @@ FINANCE = [
         ("typology", "Typology & turnover", "location", ["finance.inventory.view"]),
         ("recipes", "Recipe integrity", "company", ["finance.inventory.view"]),
         ("discharge", "Received vs discharged", "location", ["finance.inventory.view"]),
-        ("itemmaster", "Item master control", "company", ["finance.inventory.view"]),
+        # Item cards: stock by location (every warehouse, for everyone holding it) and the card checks (company)
+        ("itemmaster", "Item cards", "location", ["finance.inventory.view"]),
         ("movement", "Movement & dead stock", "location", ["finance.inventory.view"]),
         ("stockcount", "Stock count analysis", "location", ["finance.inventory.view"]),
         ("stockwc", "Stock & working capital", "company", ["finance.inventory.view", "purchasing.view"]),

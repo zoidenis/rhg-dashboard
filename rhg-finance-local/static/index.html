@@ -376,6 +376,19 @@ td.num,th.num{text-align:right}
 .pl-bd.show{display:flex}
 .em-pop{width:min(760px,100%)}
 .em-roles td,.em-roles th{padding:6px 8px} .em-roles input{width:18px;height:18px}
+.is-sw{margin-bottom:14px}
+.is-locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.is-loc{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 11px;cursor:pointer;font:inherit;color:inherit;min-width:0}
+.is-loc:hover{border-color:var(--accent)} .is-loc.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.is-loc .meta{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.is-bar{display:block;height:6px;background:var(--line);border-radius:3px;overflow:hidden} .is-bar i{display:block;height:100%;background:var(--accent);border-radius:3px} .is-bar i.neg{background:var(--up)}
+.is-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px} .is-filters .is-q{grid-column:span 2}
+#isTable td.is-name{white-space:normal;min-width:240px}
+#isTable tr.is-row{cursor:pointer} #isTable tr.is-row:hover td{background:rgba(127,127,127,.07)}
+#isTable tr.is-sub>td{background:rgba(127,127,127,.05);padding:4px 10px 10px 30px}
+#isTable tr.is-sub table{width:100%} #isTable tr.is-sub td{padding:5px 8px;font-size:12.5px}
+#isTable tr.is-hl td{font-weight:700}
+@media(max-width:760px){.is-filters .is-q{grid-column:auto}}
 .pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
 .pl-pop .ph{background:var(--side,#08303f);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .pl-pop .ph .ic{flex-shrink:0;width:48px;height:48px;border-radius:50%;background:#fff;display:grid;place-items:center}
@@ -545,7 +558,7 @@ td.num,th.num{text-align:right}
     <!-- tabs of Inventory: kept as views (addresses #typology, #recipes ... and their loading), not listed -->
     <button data-view="typology" data-parent="inventory" style="display:none">Typology &amp; turnover</button>
     <button data-view="recipes" data-parent="inventory" style="display:none">Recipe integrity</button>
-    <button data-view="itemmaster" data-parent="inventory" style="display:none">Item master control</button>
+    <button data-view="itemmaster" data-parent="inventory" style="display:none">Item cards</button>
     <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
     <button data-view="discharge" data-parent="inventory" style="display:none">Received vs discharged</button>
     <button data-view="stockcount" data-parent="inventory" style="display:none">Stock count analysis</button>
@@ -959,8 +972,36 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-itemmaster">
+    <div class="ov-tabs is-sw" id="isSw" role="tablist" aria-label="Item cards"><button data-is="stock" class="on" role="tab" aria-selected="true" type="button">Stock by location</button><button data-is="checks" role="tab" aria-selected="false" type="button">Card checks</button></div>
+    <div id="isView">
+      <div class="card">
+        <div class="card-head"><div><h2>Item cards · stock by location</h2>
+          <p class="hint" id="isNote">Every item card and the quantity each warehouse holds, as Business Central calculates it. Every warehouse is shown, so stock can be asked for from the one that holds it.</p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+            <label class="field" style="flex-direction:row;align-items:center;gap:6px">On<input type="date" id="isDate"></label>
+            <button class="mini" id="isToday" type="button">Today</button><button class="mini" id="isXlsx" type="button">Excel</button><button class="mini dark" id="isRead" type="button">Read again</button></div></div>
+        <p class="meta" id="isStatus" style="margin:6px 0 0"></p></div>
+      <div class="kpis" id="isKpis"></div>
+      <div class="card"><div class="card-head"><div><h2>Warehouses</h2><p class="hint">Click a warehouse to see what it holds; click it again for every warehouse.</p></div></div>
+        <div class="is-locs" id="isLocs"></div></div>
+      <div class="card">
+        <div class="filters is-filters">
+          <label class="is-q">Item<input id="isQ" placeholder="number or name"></label>
+          <label>Warehouse<select id="isLoc"><option value="">All warehouses</option></select></label>
+          <label>Category (group 3)<select id="isG3"><option value="">All</option></select></label>
+          <label>Sub-category (group 4)<select id="isG4"><option value="">All</option></select></label>
+          <label>Show<select id="isShow"><option value="stock">Items with stock</option><option value="negative">Below zero somewhere</option><option value="spread">In two or more warehouses</option><option value="all">Every item card</option><option value="blocked">Blocked cards with stock</option></select></label>
+          <label>Sort<select id="isSort"><option value="value">Value</option><option value="qty">Quantity</option><option value="no">Item No.</option><option value="name">Name</option><option value="locs">Warehouses</option></select></label>
+          <label>View<select id="isMode"><option value="list">By item</option><option value="matrix">Matrix: items × warehouses</option></select></label>
+        </div>
+        <p class="meta" id="isCount" style="margin:8px 0"></p>
+        <div class="scroll" id="isTableBox"><table id="isTable" data-nosort></table></div>
+        <p style="margin:10px 0 0"><button class="mini" id="isMore" type="button" style="display:none">Show more</button></p>
+        <p class="hint" id="isDefs" style="margin-top:10px"></p></div>
+    </div>
+    <div id="imChecksBox" style="display:none">
     <div class="card">
-      <div class="card-head"><div><h2>Item master control</h2>
+      <div class="card-head"><div><h2>Item cards · card checks</h2>
         <p class="hint" id="imNote">Configuration checks on the item cards and recipes, for the items in use in the period of Recipe integrity.</p></div>
         <div style="display:flex;gap:6px"><button class="mini" id="imRead">Read</button><button class="mini" id="imXlsx">Excel</button></div></div>
       <div class="kpis" id="imKpis"></div></div>
@@ -968,10 +1009,11 @@ td.num,th.num{text-align:right}
       <div class="scroll"><table id="imChecks"></table></div></div>
     <div class="card" id="imListCard" style="display:none"><div class="card-head"><h2 id="imListTitle"></h2><button class="mini" id="imListClose">Close</button></div>
       <div class="scroll"><table id="imList"></table></div></div>
+    </div>
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item master control</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button><button data-t="invcharts" role="tab" aria-selected="false">Inventory charts</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item cards</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button><button data-t="invcharts" role="tab" aria-selected="false">Inventory charts</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -1737,7 +1779,7 @@ td.num,th.num{text-align:right}
     </div>
     <div class="card" style="margin-bottom:15px" id="crCard">
       <div class="card-head"><div><h2>Cost control weekly email</h2>
-        <p class="hint">Every week, for the week before, a short report for the cost controller: highlights against the previous report (stock against the G/L, slow and dead stock, stock received and never used, days of cover, items below zero, recipe coverage, item master issues), an action list with priority, owner and value, and five lines each from Inventory, Movement &amp; dead stock, Typology &amp; turnover, Recipe integrity and Item master control. Every line behind it comes in an Excel file. Sent through the Purchasing mail server.</p></div>
+        <p class="hint">Every week, for the week before, a short report for the cost controller: highlights against the previous report (stock against the G/L, slow and dead stock, stock received and never used, days of cover, items below zero, recipe coverage, item master issues), an action list with priority, owner and value, and five lines each from Inventory, Movement &amp; dead stock, Typology &amp; turnover, Recipe integrity and Item cards (card checks). Every line behind it comes in an Excel file. Sent through the Purchasing mail server.</p></div>
         <span class="rhg-pill" id="crPill">Off</span></div>
       <div class="formgrid">
         <label class="field">To<input id="crTo" placeholder="costcontroller@rhg.al"></label>
@@ -4280,6 +4322,108 @@ const IM_LABEL = {
   no_product_group: "No general product posting group"};
 const IM_SEV = {ato_without_bom: "critical", assembly_setup_but_bought: "info", blocked_sold: "critical", blocked_in_recipes: "critical", zero_cost_in_use: "warning",
   cost_far_from_last_direct: "warning", unit_no_conversion: "critical", no_base_unit: "critical", no_category: "info", no_inventory_group: "warning", no_product_group: "warning"};
+
+// ---------- Inventory → Item cards → Stock by location (itemstock.py) and Card checks
+let isData = null, isTimer = null, isLimit = 200, isOpenRows = new Set(), isTab = "stock";
+const isFmtQ = q => q == null ? "" : fmt(q, Math.abs(q % 1) > 1e-9 ? 2 : 0);
+function isOpen(){
+  $("isSw").querySelectorAll("button").forEach(b => { const on = b.dataset.is === isTab; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  const limited = !!myLocs();
+  $("isSw").querySelector('[data-is="checks"]').style.display = limited ? "none" : "";
+  if (limited && isTab === "checks") isTab = "stock";
+  $("isView").style.display = isTab === "stock" ? "" : "none";
+  $("imChecksBox").style.display = isTab === "checks" ? "" : "none";
+  if (isTab === "checks") { if (!rcData) rcQuick("30"); }
+  else if (!isData || isData.company !== ($("company").value || "")) isLoad(false);
+}
+$("isSw").querySelectorAll("button").forEach(b => b.onclick = () => { isTab = b.dataset.is; isOpen(); });
+$("company").addEventListener("change", () => { isData = null; if ($("v-itemmaster").classList.contains("on")) isOpen(); });
+const isQs = () => new URLSearchParams({company: $("company").value || "", date: $("isDate").value || ""}).toString();
+async function isLoad(refresh){
+  clearTimeout(isTimer);
+  if (!$("isDate").value) $("isDate").value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $("isStatus").textContent = "Reading…";
+  try {
+    const j = await readJSON(await fetch("/api/inventory/items?" + isQs() + (refresh ? "&refresh=1" : "")));
+    if (j.error && !j.items) throw new Error(j.error);
+    if (j.pending) { $("isStatus").textContent = `${j.note || "Reading…"} ${j.stage || ""}`; isTimer = setTimeout(() => isLoad(false), 3000); return; }
+    if (j.available === false) throw new Error(j.error || "Not read yet.");
+    isData = j; isData.rows = j.items.map(a => Object.fromEntries(j.columns.map((c, i) => [c, a[i]])));
+    isRender();
+    if (j.reading) { $("isStatus").textContent += " · reading again…"; isTimer = setTimeout(() => isLoad(false), 4000); }
+  } catch (e) { $("isStatus").textContent = "Could not read: " + e.message; }
+}
+$("isRead").onclick = () => isLoad(true);
+$("isToday").onclick = () => { $("isDate").value = ""; isLoad(false); };
+$("isDate").onchange = () => isLoad(false);
+$("isXlsx").onclick = () => { location.href = "/api/inventory/items/xlsx?" + isQs() + "&location=" + encodeURIComponent($("isLoc").value) + "&show=" + encodeURIComponent($("isShow").value); };
+["isLoc","isG3","isG4","isShow","isSort","isMode"].forEach(id => $(id).onchange = () => { isLimit = 200; isRender(); });
+$("isQ").oninput = () => { isLimit = 200; isRender(); };
+$("isMore").onclick = () => { isLimit += 400; isRender(); };
+function isFill(sel, list, label){ const v = sel.value; sel.innerHTML = `<option value="">${label}</option>` + list.map(x => `<option value="${esc(x[0])}">${esc(x[1])}</option>`).join(""); sel.value = v; }
+function isFiltered(){
+  const d = isData, loc = $("isLoc").value, g3 = $("isG3").value, g4 = $("isG4").value, show = $("isShow").value, q = $("isQ").value.trim().toUpperCase();
+  let rows = d.rows.filter(r => {
+    const n = Object.keys(r.locations).length;
+    if (loc && !r.locations[loc]) return false;
+    if (g3 && r.group3 !== g3) return false;
+    if (g4 && r.group4 !== g4) return false;
+    if (q && !(r.no.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q))) return false;
+    if (show === "stock") return n > 0;
+    if (show === "negative") return Object.values(r.locations).some(v => v < 0);
+    if (show === "spread") return n > 1;
+    if (show === "blocked") return r.blocked && n > 0;
+    return true;
+  });
+  const val = r => loc ? (r.locations[loc] || 0) * r.unit_cost : r.value, qty = r => loc ? (r.locations[loc] || 0) : r.qty;
+  const sort = $("isSort").value;
+  rows.sort(sort === "qty" ? (a, b) => qty(b) - qty(a) : sort === "no" ? (a, b) => a.no.localeCompare(b.no, undefined, {numeric: true}) : sort === "name" ? (a, b) => (a.desc || "").localeCompare(b.desc || "")
+    : sort === "locs" ? (a, b) => Object.keys(b.locations).length - Object.keys(a.locations).length : (a, b) => Math.abs(val(b)) - Math.abs(val(a)));
+  return {rows, val, qty, loc};
+}
+function isRender(){
+  const d = isData; if (!d) return;
+  const locName = c => { const l = d.locations.find(x => x.code === c); return l && l.name ? `${c} · ${l.name}` : c; };
+  isFill($("isLoc"), d.locations.filter(l => l.items).map(l => [l.code, locName(l.code)]), "All warehouses");
+  isFill($("isG3"), [...new Set(d.rows.map(r => r.group3).filter(Boolean))].sort().map(x => [x, x]), "All");
+  isFill($("isG4"), [...new Set(d.rows.filter(r => !$("isG3").value || r.group3 === $("isG3").value).map(r => r.group4).filter(Boolean))].sort().map(x => [x, x]), "All");
+  const withStock = d.rows.filter(r => Object.keys(r.locations).length), neg = d.locations.reduce((a, l) => a + l.negative, 0);
+  const total = withStock.reduce((a, r) => a + r.value, 0), held = d.locations.filter(l => l.items && l.code !== "(no location)").length;
+  $("isStatus").textContent = `${d.company} · on ${d.as_of} · read from Business Central ${d.read_at.replace("T", " ")} · item cards read ${String(d.cards_read_at || "").replace("T", " ")}${d.failed.length ? ` · not read: ${d.failed.join("; ")}` : ""}`;
+  const card = (l, v, s, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("isKpis").innerHTML = card("Item cards", fmt(d.rows.length), `${fmt(d.rows.filter(r => r.blocked).length)} blocked`) + card("Items with stock", fmt(withStock.length), `in ${fmt(held)} warehouses`)
+    + card("Stock value", cur(total), "quantity × the card's unit cost (estimated)") + card("Lines below zero", fmt(neg), "item × warehouse", neg ? "up" : "");
+  const sel = $("isLoc").value, mx = Math.max(1, ...d.locations.map(l => Math.abs(l.value)));
+  $("isLocs").innerHTML = d.locations.filter(l => l.items).map(l => `<button type="button" class="is-loc${l.code === sel ? " on" : ""}" data-isloc="${esc(l.code)}">
+      <b>${esc(l.code)}</b><span class="meta">${esc(l.name || "")}</span><span class="is-bar"><i style="width:${Math.abs(l.value) / mx * 100}%"></i></span>
+      <span>${cur(l.value)}</span><span class="meta">${l.items === 1 ? "1 item" : `${fmt(l.items)} items`}${l.negative ? ` · <span class="up">${fmt(l.negative)} below zero</span>` : ""}</span></button>`).join("");
+  document.querySelectorAll("[data-isloc]").forEach(b => b.onclick = () => { $("isLoc").value = $("isLoc").value === b.dataset.isloc ? "" : b.dataset.isloc; isLimit = 200; isRender(); });
+  const {rows, val, qty, loc} = isFiltered(), shown = rows.slice(0, isLimit);
+  $("isCount").textContent = `${rows.length === 1 ? "1 item" : `${fmt(rows.length)} items`}${loc ? ` at ${locName(loc)}` : ""} · value ${cur(rows.reduce((a, r) => a + val(r), 0))}${rows.length > shown.length ? ` · the first ${fmt(shown.length)} shown` : ""}`;
+  $("isMore").style.display = rows.length > shown.length ? "" : "none";
+  const negQ = v => v < 0 ? `<span class="up">${isFmtQ(v)}</span>` : isFmtQ(v);
+  if ($("isMode").value === "matrix") {
+    const cols = d.locations.filter(l => l.items && (!loc || l.code === loc)).map(l => l.code).filter(c => shown.some(r => r.locations[c]));
+    $("isTable").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">Total</th>${cols.map(c => `<th class="num" title="${esc(locName(c))}">${esc(c)}</th>`).join("")}</tr>`
+      + shown.map(r => `<tr><td class="is-name"><b>${esc(r.no)}</b> ${esc(r.desc)}</td><td class="meta">${esc(r.unit)}</td><td class="num"><b>${negQ(r.qty)}</b></td>${cols.map(c => `<td class="num">${r.locations[c] != null ? negQ(r.locations[c]) : `<span class="meta">·</span>`}</td>`).join("")}</tr>`).join("");
+  } else {
+    $("isTable").innerHTML = `<tr><th>Item</th><th>Category</th><th>Unit</th><th class="num">${loc ? "At " + esc(loc) : "Total quantity"}</th><th class="num">Unit cost</th><th class="num">Value</th><th class="num">Warehouses</th></tr>`
+      + shown.map(r => {
+        const n = Object.keys(r.locations).length, open = isOpenRows.has(r.no);
+        let h = `<tr class="is-row${open ? " open" : ""}" data-isrow="${esc(r.no)}" tabindex="0"><td class="is-name">${n ? (open ? "▾ " : "▸ ") : ""}<b>${esc(r.no)}</b> ${esc(r.desc)}${r.blocked ? ` <span class="up" style="font-size:11px;font-weight:700">blocked</span>` : ""}</td>
+          <td class="meta">${esc([r.group3, r.group4].filter(Boolean).join(" › "))}</td><td class="meta">${esc(r.unit)}</td><td class="num"><b>${negQ(qty(r))}</b></td>
+          <td class="num">${r.unit_cost ? fmt(r.unit_cost, 2) : "–"}</td><td class="num">${fmt(val(r))}</td><td class="num">${fmt(n)}</td></tr>`;
+        if (open && n) {
+          const ls = Object.entries(r.locations).sort((a, b) => b[1] - a[1]), m = Math.max(1, ...ls.map(x => Math.abs(x[1])));
+          h += `<tr class="is-sub"><td colspan="7"><table data-nosort>${ls.map(([c, q]) => `<tr class="${c === loc ? "is-hl" : ""}"><td>${esc(locName(c))}</td><td class="num">${negQ(q)} ${esc(r.unit)}</td><td class="num">${fmt(q * r.unit_cost)}</td><td style="width:40%"><span class="is-bar"><i class="${q < 0 ? "neg" : ""}" style="width:${Math.abs(q) / m * 100}%"></i></span></td></tr>`).join("")}</table></td></tr>`;
+        }
+        return h; }).join("");
+  }
+  if (!shown.length) $("isTable").innerHTML = `<tr><td class="empty">Nothing with these filters.</td></tr>`;
+  $("isDefs").textContent = Object.values(d.notes).join(" ");
+}
+document.addEventListener("click", e => { const r = e.target.closest("tr[data-isrow]"); if (!r) return; const k = r.dataset.isrow; isOpenRows.has(k) ? isOpenRows.delete(k) : isOpenRows.add(k); isRender(); });
+document.addEventListener("keydown", e => { const r = e.target.closest && e.target.closest("tr[data-isrow]"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); r.click(); } });
 function renderItemMaster(){
   const d = rcData; if (!d) return;
   const n = d.check_counts, k = d.kpis;
@@ -6092,7 +6236,8 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>{ x.classList.toggle("on",x===b); x.classList.toggle("sub-on", x.dataset.view===b.dataset.parent); });
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
-  if((b.dataset.view==="recipes" || b.dataset.view==="itemmaster") && !rcData) rcQuick("30");
+  if(b.dataset.view==="recipes" && !rcData) rcQuick("30");
+  if(b.dataset.view==="itemmaster") isOpen();
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="invcharts") { if (!mvData) loadMovement(false); else renderInvCharts(); }
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
@@ -6288,7 +6433,7 @@ function ilBar(L, cls){
     s.filter(x => x[2] > 0).map(x => `<i class="il-c-${x[0]}" style="flex:${x[2]}" title="${x[1]}: ${ilM(x[2])} (${Math.round(x[2] / t * 100)}%)"></i>`).join("") + `</div>`;
 }
 // Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
-// Typology & turnover, Recipe integrity, Item master control and Movement & dead stock, which stay views
+// Typology & turnover, Recipe integrity, Item cards and Movement & dead stock, which stay views
 // of their own (their addresses and loading do not change) with the same tab bar on top.
 var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockcount", "stockwc", "invcharts"]);
 // the embedded Purchasing screen: loaded when the tab opens (again when the company changes), sized to its content

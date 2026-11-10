@@ -39,6 +39,7 @@ import unicorn_facts
 import faloc
 import recipients
 import exmail
+import itemstock
 import requests
 import cost_report
 import negstock
@@ -1917,7 +1918,7 @@ def arap_status(user):
 
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
-EXPORT_PATHS = {"/api/billyrec/xlsx", "/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
+EXPORT_PATHS = {"/api/inventory/items/xlsx", "/api/billyrec/xlsx", "/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
                 "/api/discharge/xlsx", "/api/stockcount/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
@@ -1929,7 +1930,7 @@ ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/
 # whole company and is refused to them.
 ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/kartela/locations",
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
-                         "/api/inventory/sku/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
+                         "/api/inventory/sku/xlsx", "/api/inventory/items", "/api/inventory/items/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
                          "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
                          "/api/sales/foodcost",
@@ -2047,6 +2048,8 @@ class Handler(BaseHTTPRequestHandler):
         self._allowed = (scope_expand(company, L) | L) if L is not None else None
         if path == "/api/sales":                                    # Sales: their restaurants, totals again
             self._scope_filter = lambda b: sales_cut(b, user, company)
+        elif path in ("/api/inventory/items", "/api/inventory/items/xlsx"):
+            self._scope_filter = None           # every warehouse, by decision (Geri, 10 Nov 2026): to ask for transfers
         elif path in ("/api/inventory/sku/location", "/api/inventory/sku/xlsx"):   # one location of the scope
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand, ("all_locations",), False)
         elif path in ("/api/discharge", "/api/discharge/xlsx"):     # its lines, interventions and squares; no company view
@@ -2688,6 +2691,36 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path in ("/api/inventory/items", "/api/inventory/items/xlsx"):
+                # Inventory → Item cards → Stock by location: every warehouse, to everyone who opens the screen
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    as_of = date.fromisoformat((q.get("date") or "")[:10]) if q.get("date") else date.today()
+                except ValueError:
+                    self._send(400, {"error": "The date must look like 2026-11-10."})
+                    return
+                as_of = min(as_of, date.today())
+                if url.path == "/api/inventory/items":
+                    self._send(200, itemstock.request(client, company, as_of, q.get("refresh") == "1"))
+                    return
+                r = itemstock._held.held(f"{company}|{as_of.isoformat()}")
+                if not r or not r.get("available"):
+                    self._send(409, {"error": "Read the stock first."})
+                    return
+                body = itemstock.render_xlsx(r, {"location": q.get("location") or "", "show": q.get("show") or "stock"})
+                name = f'RHG_{company}_Stock_by_location_{(q.get("location") or "all")}_{as_of.isoformat()}.xlsx'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", f'attachment; filename="{re.sub(r"[^A-Za-z0-9._-]+", "_", name)}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                store.audit("export", "Item cards · stock by location", user["username"], {},
+                            {"location": q.get("location") or "all", "date": as_of.isoformat()}, company)
             elif url.path in ("/api/inventory/sku", "/api/inventory/sku/location", "/api/inventory/sku/xlsx"):
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})
