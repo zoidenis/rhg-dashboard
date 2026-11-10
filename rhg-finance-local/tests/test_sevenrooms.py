@@ -189,6 +189,8 @@ class SevenRooms(unittest.TestCase):
         pc = p["kpis"]["per_cover_res"]
         self.assertAlmostEqual(web["ns_cost"], 2 * pc, places=2)
         self.assertAlmostEqual(p["kpis"]["ns_cost"], 2 * pc)
+        self.assertEqual(web["cancel_covers"], 6)
+        self.assertEqual(sum(m["res"] for m in p["loc_mixes"]["R2"]["shift"]), 1)       # a restaurant's own, for its pop-up
 
     def test_time_and_tables(self):
         p = srsim.public(self.r)
@@ -217,6 +219,8 @@ class SevenRooms(unittest.TestCase):
         self.assertAlmostEqual(x["fc_net"], round(x["fc_guests"] * 100 / 20, 2))
         y = F[("R2", D_NEXT)]
         self.assertEqual((y["method"], y["added"], y["fc_covers"]), ("added", 0, 0))  # too few then; all booked by then
+        self.assertEqual(x["hist"], [{"day": D1, "then": 21, "seated": 11, "guests": 20, "net": 100.0}])  # the pop-up's why
+        self.assertEqual([(b["res"], b["guests"]) for b in x["book"]], [("REF20", 4)])
         self.assertEqual(F[("R1", "2026-11-11")]["weeks"], 0)                           # no Wednesday the restaurant was open
         self.assertEqual([x["ref"] for x in srsim.public(srsim.cut(self.r, {"OPA1"}))["forecast"]], ["R2"] * srsim.AHEAD)
 

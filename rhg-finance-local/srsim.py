@@ -363,6 +363,7 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on, history=
                 C["all"] += 1
                 if cat == "cancel":
                     C["cancel"] += 1
+                    C["cancel_covers"] += x["guests"] or 0
                     return
                 C["res"] += 1
                 C[cat] += 1
@@ -511,7 +512,7 @@ def mixes(r, per_cover=None):
     return out
 
 
-BASE = ("res", "all", "cancel", "seated", "no_show", "covers", "booked", "sales", "linked_covers", "linked", "ns_covers",
+BASE = ("res", "all", "cancel", "cancel_covers", "seated", "no_show", "covers", "booked", "sales", "linked_covers", "linked", "ns_covers",
         "dwell_sum", "dwell_n", "cases")
 
 
@@ -567,7 +568,12 @@ def forecast(venues, today, now, sim_on):
             row = {"ref": ref, "day": ps, "lead": i, "res": len(book), "covers": sum(x["guests"] or 0 for x in book),
                    "vip": sum(1 for x in book if x["vip"]), "big": sum(1 for x in book if (x["guests"] or 0) >= BIG_PARTY),
                    "weeks": 0, "hist_seated": None, "hist_booked": None, "pickup": None, "added": None, "fc_covers": None, "method": "",
-                   "hist_guests": None, "fc_guests": None, "fc_net": None}
+                   "hist_guests": None, "fc_guests": None, "fc_net": None, "hist": [],
+                   "book": [{"time": (x.get("time") or "")[:5], "res": x.get("ref") or "", "guests": x["guests"] or 0,
+                             "vip": x["vip"], "source": x.get("source") or "", "area": x.get("area") or "",
+                             "tables": x.get("tables") or "", "shift": x.get("shift") or "", "tags": (x.get("tags") or [])[:4],
+                             "status": x.get("status_display") or x.get("status") or "", "created": (x.get("created") or "")[:10]}
+                            for x in sorted(book, key=lambda x: (x.get("time") or "", x.get("ref") or ""))[:80]]}
             then, seat, G, N, seat_g = 0, 0, [], 0.0, 0
             for w in range(1, HIST_WEEKS + 1):
                 H = P - timedelta(days=7 * w)
@@ -576,9 +582,12 @@ def forecast(venues, today, now, sim_on):
                     continue
                 cut_at = (datetime.combine(H, now.time()) - timedelta(days=i)).isoformat(timespec="seconds")
                 at = lambda t: str(t or "")[:19].replace(" ", "T")
-                then += sum(x["guests"] or 0 for x in by_day[hs] if x.get("created") and at(x["created"]) <= cut_at
-                            and not (_cat(x, True) == "cancel" and x.get("updated") and at(x["updated"]) <= cut_at))
+                th = sum(x["guests"] or 0 for x in by_day[hs] if x.get("created") and at(x["created"]) <= cut_at
+                         and not (_cat(x, True) == "cancel" and x.get("updated") and at(x["updated"]) <= cut_at))
+                then += th
                 s_, f = past[hs]
+                row["hist"].append({"day": hs, "then": th, "seated": s_, "guests": (f or {}).get("guests"),
+                                    "net": round((f or {}).get("net") or 0, 2) if f else None})
                 seat += s_
                 row["weeks"] += 1
                 if f and f["guests"]:
@@ -701,7 +710,8 @@ def public(r):
     shown = cases[:SHOW_ROWS] + rest[:max(0, SHOW_ROWS - len(cases))]
     out = {k: v for k, v in r.items() if k not in ("agg", "rows", "mix_raw", "prev_agg")}
     K = kpis(r["agg"])
-    out.update(kpis=K, kpis_prev=kpis(P) if "prev_agg" in r else None, mixes=mixes(r, K["per_cover_res"]), locations=locs,
+    by_loc = {ref: mixes({"agg": {ref: k}, "mix_raw": r.get("mix_raw")}, by[ref]["per_cover_res"]) for ref, k in r["agg"].items()}
+    out.update(kpis=K, kpis_prev=kpis(P) if "prev_agg" in r else None, mixes=mixes(r, K["per_cover_res"]), loc_mixes=by_loc, locations=locs,
                rows=shown, rows_count=len(rows), cases_count=len(cases), feedback=r["feedback"][:1500],
                forecast=r.get("forecast") or [])
     return out

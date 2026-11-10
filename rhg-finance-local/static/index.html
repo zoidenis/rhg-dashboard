@@ -268,6 +268,19 @@ td.num,th.num{text-align:right}
 .sv-heat{border-collapse:separate;border-spacing:2px}.sv-heat th{font-size:10.5px;font-weight:600;color:var(--sub);background:none;padding:1px 2px;text-align:center}
 .sv-heat td{min-width:26px;height:24px;border-radius:4px;text-align:center;font-size:10px;font-variant-numeric:tabular-nums;padding:0 2px;color:var(--ink)}
 .sv-heat td.z{color:var(--line)}.sv-heat td.hi{color:#fff}
+.sv-sec{margin:6px 0 18px}.sv-sec>h3{margin:0 0 4px;font-size:14px}.sv-sec>.hint{margin:0 0 8px}
+.sv-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:8px 24px}
+.sv-lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--sub);margin:2px 0 6px}
+.sv-hb{display:grid;gap:2px}
+.sv-hr{display:grid;grid-template-columns:minmax(90px,180px) minmax(0,1fr) auto;gap:12px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer}
+.sv-hr:hover,.sv-hr:focus-visible{background:var(--bg);outline:none}.sv-hr:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}
+.sv-hr .k{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv-hr .b{display:flex;gap:2px;height:14px;min-width:0}.sv-hr .b span{height:100%;border-radius:2px}.sv-hr .b span:first-child{border-radius:4px 2px 2px 4px}.sv-hr .b span:last-child{border-radius:2px 4px 4px 2px}.sv-hr .b span:only-child{border-radius:4px}
+.sv-hr .t{font-size:12.5px;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.sv-dt{margin-top:8px}.sv-dt>summary{cursor:pointer;font-size:12.5px;color:var(--sub);padding:4px 0}
+#svLocs tr[data-svloc]:hover td,#svAh tr[data-svfc]:hover td,#svSt tr[data-svs]:hover td,.pl-panel tr[data-svr]:hover td{background:var(--bg);cursor:pointer}
+.sv-heat td[data-svh]{cursor:pointer}.sv-heat td[data-svh]:hover{outline:2px solid var(--ink);outline-offset:-2px}
+@media (max-width:640px){.sv-hr{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.sv-hr .b{grid-column:1/-1;grid-row:2}}
 .sv-bar{display:inline-block;height:8px;border-radius:2px;background:var(--ch-0);vertical-align:middle;margin-right:6px}
 .sv-tl>div.on{border-left-color:var(--ch-0)}.sv-tl .k{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}.sv-tl .x{font-size:14px;font-weight:600}
 #biGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
@@ -1525,7 +1538,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <label class="field" style="margin-top:8px">Venues → restaurants <span class="meta">one per line: venue (its name or SevenRooms id) = Simphony reference; a venue with the name of a restaurant of Settings → Locations needs no line</span><textarea id="svMap" spellcheck="false" style="min-height:70px"></textarea></label>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="svSave" type="button">Save</button><button class="btn" id="svTest" type="button">Test the connection</button><span class="meta" id="svMsg"></span></div>
         <div class="scroll" style="margin-top:12px"><table id="svVen"></table></div></div>
-      <div class="fc-seg bi-seg" id="svSeg" role="tablist"><button data-b="locs" class="on">Restaurants</button><button data-b="days">Restaurants &amp; days</button><button data-b="res">Reservations</button><button data-b="mix">Shift, channel, lead time</button><button data-b="guests">Guests &amp; value</button><button data-b="time">Time &amp; tables</button><button data-b="ahead">Next 14 days</button><button data-b="staff">Staff</button><button data-b="fb">Feedback</button></div>
+      <div class="fc-seg bi-seg" id="svSeg" role="tablist"><button data-b="locs" class="on">Restaurants</button><button data-b="days">Restaurants &amp; days</button><button data-b="res">Reservations</button><button data-b="mix">Shift, party, area</button><button data-b="guests">Guests &amp; value</button><button data-b="time">Time &amp; tables</button><button data-b="ahead">Next 14 days</button><button data-b="staff">Staff</button><button data-b="fb">Feedback</button></div>
       <div class="sv-p" data-p="locs"><div class="card"><div class="card-head"><div><h2>By restaurant</h2>
         <p class="hint"><span>Covers seated against Simphony's guests, no-shows and cancellations, and what the reservations spent against everyone else.</span></p></div></div>
         <div class="scroll"><table id="svLocs"></table></div></div></div>
@@ -1538,8 +1551,8 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div class="sk-chips" id="svChips"></div>
         <div class="filters" style="margin:0 0 10px"><label>Find<input id="svQ" placeholder="reference, table, check, server"></label></div>
         <div class="scroll" style="max-height:640px"><table id="svRes"></table></div><p class="meta" id="svResMore"></p></div></div>
-      <div class="sv-p" data-p="mix" hidden><div class="card"><div class="card-head"><div><h2>Shift, channel, lead time, party, area</h2>
-        <p class="hint"><span>The reservations (walk-ins and cancellations apart) by where they came from and when they were made.</span></p></div></div>
+      <div class="sv-p" data-p="mix" hidden><div class="card"><div class="card-head"><div><h2>Shift, party, area</h2>
+        <p class="hint"><span>The reservations (walk-ins apart) by shift, party size and area: covers seated, lost to no-shows and cancelled, and the spend per cover.</span> <span>Click a bar for its reservations.</span></p></div></div>
         <div id="svMix"></div></div></div>
       <div class="sv-p" data-p="guests" hidden><div class="card"><div class="card-head"><div><h2>Guests &amp; value</h2>
         <p class="hint"><span>Who comes back, what each channel brings and loses, and what the no-shows cost: the reservations (walk-ins apart) of every restaurant of the read.</span></p></div></div>
@@ -1549,10 +1562,11 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div class="kpis" id="svTmK" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"></div><div id="svTm"></div></div></div>
       <div class="sv-p" data-p="ahead" hidden><div class="card"><div class="card-head"><div><h2>The next 14 days</h2>
         <p class="hint"><span>The reservations on the books now, and the forecast each day learns from the same weekday of the 4 weeks before.</span> <span>Choose a restaurant above for its days only.</span></p></div></div>
-        <div class="sv-charts" id="svAhCh"></div><div class="scroll" style="margin-top:12px"><table id="svAh"></table></div><p class="meta" id="svAhNote"></p></div></div>
+        <div class="kpis" id="svAhK" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px"></div>
+        <div class="sv-charts" id="svAhCh"></div><details class="sv-dt" open><summary>Table</summary><div class="scroll"><table id="svAh"></table></div></details><p class="meta" id="svAhNote"></p></div></div>
       <div class="sv-p" data-p="staff" hidden><div class="card"><div class="card-head"><div><h2>Staff</h2>
         <p class="hint"><span>By who served the table in SevenRooms: covers, the share linked to a Simphony check, the spend per cover, the time at the table, the cases and the guests' rating.</span> <span>A low linked rate is the first thing to look at: a check not linked is a reservation with no spend.</span></p></div></div>
-        <div class="scroll"><table id="svSt"></table></div></div></div>
+        <div id="svStB"></div><details class="sv-dt"><summary>Table</summary><div class="scroll"><table id="svSt"></table></div></details></div></div>
       <div class="sv-p" data-p="fb" hidden><div class="card"><div class="card-head"><div><h2>Feedback</h2>
         <p class="hint"><span>The guests' ratings of the reservations of these days, the lowest first.</span></p></div></div>
         <div class="kpis" id="svFbK" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"></div>
@@ -6194,7 +6208,7 @@ async function svLoad(refresh){
   }
 }
 function svEmpty(j){
-  ["svKpis", "svLocs", "svGrid", "svRes", "svMix", "svFbK", "svFb", "svChips", "svCases", "svGuK", "svGu", "svTmK", "svTm", "svAhCh", "svAh", "svSt"].forEach(id => $(id).innerHTML = "");
+  ["svKpis", "svLocs", "svGrid", "svRes", "svMix", "svFbK", "svFb", "svChips", "svCases", "svGuK", "svGu", "svTmK", "svTm", "svAhK", "svAhCh", "svAh", "svStB", "svSt"].forEach(id => $(id).innerHTML = "");
   $("svTrend").hidden = true;
   $("svResMore").textContent = "";
   $("svStatus").innerHTML = `<span class="warn">${fcSp(j.error || "SevenRooms is not connected yet.")}</span>` + (j.can_settings ? ` <button class="mini" type="button" id="svOpenSet">${fcSp("Connection & mapping")}</button>` : ` ${fcSp("Someone with the Settings permission enters it.")}`);
@@ -6259,12 +6273,12 @@ function svCharts(){
       <div class="meta" style="display:flex;gap:14px;font-size:11px;margin-top:4px">${legend.map(([c, t]) => `<span><span class="ch-sw" style="background:${c}"></span>${fcSp(t)}</span>`).join("")}</div>`;
   const m1 = Math.max(1, ...days.map(t => Math.max(t.guests, t.covers)));
   const b1 = days.map((t, i) => { const x = left + i * bw, w = Math.max(2, bw - 3), y = v => top + h - v / m1 * h;
-    return `<g><title>${esc(`${t.day}: ${fmt(t.covers)} covers seated with a reservation of Simphony's ${fmt(t.guests)} guests${t.guests ? ` (${fmt(t.covers / t.guests * 100, 0)}%)` : ""}`)}</title>
+    return `<g data-svdd="${t.day}" style="cursor:pointer"><title>${esc(`${t.day}: ${fmt(t.covers)} covers seated with a reservation of Simphony's ${fmt(t.guests)} guests${t.guests ? ` (${fmt(t.covers / t.guests * 100, 0)}%)` : ""}`)}</title>
       <rect x="${x}" y="${y(t.guests)}" width="${w}" height="${top + h - y(t.guests)}" rx="2" fill="var(--ch-4)" opacity=".45"/>
       <rect x="${x + w * 0.2}" y="${y(t.covers)}" width="${w * 0.6}" height="${top + h - y(t.covers)}" rx="2" fill="var(--ch-0)"/>${lab(t, i)}</g>`; }).join("");
   const m2 = Math.max(1, ...days.map(t => Math.max(t.sales, t.res)));
   const b2 = days.map((t, i) => { const x = left + i * bw, w = Math.max(2, bw - 3), hr = t.res / m2 * h, hs = Math.max(0, t.sales - t.res) / m2 * h;
-    return `<g><title>${esc(`${t.day}: Simphony ${svM(t.sales)}, with a reservation ${svM(t.res)}${t.sales ? ` (${fmt(t.res / t.sales * 100, 0)}%)` : ""}, the rest ${svM(t.sales - t.res)}`)}</title>
+    return `<g data-svdd="${t.day}" style="cursor:pointer"><title>${esc(`${t.day}: Simphony ${svM(t.sales)}, with a reservation ${svM(t.res)}${t.sales ? ` (${fmt(t.res / t.sales * 100, 0)}%)` : ""}, the rest ${svM(t.sales - t.res)}`)}</title>
       <rect x="${x}" y="${top + h - hr}" width="${w}" height="${hr}" fill="var(--ch-0)"/>
       <rect x="${x}" y="${top + h - hr - hs}" width="${w}" height="${Math.max(0, hs - 2)}" rx="2" fill="var(--ch-4)" opacity=".55"/>${lab(t, i)}</g>`; }).join("");
   $("svCh1").innerHTML = chart("Covers seated and Simphony's guests", m1, b1, [["var(--ch-0)", "covers seated with a reservation"], ["var(--ch-4)", "Simphony's guests"]]);
@@ -6286,7 +6300,7 @@ function svStatusLine(){
 function svLocs(){
   const d = svData;
   $("svLocs").innerHTML = `<tr><th>Restaurant</th><th class="num">Reservations</th><th class="num">Covers booked</th><th class="num">Covers seated</th><th class="num">Simphony guests</th><th class="num">Share of guests</th><th class="num">No-shows</th><th class="num">Cancelled</th><th class="num">Walk-ins</th><th class="num">Linked</th><th class="num">Sales with a reservation</th><th class="num">Share of sales</th><th class="num">Per cover · reservations</th><th class="num">Per cover · the rest</th><th class="num">Cases</th><th class="num">Rating</th></tr>` +
-    (d.locations.map(L => { const k = L.k; return `<tr><td><b>${esc(L.name)}</b><div class="meta">${esc(L.ref)}${L.venues.length ? " · " + esc(L.venues.join(", ")) : ""}</div></td><td class="num">${fmt(k.res)}</td><td class="num">${fmt(k.booked_covers)}</td><td class="num">${fmt(k.seated_covers)}</td><td class="num">${fmt(k.sim_guests)}</td><td class="num">${svPct(k.covers_share)}</td>
+    (d.locations.map(L => { const k = L.k; return `<tr data-svloc="${esc(L.ref)}" tabindex="0" style="cursor:pointer"><td><b>${esc(L.name)}</b><div class="meta">${esc(L.ref)}${L.venues.length ? " · " + esc(L.venues.join(", ")) : ""}</div></td><td class="num">${fmt(k.res)}</td><td class="num">${fmt(k.booked_covers)}</td><td class="num">${fmt(k.seated_covers)}</td><td class="num">${fmt(k.sim_guests)}</td><td class="num">${svPct(k.covers_share)}</td>
       <td class="num">${fmt(k.no_show)} <span class="meta">${svPct(k.no_show_rate)}</span></td><td class="num">${fmt(k.cancel)} <span class="meta">${svPct(k.cancel_rate)}</span></td><td class="num">${fmt(k.walk_in)}</td><td class="num">${svPct(k.link_rate)}</td>
       <td class="num">${svM(k.linked_sales)}</td><td class="num">${svPct(k.sales_share)}</td><td class="num">${svM(k.per_cover_res)}</td><td class="num">${svM(k.per_cover_other)}</td><td class="num ${k.cases ? "warn" : ""}">${fmt(k.cases)}</td><td class="num">${k.fb_overall == null ? "–" : fmt(k.fb_overall, 1)}</td></tr>`; }).join("")
       || `<tr><td class="meta">${fcSp("No SevenRooms venue is placed at a restaurant of this company: see Connection & mapping.")}</td></tr>`);
@@ -6298,7 +6312,7 @@ function svGrid(){
       const c = L.cells[x] || {}, share = c.sim_guests ? c.covers / c.sim_guests : null;
       const cls = !c.res && !c.sim_checks ? "none" : c.cases ? "bad" : c.no_show ? "warn" : "ok";
       const t = `${L.name} ${x}: ${fmt(c.res)} reservations, ${fmt(c.covers)} covers seated of Simphony's ${fmt(c.sim_guests)} guests; ${fmt(c.no_show)} no-shows, ${fmt(c.cancel)} cancelled, ${fmt(c.cases)} cases`;
-      return `<td class="c ${cls}" title="${esc(t)}">${cls === "none" ? "·" : `${fmt(c.covers)}<br><span style="font-weight:400">${share == null ? "" : fmt(share * 100, 0) + "%"}</span>`}</td>`; }).join("") + `</tr>`).join("");
+      return `<td class="c ${cls}" title="${esc(t)}"${cls === "none" ? "" : ` data-svd="${esc(L.ref + "|" + x)}" role="button" tabindex="0" style="cursor:pointer"`}>${cls === "none" ? "·" : `${fmt(c.covers)}<br><span style="font-weight:400">${share == null ? "" : fmt(share * 100, 0) + "%"}</span>`}</td>`; }).join("") + `</tr>`).join("");
 }
 function svRows(){
   const d = svData, L = $("svLoc").value, q = ($("svQ").value || "").trim().toUpperCase();
@@ -6331,11 +6345,7 @@ function svRes(more){
   const mb = $("svMoreBtn"); if (mb) mb.onclick = () => { svShow += 400; svRes(true); };
 }
 function svMix(){
-  const d = svData, M = d.mixes || {};
-  const tbl = (title, L) => `<h3 style="margin:14px 0 6px;font-size:14px">${fcSp(title)}</h3><div class="scroll"><table><tr><th></th><th class="num">Reservations</th><th class="num">Seated</th><th class="num">No-shows</th><th class="num">Covers</th><th class="num">Sales linked</th><th class="num">Per cover</th></tr>` +
-    ((L || []).map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.no_show)} <span class="meta">${svPct(m.seated + m.no_show ? m.no_show / (m.seated + m.no_show) : null)}</span></td><td class="num">${fmt(m.covers)}</td><td class="num">${svM(m.sales)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td></tr>`).join("")
-      || `<tr><td colspan="7" class="meta">${fcSp("None in these days.")}</td></tr>`) + `</table></div>`;
-  $("svMix").innerHTML = tbl("By shift", M.shift) + tbl("By channel (booked by)", M.source) + tbl("By lead time", M.lead) + tbl("By party size", M.party) + tbl("By area", M.area);
+  $("svMix").innerHTML = svValBlock("shift", "By shift") + svValBlock("party", "By party size") + svValBlock("area", "By area");
 }
 function svFb(){
   const d = svData, L = $("svLoc").value, k = svK(), rows = d.feedback.filter(f => !L || f.ref === L);
@@ -6347,77 +6357,113 @@ function svFb(){
       <td>${esc(f.recommend)}</td><td>${esc(f.res)}</td><td>${esc(f.tables)}</td><td>${esc(f.server)}</td></tr>`).join("")
       || `<tr><td colspan="12" class="meta">${fcSp("No feedback for the reservations of these days.")}</td></tr>`);
 }
-// ---- Guests & value, Time & tables, the next 14 days, Staff (the whole read, of the scope)
+// ---- Guests & value, Time & tables, the next 14 days, Staff: bars first (click one for its pop-up), the table below
 const svAvg = (a, n) => n ? a / n : null;
 const svMin = v => v == null ? "–" : fmt(v, 0) + " min";
 const svKc = (l, v, s) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v">${v}</div>${s ? `<div class="meta">${fcSp(s)}</div>` : ""}</div>`;
-function svVal(title, L, note){
-  const max = Math.max(1, ...(L || []).map(m => m.covers));
-  return `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp(title)}</h3>${note ? `<p class="hint" style="margin:0 0 6px">${fcSp(note)}</p>` : ""}<div class="scroll"><table><tr><th></th><th class="num">Reservations</th><th class="num">Cancelled</th><th class="num">No-shows</th><th>Covers seated</th><th class="num">Per cover</th><th class="num">No-show covers</th><th class="num">No-show cost</th></tr>` +
-    ((L || []).map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.cancel)} <span class="meta">${svPct(m.all ? m.cancel / m.all : null)}</span></td>
-      <td class="num">${fmt(m.no_show)} <span class="meta">${svPct(m.seated + m.no_show ? m.no_show / (m.seated + m.no_show) : null)}</span></td>
-      <td><span class="sv-bar" style="width:${Math.round(m.covers / max * 90)}px"></span>${fmt(m.covers)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td>
-      <td class="num">${fmt(m.ns_covers)}</td><td class="num ${m.ns_cost ? "warn" : ""}">${svM(m.ns_cost)}</td></tr>`).join("")
-      || `<tr><td colspan="8" class="meta">${fcSp("None in these days.")}</td></tr>`) + `</table></div>`;
+const svPc = m => m && m.linked_covers ? m.sales / m.linked_covers : null;
+const svNsr = m => m && m.seated + m.no_show ? m.no_show / (m.seated + m.no_show) : null;
+const SV_B = {lead: [[0, "Same day"], [2, "1–2 days"], [7, "3–7 days"], [30, "8–30 days"], [1e9, "Over 30 days"]],
+  party: [[2, "1–2"], [4, "3–4"], [6, "5–6"], [10, "7–10"], [1e9, "Over 10"]], dwell: [[60, "Under 1 h"], [90, "1–1½ h"], [120, "1½–2 h"], [180, "2–3 h"], [1e9, "Over 3 h"]]};
+const svBk = (v, t) => (SV_B[t].find(([top]) => v <= top) || [0, "–"])[1];
+const SV_KIND = {shift: "Shift", source: "Channel", lead: "Lead time", party: "Party", area: "Area", guest: "Guest", vip: "VIP", tag: "Tag", dwell: "Time at the table", turns: "Area"};
+const svMx = () => { const L = $("svLoc").value; return L && svData.loc_mixes && svData.loc_mixes[L] ? svData.loc_mixes[L] : (svData.mixes || {}); };
+const svInL = () => { const L = $("svLoc").value; return svData.rows.filter(x => !L || x.ref === L); };
+const svWd = day => (new Date(day + "T12:00:00").getDay() + 6) % 7;                 // Monday 0, as the server
+const svHr = t => { const m = /^(\d{1,2}):/.exec(t || ""); return m ? +m[1] : null; };
+// the reservations behind a bar: the same rule as the server's tables (walk-ins and, but for the cancelled ones, cancellations apart)
+function svMatch(kind, key){
+  const f = {shift: x => (x.shift || "–") === key, source: x => (x.source || "–") === key, area: x => (x.area || "–") === key,
+    party: x => svBk(x.guests || 0, "party") === key, lead: x => (x.lead != null && x.lead >= 0 ? svBk(x.lead, "lead") : "–") === key,
+    guest: x => x.guest === key, vip: x => (x.vip ? "VIP" : "Not VIP") === key, tag: x => (x.tags || []).includes(key),
+    dwell: x => x.dwell != null && svBk(x.dwell, "dwell") === key, turns: x => (x.area || "–") === key && x.cat === "seated" && !!x.tables}[kind];
+  return svInL().filter(x => (kind === "turns" || !x.walk_in) && f && f(x));
+}
+// horizontal bars: [{key, segs: [[value, color, label]], text, act}], one legend; each row opens its pop-up
+function svBars(items, legend, opts){
+  opts = opts || {};
+  const max = Math.max(1, ...items.map(it => it.segs.reduce((a, s) => a + (s[0] || 0), 0)));
+  return (legend ? `<div class="sv-lg">${legend.map(([c, t]) => `<span><span class="ch-sw" style="background:${c}"></span>${fcSp(t)}</span>`).join("")}</div>` : "")
+    + `<div class="sv-hb">` + (items.map(it => `<div class="sv-hr" role="button" tabindex="0" ${it.act}><div class="k" title="${esc(it.key)}">${esc(it.label || it.key)}</div>
+      <div class="b" title="${esc(it.segs.filter(s => s[0]).map(s => `${s[2]}: ${fmt(s[0], opts.dec || 0)}`).join(" · "))}">${it.segs.filter(s => s[0] > 0).map(s => `<span style="width:${(s[0] / max * 100).toFixed(2)}%;background:${s[1]}"></span>`).join("")}</div>
+      <div class="t">${it.text}</div></div>`).join("") || `<p class="meta">${fcSp("None in these days.")}</p>`) + `</div>`;
+}
+const svTbl = inner => `<details class="sv-dt"><summary>${fcSp("Table")}</summary><div class="scroll">${inner}</div></details>`;
+function svValBlock(kind, title, note){
+  const L = svMx()[kind] || [];
+  const items = L.map(m => ({key: m.key, act: `data-svm="${esc(kind + "|" + m.key)}"`,
+    segs: [[m.covers, "var(--ch-0)", "covers seated"], [m.ns_covers, "var(--ch-1)", "no-show covers"], [m.cancel_covers || 0, "var(--ch-4)", "cancelled covers"]],
+    text: `${svM(svPc(m))} <span class="meta">${fcSp("per cover")}</span>${m.ns_cost ? ` · <span class="warn">${svM(m.ns_cost)}</span>` : ""}`}));
+  return `<div class="sv-sec"><h3>${fcSp(title)}</h3>${note ? `<p class="hint">${fcSp(note)}</p>` : ""}`
+    + svBars(items, [["var(--ch-0)", "covers seated"], ["var(--ch-1)", "no-show covers"], ["var(--ch-4)", "cancelled covers"]])
+    + svTbl(`<table><tr><th></th><th class="num">Reservations</th><th class="num">Cancelled</th><th class="num">No-shows</th><th class="num">Covers seated</th><th class="num">Per cover</th><th class="num">No-show covers</th><th class="num">No-show cost</th></tr>` +
+      (L.map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.cancel)} <span class="meta">${svPct(m.all ? m.cancel / m.all : null)}</span></td>
+        <td class="num">${fmt(m.no_show)} <span class="meta">${svPct(svNsr(m))}</span></td><td class="num">${fmt(m.covers)}</td><td class="num">${svM(svPc(m))}</td>
+        <td class="num">${fmt(m.ns_covers)}</td><td class="num ${m.ns_cost ? "warn" : ""}">${svM(m.ns_cost)}</td></tr>`).join("") || `<tr><td colspan="8" class="meta">${fcSp("None in these days.")}</td></tr>`) + `</table>`) + `</div>`;
 }
 function svGuests(){
-  const d = svData, M = d.mixes || {}, k = d.kpis, G = Object.fromEntries((M.guest || []).map(m => [m.key, m]));
+  const d = svData, M = svMx(), k = svK(), G = Object.fromEntries((M.guest || []).map(m => [m.key, m]));
   const f = G["First visit"] || {}, r = G["Returning"] || {}, V = Object.fromEntries((M.vip || []).map(m => [m.key, m]));
-  const pc = m => m && m.linked_covers ? m.sales / m.linked_covers : null;
+  const src = (M.source || []).filter(m => m.seated + m.no_show >= 5).sort((a, b) => svNsr(b) - svNsr(a))[0];
   $("svGuK").innerHTML = svKc("Returning guests", svPct(f.seated + r.seated ? r.seated / (f.seated + r.seated) : null), `${fmt(r.seated || 0)} of ${fmt((f.seated || 0) + (r.seated || 0))} tables seated`)
-    + svKc("Per cover · returning", svM(pc(r)), `first visit ${svM(pc(f))}`)
-    + svKc("Per cover · VIP", svM(pc(V["VIP"])), `the rest ${svM(pc(V["Not VIP"]))}`)
-    + svKc("No-show cost", svM(k.ns_cost), `${fmt(k.no_show_covers)} covers × ${svM(k.per_cover_res)} per cover`);
-  const lead = M.lead || [];
-  $("svGu").innerHTML = svVal("First visit or returning", M.guest, "Returning: seated at the restaurant before, within the days read (this period and the one before it).")
-    + svVal("VIP", M.vip) + svVal("By channel (booked by)", M.source, "What each channel brings (covers, spend) and what it loses (cancellations, no-shows).")
-    + svVal("By lead time: the no-show cost", lead) + svVal("Tags and occasions", M.tag, "SevenRooms' reservation tags, the 25 most used; a reservation with two tags counts in both.");
+    + svKc("Per cover · returning", svM(svPc(r)), `first visit ${svM(svPc(f))}`)
+    + svKc("Per cover · VIP", svM(svPc(V["VIP"])), `the rest ${svM(svPc(V["Not VIP"]))}`)
+    + svKc("No-show cost", svM(k.ns_cost), `${fmt(k.no_show_covers)} covers × ${svM(k.per_cover_res)} per cover`)
+    + (src ? svKc("Most no-shows", esc(src.key), `${svPct(svNsr(src))} of its tables`) : "");
+  $("svGu").innerHTML = svValBlock("guest", "First visit or returning", "Returning: seated at the restaurant before, within the days read (this period and the one before it).")
+    + svValBlock("vip", "VIP") + svValBlock("source", "By channel (booked by)", "What each channel brings (covers, spend) and what it loses (cancellations, no-shows).")
+    + svValBlock("lead", "By lead time: the no-show cost") + svValBlock("tag", "Tags and occasions", "SevenRooms' reservation tags, the 25 most used; a reservation with two tags counts in both.");
 }
 function svHeat(title, M, field, hours, fmtv){
   const wd = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], by = Object.fromEntries((M || []).map(m => [m.key, m]));
   const max = Math.max(1, ...(M || []).map(m => m[field] || 0));
   return `<div><h3>${fcSp(title)}</h3><div class="scroll" data-nosort><table class="sv-heat"><tr><th></th>${hours.map(h => `<th>${String(h).padStart(2, "0")}</th>`).join("")}</tr>` +
     wd.map((w, i) => `<tr><th style="text-align:left">${fcSp(w)}</th>` + hours.map(h => { const m = by[`${i}|${h}`], v = m ? m[field] || 0 : 0, a = v / max;
-      return `<td class="${v ? (a > 0.55 ? "hi" : "") : "z"}" style="${v ? `background:color-mix(in srgb, var(--ch-0) ${Math.round(12 + a * 88)}%, transparent)` : ""}" title="${esc(`${w} ${String(h).padStart(2, "0")}:00 · ${fmtv(v)}`)}">${v ? fmt(v) : "·"}</td>`; }).join("") + `</tr>`).join("") + `</table></div></div>`;
+      return `<td class="${v ? (a > 0.55 ? "hi" : "") : "z"}"${v ? ` data-svh="${i}|${h}" role="button" tabindex="0"` : ""} style="${v ? `background:color-mix(in srgb, var(--ch-0) ${Math.round(12 + a * 88)}%, transparent)` : ""}" title="${esc(`${w} ${String(h).padStart(2, "0")}:00 · ${fmtv(v)}`)}">${v ? fmt(v) : "·"}</td>`; }).join("") + `</tr>`).join("") + `</table></div></div>`;
 }
 function svTime(){
-  const d = svData, M = d.mixes || {}, k = d.kpis, T = M.turns || [];
+  const M = svMx(), k = svK(), T = M.turns || [];
   const ts = T.reduce((a, m) => a + m.seated, 0), sl = T.reduce((a, m) => a + (m.slots || 0), 0);
   const sh = (M.shift || []).filter(m => m.dwell_n).map(m => [m.key, m.dwell_sum / m.dwell_n]).sort((a, b) => b[1] - a[1]);
   $("svTmK").innerHTML = svKc("Time at the table", svMin(k.dwell), `${fmt(k.dwell_n)} tables timed`) + svKc("Table turns", sl ? fmt(ts / sl, 2) : "–", "seated reservations per table, day and shift")
     + (sh.length ? svKc("Longest shift", svMin(sh[0][1]), sh.map(([s, v]) => `${s} ${svMin(v)}`).join(" · ")) : "");
-  const dl = M.dwell || [], dmax = Math.max(1, ...dl.map(m => m.seated));
-  const row = (L, label) => `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp(label)}</h3><div class="scroll"><table><tr><th></th><th class="num">Seated</th><th class="num">Timed</th><th class="num">Minutes at the table</th><th class="num">Per cover</th></tr>` +
-    ((L || []).map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.dwell_n)}</td><td class="num">${svMin(svAvg(m.dwell_sum, m.dwell_n))}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td></tr>`).join("")
-      || `<tr><td colspan="5" class="meta">${fcSp("None in these days.")}</td></tr>`) + `</table></div>`;
+  const mins = (kind, title) => { const L = (M[kind] || []).filter(m => m.dwell_n);
+    return `<div class="sv-sec"><h3>${fcSp(title)}</h3>` + svBars(L.map(m => ({key: m.key, act: `data-svm="${esc(kind + "|" + m.key)}"`, segs: [[m.dwell_sum / m.dwell_n, "var(--ch-3)", "minutes"]],
+      text: `<b>${svMin(m.dwell_sum / m.dwell_n)}</b> <span class="meta">${fcSp(`${fmt(m.dwell_n)} tables`)}</span>`}))) + `</div>`; };
+  const dl = M.dwell || [];
   const hrs = [...new Set([...(M.hour || []), ...(M.simhour || [])].map(m => +m.key.split("|")[1]))].sort((a, b) => a - b);
   const span = hrs.length ? Array.from({length: hrs[hrs.length - 1] - hrs[0] + 1}, (_, i) => hrs[0] + i) : [];
-  $("svTm").innerHTML = `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp("How long a table stays")}</h3><div class="scroll"><table><tr><th></th><th>Seated</th><th class="num">Per cover</th></tr>` +
-      (dl.map(m => `<tr><td><b>${esc(m.key)}</b></td><td><span class="sv-bar" style="width:${Math.round(m.seated / dmax * 120)}px"></span>${fmt(m.seated)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td></tr>`).join("")
-        || `<tr><td colspan="3" class="meta">${fcSp("No table timed: SevenRooms has no seated and left time and no check is linked.")}</td></tr>`) + `</table></div>`
-    + `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp("Table turns by area")}</h3><div class="scroll"><table><tr><th></th><th class="num">Seated</th><th class="num">Tables used</th><th class="num">Turns</th><th class="num">Covers</th><th class="num">Minutes at the table</th></tr>` +
-      (T.map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.slots || 0)}</td><td class="num"><b>${m.slots ? fmt(m.seated / m.slots, 2) : "–"}</b></td><td class="num">${fmt(m.covers)}</td><td class="num">${svMin(svAvg(m.dwell_sum, m.dwell_n))}</td></tr>`).join("")
-        || `<tr><td colspan="6" class="meta">${fcSp("No seated reservation with a table in these days.")}</td></tr>`) + `</table></div>`
-    + row(M.shift, "By shift") + row(M.party, "By party size")
-    + (span.length ? `<h3 style="margin:18px 0 4px;font-size:14px">${fcSp("Hours: when they book, when Simphony opens the checks")}</h3><p class="hint" style="margin:0 0 8px">${fcSp("Covers booked by the hour of the reservation's slot, against the Simphony checks by the hour they were opened, every weekday of the read.")}</p>
-      <div class="sv-heats">${svHeat("Covers booked", M.hour, "booked", span, v => fmt(v) + " covers")}${svHeat("Simphony checks opened", M.simhour, "checks", span, v => fmt(v) + " checks")}</div>` : "");
+  $("svTm").innerHTML = `<div class="sv-two"><div class="sv-sec"><h3>${fcSp("How long a table stays")}</h3>`
+      + (dl.length ? svBars(dl.map(m => ({key: m.key, act: `data-svm="${esc("dwell|" + m.key)}"`, segs: [[m.seated, "var(--ch-0)", "tables seated"]],
+          text: `<b>${fmt(m.seated)}</b> · ${svM(svPc(m))} <span class="meta">${fcSp("per cover")}</span>`}))) : `<p class="meta">${fcSp("No table timed: SevenRooms has no seated and left time and no check is linked.")}</p>`) + `</div>`
+    + `<div class="sv-sec"><h3>${fcSp("Table turns by area")}</h3>` + (T.length ? svBars(T.map(m => ({key: m.key, act: `data-svm="${esc("turns|" + m.key)}"`, segs: [[m.slots ? m.seated / m.slots : 0, "var(--ch-2)", "turns"]],
+          text: `<b>×${m.slots ? fmt(m.seated / m.slots, 2) : "–"}</b> <span class="meta">${fcSp(`${fmt(m.seated)} seated · ${fmt(m.slots || 0)} tables`)}</span>`})), null, {dec: 2}) : `<p class="meta">${fcSp("No seated reservation with a table in these days.")}</p>`) + `</div></div>`
+    + `<div class="sv-two">${mins("shift", "Minutes at the table by shift")}${mins("party", "Minutes at the table by party size")}</div>`
+    + (span.length ? `<div class="sv-sec"><h3>${fcSp("Hours: when they book, when Simphony opens the checks")}</h3><p class="hint">${fcSp("Covers booked by the hour of the reservation's slot, against the Simphony checks by the hour they were opened, every weekday of the read.")} ${fcSp("Click an hour for its reservations.")}</p>
+      <div class="sv-heats">${svHeat("Covers booked", M.hour, "booked", span, v => fmt(v) + " covers")}${svHeat("Simphony checks opened", M.simhour, "checks", span, v => fmt(v) + " checks")}</div></div>` : "");
 }
 function svAhead(){
   const d = svData, L = $("svLoc").value, F = (d.forecast || []).filter(x => !L || x.ref === L), names = Object.fromEntries(d.locations.map(l => [l.ref, l.name]));
   const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const days = [...new Set(F.map(x => x.day))].sort().map(day => { const xs = F.filter(x => x.day === day), s = f => xs.reduce((a, x) => a + (x[f] || 0), 0);
-    return {day, covers: s("covers"), fc: xs.some(x => x.fc_covers != null) ? s("fc_covers") : null, guests: xs.some(x => x.fc_guests != null) ? s("fc_guests") : null}; });
-  if (!days.length) { $("svAhCh").innerHTML = ""; $("svAh").innerHTML = `<tr><td class="meta">${fcSp("No reading of the days ahead yet: read again.")}</td></tr>`; $("svAhNote").textContent = ""; return; }
-  const W = 600, H = 196, top = 18, bot = 22, n = days.length, bw = W / n, h = H - top - bot, max = Math.max(1, ...days.map(t => Math.max(t.covers, t.fc || 0)));
-  const bars = days.map((t, i) => { const x = i * bw, w = Math.max(2, bw - 4), y = v => top + h - v / max * h;
-    return `<g><title>${esc(`${t.day}: ${fmt(t.covers)} covers on the books${t.fc != null ? `, forecast ${fmt(t.fc, 0)} covers` : ""}${t.guests != null ? `, ${fmt(t.guests, 0)} Simphony guests` : ""}`)}</title>
-      ${t.fc != null ? `<rect x="${x}" y="${y(t.fc)}" width="${w}" height="${top + h - y(t.fc)}" rx="2" fill="none" stroke="var(--ch-4)" stroke-width="2" stroke-dasharray="3 2"/>` : ""}
-      <rect x="${x + w * 0.2}" y="${y(t.covers)}" width="${w * 0.6}" height="${top + h - y(t.covers)}" rx="2" fill="var(--ch-0)"/>
+    return {day, covers: s("covers"), fc: xs.some(x => x.fc_covers != null) ? s("fc_covers") : null, guests: xs.some(x => x.fc_guests != null) ? s("fc_guests") : null, vip: s("vip"), big: s("big")}; });
+  if (!days.length) { $("svAhK").innerHTML = ""; $("svAhCh").innerHTML = ""; $("svAh").innerHTML = `<tr><td class="meta">${fcSp("No reading of the days ahead yet: read again.")}</td></tr>`; $("svAhNote").textContent = ""; return; }
+  const wk = days.slice(0, 7), sw = f => wk.reduce((a, t) => a + (t[f] || 0), 0), top = [...days].sort((a, b) => (b.fc || b.covers) - (a.fc || a.covers))[0];
+  $("svAhK").innerHTML = svKc("Today", fmt(days[0].covers), `covers on the books · forecast ${days[0].fc == null ? "–" : fmt(days[0].fc, 0)}`)
+    + svKc("The next 7 days", fmt(sw("covers")), `covers on the books · forecast ${wk.some(t => t.fc != null) ? fmt(sw("fc"), 0) : "–"}`)
+    + svKc("Busiest day", `${fcSp(wd[new Date(top.day + "T12:00:00").getDay()])} ${top.day.slice(8)}`, `forecast ${top.fc == null ? "–" : fmt(top.fc, 0)} covers`)
+    + svKc("VIP and large parties", fmt(sw("vip") + sw("big")), `${fmt(sw("vip"))} VIP · ${fmt(sw("big"))} parties of 8+, the next 7 days`);
+  const W = 600, H = 196, tp = 18, bot = 22, n = days.length, bw = W / n, h = H - tp - bot, max = Math.max(1, ...days.map(t => Math.max(t.covers, t.fc || 0)));
+  const bars = days.map((t, i) => { const x = i * bw, w = Math.max(2, bw - 4), y = v => tp + h - v / max * h;
+    return `<g data-svfd="${t.day}" role="button" tabindex="0" style="cursor:pointer"><title>${esc(`${t.day}: ${fmt(t.covers)} covers on the books${t.fc != null ? `, forecast ${fmt(t.fc, 0)} covers` : ""}${t.guests != null ? `, ${fmt(t.guests, 0)} Simphony guests` : ""}`)}</title>
+      <rect x="${x}" y="${tp}" width="${bw}" height="${h}" fill="transparent"/>
+      ${t.fc != null ? `<rect x="${x}" y="${y(t.fc)}" width="${w}" height="${tp + h - y(t.fc)}" rx="2" fill="none" stroke="var(--ch-4)" stroke-width="2" stroke-dasharray="3 2"/>` : ""}
+      <rect x="${x + w * 0.2}" y="${y(t.covers)}" width="${w * 0.6}" height="${tp + h - y(t.covers)}" rx="2" fill="var(--ch-0)"/>
       <text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${wd[new Date(t.day + "T12:00:00").getDay()].slice(0, 2)} ${t.day.slice(8)}</text></g>`; }).join("");
-  $("svAhCh").innerHTML = `<div><h3>${fcSp("Covers on the books and the forecast")}</h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Covers on the books and the forecast")}"><line x1="0" x2="${W}" y1="${top + h}" y2="${top + h}" stroke="var(--line)"/><line x1="0" x2="${W}" y1="${top}" y2="${top}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${W}" y="${top - 5}" text-anchor="end">${esc(fmt(max, 0))}</text>${bars}</svg>
-    <div class="meta" style="display:flex;gap:14px;font-size:11px;margin-top:4px"><span><span class="ch-sw" style="background:var(--ch-0)"></span>${fcSp("covers on the books")}</span><span><span class="ch-sw" style="border:2px dashed var(--ch-4);background:none"></span>${fcSp("forecast covers")}</span></div></div>`;
+  $("svAhCh").innerHTML = `<div><h3>${fcSp("Covers on the books and the forecast")}</h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Covers on the books and the forecast")}"><line x1="0" x2="${W}" y1="${tp + h}" y2="${tp + h}" stroke="var(--line)"/><line x1="0" x2="${W}" y1="${tp}" y2="${tp}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${W}" y="${tp - 5}" text-anchor="end">${esc(fmt(max, 0))}</text>${bars}</svg>
+    <div class="meta" style="display:flex;gap:14px;font-size:11px;margin-top:4px;flex-wrap:wrap"><span><span class="ch-sw" style="background:var(--ch-0)"></span>${fcSp("covers on the books")}</span><span><span class="ch-sw" style="border:2px dashed var(--ch-4);background:none"></span>${fcSp("forecast covers")}</span><span>${fcSp("Click a day for its reservations.")}</span></div></div>`;
   $("svAh").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th class="num">Reservations</th><th class="num">Covers on the books</th><th class="num">VIP</th><th class="num">Parties of 8+</th><th class="num">On the books then</th><th class="num">Seated then</th><th class="num">Pickup</th><th class="num">Forecast covers</th><th class="num">Forecast guests</th><th class="num">Forecast net sales</th></tr>` +
-    F.map(x => `<tr${x.lead === 0 ? ` style="font-weight:600"` : ""}><td>${esc(names[x.ref] || x.ref)}</td><td>${fcSp(x.lead === 0 ? "Today" : wd[new Date(x.day + "T12:00:00").getDay()])} <span class="meta">${esc(x.day)}</span></td>
+    F.map(x => `<tr data-svfc="${esc(x.ref + "|" + x.day)}" tabindex="0"${x.lead === 0 ? ` style="font-weight:600"` : ""}><td>${esc(names[x.ref] || x.ref)}</td><td>${fcSp(x.lead === 0 ? "Today" : wd[new Date(x.day + "T12:00:00").getDay()])} <span class="meta">${esc(x.day)}</span></td>
       <td class="num">${fmt(x.res)}</td><td class="num"><b>${fmt(x.covers)}</b></td><td class="num">${x.vip ? fmt(x.vip) : ""}</td><td class="num">${x.big ? fmt(x.big) : ""}</td>
       <td class="num">${x.hist_booked == null ? "–" : fmt(x.hist_booked, 1)}</td><td class="num">${x.hist_seated == null ? "–" : fmt(x.hist_seated, 1)}</td>
       <td class="num" title="${esc(x.method === "added" ? "Few on the books then: the covers added after" : x.method === "pickup" ? "Covers seated over covers on the books then" : "")}">${x.pickup != null ? "×" + fmt(x.pickup, 2) : x.added != null ? (x.added >= 0 ? "+" : "−") + fmt(Math.abs(x.added), 1) : "–"}</td>
@@ -6425,22 +6471,171 @@ function svAhead(){
   $("svAhNote").textContent = `${d.forecast_at ? "On the books as read " + d.forecast_at.replace("T", " ") + ". " : ""}` + "Learnt from the same weekday of the 4 weeks before (only the days the restaurant was open); a dash: no such day yet.";
 }
 function svStaff(){
-  const d = svData, S = (d.mixes || {}).server || [];
+  const S = svMx().server || [];
+  $("svStB").innerHTML = svBars(S.map(m => { const lr = m.seated ? m.linked / m.seated : null, fb = svAvg(m.fb_sum || 0, m.fb_n || 0);
+      return {key: m.key, act: `data-svs="${esc(m.key)}"`, segs: [[m.linked_covers, "var(--ch-0)", "covers linked to a check"], [Math.max(0, m.covers - m.linked_covers), "var(--ch-4)", "covers with no check"]],
+        text: `<span class="${lr != null && lr < 0.8 ? "warn" : ""}">${svPct(lr)}</span> <span class="meta">${fcSp("linked")}</span> · ${svM(svPc(m))}${fb != null ? ` · ★ ${fmt(fb, 1)}` : ""}`}; }),
+    [["var(--ch-0)", "covers linked to a check"], ["var(--ch-4)", "covers with no check"]]);
   $("svSt").innerHTML = `<tr><th>Served by</th><th class="num">Reservations</th><th class="num">Seated</th><th class="num">Covers</th><th class="num">Linked to a check</th><th class="num">Sales</th><th class="num">Per cover</th><th class="num">Minutes at the table</th><th class="num">Seated, no check</th><th class="num">Cases</th><th class="num">Rating</th><th class="num">Rated 1–2</th><th>Simphony employees</th></tr>` +
     (S.map(m => { const lr = m.seated ? m.linked / m.seated : null, fb = svAvg(m.fb_sum || 0, m.fb_n || 0);
-      return `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.covers)}</td>
-        <td class="num ${lr != null && lr < 0.8 ? "warn" : ""}">${svPct(lr)}</td><td class="num">${svM(m.sales)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td>
+      return `<tr data-svs="${esc(m.key)}" tabindex="0"><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.covers)}</td>
+        <td class="num ${lr != null && lr < 0.8 ? "warn" : ""}">${svPct(lr)}</td><td class="num">${svM(m.sales)}</td><td class="num">${svM(svPc(m))}</td>
         <td class="num">${svMin(svAvg(m.dwell_sum, m.dwell_n))}</td><td class="num ${m.no_check ? "warn" : ""}">${fmt(m.no_check || 0)}</td><td class="num">${fmt(m.cases)}</td>
         <td class="num">${fb == null ? "–" : fmt(fb, 1)} <span class="meta">${m.fb_n ? fmt(m.fb_n) : ""}</span></td><td class="num ${m.fb_low ? "warn" : ""}">${fmt(m.fb_low || 0)}</td><td class="meta">${esc((m.emps || []).join(", "))}</td></tr>`; }).join("")
       || `<tr><td colspan="13" class="meta">${fcSp("SevenRooms has no server on the reservations of these days.")}</td></tr>`);
 }
+// ---- pop-ups: one frame, a back button when one opens from another
+let svCur = null, svStack = [];
+const svTile = (l, v, sub, cls) => `<div class="pl-tile"><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}" style="font-size:17px">${v}</div><div class="s">${sub || ""}</div></div>`;
+function svFrame(title, sub, body, re){
+  svCur = re;
+  $("svPop").innerHTML = `<div class="ph">${svStack.length ? `<button class="close" data-svback="1">← ${fcSp("Back")}</button>` : ""}<div><h2>${title}</h2><div class="sub">${sub || ""}</div></div><div class="sp"></div>
+      <button class="close" data-svclose="1">Close ✕</button></div><div class="pl-body">${body}</div>`;
+  $("svBd").classList.add("show"); $("svPop").scrollTop = 0; $("svBd").scrollTop = 0;
+  const c = $("svPop").querySelector("[data-svback]") || $("svPop").querySelector("[data-svclose]"); if (c) c.focus();
+}
+function svResList(rows, title, multi){
+  const d = svData, names = Object.fromEntries(d.locations.map(l => [l.ref, l.name])), isCase = x => d.cases.includes(x.link) || x.cat === "open";
+  const R = [...rows].sort((a, b) => (isCase(b) - isCase(a)) || (b.day + b.time).localeCompare(a.day + a.time)), shown = R.slice(0, 200);
+  return `<div class="pl-panel" style="margin-top:12px"><div class="ttl"><h3>${fcSp(title || "The reservations")} · ${fmt(rows.length)}</h3><span class="meta">${fcSp("Click one for its whole story.")}</span></div>`
+    + (R.length ? `<div class="scroll" style="max-height:420px"><table data-nosort><tr>${multi ? "<th>Restaurant</th>" : ""}<th>Day</th><th>Time</th><th>Reference</th><th class="num">Party</th><th>Kind</th><th>Booked by</th><th>Tables</th><th>Served by</th><th class="num">Spend</th><th>Link</th></tr>`
+      + shown.map(x => `<tr data-svr="${esc(x.id)}" tabindex="0">${multi ? `<td>${esc(names[x.ref] || x.ref)}</td>` : ""}<td>${esc(x.day)}</td><td>${esc(x.time)}</td><td><b>${esc(x.res)}</b>${x.vip ? ` <span class="rhg-pill info">VIP</span>` : ""}</td>
+        <td class="num">${fmt(x.guests)}${x.arrived != null ? ` · ${fmt(x.arrived)}` : ""}</td><td><span class="rhg-pill ${SV_CAT_PILL[x.cat] || ""}">${esc(d.cat[x.cat] || x.cat)}</span></td><td>${esc(x.source)}</td>
+        <td>${esc(x.tables)}</td><td>${esc(x.server)}</td><td class="num">${x.spend == null ? "" : fmt(x.spend, 0)}</td><td>${x.link ? `<span class="rhg-pill ${SV_LINK_PILL[x.link] || ""}">${esc(d.link[x.link] || x.link)}</span>` : ""}</td></tr>`).join("") + `</table></div>`
+      + (R.length > shown.length ? `<p class="meta">${fcSp(`The first ${fmt(shown.length)}; the Reservations part and the Excel have every one.`)}</p>` : "")
+      : `<p class="hint">${fcSp("None.")}</p>`)
+    + (d.rows_count > d.rows.length ? `<p class="meta">${fcSp(`Of the ${fmt(d.rows.length)} reservations the screen holds (the cases and the latest).`)}</p>` : "") + `</div>`;
+}
+function svCaseTiles(rows){
+  return `<div class="sv-cases" style="margin-top:12px">${SV_CASES.map(([k, t]) => { const n = rows.filter(x => k === "open" ? x.cat === "open" : x.link === k).length;
+    return n ? `<div class="sv-case" style="cursor:default"><div class="n">${fmt(n)}</div><div class="t">${fcSp(t)}</div></div>` : ""; }).join("")}</div>`;
+}
+function svLocPop(ref){
+  const d = svData, L = d.locations.find(l => l.ref === ref); if (!L) return;
+  const k = L.k, P = L.kp || {}, rows = d.rows.filter(x => x.ref === ref), M = (d.loc_mixes || {})[ref] || {};
+  const dl = (key, kind, bad) => svDelta(k[key], P[key], kind, bad);
+  const days = d.days.map(x => Object.assign({day: x}, L.cells[x] || {})), mx = Math.max(1, ...days.map(c => Math.max(c.sim_guests || 0, c.covers || 0)));
+  const W = 900, H = 120, h = 96, bw = W / days.length;
+  const chart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc("Covers seated and Simphony's guests")}">${days.map((c, i) => { const x = i * bw, w = Math.max(2, bw - 3), y = v => h - (v || 0) / mx * (h - 6);
+      return `<g data-svd="${esc(ref + "|" + c.day)}" style="cursor:pointer"><title>${esc(`${c.day}: ${fmt(c.covers || 0)} covers seated of ${fmt(c.sim_guests || 0)} guests`)}</title><rect x="${x}" y="0" width="${bw}" height="${h}" fill="transparent"/>
+        <rect x="${x}" y="${y(c.sim_guests)}" width="${w}" height="${h - y(c.sim_guests)}" rx="2" fill="var(--ch-4)" opacity=".45"/><rect x="${x + w * .2}" y="${y(c.covers)}" width="${w * .6}" height="${h - y(c.covers)}" rx="2" fill="var(--ch-0)"/>
+        ${days.length <= 16 || i % Math.ceil(days.length / 14) === 0 ? `<text x="${x + w / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--sub)">${c.day.slice(8)}</text>` : ""}</g>`; }).join("")}</svg>`;
+  const src = (M.source || []).slice(0, 6);
+  svFrame(esc(L.name), esc(`${L.ref}${L.venues.length ? " · " + L.venues.join(", ") : ""} · ${d.range.from} → ${d.range.to}`), `
+    <div class="pl-tiles">${svTile("Reservations", fmt(k.res) + " " + dl("res"), fcSp(`${fmt(k.cancel)} cancelled · ${fmt(k.walk_in)} walk-ins`))
+      + svTile("Covers seated", fmt(k.seated_covers) + " " + dl("seated_covers"), fcSp(`of Simphony's ${fmt(k.sim_guests)} guests · ${svPct(k.covers_share)}`))
+      + svTile("No-show rate", svPct(k.no_show_rate) + " " + dl("no_show_rate", "rate", "up"), fcSp(`${fmt(k.no_show)} no-shows · cost ${svM(k.ns_cost)}`), k.no_show_rate > 0.05 ? "warn" : "")
+      + svTile("Linked to a check", svPct(k.link_rate) + " " + dl("link_rate", "rate"), fcSp(`${fmt(k.linked)} of ${fmt(k.seated)} seated`), k.link_rate != null && k.link_rate < 0.8 ? "warn" : "")
+      + svTile("Sales with a reservation", svM(k.linked_sales) + " " + dl("linked_sales"), fcSp(`${svPct(k.sales_share)} of ${svM(k.sim_sales)}`))
+      + svTile("Per cover", svM(k.per_cover_res), fcSp(`the rest ${svM(k.per_cover_other)}`))
+      + svTile("Time at the table", svMin(k.dwell), fcSp(`${fmt(k.dwell_n)} tables timed`))
+      + svTile("Rating", k.fb_overall == null ? "–" : fmt(k.fb_overall, 1), fcSp(`${fmt(k.fb_n)} ratings · ${fmt(k.fb_low)} at 2 or less`), k.fb_low ? "warn" : "")}</div>
+    <div class="pl-panel"><div class="ttl"><h3>${fcSp("Day by day")}</h3><span class="meta"><span class="ch-sw" style="background:var(--ch-0)"></span>${fcSp("covers seated")} <span class="ch-sw" style="background:var(--ch-4);margin-left:8px"></span>${fcSp("Simphony's guests")} · ${fcSp("click a day")}</span></div>${chart}</div>
+    ${svCaseTiles(rows)}
+    ${src.length ? `<div class="pl-panel" style="margin-top:12px"><div class="ttl"><h3>${fcSp("By channel")}</h3></div>${svBars(src.map(m => ({key: m.key, act: `data-svm="${esc("source|" + m.key)}" data-svref="${esc(ref)}"`,
+        segs: [[m.covers, "var(--ch-0)", "covers seated"], [m.ns_covers, "var(--ch-1)", "no-show covers"], [m.cancel_covers || 0, "var(--ch-4)", "cancelled covers"]], text: `${svM(svPc(m))} <span class="meta">${fcSp("per cover")}</span>`})),
+        [["var(--ch-0)", "covers seated"], ["var(--ch-1)", "no-show covers"], ["var(--ch-4)", "cancelled covers"]])}</div>` : ""}
+    ${svResList(rows.filter(x => d.cases.includes(x.link) || x.cat === "open"), "The cases")}
+    <div style="margin-top:12px"><button class="btn" type="button" data-svonly="${esc(ref)}">${fcSp("Show this restaurant only")}</button></div>`, () => svLocPop(ref));
+}
+function svDayPop(ref, day){
+  const d = svData, Ls = d.locations.filter(l => !ref || l.ref === ref), c = {};
+  Ls.forEach(l => Object.entries(l.cells[day] || {}).forEach(([k, v]) => c[k] = (c[k] || 0) + (v || 0)));
+  const rows = d.rows.filter(x => x.day === day && (!ref || x.ref === ref)), wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(day + "T12:00:00").getDay()];
+  svFrame(ref ? esc((Ls[0] || {}).name || ref) : fcSp("All restaurants"), `${fcSp(wd)} ${esc(day)}`, `
+    <div class="pl-tiles">${svTile("Reservations", fmt(c.res || 0), fcSp(`${fmt(c.seated || 0)} seated · ${fmt(c.cancel || 0)} cancelled`))
+      + svTile("Covers seated", fmt(c.covers || 0), fcSp(`of Simphony's ${fmt(c.sim_guests || 0)} guests · ${svPct(c.sim_guests ? (c.covers || 0) / c.sim_guests : null)}`))
+      + svTile("No-shows", fmt(c.no_show || 0), "", c.no_show ? "warn" : "")
+      + svTile("Sales with a reservation", svM(c.linked_sales || 0), fcSp(`of ${svM(c.sim_sales || 0)} on ${fmt(c.sim_checks || 0)} checks`))
+      + svTile("Cases", fmt(c.cases || 0), "", c.cases ? "up" : "")}</div>
+    ${svCaseTiles(rows)}${svResList(rows, "The reservations of the day", !ref)}`, () => svDayPop(ref, day));
+}
+function svMixPop(kind, key, ref){
+  const d = svData, mix = (ref ? ((d.loc_mixes || {})[ref] || {}) : svMx())[kind] || [], m = mix.find(x => x.key === key) || {};
+  const rows = ref ? svMatch(kind, key).filter(x => x.ref === ref) : svMatch(kind, key);
+  svFrame(`${fcSp(SV_KIND[kind] || kind)}: ${esc(key)}`, esc(`${ref ? ((d.locations.find(l => l.ref === ref) || {}).name || ref) + " · " : $("svLoc").value ? ((d.locations.find(l => l.ref === $("svLoc").value) || {}).name || "") + " · " : ""}${d.range.from} → ${d.range.to}`), `
+    <div class="pl-tiles">${svTile("Reservations", fmt(m.res || 0), kind === "turns" ? "" : fcSp(`${fmt(m.cancel || 0)} cancelled · ${svPct(m.all ? m.cancel / m.all : null)}`))
+      + svTile("Covers seated", fmt(m.covers || 0), fcSp(`${fmt(m.seated || 0)} tables`))
+      + (kind === "turns" ? svTile("Turns", m.slots ? "×" + fmt(m.seated / m.slots, 2) : "–", fcSp(`${fmt(m.slots || 0)} tables used, by day and shift`))
+        : svTile("No-shows", fmt(m.no_show || 0), fcSp(`${svPct(svNsr(m))} · ${fmt(m.ns_covers || 0)} covers`), svNsr(m) > 0.05 ? "warn" : ""))
+      + svTile("Per cover", svM(svPc(m)), fcSp(`sales with a reservation ${svM(m.sales)}`))
+      + svTile("No-show cost", svM(m.ns_cost), "", m.ns_cost ? "warn" : "")
+      + svTile("Time at the table", svMin(svAvg(m.dwell_sum, m.dwell_n)), fcSp(`${fmt(m.dwell_n || 0)} tables timed`))}</div>
+    ${svResList(rows, "The reservations", !ref && !$("svLoc").value)}`, () => svMixPop(kind, key, ref));
+}
+function svStaffPop(key){
+  const d = svData, m = (svMx().server || []).find(x => x.key === key) || {}, rows = svInL().filter(x => (x.server || "–") === key);
+  const ids = new Set(rows.map(x => x.res)), fb = d.feedback.filter(f => (f.server || "–") === key && (!$("svLoc").value || f.ref === $("svLoc").value));
+  const lr = m.seated ? m.linked / m.seated : null, avg = svAvg(m.fb_sum || 0, m.fb_n || 0);
+  svFrame(esc(key), `${fcSp("Served by")} · ${esc(`${d.range.from} → ${d.range.to}`)}`, `
+    <div class="pl-tiles">${svTile("Tables seated", fmt(m.seated || 0), fcSp(`${fmt(m.covers || 0)} covers · ${fmt(m.no_show || 0)} no-shows`))
+      + svTile("Linked to a check", svPct(lr), fcSp(`${fmt(m.no_check || 0)} seated with no check`), lr != null && lr < 0.8 ? "warn" : "")
+      + svTile("Per cover", svM(svPc(m)), fcSp(`sales ${svM(m.sales)}`))
+      + svTile("Time at the table", svMin(svAvg(m.dwell_sum, m.dwell_n)))
+      + svTile("Rating", avg == null ? "–" : fmt(avg, 1), fcSp(`${fmt(m.fb_n || 0)} ratings · ${fmt(m.fb_low || 0)} at 2 or less`), m.fb_low ? "warn" : "")
+      + svTile("Simphony employees", esc((m.emps || []).join(", ") || "–"), fcSp("on the checks linked"))}</div>
+    ${svCaseTiles(rows)}
+    ${fb.length ? `<div class="pl-panel" style="margin-top:12px"><div class="ttl"><h3>${fcSp("Their tables' ratings")} · ${fmt(fb.length)}</h3></div><div class="scroll"><table data-nosort><tr><th>Day</th><th>Reference</th><th class="num">Overall</th><th class="num">Food</th><th class="num">Service</th><th>Tables</th></tr>${fb.slice(0, 60).map(f => `<tr><td>${esc(f.day)}</td><td>${esc(f.res)}</td><td class="num ${f.overall != null && f.overall <= 2 ? "warn" : ""}"><b>${f.overall == null ? "" : fmt(f.overall, 0)}</b></td><td class="num">${f.food == null ? "" : fmt(f.food, 0)}</td><td class="num">${f.service == null ? "" : fmt(f.service, 0)}</td><td>${esc(f.tables)}</td></tr>`).join("")}</table></div></div>` : ""}
+    ${svResList(rows, "Their reservations", !$("svLoc").value)}`, () => svStaffPop(key));
+}
+function svAheadPop(day, ref){
+  const d = svData, L = ref || $("svLoc").value, xs = (d.forecast || []).filter(x => x.day === day && (!L || x.ref === L)), names = Object.fromEntries(d.locations.map(l => [l.ref, l.name]));
+  if (!xs.length) return;
+  const s = f => xs.reduce((a, x) => a + (x[f] || 0), 0), has = f => xs.some(x => x[f] != null), wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(day + "T12:00:00").getDay()];
+  const book = xs.flatMap(x => (x.book || []).map(b => Object.assign({ref: x.ref}, b))).sort((a, b) => a.time.localeCompare(b.time));
+  svFrame(L ? esc(names[L] || L) : fcSp("All restaurants"), `${fcSp(xs[0].lead === 0 ? "Today" : wd)} ${esc(day)}${xs[0].lead ? " · " + fcSp(`${fmt(xs[0].lead)} days ahead`) : ""}`, `
+    <div class="pl-tiles">${svTile("Covers on the books", fmt(s("covers")), fcSp(`${fmt(s("res"))} reservations`))
+      + svTile("Forecast covers", has("fc_covers") ? fmt(s("fc_covers"), 0) : "–", fcSp(xs.length === 1 ? (xs[0].method === "pickup" ? `on the books × ${fmt(xs[0].pickup, 2)}` : xs[0].method === "added" ? `on the books + ${fmt(xs[0].added, 1)}` : "") : ""))
+      + svTile("Forecast guests", has("fc_guests") ? fmt(s("fc_guests"), 0) : "–", fcSp("in Simphony"))
+      + svTile("Forecast net sales", has("fc_net") ? svM(s("fc_net")) : "–")
+      + svTile("VIP", fmt(s("vip"))) + svTile("Parties of 8+", fmt(s("big")))}</div>
+    <div class="pl-panel"><div class="ttl"><h3>${fcSp("What the forecast learnt from")}</h3><span class="meta">${fcSp("the same weekday of the 4 weeks before, at the same number of days ahead")}</span></div>
+      ${xs.some(x => (x.hist || []).length) ? `<div class="scroll"><table data-nosort><tr>${xs.length > 1 ? "<th>Restaurant</th>" : ""}<th>Day</th><th class="num">On the books then</th><th class="num">Seated</th><th class="num">Simphony guests</th><th class="num">Net sales</th></tr>`
+        + xs.flatMap(x => (x.hist || []).map(hh => `<tr>${xs.length > 1 ? `<td>${esc(names[x.ref] || x.ref)}</td>` : ""}<td>${esc(hh.day)}</td><td class="num">${fmt(hh.then)}</td><td class="num">${fmt(hh.seated)}</td><td class="num">${hh.guests == null ? "–" : fmt(hh.guests)}</td><td class="num">${svM(hh.net)}</td></tr>`)).join("") + `</table></div>`
+        : `<p class="hint">${fcSp("No such day yet: the restaurant was not open, or it was not read.")}</p>`}</div>
+    <div class="pl-panel" style="margin-top:12px"><div class="ttl"><h3>${fcSp("On the books")} · ${fmt(book.length)}</h3></div>
+      ${book.length ? `<div class="scroll" style="max-height:420px"><table data-nosort><tr>${xs.length > 1 ? "<th>Restaurant</th>" : ""}<th>Time</th><th>Reference</th><th class="num">Party</th><th>Status</th><th>Booked by</th><th>Area · tables</th><th>Booked on</th><th>Tags</th></tr>`
+        + book.map(b => `<tr>${xs.length > 1 ? `<td>${esc(names[b.ref] || b.ref)}</td>` : ""}<td>${esc(b.time)}</td><td><b>${esc(b.res)}</b>${b.vip ? ` <span class="rhg-pill info">VIP</span>` : ""}</td><td class="num ${b.guests >= 8 ? "warn" : ""}">${fmt(b.guests)}</td><td>${esc(b.status)}</td><td>${esc(b.source)}</td><td>${esc([b.area, b.tables].filter(Boolean).join(" · "))}</td><td class="meta">${esc(b.created)}</td><td>${(b.tags || []).map(g => `<span class="rhg-pill" style="margin:1px">${esc(g)}</span>`).join("")}</td></tr>`).join("") + `</table></div>`
+        : `<p class="hint">${fcSp(xs.some(x => x.res) ? "Read again for the list of this day." : "Nothing on the books yet.")}</p>`}</div>`, () => svAheadPop(day, ref));
+}
+function svHourPop(i, h){
+  const M = svMx(), key = `${i}|${h}`, b = (M.hour || []).find(m => m.key === key) || {}, s = (M.simhour || []).find(m => m.key === key) || {};
+  const wd = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][i];
+  const rows = svInL().filter(x => !x.walk_in && svWd(x.day) === i && svHr(x.time) === h);
+  svFrame(`${fcSp(wd)} ${String(h).padStart(2, "0")}:00`, esc(`${svData.range.from} → ${svData.range.to}`), `
+    <div class="pl-tiles">${svTile("Covers booked", fmt(b.booked || 0), fcSp(`${fmt(b.res || 0)} reservations`)) + svTile("Covers seated", fmt(b.covers || 0), fcSp(`${fmt(b.no_show || 0)} no-shows`))
+      + svTile("Simphony checks opened", fmt(s.checks || 0), fcSp("that hour, every such weekday")) + svTile("Simphony sales", svM(s.sales || 0), fcSp("on those checks"))}</div>
+    ${svResList(rows, "The reservations of that hour", !$("svLoc").value)}`, () => svHourPop(i, h));
+}
+// one dispatcher for the page and the pop-ups
+function svAct(el, inPop){
+  const go = fn => { if (inPop && svCur) svStack.push(svCur); else if (!inPop) svStack = []; fn(); };
+  const ds = el.dataset;
+  if (ds.svback) { const fn = svStack.pop(); if (fn) fn(); return true; }
+  if (ds.svonly) { $("svLoc").value = ds.svonly; $("svLoc").onchange(); $("svBd").classList.remove("show"); return true; }
+  if (ds.svr) { go(() => svOpen(ds.svr)); return true; }
+  if (ds.svloc) { go(() => svLocPop(ds.svloc)); return true; }
+  if (ds.svd) { const [r, day] = ds.svd.split("|"); go(() => svDayPop(r || null, day)); return true; }
+  if (ds.svdd) { go(() => svDayPop($("svLoc").value || null, ds.svdd)); return true; }
+  if (ds.svm) { const p = ds.svm.indexOf("|"); go(() => svMixPop(ds.svm.slice(0, p), ds.svm.slice(p + 1), ds.svref || null)); return true; }
+  if (ds.svs) { go(() => svStaffPop(ds.svs)); return true; }
+  if (ds.svfc) { const [r, day] = ds.svfc.split("|"); go(() => svAheadPop(day, r)); return true; }
+  if (ds.svfd) { go(() => svAheadPop(ds.svfd, null)); return true; }
+  if (ds.svh) { const [i, h] = ds.svh.split("|"); go(() => svHourPop(+i, +h)); return true; }
+  return false;
+}
+const SV_SEL = "[data-svback],[data-svonly],[data-svr],[data-svloc],[data-svd],[data-svdd],[data-svm],[data-svs],[data-svfc],[data-svfd],[data-svh]";
+[["slSrView", false], ["svPop", true]].forEach(([id, inPop]) => {
+  $(id).addEventListener("click", ev => { const el = ev.target.closest(SV_SEL); if (el && $(id).contains(el) && svData && svAct(el, inPop)) ev.preventDefault(); });
+  $(id).addEventListener("keydown", ev => { if (ev.key !== "Enter" && ev.key !== " ") return; const el = ev.target.closest(SV_SEL); if (el && el === ev.target && svData && svAct(el, inPop)) ev.preventDefault(); });
+});
 function svSegShow(b){
   svSegOn = b;
   $("svSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.b === b));
   document.querySelectorAll("#slSrView .sv-p").forEach(p => p.hidden = p.dataset.p !== b);
 }
 $("svSeg").querySelectorAll("button").forEach(b => b.onclick = () => svSegShow(b.dataset.b));
-$("svLoc").onchange = () => { if (svData) { svKpis(); svCharts(); svRes(); svAhead(); svFb(); } };
+$("svLoc").onchange = () => { if (svData) { svKpis(); svCharts(); svRes(); svMix(); svGuests(); svTime(); svAhead(); svStaff(); svFb(); } };
 // a reservation's whole story: SevenRooms (booked, the slot, seated, left) and its checks in Simphony
 function svOpen(id){
   const d = svData, x0 = d.rows.find(r => r.id === id); if (!x0) return;
@@ -6450,7 +6645,8 @@ function svOpen(id){
   const steps = [["Booked", t(x.created), x.lead != null ? `${fmt(x.lead)} days before` : ""], ["Reserved for", `${x.day} ${x.time}`, x.shift],
     ["Seated", x.seated, x.area], ["Left", x.left, x.duration ? `${fmt(x.duration)} min booked` : ""]];
   const why = SV_CASES.find(c => c[0] === (x.cat === "open" ? "open" : x.link));
-  $("svPop").innerHTML = `<div class="ph"><div><h2>${esc(x.res || x.id)} · ${esc(L.name || x.ref)}</h2>
+  svCur = () => svOpen(id);
+  $("svPop").innerHTML = `<div class="ph">${svStack.length ? `<button class="close" data-svback="1">← ${fcSp("Back")}</button>` : ""}<div><h2>${esc(x.res || x.id)} · ${esc(L.name || x.ref)}</h2>
       <div class="sub">${esc(`${x.day} ${x.time}`)} · ${fcSp(`party ${fmt(x.guests)}${x.arrived != null ? `, came ${fmt(x.arrived)}` : ""}`)} · ${esc(x.status)}${x.vip ? " · VIP" : ""}</div></div><div class="sp"></div>
       <button class="close" data-svclose="1">Close ✕</button></div>
     <div class="pl-body">
@@ -6468,10 +6664,8 @@ function svOpen(id){
         ${x.tickets && x.tickets.length ? `<h4 style="margin:10px 0 4px;font-size:13px">${fcSp("The POS tickets SevenRooms holds")}</h4><div class="scroll"><table data-nosort><tr><th>Ticket</th><th>Table</th><th>From</th><th>To</th><th class="num">Total</th></tr>${x.tickets.map(k => `<tr><td>${esc(k.code)}</td><td>${esc(k.table)}</td><td>${esc(t(k.start))}</td><td>${esc(t(k.end))}</td><td class="num">${k.total == null ? "" : fmt(k.total, 2)}</td></tr>`).join("")}</table></div>` : ""}</div>
     </div>`;
   $("svBd").classList.add("show");
-  const c = $("svPop").querySelector("[data-svclose]"); if (c) c.focus();
+  const c = $("svPop").querySelector("[data-svback]") || $("svPop").querySelector("[data-svclose]"); if (c) c.focus();
 }
-$("svRes").addEventListener("click", ev => { const tr = ev.target.closest("tr[data-svr]"); if (tr) svOpen(tr.dataset.svr); });
-$("svRes").addEventListener("keydown", ev => { const tr = ev.target.closest("tr[data-svr]"); if (tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); svOpen(tr.dataset.svr); } });
 $("svBd").addEventListener("click", ev => { if (ev.target === $("svBd") || ev.target.closest("[data-svclose]")) $("svBd").classList.remove("show"); });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && $("svBd").classList.contains("show")) $("svBd").classList.remove("show"); });
 $("svQ").oninput = () => { if (svData) svRes(); };
