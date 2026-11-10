@@ -449,7 +449,10 @@ def build(company, latest_fn, progress=None, today=None):
     if sim_on:
         jobs += [("sim", r["ref"], d.isoformat()) for r in regs for d in days
                  if not latest.get(r["ref"]) or d.isoformat() <= latest[r["ref"]]]
-    say(f"Billy and Simphony · {len(jobs)} days")
+    n_sim = sum(1 for j in jobs if j[0] == "sim")
+    # a job is one day of one source: the days of Settings × (Billy's two methods + each restaurant in Simphony)
+    say(f"{len(days)} days · {len(jobs):,} reads: {len(jobs) - n_sim:,} of Billy, {n_sim:,} of Simphony "
+        f"({len({j[1] for j in jobs if j[0] == 'sim'})} restaurants)")
 
     def run(job):
         kind, x, d = job
@@ -469,7 +472,7 @@ def build(company, latest_fn, progress=None, today=None):
                 if len(errors) < 12:
                     errors.append(f"{'Simphony' if kind == 'sim' else 'Billy'} {x} {d}: {str(exc)[:140]}")
             if n % 10 == 0:
-                say(f"Billy and Simphony · {n} of {len(jobs)} days")
+                say(f"{len(days)} days · {n:,} of {len(jobs):,} reads (days × Billy's two methods and the restaurants)")
     a_, b_ = days[0].isoformat(), days[-1].isoformat()
     bridge = billy.held(acct["nuis"], "bridge", days[0], days[-1])
     fiscal = billy.held(acct["nuis"], "fiscal", days[0], days[-1])
