@@ -98,6 +98,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "select.js": "application/javascript; charset=utf-8",
                 "select.css": "text/css; charset=utf-8",
                 "tables.js": "application/javascript; charset=utf-8",
+                "pulse.js": "application/javascript; charset=utf-8",
                 "layout.js": "application/javascript; charset=utf-8",
                 "recipients.js": "application/javascript; charset=utf-8",
                 "login.html": "text/html; charset=utf-8"}

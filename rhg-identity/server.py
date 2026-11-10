@@ -39,6 +39,7 @@ STATIC_FILES = {
     "locintel.js": "application/javascript; charset=utf-8",
     "locintel.css": "text/css; charset=utf-8",
     "tables.js": "application/javascript; charset=utf-8",
+    "pulse.js": "application/javascript; charset=utf-8",
     "reports.js": "application/javascript; charset=utf-8",
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",

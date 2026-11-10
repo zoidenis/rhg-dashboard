@@ -789,7 +789,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div id="lqBuckets"></div></div>
     </div>
     <div class="card" style="margin-bottom:15px"><h2>By supplier</h2><p class="hint">The 25 largest, group companies apart</p>
-      <div class="scroll"><table id="lqVendors"></table></div></div>
+      <div id="lqVendBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="lqVendors"></table></div></details></div>
     <div class="grid">
       <div class="card"><h2>By currency</h2><div class="scroll"><table id="lqCcy"></table></div></div>
       <div class="card"><h2>Group companies</h2><p class="hint">Suppliers whose name is a company in Business Central: intercompany, kept out of the supplier figures</p>
@@ -887,21 +887,24 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="kpis six" id="fsKpis" style="margin-top:14px"></div>
       <p class="meta" id="fsStatus"></p>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Day by day</h2>
+      <p class="hint">The invoices fiscalized to us by their date: found in BC, with a problem, or recent and the rest. Click a day, a case or a supplier for its invoices; an invoice for the whole of it.</p></div></div>
+      <div id="fsViz"></div></div>
     <div class="card"><div class="card-head"><div><h2>Fiscalized invoices</h2><p class="hint">Problems first. Click a status to filter.</p></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <select id="fsFilter"></select><input id="fsQ" placeholder="Supplier, NIPT, EIC or BC no." style="width:220px"></div></div>
-      <div class="scroll"><table id="fsRows"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fsRows"></table></div></details></div>
     <div class="grid">
       <div class="card"><h2>Missing in BC, by supplier</h2><p class="hint">Invoices and credit notes older than the grace days</p>
-        <div class="scroll"><table id="fsSup"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fsSup"></table></div></details></div>
       <div class="card"><h2>Same EIC posted more than once</h2><p class="hint">Same amount: possibly posted twice; check whether one was reversed first</p>
-        <div class="scroll"><table id="fsDup"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fsDup"></table></div></details></div>
     </div>
     <div class="grid">
       <div class="card"><h2>BC: EIC not listed by the Tax Administration</h2><p class="hint">Posted invoices of the period whose NIVF is not among our fiscalized invoices</p>
-        <div class="scroll"><table id="fsNotF"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fsNotF"></table></div></details></div>
       <div class="card"><h2>BC: posted invoices without EIC</h2><p class="hint">Of the period, not matched by NIPT and amount; farmers and individuals often issue none</p>
-        <div class="scroll"><table id="fsNoEic"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fsNoEic"></table></div></details></div>
     </div>
     <div class="card" id="fsConn">
       <div class="card-head"><div><h2>Connection to the Tax Administration</h2>
@@ -946,16 +949,19 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <button class="btn dark" id="fxFetch">Read issued e-invoices from the Tax Administration now</button>
         <span class="meta" id="fxMsg">The certificate, the daily run and the email are set on Fiscal purchases vs BC; the daily email carries both sides.</span></div>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Day by day</h2>
+      <p class="hint">The e-invoices we issued by their date: found in BC, with a problem, or recent and the rest. Click a day, a case or a buyer for its invoices; an invoice for the whole of it.</p></div></div>
+      <div id="fxViz"></div></div>
     <div class="card"><div class="card-head"><div><h2>E-invoices issued</h2><p class="hint">Problems first</p></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <select id="fxFilter"></select><input id="fxQ" placeholder="Buyer, NIPT, number, EIC or BC no." style="width:230px"></div></div>
-      <div class="scroll"><table id="fxRows"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fxRows"></table></div></details></div>
     <div class="grid">
       <div class="card"><h2>B2B invoices in BC without e-invoice</h2><p class="hint">Posted in the period to a customer with an Albanian NIPT, no e-invoice code (NIVF)</p>
-        <div class="scroll"><table id="fxB2b"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fxB2b"></table></div></details></div>
       <div class="card"><h2>BC codes the Tax Administration does not list</h2><p class="hint">Posted documents whose NIVF is not among the e-invoices issued by us; then the same code on two documents</p>
-        <div class="scroll"><table id="fxNotF"></table></div>
-        <div class="scroll" style="margin-top:12px"><table id="fxDup"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="fxNotF"></table></div>
+        <div class="scroll" style="margin-top:12px"><table id="fxDup"></table></div></details></div>
     </div>
   </section>
 
@@ -1661,9 +1667,12 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="kpis six" id="rgKpis" style="margin-top:14px"></div>
       <p class="meta" id="rgStatus"></p>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Where the items are</h2>
+      <p class="hint">The items of the filter below by control, location and owner: overdue, open in time, awaiting verification. Click a bar to see only its items; click it again for all.</p></div></div>
+      <div id="rgViz"></div></div>
     <div class="card"><div class="card-head"><div><h2>Owners</h2>
       <p class="hint">Who holds what: open and overdue items, the oldest, the value at stake and what they closed in the last 7 days. Click an owner to see only their items; click again for all.</p></div></div>
-      <div class="scroll"><table id="rgOwners"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="rgOwners"></table></div></details></div>
     <div class="card"><div class="card-head"><div><h2>Items</h2><p class="hint" id="rgItemsNote"></p></div></div>
       <div class="sk-chips" id="rgChips"></div>
       <div class="filters" style="margin:0 0 10px">
@@ -1763,6 +1772,9 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <label class="field" style="margin-top:8px">Operators → employees <span class="meta">optional, one per line: operator code = Simphony employee number</span><textarea id="biSOps" spellcheck="false" style="min-height:60px"></textarea></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="biSave">Save</button><span class="meta" id="biMsg"></span></div>
     </div>
+    <div class="card no-report"><div class="card-head"><div><h2>Day by day</h2>
+      <p class="hint"><span>Every restaurant together: the checks of each day, fiscalized, fiscalized late, or not fiscalized. Click a day for its restaurants; a case for the records behind it.</span></p></div></div>
+      <div id="biViz"></div></div>
     <div class="fc-seg bi-seg no-report" id="biSeg" role="tablist"><button data-b="checks" class="on">Checks</button><button data-b="returns">Returns tracking</button><button data-b="days">Restaurants &amp; days</button><button data-b="tills">Tills &amp; units</button><button data-b="ops">Shift &amp; operator</button><button data-b="orders">Orders</button><button data-b="summary">Summary invoices</button><button data-b="book">Sales book</button></div>
     <div class="bi-p" data-p="checks">
       <div class="card"><div class="card-head"><div><h2>Every check</h2><p class="hint"><span>Each Simphony check with its invoice: number, IIC, FIC, the time it was fiscalized and how long after the check closed.</span></p></div></div>
@@ -1817,16 +1829,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="kpis six" id="sxKpis" style="margin-top:14px"></div>
       <p class="meta" id="sxStatus"></p>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Day by day</h2>
+      <p class="hint">Every restaurant together: what came into Business Central through the POS import against what Simphony sold (the dashed mark). Click a day for its restaurants; a case below for its days.</p></div></div>
+      <div id="sxChart"></div><div id="sxCases" style="margin-top:14px"></div></div>
     <div class="card"><div class="card-head"><div><h2>Every restaurant, every day</h2>
       <p class="hint">A square per day: green when Simphony, the import and the invoice meet; the gap of the import against Simphony in the square. Click a square for the day.</p></div></div>
       <div class="il-lg sx-lg" id="sxLegend" style="margin:0 0 8px"></div>
       <div class="scroll" data-nosort><table id="sxGrid"></table></div></div>
-    <div class="card" id="sxDetCard" style="display:none"><div class="card-head"><div><h2 id="sxDetTitle"></h2><p class="hint" id="sxDetNote"></p></div></div>
-      <div class="sx-tiles" id="sxTiles"></div>
-      <div class="scroll"><table id="sxItems"></table></div><p class="meta" id="sxItemsMore"></p></div>
     <div class="card"><div class="card-head"><div><h2>Menu items and BC items</h2>
       <p class="hint">Menu items of the period imported with no BC item, with an item BC does not know or has blocked, with an item that needs a recipe and has none, or sold in Simphony and never imported. Each one is an exception for the cost controller.</p></div></div>
-      <div class="scroll"><table id="sxMap"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="sxMap"></table></div></details></div>
     <div class="card" id="sxSetCard" style="display:none"><div class="card-head"><div><h2>Lags and tolerance</h2>
       <p class="hint">A day is pending, not an exception, until its lag has passed. A gap counts above the larger of the amount and the percentage.</p></div></div>
       <div class="formgrid">
@@ -1851,20 +1863,22 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="kpis six" id="tkKpis" style="margin-top:14px"></div>
       <p class="meta" id="tkStatus"></p>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Day by day</h2>
+      <p class="hint">Every restaurant and channel together: what the till took, as received in Business Central, still within the lag, or not received after it. Click a day for its restaurants; a case below for its days.</p></div></div>
+      <div id="tkChart"></div><div id="tkCases" style="margin-top:14px"></div></div>
     <div class="card"><div class="card-head"><div><h2>Every restaurant and channel, every day</h2>
       <p class="hint">A channel is the tenders that land on the same BC accounts (cash on the cash box, each card on its bank). A square per day: green received, amber received late, red not received after the lag, dashed still within the lag. Click a square for the day.</p></div></div>
       <div class="il-lg sx-lg" style="margin:0 0 8px"><span><i class="ok"></i>Received</span><span><i class="warn"></i>Received late</span><span><i class="bad"></i>Not received</span><span><i class="pend"></i>Within the lag</span></div>
-      <div class="scroll" data-nosort><table id="tkGrid"></table></div>
-      <div id="tkDet" style="margin-top:10px"></div></div>
+      <div class="scroll" data-nosort><table id="tkGrid"></table></div></div>
     <div class="card"><div class="card-head"><div><h2>By restaurant and channel</h2><p class="hint" id="tkChNote"></p></div></div>
-      <div class="scroll"><table id="tkTable"></table></div></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="tkTable"></table></div></details></div>
     <div class="grid">
       <div class="card"><h2>Tips, VAT and service charge</h2>
         <p class="hint">Net sales in Simphony include VAT; the service charge is apart; the tenders are what guests paid. Tenders − (net sales + service charge) is what was paid on top: card tips keyed on the till, rounding. How card tips are recorded is <b>Content required</b> from Finance.</p>
-        <div class="scroll"><table id="tkTips"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="tkTips"></table></div></details></div>
       <div class="card"><h2>Refunds and chargebacks</h2>
         <p class="hint">Money going out of a card or online account on a restaurant's department: a refund to a guest, a chargeback or a fee. Each one is a case to check against the bank or terminal statement.</p>
-        <div class="scroll"><table id="tkOut"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="tkOut"></table></div></details></div>
     </div>
     <div class="card" id="tkMapCard"><div class="card-head"><div><h2>Tender mapping</h2>
       <p class="hint" id="tkMapNote">Every Simphony tender: what it is and which BC accounts receive its money, and in how many days. The proposal comes from the tender's category and name and the bank accounts seen on the restaurants; save it once it is right.</p></div></div>
@@ -2249,11 +2263,8 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
   <div class="filters sh-by-f"><label>Item<input id="shQ" placeholder="number or name"></label>
     <label>Show<select id="shPShow"><option value="diff">With a difference</option><option value="loss">Losses</option><option value="beyond">Beyond % Waste</option><option value="nc">Not counted</option><option value="all">All items</option></select></label></div>
   <div class="scroll"><table id="shItems"></table></div></div></div>
-<div class="modal-bg" id="modalBg"><div class="modal">
-  <div class="mhead"><div><h2 id="modalTitle">Records</h2><p class="hint" id="modalHint" style="margin:0"></p></div>
-    <div style="display:flex;gap:8px"><button class="mini" id="modalCsv">Export CSV</button><button class="mini dark" id="modalClose">Close</button></div></div>
-  <div id="modalBody"></div></div></div>
 
+<script src="pulse.js"></script><!-- the shared pop-ups, Back and small charts -->
 <script>
 const $ = id => document.getElementById(id);
 const fmt = (n,d=0) => n==null||isNaN(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -2402,6 +2413,10 @@ function renderAgeing(kind){
   $(kind+"Age").innerHTML = tot ? `<div class="rhg-stack-bar">${b.map((x,i)=>`<span title="${esc(x.label)}: ${fmt(x.value)}" style="width:${pct(x)}%;background:${AGE_COLORS[i%5]}"></span>`).join("")}</div>
     <div class="rhg-buckets">${b.map(x=>`<div>${esc(x.label.replace(/ days$/,"").replace("Over ","").replace(/^(\d+)$/,"$1+"))}<b>${fmt(pct(x))}%</b></div>`).join("")}</div>`
     : '<div class="empty">No open entries.</div>';
+  // the most overdue: a click opens the supplier or customer (Pulse), Kartela one more click away
+  const P = (d.parties || []).map(p => [p, (p.buckets || []).slice(1).reduce((a, v) => a + Math.max(0, v), 0)]).filter(([, o]) => o > 0.5).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (P.length) $(kind+"Age").innerHTML += `<h3 style="font-size:13px;margin:14px 0 4px">${fcSp("Most overdue")}</h3>` + Pulse.bars(P.map(([p, o]) => ({key: p.party,
+    segs: [[o, "var(--ch-1)", "overdue"], [Math.max(0, p.total - o), "var(--ch-0)", "not due"]], text: `${fmt(o)} <span class="meta">${p.oldest_days == null ? "" : fmt(p.oldest_days) + " d"}</span>`, open: `${kind}|${p.no}`})));
 }
 function render(){
   const m = data.meta, k = data.kpis;
@@ -2777,6 +2792,10 @@ function renderLiquidity(){
     (rows.length ? rows.map(v => `<tr><td class="name">${esc(v[key])}</td><td class="num"><b>${fmt(v.total)}</b></td>${LB.map(l => `<td class="num ${l === "Overdue" && v[l] > 0.5 ? "up" : ""}">${fmt(v[l])}</td>`).join("")}</tr>`).join("")
       : `<tr><td colspan="${LB.length + 2}" class="empty">None.</td></tr>`);
   $("lqVendors").innerHTML = tbl(M.vendors || [], "Supplier", "vendor");
+  const PN = Object.fromEntries(((data.payables || {}).parties || []).map(p => [p.party, p.no]));
+  $("lqVendBars").innerHTML = Pulse.bars((M.vendors || []).map(v => { const od = v["Overdue"] || 0;
+      return {key: v.vendor, segs: [[Math.max(0, od), "var(--ch-1)", "overdue"], [Math.max(0, v.total - Math.max(0, od)), "var(--ch-0)", "due later"]], text: `<b>${fmt(v.total)}</b>${od > 0.5 ? ` <span class="meta">${fmt(od)} overdue</span>` : ""}`,
+        open: PN[v.vendor] ? `ap|${PN[v.vendor]}` : null}; }), [["var(--ch-1)", "overdue"], ["var(--ch-0)", "due later"]], {none: "None."});
   $("lqCcy").innerHTML = tbl(M.currencies || [], "Currency", "currency");
   $("lqIc").innerHTML = tbl(M.intercompany || [], "Group company", "vendor");
 }
@@ -3230,14 +3249,14 @@ async function loadReceipts(refresh){
 }
 function renderReceipts(){
   const d = tkData, k = d.kpis;
-  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const card = (l, val, sub, cls, open) => `<div class="card kpi"${open ? ` data-pulse="${open}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
   $("tkKpis").innerHTML =
     card("Taken at the till", sxM(k.taken), "cash, cards and online, the mapped tenders") +
-    card("Received in BC", sxM(k.matched), `matched to the days · ${fmt(k.ok_days)} days on time, ${fmt(k.late_days)} late`) +
-    card("Not received", sxM(k.open), `${fmt(k.open_days)} restaurant-days past their lag`, k.open_days ? "up" : "down") +
+    card("Received in BC", sxM(k.matched), `matched to the days · ${fmt(k.ok_days)} days on time, ${fmt(k.late_days)} late`, "", "tkcase|late") +
+    card("Not received", sxM(k.open), `${fmt(k.open_days)} restaurant-days past their lag`, k.open_days ? "up" : "down", "tkcase|open") +
     card("Within the lag", sxM(k.pending), "not due yet") +
-    card("Received with no takings", sxM(k.over), "more than the till took", k.over ? "warn" : "") +
-    card("Refunds and chargebacks", sxM(k.refunds), k.unmapped ? `${fmt(k.unmapped)} tenders not mapped` : "out of card and online accounts", k.refunds || k.unmapped ? "warn" : "");
+    card("Received with no takings", sxM(k.over), "more than the till took", k.over ? "warn" : "", "tkcase|over") +
+    card("Refunds and chargebacks", sxM(k.refunds), k.unmapped ? `${fmt(k.unmapped)} tenders not mapped` : "out of card and online accounts", k.refunds || k.unmapped ? "warn" : "", "tkcase|refunds");
   $("tkNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.filter(L => L.tips && L.tips.tenders).length} restaurants with takings` + (d.simphony ? "" : " · Simphony is not connected") +
     (d.mapping.saved ? ` · tender mapping saved by ${d.mapping.saved_by} on ${String(d.mapping.saved_at).slice(0, 10)}` : " · tender mapping: the proposal, not saved yet");
   $("tkStatus").dataset.base = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.found} found, ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
@@ -3248,18 +3267,12 @@ function renderReceipts(){
   d.locations.forEach((L, li) => L.channels.forEach((c, ci) => rows.push([L, c, li, ci])));
   $("tkGrid").innerHTML = rows.length ? `<tr><th class="loc"></th>${days.map(x => `<th>${wd[new Date(x + "T12:00:00").getDay()]}<br>${x.slice(8)}</th>`).join("")}</tr>` +
     rows.map(([L, c, li, ci]) => { const by = Object.fromEntries(c.days.map(x => [x.date, x]));
-      return `<tr><td class="loc"><b>${esc(L.name)}</b><div class="meta">${esc(c.tenders.join(", "))} → ${esc(c.account_names.join(", "))}</div></td>` +
+      return `<tr><td class="loc" data-pulse="tkloc|${li}" role="button" tabindex="0" style="cursor:pointer"><b>${esc(L.name)}</b><div class="meta">${esc(c.tenders.join(", "))} → ${esc(c.account_names.join(", "))}</div></td>` +
         days.map(x => { const v = by[x], st = v ? v.status : "none", txt = st === "open" ? sxM(v.outstanding) : TK_SHORT[st];
           return `<td class="c ${st}${tkSel && tkSel[0] === li && tkSel[1] === ci && tkSel[2] === x ? " sel" : ""}" ${v ? `data-l="${li}" data-c="${ci}" data-d="${x}"` : ""} title="${esc(L.name)} ${x}${v ? `: taken ${fmt(v.taken)}, received ${fmt(v.received)}${v.paid_on ? " by " + v.paid_on : ""}` : ": no takings"}">${txt}</td>`; }).join("") + `</tr>`; }).join("")
     : `<tr><td class="meta">No money tender is mapped to a BC account yet: map the tenders below.</td></tr>`;
-  $("tkGrid").querySelectorAll("td.c[data-l]").forEach(td => td.onclick = () => { tkSel = [+td.dataset.l, +td.dataset.c, td.dataset.d]; renderReceipts(); });
-  if (tkSel && d.locations[tkSel[0]] && d.locations[tkSel[0]].channels[tkSel[1]]) {
-    const L = d.locations[tkSel[0]], c = L.channels[tkSel[1]], v = c.days.find(x => x.date === tkSel[2]);
-    $("tkDet").innerHTML = v ? `<div class="sx-tiles">
-      <div class="sx-tile"><div class="l">${esc(L.name)} · ${esc(v.date)}</div><div class="v">${sxM(v.taken)}</div><div class="s">taken: ${esc(c.tenders.join(", "))}${c.groups.includes("cash") ? " (cash less paid out)" : ""}</div></div>
-      <div class="sx-tile"><div class="l">Received in BC</div><div class="v">${sxM(v.received)}</div><div class="s">${esc(c.account_names.join(", "))}${v.paid_on ? ` · last on ${esc(v.paid_on)}` : ""}</div></div>
-      <div class="sx-tile"><div class="l">Outstanding</div><div class="v ${v.status === "open" ? "up" : ""}">${sxM(v.outstanding)}</div><div class="s">${esc({ok: "received", late: "received after the lag", open: "not received after the lag", pending: "within the lag"}[v.status])} · lag ${c.lag} days · ${v.age} days ago</div></div></div>` : "";
-  } else $("tkDet").innerHTML = "";
+  $("tkGrid").querySelectorAll("td.c[data-l]").forEach(td => { td.tabIndex = 0; td.setAttribute("role", "button"); td.setAttribute("data-pulse", `tkcell|${td.dataset.l}|${td.dataset.c}|${td.dataset.d}`); });
+  tkChart();
   const T = d.locations.flatMap(L => L.channels.map(c => [L, c]));
   $("tkChNote").textContent = `Each channel's takings matched with its receipts first in, first out over ${d.from} → ${d.to}. Tolerance ${fmt(d.params.tol_abs)} or ${d.params.tol_pct}%, ${d.params.grace} grace days after the lag.`;
   $("tkTable").innerHTML = T.length ? `<tr><th>Restaurant</th><th>Tenders</th><th>BC accounts</th><th class="num">Lag</th><th class="num">Taken</th><th class="num">Received</th><th class="num">Not received</th><th class="num">Within lag</th><th class="num">No takings</th><th class="num">Days ok · late · open</th></tr>` +
@@ -3291,6 +3304,76 @@ function renderReceipts(){
     <p><b>Cases.</b> Not received, received with no takings, refunds and chargebacks → Finance (treasury). Tenders not mapped and tips above ${P.tips_pct}% → Chief accountant. They go to the Exceptions register (Takings POS ↔ BC) with the daily email of the register, and close by themselves when the data meets.</p>
     <p><b>Not yet.</b> Bank and terminal settlement extracts (what really reached the bank, acquirer fees, chargebacks notified by the bank) are not read: this compares the till with what is posted in Business Central. They come in a later step.</p>`;
 }
+// ---- Takings POS ↔ BC: the day by day chart, the cases and the pop-ups (a channel's day, a day, a restaurant, a case)
+const TK_ST = {ok: "received", late: "received after the lag", open: "not received after the lag", pending: "within the lag"};
+function tkDay(x, li){
+  const t = {taken: 0, received: 0, open: 0, pending: 0, late: 0};
+  tkData.locations.forEach((L, i) => { if (li != null && i !== li) return; L.channels.forEach(c => { const v = c.days.find(y => y.date === x); if (!v) return;
+    t.taken += v.taken || 0; t.received += v.received || 0; if (v.status === "open") t.open += v.outstanding || 0; if (v.status === "pending") t.pending += v.outstanding || 0; if (v.status === "late") t.late++; }); });
+  return t;
+}
+const TK_SEGS = t => [[Math.min(t.received, t.taken), "var(--ch-0)", "received"], [t.pending, "var(--ch-4)", "within the lag"], [t.open, "var(--ch-1)", "not received"]];
+const TK_LG = [["var(--ch-0)", "received"], ["var(--ch-4)", "within the lag"], ["var(--ch-1)", "not received after the lag"]];
+function tkChart(){
+  const d = tkData, k = d.kpis;
+  $("tkChart").innerHTML = Pulse.cols(d.days.map(x => { const t = tkDay(x); return {label: x.slice(8), segs: TK_SEGS(t), open: "tkday|" + x,
+      tip: `${x}: taken ${sxM(t.taken)}, received ${sxM(t.received)}${t.open ? `, not received ${sxM(t.open)}` : ""}${t.pending ? `, within the lag ${sxM(t.pending)}` : ""}`}; }),
+    TK_LG, {aria: "Takings and receipts, day by day"});
+  const outs = d.locations.reduce((a, L) => a + (L.refunds || []).length, 0);
+  $("tkCases").innerHTML = Pulse.cases([{n: k.open_days, t: "Not received", w: `${sxM(k.open)} past the lag`, open: "tkcase|open"},
+    {n: k.late_days, t: "Received late", w: "paid after the lag", open: "tkcase|late"},
+    {n: d.locations.reduce((a, L) => a + L.channels.filter(c => c.over > 0.5).length, 0), t: "Received with no takings", w: `${sxM(k.over)} more than the till took`, open: "tkcase|over"},
+    {n: outs, t: "Refunds and chargebacks", w: `${sxM(k.refunds)} out of card and online accounts`, open: "tkcase|refunds"},
+    {n: k.unmapped || 0, t: "Tenders not mapped", w: "map them in Tender mapping below", open: "tkcase|unmapped"}]);
+}
+const TK_HEAD = [["Restaurant"], ["Channel"], ["Day"], ["Status"], ["Taken", 1], ["Received", 1], ["Outstanding", 1]];
+function tkRow(L, li, c, ci, v){
+  return {cells: [`<b>${esc(L.name)}</b>`, `<span class="meta">${esc(c.tenders.join(", "))}</span>`, esc(v.date), `<span class="rhg-pill ${v.status === "ok" ? "low" : v.status === "open" ? "critical" : v.status === "late" ? "medium" : ""}">${esc(TK_ST[v.status] || v.status)}</span>`,
+    sxM(v.taken), sxM(v.received), sxM(v.outstanding)], open: `tkcell|${li}|${ci}|${v.date}`};
+}
+function tkCellPop(li, ci, x){
+  const d = tkData, L = d.locations[li], c = L && L.channels[ci], v = c && c.days.find(y => y.date === x); if (!v) return;
+  Pulse.pop({title: esc(`${L.name} · ${x}`), sub: esc(`${c.tenders.join(", ")} → ${c.account_names.join(", ")} · lag ${c.lag} days`),
+    body: Pulse.tiles([{l: "Taken at the till", v: sxM(v.taken), s: c.groups.includes("cash") ? "cash less paid out" : ""}, {l: "Received in BC", v: sxM(v.received), s: v.paid_on ? "last on " + esc(v.paid_on) : ""},
+        {l: "Outstanding", v: sxM(v.outstanding), s: esc(TK_ST[v.status]), cls: v.status === "open" ? "up" : v.status === "late" ? "warn" : ""}])
+      + Pulse.panel("This channel, day by day", Pulse.cols(c.days.map(y => ({label: y.date.slice(8), segs: TK_SEGS({taken: y.taken, received: y.received, open: y.status === "open" ? y.outstanding : 0, pending: y.status === "pending" ? y.outstanding : 0}),
+          open: `tkcell|${li}|${ci}|${y.date}`})), TK_LG, {h: 140}))
+      + `<p style="margin:12px 0 0"><button class="btn" type="button" data-pulse="tkloc|${li}">${fcSp("The whole period of " + L.name)}</button></p>`});
+}
+function tkDayPop(x){
+  const d = tkData, t = tkDay(x), rows = [];
+  d.locations.forEach((L, li) => L.channels.forEach((c, ci) => { const v = c.days.find(y => y.date === x); if (v) rows.push(tkRow(L, li, c, ci, v)); }));
+  Pulse.pop({title: esc(x), sub: fcSp("Every restaurant and channel"),
+    body: Pulse.tiles([{l: "Taken at the till", v: sxM(t.taken)}, {l: "Received in BC", v: sxM(t.received)}, {l: "Not received", v: sxM(t.open), cls: t.open ? "up" : ""}, {l: "Within the lag", v: sxM(t.pending)}])
+      + Pulse.panel("Restaurants and channels", Pulse.list(TK_HEAD, rows))});
+}
+function tkLocPop(li){
+  const d = tkData, L = d.locations[li]; if (!L) return;
+  const s = f => L.channels.reduce((a, c) => a + (c[f] || 0), 0), t = L.tips || {};
+  Pulse.pop({title: esc(L.name), sub: esc(`${d.from} to ${d.to}`),
+    body: Pulse.tiles([{l: "Taken at the till", v: sxM(s("taken"))}, {l: "Received in BC", v: sxM(s("matched"))}, {l: "Not received", v: sxM(s("open")), cls: s("open") ? "up" : ""},
+        {l: "Received with no takings", v: sxM(s("over")), cls: s("over") ? "warn" : ""}, {l: "On top of the sales", v: sxS(t.on_top || 0), s: t.on_top_pct != null ? t.on_top_pct.toFixed(1) + "% · tips and rounding" : ""}])
+      + Pulse.panel("Day by day", Pulse.cols(d.days.map(x => { const v = tkDay(x, li); return {label: x.slice(8), segs: TK_SEGS(v), open: "tkday|" + x}; }), TK_LG, {h: 150}))
+      + Pulse.panel("By channel", Pulse.bars(L.channels.map((c, ci) => ({key: c.tenders.join(", "), segs: [[c.matched, "var(--ch-0)", "received"], [c.pending, "var(--ch-4)", "within the lag"], [c.open, "var(--ch-1)", "not received"]],
+          text: `${sxM(c.taken)} <span class="meta">${esc(c.account_names.join(", "))}</span>`})), TK_LG))
+      + ((L.refunds || []).length ? Pulse.panel("Refunds and chargebacks", Pulse.list([["Date"], ["Account"], ["Document"], ["Amount", 1]], L.refunds.map(o => ({cells: [esc(o.date), esc(o.name), esc(`${o.type} ${o.document}`), fmt(o.amount)]})))) : "")});
+}
+function tkCasePop(kind){
+  const d = tkData, rows = [];
+  if (kind === "open" || kind === "late") d.locations.forEach((L, li) => L.channels.forEach((c, ci) => c.days.filter(v => v.status === kind).forEach(v => rows.push(tkRow(L, li, c, ci, v)))));
+  const title = {open: "Not received", late: "Received late", over: "Received with no takings", refunds: "Refunds and chargebacks", unmapped: "Tenders not mapped"}[kind];
+  let body = "";
+  if (kind === "open" || kind === "late") body = Pulse.panel(`The days · ${fmt(rows.length)}`, Pulse.list(TK_HEAD, rows.reverse(), {none: "None in these days."}));
+  else if (kind === "over") body = Pulse.panel("Channels", Pulse.bars(d.locations.flatMap((L, li) => L.channels.filter(c => c.over > 0.5).map(c => ({key: `${L.name} · ${c.tenders.join(", ")}`, segs: [[c.over, "var(--ch-1)", "received with no takings"]], text: sxM(c.over), open: "tkloc|" + li}))), null, {none: "None."}));
+  else if (kind === "refunds") body = Pulse.panel("Out of card and online accounts", Pulse.list([["Date"], ["Restaurant"], ["Account"], ["Document"], ["Amount", 1]],
+    d.locations.flatMap((L, li) => (L.refunds || []).map(o => ({cells: [esc(o.date), esc(L.name), esc(o.name), esc(`${o.type} ${o.document}`), fmt(o.amount)], open: "tkloc|" + li}))), {none: "None."}));
+  else body = Pulse.panel("Tenders", Pulse.list([["Tender"], ["Where"], ["Paid", 1], ["Count", 1]], d.tenders.filter(t => !(t.accounts || []).length).map(t => ({cells: [`<b>${esc(t.name)}</b>`, esc(t.locations.join(", ")), fmt(t.total), fmt(t.count)]})), {none: "Every tender is mapped."}));
+  Pulse.pop({title: fcSp(title), sub: esc(`${d.from} to ${d.to}`), body});
+}
+Pulse.on("tkday", x => tkDayPop(x));
+Pulse.on("tkcell", v => { const [li, ci, x] = v.split("|"); tkCellPop(+li, +ci, x); });
+Pulse.on("tkloc", li => tkLocPop(+li));
+Pulse.on("tkcase", k => tkCasePop(k));
 $("tkRead").onclick = () => loadReceipts(true);
 $("tkReg").onclick = () => { navTo("register"); $("rgSource").innerHTML = `<option value="receipts_rec">Takings POS ↔ BC</option>`; $("rgSource").value = "receipts_rec"; loadRegister(); };
 $("tkSave").onclick = async () => {
@@ -5336,29 +5419,83 @@ function renderGroup(){
       <td class="num">${g.totals.liabilities==null?"–":fmt(g.totals.liabilities)}</td><td class="num">${g.totals.equity==null?"–":fmt(g.totals.equity)}</td></tr>`;
 }
 
+// ---- the records behind a figure (an account, a P&L or balance sheet line, open payables…): a pop-up of Pulse,
+// the months (or days) of its entries as columns, its sources as bars, every record below; Export CSV as before
 let modalRows=[], modalCols=[], modalName="records";
-async function openDrill(kind,key,context){
-  $("modalBg").classList.add("on"); $("modalTitle").textContent="Loading…"; $("modalBody").innerHTML=""; $("modalHint").textContent="";
-  try{
-    const j = await (await fetch(`/api/drill?kind=${encodeURIComponent(kind)}&key=${encodeURIComponent(key||"")}`)).json();
-    modalRows=j.rows; modalCols=j.columns; modalName=j.kind;
-    $("modalTitle").textContent=j.title;
-    $("modalHint").textContent=`${j.count} record${j.count===1?"":"s"} · ${data.meta.company} · ${data.meta.current[0]} to ${data.meta.current[1]}${context?" · "+context:""}`;
-    $("modalBody").innerHTML = j.rows.length ? `<div class="scroll"><table><tr>${j.columns.map(c=>`<th class="${typeof j.rows[0][c]==="number"?"num":""}">${esc(c)}</th>`).join("")}</tr>`+
-      j.rows.map(r=>`<tr>${j.columns.map(c=>`<td class="${typeof r[c]==="number"?"num":""}">${r[c]==null?"":(typeof r[c]==="number"?fmt(r[c]):esc(r[c]))}</td>`).join("")}</tr>`).join("")+"</table></div>"
-      : '<div class="empty">No underlying records for this selection.</div>';
-  }catch(e){ $("modalTitle").textContent="Could not load records"; $("modalBody").innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
-}
-$("modalClose").onclick=()=>$("modalBg").classList.remove("on");
-$("modalBg").onclick=e=>{ if(e.target===$("modalBg")) $("modalBg").classList.remove("on"); };
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("modalBg").classList.remove("on"); });
-$("modalCsv").onclick=()=>{
+const DR_DATE = ["Posted", "Document date", "Due"], DR_AMT = ["Amount", "Remaining", "Balance", "Current", "Movement in period"];
+function drCsv(){
   if(!modalRows.length) return;
   const lines=[modalCols].concat(modalRows.map(r=>modalCols.map(c=>r[c]??"")));
   const csv=lines.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"}));
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv"}));
   a.download=`${modalName}-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
-};
+}
+function openDrill(kind, key, context){
+  const period = data && data.meta ? `${data.meta.company} · ${data.meta.current[0]} to ${data.meta.current[1]}` : "";
+  Pulse.pop({title: fcSp("Reading the records…"), sub: esc(period), icon: kind === "account" ? IL_GLYPH.BOX : "",
+    actions: `<button class="close" type="button" data-drcsv="1">${fcSp("Export CSV")}</button>`,
+    body: async el => {
+      el.innerHTML = `<p class="meta">${fcSp("Reading…")}</p>`;
+      const pop = el.closest(".pl-pop");
+      try{
+        const j = await readJSON(await fetch(`/api/drill?kind=${encodeURIComponent(kind)}&key=${encodeURIComponent(key || "")}`));
+        modalRows = j.rows; modalCols = j.columns; modalName = j.kind;
+        pop.querySelector("h2").textContent = j.title;
+        pop.querySelector(".sub").textContent = `${j.count} record${j.count === 1 ? "" : "s"} · ${period}${context ? " · " + context : ""}`;
+        const R = j.rows, dc = DR_DATE.find(c => j.columns.includes(c)), ac = DR_AMT.find(c => j.columns.includes(c));
+        let head = "";
+        if (ac && R.length) {
+          const tot = R.reduce((a, r) => a + (+r[ac] || 0), 0), big = R.reduce((m, r) => Math.abs(+r[ac] || 0) > Math.abs(m) ? +r[ac] : m, 0);
+          head += Pulse.tiles([{l: "Records", v: fmt(R.length)}, {l: "Total", v: sxM(tot), s: esc(ac)}, {l: "Largest", v: sxM(big)},
+            dc ? {l: "From", v: esc(R.map(r => String(r[dc] || "").slice(0, 10)).filter(Boolean).sort()[0] || "–"), s: esc(dc)} : null]);
+        }
+        if (dc && ac && R.length > 1) {
+          const months = new Set(R.map(r => String(r[dc] || "").slice(0, 7)).filter(Boolean)), per = months.size > 1 ? 7 : 10, by = {};
+          R.forEach(r => { const k = String(r[dc] || "").slice(0, per); if (!k) return; const v = +r[ac] || 0; by[k] = by[k] || [0, 0]; by[k][v >= 0 ? 0 : 1] += Math.abs(v); });
+          const keys = Object.keys(by).sort();
+          head += Pulse.panel(per === 7 ? "By month" : "By day", Pulse.cols(keys.map(k => ({label: per === 7 ? k : k.slice(8), segs: [[by[k][0], "var(--ch-0)", "debit / positive"], [by[k][1], "var(--ch-1)", "credit / negative"]]})),
+            [["var(--ch-0)", "debit / positive"], ["var(--ch-1)", "credit / negative"]], {aria: j.title, h: 150}));
+        }
+        const src = ["Source", "Category", "Party", "Type"].find(c => j.columns.includes(c));
+        if (src && ac && R.length > 3) {
+          const by = {}; R.forEach(r => { const k = r[src] || "–"; by[k] = (by[k] || 0) + Math.abs(+r[ac] || 0); });
+          const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 8);
+          if (top.length > 1) head += Pulse.panel(`By ${src.toLowerCase()}`, Pulse.bars(top.map(([k, v]) => ({key: k, segs: [[v, "var(--ch-0)", ac]], text: sxM(v)}))));
+        }
+        const table = R.length ? `<div class="scroll" style="max-height:480px"><table><tr>${j.columns.map(c => `<th class="${typeof R[0][c] === "number" ? "num" : ""}">${esc(c)}</th>`).join("")}</tr>` +
+          R.map(r => `<tr>${j.columns.map(c => `<td class="${typeof r[c] === "number" ? "num" : ""}">${r[c] == null ? "" : (typeof r[c] === "number" ? fmt(r[c]) : esc(r[c]))}</td>`).join("")}</tr>`).join("") + "</table></div>"
+          : `<div class="empty">${fcSp("No underlying records for this selection.")}</div>`;
+        el.innerHTML = head + Pulse.panel("The records", table);
+      }catch(e){ pop.querySelector("h2").textContent = "Could not load records"; el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+    }});
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-drcsv]")) drCsv(); });
+Pulse.on("account", no => openDrill("account", no));
+// ---- a supplier or a customer, wherever its name is shown: open today by age, the oldest documents, Kartela one click away
+function kaPartyPop(kind, no){
+  const D = data && data[kind === "ap" ? "payables" : "receivables"], p = D && (D.parties || []).find(x => String(x.no) === String(no));
+  const W = kind === "ap" ? "Supplier" : "Customer";
+  Pulse.pop({title: esc(p ? p.party : no), sub: `${fcSp(W)} · ${esc(no)} · ${fcSp("open today")}`, wide: true,
+    actions: `<button class="close" type="button" data-kago="${kind}|${esc(no)}">${fcSp("Open in Kartela")}</button>`,
+    body: async el => {
+      const lbl = (D && D.bucket_labels) || KA_AGE;
+      const top = p ? Pulse.tiles([{l: "Open", v: fmt(p.total)}, {l: "Overdue", v: fmt((p.buckets || []).slice(1).reduce((a, v) => a + v, 0)), cls: (p.buckets || []).slice(1).some(v => v > 0.5) ? "warn" : ""},
+          {l: "Oldest", v: p.oldest_days == null ? "–" : fmt(p.oldest_days) + " d"}, {l: "Due in 7 days", v: fmt(p.due7 || 0)}, {l: "Next due", v: esc(p.next_due || "–")}])
+        + Pulse.panel("By days past the due date", Pulse.bars((p.buckets || []).map((v, i) => ({key: lbl[i] || String(i), segs: [[Math.max(0, v), i ? "var(--ch-1)" : "var(--ch-0)", "open"]], text: fmt(v)})))) : "";
+      el.innerHTML = top + `<p class="meta">${fcSp("Reading the open entries…")}</p>`;
+      try{
+        const j = await readJSON(await fetch("/api/kartela/entries?" + new URLSearchParams({kind, party: no, company: $("company").value || ""})));
+        if (j.error) throw new Error(j.error);
+        el.innerHTML = top + Pulse.panel(`The open entries · ${fmt(j.entries.length)}`, Pulse.list([["Document"], ["Type"], ["Posted"], ["Due"], ["Days", 1], ["Original", 1], ["Open", 1]],
+          j.entries.map(e => ({cells: [`<b>${esc(e.document)}</b>`, esc(e.type), esc(e.posting), esc(e.due), `<span class="${e.days > 0 ? "up" : ""}">${e.days == null ? "–" : e.days > 0 ? fmt(e.days) + " late" : e.days === 0 ? "today" : "in " + fmt(-e.days)}</span>`, fmt(e.original), `<b>${fmt(e.remaining)}</b>`]})),
+          {max: 460, none: "Nothing open."}));
+      }catch(e){ el.innerHTML = top + `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+    }});
+}
+Pulse.on("ap", no => kaPartyPop("ap", no));
+Pulse.on("ar", no => kaPartyPop("ar", no));
+document.addEventListener("click", e => { const b = e.target.closest("[data-kago]"); if (!b) return;
+  const [kind, no] = b.dataset.kago.split("|"); $("pzBd").classList.remove("show"); navTo(kind); KA[kind].open = no; renderLedger(kind); if (!KA[kind].ent[no]) kaLoad(kind, no); });
 // ---------------------------------------------------------------- Simphony ↔ Billy
 // ---------- Control → EMC privileges (emcpriv.py): one Simphony user against another ----------
 let epData = null, epTimer = null, epF = "diff", epA = "", epB = "";
@@ -5508,8 +5645,64 @@ async function loadBilly(refresh){
   }
 }
 const biM = v => v == null || isNaN(v) ? "–" : sxM(v);
+// ---- Simphony ↔ Billy: the checks day by day, the cases, and a day or a restaurant's day as pop-ups
+function biTot(x, ref){
+  const t = {checks: 0, missing: 0, late: 0, no_check: 0, sim: 0, fisc: 0, missing_value: 0};
+  biData.locations.forEach(L => { if (ref && L.ref !== ref) return; const c = L.cells[x]; if (!c) return; Object.keys(t).forEach(k => t[k] += c[k] || 0); });
+  return t;
+}
+const BI_SEGS = t => [[Math.max(0, t.checks - t.missing - t.late), "var(--ch-0)", "fiscalized"], [t.late, "var(--ch-3)", "fiscalized late"], [t.missing, "var(--ch-1)", "not fiscalized"]];
+const BI_LG = [["var(--ch-0)", "fiscalized"], ["var(--ch-3)", "fiscalized late"], ["var(--ch-1)", "not fiscalized"]];
+function biViz(){
+  const d = biData, k = d.kpis;
+  $("biViz").innerHTML = Pulse.cols(d.days.map(x => { const t = biTot(x); return {label: x.slice(8), segs: BI_SEGS(t), open: "biday|" + x,
+      tip: `${x}: ${fmt(t.checks)} checks, ${fmt(t.missing)} not fiscalized (${biM(t.missing_value)}), ${fmt(t.late)} late, ${fmt(t.no_check)} invoices without a check`}; }),
+    BI_LG, {aria: "Checks and invoices, day by day", maxLabel: m => fmt(m) + " checks"})
+    + `<div style="margin-top:14px">${Pulse.cases([{n: k.missing, t: "Not fiscalized", w: `${biM(k.missing_value)} on the checks`, open: "biseg|checks|missing"},
+      {n: k.late + k.late48, t: "Fiscalized late", w: `${fmt(k.late48)} after 48 hours`, open: "biseg|checks|late"},
+      {n: k.no_check, t: "Invoices without a check", w: biM(k.no_check_value), open: "biseg|checks|inv"},
+      {n: k.no_fic, t: "No FIC in Billy", w: biM(k.no_fic_value), open: "biseg|checks|inv"},
+      {n: d.returns ? d.returns.kpis.unfiscalized : 0, t: "Unfiscalized returns", w: "cancelled, returned or changed with no corrective invoice", open: "biseg|returns|"},
+      {n: k.book_errors, t: "Sales book cases", w: `of ${fmt(k.invoices)} invoices`, open: "biseg|book|"}])}</div>`;
+}
+const BI_HEAD = [["Restaurant"], ["Day"], ["Checks", 1], ["Not fiscalized", 1], ["Late", 1], ["Invoices without a check", 1], ["Simphony", 1], ["Fiscalized", 1]];
+function biRowOf(L, x){
+  const c = L.cells[x] || {};
+  return {cells: [`<b>${esc(L.name)}</b>`, esc(x), fmt(c.checks), `<span class="${c.missing ? "up" : ""}">${fmt(c.missing)}</span>`, fmt(c.late), fmt(c.no_check), biM(c.sim), biM(c.fisc)], open: `bicell|${L.ref}|${x}`};
+}
+function biDayPop(x){
+  const d = biData, t = biTot(x);
+  Pulse.pop({title: esc(x), sub: fcSp("Every restaurant"),
+    body: Pulse.tiles([{l: "Checks", v: fmt(t.checks)}, {l: "Not fiscalized", v: fmt(t.missing), s: biM(t.missing_value), cls: t.missing ? "up" : "down"}, {l: "Fiscalized late", v: fmt(t.late)},
+        {l: "Invoices without a check", v: fmt(t.no_check), cls: t.no_check ? "warn" : ""}, {l: "Simphony", v: biM(t.sim), s: "fiscalized " + biM(t.fisc)}])
+      + Pulse.panel("Restaurants", Pulse.list(BI_HEAD, d.locations.filter(L => L.cells[x]).map(L => biRowOf(L, x))))});
+}
+function biCellPop(ref, x){
+  const d = biData, L = d.locations.find(l => l.ref === ref), c = L && L.cells[x]; if (!c) return;
+  Pulse.pop({title: esc(`${L.name} · ${x}`), sub: esc(ref), wide: false,
+    body: Pulse.tiles([{l: "Checks", v: fmt(c.checks), s: "Simphony " + biM(c.sim)}, {l: "Fiscalized", v: biM(c.fisc)}, {l: "Not fiscalized", v: fmt(c.missing), s: biM(c.missing_value), cls: c.missing ? "up" : "down"},
+        {l: "Fiscalized late", v: fmt(c.late)}, {l: "Invoices without a check", v: fmt(c.no_check), cls: c.no_check ? "warn" : ""}])
+      + Pulse.panel("Day by day", Pulse.cols(d.days.map(y => ({label: y.slice(8), segs: BI_SEGS(L.cells[y] || {}), open: `bicell|${ref}|${y}`})), BI_LG, {h: 140, maxLabel: m => fmt(m) + " checks"}))
+      + `<p style="margin:12px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn dark" type="button" data-pulse="biseg|checks|missing|${esc(ref)}">${fcSp("Its checks not fiscalized")}</button><button class="btn" type="button" data-pulse="biseg|checks|all|${esc(ref)}">${fcSp("Every check of " + L.name)}</button></p>`});
+}
+// a case or a button: the part of the screen that lists the records, filtered (the checks are read page by page)
+function biGo(v){
+  const [seg, st, ref] = v.split("|");
+  if ($("pzBd")) $("pzBd").classList.remove("show");
+  $("biSeg").querySelector(`[data-b="${seg}"]`).click();
+  if (seg === "checks") {
+    if (ref != null) $("biFLoc").value = ref;
+    if (st && st !== "inv" && [...$("biFSt").options].some(o => o.value === st)) $("biFSt").value = st;
+    biChecks();
+    (st === "inv" ? $("biInv") : $("biChecks")).scrollIntoView({behavior: "smooth", block: "start"});
+  } else $("biSeg").scrollIntoView({behavior: "smooth", block: "start"});
+}
+Pulse.on("biday", x => biDayPop(x));
+Pulse.on("bicell", v => { const i = v.lastIndexOf("|"); biCellPop(v.slice(0, i), v.slice(i + 1)); });
+Pulse.on("biseg", v => biGo(v));
 function renderBilly(){
-  const d = biData, k = d.kpis, card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const BI_GO = {"Not fiscalized": "biseg|checks|missing", "Fiscalized late": "biseg|checks|late", "Invoices without a check": "biseg|checks|inv", "No FIC in Billy": "biseg|checks|inv", "Sales book cases": "biseg|book|", "Orders": "biseg|orders|"};
+  const d = biData, k = d.kpis, card = (l, val, sub, cls) => `<div class="card kpi"${BI_GO[l] ? ` data-pulse="${BI_GO[l]}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
   const pct = k.checks ? k.fiscalized / k.checks * 100 : null;
   $("biKpis").innerHTML =
     card("Checks fiscalized", pct == null ? "–" : fmt(pct, 1) + "%", fcSp(`${fmt(k.fiscalized)} of ${fmt(k.checks)} checks`), pct == null ? "" : pct >= 99.9 ? "down" : "warn") +
@@ -5526,7 +5719,7 @@ function renderBilly(){
   $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
   biRangeSync();
-  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders(); biRet();
+  biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders(); biRet(); biViz();
   const rc = $("biRetCard"); if (rc) { const go = () => $("biSeg").querySelector('[data-b="returns"]').click(); rc.onclick = go; rc.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } }; }
 }
 // ---- the tables of a read come from the server a page at a time (billyrec.rows), filtered there: the screen holds
@@ -5659,7 +5852,7 @@ function biGrid(){
     d.locations.map(L => `<tr><td class="loc"><b>${esc(L.name)}</b><div class="meta">${esc(L.ref)}${L.missing ? ` · ${fmt(L.missing)} not fiscalized` : ""}</div></td>` + d.days.map(x => {
       const c = L.cells[x] || {}, cls = !c.checks && !c.fisc ? "none" : c.missing ? "bad" : c.pending ? "pend" : c.late || c.no_check ? "warn" : "ok";
       const t = `${L.name} ${x}: ${fmt(c.checks)} checks, Simphony ${fmt(c.sim)}, fiscalized ${fmt(c.fisc)}; ${fmt(c.missing)} not fiscalized (${fmt(c.missing_value)}), ${fmt(c.late)} late, ${fmt(c.no_check)} invoices without a check`;
-      return `<td class="c ${cls}" title="${esc(t)}">${cls === "none" ? "·" : c.missing ? fmt(c.missing) : cls === "pend" ? "…" : "✓"}</td>`; }).join("") + `</tr>`).join("");
+      return `<td class="c ${cls}" title="${esc(t)}"${cls === "none" ? "" : ` data-pulse="bicell|${esc(L.ref)}|${x}" role="button" tabindex="0" style="cursor:pointer"`}>${cls === "none" ? "·" : c.missing ? fmt(c.missing) : cls === "pend" ? "…" : "✓"}</td>`; }).join("") + `</tr>`).join("");
 }
 function biTills(){
   const d = biData;
@@ -5802,14 +5995,14 @@ async function loadSalesrec(refresh){
 }
 function renderSalesrec(){
   const d = sxData, k = d.kpis, c = d.currency;
-  const card = (l, val, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const card = (l, val, sub, cls, open) => `<div class="card kpi"${open ? ` data-pulse="${open}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
   $("sxKpis").innerHTML =
     card("Simphony sales", sxM(k.sim), `${c} · VAT included, after discounts`) +
-    card("Imported in BC", sxM(k.imp), `${sxS(k.imp_gap)} against Simphony, the same days`, Math.abs(k.imp_gap) > d.settings.tol_abs ? "warn" : "") +
-    card("Invoiced", sxM(k.inv), `${sxS(k.inv_gap)} against the import, the same days`, Math.abs(k.inv_gap) > d.settings.tol_abs ? "warn" : "") +
+    card("Imported in BC", sxM(k.imp), `${sxS(k.imp_gap)} against Simphony, the same days`, Math.abs(k.imp_gap) > d.settings.tol_abs ? "warn" : "", "sxissue|import_diff") +
+    card("Invoiced", sxM(k.inv), `${sxS(k.inv_gap)} against the import, the same days`, Math.abs(k.inv_gap) > d.settings.tol_abs ? "warn" : "", "sxissue|invoice_diff") +
     card("Days reconciled", `${fmt(k.ok)} / ${fmt(k.days)}`, "past their lag", k.ok === k.days ? "down" : "warn") +
-    card("Open on the invoices", sxM(k.remaining), "takings not yet applied", k.remaining ? "warn" : "") +
-    card("Exceptions", fmt(k.issues), `${fmt(k.mapping)} menu items`, k.issues ? "up" : "down");
+    card("Open on the invoices", sxM(k.remaining), "takings not yet applied", k.remaining ? "warn" : "", "sxissue|unpaid") +
+    card("Exceptions", fmt(k.issues), `${fmt(k.mapping)} menu items`, k.issues ? "up" : "down", "sxissue|not_imported");
   $("sxNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.length} restaurants` + (d.simphony ? "" : " · Simphony is not connected: only the import, the invoices and the takings are checked");
   $("sxStatus").dataset.base = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
     + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
@@ -5818,12 +6011,12 @@ function renderSalesrec(){
     <span><i class="warn"></i>${esc(d.statuses.import_diff)} · ${esc(d.statuses.not_posted)} · ${esc(d.statuses.unpaid)}</span><span><i class="pend"></i>${esc(d.statuses.pending)}</span>`;
   const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   $("sxGrid").innerHTML = `<tr><th class="loc"></th>${days.map(x => `<th>${wd[new Date(x + "T12:00:00").getDay()]}<br>${x.slice(8)}</th>`).join("")}</tr>` +
-    d.locations.map((L, li) => `<tr><td class="loc"><b>${esc(L.name)}</b><div class="meta">${esc(L.bc)}${L.issues ? ` · ${fmt(L.issues)} ${L.issues === 1 ? "issue" : "issues"}` : ""}</div></td>` +
+    d.locations.map((L, li) => `<tr><td class="loc" data-pulse="sxloc|${li}" role="button" tabindex="0" style="cursor:pointer"><b>${esc(L.name)}</b><div class="meta">${esc(L.bc)}${L.issues ? ` · ${fmt(L.issues)} ${L.issues === 1 ? "issue" : "issues"}` : ""}</div></td>` +
       days.map(x => { const cc = L.cells[x]; const g = cc.sim != null && cc.imp != null ? cc.imp - cc.sim : null;
         const txt = cc.status === "import_diff" && g != null ? sxS(g) : SX_SHORT[cc.status];
         return `<td class="c ${cc.status}${sxSel && sxSel[0] === li && sxSel[1] === x ? " sel" : ""}" data-l="${li}" data-d="${x}" title="${esc(L.name)} ${x}: ${esc(cc.issues.map(i => d.statuses[i]).join(", ") || d.statuses[cc.status])}">${txt}</td>`; }).join("") + `</tr>`).join("");
-  $("sxGrid").querySelectorAll("td.c").forEach(td => td.onclick = () => { sxSel = [+td.dataset.l, td.dataset.d]; renderSalesrec(); });
-  renderSrDetail();
+  $("sxGrid").querySelectorAll("td.c").forEach(td => { td.tabIndex = 0; td.setAttribute("role", "button"); td.setAttribute("data-pulse", `sxcell|${td.dataset.l}|${td.dataset.d}`); });
+  sxChart();
   const maps = d.mapping || [];
   $("sxMap").innerHTML = maps.length ? `<tr><th>Menu item</th><th>Problem</th><th>BC item</th><th>Where</th><th class="num">Days</th><th class="num">Sold</th><th class="num">Value</th></tr>` +
     maps.slice(0, 150).map(M => `<tr><td><b>${esc(M.mi)}</b> ${esc(M.name)}</td><td>${esc(M.label)}</td><td>${esc(M.item || "–")}</td><td class="meta">${esc(M.locations.join(", "))}</td>
@@ -5837,26 +6030,86 @@ function renderSalesrec(){
     <p><b>Invoiced.</b> Sales invoices less credit memos of that customer on that posting date, in the customer ledger; what is still open on them is the takings not yet applied.</p>
     <p><b>Exceptions.</b> Not imported after ${S.import_lag} days → Chief accountant. Import ≠ Simphony, beyond ${fmt(S.tol_abs)} or ${S.tol_pct}% → Chief accountant, with the menu items that differ. Not posted after ${S.post_lag} days → Chief accountant. Invoice ≠ import → Chief accountant. Still open after ${S.settle_days} days → Finance. Menu item problems → Cost controller. Owners come from Email recipients by company; every exception closes by itself when the data meets.</p>`;
 }
-function renderSrDetail(){
-  const d = sxData;
-  if (!sxSel || !d.locations[sxSel[0]]) { $("sxDetCard").style.display = "none"; return; }
-  const L = d.locations[sxSel[0]], c = L.cells[sxSel[1]];
-  if (!c) { $("sxDetCard").style.display = "none"; return; }
-  $("sxDetCard").style.display = "";
-  $("sxDetTitle").textContent = `${L.name} · ${sxSel[1]}`;
-  $("sxDetNote").textContent = (c.issues.length ? c.issues.map(i => d.statuses[i]).join(" · ") : d.statuses[c.status]) + ` · ${c.age} days ago`;
-  const tile = (l, v, s) => `<div class="sx-tile"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
-  $("sxTiles").innerHTML = tile("Simphony", sxM(c.sim), c.sim == null ? "not read: the day is not closed in Simphony, or Simphony is not connected" : "sold at the till") +
-    tile("Imported in BC", sxM(c.imp), c.imp == null ? "nothing in the POS import" : `${fmt(c.rows)} lines${c.unposted ? `, ${fmt(c.unposted)} not in a sales document` : ""} · ${(c.imported_at || "").replace("T", " ")}`) +
-    tile("Invoiced", sxM(c.inv), c.inv == null ? "no sales invoice of " + L.customer : (c.docs || []).join(", ")) +
-    tile("Open on the invoice", sxM(c.remaining), c.remaining ? "takings not yet applied" : c.inv == null ? "–" : "settled");
-  const it = c.items || [];
-  $("sxItems").innerHTML = it.length ? `<tr><th>Menu item</th><th>BC item</th><th class="num">Simphony qty</th><th class="num">Imported qty</th><th class="num">Simphony</th><th class="num">Imported</th><th class="num">Difference</th></tr>` +
-    it.map(x => `<tr><td><b>${esc(x.mi)}</b> ${esc(x.name || "")}</td><td>${esc(x.item || "–")}</td><td class="num">${dcQ(x.sim_qty)}</td><td class="num">${dcQ(x.imp_qty)}</td>
-      <td class="num">${fmt(Math.round(x.sim))}</td><td class="num">${fmt(Math.round(x.imp))}</td><td class="num ${Math.abs(x.diff) >= 1 ? "warn" : ""}">${sxS(x.diff)}</td></tr>`).join("")
-    : `<tr><td class="meta">${c.sim != null && c.imp != null ? "Every menu item meets, quantity and value." : "Menu items are compared when both Simphony and the import have the day."}</td></tr>`;
-  $("sxItemsMore").textContent = c.items_n > it.length ? `${fmt(c.items_n - it.length)} more menu items differ by less.` : "";
+// ---- Simphony ↔ BC: the day by day chart, the cases and the pop-ups (a restaurant's day, a day of every restaurant,
+// a kind of exception, a restaurant, a menu item problem)
+const SX_BAD = ["not_imported", "import_diff", "invoice_diff", "not_posted", "unpaid"];
+function sxDayTotals(day, li){
+  const t = {sim: 0, imp: 0, inv: 0, remaining: 0, bad: 0, n: 0};
+  sxData.locations.forEach((L, i) => { if (li != null && i !== li) return; const c = L.cells[day]; if (!c) return;
+    t.sim += c.sim || 0; t.imp += c.imp || 0; t.inv += c.inv || 0; t.remaining += c.remaining || 0; t.bad += SX_BAD.includes(c.status) ? 1 : 0; t.n++; });
+  return t;
 }
+function sxChart(){
+  const d = sxData;
+  $("sxChart").innerHTML = Pulse.cols(d.days.map(x => { const t = sxDayTotals(x);
+      return {label: x.slice(8), segs: [[t.imp, "var(--ch-0)", "imported in BC"]], line: t.sim || null, open: "sxday|" + x,
+        tip: `${x}: Simphony ${sxM(t.sim)}, imported ${sxM(t.imp)}, invoiced ${sxM(t.inv)}${t.bad ? `, ${t.bad} restaurants with an exception` : ""}`}; }),
+    [["var(--ch-0)", "imported in BC"], ["var(--ink)", "Simphony (the dashed mark)"]], {aria: "Simphony against the import, day by day"});
+  const k = d.kpis, cnt = {};
+  d.locations.forEach(L => Object.values(L.cells).forEach(c => (c.issues || []).forEach(i => cnt[i] = (cnt[i] || 0) + 1)));
+  $("sxCases").innerHTML = Pulse.cases([...SX_BAD.map(s => ({n: cnt[s] || 0, t: d.statuses[s], w: "restaurant days", open: "sxissue|" + s})),
+    {n: (d.mapping || []).length, t: "Menu items and BC items", w: "items to map, block or give a recipe", open: "sxmap|"}]);
+}
+function sxCellRow(L, li, x){
+  const c = L.cells[x] || {};
+  return {cells: [`<b>${esc(L.name)}</b> <span class="meta">${esc(L.bc)}</span>`, esc(x), `<span class="rhg-pill ${c.status === "ok" ? "low" : SX_BAD.includes(c.status) ? "critical" : ""}">${esc((c.issues || []).map(i => sxData.statuses[i]).join(", ") || sxData.statuses[c.status] || "")}</span>`,
+    sxM(c.sim), sxM(c.imp), sxM(c.inv), sxM(c.remaining)], open: `sxcell|${li}|${x}`};
+}
+const SX_HEAD = [["Restaurant"], ["Day"], ["Status"], ["Simphony", 1], ["Imported", 1], ["Invoiced", 1], ["Open", 1]];
+function sxCellPop(li, x){
+  const d = sxData, L = d.locations[li], c = L && L.cells[x]; if (!c) return;
+  const it = c.items || [];
+  Pulse.pop({title: esc(`${L.name} · ${x}`), sub: esc((c.issues.length ? c.issues.map(i => d.statuses[i]).join(" · ") : d.statuses[c.status]) + ` · ${c.age} days ago`),
+    body: Pulse.tiles([{l: "Simphony", v: sxM(c.sim), s: c.sim == null ? "not read: the day is not closed in Simphony, or Simphony is not connected" : "sold at the till"},
+        {l: "Imported in BC", v: sxM(c.imp), s: c.imp == null ? "nothing in the POS import" : `${fmt(c.rows)} lines${c.unposted ? `, ${fmt(c.unposted)} not in a sales document` : ""}`, cls: c.sim != null && c.imp != null && Math.abs(c.imp - c.sim) > d.settings.tol_abs ? "warn" : ""},
+        {l: "Invoiced", v: sxM(c.inv), s: c.inv == null ? "no sales invoice of " + esc(L.customer) : esc((c.docs || []).join(", "))},
+        {l: "Open on the invoice", v: sxM(c.remaining), s: c.remaining ? "takings not yet applied" : c.inv == null ? "–" : "settled", cls: c.remaining ? "warn" : ""}])
+      + Pulse.panel("Menu items that differ", it.length ? Pulse.bars(it.slice(0, 12).map(m => ({key: `${m.mi} ${m.name || ""}`, segs: [[Math.abs(m.diff), m.diff < 0 ? "var(--ch-1)" : "var(--ch-0)", m.diff < 0 ? "imported less" : "imported more"]], text: sxS(m.diff)})),
+          [["var(--ch-0)", "imported more than Simphony"], ["var(--ch-1)", "imported less"]])
+        + Pulse.fold(Pulse.list([["Menu item"], ["BC item"], ["Simphony qty", 1], ["Imported qty", 1], ["Simphony", 1], ["Imported", 1], ["Difference", 1]],
+          it.map(m => ({cells: [`<b>${esc(m.mi)}</b> ${esc(m.name || "")}`, esc(m.item || "–"), dcQ(m.sim_qty), dcQ(m.imp_qty), fmt(Math.round(m.sim)), fmt(Math.round(m.imp)), sxS(m.diff)]}))))
+        : `<p class="meta">${c.sim != null && c.imp != null ? "Every menu item meets, quantity and value." : "Menu items are compared when both Simphony and the import have the day."}</p>`,
+        c.items_n > it.length ? esc(`${fmt(c.items_n - it.length)} more differ by less`) : "")
+      + `<p style="margin:12px 0 0"><button class="btn" type="button" data-pulse="sxloc|${li}">${fcSp("The whole period of " + L.name)}</button></p>`});
+}
+function sxDayPop(x){
+  const d = sxData, t = sxDayTotals(x);
+  Pulse.pop({title: esc(x), sub: fcSp("Every restaurant"),
+    body: Pulse.tiles([{l: "Simphony", v: sxM(t.sim)}, {l: "Imported in BC", v: sxM(t.imp), s: sxS(t.imp - t.sim) + " against Simphony"}, {l: "Invoiced", v: sxM(t.inv)},
+        {l: "Restaurants with an exception", v: fmt(t.bad), cls: t.bad ? "up" : "down"}])
+      + Pulse.panel("Restaurants", Pulse.list(SX_HEAD, d.locations.map((L, li) => sxCellRow(L, li, x)).filter(r => r))) });
+}
+function sxIssuePop(s){
+  const d = sxData, rows = [];
+  d.locations.forEach((L, li) => d.days.forEach(x => { const c = L.cells[x]; if (c && (c.issues || []).includes(s)) rows.push(sxCellRow(L, li, x)); }));
+  const by = {}; d.locations.forEach(L => { const n = Object.values(L.cells).filter(c => (c.issues || []).includes(s)).length; if (n) by[L.name] = n; });
+  Pulse.pop({title: esc(d.statuses[s]), sub: esc(`${d.from} to ${d.to}`),
+    body: (Object.keys(by).length > 1 ? Pulse.panel("By restaurant", Pulse.bars(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({key: k, segs: [[n, "var(--ch-1)", "days"]], text: fmt(n) + " days"})))) : "")
+      + Pulse.panel(`The days · ${fmt(rows.length)}`, Pulse.list(SX_HEAD, rows.reverse(), {none: "None in these days."}))});
+}
+function sxLocPop(li){
+  const d = sxData, L = d.locations[li]; if (!L) return;
+  const sum = f => d.days.reduce((a, x) => a + ((L.cells[x] || {})[f] || 0), 0);
+  Pulse.pop({title: esc(L.name), sub: esc(`${L.bc} · ${L.customer || ""} · ${d.from} to ${d.to}`),
+    body: Pulse.tiles([{l: "Simphony", v: sxM(sum("sim"))}, {l: "Imported in BC", v: sxM(sum("imp")), s: sxS(sum("imp") - sum("sim")) + " against Simphony"}, {l: "Invoiced", v: sxM(sum("inv"))},
+        {l: "Open on the invoices", v: sxM(sum("remaining")), cls: sum("remaining") ? "warn" : ""}, {l: "Exceptions", v: fmt(L.issues), cls: L.issues ? "up" : "down"}])
+      + Pulse.panel("Day by day", Pulse.cols(d.days.map(x => { const c = L.cells[x] || {}; return {label: x.slice(8), segs: [[c.imp || 0, SX_BAD.includes(c.status) ? "var(--ch-1)" : "var(--ch-0)", "imported"]], line: c.sim || null, open: `sxcell|${li}|${x}`}; }),
+          [["var(--ch-0)", "imported, reconciled or pending"], ["var(--ch-1)", "imported, with an exception"], ["var(--ink)", "Simphony (the dashed mark)"]], {h: 150}))
+      + Pulse.panel("The days with an exception", Pulse.list(SX_HEAD, d.days.filter(x => SX_BAD.includes((L.cells[x] || {}).status)).reverse().map(x => sxCellRow(L, li, x)), {none: "None: every day meets."}))});
+}
+function sxMapPop(kind){
+  const d = sxData, M = (d.mapping || []).filter(m => !kind || m.kind === kind), lab = d.mapping_labels || {};
+  const by = {}; (d.mapping || []).forEach(m => by[m.kind] = (by[m.kind] || 0) + 1);
+  Pulse.pop({title: fcSp(kind ? lab[kind] || kind : "Menu items and BC items"), sub: fcSp("each one is an exception for the cost controller"),
+    body: (!kind ? Pulse.panel("By problem", Pulse.bars(Object.entries(by).map(([k, n]) => ({key: lab[k] || k, segs: [[n, "var(--ch-1)", "menu items"]], text: fmt(n), open: "sxmap|" + k})))) : "")
+      + Pulse.panel(`The menu items · ${fmt(M.length)}`, Pulse.list([["Menu item"], ["Problem"], ["BC item"], ["Where"], ["Days", 1], ["Sold", 1], ["Value", 1]],
+        M.map(m => ({cells: [`<b>${esc(m.mi)}</b> ${esc(m.name)}`, esc(m.label), esc(m.item || "–"), `<span class="meta">${esc(m.locations.join(", "))}</span>`, fmt(m.days), dcQ(m.qty), sxM(m.value)]})), {max: 480, none: "None."}))});
+}
+Pulse.on("sxday", x => sxDayPop(x));
+Pulse.on("sxcell", v => { const [li, x] = v.split("|"); sxCellPop(+li, x); });
+Pulse.on("sxissue", s => sxIssuePop(s));
+Pulse.on("sxloc", li => sxLocPop(+li));
+Pulse.on("sxmap", k => sxMapPop(k));
 $("sxRead").onclick = () => loadSalesrec(true);
 $("sxReg").onclick = () => { navTo("register"); $("rgSource").innerHTML = `<option value="sales_rec">Simphony ↔ BC</option>`; $("rgSource").value = "sales_rec"; loadRegister(); };
 $("sxSave").onclick = async () => {
@@ -5923,7 +6176,7 @@ function renderRegister(){
   rgFill("rgLoc", d.locations || [], "All");
   $("rgChips").innerHTML = RG_CHIPS.map(([key, l]) => `<button data-st="${esc(key)}" class="${key === rgStatus ? "on" : ""}">${esc(l)}</button>`).join("");
   $("rgChips").querySelectorAll("button").forEach(b => b.onclick = () => { rgStatus = b.dataset.st; loadRegister(); });
-  renderRgItems();
+  renderRgItems(); rgViz();
   $("rgRun").disabled = !d.can_settings || (d.job && d.job.state === "running");
   $("rgRun").title = d.can_settings ? "Reads Business Central for every company of the negative stock email and syncs the register." : "Your role cannot run the controls (needs finance.settings.manage).";
   if (d.job && d.job.state !== "running") $("rgStatus").textContent += ` · Run by ${d.job.by} at ${rgWhen(d.job.ended)}: ` + (d.job.state === "failed" ? "failed, " + (d.job.error || "")
@@ -5938,6 +6191,26 @@ function renderRegister(){
     <p><b>Statuses.</b> Open → In progress → Fixed – verify (Awaiting verification). Only the data closes an item: the next run that no longer finds it closes it as verified; if it still finds it, it goes back to Open with a note. Dismissed needs a reason and stays out of the counts. A closed item found again is reopened and counted.</p>
     <p><b>Who can change an item.</b> Its owner, and the roles with actions. Every change is in the item's history and in the audit trail. Nothing is written to Business Central or Simphony.</p>`;
 }
+// ---- Exceptions register: who holds what and where the items are, as bars; a bar narrows the items to it
+const RG_LG = [["var(--ch-1)", "overdue"], ["var(--ch-0)", "open, in time"], ["var(--ch-4)", "awaiting verification"]];
+function rgViz(){
+  const d = rgData, items = d.items || [], src = s => (d.sources || {})[s] || s;
+  const group = key => { const by = {}; items.forEach(x => { const k = key(x) || "–"; const b = by[k] = by[k] || {od: 0, open: 0, aw: 0, v: 0};
+    if (x.status === "Awaiting verification") b.aw++; else if (x.overdue) b.od++; else if (["Open", "In progress"].includes(x.status)) b.open++; b.v += x.value || 0; }); return by; };
+  const bars = (by, kind, label) => Pulse.bars(Object.entries(by).sort((a, b) => (b[1].od + b[1].open + b[1].aw) - (a[1].od + a[1].open + a[1].aw)).slice(0, 12)
+    .map(([k, b]) => ({key: k, label: label ? label(k) : k, segs: [[b.od, "var(--ch-1)", "overdue"], [b.open, "var(--ch-0)", "open"], [b.aw, "var(--ch-4)", "awaiting verification"]],
+      text: `${fmt(b.od + b.open + b.aw)} · ${rgM(b.v)}`, open: `data-rgf="${kind}|${esc(k)}"`})), RG_LG, {none: "No item matches."});
+  const ow = (d.owners || []).map(o => [o.owner, {od: o.overdue, open: Math.max(0, o.open - o.overdue), aw: 0, v: o.value}]);
+  $("rgViz").innerHTML = `<div class="sv-two"><div class="sv-sec"><h3>${fcSp("By control")}</h3>${bars(group(x => x.source), "source", src)}</div>
+      <div class="sv-sec"><h3>${fcSp("By location")}</h3>${bars(group(x => x.location || "company"), "location")}</div></div>
+    <div class="sv-sec"><h3>${fcSp("By owner")}</h3>${bars(Object.fromEntries(ow), "owner")}</div>`;
+}
+document.addEventListener("click", ev => { const el = ev.target.closest("[data-rgf]"); if (!el) return;
+  const [kind, v] = el.dataset.rgf.split("|"), set = (id, val) => { const s = $(id); if (![...s.options].some(o => o.value === val)) s.insertAdjacentHTML("beforeend", `<option value="${esc(val)}">${esc(val)}</option>`); s.value = s.value === val ? "" : val; };
+  if (kind === "source") set("rgSource", v); else if (kind === "location") set("rgLoc", v === "company" ? "" : v);
+  else { $("rgMine").checked = false; set("rgOwner", v); }
+  loadRegister(); $("rgItems").scrollIntoView({behavior: "smooth", block: "start"}); });
+document.addEventListener("keydown", ev => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.rgf) { ev.preventDefault(); ev.target.click(); } });
 function renderRgItems(){
   const d = rgData, items = d.items || [];
   const canAll = d.can_manage, me = (d.me || "").toLowerCase();
@@ -7718,9 +7991,9 @@ function renderFiscal(){
   $("fsFilter").innerHTML = `<option value="problems">Problems (${fmt(d.rows.filter(r => ["missing","amount differs","missing credit note"].includes(r.status)).length)})</option><option value="">All (${fmt(d.rows.length)})</option>` +
     FS_ORDER.filter(s => counts[s]).map(s => `<option value="${esc(s)}">${esc(s)} (${fmt(counts[s])})</option>`).join("");
   $("fsFilter").value = [...$("fsFilter").options].some(o => o.value === keep) ? keep : "problems";
-  fsRows();
+  fsRows(); fiChart("fs");
   $("fsSup").innerHTML = `<tr><th>Supplier</th><th>NIPT</th><th class="num">Invoices</th><th class="num">Value</th><th>Oldest</th></tr>` +
-    (d.missing_by_supplier.slice(0, 25).map(x => `<tr><td><a href="#" data-fsq="${esc(x.nipt)}">${esc(x.seller)}</a></td><td class="meta">${esc(x.nipt)}</td><td class="num">${fmt(x.count)}</td><td class="num">${fsM(x.value)}</td><td class="meta">${esc(x.oldest || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="hint">Nothing missing.</td></tr>`);
+    (d.missing_by_supplier.slice(0, 25).map(x => `<tr data-pulse="fiparty|fs|${esc(x.nipt)}" tabindex="0" style="cursor:pointer"><td><b>${esc(x.seller)}</b></td><td class="meta">${esc(x.nipt)}</td><td class="num">${fmt(x.count)}</td><td class="num">${fsM(x.value)}</td><td class="meta">${esc(x.oldest || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="hint">Nothing missing.</td></tr>`);
   $("fsDup").innerHTML = `<tr><th>EIC</th><th>BC no.</th><th>Supplier</th><th>Posted</th><th class="num">Amount</th><th></th></tr>` +
     (d.posted_twice.slice(0, 40).map(x => `<tr><td class="meta" title="${esc(x.eic)}">${esc(x.eic.slice(0, 8))}…</td><td>${esc(x.bc_no)}</td><td>${esc(x.vendor)}</td><td class="meta">${esc(x.posting_date || "")}</td><td class="num">${fsM(x.amount)}${x.currency ? " " + esc(x.currency) : ""}</td><td><span class="rhg-pill ${x.kind === "same amount" ? "critical" : "info"}">${esc(x.kind)}</span></td></tr>`).join("") || `<tr><td colspan="6" class="hint">None.</td></tr>`);
   $("fsNotF").innerHTML = `<tr><th>BC no.</th><th>Supplier</th><th>Date</th><th class="num">Amount</th><th>EIC</th></tr>` +
@@ -7736,11 +8009,81 @@ function fsRows(){
   const list = d.rows.filter(r => (f === "problems" ? ["missing","amount differs","missing credit note"].includes(r.status) : !f || r.status === f) &&
     (!q || [r.seller, r.nipt, r.eic, r.bc_no, r.bc_vendor].some(x => String(x || "").toLowerCase().includes(q))));
   $("fsRows").innerHTML = `<tr><th>Status</th><th>Date</th><th>Supplier</th><th>NIPT</th><th class="num">Total</th><th>EIC</th><th>BC no.</th><th>BC posted</th><th class="num">BC amount</th><th class="num">Difference</th><th>Note</th></tr>` +
-    (list.slice(0, 100).map(r => `<tr><td><span class="rhg-pill ${FS_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.seller)}</td><td class="meta">${esc(r.nipt)}</td>
+    (list.slice(0, 100).map(r => `<tr data-pulse="fidoc|fs|${esc(r.eic)}" tabindex="0" style="cursor:pointer"><td><span class="rhg-pill ${FS_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.seller)}</td><td class="meta">${esc(r.nipt)}</td>
       <td class="num">${fsM(r.total)}${r.currency && r.currency !== "ALL" ? ` <span class="meta">${esc(r.currency)}</span>` : ""}</td><td class="meta" title="${esc(r.eic)}">${esc(r.eic.slice(0, 8))}…</td><td>${esc(r.bc_no)}</td><td class="meta">${esc(r.bc_date || "")}</td>
       <td class="num">${fsM(r.bc_amount)}</td><td class="num ${r.diff ? "up" : ""}">${r.diff == null ? "–" : fsM(r.diff)}</td><td class="meta">${esc(r.note)}</td></tr>`).join("") || `<tr><td colspan="11" class="hint">No invoice for this selection.</td></tr>`) +
     (list.length > 100 ? `<tr><td colspan="11" class="meta">Showing 100 of ${fmt(list.length)}; use the filter or the Excel file for the rest.</td></tr>` : "");
 }
+// ---- Fiscal vs BC (both sides): the invoices day by day, the cases, the parties and an invoice as pop-ups
+const FI = {
+  fs: {data: () => fsData, party: "seller", partyNo: "nipt", who: "Supplier", problems: ["missing", "amount differs", "missing credit note"], ok: ["matched", "matched, no EIC in BC", "credit memo"], cls: () => FS_CLS, side: "purchase"},
+  fx: {data: () => fxData, party: "buyer", partyNo: "nipt", who: "Buyer", problems: ["missing", "refused by buyer", "amount differs"], ok: ["matched", "matched, no EIC in BC"], cls: () => FX_CLS, side: "sales"}};
+const FI_LG = [["var(--ch-0)", "found in BC"], ["var(--ch-1)", "a problem"], ["var(--ch-4)", "recent, refused, zero or in an order"]];
+function fiChart(side){
+  const C = FI[side], d = C.data(), by = {};
+  d.rows.forEach(r => { const k = (r.date || "").slice(0, 10); if (!k) return; by[k] = by[k] || [0, 0, 0]; by[k][C.ok.includes(r.status) ? 0 : C.problems.includes(r.status) ? 1 : 2]++; });
+  const days = Object.keys(by).sort();
+  const cnt = s => d.rows.filter(r => r.status === s).length;
+  const party = {};
+  d.rows.filter(r => C.problems.includes(r.status)).forEach(r => { const k = r[C.partyNo] || r[C.party]; party[k] = party[k] || {name: r[C.party], n: 0, v: 0}; party[k].n++; party[k].v += Math.abs(r.total || 0); });
+  const top = Object.entries(party).sort((a, b) => b[1].v - a[1].v).slice(0, 10);
+  const extra = side === "fs"
+    ? [{n: d.posted_twice.length, t: "Posted twice", w: "same EIC on two BC invoices", open: "filist|fs|posted_twice"}, {n: d.bc_not_in_fiscal.length, t: "EIC not listed by the Tax Administration", w: "posted in BC", open: "filist|fs|bc_not_in_fiscal"},
+       {n: d.bc_without_eic.length, t: "BC without EIC", w: "posted invoices not matched", open: "filist|fs|bc_without_eic"}]
+    : [{n: d.b2b_without_eic.length, t: "B2B in BC without e-invoice", w: "customers with an Albanian NIPT", open: "filist|fx|b2b_without_eic"}, {n: d.bc_not_in_fiscal.length, t: "BC codes the Tax Administration does not list", w: "posted in BC", open: "filist|fx|bc_not_in_fiscal"},
+       {n: d.posted_twice.length, t: "Same code on two documents", w: "in BC", open: "filist|fx|posted_twice"}];
+  $(side + "Viz").innerHTML = Pulse.cols(days.map(k => ({label: k.slice(8), segs: [[by[k][0], "var(--ch-0)", "found in BC"], [by[k][1], "var(--ch-1)", "a problem"], [by[k][2], "var(--ch-4)", "other"]], open: `fiday|${side}|${k}`,
+      tip: `${k}: ${by[k][0]} found in BC, ${by[k][1]} with a problem, ${by[k][2]} other`})), FI_LG, {aria: "Fiscalized invoices by day", maxLabel: m => fmt(m) + " invoices"})
+    + `<div style="margin-top:14px">${Pulse.cases([...C.problems.map(s => ({n: cnt(s), t: s.charAt(0).toUpperCase() + s.slice(1), w: "fiscalized, not as in BC", open: `fistatus|${side}|${s}`})), ...extra])}</div>`
+    + (top.length ? Pulse.panel(`${C.who}s with problems`, Pulse.bars(top.map(([k, p]) => ({key: p.name || k, segs: [[p.v, "var(--ch-1)", "value"]], text: `${fmt(p.n)} · ${fmt(p.v)}`, open: `fiparty|${side}|${k}`})))) : "");
+}
+const fiHead = side => [["Status"], ["Date"], [FI[side].who], ["Total", 1], ["BC no."], ["BC amount", 1], ["Difference", 1]];
+const fiRow = (side, r) => ({cells: [`<span class="rhg-pill ${FI[side].cls()[r.status] || "info"}">${esc(r.status)}</span>`, esc(r.date || ""), esc(r[FI[side].party]), fmt(r.total), esc(r.bc_no || "–"),
+  r.bc_amount == null ? "–" : fmt(r.bc_amount), `<span class="${r.diff ? "up" : ""}">${r.diff == null ? "–" : fmt(r.diff)}</span>`], open: `fidoc|${side}|${r.eic}`});
+function fiDocPop(side, eic){
+  const C = FI[side], r = C.data().rows.find(x => x.eic === eic); if (!r) return;
+  const f = (l, v) => v ? `<div><div class="meta">${esc(l)}</div><b>${esc(v)}</b></div>` : "";
+  Pulse.pop({title: esc(r[C.party] || "–"), sub: esc(`${r.date || ""} · ${r.status}`), wide: false,
+    body: Pulse.tiles([{l: "At the Tax Administration", v: fmt(r.total), s: esc(r.currency && r.currency !== "ALL" ? r.currency : "ALL")}, {l: "In BC", v: r.bc_amount == null ? "–" : fmt(r.bc_amount), s: esc(r.bc_no || "not found")},
+        {l: "Difference", v: r.diff == null ? "–" : fmt(r.diff), cls: r.diff ? "up" : ""}])
+      + Pulse.panel("The invoice", `<div class="money" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">${f("NIPT", r.nipt)}${f("Number", r.inv_no)}${f("EIC (NIVF)", r.eic)}${f("BC posted", r.bc_date)}${f("BC vendor / customer", r.bc_vendor || r.bc_customer)}${f("At the Tax Administration", r.status_tax)}${f("Due", r.due)}</div>`
+        + (r.note ? `<p class="hint" style="margin:10px 0 0">${esc(r.note)}</p>` : ""))
+      + `<p style="margin:12px 0 0"><button class="btn" type="button" data-pulse="fiparty|${side}|${esc(r.nipt || r[C.party])}">${fcSp("Every invoice of " + (r[C.party] || ""))}</button></p>`});
+}
+function fiPartyPop(side, key){
+  const C = FI[side], rows = C.data().rows.filter(r => (r[C.partyNo] || r[C.party]) === key), name = (rows[0] || {})[C.party] || key;
+  const prob = rows.filter(r => C.problems.includes(r.status));
+  Pulse.pop({title: esc(name), sub: esc(`${C.who} · NIPT ${key}`),
+    body: Pulse.tiles([{l: "Invoices", v: fmt(rows.length), s: fmt(rows.reduce((a, r) => a + (r.total || 0), 0)) + " ALL"}, {l: "With a problem", v: fmt(prob.length), cls: prob.length ? "up" : "down", s: fmt(prob.reduce((a, r) => a + Math.abs(r.total || 0), 0)) + " ALL"},
+        {l: "Found in BC", v: fmt(rows.filter(r => C.ok.includes(r.status)).length)}])
+      + Pulse.panel("The invoices", Pulse.list(fiHead(side), rows.sort((a, b) => (C.problems.includes(b.status) - C.problems.includes(a.status)) || String(b.date).localeCompare(String(a.date))).map(r => fiRow(side, r)), {max: 480}))});
+}
+function fiStatusPop(side, s){
+  const C = FI[side], rows = C.data().rows.filter(r => r.status === s);
+  Pulse.pop({title: esc(s.charAt(0).toUpperCase() + s.slice(1)), sub: esc(`${C.data().date_from} to ${C.data().date_to}`),
+    body: Pulse.tiles([{l: "Invoices", v: fmt(rows.length)}, {l: "Value", v: fmt(rows.reduce((a, r) => a + Math.abs(r.total || 0), 0)), s: "ALL"}])
+      + Pulse.panel("The invoices", Pulse.list(fiHead(side), rows.map(r => fiRow(side, r)), {max: 520, none: "None."}))});
+}
+function fiDayPop(side, day){
+  const C = FI[side], rows = C.data().rows.filter(r => (r.date || "").slice(0, 10) === day);
+  Pulse.pop({title: esc(day), sub: fcSp(side === "fs" ? "Fiscalized to us" : "Issued by us"),
+    body: Pulse.panel(`The invoices · ${fmt(rows.length)}`, Pulse.list(fiHead(side), rows.sort((a, b) => C.problems.includes(b.status) - C.problems.includes(a.status)).map(r => fiRow(side, r))))});
+}
+function fiListPop(side, key){
+  const d = FI[side].data(), L = d[key] || [];
+  const T = {posted_twice: "Same EIC posted more than once", bc_not_in_fiscal: "EIC not listed by the Tax Administration", bc_without_eic: "BC: posted invoices without EIC", b2b_without_eic: "B2B invoices in BC without e-invoice"}[key];
+  const who = x => x.vendor || x.customer || "";
+  Pulse.pop({title: fcSp(T), sub: esc(`${d.date_from} to ${d.date_to}`),
+    body: Pulse.panel(`${fmt(L.length)}`, Pulse.list([["BC no."], [FI[side].who], ["NIPT"], ["Date"], ["Amount", 1], ["EIC"]],
+      L.map(x => ({cells: [esc(x.bc_no), esc(who(x)), esc(x.nipt || ""), esc(x.posting_date || x.document_date || ""), fmt(x.amount), `<span class="meta" title="${esc(x.eic || "")}">${esc(String(x.eic || "").slice(0, 10))}${x.eic ? "…" : ""}</span>`]})), {max: 520, none: "None."}))});
+}
+Pulse.on("fidoc", v => { const i = v.indexOf("|"); fiDocPop(v.slice(0, i), v.slice(i + 1)); });
+Pulse.on("fiparty", v => { const i = v.indexOf("|"); fiPartyPop(v.slice(0, i), v.slice(i + 1)); });
+Pulse.on("fistatus", v => { const i = v.indexOf("|"); fiStatusPop(v.slice(0, i), v.slice(i + 1)); });
+Pulse.on("fiday", v => { const i = v.indexOf("|"); fiDayPop(v.slice(0, i), v.slice(i + 1)); });
+Pulse.on("filist", v => { const i = v.indexOf("|"); fiListPop(v.slice(0, i), v.slice(i + 1)); });
+// a filter typed or chosen opens the table it filters
+[["fsFilter", "fsRows"], ["fsQ", "fsRows"], ["fxFilter", "fxRows"], ["fxQ", "fxRows"]].forEach(([f, t]) => ["change", "input"].forEach(e => $(f).addEventListener(e, () => { const d = $(t).closest("details"); if (d) d.open = true; })));
 async function loadFiscalStatus(){
   try{ fsStat = await readJSON(await fetch("/api/fiscal/status")); renderFiscalStatus(); }catch(e){ $("fsMsg").textContent = "Could not read the connection status: " + e.message; }
 }
@@ -7869,7 +8212,7 @@ function renderFiscalSales(){
   $("fxFilter").innerHTML = `<option value="problems">Problems (${fmt(d.rows.filter(r => FX_PROBLEMS.includes(r.status)).length)})</option><option value="">All (${fmt(d.rows.length)})</option>` +
     FX_ORDER.filter(s => counts[s]).map(s => `<option value="${esc(s)}">${esc(s)} (${fmt(counts[s])})</option>`).join("");
   $("fxFilter").value = [...$("fxFilter").options].some(o => o.value === keep) ? keep : "problems";
-  fxRows();
+  fxRows(); fiChart("fx");
   $("fxB2b").innerHTML = `<tr><th>BC no.</th><th>Customer</th><th>NIPT</th><th>Posted</th><th class="num">Amount</th></tr>` +
     (d.b2b_without_eic.slice(0, 30).map(x => `<tr><td>${esc(x.bc_no)}${x.kind === "credit memo" ? ` <span class="meta">credit</span>` : ""}</td><td>${esc(x.customer)}</td><td class="meta">${esc(x.nipt)}</td><td class="meta">${esc(x.posting_date || "")}</td><td class="num">${fmt(x.amount)}${x.currency ? ` <span class="meta">${esc(x.currency)}</span>` : ""}</td></tr>`).join("") +
      (d.b2b_without_eic.length > 30 ? `<tr><td colspan="5" class="meta">Showing 30 of ${fmt(d.b2b_without_eic.length)}; the Excel file has them all.</td></tr>` : "") || `<tr><td colspan="5" class="hint">None.</td></tr>`);
@@ -7884,7 +8227,7 @@ function fxRows(){
   const list = d.rows.filter(r => (f === "problems" ? FX_PROBLEMS.includes(r.status) : !f || r.status === f) &&
     (!q || [r.buyer, r.nipt, r.inv_no, r.eic, r.bc_no, r.bc_customer].some(x => String(x || "").toLowerCase().includes(q))));
   $("fxRows").innerHTML = `<tr><th>Status</th><th>Received</th><th>Buyer</th><th>NIPT</th><th>Number</th><th class="num">Total</th><th>At the Tax Administration</th><th>BC no.</th><th>BC posted</th><th class="num">BC amount</th><th class="num">Difference</th><th>Note</th></tr>` +
-    (list.slice(0, 100).map(r => `<tr><td><span class="rhg-pill ${FX_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.buyer)}</td><td class="meta">${esc(r.nipt)}</td><td class="meta">${esc(r.inv_no)}</td>
+    (list.slice(0, 100).map(r => `<tr data-pulse="fidoc|fx|${esc(r.eic)}" tabindex="0" style="cursor:pointer"><td><span class="rhg-pill ${FX_CLS[r.status] || "info"}">${esc(r.status)}</span></td><td class="meta">${esc(r.date || "")}</td><td>${esc(r.buyer)}</td><td class="meta">${esc(r.nipt)}</td><td class="meta">${esc(r.inv_no)}</td>
       <td class="num">${fmt(r.total, r.total % 1 ? 2 : 0)}${r.currency !== "ALL" ? ` <span class="meta">${esc(r.currency)}</span>` : ""}</td><td class="meta">${esc((r.status_tax || "").toLowerCase().replace("_", " "))}${r.due ? ` · due ${esc(r.due)}` : ""}</td>
       <td>${esc(r.bc_no)}</td><td class="meta">${esc(r.bc_date || "")}</td><td class="num">${r.bc_amount == null ? "–" : fmt(r.bc_amount, r.bc_amount % 1 ? 2 : 0)}</td><td class="num ${r.diff ? "up" : ""}">${r.diff == null ? "–" : fmt(r.diff)}</td><td class="meta">${esc(r.note)}</td></tr>`).join("") || `<tr><td colspan="12" class="hint">No e-invoice for this selection.</td></tr>`) +
     (list.length > 100 ? `<tr><td colspan="12" class="meta">Showing 100 of ${fmt(list.length)}; use the filter or the Excel file for the rest.</td></tr>` : "");

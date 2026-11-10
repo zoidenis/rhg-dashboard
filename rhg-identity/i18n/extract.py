@@ -11,7 +11,7 @@ FILES = ["rhg-finance-local/static/index.html", "rhg-purchasing-local/static/ind
          "rhg-identity/static/admin.html", "rhg-identity/static/control.html", "rhg-identity/static/executive.html",
          "rhg-identity/static/login.html", "rhg-identity/static/unicorn.html",
          "rhg-finance-local/static/layout.js", "rhg-finance-local/static/recipients.js",
-         "rhg-identity/static/locintel.js", "rhg-finance-local/static/tables.js", "rhg-identity/static/reports.js"]
+         "rhg-identity/static/locintel.js", "rhg-finance-local/static/tables.js", "rhg-finance-local/static/pulse.js", "rhg-identity/static/reports.js"]
 
 NUM = re.compile(r"[−+\-]?(?:\d[\d.,]*)(?:\s?(?:%|k|M|B|pts|s|h|d)\b)?")
 SEP = re.compile(r"\s+·\s+|\s*·\s*$|^\s*·\s*")
