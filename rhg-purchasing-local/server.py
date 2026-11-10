@@ -1925,8 +1925,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 files.append((name, *ctype.split("/", 1), data))
         try:
+            reply, _bad = notify.parse_emails(str(body.get("reply_to") or ""))
             notify.send_mail(to, [c for c in cc if c not in to], subject, html_body, text_body or subject, files,
-                             inline)
+                             inline, reply_to=reply[0] if reply else None)
         except Exception as exc:                                # noqa: BLE001
             store.audit("internal mail", source, "service", {}, {"to": to, "cc": cc, "status": "failed"},
                         str(exc)[:300])

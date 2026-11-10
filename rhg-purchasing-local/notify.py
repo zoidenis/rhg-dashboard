@@ -60,7 +60,7 @@ def parse_emails(text):
     return out, bad
 
 
-def send_mail(to, cc, subject, html_body, text_body, attachments=None, inline=None):
+def send_mail(to, cc, subject, html_body, text_body, attachments=None, inline=None, reply_to=None):
     """attachments: [(filename, maintype, subtype, bytes)]; inline: [(cid, maintype, subtype, bytes)], pictures the
     html shows with src="cid:<cid>"."""
     smtp = smtp_config.current()
@@ -72,6 +72,8 @@ def send_mail(to, cc, subject, html_body, text_body, attachments=None, inline=No
     if cc:
         msg["Cc"] = ", ".join(cc)
     msg["Subject"] = subject
+    if reply_to:
+        msg["Reply-To"] = reply_to
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain=(smtp["from"].split("@")[-1] or "rhg.al").strip(">"))
     msg.set_content(text_body)

@@ -374,6 +374,8 @@ td.num,th.num{text-align:right}
 .pl-sq .al.info i{background:var(--sub)}
 .pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
 .pl-bd.show{display:flex}
+.em-pop{width:min(760px,100%)}
+.em-roles td,.em-roles th{padding:6px 8px} .em-roles input{width:18px;height:18px}
 .pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
 .pl-pop .ph{background:var(--side,#08303f);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .pl-pop .ph .ic{flex-shrink:0;width:48px;height:48px;border-radius:50%;background:#fff;display:grid;place-items:center}
@@ -1876,6 +1878,7 @@ td.num,th.num{text-align:right}
 
   <div class="foot" id="foot"></div>
 </main>
+<div class="pl-bd" id="emBd"><div class="pl-pop em-pop" id="emPop" role="dialog" aria-modal="true" aria-label="Send an exception by email"></div></div>
 <div class="pl-bd" id="blBd"><div class="pl-pop" id="blPop" role="dialog" aria-modal="true" aria-label="Location accounts against budget"></div></div>
 <div class="pl-bd" id="slBd"><div class="pl-pop" id="slPop" role="dialog" aria-modal="true" aria-label="Restaurant sales"></div></div>
 <div class="pl-bd" id="faBd"><div class="pl-pop" id="faPop" role="dialog" aria-modal="true" aria-label="Location fixed assets"></div></div>
@@ -2591,7 +2594,10 @@ function renderExceptions(){
     <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
       ${e.drill?`<button class="mini" data-ed="${i}">Supporting records</button>`:""}
       <button class="mini dark" data-ea="${i}" ${tracked.includes(e.code)?"disabled":""}>${tracked.includes(e.code)?"Already tracked":"Create action"}</button>
-    </div></div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
+      <button class="mini" data-em="${i}" type="button">Send by email</button>
+    </div>${emSentLine(e.code)}</div>`).join("") : '<div class="empty">No rule was breached in this period.</div>';
+  document.querySelectorAll("[data-em]").forEach(b=>b.onclick=()=>emOpen(list[+b.dataset.em]));
+  emLoad(false);
   document.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{const e=list[+b.dataset.ed]; openDrill(e.drill.kind, e.drill.key||"", e.rule);});
   document.querySelectorAll("[data-ea]").forEach(b=>b.onclick=()=>{const e=list[+b.dataset.ea];
     createAction({title:e.title, description:`${e.detail}\nRecommended: ${e.next_action||""}`, source_exception:e.code,
@@ -2600,6 +2606,81 @@ function renderExceptions(){
       evidence:[{entity:"Business Central", key:e.document||"", period:`${data.meta.current[0]}..${data.meta.current[1]}`}]});});
 }
 
+
+// ---------- Exceptions → Send by email (exmail.py): to roles of Email recipients by company and / or addresses
+let emData = null, emCompany = "";
+async function emLoad(force){
+  const co = data && data.meta ? data.meta.company : "";
+  if (!co || (!force && emData && emCompany === co)) return;
+  try { const r = await fetch("/api/exceptions/email?company=" + encodeURIComponent(co)); const j = await r.json(); if (!r.ok) throw new Error(j.error);
+    emData = j; emCompany = co;
+    document.querySelectorAll("#excList .act").forEach((el, i) => { const e = (data.exceptions || [])[i], old = el.querySelector(".em-sent"); if (!e) return;
+      if (old) old.remove(); el.insertAdjacentHTML("beforeend", emSentLine(e.code)); });
+  } catch (e) { emData = null; }
+}
+function emSentLine(code){
+  const l = emData && emCompany === (data && data.meta && data.meta.company) ? (emData.log || {})[code] : null;
+  if (!l || !l.length) return "";
+  const x = l[l.length - 1];
+  return `<p class="meta em-sent" style="margin:8px 0 0">✉ Sent ${esc(x.at)} by ${esc(x.by)} to ${esc((x.to || []).join(", "))}${(x.cc || []).length ? ` · Cc ${esc(x.cc.join(", "))}` : ""}${l.length > 1 ? ` · ${l.length} sends` : ""}${x.action ? " · tracked as an action" : ""}</p>`;
+}
+async function emOpen(e){
+  await emLoad(true);
+  const d = emData, P = $("emPop");
+  if (!d) { alert("The email recipients could not be read."); return; }
+  const area = String(e.area || "").toUpperCase(), sug = d.by_area[area] || d.default;
+  const tracked = (data.action_keys || []).includes(e.code);
+  const roles = d.roles.slice().sort((a, b) => (sug.to.includes(b.key) - sug.to.includes(a.key)) || (sug.cc.includes(b.key) - sug.cc.includes(a.key)) || (!!b.emails.length - !!a.emails.length));
+  P.innerHTML = `<div class="ph"><div><h2>Send by email</h2><div class="sub">${esc(e.title)}</div></div><div class="sp"></div><button class="close" type="button" data-emclose="1">Close ✕</button></div>
+  <div class="pl-body">
+    ${d.mail && d.mail.configured === false ? `<p class="up">The mail server is not ready: ${esc(d.mail.error || "set it up in Purchasing → Settings")}.</p>` : ""}
+    ${!d.can_send ? `<p class="up">Your role cannot send exceptions by email (it needs the Finance actions right).</p>` : ""}
+    ${d.error ? `<p class="up">${esc(d.error)}</p>` : ""}
+    <p class="hint">${esc(data.meta.company)} · ${esc(e.area || "")} · ${esc(e.rule || "")}. The roles and their addresses are those of Settings → Email recipients by company (${esc(data.meta.company)} and the whole group). Suggested for ${esc(e.area || "this area")}: To ${esc(sug.to.map(k => (d.roles.find(r => r.key === k) || {label: k}).label).join(", ") || "–")}${sug.cc.length ? ", Cc " + esc(sug.cc.map(k => (d.roles.find(r => r.key === k) || {label: k}).label).join(", ")) : ""}.</p>
+    <div class="scroll" style="max-height:340px"><table class="em-roles" data-nosort><tr><th>Role and addresses</th><th class="num">To</th><th class="num">Cc</th></tr>
+      ${roles.map(r => `<tr class="${r.emails.length ? "" : "meta"}"><td style="white-space:normal">${esc(r.label)}<div class="meta">${r.emails.length ? esc(r.emails.join(", ")) : "no address"}</div></td>
+        <td class="num"><input type="checkbox" data-emto="${esc(r.key)}" ${r.emails.length ? "" : "disabled"} ${r.emails.length && sug.to.includes(r.key) ? "checked" : ""} aria-label="To ${esc(r.label)}"></td>
+        <td class="num"><input type="checkbox" data-emcc="${esc(r.key)}" ${r.emails.length ? "" : "disabled"} ${r.emails.length && sug.cc.includes(r.key) ? "checked" : ""} aria-label="Cc ${esc(r.label)}"></td></tr>`).join("")}</table></div>
+    <div class="formgrid" style="margin-top:12px">
+      <label class="field">Other addresses (To)<input id="emTo" placeholder="name@rhg.al, …"></label>
+      <label class="field">Other addresses (Cc)<input id="emCc" placeholder="name@rhg.al, …"></label></div>
+    <label class="field">Note to the recipients<textarea id="emNote" rows="3" style="font:inherit" placeholder="e.g. Please confirm the payment plan by Friday."></textarea></label>
+    <div style="display:flex;flex-direction:column;gap:6px;margin:10px 0 12px;font-size:13px">
+      ${d.me.email ? `<label><input type="checkbox" id="emMe" checked> Copy me (${esc(d.me.email)}); answers come back to me</label>` : `<span class="meta">Your account has no email address, so answers go to the sending address.</span>`}
+      ${e.drill ? `<label><input type="checkbox" id="emRec" checked> Attach the supporting records (Excel)</label>` : ""}
+      <label><input type="checkbox" id="emAssign" checked> ${tracked ? "Update the tracked action: owner = the recipients in To" : "Track it as an action owned by the recipients in To"}</label></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn dark" id="emSend" type="button" ${d.can_send ? "" : "disabled"}>Send</button><span class="meta" id="emMsg"></span></div>
+    <div id="emWho" class="meta" style="margin-top:8px"></div>
+    ${((d.log || {})[e.code] || []).length ? `<h3 style="font-size:13.5px;margin:16px 0 6px">Sent before</h3><table data-nosort>${d.log[e.code].slice().reverse().map(x => `<tr><td>${esc(x.at)}</td><td>${esc(x.by)}</td><td class="meta" style="white-space:normal">To ${esc((x.to || []).join(", "))}${(x.cc || []).length ? " · Cc " + esc(x.cc.join(", ")) : ""}</td></tr>`).join("")}</table>` : ""}
+  </div>`;
+  $("emBd").classList.add("show");
+  const who = () => {
+    const pick = a => [...P.querySelectorAll(`[data-em${a}]:checked`)].flatMap(i => (d.roles.find(r => r.key === i.dataset["em" + a]) || {emails: []}).emails);
+    const to = [...new Set([...pick("to"), ...$("emTo").value.split(/[,;\s]+/).filter(Boolean)])];
+    const cc = [...new Set([...pick("cc"), ...$("emCc").value.split(/[,;\s]+/).filter(Boolean), ...($("emMe") && $("emMe").checked ? [d.me.email] : [])])].filter(x => !to.includes(x));
+    $("emWho").textContent = to.length ? `To: ${to.join(", ")}${cc.length ? " · Cc: " + cc.join(", ") : ""}` : "Choose at least one role with an address, or type an address.";
+    return {to, cc};
+  };
+  P.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", who)); who();
+  $("emSend").onclick = async () => {
+    const w = who(); if (!w.to.length) { $("emMsg").textContent = "Nobody to send to."; return; }
+    $("emSend").disabled = true; $("emMsg").textContent = "Sending…";
+    const ccEmails = $("emCc").value.split(/[,;\s]+/).filter(Boolean).concat($("emMe") && $("emMe").checked ? [d.me.email] : []);
+    try {
+      const r = await fetch("/api/exceptions/email", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+        company: data.meta.company, code: e.code, period: data.meta.current,
+        exception: {code: e.code, severity: e.severity, area: e.area, rule: e.rule, title: e.title, detail: e.detail, next_action: e.next_action, impact: e.impact, document: e.document},
+        to_roles: [...P.querySelectorAll("[data-emto]:checked")].map(i => i.dataset.emto), cc_roles: [...P.querySelectorAll("[data-emcc]:checked")].map(i => i.dataset.emcc),
+        to_emails: $("emTo").value.split(/[,;\s]+/).filter(Boolean), cc_emails: ccEmails, note: $("emNote").value,
+        records: !!($("emRec") && $("emRec").checked), assign: $("emAssign").checked})});
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || "failed");
+      emData.log = j.log; $("emMsg").textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc.length ? " · Cc " + j.sent.cc.join(", ") : ""}${j.sent.records ? ` · ${j.sent.records} records attached` : ""}.`;
+      renderExceptions(); if (j.sent.action) load();
+      setTimeout(() => $("emBd").classList.remove("show"), 1600);
+    } catch (err) { $("emMsg").textContent = "Could not send: " + err.message; $("emSend").disabled = false; }
+  };
+}
+document.addEventListener("click", ev => { if (ev.target.closest("[data-emclose]") || ev.target === $("emBd")) $("emBd").classList.remove("show"); });
 let actions=[];
 async function createAction(payload){
   try{

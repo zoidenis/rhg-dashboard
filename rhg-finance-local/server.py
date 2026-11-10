@@ -38,6 +38,7 @@ import today as todayloc
 import unicorn_facts
 import faloc
 import recipients
+import exmail
 import requests
 import cost_report
 import negstock
@@ -105,6 +106,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
                      "/api/pl-memo/settings": "settings", "/api/pl-memo/job": "settings",
                      "/api/recipients": "settings",
+                     "/api/exceptions/email": "actions",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -1528,6 +1530,47 @@ def _statement_exceptions(pl, bs, cash, settings):
 
 
 # ------------------------------------------------------------------ drill-down
+EXC_FIELDS = ("code", "severity", "area", "rule", "title", "detail", "next_action", "impact", "document")
+
+
+def send_exception_email(body, user):
+    """(status, answer) of Exceptions → Send by email (exmail.py). The exception is taken from the figures this
+    server holds for the company when it is there (the screen's), else from what the page sent."""
+    company = str(body.get("company") or config.BC_COMPANY)
+    code = str(body.get("code") or "")
+    with _last_lock:
+        held = _last.get("data") if _last.get("company") == company else None
+    exc = next((e for e in (held or {}).get("exceptions") or [] if e.get("code") == code), None)
+    sent = body.get("exception") or {}
+    if exc is None:
+        exc = {k: sent.get(k) for k in EXC_FIELDS}
+        exc["code"] = code
+    if not exc.get("title"):
+        return 400, {"error": "The exception could not be found; refresh the screen and try again."}
+    meta = (held or {}).get("meta") or {}
+    cur = meta.get("current") or body.get("period") or ["", ""]
+    period = f"{cur[0]} to {cur[1]}" if cur and cur[0] else ""
+    records = None
+    if body.get("records") and exc.get("drill") and held is not None:
+        try:
+            records = drill(exc["drill"].get("kind"), exc["drill"].get("key") or "")
+        except Exception:                                          # noqa: BLE001
+            records = None
+    tracked = next((a for a in store.list_actions() if a.get("source_exception") == code
+                    and a.get("status") not in ("Resolved", "Dismissed")), None)
+    try:
+        entry = exmail.send(exc, company, period, meta.get("currency") or company_currency(company),
+                            [str(x) for x in body.get("to_roles") or []], [str(x) for x in body.get("to_emails") or []],
+                            [str(x) for x in body.get("cc_roles") or []], [str(x) for x in body.get("cc_emails") or []],
+                            str(body.get("note") or ""), user, records, bool(body.get("assign")),
+                            tracked["id"] if tracked else None)
+    except ValueError as exc_:
+        return 400, {"error": str(exc_)}
+    except RuntimeError as exc_:
+        return 502, {"error": str(exc_)}
+    return 200, {"ok": True, "sent": entry, "log": exmail.log(company)}
+
+
 def drill(kind, key):
     with _last_lock:
         d = _last.get("data") or {}
@@ -2855,6 +2898,13 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/capital":
                 self._send(200, capital_screen(q.get("company") or config.BC_COMPANY, q.get("period"),
                                                q.get("mode", "month")))
+            elif url.path == "/api/exceptions/email":
+                company = q.get("company") or config.BC_COMPANY
+                roles, err = exmail.targets(company)
+                self._send(200, {"roles": roles, "error": err, "by_area": {k: {"to": v[0], "cc": v[1]} for k, v in exmail.BY_AREA.items()},
+                                 "default": {"to": exmail.DEFAULT[0], "cc": exmail.DEFAULT[1]}, "log": exmail.log(company),
+                                 "mail": arap_notify.mail_status(), "can_send": auth.can(user, "actions"),
+                                 "me": {"name": user.get("name") or user.get("username"), "email": user.get("email") or ""}})
             elif url.path == "/api/drill":
                 self._send(200, drill(q.get("kind", "pl"), q.get("key", "")))
             elif url.path == "/api/recipients/locations":
@@ -2967,7 +3017,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         actor = user["username"]
         try:
-            if url.path == "/api/actions":
+            if url.path == "/api/exceptions/email":
+                self._send(*send_exception_email(body, user))
+            elif url.path == "/api/actions":
                 self._send(200, store.create_action(body, actor))
             elif url.path.startswith("/api/actions/"):
                 updated = store.update_action(url.path.rsplit("/", 1)[-1], body, actor)

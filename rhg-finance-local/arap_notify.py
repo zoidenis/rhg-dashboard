@@ -92,7 +92,8 @@ def mail_status():
     return value
 
 
-def send_mail(to, cc, subject, html_body, text_body, attachments=None):
+def send_mail(to, cc, subject, html_body, text_body, attachments=None, source="Finance · receivables & payables",
+              reply_to=None):
     """attachments: [(filename, content_type, bytes)]"""
     files = [{"filename": n, "content_type": t, "data": base64.b64encode(b).decode("ascii")}
              for n, t, b in attachments or []]
@@ -100,8 +101,8 @@ def send_mail(to, cc, subject, html_body, text_body, attachments=None):
         r = requests.post(f"{config.PURCHASING_URL}/internal/mail", timeout=90,
                           headers={"X-Service-Token": auth.SERVICE_TOKEN, "Content-Type": "application/json"},
                           data=json.dumps({"to": to, "cc": cc, "subject": subject, "html": html_body,
-                                           "text": text_body, "source": "Finance · receivables & payables",
-                                           "attachments": files}))
+                                           "text": text_body, "source": source,
+                                           "attachments": files, "reply_to": reply_to or ""}))
     except requests.RequestException as exc:
         raise RuntimeError(f"The Purchasing tower, which sends the email, could not be reached: {exc}") from exc
     try:
