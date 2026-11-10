@@ -326,7 +326,7 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
     for ref in sorted(agg):
         R = names.get(ref) or {}
         locs.append({"ref": ref, "name": R.get("name") or ref, "bc": R.get("bc") or "", "dept": R.get("dept") or "",
-                     "venues": [v["name"] for v, r in venues if r["ref"] == ref],
+                     "venues": [v["name"] or v["id"] for v, r in venues if r["ref"] == ref],
                      "cells": {d.isoformat(): _cell(cells.get((ref, d.isoformat()))) for d in days}})
     res_ids = {x["id"]: x for x in rows}
     fb_rows = []
@@ -338,7 +338,7 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
                         "server": x.get("server") or "", "guests": x.get("guests")})
     fb_rows.sort(key=lambda f: (f["overall"] if f["overall"] is not None else 9, f["day"]))
     mix_raw = {kind: {ref: {k: dict(c) for k, c in D.items()} for ref, D in by_ref.items()} for kind, by_ref in mix.items()}
-    venues_out = [{"id": v["id"], "name": v["name"], "internal_name": v.get("internal_name") or "", "ref": (r or {}).get("ref") or "",
+    venues_out = [{"id": v["id"], "name": v["name"] or v["id"], "internal_name": v.get("internal_name") or "", "ref": (r or {}).get("ref") or "",
                    "restaurant": (r or {}).get("name") or "", "how": how,
                    "company": (r or {}).get("company") or ""} for v, r, how in placed]
     return {"company": company, "days": [d.isoformat() for d in days], "range": {"from": a.isoformat(), "to": b.isoformat()},

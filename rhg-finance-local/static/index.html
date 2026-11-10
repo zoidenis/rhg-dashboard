@@ -6258,13 +6258,13 @@ async function svOpenSettings(show){
   $("svEnv").innerHTML = Object.entries(C.servers).map(([k, l]) => `<option value="${k}"${k === C.env ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("svCid").value = C.client_id || ""; $("svVg").value = C.venue_group_id || ""; $("svMap").value = C.map || ""; $("svSec").value = "";
   $("svSec").placeholder = C.has_secret ? "set · type to change" : "not set";
-  $("svMsg").textContent = svCfg.error || "";
+  $("svMsg").textContent = svCfg.error || svCfg.note || "";
   svVenues(svCfg.venues || []);
   card.scrollIntoView({behavior: "smooth", block: "start"});
 }
 function svVenues(V){
   $("svVen").innerHTML = V.length ? `<tr><th>Venue</th><th>Internal name</th><th>SevenRooms id</th><th>Restaurant</th><th>Placed by</th></tr>` +
-    V.map(v => `<tr><td><b>${esc(v.name)}</b></td><td>${esc(v.internal_name || "")}</td><td class="meta">${esc(v.id)}</td><td>${v.ref ? `${esc(v.restaurant)} <span class="meta">${esc(v.ref)}</span>` : `<span class="warn">${fcSp("not placed")}</span>`}</td><td class="meta">${fcSp(v.how)}</td></tr>`).join("")
+    V.map(v => `<tr><td><b>${esc(v.name || v.id)}</b></td><td>${esc(v.internal_name || "")}</td><td class="meta">${esc(v.id)}</td><td>${v.ref ? `${esc(v.restaurant)} <span class="meta">${esc(v.ref)}</span>` : `<span class="warn">${fcSp("not placed")}</span>`}</td><td class="meta">${fcSp(v.how)}</td></tr>`).join("")
     : `<tr><td class="meta">${fcSp("The venues appear here once the connection works.")}</td></tr>`;
 }
 $("svSetBtn").onclick = () => svOpenSettings(false);
@@ -6277,7 +6277,7 @@ $("svSave").onclick = async () => {
 };
 $("svTest").onclick = async () => {
   $("svMsg").textContent = "Signing in to SevenRooms…";
-  try { const j = await simphonyPost("/api/sevenrooms/test", {}); $("svMsg").textContent = `SevenRooms accepted the account: ${j.venues.length} venues.`; const keep = $("svMsg").textContent; await svOpenSettings(true); $("svMsg").textContent = keep; }
+  try { const j = await simphonyPost("/api/sevenrooms/test", {}); $("svMsg").textContent = `SevenRooms accepted the account: ${j.venues.length} venues.` + (j.note ? " " + j.note : ""); const keep = $("svMsg").textContent; await svOpenSettings(true); $("svMsg").textContent = keep; }
   catch(e){ $("svMsg").textContent = "SevenRooms: " + e.message; }
 };
 $("company").addEventListener("change", () => { if ($("slSrView").style.display !== "none" && $("v-sales").classList.contains("on")) { svData = null; svLoad(false); } });

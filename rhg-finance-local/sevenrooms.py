@@ -44,11 +44,13 @@ KEEP = 900                      # a day not yet closed is read again after 15 mi
 FINAL_AFTER = 3                 # days: statuses (no-show, completed) are set the night after; then a day is closed
 _lock, _db_lock, _token_lock = threading.Lock(), threading.Lock(), threading.Lock()
 _conn = None
-_venues = {"at": 0.0, "list": None}
+_venues = {"at": 0.0, "list": None, "note": ""}
 
 
 class Error(Exception):
-    pass
+    def __init__(self, msg, status=None):
+        super().__init__(msg)
+        self.status = status
 
 
 # ---------------------------------------------------------------- the account
@@ -182,7 +184,7 @@ def get(path, params=None):
         if r.status_code == 204:
             return {}
         if r.status_code != 200:
-            raise Error(f"SevenRooms {path.split('?')[0]}: " + _msg(j, r))
+            raise Error(f"SevenRooms {path.split('?')[0]}: " + _msg(j, r), r.status_code)
         return j.get("data") if isinstance(j, dict) else {}
     raise Error("SevenRooms is busy: try again in a few minutes.")
 
@@ -204,26 +206,65 @@ def _pages(path, params, key="results"):
 
 
 # ---------------------------------------------------------------- venues
+def _venue(v):
+    return {"id": v.get("id") or "", "name": v.get("name") or "", "internal_name": v.get("internal_name") or "",
+            "external_venue_id": v.get("external_venue_id") or "", "currency": v.get("currency_code") or "",
+            "group": v.get("venue_group_name") or "", "prefix": v.get("unique_confirmation_prefix") or ""}
+
+
+_ID = re.compile(r"^[A-Za-z0-9_-]{16,}$")
+
+
 def venues(max_age=6 * 3600, force=False):
-    """[{id, name, internal_name, external_venue_id, currency, group}] of the account (cached)."""
+    """[{id, name, internal_name, external_venue_id, currency, group}] of the account (cached). An account not
+    allowed to list the venues (GET /venues refused): the venues of its reservations of the last two weeks, and the
+    SevenRooms ids written in the mapping, each named by GET /venues/{id} when the account may (else by its id)."""
     if not force and _venues["list"] is not None and time.time() - _venues["at"] < max_age:
         return _venues["list"]
     with _lock:
         cfg = _read()
     p = {"venue_group_id": cfg["venue_group_id"]} if cfg.get("venue_group_id") else {}
-    rows = _pages("/venues", p)
-    out = [{"id": v.get("id") or "", "name": v.get("name") or "", "internal_name": v.get("internal_name") or "",
-            "external_venue_id": v.get("external_venue_id") or "", "currency": v.get("currency_code") or "",
-            "group": v.get("venue_group_name") or "", "prefix": v.get("unique_confirmation_prefix") or ""}
-           for v in rows if v.get("id")]
-    _venues.update(at=time.time(), list=out)
+    note = ""
+    try:
+        out = [_venue(v) for v in _pages("/venues", p) if v.get("id")]
+    except Error as exc:
+        if exc.status not in (401, 403):
+            raise
+        ids = [k.strip() for k in _map_keys(cfg.get("map")) if _ID.match(k.strip())]
+        try:                                   # the venues the account's reservations are at
+            b = date.today() - timedelta(days=1)
+            rows = get("/reservations/export", dict(p, from_date=(b - timedelta(days=13)).isoformat(), to_date=b.isoformat(),
+                                                    limit=PAGE)) or {}
+            ids += [str(x.get("venue_id")) for x in rows.get("results") or [] if isinstance(x, dict) and x.get("venue_id")]
+        except Error as exc2:
+            if not ids:
+                raise Error("SevenRooms lets this API account sign in but not list the venues (" + str(exc).split(": ", 1)[-1]
+                            + ") nor read the reservations (" + str(exc2).split(": ", 1)[-1] + "): ask SevenRooms to give it "
+                            "the reservations (and the venues) of the restaurants, for reporting.", exc2.status) from None
+        out = []
+        for vid in dict.fromkeys(ids):
+            try:
+                out.append(_venue(dict(get(f"/venues/{vid}") or {}, id=vid)))
+            except Error:
+                out.append({"id": vid, "name": "", "internal_name": "", "external_venue_id": "", "currency": "", "group": "", "prefix": ""})
+        note = ("This API account may not list the venues: these are the venues of its reservations of the last two weeks "
+                "and those written in the mapping by their SevenRooms id.")
+    _venues.update(at=time.time(), list=out, note=note)
     return out
+
+
+def _map_keys(text):
+    for line in str(text or "").splitlines():
+        line = line.split("#", 1)[0]
+        if "=" in line:
+            yield line.rpartition("=")[0]
 
 
 def test():
     """Signs in afresh and lists the venues the account sees."""
     _token(force=True)
-    return {"ok": True, "venues": venues(force=True)}
+    V = venues(force=True)
+    return {"ok": True, "venues": V, "note": _venues["note"]}
 
 
 # ---------------------------------------------------------------- reservations, kept by venue and day

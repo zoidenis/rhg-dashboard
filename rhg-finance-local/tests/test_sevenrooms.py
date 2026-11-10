@@ -164,6 +164,38 @@ class SevenRooms(unittest.TestCase):
         self.assertEqual(wb.sheetnames[:3], ["Restaurants", "Days", "Reservations"])
         self.assertEqual(sum(1 for _ in wb["Reservations"].iter_rows()) - 1, 10)
 
+    def test_an_account_that_may_not_list_the_venues(self):
+        def denied(path, params=None):
+            if path == "/venues":
+                raise sevenrooms.Error("SevenRooms /venues: Permission denied", 403)
+            if path == f"/venues/{V1}":
+                return {"name": "SALT Tirana", "internal_name": "SALT"}
+            if path.startswith("/venues/"):
+                raise sevenrooms.Error("SevenRooms: Permission denied", 403)
+            if path == "/reservations/export":
+                return {"results": [dict(r, venue_id=r["venue_id"]) for r in RES[V1][D1][:2]] + [{"venue_id": V1}]}
+            return fake_get(path, params)
+        cfg = sevenrooms._read()
+        long_id = "ahZzfnNldmVucm9vbXMtc2VjdXJlcgwLEgVWZW51ZRgB"                    # SevenRooms ids are like this
+        sevenrooms._write(dict(cfg, map=long_id + " = R2"))
+        sevenrooms.get = denied
+        try:
+            V = sevenrooms.venues(force=True)
+            self.assertEqual([(v["id"], v["name"]) for v in V], [(long_id, ""), (V1, "SALT Tirana")])
+            self.assertIn("may not list the venues", sevenrooms._venues["note"])
+            regs = locintel.registry()
+            placed = {v["id"]: (r or {}).get("ref") for v, r, _h in srsim.place(V, regs, long_id + " = R2")}
+            self.assertEqual(placed, {long_id: "R2", V1: "R1"})
+            sevenrooms.get = lambda path, params=None: (_ for _ in ()).throw(sevenrooms.Error("SevenRooms: Permission denied", 403))
+            sevenrooms._write(dict(cfg, map=""))
+            with self.assertRaises(sevenrooms.Error) as e:
+                sevenrooms.venues(force=True)
+            self.assertIn("ask SevenRooms", str(e.exception))
+        finally:
+            sevenrooms._write(cfg)
+            sevenrooms.get = fake_get
+            sevenrooms._venues.update(at=0.0, list=None, note="")
+
 
 if __name__ == "__main__":
     unittest.main()

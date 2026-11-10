@@ -2481,6 +2481,7 @@ class Handler(BaseHTTPRequestHandler):
                                                   for r in regs if r.get("ref")]
                             out["venues"] = [dict(v, ref=(r or {}).get("ref") or "", restaurant=(r or {}).get("name") or "", how=how)
                                              for v, r, how in srsim.place(sevenrooms.venues(), regs, out["connection"]["map"])]
+                            out["note"] = sevenrooms._venues.get("note") or ""
                     except sevenrooms.Error as exc:
                         out["error"] = str(exc)[:300]
                     self._send(200, out)
