@@ -119,6 +119,14 @@ class Parts(unittest.TestCase):
             r = billyrec.build("SALT", lambda ref: END.isoformat(), today=END + timedelta(days=1))
             billyrec.remember("SALT", r)
             cls.read[size] = (r, billyrec.expand(r))
+        # ranges asked on the screen: four, of which the three last stay
+        billyrec.CHUNK_DAYS = 2
+        cls.ranges = []
+        for k in range(4):
+            a, b = END - timedelta(days=6 - k), END - timedelta(days=4 - k)
+            r = billyrec.build("SALT", lambda ref: END.isoformat(), today=END + timedelta(days=1), frm=a.isoformat(), to=b.isoformat())
+            billyrec.remember("SALT", r, billyrec.key_of("SALT", a.isoformat(), b.isoformat()))
+            cls.ranges.append((a.isoformat(), b.isoformat(), r, billyrec.expand(r)))
 
     @classmethod
     def tearDownClass(cls):
@@ -170,7 +178,8 @@ class Parts(unittest.TestCase):
         r = billyrec.held("SALT")
         self.assertEqual(r["gen"], self.read[1][0]["gen"])
         con = billyrec._rcon()
-        self.assertEqual({g for (g,) in con.execute("SELECT DISTINCT gen FROM rw")}, {r["gen"]})   # the reads before: gone
+        ranges = {g for (g,) in con.execute("SELECT gen FROM gens WHERE company<>'SALT'")}
+        self.assertEqual({g for (g,) in con.execute("SELECT DISTINCT gen FROM rw")} - ranges, {r["gen"]})   # the reads before: gone
         every = billyrec.rows(r, "checks", None, st="all", limit=5000)
         self.assertEqual(every["total"], len(self.read[1][1]["checks"]))
         page = billyrec.rows(r, "checks", None, st="all", offset=10, limit=7)
@@ -200,6 +209,40 @@ class Parts(unittest.TestCase):
         self.assertNotIn("agg", v)
         with self.assertRaises(ValueError):
             billyrec.rows(r, "nothing")
+
+    def test_a_range_is_the_same_days_of_a_longer_read(self):
+        whole = self.read[1][1]
+        for a, b, r, x in self.ranges:
+            self.assertEqual((r["days"][0], r["days"][-1], r["range"]["custom"]), (a, b, True))
+            inr = lambda d: a <= (d or "")[:10] <= b
+            self.assertEqual(self.canon(x["checks"]), self.canon([c for c in whole["checks"] if inr(c["day"])]), a)
+            self.assertEqual(self.canon(x["book"]), self.canon([y for y in whole["book"] if inr(y["issue"])]), a)
+            self.assertEqual(self.canon(x["invoices"]), self.canon([y for y in whole["invoices"] if inr(y["issue"])]), a)
+            self.assertEqual(self.canon(x["orders"]), self.canon([y for y in whole["orders"] if inr(y["issue"])]), a)
+            self.assertEqual(self.canon(x["returns"]["events"]), self.canon([e for e in whole["returns"]["events"] if inr(e["day"])]), a)
+            # a corrective of the range whose event is before it (outside the days read) has no event in the range
+            issued = {y["iic"]: y["issue"] for y in whole["book"]}
+            lo, wl = self.canon(x["returns"]["loose"]), self.canon([y for y in whole["returns"]["loose"] if inr(y["issue"])])
+            self.assertTrue(set(wl) <= set(lo), a)
+            for y in set(lo) - set(wl):
+                y = json.loads(y)
+                self.assertLess(issued.get(y["corr_ref"], "9"), (date.fromisoformat(a) - timedelta(days=3)).isoformat(), y)
+            self.assertEqual(r["empty_days"], [])
+
+    def test_ranges_kept_apart(self):
+        con = billyrec._rcon()
+        keys = {k for (k,) in con.execute("SELECT company FROM gens")}
+        kept = {billyrec.key_of("SALT", a, b) for a, b, _r, _x in self.ranges[1:]}
+        self.assertEqual(keys, {"SALT"} | kept)                          # the oldest range is gone, the company's read stays
+        a, b, r, _x = self.ranges[-1]
+        self.assertEqual(billyrec.held("SALT", billyrec.key_of("SALT", a, b))["gen"], r["gen"])
+        self.assertEqual(billyrec.held("SALT")["gen"], self.read[1][0]["gen"])
+        self.assertIsNone(billyrec.held("SALT", billyrec.key_of("SALT", self.ranges[0][0], self.ranges[0][1])))
+        today = END + timedelta(days=1)
+        self.assertEqual(billyrec.check_range("2026-10-01", "2026-10-31", today), (date(2026, 10, 1), date(2026, 10, 31)))
+        for frm, to in (("2026-11-01", "2026-11-10"), ("2026-11-05", "2026-11-01"), ("2026-08-01", "2026-10-31"), ("", "x")):
+            with self.assertRaises(ValueError):
+                billyrec.check_range(frm, to, today)
 
     def test_the_excel(self):
         import io

@@ -531,7 +531,33 @@ def apply_details(nuis, inv):
     return set(comp)
 
 
-def build(company, latest_fn, progress=None, today=None):
+MAX_RANGE = 62
+
+
+def check_range(frm, to, today=None):
+    """A range asked on the screen → (first day, last day); its last day yesterday at the latest, MAX_RANGE days."""
+    today = today or date.today()
+    try:
+        a, b = date.fromisoformat(str(frm)[:10]), date.fromisoformat(str(to)[:10])
+    except ValueError:
+        raise ValueError("Choose the first and the last day of the range.") from None
+    if b >= today:
+        raise ValueError("The range ends yesterday at the latest: today is not closed yet.")
+    if a > b:
+        raise ValueError("The first day is after the last one.")
+    if (b - a).days + 1 > MAX_RANGE:
+        raise ValueError(f"At most {MAX_RANGE} days at a time.")
+    return a, b
+
+
+def key_of(company, frm=None, to=None):
+    """The held read: the company's (the last days of Settings), or of a range asked on the screen."""
+    return f"{company}|{frm}|{to}" if frm and to else company
+
+
+def build(company, latest_fn, progress=None, today=None, frm=None, to=None):
+    """A read of the company: the last days of Settings, or the range frm–to (a range of its own: the invoices
+    of the three days after it are read too, for the checks fiscalized late)."""
     today = today or date.today()
     settings = store.get_settings()
     S = settings_of(settings)
@@ -539,8 +565,14 @@ def build(company, latest_fn, progress=None, today=None):
     if not acct:
         raise ValueError(f"{company} has no Billy account with a password (Finance → Settings → Billy).")
     regs = [r for r in restaurants(company, settings) if (r.get("ref") or "").upper() not in S["exclude"]]
-    b = today - timedelta(days=1)
-    days = _dates(b - timedelta(days=S["days"] - 1), b)
+    yday = today - timedelta(days=1)
+    if frm or to:
+        days = _dates(*check_range(frm, to, today))
+    else:
+        days = _dates(yday - timedelta(days=S["days"] - 1), yday)
+    end = min(days[-1] + timedelta(days=OVERLAP_DAYS), yday)      # the days read: the period and the days after it,
+    lead = _dates(days[0] - timedelta(days=OVERLAP_DAYS), days[0] - timedelta(days=1))   # and the days before it
+    read_days = lead + _dates(days[0], end)
     say = progress or (lambda *_: None)
     errors = []
     # Billy (both methods, day by day) and Simphony (each restaurant's checks, day by day) read at the same time
@@ -556,13 +588,13 @@ def build(company, latest_fn, progress=None, today=None):
         billy._token(acct)                                          # one sign-in before the reads in parallel
     except billy.BillyError as exc:
         raise ValueError(str(exc)) from exc
-    jobs = [("billy", src, d) for d in days for src in ("bridge", "fiscal")]
+    jobs = [("billy", src, d) for d in read_days for src in ("bridge", "fiscal")]
     if sim_on:
-        jobs += [("sim", r["ref"], d.isoformat()) for r in regs for d in days
+        jobs += [("sim", r["ref"], d.isoformat()) for r in regs for d in read_days
                  if not latest.get(r["ref"]) or d.isoformat() <= latest[r["ref"]]]
     n_sim = sum(1 for j in jobs if j[0] == "sim")
     # a job is one day of one source: the days of Settings × (Billy's two methods + each restaurant in Simphony)
-    say(f"{len(days)} days · {len(jobs):,} reads: {len(jobs) - n_sim:,} of Billy, {n_sim:,} of Simphony "
+    say(f"{len(read_days)} days · {len(jobs):,} reads: {len(jobs) - n_sim:,} of Billy, {n_sim:,} of Simphony "
         f"({len({j[1] for j in jobs if j[0] == 'sim'})} restaurants)")
 
     def run(job):
@@ -586,19 +618,22 @@ def build(company, latest_fn, progress=None, today=None):
                 if len(errors) < 12:
                     errors.append(f"{'Simphony' if kind == 'sim' else 'Billy'} {x} {d}: {str(exc)[:140]}")
             if n % 10 == 0:
-                say(f"{len(days)} days · {n:,} of {len(jobs):,} reads (days × Billy's two methods and the restaurants)")
+                say(f"{len(read_days)} days · {n:,} of {len(jobs):,} reads (days × Billy's two methods and the restaurants)")
     nuis = acct["nuis"]
     gen = f"{re.sub(r'[^A-Za-z0-9_-]+', '_', company)}-{time.time():.3f}"
     acc = _Acc(company, nuis, days, S, regs)
     W = _Writer(gen, acc.keys)
     P = parts(days)
+    # the days before the period, matched first and not shown: their checks fiscalized late take the invoices of
+    # the period's first days, which are then not counted as without a check (as a read of more days would do)
+    P = [lead] + P
     try:
-        corr_idx = corrective_index(nuis, days[0], days[-1])
+        corr_idx = corrective_index(nuis, lead[0], yday)      # to yesterday: a corrective days after a range
         pre_used, ret_used, budget, left = set(), set(), DETAIL_CAP, 0
-        for n, part in enumerate(P, 1):
+        for n, part in enumerate(P):
             a, z = part[0], part[-1]
-            hi = min(z + timedelta(days=OVERLAP_DAYS), days[-1])
-            tag = f"part {n} of {len(P)} · " if len(P) > 1 else ""
+            hi = min(z + timedelta(days=OVERLAP_DAYS), end)
+            tag = "the days before · " if n == 0 else f"part {n} of {len(P) - 1} · " if len(P) > 2 else ""
             inv = load_invoices(nuis, a, hi)
             full = apply_details(nuis, inv)
             checks = {r["ref"]: checks_held(r["ref"], a.isoformat(), z.isoformat()) for r in regs} if sim_on else {}
@@ -608,8 +643,9 @@ def build(company, latest_fn, progress=None, today=None):
                                   for c in checks_held(r["ref"], (z + timedelta(days=1)).isoformat(), hi.isoformat())
                                   if not c["cancel"] and abs(c["total"]) >= 0.01] for r in regs}
             say(f"{tag}matching {sum(map(len, checks.values())):,} checks with {len(inv):,} invoices of {len(part)} days")
-            args = dict(last_day=days[-1].isoformat(), pre_used=pre_used, nxt=nxt, ret_used=ret_used, corr_index=corr_idx,
-                        number_of=lambda k: billy.number_of(nuis, k, days[0], days[-1]))
+            # Pending: the last business day (when Simphony does not say which), yesterday for a range too
+            args = dict(last_day=yday.isoformat(), pre_used=pre_used, nxt=nxt, ret_used=ret_used, corr_index=corr_idx,
+                        number_of=lambda k: billy.number_of(nuis, k, lead[0], end))
             res = analyse(company, nuis, regs, part, inv, checks, latest, S, today, **args)
             # Orders. Billy's lists leave out the payment method and the references (payMethods, sumInvIICRefs
             # null). In full, the invoice that closes a check (cash, card, account) lists the IICs of the orders it
@@ -619,7 +655,7 @@ def build(company, latest_fn, progress=None, today=None):
             nchk = Counter(c["ref"] for c in res["checks"] if c["status"] != "zero")
             rest = {ref for ref, k in res["nochk"].items() if ref and k >= max(20, 0.5 * nchk.get(ref, 0))} | res["order_refs"]
             cand = {c["iic"]: c["fic"] for c in res["checks"] if c["ref"] in rest and c["fic"] and c["iic"]}
-            todo = [k for k in cand if k not in full][:max(0, budget)]
+            todo = [k for k in cand if k not in full][:max(0, budget)] if n else []
             if todo:
                 budget -= len(todo)
                 say(f"Billy · {len(todo)} invoices in full, for their orders")
@@ -642,9 +678,10 @@ def build(company, latest_fn, progress=None, today=None):
                     say(f"{tag}matching again, with the orders apart")
                     del res
                     res = analyse(company, nuis, regs, part, inv, checks, latest, S, today, **args)
-            left += len([k for k in cand if k not in full])
-            W.put(res)
-            acc.add(res)
+            if n:                                    # the days before: what they take is passed on, nothing shown
+                left += len([k for k in cand if k not in full])
+                W.put(res)
+                acc.add(res)
             pre_used, ret_used = res["forward"], ret_used | res["ret_used"]
             del inv, checks, nxt, res, cand
             _trim()
@@ -656,8 +693,12 @@ def build(company, latest_fn, progress=None, today=None):
     note = (f"{left} invoice{'' if left == 1 else 's'} still to be read in full for their orders; "
             f"the next read continues.") if left else ""
     r = acc.result(gen)
+    nb, nf = billy.counts(nuis, "bridge", days[0], days[-1]), billy.counts(nuis, "fiscal", days[0], days[-1])
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"), complete=not errors,
-             simphony=sim_on, orders_note=note)
+             simphony=sim_on, orders_note=note,
+             range={"from": days[0].isoformat(), "to": days[-1].isoformat(), "custom": bool(frm or to)},
+             # the days Billy gave no invoice for (before what Billy keeps, or a day closed)
+             empty_days=[d.isoformat() for d in days if not nb.get(d.isoformat()) and not nf.get(d.isoformat())])
     _trim()
     return r
 
@@ -1590,42 +1631,67 @@ def _registered(gen):
         return False
 
 
-def held(company):
+def held(company, key=None):
+    key = key or company
     with _lock:
-        hit = _results.get(company)
+        hit = _results.get(key)
     if hit:
         return hit[1]
     try:                                                     # the last read, kept on disk across restarts
-        with gzip.open(_file(company), "rt", encoding="utf-8") as f:
+        with gzip.open(_file(key), "rt", encoding="utf-8") as f:
             r = json.load(f)
     except (OSError, ValueError):
         return None
     if not r.get("gen") or not _registered(r["gen"]):       # a read of before the rows were kept on disk: read again
         return None
     with _lock:
-        _results.setdefault(company, (0.0, r))              # age 0: shown at once, read again in the background
+        _results.setdefault(key, (0.0, r))                  # age 0: shown at once, read again in the background
     return r
 
 
-def remember(company, r):
+KEEP_RANGES = 3                 # ranges asked on the screen kept per company (the oldest dropped)
+
+
+def _forget(con, key):
+    for (g,) in con.execute("SELECT gen FROM gens WHERE company=?", (key,)).fetchall():
+        with con:
+            con.execute("DELETE FROM rw WHERE gen=?", (g,))
+            con.execute("DELETE FROM gens WHERE gen=?", (g,))
+    with _lock:
+        _results.pop(key, None)
+    try:
+        _file(key).unlink()
+    except OSError:
+        pass
+
+
+def remember(company, r, key=None):
+    """Holds the read (in memory, on disk) under its key (key_of), and deletes the reads before it of the same key;
+    of the ranges asked on the screen, the KEEP_RANGES most recent stay."""
+    key = key or company
     con = _rcon()
     with con:
-        con.execute("INSERT OR REPLACE INTO gens VALUES (?,?,?)", (r["gen"], company, time.time()))
+        con.execute("INSERT OR REPLACE INTO gens VALUES (?,?,?)", (r["gen"], key, time.time()))
     with _lock:
-        _results[company] = (time.time(), r)
+        _results[key] = (time.time(), r)
     try:
-        tmp = _file(company).with_suffix(".tmp")
+        tmp = _file(key).with_suffix(".tmp")
         with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=5) as f:
             json.dump(r, f, default=str)
-        tmp.replace(_file(company))
+        tmp.replace(_file(key))
     except OSError:
         traceback.print_exc()
-    try:                                                     # the reads before it, of the same company
-        old = [g for (g,) in con.execute("SELECT gen FROM gens WHERE company=? AND gen<>?", (company, r["gen"]))]
+    try:                                                     # the reads before it, of the same key
+        old = [g for (g,) in con.execute("SELECT gen FROM gens WHERE company=? AND gen<>?", (key, r["gen"]))]
         for g in old:
             with con:
                 con.execute("DELETE FROM rw WHERE gen=?", (g,))
                 con.execute("DELETE FROM gens WHERE gen=?", (g,))
+        if key != company:
+            ranges = [k for (k,) in con.execute("SELECT company FROM gens WHERE substr(company, 1, ?)=? "
+                                                "GROUP BY company ORDER BY MAX(at) DESC", (len(company) + 1, company + "|"))]
+            for k in ranges[KEEP_RANGES:]:
+                _forget(con, k)
     except sqlite3.Error:
         traceback.print_exc()
 
@@ -1641,34 +1707,42 @@ def _sweep():
         traceback.print_exc()
 
 
-def request(company, latest_fn, refresh=False):
+def request(company, latest_fn, refresh=False, frm=None, to=None):
     """The last read at once; a new read in the background when it is older than KEEP or asked for. While it runs
-    the last read comes back with reading: True (the screen keeps showing it and asks again)."""
-    last = held(company)
+    the last read comes back with reading: True (the screen keeps showing it and asks again). frm–to: a range of its
+    own (check_range), held apart from the company's read; it does not touch the exceptions register, and once every
+    day of it and the three after are closed it is not read again unless asked."""
+    custom = bool(frm or to)
+    if custom:
+        a, b = check_range(frm, to)
+        frm, to = a.isoformat(), b.isoformat()
+    key = key_of(company, frm, to)
+    closed = custom and b + timedelta(days=OVERLAP_DAYS) <= date.today() - timedelta(days=2)
+    last = held(company, key)
     with _lock:
-        hit = _results.get(company)
-        job = _jobs.get(company)
+        hit = _results.get(key)
+        job = _jobs.get(key)
         running = bool(job and job["state"] == "running")
-        fresh = hit and time.time() - hit[0] < KEEP
+        fresh = hit and (time.time() - hit[0] < KEEP or closed)
         if job and job["state"] == "failed" and not refresh and time.time() - job["at"] < 60:
-            _jobs.pop(company, None)
+            _jobs.pop(key, None)
             if not last:
                 return {"available": False, "error": job["error"]}
             return dict(last, reading=False, read_error=job["error"])
         if not running and (refresh or not fresh):
-            job = _jobs[company] = {"state": "running", "stage": "starting", "at": time.time(), "error": ""}
+            job = _jobs[key] = {"state": "running", "stage": "starting", "at": time.time(), "error": ""}
             running = True
 
             def go():
                 try:
-                    r = build(company, latest_fn, progress=lambda st: job.update(stage=st))
-                    if on_built:
+                    r = build(company, latest_fn, progress=lambda st: job.update(stage=st), frm=frm, to=to)
+                    if on_built and not custom:              # the register follows the company's read only
                         job.update(stage="updating the exceptions register")
                         try:
                             r["register"] = on_built(company, r)
                         except Exception:                          # noqa: BLE001
                             traceback.print_exc()
-                    remember(company, r)
+                    remember(company, r, key)
                     job["state"] = "done"
                 except Exception as exc:                           # noqa: BLE001
                     traceback.print_exc()

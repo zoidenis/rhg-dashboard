@@ -1667,6 +1667,9 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <p class="hint" id="biNote"><span>Every Simphony check against the invoice Billy fiscalized for it: whether, with which IIC and FIC and at what time; the tills and units (kiosks included), shifts and operators, the summary invoices, and the sales book in the columns of the law in place of the Self-Care download.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <button class="mini dark" id="biRead">Read again</button><button class="mini exp" id="biXlsx">Sales book · Export ▾</button><button class="mini" id="biSetBtn" style="display:none">Connection &amp; mapping</button></div></div>
+      <div class="filters" style="margin:12px 0 0;align-items:flex-end"><label>From<input type="date" id="biFrom"></label><label>To<input type="date" id="biTo"></label>
+        <button class="mini" type="button" id="biRange">Read this range</button><button class="mini" type="button" id="biRangeOff" hidden>Back to the last days</button>
+        <span class="meta" id="biRangeMsg"><span>Any days up to yesterday, 62 at most; the usual view is the last days of Settings.</span></span></div>
       <div class="kpis" id="biKpis" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
       <p class="meta" id="biStatus"></p>
     </div>
@@ -5482,18 +5485,21 @@ $("epExp").onclick = () => {
      "A · " + who(a), "B · " + who(b), "A user has every right any of their roles gives."]);
 };
 let biData = null, biTimer = null, biTab = "checks", biBookErr = "", biCfg = null;
+let biRng = null;            // a range asked here ({from, to}); none: the last days of Settings
+const biRngP = p => { if (biRng) { p.set("from", biRng.from); p.set("to", biRng.to); } return p; };
+const biYday = () => { const y = new Date(); y.setDate(y.getDate() - 1); return y.toLocaleDateString("sv-SE"); };
 const BL_PILL = {ok: "low", late: "medium", late48: "critical", missing: "critical", pending: "", zero: ""};
 async function loadBilly(refresh){
   clearTimeout(biTimer);
   $("biStatus").textContent = "Reading…";
   try{
-    const p = new URLSearchParams({company: $("company").value || ""});
+    const p = biRngP(new URLSearchParams({company: $("company").value || ""}));
     const j = await readJSON(await fetch("/api/billyrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
     $("biSetBtn").style.display = j.can_settings ? "" : "none";
-    if (j.pending) { $("biStatus").textContent = `Reading Simphony and Billy… ${j.stage || ""}`; biTimer = setTimeout(() => loadBilly(false), 4000); return; }
+    if (j.pending) { $("biStatus").innerHTML = `${fcSp("Reading Simphony and Billy…")} ${biRng ? esc(`${biRng.from} → ${biRng.to}`) + " · " : ""}${esc(j.stage || "")}`; biTimer = setTimeout(() => loadBilly(false), 4000); return; }
     if (j.available === false || j.error) throw Object.assign(new Error(j.error || "not available"), {companies: j.companies || []});
     // the last read is shown at once; a new one may be running behind it
-    const same = biData && biData.checked_at === j.checked_at && biData.company === j.company;
+    const same = biData && biData.gen === j.gen && biData.checked_at === j.checked_at && biData.company === j.company;
     biData = j; if (!same) renderBilly(); else biStatusLine();
     if (j.reading) biTimer = setTimeout(() => loadBilly(false), 5000);
   }catch(e){
@@ -5521,6 +5527,7 @@ function renderBilly(){
   $("biFLoc").innerHTML = `<option value="">All</option>` + locs.map(r => `<option value="${esc(r)}"${r === lv ? " selected" : ""}>${esc((d.locations.find(L => L.ref === r) || {}).name || r)}</option>`).join("");
   $("biFSt").innerHTML = `<option value="all">All</option>` + Object.entries(d.status).map(([k2, l]) => `<option value="${k2}"${k2 === sv ? " selected" : ""}>${esc(l)}</option>`).join("");
   $("biDefs").innerHTML = Object.values(d.definitions).map(x => `<p>${fcSp(x)}</p>`).join("");
+  biRangeSync();
   biChecks(); biInv(); biGrid(); biTills(); biOps(); biSum(); biBook(); biOrders(); biRet();
   const rc = $("biRetCard"); if (rc) { const go = () => $("biSeg").querySelector('[data-b="returns"]').click(); rc.onclick = go; rc.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } }; }
 }
@@ -5532,7 +5539,7 @@ async function biTable(kind, params, draw, more){
   const P = biPg[kind] || (biPg[kind] = {seq: 0, rows: []}), key = JSON.stringify(params) + d.gen;
   if (!more || P.key !== key) { P.key = key; P.rows = []; P.total = 0; }
   const seq = ++P.seq;
-  const p = new URLSearchParams({company: d.company, gen: d.gen || "", kind, offset: String(P.rows.length), limit: "400"});
+  const p = biRngP(new URLSearchParams({company: d.company, gen: d.gen || "", kind, offset: String(P.rows.length), limit: "400"}));
   Object.entries(params).forEach(([k, v]) => { if (v) p.set(k, v); });
   try{
     const j = await readJSON(await fetch("/api/billyrec/rows?" + p.toString()));
@@ -5609,13 +5616,16 @@ $("biRetLoc").onchange = $("biRetKind").onchange = () => biData && biRetTable();
 $("biRetQ").oninput = () => biLater(biRetTable);
 $("biRetExp").onclick = () => {
   if (!biData || !biData.returns) return;
-  const p = new URLSearchParams({company: biData.company, part: "returns"});
+  const p = biRngP(new URLSearchParams({company: biData.company, part: "returns"}));
   Object.entries(biRetParams()).forEach(([k, v]) => { if (v) p.set(k, v); });
   exportGo("/api/billyrec/xlsx?" + p.toString());
 };
 function biStatusLine(){
   const d = biData;
-  $("biStatus").innerHTML = (d.reading ? `<b>${fcSp("Reading the new figures…")}</b> ${esc(d.stage || "")} · ${fcSp("shown: the last read")} · ` : "") + (d.read_error ? `<span class="warn">${esc("Last read failed: " + d.read_error)}</span> · ` : "") + esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
+  $("biStatus").innerHTML = (d.reading ? `<b>${fcSp("Reading the new figures…")}</b> ${esc(d.stage || "")} · ${fcSp("shown: the last read")} · ` : "") + (d.read_error ? `<span class="warn">${esc("Last read failed: " + d.read_error)}</span> · ` : "")
+    + (d.range && d.range.custom ? `<b>${fcSp("Chosen range")}</b> · ${fcSp("not in the exceptions register")} · ` : "")
+    + esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
+    + ((d.empty_days || []).length ? ` · <span class="warn">${fcSp(`Billy gave no invoice for ${d.empty_days.length} of the days`)}</span>` : "")
     + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
     + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
     + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
@@ -5719,7 +5729,21 @@ $("biFLoc").onchange = () => { if (biData) { biChecks(); biInv(); } };
 $("biFSt").onchange = () => biData && biChecks();
 $("biFQ").oninput = () => biLater(biChecks);
 $("biRead").onclick = () => loadBilly(true);
-$("biXlsx").onclick = () => { if (biData) exportGo("/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company)); };
+$("biXlsx").onclick = () => { if (biData) exportGo("/api/billyrec/xlsx?" + biRngP(new URLSearchParams({company: biData.company})).toString()); };
+// a range of its own: read apart from the last days (and kept a while: the three last ranges of a company)
+function biRangeSync(){
+  const d = biData, R = d.range || {from: d.days[0], to: d.days[d.days.length - 1]};
+  [["biFrom", R.from], ["biTo", R.to]].forEach(([id, v]) => { if (document.activeElement !== $(id)) $(id).value = v; $(id).max = biYday(); });
+  $("biRangeOff").hidden = !biRng;
+}
+$("biRange").onclick = () => {
+  const a = $("biFrom").value, b = $("biTo").value, n = a && b ? (new Date(b) - new Date(a)) / 864e5 + 1 : 0;
+  const bad = !a || !b ? "Choose the first and the last day." : a > b ? "The first day is after the last one." : b > biYday() ? "The range ends yesterday at the latest." : n > 62 ? "At most 62 days at a time." : "";
+  if (bad) { $("biRangeMsg").innerHTML = `<span class="warn">${fcSp(bad)}</span>`; return; }
+  $("biRangeMsg").innerHTML = `<span>${fcSp("The range is read apart: the days already read are not asked again, and the exceptions register follows only the last days.")}</span>`;
+  biRng = {from: a, to: b}; $("biRangeOff").hidden = false; loadBilly(false);
+};
+$("biRangeOff").onclick = () => { biRng = null; $("biRangeOff").hidden = true; $("biRangeMsg").innerHTML = `<span>${fcSp("Any days up to yesterday, 62 at most; the usual view is the last days of Settings.")}</span>`; loadBilly(false); };
 // connection and mapping (Settings permission): the passwords are typed here and never shown back
 function biAcctRow(a){
   const cos = (biCfg && biCfg.companies) || [];

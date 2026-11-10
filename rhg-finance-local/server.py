@@ -2751,10 +2751,11 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Your role does not include Simphony ↔ Billy."})
                     return
                 company = q.get("company") or (billyrec.companies() or [config.BC_COMPANY])[0]
+                frm, to = q.get("from") or None, q.get("to") or None      # a range asked on the screen
                 if url.path.endswith(("xlsx", "rows")):
-                    r = billyrec.held(company)
+                    r = billyrec.held(company, billyrec.key_of(company, frm, to))
                     if not r:
-                        self._send(409, {"error": "Read Simphony ↔ Billy first."})
+                        self._send(409, {"error": "Read Simphony ↔ Billy first." if not frm else "Read this range first."})
                         return
                     keep = billyrec._keep_of(r, self._allowed)
                     f = {k: q.get(k) or "" for k in ("ref", "st", "k", "q")}
@@ -2787,7 +2788,7 @@ class Handler(BaseHTTPRequestHandler):
                     store.audit("export", what, user["username"], {}, {}, r["days"][0])
                     return
                 try:
-                    r = billyrec.request(company, _latest, q.get("refresh") == "1")
+                    r = billyrec.request(company, _latest, q.get("refresh") == "1", frm, to)
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
                 if isinstance(r, dict) and r.get("gen"):
