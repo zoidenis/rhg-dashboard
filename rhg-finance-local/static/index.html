@@ -3510,7 +3510,7 @@ $("cpKey").onchange = () => cpLoad();
 $("cpView").onchange = () => { $("cpChL").style.display = $("cpView").value === "month" ? "" : "none"; if ($("cpView").value === "month" && !$("cpCh").value && cpData && cpData.channels.length) $("cpCh").value = cpData.channels[0].key; cpLoad(); };
 $("cpCh").onchange = () => cpLoad();
 $("cpRead").onclick = () => cpLoad(true);
-$("cpXlsx").onclick = () => { if (cpData) location.href = exportUrl("/api/sales/channel-profit/xlsx?" + cpQs()); };
+$("cpXlsx").onclick = () => { if (cpData) exportGo("/api/sales/channel-profit/xlsx?" + cpQs()); };
 function cpRender(){
   const d = cpData, T = d.total, C = d.currency;
   const card = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
@@ -3644,7 +3644,7 @@ $("meLevel").onchange = () => {
 $("meKey").onchange = () => meLoad();
 $("meSec").onchange = () => meLoad();
 $("meRead").onclick = () => meLoad(true);
-$("meXlsx").onclick = () => { if (meData) location.href = exportUrl("/api/sales/menu/xlsx?" + meQs()); };
+$("meXlsx").onclick = () => { if (meData) exportGo("/api/sales/menu/xlsx?" + meQs()); };
 $("meChartSec").onchange = () => meData && meChart();
 $("meQ").oninput = () => meData && meItems();
 function meRender(){
@@ -4212,7 +4212,7 @@ function prxRender(){
 ["prxLoc", "prxLvl", "prxGrp"].forEach(id => $(id).onchange = () => prxLoad());
 $("prxQ").oninput = () => { clearTimeout(prxTimer); prxTimer = setTimeout(() => prxLoad(), 400); };
 $("prxRead").onclick = () => prxLoad(true);
-$("prxXlsx").onclick = () => { location.href = exportUrl("/api/sales/prices/xlsx?" + prxQs()); };
+$("prxXlsx").onclick = () => { exportGo("/api/sales/prices/xlsx?" + prxQs()); };
 function slOpen(i){ $("slPop").dataset.i = i; slDraw(i); $("slBd").classList.add("show"); }
 function slDraw(i){
   const d = salesData, l = (d.locations || [])[i]; if (!l) return;
@@ -4268,20 +4268,36 @@ function renderSimphony(st){
   ["spSave","spTest"].forEach(id => { $(id).disabled = !can("settings");
     $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
 }
-// ---------- Export: every export of the tower as Excel or PDF ----------
-// A button or link with class "exp" opens a small menu, Excel (.xlsx) or PDF; the choice runs the export the
-// button already does, with format=pdf for a PDF: the server builds the same workbook and lays it out (xlsxpdf.py).
-var exportFmt = "xlsx";
+// ---------- Export: every export of the tower as Excel or PDF, or sent by email ----------
+// A button or link with class "exp" opens a small menu: Excel (.xlsx), PDF, Send by email. Excel and PDF run the
+// export the button already does (format=pdf for a PDF: the server lays the same workbook out, xlsxpdf.py). Send by
+// email runs it in "capture" mode: the export's address (or the table a screen sends) is kept, the person writes
+// the addresses and a message, and the server builds the file itself and sends it (exportmail.py).
+var exportFmt = "xlsx", exportMode = "", exportCaptured = null;
 function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ? "&" : "?") + "format=pdf" : url; }
+function exportGo(url){ if (exportMode === "capture") { exportCaptured = {url}; return; } location.href = exportUrl(url); }
 (function(){
+  const TOWER = "RHG-Finance";                              // the header this tower's POSTs carry
   const st = document.createElement("style");
   st.textContent = `.exp{white-space:nowrap}
-.exp-menu{position:absolute;z-index:90;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:4px;min-width:170px}
+.exp-menu{position:absolute;z-index:90;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:4px;min-width:190px}
 .exp-menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 12px;border-radius:7px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
 .exp-menu button:hover,.exp-menu button:focus-visible{background:var(--bg);outline:none}
-.exp-menu .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--sub,var(--muted))}`;
+.exp-menu .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--sub,var(--muted));min-width:34px;text-align:center}
+.exp-menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.exp-dlg-bg{position:fixed;inset:0;z-index:95;background:rgba(8,30,40,.55);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;overflow:auto}
+.exp-dlg{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:100%;max-width:480px;padding:18px 20px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.exp-dlg h3{margin:0 0 2px;font-size:16px}.exp-dlg .meta{font-size:12px;color:var(--sub,var(--muted))}
+.exp-dlg label{display:block;font-size:12.5px;font-weight:600;margin:12px 0 4px}
+.exp-dlg input[type=text],.exp-dlg input[type=email],.exp-dlg textarea{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.exp-dlg textarea{min-height:70px;resize:vertical}
+.exp-dlg .fmt{display:flex;gap:8px}.exp-dlg .fmt label{display:flex;align-items:center;gap:6px;margin:0;font-weight:500;padding:7px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.exp-dlg .fmt input{margin:0}.exp-dlg .row{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:16px;flex-wrap:wrap}
+.exp-dlg .msg{font-size:12.5px;margin-top:10px;min-height:1em}.exp-dlg .msg.err{color:var(--up,#c0392b)}.exp-dlg .msg.ok{color:var(--down,#0e8a57)}
+.exp-dlg .chk{display:flex;align-items:center;gap:8px;font-weight:500}.exp-dlg .chk input{margin:0}`;
   document.head.appendChild(st);
   let menu = null, owner = null, openedAt = 0;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const close = () => { if (menu) { menu.remove(); menu = null; if (owner) owner.setAttribute("aria-expanded", "false"); owner = null; } };
   function run(el, f){
     if (el.tagName === "A") {
@@ -4292,19 +4308,74 @@ function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ?
     exportFmt = f; el.__expRun = true;
     try { el.click(); } finally { el.__expRun = false; exportFmt = "xlsx"; }
   }
+  function capture(el){
+    if (el.tagName === "A") { const h = el.getAttribute("href"); return h && h !== "#" ? {url: h} : null; }
+    exportMode = "capture"; exportCaptured = null; el.__expRun = true;
+    try { el.click(); } finally { el.__expRun = false; exportMode = ""; }
+    return exportCaptured;
+  }
+  function titleOf(el){
+    const box = el.closest(".modal, .card, section");
+    const h = box && box.querySelector("h2");
+    const page = (document.getElementById("title") || {}).textContent || "";
+    const t = h ? h.textContent.trim() : "";
+    return [page.trim(), t].filter(Boolean).filter((x, i, a) => i === 0 || !a[0].includes(x)).join(" · ") || document.title;
+  }
+  function mailDialog(el){
+    const what = capture(el);
+    const bg = document.createElement("div");
+    bg.className = "exp-dlg-bg";
+    let last = "";
+    try { last = localStorage.getItem("pulse-export-to") || ""; } catch (e) { /* storage off */ }
+    const title = what && what.table ? what.table.name : titleOf(el);
+    bg.innerHTML = `<div class="exp-dlg" role="dialog" aria-modal="true" aria-labelledby="expDlgT">
+      <h3 id="expDlgT">Send by email</h3><div class="meta">${esc(title)}</div>
+      ${what ? `<label for="expTo">To</label><input type="text" id="expTo" placeholder="name@rhg.al, other@rhg.al" value="${esc(last)}" autocomplete="email">
+      <label>File</label><div class="fmt"><label><input type="radio" name="expFmt" value="xlsx" checked> Excel</label><label><input type="radio" name="expFmt" value="pdf"> PDF</label></div>
+      <label for="expNote">Message (optional)</label><textarea id="expNote" placeholder="A line for the people who receive it"></textarea>
+      <label class="chk"><input type="checkbox" id="expMe" checked> Send me a copy</label>` :
+      `<p class="msg err">This export is not ready yet: wait for the screen to finish reading, then try again.</p>`}
+      <div class="msg" id="expMsg" aria-live="polite"></div>
+      <div class="row"><button type="button" class="mini" id="expCancel">${what ? "Cancel" : "Close"}</button>${what ? `<button type="button" class="mini dark" id="expSend">Send</button>` : ""}</div></div>`;
+    document.body.appendChild(bg);
+    const onKey = ev => { if (ev.key === "Escape") { ev.stopPropagation(); ev.preventDefault(); shut(); } };
+    const shut = () => { document.removeEventListener("keydown", onKey, true); bg.remove(); el.focus({preventScroll: true}); };
+    bg.addEventListener("click", ev => { if (ev.target === bg) shut(); });
+    document.addEventListener("keydown", onKey, true);
+    bg.querySelector("#expCancel").onclick = shut;
+    if (!what) { bg.querySelector("#expCancel").focus(); return; }
+    const to = bg.querySelector("#expTo"); to.focus();
+    bg.querySelector("#expSend").onclick = async () => {
+      const msg = bg.querySelector("#expMsg"), btn = bg.querySelector("#expSend");
+      const addr = to.value.trim();
+      if (!addr) { msg.className = "msg err"; msg.textContent = "Write at least one address."; to.focus(); return; }
+      const fmt = bg.querySelector('input[name="expFmt"]:checked').value;
+      btn.disabled = true; msg.className = "msg"; msg.textContent = fmt === "pdf" ? "Building the PDF and sending…" : "Building the file and sending…";
+      try {
+        const r = await fetch("/api/export/email", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": TOWER},
+          body: JSON.stringify(Object.assign({}, what, {to: addr, format: fmt, note: bg.querySelector("#expNote").value, copy_me: bg.querySelector("#expMe").checked, title})) });
+        let j = {}; try { j = await r.json(); } catch (e) { /* not JSON */ }
+        if (!r.ok) throw new Error(j.error || `failed (${r.status})`);
+        try { localStorage.setItem("pulse-export-to", addr); } catch (e) { /* storage off */ }
+        msg.className = "msg ok"; msg.textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc.length ? " · copy to " + j.sent.cc.join(", ") : ""}: ${j.sent.file}`;
+        btn.textContent = "Sent"; bg.querySelector("#expCancel").textContent = "Close";
+      } catch (e) { msg.className = "msg err"; msg.textContent = "Not sent: " + e.message; btn.disabled = false; }
+    };
+  }
   function open(el){
     close();
     owner = el; el.setAttribute("aria-expanded", "true");
     menu = document.createElement("div");
     menu.className = "exp-menu"; menu.setAttribute("role", "menu");
     menu.innerHTML = `<button type="button" role="menuitem" data-f="xlsx"><span class="k">XLSX</span><span>Excel</span></button>` +
-      `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button>`;
+      `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button><hr>` +
+      `<button type="button" role="menuitem" data-f="mail"><span class="k">@</span><span>Send by email…</span></button>`;
     (el.closest(".modal-bg") || document.body).appendChild(menu);
     const r = el.getBoundingClientRect(), host = menu.offsetParent || document.body, hr = host === document.body ? {top: -window.scrollY, left: -window.scrollX} : host.getBoundingClientRect();
     const sy = host === document.body ? 0 : host.scrollTop, sx = host === document.body ? 0 : host.scrollLeft;
     menu.style.top = (r.bottom - hr.top + sy + 4) + "px";
     menu.style.left = Math.max(8, Math.min(r.left - hr.left + sx, document.documentElement.clientWidth - hr.left + sx - menu.offsetWidth - 8)) + "px";
-    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); run(el, f); });
+    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); if (f === "mail") mailDialog(el); else run(el, f); });
     menu.querySelector("button").focus({preventScroll: true});
     openedAt = Date.now();
   }
@@ -4325,6 +4396,7 @@ function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ?
 })();
 // one table as an Excel file (xlsxtable.py), or a PDF of it: the screen sends the rows it shows, numbers unformatted
 async function xlsxTable(name, sheets, notes){
+  if (exportMode === "capture") { exportCaptured = {table: {name, sheets, notes: notes || []}}; return; }
   const fmt = exportFmt;
   const r = await fetch("/api/xlsx/table", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"},
     body: JSON.stringify({name, sheets, notes: notes || [], format: fmt})});
@@ -4438,7 +4510,7 @@ async function loadRecipes(refresh){
 }
 $("rcRead").onclick = () => loadRecipes(true);
 $("imRead").onclick = () => loadRecipes(true);
-$("rcXlsx").onclick = $("imXlsx").onclick = () => { location.href = exportUrl("/api/recipes/xlsx?" + rcQs()); };
+$("rcXlsx").onclick = $("imXlsx").onclick = () => { exportGo("/api/recipes/xlsx?" + rcQs()); };
 $("rcDrillClose").onclick = () => { $("rcDrillCard").style.display = "none"; };
 $("imListClose").onclick = () => { $("imListCard").style.display = "none"; };
 const rcPill = st => `<span class="rhg-pill ${RC_PILL[st] || "info"}">${esc(st.toLowerCase())}</span>`;
@@ -4565,7 +4637,7 @@ async function isLoad(refresh){
 $("isRead").onclick = () => isLoad(true);
 $("isToday").onclick = () => { $("isDate").value = ""; isLoad(false); };
 $("isDate").onchange = () => isLoad(false);
-$("isXlsx").onclick = () => { location.href = exportUrl("/api/inventory/items/xlsx?" + isQs() + "&location=" + encodeURIComponent($("isLoc").value) + "&show=" + encodeURIComponent($("isShow").value)); };
+$("isXlsx").onclick = () => { exportGo("/api/inventory/items/xlsx?" + isQs() + "&location=" + encodeURIComponent($("isLoc").value) + "&show=" + encodeURIComponent($("isShow").value)); };
 ["isLoc","isG3","isG4","isShow","isSort","isMode"].forEach(id => $(id).onchange = () => { isLimit = 200; isRender(); });
 $("isQ").oninput = () => { isLimit = 200; isRender(); };
 $("isMore").onclick = () => { isLimit += 400; isRender(); };
@@ -4776,7 +4848,7 @@ window.addEventListener("resize", () => { if ($("v-invcharts") && $("v-invcharts
 $("mvRead").onclick = () => { mvData = null; loadMovement(true); };
 $("mvDays").onchange = () => { mvData = null; loadMovement(false); };
 $("mvAsOf").onchange = () => { mvData = null; loadMovement(false); };
-$("mvXlsx").onclick = () => { if (mvData) location.href = exportUrl("/api/movement/xlsx?" + mvQs()); };
+$("mvXlsx").onclick = () => { if (mvData) exportGo("/api/movement/xlsx?" + mvQs()); };
 ["mvFLoc","mvFClass","mvFCat","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => loadMvRows());
 $("mvFQ").onkeydown = e => { if (e.key === "Enter") loadMvRows(); };
 function renderMovement(){
@@ -5230,7 +5302,7 @@ $("biFLoc").onchange = () => { if (biData) { biChecks(); biInv(); } };
 $("biFSt").onchange = () => biData && biChecks();
 $("biFQ").oninput = () => biData && biChecks();
 $("biRead").onclick = () => loadBilly(true);
-$("biXlsx").onclick = () => { if (biData) location.href = exportUrl("/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company)); };
+$("biXlsx").onclick = () => { if (biData) exportGo("/api/billyrec/xlsx?company=" + encodeURIComponent(biData.company)); };
 // connection and mapping (Settings permission): the passwords are typed here and never shown back
 function biAcctRow(a){
   const cos = (biCfg && biCfg.companies) || [];
@@ -5601,7 +5673,7 @@ function stRender(){
 $("stLoc").onchange = () => stRender();
 $("stQ").oninput = () => stRender();
 $("stRead").onclick = () => stLoad(true);
-$("stXlsx").onclick = () => { if (stData) location.href = exportUrl("/api/sales/stockstop/xlsx?" + new URLSearchParams({company: $("company").value || ""})); };
+$("stXlsx").onclick = () => { if (stData) exportGo("/api/sales/stockstop/xlsx?" + new URLSearchParams({company: $("company").value || ""})); };
 $("company").addEventListener("change", () => { stData = null; if ($("slStView").style.display !== "none") stLoad(false); });
 // ---------- Inventory → Shrinkage KPIs (shrinkage.py) ----------
 var shCfgSaved = false;
@@ -6079,7 +6151,7 @@ $("shLoc").onchange = () => { shUpHint(); shMon = ""; shCat = ""; shData = null;
 $("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
 $("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
 $("shRead").onclick = () => $("shLoc").value ? loadSh(true) : loadShOv(true);
-$("shXlsx").onclick = () => { if (shData) location.href = exportUrl("/api/shrinkage/xlsx?" + shQs()); };
+$("shXlsx").onclick = () => { if (shData) exportGo("/api/shrinkage/xlsx?" + shQs()); };
 $("shCfgBtn").onclick = () => { if (shCfgOpen && !$("shCfgCard").hidden) { $("shCfgCard").hidden = true; shCfgOpen = false; } else { shCfgLoad(); $("shCfgCard").scrollIntoView({behavior: "smooth", block: "start"}); } };
 $("shCfgClose").onclick = () => { $("shCfgCard").hidden = true; shCfgOpen = false; };
 $("shQ").oninput = () => shItems();
@@ -6266,7 +6338,7 @@ $("cnSheet").onchange = () => cnUpload($("cnSheet").value);
 $("cnLoc").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; loadCn(false); };
 $("cnMonth").onchange = () => { cnData = null; cnFile = null; $("cnSheet").hidden = true; $("cnUpMsg").textContent = ""; loadCn(false); };
 $("cnRead").onclick = () => { cnData = null; loadCn(true); };
-$("cnXlsx").onclick = () => { if (cnData) location.href = exportUrl("/api/stockcount/xlsx?" + cnQs()); };
+$("cnXlsx").onclick = () => { if (cnData) exportGo("/api/stockcount/xlsx?" + cnQs()); };
 $("cnQ").oninput = () => cnData && cnLines();
 // ---------- the window of a new count: location and month → read Business Central → upload the form → Excel
 const cnSp = t => `<span>${esc(t)}</span>`;
@@ -6309,7 +6381,7 @@ async function cnWizShow(){
   drop.ondragleave = () => drop.classList.remove("over");
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (!$("cnw3").classList.contains("off")) take(e.dataTransfer.files[0]); };
   $("cnwSheet").onchange = () => cnUpload($("cnwSheet").value);
-  $("cnwXlsx").onclick = () => { if (!cnWizMine()) return; location.href = exportUrl("/api/stockcount/xlsx?" + cnQs()); cnWizXlsx = true; cnWizDraw(); };
+  $("cnwXlsx").onclick = () => { if (!cnWizMine()) return; exportGo("/api/stockcount/xlsx?" + cnQs()); cnWizXlsx = true; cnWizDraw(); };
   $("cnwSee").onclick = () => { cnWizClose(); window.scrollTo({top: 0, behavior: "smooth"}); };
   cnWizOn = true; $("cnBd").classList.add("show"); cnWizDraw();
   clearInterval(cnWizTimer); cnWizTimer = setInterval(cnWizDraw, 800);
@@ -6350,7 +6422,7 @@ $("dcRead").onclick = () => { dcData = null; loadDischarge(true); };
 $("dcDays").onchange = () => { dcData = null; loadDischarge(false); };
 $("dcLocSel").onchange = () => dcData && renderDischarge();
 $("dcQ").oninput = () => dcData && renderDcLines();
-$("dcXlsx").onclick = () => { if (dcData) location.href = exportUrl("/api/discharge/xlsx?" + new URLSearchParams({company: $("company").value || "", days: $("dcDays").value})); };
+$("dcXlsx").onclick = () => { if (dcData) exportGo("/api/discharge/xlsx?" + new URLSearchParams({company: $("company").value || "", days: $("dcDays").value})); };
 function dcLines(){ const loc = $("dcLocSel").value; return dcData.lines.filter(x => !loc || x.location === loc); }
 function renderDischarge(){
   const d = dcData, loc = $("dcLocSel").value, L = dcLines();
@@ -6486,7 +6558,7 @@ async function loadTypology(refresh){
 $("tyRead").onclick = () => { tyData = null; loadTypology(true); };
 $("tyDays").onchange = () => { tyData = null; loadTypology(false); };
 $("tyAsOf").onchange = () => { tyData = null; loadTypology(false); };
-$("tyXlsx").onclick = () => { if (tyData) location.href = exportUrl("/api/typology/xlsx?" + tyQs()); };
+$("tyXlsx").onclick = () => { if (tyData) exportGo("/api/typology/xlsx?" + tyQs()); };
 ["tyLoc", "tyNat", "tyOnlyCount"].forEach(id => $(id).onchange = () => tyData && renderTypology());
 // sum the (location, type, family) rows; for the whole group the use of distribution locations
 // (their transfers out) is left out, so the restaurants' use is not counted twice
@@ -6747,7 +6819,7 @@ async function fsWait(id, msgEl, done){
 }
 $("fsRead").onclick = () => { fsData = null; loadFiscal(true); };
 $("fsFrom").onchange = $("fsTo").onchange = () => { fsData = null; loadFiscal(false); };
-$("fsXlsx").onclick = () => { if (fsData) location.href = exportUrl("/api/fiscal/xlsx?" + fsQs()); };
+$("fsXlsx").onclick = () => { if (fsData) exportGo("/api/fiscal/xlsx?" + fsQs()); };
 $("fsFilter").onchange = fsRows; $("fsQ").oninput = fsRows;
 $("fsFetch").onclick = async () => {
   $("fsMsg").textContent = "Reading the e-invoices from the Tax Administration…";
@@ -6849,7 +6921,7 @@ function fxRows(){
 }
 $("fxRead").onclick = () => { fxData = null; loadFiscalSales(true); };
 $("fxFrom").onchange = $("fxTo").onchange = () => { fxData = null; loadFiscalSales(false); };
-$("fxXlsx").onclick = () => { if (fxData) location.href = exportUrl("/api/fiscal/xlsx?" + fxQs()); };
+$("fxXlsx").onclick = () => { if (fxData) exportGo("/api/fiscal/xlsx?" + fxQs()); };
 $("fxFilter").onchange = fxRows; $("fxQ").oninput = fxRows;
 $("fxFetch").onclick = async () => {
   $("fxMsg").textContent = "Reading the e-invoices we issued from the Tax Administration…";

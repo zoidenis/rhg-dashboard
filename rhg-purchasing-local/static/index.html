@@ -1216,20 +1216,36 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 
 <script>
 const $ = id => document.getElementById(id);
-// ---------- Export: every export of the tower as Excel or PDF ----------
-// A button or link with class "exp" opens a small menu, Excel (.xlsx) or PDF; the choice runs the export the
-// button already does, with format=pdf for a PDF: the server builds the same workbook and lays it out (xlsxpdf.py).
-var exportFmt = "xlsx";
+// ---------- Export: every export of the tower as Excel or PDF, or sent by email ----------
+// A button or link with class "exp" opens a small menu: Excel (.xlsx), PDF, Send by email. Excel and PDF run the
+// export the button already does (format=pdf for a PDF: the server lays the same workbook out, xlsxpdf.py). Send by
+// email runs it in "capture" mode: the export's address (or the table a screen sends) is kept, the person writes
+// the addresses and a message, and the server builds the file itself and sends it (exportmail.py).
+var exportFmt = "xlsx", exportMode = "", exportCaptured = null;
 function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ? "&" : "?") + "format=pdf" : url; }
+function exportGo(url){ if (exportMode === "capture") { exportCaptured = {url}; return; } location.href = exportUrl(url); }
 (function(){
+  const TOWER = "RHG-Purchasing";                              // the header this tower's POSTs carry
   const st = document.createElement("style");
   st.textContent = `.exp{white-space:nowrap}
-.exp-menu{position:absolute;z-index:90;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:4px;min-width:170px}
+.exp-menu{position:absolute;z-index:90;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:4px;min-width:190px}
 .exp-menu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 12px;border-radius:7px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
 .exp-menu button:hover,.exp-menu button:focus-visible{background:var(--bg);outline:none}
-.exp-menu .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--sub,var(--muted))}`;
+.exp-menu .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--sub,var(--muted));min-width:34px;text-align:center}
+.exp-menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.exp-dlg-bg{position:fixed;inset:0;z-index:95;background:rgba(8,30,40,.55);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;overflow:auto}
+.exp-dlg{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:100%;max-width:480px;padding:18px 20px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.exp-dlg h3{margin:0 0 2px;font-size:16px}.exp-dlg .meta{font-size:12px;color:var(--sub,var(--muted))}
+.exp-dlg label{display:block;font-size:12.5px;font-weight:600;margin:12px 0 4px}
+.exp-dlg input[type=text],.exp-dlg input[type=email],.exp-dlg textarea{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.exp-dlg textarea{min-height:70px;resize:vertical}
+.exp-dlg .fmt{display:flex;gap:8px}.exp-dlg .fmt label{display:flex;align-items:center;gap:6px;margin:0;font-weight:500;padding:7px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.exp-dlg .fmt input{margin:0}.exp-dlg .row{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:16px;flex-wrap:wrap}
+.exp-dlg .msg{font-size:12.5px;margin-top:10px;min-height:1em}.exp-dlg .msg.err{color:var(--up,#c0392b)}.exp-dlg .msg.ok{color:var(--down,#0e8a57)}
+.exp-dlg .chk{display:flex;align-items:center;gap:8px;font-weight:500}.exp-dlg .chk input{margin:0}`;
   document.head.appendChild(st);
   let menu = null, owner = null, openedAt = 0;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const close = () => { if (menu) { menu.remove(); menu = null; if (owner) owner.setAttribute("aria-expanded", "false"); owner = null; } };
   function run(el, f){
     if (el.tagName === "A") {
@@ -1240,18 +1256,74 @@ function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ?
     exportFmt = f; el.__expRun = true;
     try { el.click(); } finally { el.__expRun = false; exportFmt = "xlsx"; }
   }
+  function capture(el){
+    if (el.tagName === "A") { const h = el.getAttribute("href"); return h && h !== "#" ? {url: h} : null; }
+    exportMode = "capture"; exportCaptured = null; el.__expRun = true;
+    try { el.click(); } finally { el.__expRun = false; exportMode = ""; }
+    return exportCaptured;
+  }
+  function titleOf(el){
+    const box = el.closest(".modal, .card, section");
+    const h = box && box.querySelector("h2");
+    const page = (document.getElementById("title") || {}).textContent || "";
+    const t = h ? h.textContent.trim() : "";
+    return [page.trim(), t].filter(Boolean).filter((x, i, a) => i === 0 || !a[0].includes(x)).join(" · ") || document.title;
+  }
+  function mailDialog(el){
+    const what = capture(el);
+    const bg = document.createElement("div");
+    bg.className = "exp-dlg-bg";
+    let last = "";
+    try { last = localStorage.getItem("pulse-export-to") || ""; } catch (e) { /* storage off */ }
+    const title = what && what.table ? what.table.name : titleOf(el);
+    bg.innerHTML = `<div class="exp-dlg" role="dialog" aria-modal="true" aria-labelledby="expDlgT">
+      <h3 id="expDlgT">Send by email</h3><div class="meta">${esc(title)}</div>
+      ${what ? `<label for="expTo">To</label><input type="text" id="expTo" placeholder="name@rhg.al, other@rhg.al" value="${esc(last)}" autocomplete="email">
+      <label>File</label><div class="fmt"><label><input type="radio" name="expFmt" value="xlsx" checked> Excel</label><label><input type="radio" name="expFmt" value="pdf"> PDF</label></div>
+      <label for="expNote">Message (optional)</label><textarea id="expNote" placeholder="A line for the people who receive it"></textarea>
+      <label class="chk"><input type="checkbox" id="expMe" checked> Send me a copy</label>` :
+      `<p class="msg err">This export is not ready yet: wait for the screen to finish reading, then try again.</p>`}
+      <div class="msg" id="expMsg" aria-live="polite"></div>
+      <div class="row"><button type="button" class="mini" id="expCancel">${what ? "Cancel" : "Close"}</button>${what ? `<button type="button" class="mini dark" id="expSend">Send</button>` : ""}</div></div>`;
+    document.body.appendChild(bg);
+    const onKey = ev => { if (ev.key === "Escape") { ev.stopPropagation(); ev.preventDefault(); shut(); } };
+    const shut = () => { document.removeEventListener("keydown", onKey, true); bg.remove(); el.focus({preventScroll: true}); };
+    bg.addEventListener("click", ev => { if (ev.target === bg) shut(); });
+    document.addEventListener("keydown", onKey, true);
+    bg.querySelector("#expCancel").onclick = shut;
+    if (!what) { bg.querySelector("#expCancel").focus(); return; }
+    const to = bg.querySelector("#expTo"); to.focus();
+    bg.querySelector("#expSend").onclick = async () => {
+      const msg = bg.querySelector("#expMsg"), btn = bg.querySelector("#expSend");
+      const addr = to.value.trim();
+      if (!addr) { msg.className = "msg err"; msg.textContent = "Write at least one address."; to.focus(); return; }
+      const fmt = bg.querySelector('input[name="expFmt"]:checked').value;
+      btn.disabled = true; msg.className = "msg"; msg.textContent = fmt === "pdf" ? "Building the PDF and sending…" : "Building the file and sending…";
+      try {
+        const r = await fetch("/api/export/email", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": TOWER},
+          body: JSON.stringify(Object.assign({}, what, {to: addr, format: fmt, note: bg.querySelector("#expNote").value, copy_me: bg.querySelector("#expMe").checked, title})) });
+        let j = {}; try { j = await r.json(); } catch (e) { /* not JSON */ }
+        if (!r.ok) throw new Error(j.error || `failed (${r.status})`);
+        try { localStorage.setItem("pulse-export-to", addr); } catch (e) { /* storage off */ }
+        msg.className = "msg ok"; msg.textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc.length ? " · copy to " + j.sent.cc.join(", ") : ""}: ${j.sent.file}`;
+        btn.textContent = "Sent"; bg.querySelector("#expCancel").textContent = "Close";
+      } catch (e) { msg.className = "msg err"; msg.textContent = "Not sent: " + e.message; btn.disabled = false; }
+    };
+  }
   function open(el){
     close();
     owner = el; el.setAttribute("aria-expanded", "true");
     menu = document.createElement("div");
     menu.className = "exp-menu"; menu.setAttribute("role", "menu");
     menu.innerHTML = `<button type="button" role="menuitem" data-f="xlsx"><span class="k">XLSX</span><span>Excel</span></button>` +
-      `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button>`;
+      `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button><hr>` +
+      `<button type="button" role="menuitem" data-f="mail"><span class="k">@</span><span>Send by email…</span></button>`;
     (el.closest(".modal-bg") || document.body).appendChild(menu);
     const r = el.getBoundingClientRect(), host = menu.offsetParent || document.body, hr = host === document.body ? {top: -window.scrollY, left: -window.scrollX} : host.getBoundingClientRect();
-    menu.style.top = (r.bottom - hr.top + 4) + "px";
-    menu.style.left = Math.max(8, Math.min(r.left - hr.left, document.documentElement.clientWidth - hr.left - menu.offsetWidth - 8)) + "px";
-    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); run(el, f); });
+    const sy = host === document.body ? 0 : host.scrollTop, sx = host === document.body ? 0 : host.scrollLeft;
+    menu.style.top = (r.bottom - hr.top + sy + 4) + "px";
+    menu.style.left = Math.max(8, Math.min(r.left - hr.left + sx, document.documentElement.clientWidth - hr.left + sx - menu.offsetWidth - 8)) + "px";
+    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); if (f === "mail") mailDialog(el); else run(el, f); });
     menu.querySelector("button").focus({preventScroll: true});
     openedAt = Date.now();
   }
@@ -3669,7 +3741,7 @@ function renderPqMail(){
 $("pqRead").onclick = () => loadPq(true);
 ["pqWho", "pqShow"].forEach(id => $(id).onchange = () => pqData && renderPq());
 $("pqQ").oninput = () => pqData && renderPqLines();
-$("pqXlsx").onclick = () => { if (pqData) location.href = exportUrl("/api/price-changes/xlsx?" + pqParams().toString() + "&purchaser=" + encodeURIComponent($("pqWho").value)); };
+$("pqXlsx").onclick = () => { if (pqData) exportGo("/api/price-changes/xlsx?" + pqParams().toString() + "&purchaser=" + encodeURIComponent($("pqWho").value)); };
 $("pqSave").onclick = async () => {
   $("pqMailMsg").textContent = "Saving…";
   try{
@@ -3734,7 +3806,7 @@ $("svRead").onclick = () => loadSavings(false);
 ["svLoc","svVendor","svCat","svStream"].forEach(id => $(id).onchange = () => loadSavings(false));
 $("svQ").onkeydown = e => { if (e.key === "Enter") loadSavings(false); };
 $("svPdf").onclick = () => window.open("/api/savings/pdf?" + svParams().toString(), "_blank", "noopener");
-$("svXlsx").onclick = () => { location.href = exportUrl("/api/savings/xlsx?" + svParams().toString()); };
+$("svXlsx").onclick = () => { exportGo("/api/savings/xlsx?" + svParams().toString()); };
 async function svSendTo(onlyTo){
   if (!svData) { $("svMsg").textContent = "Read the report first."; return; }
   $("svMsg").textContent = "Sending…";
@@ -4030,7 +4102,7 @@ function ngRender(){
   $("ngNew") && ($("ngNew").onclick = () => ngScenDlg(null));
   $("ngEditSc") && ($("ngEditSc").onclick = () => ngScenDlg(sc));
   $("ngCompare").onclick = ngCompareDlg;
-  $("ngXlsx").onclick = () => { location.href = exportUrl("/api/negotiations/xlsx?" + ngParams() + "&scenario=" + ngScen); };
+  $("ngXlsx").onclick = () => { exportGo("/api/negotiations/xlsx?" + ngParams() + "&scenario=" + ngScen); };
   document.querySelectorAll("[data-ngsort]").forEach(b => b.onclick = () => { ngSort = b.dataset.ngsort; ngRender(); });
 }
 function ngRowCells(r, p, edit){
@@ -4876,7 +4948,7 @@ function prQuick(kind){
 document.querySelectorAll("[data-prq]").forEach(b => b.onclick = () => prQuick(b.dataset.prq));
 const prQs = () => new URLSearchParams({company: $("company").value || "", from: $("prFrom").value, to: $("prTo").value}).toString();
 $("prRead").onclick = () => prLoad();
-$("prXlsx").onclick = () => { location.href = exportUrl("/api/purchasers/xlsx?" + prQs()); };
+$("prXlsx").onclick = () => { exportGo("/api/purchasers/xlsx?" + prQs()); };
 async function prLoad(quiet){
   clearTimeout(prTimer);
   if (prBusy) return;

@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse
 
 import arap_notify
 import xlsxpdf
+import exportmail
 import brand_report
 import sales_report
 import channels
@@ -2256,9 +2257,12 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- Export → PDF: any Excel export (an address ending in /xlsx) asked with format=pdf is built as usual and
     # handed back as a PDF of the same workbook (xlsxpdf.py); an answer that is not a workbook passes unchanged
-    def _as_pdf(self, url):
-        rest = [(k, v) for k, v in parse_qsl(url.query, keep_blank_values=True) if k != "format"]
-        self.path = url.path + ("?" + urlencode(rest) if rest else "")
+    def _capture_get(self, path):
+        """This tower's answer to a GET of path, with this request's session, kept instead of sent:
+        (status, [(header, value)], body). For Export → PDF and Export → Send by email."""
+        saved = self.path
+        scope = {k: getattr(self, k, None) for k in ("_scope_filter", "_scope_set", "_allowed")}
+        self.path = path
         cap = {"status": 200, "headers": []}
         real = (self.wfile, self.send_response, self.send_header, self.end_headers)
         buf = io.BytesIO()
@@ -2272,8 +2276,16 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             self.wfile, self.send_response, self.send_header, self.end_headers = real
             self._pdf_inner = False
+            self.path = saved
+            for k, v in scope.items():                      # the inner answer's scope filter stays with it
+                setattr(self, k, v)
+        return cap["status"], cap["headers"], buf.getvalue()
+
+    def _as_pdf(self, url):
+        rest = [(k, v) for k, v in parse_qsl(url.query, keep_blank_values=True) if k != "format"]
+        status, headers, body = self._capture_get(url.path + ("?" + urlencode(rest) if rest else ""))
+        cap = {"status": status, "headers": headers}
         h = {k.lower(): v for k, v in cap["headers"]}
-        body = buf.getvalue()
         if cap["status"] != 200 or not str(h.get("content-type", "")).startswith(xlsxpdf.XLSX):
             self.send_response(cap["status"])
             for k, v in cap["headers"]:
@@ -2296,6 +2308,55 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(pdf)
+
+    def _export_email(self, body, user, tower, send):
+        """Export → Send by email (exportmail.py): the file built here as its download would be, then sent."""
+        try:
+            to, fmt = exportmail.check(body)
+            if body.get("table"):
+                if tower != "Finance":
+                    raise ValueError("This export cannot be sent by email.")
+                t = body["table"]
+                fname = xlsxtable.filename(t.get("name"))
+                data = xlsxtable.render(t.get("sheets"), t.get("notes") or [])
+                title = str(t.get("name") or "")
+            else:
+                path = exportmail.clean_url(body.get("url"))
+                status, headers, data = self._capture_get(path)
+                h = {k.lower(): v for k, v in headers}
+                if status != 200 or not str(h.get("content-type", "")).startswith(exportmail.XLSX):
+                    try:
+                        j = json.loads(gzip.decompress(data) if h.get("content-encoding") == "gzip" else data)
+                    except (ValueError, OSError):
+                        j = {}
+                    msg = j.get("error") or ("The report is still being read; send it again in a moment."
+                                             if status in (200, 202) else f"The export answered {status}.")
+                    self._send(409 if status in (200, 202) else status, {"error": msg})
+                    return
+                m = re.search(r'filename="([^"]+)"', h.get("content-disposition", ""))
+                fname = m.group(1) if m else "export.xlsx"
+                title = re.sub(r"\.xlsx$", "", fname, flags=re.I).replace("_", " ")
+            screen = str(body.get("title") or "")[:200]
+            ctype = exportmail.XLSX
+            if fmt == "pdf":
+                data = xlsxpdf.render(data, title)
+                fname, ctype = xlsxpdf.pdf_name(fname), "application/pdf"
+            if len(data) > exportmail.MAX_BYTES:
+                raise ValueError("The file is too large to send by email; download it instead.")
+            me = (user.get("email") or "").strip()
+            cc = [me] if body.get("copy_me") and me and me not in to else []
+            subject, html_body, text_body = exportmail.compose(user, title, fname, fmt, body.get("note"), tower, screen)
+            send(to, cc, subject, html_body, text_body, fname, ctype, data, me or None)
+        except ValueError as exc:
+            self._send(400, {"error": str(exc)})
+            return
+        except Exception as exc:                                   # noqa: BLE001
+            traceback.print_exc()
+            self._send(502, {"error": f"Could not send: {str(exc)[:240]}"})
+            return
+        store.audit("email", f"export · {fname}", user["username"], {},
+                    {"to": to, "cc": cc, "format": fmt, "title": title}, str(body.get("note") or "")[:300])
+        self._send(200, {"sent": {"to": to, "cc": cc, "file": fname}})
 
     def do_GET(self):
         if not getattr(self, "_pdf_inner", False) and "format=pdf" in self.path:
@@ -3503,6 +3564,16 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path == "/api/export/email":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                if not auth.can(user, "export"):
+                    self._send(403, {"error": "Your role cannot export (needs finance.export)."})
+                    return
+                self._export_email(body, user, "Finance", lambda to, cc, subj, h, t, fname, ctype, data, reply:
+                                   arap_notify.send_mail(to, cc, subj, h, t, [(fname, ctype, data)],
+                                                         source="Finance · export by email", reply_to=reply))
             elif url.path == "/api/xlsx/table":
                 # one table of a screen, as the person sees it (xlsxtable.py): nothing is read from BC here
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
