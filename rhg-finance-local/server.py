@@ -41,6 +41,7 @@ import recipients
 import exmail
 import itemstock
 import shrinkage
+import salestop
 import requests
 import cost_report
 import negstock
@@ -1922,7 +1923,7 @@ def arap_status(user):
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
 EXPORT_PATHS = {"/api/inventory/items/xlsx", "/api/billyrec/xlsx", "/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
-                "/api/discharge/xlsx", "/api/stockcount/xlsx", "/api/shrinkage/xlsx",
+                "/api/discharge/xlsx", "/api/stockcount/xlsx", "/api/shrinkage/xlsx", "/api/sales/stockstop/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/simphony/status", "/api/users",
@@ -1943,6 +1944,8 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
                          "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview", "/api/shrinkage/config",
                          "/api/shrinkage/count",
+                         # Sales → Blocked by stock: cut to the person's locations
+                         "/api/sales/stockstop", "/api/sales/stockstop/xlsx",
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
                          "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx",
                          # Budget & forecast → Location intelligence, by department
@@ -2063,6 +2066,8 @@ class Handler(BaseHTTPRequestHandler):
                       "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx",
                       "/api/shrinkage/overview", "/api/shrinkage/config", "/api/shrinkage/count"):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
+        elif path in ("/api/sales/stockstop", "/api/sales/stockstop/xlsx"):
+            self._scope_filter = lambda b: salestop.cut(b, self._allowed)
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
         elif path == "/api/salesrec":
@@ -2310,6 +2315,30 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/sales/channel-profit/params":
                 self._send(200, {"config": chanprof.load_config(),
                                  "fields": [{"key": k, "label": lb, "unit": u} for k, lb, u in chanprof.CHANNEL_FIELDS]})
+            elif url.path in ("/api/sales/stockstop", "/api/sales/stockstop/xlsx"):
+                # Sales → Blocked by stock: the sales BC cannot post for want of stock, and what today's will block
+                if not auth.can(user, "finance.s.sales.stockstop"):
+                    self._send(403, {"error": "Your role does not include Sales blocked by stock."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                if url.path.endswith("/xlsx"):
+                    hit = salestop._held.held(company)
+                    if not hit or not hit.get("available"):
+                        self._send(409, {"error": "Read the report first."})
+                        return
+                    body = salestop.render_xlsx(salestop.cut(hit, self._allowed))
+                    store.audit("export", "salestop", user["username"], None, {"company": company}, "")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                                     f'sales_blocked_by_stock_{date.today().isoformat()}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                r = salestop.request(client, company, q.get("refresh") == "1")
+                self._send(200, dict(r, can_export=auth.can(user, "export")) if isinstance(r, dict) else r)
             elif url.path in ("/api/sales/channel-profit", "/api/sales/channel-profit/xlsx"):
                 # Sales → Channel profitability: a P&L of every order type (Simphony) with costs from BC and parameters
                 if not simphony.info()["configured"]:

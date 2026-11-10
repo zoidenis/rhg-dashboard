@@ -28,6 +28,8 @@ FINANCE = [
         ("menu", "Menu engineering", "location", []),
         ("menucost", "Menu & food cost", "location", []),
         ("chanprofit", "Channel profitability", "location", []),
+        # the sales BC cannot post for want of stock (open assembly orders), and what today's Simphony sales will block
+        ("stockstop", "Blocked by stock", "location", []),
         ("today", "Today", "location", [])]),
     ("pl", "Financial statements", "Statements", "stTabs", [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),

@@ -1336,7 +1336,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-sales">
-    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="menucost" role="tab" aria-selected="false">Menu &amp; food cost</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button></div>
+    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="menucost" role="tab" aria-selected="false">Menu &amp; food cost</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button><button data-t="stockstop" role="tab" aria-selected="false">Blocked by stock</button></div>
     <div id="slPrView" style="display:none">
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu prices</h2>
@@ -1428,6 +1428,32 @@ td.num,th.num{text-align:right}
         <p class="hint"><span>Items above the food cost target of Settings (Menu engineering parameters), the largest margin lost first.</span> <span>Sold more than the median: the price first, since a small rise reaches many sales. Sold less: the recipe and the portion first.</span></p>
         <div class="mc-cols"><div><h3>Price</h3><div id="mcPrice"></div></div><div><h3>Recipe &amp; portion</h3><div id="mcRecipe"></div></div><div><h3>Losses</h3><div id="mcLoss"></div></div></div></div>
     </div>
+    <div id="slStView" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>Sales blocked by stock</h2>
+          <p class="hint"><span>The sales Business Central cannot post because a component is short at the location, and the components today's Simphony sales will run out of before they are imported.</span> <span>Read every few minutes; Business Central and Simphony are only read.</span></p></div>
+          <div class="sh-ctl"><select id="stLoc" aria-label="Location"><option value="">All locations</option></select>
+            <button class="mini dark" id="stRead" type="button">Read again</button><button class="mini" id="stXlsx" type="button">Excel</button></div></div>
+        <div class="kpis six" id="stKpis" style="margin-top:14px"></div>
+        <p class="meta" id="stStatus">Reading…</p></div>
+      <div class="card" id="stLocCard" hidden style="margin-bottom:16px"><div class="card-head"><div><h2>By location</h2>
+        <p class="hint">Click a location to see only its items.</p></div></div>
+        <div class="scroll"><table id="stLocs"></table></div></div>
+      <div class="card" id="stNowCard" hidden style="margin-bottom:16px"><div class="card-head"><div><h2 id="stNowT">Blocking the sales now</h2>
+        <p class="hint">Components the open assembly orders need more of than the location holds now: until the stock is there (a receipt, a transfer, a count), the orders that use them, and their sales, are not posted. Below them, the ones Business Central still flags whose stock has come: those orders can be posted. Largest sales held first; click a row for the menu items.</p></div></div>
+        <div class="filters" style="margin:0 0 10px"><label>Item<input id="stQ" placeholder="number or name"></label></div>
+        <div class="scroll"><table id="stNow"></table></div></div>
+      <div class="card" id="stRiskCard" hidden style="margin-bottom:16px"><div class="card-head"><div><h2 id="stRiskT">At risk today</h2>
+        <p class="hint">What Simphony has sold today and Business Central has not imported yet, through the recipes: the components whose stock, after what the open orders already need, does not cover it. Fix them before the import, and the sales post.</p></div></div>
+        <div class="scroll"><table id="stRisk"></table></div></div>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" style="margin-top:12px;line-height:1.55">
+          <p><span>The Simphony sales are imported into Business Central as assembly orders, one per menu item, location and day; an order is posted when its components can be taken out of the location's stock.</span></p>
+          <p><span>Blocking now: need = the remaining quantity of every open assembly line of the component at the location, in its base unit; on hand = its stock at the location now; short = need − on hand, above zero.</span> <span>Business Central's Avail. Warning is set when a line is checked and can stay on after the stock has come: such a component is shown as covered now.</span> <span>Sales held = the portions of the blocked orders × the menu item's price in Simphony.</span></p>
+          <p><span>At risk today: the menu items sold today in Simphony (current business day) less what is already imported, exploded through their BC recipe (Assembly BOM, units converted).</span> <span>A component is at risk when on hand − the open orders' need − today's need is below zero.</span></p>
+          <p><span>The Simphony menu item number is the BC item number; each restaurant's Simphony location and BC location come from the location registry (Settings → Location intelligence).</span></p>
+        </div></details></div>
+    </div>
     <div id="slCpView" style="display:none">
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Channel profitability</h2>
@@ -1501,7 +1527,7 @@ td.num,th.num{text-align:right}
         <div class="scroll"><table id="slCtl"></table></div></div>
     </div>
     </div>
-    <details class="card" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
+    <details class="card" id="slHow" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
   </section>
 
   <section class="view" id="v-exceptions"><div class="card"><h2>Exceptions</h2>
@@ -3913,7 +3939,10 @@ var slTab = "main", slSort = "net";
 function slShowTab(tab){
   slTab = tab;
   document.querySelectorAll("#slTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" || tab === "menucost" ? "none" : "";
+  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" || tab === "menucost" || tab === "stockstop" ? "none" : "";
+  $("slStView").style.display = tab === "stockstop" ? "" : "none";
+  $("slHow").style.display = tab === "stockstop" ? "none" : "";
+  if (tab === "stockstop") stLoad(false); else clearTimeout(stTimer);
   $("slMcView").style.display = tab === "menucost" ? "" : "none";
   if (tab === "menucost") mcLoad();
   $("slCpView").style.display = tab === "chanprofit" ? "" : "none";
@@ -5402,6 +5431,68 @@ async function loadDischarge(refresh){
     renderDischarge();
   }catch(e){ $("dcStatus").textContent = "Could not read: " + e.message; }
 }
+// ---------- Sales → Blocked by stock (salestop.py) ----------
+var stData = null, stTimer = null, stOpen = "";
+async function stLoad(refresh){
+  clearTimeout(stTimer);
+  $("stStatus").textContent = "Reading Business Central and Simphony…";
+  try {
+    const j = await readJSON(await fetch("/api/sales/stockstop?" + new URLSearchParams(Object.assign({company: $("company").value || ""}, refresh ? {refresh: 1} : {}))));
+    if (j.pending) { $("stStatus").textContent = `Reading: ${j.stage || "starting"}…`; stTimer = setTimeout(() => stLoad(false), 3000); return; }
+    if (j.error && !j.available) throw new Error(j.error);
+    stData = j; stRender();
+    // while the tab is open: again in a few minutes (sooner while a read runs)
+    stTimer = setTimeout(() => { if ($("slStView").style.display !== "none" && $("v-sales").classList.contains("on")) stLoad(false); }, j.reading ? 5000 : 180000);
+  } catch (e) { $("stStatus").textContent = "Could not read: " + e.message; }
+}
+function stRender(){
+  const d = stData; if (!d) return;
+  const sel = $("stLoc"), cur = sel.value;
+  const locs = [...new Set([...d.locations.map(x => x.location), ...d.now.map(x => x.location), ...d.risk.map(x => x.location)])].filter(Boolean).sort();
+  sel.innerHTML = `<option value="">All locations</option>` + locs.map(l => `<option value="${esc(l)}">${esc(l)}${(d.locations.find(x => x.location === l) || {}).name ? " · " + esc(d.locations.find(x => x.location === l).name) : ""}</option>`).join("");
+  sel.value = locs.includes(cur) ? cur : "";
+  const L = sel.value, inL = x => !L || x.location === L;
+  const now = d.now.filter(inL), risk = d.risk.filter(inL), lr = d.locations.filter(inL);
+  const T = L ? {components: now.filter(x => x.status === "short").length, orders: lr.reduce((a, x) => a + x.orders, 0), portions: lr.reduce((a, x) => a + x.portions, 0), sales: lr.reduce((a, x) => a + x.sales, 0), risk: risk.length, days: [...new Set(lr.flatMap(x => x.days))].sort()} : d.totals;
+  const card = (l, v, sub, cls) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  $("stKpis").innerHTML = card("Components short", fmt(T.components), `<span>blocking the posting of sales now</span>`, T.components ? "up" : "") +
+    card("Sales orders blocked", fmt(T.orders), `<span>${fmt(T.portions)} portions</span>${T.days.length ? ` · <span>${esc(T.days.join(", "))}</span>` : ""}`, T.orders ? "up" : "") +
+    card("Sales held", ilM(T.sales), `<span>portions × menu price in Simphony</span>`, T.sales ? "warn" : "") +
+    card("At risk today", fmt(T.risk), `<span>components today's sales will run out of</span>`, T.risk ? "warn" : "") +
+    card("Flagged, covered now", fmt(L ? now.filter(x => x.status === "covered").length : T.covered), `<span>BC still flags them; the stock is there: post the orders</span>`);
+  $("stStatus").innerHTML = [`${esc(d.company)}`, `<span>read at ${esc((d.read_at || "").replace("T", " ").slice(0, 16))}</span>`,
+    `<span>${fmt(d.open_orders)} open assembly orders, ${fmt(d.open_lines)} lines</span>`,
+    d.reading ? `<span>reading again…</span>` : `<span>read again every 3 minutes while open</span>`,
+    ...(d.simphony_errors || []).map(e => `<span class="neg">${esc(e)}</span>`)].join(" · ");
+  $("stXlsx").style.display = d.can_export ? "" : "none";
+  $("stLocCard").hidden = !d.locations.length || !!L;
+  $("stLocs").innerHTML = `<tr><th>Location</th><th class="num">Orders blocked</th><th class="num">Portions</th><th class="num">Sales held</th><th class="num">Components short</th><th class="num">At risk today</th><th>Days</th><th>Simphony day</th></tr>` +
+    d.locations.map(x => `<tr data-stloc="${esc(x.location)}" style="cursor:pointer"><td><b>${esc(x.location)}</b>${x.name ? `<div class="meta">${esc(x.name)}</div>` : ""}</td><td class="num"><b>${fmt(x.orders)}</b></td><td class="num">${fmt(x.portions)}</td><td class="num">${fmt(x.sales)}</td><td class="num">${fmt(x.components)}</td><td class="num">${fmt(x.risk)}</td><td class="meta">${esc(x.days.join(", "))}</td><td class="meta">${esc(x.today || "–")}${x.sold_no_recipe ? `<div title="Menu items sold today with no recipe in BC: not checked">${x.sold_no_recipe === 1 ? "1 item" : fmt(x.sold_no_recipe) + " items"} sold without a recipe</div>` : ""}</td></tr>`).join("");
+  $("stLocs").querySelectorAll("[data-stloc]").forEach(tr => tr.onclick = () => { $("stLoc").value = tr.dataset.stloc; stRender(); });
+  const q = $("stQ").value.trim().toLowerCase();
+  const nowF = now.filter(x => !q || (x.item + " " + x.desc).toLowerCase().includes(q));
+  $("stNowCard").hidden = false;
+  $("stNowT").textContent = `Blocking the sales now · ${fmt(nowF.length)}`;
+  $("stNow").innerHTML = `<tr><th>Item</th><th>Location</th><th>Status</th><th class="num">Open orders need</th><th class="num">On hand</th><th class="num">Short</th><th class="num">Orders</th><th class="num">Sales held</th><th>Since</th></tr>` +
+    (nowF.slice(0, 300).map(x => { const k = x.location + "|" + x.item; return `<tr data-stk="${esc(k)}" style="cursor:pointer"><td><b>${esc(x.item)}</b> ${esc(x.desc)} <span class="meta">${esc(x.unit)}</span></td><td>${esc(x.location)}</td>
+      <td>${x.status === "short" ? `<span class="sh-pill inv">short</span>` : `<span class="sh-pill" title="Business Central still flags ${fmt(x.flagged)} lines; the stock now covers the need">covered now</span>`}</td>
+      <td class="num">${cnN(x.need)}</td><td class="num">${cnN(x.on_hand)}</td><td class="num">${x.short ? `<b class="neg">${cnN(x.short)}</b>` : "–"}</td><td class="num">${fmt(x.orders)}</td><td class="num"><b>${fmt(x.sales)}</b></td><td class="meta">${esc(x.oldest || "")}</td></tr>` +
+      (stOpen === k ? `<tr><td colspan="9" class="meta" style="padding-left:24px">${x.menu.map(m => `${esc(m[0])} ${esc(m[1])} · ${cnN(m[2])}`).join("<br>") || "–"}</td></tr>` : ""); }).join("")
+      || `<tr><td colspan="9" class="meta">Nothing blocked: every open order has its components in stock.</td></tr>`);
+  $("stNow").querySelectorAll("[data-stk]").forEach(tr => tr.onclick = () => { stOpen = stOpen === tr.dataset.stk ? "" : tr.dataset.stk; stRender(); });
+  $("stRiskCard").hidden = false;
+  $("stRiskT").textContent = `At risk today · ${fmt(risk.length)}`;
+  $("stRisk").innerHTML = `<tr><th>Item</th><th>Location</th><th class="num">On hand</th><th class="num">Open orders need</th><th class="num">Today's need</th><th class="num">After today</th><th>Sold today</th></tr>` +
+    (risk.slice(0, 300).map(x => `<tr><td><b>${esc(x.item)}</b> ${esc(x.desc)} <span class="meta">${esc(x.unit)}</span>${x.blocked_now ? ` <span class="sh-pill inv">blocking now too</span>` : ""}</td><td>${esc(x.location)}<div class="meta">${esc(x.day)}</div></td>
+      <td class="num">${cnN(x.on_hand)}</td><td class="num">${cnN(x.open_need)}</td><td class="num">${cnN(x.today_need)}</td><td class="num"><b class="neg">${cnN(x.after)}</b></td>
+      <td class="meta">${x.menu.slice(0, 3).map(m => `${esc(m[1] || m[0])} ×${cnN(m[2])}`).join(", ")}${x.menu.length > 3 ? " …" : ""}</td></tr>`).join("")
+      || `<tr><td colspan="7" class="meta">${(d.simphony_errors || []).length ? "Simphony could not be read." : "Nothing at risk: today's sales are covered by the stock."}</td></tr>`);
+}
+$("stLoc").onchange = () => stRender();
+$("stQ").oninput = () => stRender();
+$("stRead").onclick = () => stLoad(true);
+$("stXlsx").onclick = () => { if (stData) location.href = "/api/sales/stockstop/xlsx?" + new URLSearchParams({company: $("company").value || ""}); };
+$("company").addEventListener("change", () => { stData = null; if ($("slStView").style.display !== "none") stLoad(false); });
 // ---------- Inventory → Shrinkage KPIs (shrinkage.py) ----------
 var shData = null, shOvData = null, shSetup = null, shTimer = null, shMon = "", shCat = "", shCfg = null, shCfgOpen = false;
 const SH_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -6697,8 +6788,10 @@ function setHeader(){
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){
-    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : "Sales") + " · all restaurants";
-    $("period").textContent = salesData && salesData.available
+    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : typeof slTab !== "undefined" && slTab === "stockstop" ? "Sales · Blocked by stock" : "Sales") + " · all restaurants";
+    $("period").textContent = typeof slTab !== "undefined" && slTab === "stockstop"
+      ? "Open assembly orders in Business Central and today's sales in Simphony · read every few minutes"
+      : salesData && salesData.available
       ? `${salesData.period.label} · ${salesData.period.from} → ${salesData.period.to} · against ${salesData.prior.from} → ${salesData.prior.to}`
       : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";
     return;
