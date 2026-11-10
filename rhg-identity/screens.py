@@ -60,6 +60,8 @@ FINANCE = [
         ("itemmaster", "Item cards", "location", ["finance.inventory.view"]),
         ("movement", "Movement & dead stock", "location", ["finance.inventory.view"]),
         ("stockcount", "Stock count analysis", "location", ["finance.inventory.view"]),
+        # count differences by category against the waste allowance, every month (the SIN KPI workbook, automated)
+        ("shrinkage", "Shrinkage KPIs", "location", ["finance.inventory.view"]),
         ("stockwc", "Stock & working capital", "company", ["finance.inventory.view", "purchasing.view"]),
         ("invcharts", "Inventory charts", "location", ["finance.inventory.view"]),
         ("today", "Today", "location", ["finance.inventory.view"])]),

@@ -269,6 +269,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.receipts": ("finance.s.salesrec", "finance.s.cash.main"),
                  # Inventory → Stock count analysis: whoever reads Movement & dead stock
                  "finance.s.inventory.stockcount": "finance.s.inventory.movement",
+                 # Inventory → Shrinkage KPIs: whoever reads Stock count analysis
+                 "finance.s.inventory.shrinkage": "finance.s.inventory.stockcount",
                  # Supplier performance became three tabs: whoever held the screen gets all three
                  "purchasing.s.suppliers.suppliers": "purchasing.s.suppliers",
                  "purchasing.s.suppliers.suploc": "purchasing.s.suppliers",

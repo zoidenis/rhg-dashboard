@@ -40,6 +40,7 @@ import faloc
 import recipients
 import exmail
 import itemstock
+import shrinkage
 import requests
 import cost_report
 import negstock
@@ -108,6 +109,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/pl-memo/settings": "settings", "/api/pl-memo/job": "settings",
                      "/api/recipients": "settings",
                      "/api/exceptions/email": "actions",
+                     "/api/shrinkage/config": "settings", "/api/shrinkage/import": "settings",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -1919,7 +1921,7 @@ def arap_status(user):
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
 EXPORT_PATHS = {"/api/inventory/items/xlsx", "/api/billyrec/xlsx", "/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
-                "/api/discharge/xlsx", "/api/stockcount/xlsx",
+                "/api/discharge/xlsx", "/api/stockcount/xlsx", "/api/shrinkage/xlsx",
                 "/api/recipes/xlsx", "/api/supplier-stock/statement"}
 # Asked by anyone signed in, whatever their scope.
 ACCESS_FREE = {"/api/session", "/api/logout", "/api/password", "/api/health", "/api/simphony/status", "/api/users",
@@ -1938,6 +1940,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          # Inventory: Movement & dead stock, Typology & turnover, Stock count analysis
                          "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
                          "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
+                         "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview", "/api/shrinkage/config",
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
                          "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx",
                          # Budget & forecast → Location intelligence, by department
@@ -2055,7 +2058,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path in ("/api/discharge", "/api/discharge/xlsx"):     # its lines, interventions and squares; no company view
             self._scope_filter = lambda b: recipeuse.cut(b, self._allowed)
         elif path in ("/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
-                      "/api/stockcount", "/api/stockcount/xlsx"):
+                      "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx",
+                      "/api/shrinkage/overview", "/api/shrinkage/config"):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
@@ -2119,6 +2123,86 @@ class Handler(BaseHTTPRequestHandler):
                              else f"Choose one of your locations: {', '.join(codes) or 'none'}."})
             return
         r = stockcount.request(client, company, location, month, q.get("refresh") == "1")
+        self._send(200, dict(r, setup=setup))
+
+    def _shrinkage(self, q, user, path):
+        """Inventory → Shrinkage KPIs: a location's count differences by category, month by month; every location's
+        count adjustments of a month (location empty); the categories and waste table (config)."""
+        company = q.get("company") or config.BC_COMPANY
+        try:
+            codes = client.locations(company)
+        except BCError as exc:
+            self._send(200, {"available": False, "error": str(exc)[:300]})
+            return
+        A = self._allowed
+        if A is not None:
+            codes = [c for c in codes if c.upper() in A]
+        if path == "/api/shrinkage/config":
+            cfg = shrinkage.get_config()
+            ov = cfg["overrides"].get(company) or {}
+            try:
+                cards = shrinkage.item_cards(client, company)
+            except BCError:
+                cards = {}
+            rows = []
+            for no, o in sorted(ov.items()):
+                card = cards.get(no) or {}
+                rows.append({"no": no, "desc": (card.get("Description") or "").strip(), "kat2": o["kat2"],
+                             "by_map": shrinkage.category(card, cfg, company, overrides=False) or "",
+                             "g4": card.get("Item_Category_Group_4") or "", "g5": card.get("Item_Category_Group_5") or "",
+                             "source": o.get("source"), "by": o.get("by"), "at": o.get("at")})
+            self._send(200, {"company": company, "categories": cfg["categories"], "map": cfg["map"],
+                             "prefixes": cfg["prefixes"], "status": cfg["status"], "history": cfg["history"][:30],
+                             "overrides": rows, "updated_at": cfg["updated_at"], "updated_by": cfg["updated_by"],
+                             "can_edit": auth.can(user, "settings")})
+            return
+        names = {(r.get("bc") or "").upper(): r.get("name") for r in locintel.registry()
+                 if (r.get("company") or "").upper() == company.upper() and r.get("bc")}
+        today = date.today()
+        setup = {"company": company, "locations": [{"code": c, "name": names.get(c.upper()) or ""} for c in codes],
+                 "years": [today.year - i for i in range(3)], "default_month": stockcount.default_month(),
+                 "months": [(today.replace(day=1) - timedelta(days=1 + 31 * i)).strftime("%Y-%m") for i in range(13)],
+                 "can_settings": auth.can(user, "settings"), "can_export": auth.can(user, "export"),
+                 "status": shrinkage.get_config()["status"]}
+        if path == "/api/shrinkage/overview":
+            month = q.get("month") or stockcount.default_month()
+            try:
+                stockcount.month_range(month)
+            except (ValueError, TypeError):
+                month = stockcount.default_month()
+            r = shrinkage.request_overview(client, company, month, q.get("refresh") == "1")
+            if isinstance(r, dict) and r.get("locations") is not None and A is not None:
+                r = dict(r, locations=[x for x in r["locations"] if x["location"].upper() in A])
+            self._send(200, dict(r, setup=setup))
+            return
+        location = (q.get("location") or "").strip()
+        try:
+            year = int(q.get("year") or today.year)
+        except ValueError:
+            year = today.year
+        if year not in setup["years"]:
+            year = today.year
+        if location not in codes:
+            self._send(200, {"available": False, "setup": setup,
+                             "error": "" if not location else f"Choose one of the locations: {', '.join(codes) or 'none'}."})
+            return
+        if path == "/api/shrinkage/xlsx":
+            hit = shrinkage._held.held(f"{company}|{location}|{year}")
+            if not hit or not hit.get("available"):
+                self._send(409, {"error": "Read the analysis first."})
+                return
+            body = shrinkage.render_xlsx(hit)
+            store.audit("export", "shrinkage", user["username"], None, {"location": location, "year": year}, "")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_'
+                             f'shrinkage_{location.replace(" ", "_")}_{year}.xlsx"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        r = shrinkage.request(client, company, location, year, q.get("refresh") == "1")
         self._send(200, dict(r, setup=setup))
 
     def _service_call(self):
@@ -2914,6 +2998,11 @@ class Handler(BaseHTTPRequestHandler):
                     r = {"available": False, "error": str(exc)}
                 self._send(200, dict(r, companies=rcpt.companies(), can_settings=auth.can(user, "settings"))
                            if isinstance(r, dict) else r)
+            elif url.path in ("/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview", "/api/shrinkage/config"):
+                if not auth.can(user, "finance.s.inventory.shrinkage"):
+                    self._send(403, {"error": "Your role does not include Shrinkage KPIs."})
+                    return
+                self._shrinkage(q, user, url.path)
             elif url.path in ("/api/stockcount", "/api/stockcount/xlsx"):
                 if not auth.can(user, "finance.s.inventory.stockcount"):
                     self._send(403, {"error": "Your role does not include Stock count analysis."})
@@ -3052,6 +3141,19 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if url.path == "/api/exceptions/email":
                 self._send(*send_exception_email(body, user))
+            elif url.path in ("/api/shrinkage/config", "/api/shrinkage/import"):
+                company = body.get("company") or config.BC_COMPANY
+                try:
+                    if url.path.endswith("/import"):
+                        data = stockcount.decode(body.get("data"))
+                        res = shrinkage.import_excel(company, data, actor, shrinkage.item_cards(client, company))
+                        self._send(200, {"ok": True, "import": res})
+                    else:
+                        patch = {k: body[k] for k in ("categories", "map", "prefixes", "overrides", "status") if k in body}
+                        shrinkage.save_config(company, patch, actor, str(body.get("note") or ""))
+                        self._send(200, {"ok": True})
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path == "/api/actions":
                 self._send(200, store.create_action(body, actor))
             elif url.path.startswith("/api/actions/"):

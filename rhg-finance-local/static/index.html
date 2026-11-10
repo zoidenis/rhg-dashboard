@@ -444,6 +444,17 @@ td.num,th.num{text-align:right}
 .cn-st.match,.cn-st.late_match{background:var(--down-bg);color:var(--down)}.cn-st.cutoff{background:#e4ecf9;color:#2f5aa8}
 @media (prefers-color-scheme: dark){.cn-st.cutoff{background:#1d2a40;color:#9db8ea}}
 #v-stockcount .neg{color:var(--up)}
+#v-shrinkage .neg{color:var(--up)}
+.sh-ctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sh-ctl select,#shCfgCard select,#shCfgCard input:not([type=checkbox]),#shCfgCard textarea{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
+#shCats tr[data-shcat],#shMonths tr[data-shm],#shOv tr[data-shloc]{cursor:pointer}
+#shCats tr[data-shcat]:hover td,#shMonths tr[data-shm]:hover td,#shOv tr[data-shloc]:hover td{background:var(--bg)}
+#shCats tr.on td,#shMonths tr.on td{background:var(--bg);box-shadow:inset 0 -1px 0 var(--line)}
+.sh-pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--down-bg);color:var(--down)}
+.sh-pill.inv{background:var(--up-bg);color:var(--up)}.sh-pill.st{background:var(--bg);color:var(--sub)}
+#shCfgCard table input{width:100%;min-width:60px}#shCfgCard td.c{text-align:center}
+.sh-cfg-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@media(max-width:700px){#shCats td:nth-child(4),#shCats th:nth-child(4),#shCats td:nth-child(5),#shCats th:nth-child(5){display:none}}
 #v-stockcount .card-head select,#cnSheet{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
 .sk-chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
 .sk-chips button.on{border-color:var(--ink);font-weight:600}
@@ -568,6 +579,7 @@ td.num,th.num{text-align:right}
     <button data-view="movement" data-parent="inventory" style="display:none">Movement &amp; dead stock</button>
     <button data-view="discharge" data-parent="inventory" style="display:none">Received vs discharged</button>
     <button data-view="stockcount" data-parent="inventory" style="display:none">Stock count analysis</button>
+    <button data-view="shrinkage" data-parent="inventory" style="display:none">Shrinkage KPIs</button>
     <button data-view="stockwc" data-parent="inventory" style="display:none">Stock &amp; working capital</button>
     <button data-view="invcharts" data-parent="inventory" style="display:none">Inventory charts</button>
 
@@ -1019,7 +1031,7 @@ td.num,th.num{text-align:right}
   </section>
 
   <section class="view" id="v-inventory">
-    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item cards</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button><button data-t="invcharts" role="tab" aria-selected="false">Inventory charts</button></div>
+    <div class="ov-tabs" id="invTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="sku" role="tab" aria-selected="false">SKU planning</button><button data-t="typology" role="tab" aria-selected="false">Typology &amp; turnover</button><button data-t="recipes" role="tab" aria-selected="false">Recipe integrity</button><button data-t="discharge" role="tab" aria-selected="false">Received vs discharged</button><button data-t="itemmaster" role="tab" aria-selected="false">Item cards</button><button data-t="movement" role="tab" aria-selected="false">Movement &amp; dead stock</button><button data-t="stockcount" role="tab" aria-selected="false">Stock count analysis</button><button data-t="shrinkage" role="tab" aria-selected="false">Shrinkage KPIs</button><button data-t="stockwc" role="tab" aria-selected="false">Stock &amp; working capital</button><button data-t="invcharts" role="tab" aria-selected="false">Inventory charts</button></div>
     <div id="ilView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Location intelligence</h2>
@@ -1186,6 +1198,46 @@ td.num,th.num{text-align:right}
         <p><span>The figures are exact once the cost adjustment (Adjust Cost – Item Entries) has run up to the month end: in this Business Central it runs by hand (Automatic Cost Adjustment = Never), as part of the month-end close.</span></p>
         <p><span>Excel drops the zeros in front of a number: a code like 7020 on the form is matched to the one BC item 007020.</span></p>
         <p><span>Posted after the form: the count equals the form's system stock (Gjendje Finance), but BC changed after the form was printed, with documents dated in the month (a transfer or a return dated the last day and posted days later).</span> <span>The documents are named on the line.</span> <span>These lines are kept out of the shortages, surpluses and net difference: the question is the cut-off of those documents, not the count.</span></p>
+      </div></details></div>
+  </section>
+
+  <section class="view" id="v-shrinkage">
+    <div class="card">
+      <div class="card-head"><div><h2>Shrinkage KPIs</h2>
+        <p class="hint"><span>The count differences of a location, month by month and by category, against the waste the category is allowed: what is lost beyond it is the unjustified value.</span> <span>Read from Business Central: the count adjustments, and the month's ins and outs at their posted cost.</span></p></div>
+        <div class="sh-ctl">
+          <select id="shLoc" aria-label="Location"><option value="">All locations</option></select>
+          <select id="shYear" aria-label="Year"></select>
+          <select id="shMonth" aria-label="Month"></select>
+          <button class="mini dark" id="shRead" type="button">Read again</button><button class="mini" id="shXlsx" type="button">Excel</button><button class="mini" id="shCfgBtn" type="button">Categories &amp; waste</button></div></div>
+      <div class="kpis six" id="shKpis" style="margin-top:14px"></div>
+      <p class="meta" id="shStatus">Reading…</p>
+    </div>
+    <div class="card" id="shOvCard" hidden><div class="card-head"><div><h2>Every location</h2>
+      <p class="hint" id="shOvNote"></p></div></div>
+      <div class="scroll"><table id="shOv"></table></div></div>
+    <div class="card" id="shMonthsCard" hidden><div class="card-head"><div><h2>By month</h2>
+      <p class="hint">A month is in the KPIs once its count is posted in Business Central. Click a month to open it.</p></div></div>
+      <div class="scroll"><table id="shMonths"></table></div></div>
+    <div class="card" id="shCatCard" hidden><div class="card-head"><div><h2 id="shCatT">By category</h2>
+      <p class="hint" id="shCatNote"></p></div></div>
+      <div class="scroll"><table id="shCats"></table></div></div>
+    <div class="card" id="shItemsCard" hidden><div class="card-head"><div><h2 id="shItemsT">Items</h2>
+      <p class="hint" id="shItemsNote"></p></div><button class="mini" id="shItemsClose" type="button">Close</button></div>
+      <div class="filters" style="margin:0 0 10px"><label>Item<input id="shQ" placeholder="number or name"></label></div>
+      <div class="scroll"><table id="shItems"></table></div></div>
+    <div class="card" id="shCfgCard" hidden><div class="card-head"><div><h2>Categories &amp; waste</h2>
+      <p class="hint" id="shCfgNote"></p></div><button class="mini" id="shCfgClose" type="button">Close</button></div>
+      <div class="sh-cfg-grid" id="shCfg"></div></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" style="margin-top:12px;line-height:1.55">
+        <p><span>Difference: the count of the 1st of a month is posted in Business Central as an item adjustment dated the last day of the month before, its document starting with IF (IF 01.10.2026, IFAMB 01/10/2026…). Its quantity is the count difference of each item, its cost amount the difference in value.</span></p>
+        <p><span>In and out: the month's other entries of the location, by sign (purchases, transfers, consumption by the recipes, sales). Staff consumption, declared waste (FIRO) and corrections that cancel each other are netted per item.</span></p>
+        <p><span>Opening = stock at the end of the month before; counted = stock at the month end, with the count posted; theoretical = opening + in − out.</span></p>
+        <p><span>KMSH / Dalje = the cost of the month's outs, as posted. Diferenca / Dalje = loss ÷ KMSH / Dalje. % Delta = difference ÷ out, in quantity.</span></p>
+        <p><span>Investigate: Diferenca / Dalje above the % Waste of the category. Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero. Unjustified (Excel) = the whole loss of a category marked Investigate, as the KPI workbook counts it.</span></p>
+        <p><span>Category: from the item card (Item Category Group 4 and 5; Group 2 for PN) through the map in Categories &amp; waste, with exceptions per item. Items the map does not reach (packaging, cleaning, uniforms) are out of scope and shown apart.</span></p>
+        <p><span>Values are exact once the cost adjustment (Adjust Cost – Item Entries) has run for the month.</span></p>
       </div></details></div>
   </section>
 
@@ -5340,6 +5392,245 @@ async function loadDischarge(refresh){
     renderDischarge();
   }catch(e){ $("dcStatus").textContent = "Could not read: " + e.message; }
 }
+// ---------- Inventory → Shrinkage KPIs (shrinkage.py) ----------
+var shData = null, shOvData = null, shSetup = null, shTimer = null, shMon = "", shCat = "", shCfg = null, shCfgOpen = false;
+const SH_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const shMonth = m => m === "ytd" ? "Year to date" : (m ? SH_MON[+m.slice(5, 7) - 1] + " " + m.slice(0, 4) : "");
+const shPct = (v, d = 1) => v == null || !isFinite(v) ? "–" : fmt(v * 100, d) + "%";
+const shV = v => v == null ? "–" : `<span class="${v < 0 ? "neg" : ""}">${fmt(v)}</span>`;
+function shQs(extra){
+  return new URLSearchParams(Object.assign({company: $("company").value || "", location: $("shLoc").value, year: $("shYear").value || ""}, extra || {})).toString();
+}
+function shSetupFill(st){
+  shSetup = st;
+  const loc = $("shLoc"), yr = $("shYear");
+  if (loc.dataset.co !== st.company) {
+    let want = loc.value;
+    try { want = want || localStorage.getItem("pulse-sh-loc-" + st.company) || ""; } catch (e) { /* storage off */ }
+    loc.innerHTML = `<option value="">All locations</option>` + st.locations.map(l => `<option value="${esc(l.code)}">${esc(l.code)}${l.name ? " · " + esc(l.name) : ""}</option>`).join("");
+    loc.value = st.locations.some(l => l.code === want) ? want : (st.locations.length === 1 ? st.locations[0].code : "");
+    loc.dataset.co = st.company;
+  }
+  if (!yr.options.length) { yr.innerHTML = st.years.map(y => `<option>${y}</option>`).join(""); yr.value = st.years[0]; }
+  $("shXlsx").style.display = st.can_export && $("shLoc").value ? "" : "none";
+  $("shYear").style.display = $("shLoc").value ? "" : "none";
+}
+async function loadSh(refresh){
+  clearTimeout(shTimer);
+  const loc = $("shLoc").value;
+  try { if (loc) localStorage.setItem("pulse-sh-loc-" + ($("company").value || ""), loc); } catch (e) { /* storage off */ }
+  if (!loc) return loadShOv(refresh);
+  $("shStatus").textContent = "Reading Business Central…";
+  try {
+    const j = await readJSON(await fetch("/api/shrinkage?" + shQs(refresh ? {refresh: 1} : {})));
+    if (j.setup) shSetupFill(j.setup);
+    if (!$("shLoc").value) return loadShOv(false);
+    if (j.pending) { $("shStatus").textContent = `Reading Business Central: ${j.stage || "starting"}…`; shTimer = setTimeout(() => loadSh(false), 3000); return; }
+    if (!j.available) throw new Error(j.error || "not available");
+    shData = j; shOvData = null;
+    const counted = j.months.filter(m => m.counted).map(m => m.month);
+    if (!shMon || (shMon !== "ytd" && !counted.includes(shMon))) shMon = counted.length ? counted[counted.length - 1] : "ytd";
+    shRender();
+    if (j.reading) { $("shStatus").textContent += ` · reading again: ${j.stage || "…"}`; shTimer = setTimeout(() => loadSh(false), 4000); }
+  } catch (e) { $("shStatus").textContent = "Could not read: " + e.message; }
+}
+async function loadShOv(refresh){
+  $("shStatus").textContent = "Reading the count adjustments of every location…";
+  const mon = $("shMonth");
+  try {
+    const qs = new URLSearchParams({company: $("company").value || "", month: (mon.dataset.mode === "ov" && mon.value) || ""});
+    if (refresh) qs.set("refresh", 1);
+    const j = await readJSON(await fetch("/api/shrinkage/overview?" + qs));
+    if (j.setup) shSetupFill(j.setup);
+    if ($("shLoc").value) return loadSh(false);                     // one location in the scope: its KPIs
+    if (mon.dataset.mode !== "ov") {
+      mon.dataset.mode = "ov";
+      mon.innerHTML = (j.setup || shSetup).months.map(m => `<option value="${m}">${shMonth(m)}</option>`).join("");
+      mon.value = j.month || (j.setup || shSetup).default_month;
+    }
+    if (j.pending) { $("shStatus").textContent = `Reading Business Central: ${j.stage || "starting"}…`; shTimer = setTimeout(() => loadShOv(false), 3000); return; }
+    if (!j.available) throw new Error(j.error || "not available");
+    shOvData = j; shData = null;
+    shRender();
+    if (j.reading) shTimer = setTimeout(() => loadShOv(false), 4000);
+  } catch (e) { $("shStatus").textContent = "Could not read: " + e.message; }
+}
+function shCard(l, v, sub, cls, full){
+  return `<div class="card kpi"><div class="l">${l}</div><div class="v ${cls || ""}" title="${full == null ? "" : fmt(full)}">${v}</div><div class="s">${sub}</div></div>`;
+}
+function shRender(){
+  ["shOvCard", "shMonthsCard", "shCatCard", "shItemsCard"].forEach(id => $(id).hidden = true);
+  $("shXlsx").style.display = shSetup && shSetup.can_export && $("shLoc").value ? "" : "none";
+  $("shYear").style.display = $("shLoc").value ? "" : "none";
+  if (shOvData) return shRenderOv();
+  const d = shData; if (!d) return;
+  const mon = $("shMonth");
+  const counted = d.months.filter(m => m.counted).map(m => m.month);
+  mon.dataset.mode = "loc";
+  mon.innerHTML = `<option value="ytd">Year to date</option>` + counted.slice().reverse().map(m => `<option value="${m}">${shMonth(m)}</option>`).join("");
+  mon.value = shMon;
+  const P = shMon === "ytd" ? d.ytd : d.per_month[shMon] || {rows: [], totals: null};
+  const t = P.totals;
+  $("shKpis").innerHTML = t ?
+    shCard("Net difference", ilM(t.net), `<span>losses ${fmt(t.losses)}</span> · <span>surpluses ${fmt(t.surpluses)}</span>`, t.net < 0 ? "up" : "", t.net) +
+    shCard("KMSH / Dalje", ilM(t.kmsh), `<span>the cost of the outs, as posted</span>`, "", t.kmsh) +
+    shCard("Diferenca / Dalje", shPct(t.ratio), `<span>the loss as a share of the cost of the outs</span>`, t.ratio > 0.05 ? "up" : "") +
+    shCard("Categories to investigate", fmt(t.investigate), `<span>above their % Waste</span>`, t.investigate ? "warn" : "") +
+    shCard("Unjustified", ilM(t.unjust), `<span>loss − % Waste × KMSH / Dalje; CHECK = YES ${fmt(t.unjust_yes)}</span><br><span title="The whole loss of the categories to investigate, as the KPI workbook counts it">Excel method ${fmt(t.unjust_excel)}; CHECK = YES ${fmt(t.unjust_excel_yes)}</span>`, t.unjust ? "up" : "", t.unjust)
+    : shCard("Count", "–", `<span>No count posted in ${esc(shMonth(shMon))} for ${esc(d.location)}.</span>`, "warn");
+  const docs = shMon !== "ytd" ? Object.keys((d.months.find(m => m.month === shMon) || {}).docs || {}) : [];
+  const off = d.months.reduce((a, m) => a + (m.qty_off || 0), 0);
+  $("shStatus").innerHTML = [`${esc(d.company)} · ${esc(d.location)} · ${esc(shMonth(shMon))}${shMon === "ytd" ? ` (${d.ytd.months.length} counted months of ${d.year})` : ""}`,
+    `<span>read at ${esc((d.read_at || "").replace("T", " ").slice(0, 16))}</span>`,
+    docs.length ? `<span>count documents: ${esc(docs.slice(0, 4).join(", "))}${docs.length > 4 ? " …" : ""}</span>` : "",
+    P.out_of_scope ? `<span>out of scope (not in the category map): ${fmt(P.out_of_scope)}</span>` : "",
+    off ? `<span class="neg">${fmt(off)} item-months where opening + in + out + difference does not give the closing stock</span>` : "",
+    `<span>status of the categories and waste: ${esc(d.config.status)}</span>`].filter(Boolean).join(" · ");
+  // by month
+  $("shMonthsCard").hidden = false;
+  const mrow = (m, T, label, on) => `<tr data-shm="${m}" class="${on ? "on" : ""}"><td><b>${esc(label)}</b></td>` + (T ?
+    `<td class="num">${shV(T.net)}</td><td class="num">${fmt(T.losses)}</td><td class="num">${fmt(T.surpluses)}</td><td class="num">${fmt(T.kmsh)}</td><td class="num">${shPct(T.ratio)}</td>
+     <td class="num">${fmt(T.investigate)}</td><td class="num"><b>${fmt(T.unjust)}</b></td><td class="num">${fmt(T.unjust_excel)}</td>` :
+    `<td colspan="8" class="meta">no count posted</td>`) + `</tr>`;
+  $("shMonths").innerHTML = `<tr><th>Month</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">KMSH / Dalje</th><th class="num">Diferenca / Dalje</th><th class="num">Investigate</th><th class="num">Unjustified</th><th class="num">Unjustified (Excel)</th></tr>` +
+    d.months.slice().reverse().map(m => mrow(m.month, (d.per_month[m.month] || {}).totals, shMonth(m.month), shMon === m.month)).join("") +
+    (d.ytd.totals ? mrow("ytd", d.ytd.totals, "Year to date", shMon === "ytd") : "");
+  $("shMonths").querySelectorAll("tr[data-shm]").forEach(tr => tr.onclick = () => {
+    const m = tr.dataset.shm; if (m !== "ytd" && !(d.per_month[m] || {}).totals) return;
+    shMon = m; shCat = ""; shRender();
+  });
+  // by category
+  if (!P.rows.length) return;
+  $("shCatCard").hidden = false;
+  $("shCatT").textContent = `By category · ${shMonth(shMon)}`;
+  $("shCatNote").innerHTML = `<span>Worst first. Click a category for its items.</span> <span>% Delta = count difference ÷ out, in quantity (hover for each unit).</span>` +
+    (shMon === "ytd" ? ` <span>Year to date: the unjustified values are the sum of the months; Investigate counts the months above the threshold.</span>` : "");
+  $("shCats").innerHTML = `<tr><th>Category</th><th>CHECK</th><th class="num">% Waste</th><th class="num">Items</th><th class="num">% Delta</th><th class="num">Net difference</th><th class="num">KMSH / Dalje</th><th class="num">Diferenca / Dalje</th><th>Target</th><th class="num">Allowed waste</th><th class="num">Unjustified</th><th class="num">Unjustified (Excel)</th></tr>` +
+    P.rows.map(x => `<tr data-shcat="${esc(x.kat2)}" class="${shCat === x.kat2 ? "on" : ""}"><td><b>${esc(x.kat2)}</b><div class="meta">${esc(x.kat1)}</div></td>
+      <td>${x.check ? "YES" : "NO"}</td><td class="num">${fmt(x.waste_pct, x.waste_pct % 1 ? 1 : 0)}%</td><td class="num">${fmt(x.items)}</td>
+      <td class="num" title="${esc(Object.entries(x.delta).map(([u, v]) => `${u}: ${shPct(v)}`).join("\n"))}">${shPct(x.delta_all)}</td>
+      <td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.kmsh)}</td><td class="num">${shPct(x.ratio)}</td>
+      <td><span class="sh-pill ${x.target === "Investigate" ? "inv" : ""}">${esc(x.target)}${shMon === "ytd" && x.months_investigate ? " · " + fmt(x.months_investigate) : ""}</span></td>
+      <td class="num">${fmt(x.allowed)}</td><td class="num"><b>${x.unjust ? `<span class="neg">${fmt(x.unjust)}</span>` : "–"}</b></td><td class="num">${x.unjust_excel ? fmt(x.unjust_excel) : "–"}</td></tr>`).join("") +
+    `<tr><td><b>Total</b></td><td></td><td></td><td></td><td></td><td class="num"><b>${shV(P.totals.net)}</b></td><td class="num"><b>${fmt(P.totals.kmsh)}</b></td><td class="num"><b>${shPct(P.totals.ratio)}</b></td><td></td><td class="num">${fmt(P.totals.allowed)}</td><td class="num"><b>${fmt(P.totals.unjust)}</b></td><td class="num"><b>${fmt(P.totals.unjust_excel)}</b></td></tr>`;
+  $("shCats").querySelectorAll("tr[data-shcat]").forEach(tr => tr.onclick = () => { shCat = shCat === tr.dataset.shcat ? "" : tr.dataset.shcat; shRender(); });
+  if (shCat) shItems();
+}
+function shItems(){
+  const d = shData, months = shMon === "ytd" ? d.ytd.months : [shMon];
+  const q = $("shQ").value.trim().toLowerCase();
+  const rows = d.items.filter(it => it.kat2 === shCat && months.some(m => it.m[m]) && (!q || (it.no + " " + it.desc).toLowerCase().includes(q))).map(it => {
+    const a = {op: null, in: 0, out: 0, cnt: 0, val: 0, kmsh: 0, cl: null};
+    months.forEach((m, i) => { const v = it.m[m]; if (!v) return; if (a.op == null) a.op = v[0]; a.in += v[1]; a.out += -v[3]; a.kmsh += -v[4]; a.cnt += v[5]; a.val += v[6]; a.cl = v[7]; });
+    return Object.assign({it}, a);
+  }).sort((x, y) => x.val - y.val);
+  $("shItemsCard").hidden = false;
+  $("shItemsT").textContent = `${shCat} · ${shMonth(shMon)} · ${fmt(rows.length)} items`;
+  $("shItemsNote").innerHTML = `<span>Largest loss first.</span> <span>Difference = the count adjustment posted in Business Central; its value is the cost BC posted.</span>` +
+    (shMon === "ytd" ? ` <span>Year to date: opening of the first counted month, closing of the last, ins, outs and differences summed.</span>` : "");
+  $("shItems").innerHTML = `<tr><th>Item</th><th>Unit</th><th class="num">Opening</th><th class="num">In</th><th class="num">Out</th><th class="num">Theoretical</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Unit cost</th><th class="num">Difference value</th><th class="num">KMSH / Dalje</th></tr>` +
+    (rows.slice(0, 400).map(r => `<tr><td><b>${esc(r.it.no)}</b> ${esc(r.it.desc)}${r.it.exception ? ` <span class="sh-pill st" title="Category set by an exception, not by the map">exception</span>` : ""}<div class="meta">${esc([r.it.g4, r.it.g5].filter(Boolean).join(" · "))}</div></td>
+      <td>${esc(r.it.unit)}</td><td class="num">${cnN(r.op)}</td><td class="num">${cnN(r.in)}</td><td class="num">${cnN(r.out)}</td><td class="num">${cnN((r.op || 0) + r.in - r.out)}</td><td class="num">${cnN(r.cl)}</td>
+      <td class="num"><b class="${r.cnt < 0 ? "neg" : ""}">${cnN(r.cnt)}</b></td><td class="num">${r.cnt ? fmt(r.val / r.cnt, 2) : "–"}</td><td class="num"><b>${shV(r.val)}</b></td><td class="num">${fmt(r.kmsh)}</td></tr>`).join("")
+      || `<tr><td colspan="11" class="meta">No item.</td></tr>`);
+}
+function shRenderOv(){
+  const j = shOvData;
+  $("shKpis").innerHTML = "";
+  const L = j.locations, tot = k => L.reduce((a, x) => a + (x[k] || 0), 0);
+  $("shKpis").innerHTML = shCard("Locations with a count", fmt(L.length), `<span>in ${esc(shMonth(j.month))}</span>`) +
+    shCard("Net difference", ilM(tot("net")), `<span>in scope, at posted cost</span>`, tot("net") < 0 ? "up" : "", tot("net")) +
+    shCard("Losses", ilM(tot("losses")), `<span>items counted below the stock</span>`, "up", tot("losses")) +
+    shCard("Surpluses", ilM(tot("surpluses")), `<span>items counted above the stock</span>`, "", tot("surpluses")) +
+    shCard("Out of scope", ilM(tot("out_of_scope")), `<span>packaging, cleaning…: not in the category map</span>`, "", tot("out_of_scope"));
+  $("shStatus").innerHTML = `${esc(j.company)} · ${esc(shMonth(j.month))} · <span>read at ${esc((j.read_at || "").replace("T", " ").slice(0, 16))}</span> · <span>count documents starting with ${esc(j.prefixes.join(", "))}</span>`;
+  $("shOvCard").hidden = false;
+  $("shOvNote").innerHTML = `<span>The count adjustments of ${esc(shMonth(j.month))} by location, worst first. Click a location for its KPIs by category: the categories and the unjustified value need the month's ins and outs, read for one location at a time.</span>`;
+  $("shOv").innerHTML = `<tr><th>Location</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">Out of scope</th><th class="num">Lines</th><th>Count documents</th></tr>` +
+    (L.map(x => `<tr data-shloc="${esc(x.location)}"><td><b>${esc(x.location)}</b>${x.analysis_read_at ? `<div class="meta">KPIs read ${esc(x.analysis_read_at.replace("T", " ").slice(0, 16))}</div>` : ""}</td>
+      <td class="num"><b>${shV(x.net)}</b></td><td class="num">${fmt(x.losses)}</td><td class="num">${fmt(x.surpluses)}</td><td class="num">${fmt(x.out_of_scope)}</td><td class="num">${fmt(x.lines)}</td>
+      <td class="meta">${esc(x.docs.join(", "))}</td></tr>`).join("") || `<tr><td colspan="7" class="meta">No count adjustment posted in ${esc(shMonth(j.month))}.</td></tr>`);
+  $("shOv").querySelectorAll("tr[data-shloc]").forEach(tr => tr.onclick = () => {
+    $("shLoc").value = tr.dataset.shloc; $("shYear").value = j.month.slice(0, 4); shMon = j.month; shCat = ""; loadSh(false);
+  });
+}
+// ---- Categories & waste
+async function shCfgLoad(){
+  $("shCfgCard").hidden = false; shCfgOpen = true;
+  $("shCfgNote").textContent = "Reading…";
+  try {
+    shCfg = await readJSON(await fetch("/api/shrinkage/config?" + new URLSearchParams({company: $("company").value || ""})));
+    if (shCfg.error) throw new Error(shCfg.error);
+    shCfgRender();
+  } catch (e) { $("shCfgNote").textContent = "Could not read: " + e.message; }
+}
+function shCfgRender(){
+  const c = shCfg, ed = c.can_edit, dis = ed ? "" : " disabled";
+  $("shCfgNote").innerHTML = `<span>The waste each category is allowed, the map from the item card to the category, and the exceptions per item.</span> <span>Status: <b>${esc(c.status)}</b>${c.updated_by ? ` · last change by ${esc(c.updated_by)}, ${esc((c.updated_at || "").replace("T", " ").slice(0, 16))}` : ""}.</span>` + (ed ? "" : ` <span>Read only: changes need the settings permission.</span>`);
+  const catOpts = sel => c.categories.map(x => `<option${x.kat2 === sel ? " selected" : ""}>${esc(x.kat2)}</option>`).join("");
+  const box = (title, hint, body) => `<div><h3 style="margin:0 0 4px;font-size:14px">${title}</h3><p class="hint" style="margin:0 0 8px">${hint}</p>${body}</div>`;
+  $("shCfg").innerHTML =
+    box("Status", "Pilot while the figures are checked against the Excel; Reconciled once they match; Approved by Finance. Reconciled and Approved need a note.",
+      `<div class="sh-ctl"><select id="shStSel"${dis}>${["Pilot", "Reconciled", "Approved"].map(x => `<option${x === c.status ? " selected" : ""}>${x}</option>`).join("")}</select><input id="shStNote" placeholder="note"${dis} style="min-width:240px"><button class="mini dark" id="shStSave" type="button"${dis}>Save status</button></div>`) +
+    box("Waste by category", "% Waste = the loss a category is allowed, as a share of the cost of its outs (KMSH / Dalje). CHECK = YES: in the subtotal of the categories followed.",
+      `<div class="scroll"><table id="shCatEd"><tr><th>Kat. 2</th><th>Kat. 1</th><th class="num">% Waste</th><th>CHECK</th><th>Basis</th><th></th></tr>` +
+      c.categories.map((x, i) => `<tr data-i="${i}"><td><input data-f="kat2" value="${esc(x.kat2)}"${dis}></td><td><input data-f="kat1" value="${esc(x.kat1)}"${dis}></td><td><input data-f="waste_pct" type="number" step="0.5" min="0" max="100" value="${x.waste_pct}"${dis} style="width:80px"></td><td class="c"><input data-f="check" type="checkbox"${x.check ? " checked" : ""}${dis}></td><td><input data-f="basis" value="${esc(x.basis || "")}"${dis} style="min-width:260px"></td><td>${ed ? `<button class="mini" data-rm type="button">Remove</button>` : ""}</td></tr>`).join("") +
+      `</table></div>` + (ed ? `<p style="margin:8px 0 0"><button class="mini" id="shCatAdd" type="button">Add a category</button> <button class="mini dark" id="shCatSave" type="button">Save the categories</button></p>` : "")) +
+    box("Map from the item card", "Item Category Group 2, 4 and 5 of the card → category; empty = any. The row with more groups filled wins.",
+      `<div class="scroll"><table id="shMapEd"><tr><th>Group 2</th><th>Group 4</th><th>Group 5</th><th>Category</th><th></th></tr>` +
+      c.map.map(m => `<tr><td><input data-f="g2" value="${esc(m.g2)}"${dis}></td><td><input data-f="g4" value="${esc(m.g4)}"${dis}></td><td><input data-f="g5" value="${esc(m.g5)}"${dis}></td><td><select data-f="kat2"${dis}>${catOpts(m.kat2)}</select></td><td>${ed ? `<button class="mini" data-rm type="button">Remove</button>` : ""}</td></tr>`).join("") +
+      `</table></div>` + (ed ? `<p style="margin:8px 0 0"><button class="mini" id="shMapAdd" type="button">Add a row</button> <button class="mini dark" id="shMapSave" type="button">Save the map</button></p>` : "")) +
+    box(`Exceptions per item · ${esc(c.company)} · ${fmt(c.overrides.length)}`, "An item whose category is not the one the map gives: by use (barista milk → Kafeteria), or until its card is corrected in Business Central.",
+      `<div class="scroll"><table id="shOvEd"><tr><th>Item</th><th>Card (Group 4 · 5)</th><th>By the map</th><th>Category</th><th>Set by</th><th></th></tr>` +
+      (c.overrides.map(o => `<tr data-no="${esc(o.no)}"><td><b>${esc(o.no)}</b> ${esc(o.desc)}</td><td class="meta">${esc([o.g4, o.g5].filter(Boolean).join(" · "))}</td><td>${esc(o.by_map || "out of scope")}</td><td><select data-ov${dis}>${catOpts(o.kat2)}</select></td><td class="meta">${esc(o.source || "")} · ${esc(o.by || "")}</td><td>${ed ? `<button class="mini" data-ovrm type="button">Remove</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="meta">No exception.</td></tr>`) +
+      `</table></div>` + (ed ? `<div class="sh-ctl" style="margin-top:8px"><input id="shOvNo" placeholder="item no."><select id="shOvKat">${catOpts("")}</select><button class="mini dark" id="shOvAdd" type="button">Add the exception</button>
+        <label class="mini" style="cursor:pointer">Import from the Excel analysis<input type="file" id="shImp" accept=".xlsx" hidden></label></div>` : "")) +
+    box("Count documents", "Item adjustments whose document number starts with one of these are the posted counts (comma separated).",
+      `<div class="sh-ctl"><input id="shPre" value="${esc(c.prefixes.join(", "))}"${dis}>${ed ? `<button class="mini dark" id="shPreSave" type="button">Save</button>` : ""}</div>`) +
+    box("History", "", `<div class="scroll"><table><tr><th>When</th><th>Who</th><th>Changed</th><th>Status</th><th>Note</th></tr>` +
+      (c.history.map(h => `<tr><td class="meta">${esc((h.at || "").replace("T", " ").slice(0, 16))}</td><td>${esc(h.by || "")}</td><td>${esc((h.changed || []).join(", "))}</td><td>${esc(h.status || "")}</td><td class="meta">${esc(h.note || "")}</td></tr>`).join("") || `<tr><td colspan="5" class="meta">No change yet: the defaults of the KPI workbook.</td></tr>`) + `</table></div>`) +
+    `<p class="meta" id="shCfgMsg"></p>`;
+  if (!ed) return;
+  const save = async (patch, note) => {
+    $("shCfgMsg").textContent = "Saving…";
+    try { await simphonyPost("/api/shrinkage/config", Object.assign({company: $("company").value || "", note: note || ""}, patch)); await shCfgLoad(); $("shCfgMsg").textContent = "Saved. Read the KPIs again to see the change."; shData = null; }
+    catch (e) { $("shCfgMsg").textContent = "Could not save: " + e.message; }
+  };
+  const rowsOf = (id, fields) => [...$(id).querySelectorAll("tr")].slice(1).map(tr => Object.fromEntries(fields.map(f => { const el = tr.querySelector(`[data-f="${f}"]`); return [f, el.type === "checkbox" ? el.checked : el.value]; })));
+  $("shCfg").querySelectorAll("#shCatEd [data-rm], #shMapEd [data-rm]").forEach(b => b.onclick = () => b.closest("tr").remove());
+  $("shCatAdd").onclick = () => $("shCatEd").insertAdjacentHTML("beforeend", `<tr><td><input data-f="kat2"></td><td><input data-f="kat1"></td><td><input data-f="waste_pct" type="number" step="0.5" min="0" max="100" value="5" style="width:80px"></td><td class="c"><input data-f="check" type="checkbox"></td><td><input data-f="basis" style="min-width:260px"></td><td></td></tr>`);
+  $("shCatSave").onclick = () => save({categories: rowsOf("#shCatEd", ["kat2", "kat1", "waste_pct", "check", "basis"])}, "categories");
+  $("shMapAdd").onclick = () => $("shMapEd").insertAdjacentHTML("beforeend", `<tr><td><input data-f="g2"></td><td><input data-f="g4"></td><td><input data-f="g5"></td><td><select data-f="kat2">${catOpts("")}</select></td><td></td></tr>`);
+  $("shMapSave").onclick = () => save({map: rowsOf("#shMapEd", ["g2", "g4", "g5", "kat2"])}, "map");
+  $("shStSave").onclick = () => save({status: $("shStSel").value}, $("shStNote").value);
+  $("shPreSave").onclick = () => save({prefixes: $("shPre").value});
+  $("shOvAdd").onclick = () => { const no = $("shOvNo").value.trim(); if (no) save({overrides: {[no]: $("shOvKat").value}}); };
+  $("shOvEd").querySelectorAll("[data-ov]").forEach(s => s.onchange = () => save({overrides: {[s.closest("tr").dataset.no]: s.value}}));
+  $("shOvEd").querySelectorAll("[data-ovrm]").forEach(b => b.onclick = () => save({overrides: {[b.closest("tr").dataset.no]: ""}}));
+  $("shImp").onchange = async ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    $("shCfgMsg").textContent = "Reading the workbook…";
+    try {
+      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+      const j = await simphonyPost("/api/shrinkage/import", {company: $("company").value || "", data, filename: f.name});
+      await shCfgLoad(); shData = null;
+      const x = j.import;
+      $("shCfgMsg").textContent = `Imported ${f.name}: ${fmt(x.items)} items, ${fmt(x.same_as_map)} already as the map, ${fmt(x.exceptions)} exceptions${x.n_not_found ? `, ${fmt(x.n_not_found)} not found in Business Central` : ""}${x.categories ? `; waste table: ${fmt(x.categories)} categories` : ""}.`;
+    } catch (e) { $("shCfgMsg").textContent = "Could not import: " + e.message; }
+    ev.target.value = "";
+  };
+}
+$("shLoc").onchange = () => { shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shItemsCard").hidden = true; loadSh(false); };
+$("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
+$("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
+$("shRead").onclick = () => $("shLoc").value ? loadSh(true) : loadShOv(true);
+$("shXlsx").onclick = () => { if (shData) location.href = "/api/shrinkage/xlsx?" + shQs(); };
+$("shCfgBtn").onclick = () => { if (shCfgOpen && !$("shCfgCard").hidden) { $("shCfgCard").hidden = true; shCfgOpen = false; } else { shCfgLoad(); $("shCfgCard").scrollIntoView({behavior: "smooth", block: "start"}); } };
+$("shCfgClose").onclick = () => { $("shCfgCard").hidden = true; shCfgOpen = false; };
+$("shItemsClose").onclick = () => { shCat = ""; shRender(); };
+$("shQ").oninput = () => { if (shCat) shItems(); };
+$("company").addEventListener("change", () => { $("shLoc").dataset.co = ""; $("shMonth").dataset.mode = ""; shData = shOvData = null; shCfg = null; $("shCfgCard").hidden = true; if ($("v-shrinkage").classList.contains("on")) loadSh(false); });
+
 // ---------- Inventory → Stock count analysis (stockcount.py) ----------
 var cnData = null, cnTimer = null, cnFilter = "all", cnFile = null, cnSetupData = null;
 const CN_ST = {match: "Match", short: "Shortage", surplus: "Surplus", not_counted: "Not counted", not_on_form: "Not on the form", unknown: "Not in Business Central", cutoff: "Posted after the form", late_match: "Match after later postings", no_stock: "No stock"};
@@ -6272,6 +6563,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="typology" && !tyData) loadTypology(false);
   if(b.dataset.view==="discharge" && !dcData) loadDischarge(false);
   if(b.dataset.view==="stockcount") loadCn(false);
+  if(b.dataset.view==="shrinkage" && (!shData || shData.company !== ($("company").value || shData.company))) loadSh(false);
   if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="receipts" && (!tkData || tkData.company !== ($("company").value || tkData.company))) loadReceipts(false);
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
@@ -6464,7 +6756,7 @@ function ilBar(L, cls){
 // Inventory is one screen with tabs: Overview and Location intelligence on the inventory view, then
 // Typology & turnover, Recipe integrity, Item cards and Movement & dead stock, which stay views
 // of their own (their addresses and loading do not change) with the same tab bar on top.
-var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockcount", "stockwc", "invcharts"]);
+var INV_TABS = new Set(["typology", "recipes", "discharge", "itemmaster", "movement", "stockcount", "shrinkage", "stockwc", "invcharts"]);
 // the embedded Purchasing screen: loaded when the tab opens (again when the company changes), sized to its content
 var swCompany = null, swTimer = null;
 function swShow(){
