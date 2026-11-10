@@ -264,6 +264,11 @@ td.num,th.num{text-align:right}
 .sv-case .n{font-size:20px;font-weight:700}.sv-case .n.zero{color:var(--sub)}.sv-case .t{font-size:13px;font-weight:600;margin:2px 0}.sv-case .w{font-size:12px;color:var(--sub)}
 #svRes tr[data-svr]{cursor:pointer}#svRes tr[data-svr]:hover td{background:var(--bg)}
 .sv-tl{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:8px 0 2px}.sv-tl>div{border-left:3px solid var(--line);padding:2px 0 2px 9px}
+.sv-heats{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}.sv-heats h3{margin:0 0 6px;font-size:13px}
+.sv-heat{border-collapse:separate;border-spacing:2px}.sv-heat th{font-size:10.5px;font-weight:600;color:var(--sub);background:none;padding:1px 2px;text-align:center}
+.sv-heat td{min-width:26px;height:24px;border-radius:4px;text-align:center;font-size:10px;font-variant-numeric:tabular-nums;padding:0 2px;color:var(--ink)}
+.sv-heat td.z{color:var(--line)}.sv-heat td.hi{color:#fff}
+.sv-bar{display:inline-block;height:8px;border-radius:2px;background:var(--ch-0);vertical-align:middle;margin-right:6px}
 .sv-tl>div.on{border-left-color:var(--ch-0)}.sv-tl .k{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}.sv-tl .x{font-size:14px;font-weight:600}
 #biGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
 #biGrid td.loc,#biGrid th.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px;position:sticky;left:0;background:var(--card);z-index:1}
@@ -1520,7 +1525,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <label class="field" style="margin-top:8px">Venues → restaurants <span class="meta">one per line: venue (its name or SevenRooms id) = Simphony reference; a venue with the name of a restaurant of Settings → Locations needs no line</span><textarea id="svMap" spellcheck="false" style="min-height:70px"></textarea></label>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="svSave" type="button">Save</button><button class="btn" id="svTest" type="button">Test the connection</button><span class="meta" id="svMsg"></span></div>
         <div class="scroll" style="margin-top:12px"><table id="svVen"></table></div></div>
-      <div class="fc-seg bi-seg" id="svSeg" role="tablist"><button data-b="locs" class="on">Restaurants</button><button data-b="days">Restaurants &amp; days</button><button data-b="res">Reservations</button><button data-b="mix">Shift, channel, lead time</button><button data-b="fb">Feedback</button></div>
+      <div class="fc-seg bi-seg" id="svSeg" role="tablist"><button data-b="locs" class="on">Restaurants</button><button data-b="days">Restaurants &amp; days</button><button data-b="res">Reservations</button><button data-b="mix">Shift, channel, lead time</button><button data-b="guests">Guests &amp; value</button><button data-b="time">Time &amp; tables</button><button data-b="ahead">Next 14 days</button><button data-b="staff">Staff</button><button data-b="fb">Feedback</button></div>
       <div class="sv-p" data-p="locs"><div class="card"><div class="card-head"><div><h2>By restaurant</h2>
         <p class="hint"><span>Covers seated against Simphony's guests, no-shows and cancellations, and what the reservations spent against everyone else.</span></p></div></div>
         <div class="scroll"><table id="svLocs"></table></div></div></div>
@@ -1536,6 +1541,18 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="sv-p" data-p="mix" hidden><div class="card"><div class="card-head"><div><h2>Shift, channel, lead time, party, area</h2>
         <p class="hint"><span>The reservations (walk-ins and cancellations apart) by where they came from and when they were made.</span></p></div></div>
         <div id="svMix"></div></div></div>
+      <div class="sv-p" data-p="guests" hidden><div class="card"><div class="card-head"><div><h2>Guests &amp; value</h2>
+        <p class="hint"><span>Who comes back, what each channel brings and loses, and what the no-shows cost: the reservations (walk-ins apart) of every restaurant of the read.</span></p></div></div>
+        <div class="kpis" id="svGuK" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"></div><div id="svGu"></div></div></div>
+      <div class="sv-p" data-p="time" hidden><div class="card"><div class="card-head"><div><h2>Time &amp; tables</h2>
+        <p class="hint"><span>How long a table stays, how many times a table turns in a shift, and when the guests book against when Simphony opens the checks.</span></p></div></div>
+        <div class="kpis" id="svTmK" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"></div><div id="svTm"></div></div></div>
+      <div class="sv-p" data-p="ahead" hidden><div class="card"><div class="card-head"><div><h2>The next 14 days</h2>
+        <p class="hint"><span>The reservations on the books now, and the forecast each day learns from the same weekday of the 4 weeks before.</span> <span>Choose a restaurant above for its days only.</span></p></div></div>
+        <div class="sv-charts" id="svAhCh"></div><div class="scroll" style="margin-top:12px"><table id="svAh"></table></div><p class="meta" id="svAhNote"></p></div></div>
+      <div class="sv-p" data-p="staff" hidden><div class="card"><div class="card-head"><div><h2>Staff</h2>
+        <p class="hint"><span>By who served the table in SevenRooms: covers, the share linked to a Simphony check, the spend per cover, the time at the table, the cases and the guests' rating.</span> <span>A low linked rate is the first thing to look at: a check not linked is a reservation with no spend.</span></p></div></div>
+        <div class="scroll"><table id="svSt"></table></div></div></div>
       <div class="sv-p" data-p="fb" hidden><div class="card"><div class="card-head"><div><h2>Feedback</h2>
         <p class="hint"><span>The guests' ratings of the reservations of these days, the lowest first.</span></p></div></div>
         <div class="kpis" id="svFbK" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"></div>
@@ -2105,6 +2122,29 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <p class="hint" id="bxInfo" style="margin:10px 0 0"></p>
       <div class="scroll" style="margin-top:10px"><table id="bxRuns"></table></div>
     </div>
+    <div class="card" style="margin-bottom:15px" id="srxCard">
+      <div class="card-head"><div><h2>SevenRooms daily email</h2>
+        <p class="hint">Every day at the time set, what Sales → SevenRooms ↔ Simphony shows for the last 7 days, read fresh: yesterday's reservations of each restaurant against Simphony (covers seated against the guests, no-shows, the sales that came with a reservation), the cases to correct, the guests rated 1 or 2, and today's and the next days' book with the forecast. Everything in an Excel file. One email per company (Email recipients by company → Reservations against Simphony · daily: the unit managers and operations, unless changed there), one per location to the location's own people with that location only. No guest's name, phone or email is in it. Sent through the Purchasing mail server.</p></div>
+        <span class="rhg-pill" id="srxPill">Off</span></div>
+      <div class="formgrid">
+        <label class="field">To (when Email recipients has nobody)<input id="srxTo" placeholder="operations@rhg.al"></label>
+        <label class="field">Cc (optional)<input id="srxCc" placeholder="name@rhg.al"></label>
+        <label class="field">Days<select id="srxDays"><option value="daily">Every day</option><option value="mon_sat">Monday to Saturday</option><option value="weekdays">Monday to Friday</option></select></label>
+        <label class="field">Time<input id="srxTime" type="time" value="10:00"></label>
+        <label class="field">Companies (blank = every company with a SevenRooms venue)<input id="srxCo" placeholder="SALT"></label>
+        <label class="field">Lines per section in the email (0 = all)<input id="srxLines" type="number" min="0" max="1000" value="50"></label>
+        <label class="field">Send a test to<input id="srxTestTo" placeholder="you@rhg.al"></label>
+      </div>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin:4px 0 12px"><input type="checkbox" id="srxOn" style="width:auto"> Send on the days above</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn dark" id="srxSave">Save</button>
+        <button class="btn" id="srxPreview">Preview</button>
+        <button class="btn" id="srxTest">Send a test</button>
+        <span class="meta" id="srxMsg"></span>
+      </div>
+      <p class="hint" id="srxInfo" style="margin:10px 0 0"></p>
+      <div class="scroll" style="margin-top:10px"><table id="srxRuns"></table></div>
+    </div>
     <div class="card" style="margin-bottom:15px" id="brCard">
       <div class="card-head"><div><h2>Brand performance email</h2>
         <p class="hint">One email per brand, to the brand's own addresses with finance and operations in Cc. <b>Weekly</b>, for the week before: sales of every location (Simphony, excluding VAT) against the budget, the week before and the same weekdays last year; guests, checks and the average check; sales by day; the month to date with the costs posted so far. <b>Monthly</b>, for the month before, twice: <i>provisional</i> on the first working day and <i>final</i> on the day set below, once payroll and stock usage are posted: the P&amp;L of the brand (sales, food &amp; beverage, labour, prime cost, other costs, EBITDA) against budget and last year, the month and the year to date, every location. Brands and locations come from the registry in Location intelligence. Sent through the Purchasing mail server.</p></div>
@@ -2424,6 +2464,7 @@ function render(){
   if(!crLoaded) loadCostReport();
   if(!ngLoaded) loadNegReport();
   if(!bxLoaded) loadBxReport();
+  if(!srxLoaded) loadSrxReport();
   if(!brLoaded) loadBrandReport();
   if(!srLoaded) loadSalesReport();
   if(!pmLoaded) loadPlMemo();
@@ -6153,7 +6194,7 @@ async function svLoad(refresh){
   }
 }
 function svEmpty(j){
-  ["svKpis", "svLocs", "svGrid", "svRes", "svMix", "svFbK", "svFb", "svChips", "svCases"].forEach(id => $(id).innerHTML = "");
+  ["svKpis", "svLocs", "svGrid", "svRes", "svMix", "svFbK", "svFb", "svChips", "svCases", "svGuK", "svGu", "svTmK", "svTm", "svAhCh", "svAh", "svSt"].forEach(id => $(id).innerHTML = "");
   $("svTrend").hidden = true;
   $("svResMore").textContent = "";
   $("svStatus").innerHTML = `<span class="warn">${fcSp(j.error || "SevenRooms is not connected yet.")}</span>` + (j.can_settings ? ` <button class="mini" type="button" id="svOpenSet">${fcSp("Connection & mapping")}</button>` : ` ${fcSp("Someone with the Settings permission enters it.")}`);
@@ -6170,7 +6211,7 @@ function svRender(){
   const d = svData, lv = $("svLoc").value;
   svRangeSync(d.range);
   $("svLoc").innerHTML = `<option value="">All</option>` + d.locations.map(L => `<option value="${esc(L.ref)}"${L.ref === lv ? " selected" : ""}>${esc(L.name)}</option>`).join("");
-  svKpis(); svCharts(); svStatusLine(); svLocs(); svGrid(); svRes(); svMix(); svFb();
+  svKpis(); svCharts(); svStatusLine(); svLocs(); svGrid(); svRes(); svMix(); svGuests(); svTime(); svAhead(); svStaff(); svFb();
   $("svDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p>${fcSp(x)}</p>`).join("");
 }
 function svKp(){ const L = $("svLoc").value; return L ? ((svData.locations.find(x => x.ref === L) || {}).kp || null) : svData.kpis_prev; }
@@ -6306,13 +6347,100 @@ function svFb(){
       <td>${esc(f.recommend)}</td><td>${esc(f.res)}</td><td>${esc(f.tables)}</td><td>${esc(f.server)}</td></tr>`).join("")
       || `<tr><td colspan="12" class="meta">${fcSp("No feedback for the reservations of these days.")}</td></tr>`);
 }
+// ---- Guests & value, Time & tables, the next 14 days, Staff (the whole read, of the scope)
+const svAvg = (a, n) => n ? a / n : null;
+const svMin = v => v == null ? "–" : fmt(v, 0) + " min";
+const svKc = (l, v, s) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v">${v}</div>${s ? `<div class="meta">${fcSp(s)}</div>` : ""}</div>`;
+function svVal(title, L, note){
+  const max = Math.max(1, ...(L || []).map(m => m.covers));
+  return `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp(title)}</h3>${note ? `<p class="hint" style="margin:0 0 6px">${fcSp(note)}</p>` : ""}<div class="scroll"><table><tr><th></th><th class="num">Reservations</th><th class="num">Cancelled</th><th class="num">No-shows</th><th>Covers seated</th><th class="num">Per cover</th><th class="num">No-show covers</th><th class="num">No-show cost</th></tr>` +
+    ((L || []).map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.cancel)} <span class="meta">${svPct(m.all ? m.cancel / m.all : null)}</span></td>
+      <td class="num">${fmt(m.no_show)} <span class="meta">${svPct(m.seated + m.no_show ? m.no_show / (m.seated + m.no_show) : null)}</span></td>
+      <td><span class="sv-bar" style="width:${Math.round(m.covers / max * 90)}px"></span>${fmt(m.covers)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td>
+      <td class="num">${fmt(m.ns_covers)}</td><td class="num ${m.ns_cost ? "warn" : ""}">${svM(m.ns_cost)}</td></tr>`).join("")
+      || `<tr><td colspan="8" class="meta">${fcSp("None in these days.")}</td></tr>`) + `</table></div>`;
+}
+function svGuests(){
+  const d = svData, M = d.mixes || {}, k = d.kpis, G = Object.fromEntries((M.guest || []).map(m => [m.key, m]));
+  const f = G["First visit"] || {}, r = G["Returning"] || {}, V = Object.fromEntries((M.vip || []).map(m => [m.key, m]));
+  const pc = m => m && m.linked_covers ? m.sales / m.linked_covers : null;
+  $("svGuK").innerHTML = svKc("Returning guests", svPct(f.seated + r.seated ? r.seated / (f.seated + r.seated) : null), `${fmt(r.seated || 0)} of ${fmt((f.seated || 0) + (r.seated || 0))} tables seated`)
+    + svKc("Per cover · returning", svM(pc(r)), `first visit ${svM(pc(f))}`)
+    + svKc("Per cover · VIP", svM(pc(V["VIP"])), `the rest ${svM(pc(V["Not VIP"]))}`)
+    + svKc("No-show cost", svM(k.ns_cost), `${fmt(k.no_show_covers)} covers × ${svM(k.per_cover_res)} per cover`);
+  const lead = M.lead || [];
+  $("svGu").innerHTML = svVal("First visit or returning", M.guest, "Returning: seated at the restaurant before, within the days read (this period and the one before it).")
+    + svVal("VIP", M.vip) + svVal("By channel (booked by)", M.source, "What each channel brings (covers, spend) and what it loses (cancellations, no-shows).")
+    + svVal("By lead time: the no-show cost", lead) + svVal("Tags and occasions", M.tag, "SevenRooms' reservation tags, the 25 most used; a reservation with two tags counts in both.");
+}
+function svHeat(title, M, field, hours, fmtv){
+  const wd = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], by = Object.fromEntries((M || []).map(m => [m.key, m]));
+  const max = Math.max(1, ...(M || []).map(m => m[field] || 0));
+  return `<div><h3>${fcSp(title)}</h3><div class="scroll" data-nosort><table class="sv-heat"><tr><th></th>${hours.map(h => `<th>${String(h).padStart(2, "0")}</th>`).join("")}</tr>` +
+    wd.map((w, i) => `<tr><th style="text-align:left">${fcSp(w)}</th>` + hours.map(h => { const m = by[`${i}|${h}`], v = m ? m[field] || 0 : 0, a = v / max;
+      return `<td class="${v ? (a > 0.55 ? "hi" : "") : "z"}" style="${v ? `background:color-mix(in srgb, var(--ch-0) ${Math.round(12 + a * 88)}%, transparent)` : ""}" title="${esc(`${w} ${String(h).padStart(2, "0")}:00 · ${fmtv(v)}`)}">${v ? fmt(v) : "·"}</td>`; }).join("") + `</tr>`).join("") + `</table></div></div>`;
+}
+function svTime(){
+  const d = svData, M = d.mixes || {}, k = d.kpis, T = M.turns || [];
+  const ts = T.reduce((a, m) => a + m.seated, 0), sl = T.reduce((a, m) => a + (m.slots || 0), 0);
+  const sh = (M.shift || []).filter(m => m.dwell_n).map(m => [m.key, m.dwell_sum / m.dwell_n]).sort((a, b) => b[1] - a[1]);
+  $("svTmK").innerHTML = svKc("Time at the table", svMin(k.dwell), `${fmt(k.dwell_n)} tables timed`) + svKc("Table turns", sl ? fmt(ts / sl, 2) : "–", "seated reservations per table, day and shift")
+    + (sh.length ? svKc("Longest shift", svMin(sh[0][1]), sh.map(([s, v]) => `${s} ${svMin(v)}`).join(" · ")) : "");
+  const dl = M.dwell || [], dmax = Math.max(1, ...dl.map(m => m.seated));
+  const row = (L, label) => `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp(label)}</h3><div class="scroll"><table><tr><th></th><th class="num">Seated</th><th class="num">Timed</th><th class="num">Minutes at the table</th><th class="num">Per cover</th></tr>` +
+    ((L || []).map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.dwell_n)}</td><td class="num">${svMin(svAvg(m.dwell_sum, m.dwell_n))}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td></tr>`).join("")
+      || `<tr><td colspan="5" class="meta">${fcSp("None in these days.")}</td></tr>`) + `</table></div>`;
+  const hrs = [...new Set([...(M.hour || []), ...(M.simhour || [])].map(m => +m.key.split("|")[1]))].sort((a, b) => a - b);
+  const span = hrs.length ? Array.from({length: hrs[hrs.length - 1] - hrs[0] + 1}, (_, i) => hrs[0] + i) : [];
+  $("svTm").innerHTML = `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp("How long a table stays")}</h3><div class="scroll"><table><tr><th></th><th>Seated</th><th class="num">Per cover</th></tr>` +
+      (dl.map(m => `<tr><td><b>${esc(m.key)}</b></td><td><span class="sv-bar" style="width:${Math.round(m.seated / dmax * 120)}px"></span>${fmt(m.seated)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td></tr>`).join("")
+        || `<tr><td colspan="3" class="meta">${fcSp("No table timed: SevenRooms has no seated and left time and no check is linked.")}</td></tr>`) + `</table></div>`
+    + `<h3 style="margin:16px 0 4px;font-size:14px">${fcSp("Table turns by area")}</h3><div class="scroll"><table><tr><th></th><th class="num">Seated</th><th class="num">Tables used</th><th class="num">Turns</th><th class="num">Covers</th><th class="num">Minutes at the table</th></tr>` +
+      (T.map(m => `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.slots || 0)}</td><td class="num"><b>${m.slots ? fmt(m.seated / m.slots, 2) : "–"}</b></td><td class="num">${fmt(m.covers)}</td><td class="num">${svMin(svAvg(m.dwell_sum, m.dwell_n))}</td></tr>`).join("")
+        || `<tr><td colspan="6" class="meta">${fcSp("No seated reservation with a table in these days.")}</td></tr>`) + `</table></div>`
+    + row(M.shift, "By shift") + row(M.party, "By party size")
+    + (span.length ? `<h3 style="margin:18px 0 4px;font-size:14px">${fcSp("Hours: when they book, when Simphony opens the checks")}</h3><p class="hint" style="margin:0 0 8px">${fcSp("Covers booked by the hour of the reservation's slot, against the Simphony checks by the hour they were opened, every weekday of the read.")}</p>
+      <div class="sv-heats">${svHeat("Covers booked", M.hour, "booked", span, v => fmt(v) + " covers")}${svHeat("Simphony checks opened", M.simhour, "checks", span, v => fmt(v) + " checks")}</div>` : "");
+}
+function svAhead(){
+  const d = svData, L = $("svLoc").value, F = (d.forecast || []).filter(x => !L || x.ref === L), names = Object.fromEntries(d.locations.map(l => [l.ref, l.name]));
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const days = [...new Set(F.map(x => x.day))].sort().map(day => { const xs = F.filter(x => x.day === day), s = f => xs.reduce((a, x) => a + (x[f] || 0), 0);
+    return {day, covers: s("covers"), fc: xs.some(x => x.fc_covers != null) ? s("fc_covers") : null, guests: xs.some(x => x.fc_guests != null) ? s("fc_guests") : null}; });
+  if (!days.length) { $("svAhCh").innerHTML = ""; $("svAh").innerHTML = `<tr><td class="meta">${fcSp("No reading of the days ahead yet: read again.")}</td></tr>`; $("svAhNote").textContent = ""; return; }
+  const W = 600, H = 196, top = 18, bot = 22, n = days.length, bw = W / n, h = H - top - bot, max = Math.max(1, ...days.map(t => Math.max(t.covers, t.fc || 0)));
+  const bars = days.map((t, i) => { const x = i * bw, w = Math.max(2, bw - 4), y = v => top + h - v / max * h;
+    return `<g><title>${esc(`${t.day}: ${fmt(t.covers)} covers on the books${t.fc != null ? `, forecast ${fmt(t.fc, 0)} covers` : ""}${t.guests != null ? `, ${fmt(t.guests, 0)} Simphony guests` : ""}`)}</title>
+      ${t.fc != null ? `<rect x="${x}" y="${y(t.fc)}" width="${w}" height="${top + h - y(t.fc)}" rx="2" fill="none" stroke="var(--ch-4)" stroke-width="2" stroke-dasharray="3 2"/>` : ""}
+      <rect x="${x + w * 0.2}" y="${y(t.covers)}" width="${w * 0.6}" height="${top + h - y(t.covers)}" rx="2" fill="var(--ch-0)"/>
+      <text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${wd[new Date(t.day + "T12:00:00").getDay()].slice(0, 2)} ${t.day.slice(8)}</text></g>`; }).join("");
+  $("svAhCh").innerHTML = `<div><h3>${fcSp("Covers on the books and the forecast")}</h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Covers on the books and the forecast")}"><line x1="0" x2="${W}" y1="${top + h}" y2="${top + h}" stroke="var(--line)"/><line x1="0" x2="${W}" y1="${top}" y2="${top}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${W}" y="${top - 5}" text-anchor="end">${esc(fmt(max, 0))}</text>${bars}</svg>
+    <div class="meta" style="display:flex;gap:14px;font-size:11px;margin-top:4px"><span><span class="ch-sw" style="background:var(--ch-0)"></span>${fcSp("covers on the books")}</span><span><span class="ch-sw" style="border:2px dashed var(--ch-4);background:none"></span>${fcSp("forecast covers")}</span></div></div>`;
+  $("svAh").innerHTML = `<tr><th>Restaurant</th><th>Day</th><th class="num">Reservations</th><th class="num">Covers on the books</th><th class="num">VIP</th><th class="num">Parties of 8+</th><th class="num">On the books then</th><th class="num">Seated then</th><th class="num">Pickup</th><th class="num">Forecast covers</th><th class="num">Forecast guests</th><th class="num">Forecast net sales</th></tr>` +
+    F.map(x => `<tr${x.lead === 0 ? ` style="font-weight:600"` : ""}><td>${esc(names[x.ref] || x.ref)}</td><td>${fcSp(x.lead === 0 ? "Today" : wd[new Date(x.day + "T12:00:00").getDay()])} <span class="meta">${esc(x.day)}</span></td>
+      <td class="num">${fmt(x.res)}</td><td class="num"><b>${fmt(x.covers)}</b></td><td class="num">${x.vip ? fmt(x.vip) : ""}</td><td class="num">${x.big ? fmt(x.big) : ""}</td>
+      <td class="num">${x.hist_booked == null ? "–" : fmt(x.hist_booked, 1)}</td><td class="num">${x.hist_seated == null ? "–" : fmt(x.hist_seated, 1)}</td>
+      <td class="num" title="${esc(x.method === "added" ? "Few on the books then: the covers added after" : x.method === "pickup" ? "Covers seated over covers on the books then" : "")}">${x.pickup != null ? "×" + fmt(x.pickup, 2) : x.added != null ? (x.added >= 0 ? "+" : "−") + fmt(Math.abs(x.added), 1) : "–"}</td>
+      <td class="num"><b>${x.fc_covers == null ? "–" : fmt(x.fc_covers, 0)}</b></td><td class="num">${x.fc_guests == null ? "–" : fmt(x.fc_guests, 0)}</td><td class="num">${svM(x.fc_net)}</td></tr>`).join("");
+  $("svAhNote").textContent = `${d.forecast_at ? "On the books as read " + d.forecast_at.replace("T", " ") + ". " : ""}` + "Learnt from the same weekday of the 4 weeks before (only the days the restaurant was open); a dash: no such day yet.";
+}
+function svStaff(){
+  const d = svData, S = (d.mixes || {}).server || [];
+  $("svSt").innerHTML = `<tr><th>Served by</th><th class="num">Reservations</th><th class="num">Seated</th><th class="num">Covers</th><th class="num">Linked to a check</th><th class="num">Sales</th><th class="num">Per cover</th><th class="num">Minutes at the table</th><th class="num">Seated, no check</th><th class="num">Cases</th><th class="num">Rating</th><th class="num">Rated 1–2</th><th>Simphony employees</th></tr>` +
+    (S.map(m => { const lr = m.seated ? m.linked / m.seated : null, fb = svAvg(m.fb_sum || 0, m.fb_n || 0);
+      return `<tr><td><b>${esc(m.key)}</b></td><td class="num">${fmt(m.res)}</td><td class="num">${fmt(m.seated)}</td><td class="num">${fmt(m.covers)}</td>
+        <td class="num ${lr != null && lr < 0.8 ? "warn" : ""}">${svPct(lr)}</td><td class="num">${svM(m.sales)}</td><td class="num">${svM(m.linked_covers ? m.sales / m.linked_covers : null)}</td>
+        <td class="num">${svMin(svAvg(m.dwell_sum, m.dwell_n))}</td><td class="num ${m.no_check ? "warn" : ""}">${fmt(m.no_check || 0)}</td><td class="num">${fmt(m.cases)}</td>
+        <td class="num">${fb == null ? "–" : fmt(fb, 1)} <span class="meta">${m.fb_n ? fmt(m.fb_n) : ""}</span></td><td class="num ${m.fb_low ? "warn" : ""}">${fmt(m.fb_low || 0)}</td><td class="meta">${esc((m.emps || []).join(", "))}</td></tr>`; }).join("")
+      || `<tr><td colspan="13" class="meta">${fcSp("SevenRooms has no server on the reservations of these days.")}</td></tr>`);
+}
 function svSegShow(b){
   svSegOn = b;
   $("svSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.b === b));
   document.querySelectorAll("#slSrView .sv-p").forEach(p => p.hidden = p.dataset.p !== b);
 }
 $("svSeg").querySelectorAll("button").forEach(b => b.onclick = () => svSegShow(b.dataset.b));
-$("svLoc").onchange = () => { if (svData) { svKpis(); svCharts(); svRes(); svFb(); } };
+$("svLoc").onchange = () => { if (svData) { svKpis(); svCharts(); svRes(); svAhead(); svFb(); } };
 // a reservation's whole story: SevenRooms (booked, the slot, seated, left) and its checks in Simphony
 function svOpen(id){
   const d = svData, x0 = d.rows.find(r => r.id === id); if (!x0) return;
@@ -7980,6 +8108,7 @@ function openFromHash(){
   const v = (location.hash || "").slice(1);
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
   if (v === "stockstop") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("stockstop"); return; }
+  if (v === "sevenrooms") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("sevenrooms"); return; }
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();
 }
@@ -8808,6 +8937,60 @@ async function pollBxReport(){
 }
 $("bxPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the sales blocked by stock report…</p>"); startBxReport("", w); };
 $("bxTest").onclick = () => { const to = $("bxTestTo").value.trim(); if (!to) { $("bxMsg").textContent = "Enter an address for the test."; return; } startBxReport(to, null); };
+// ---------- SevenRooms ↔ Simphony daily email (sevenrooms_report.py) ----------
+let srxLoaded = false, srxJob = null, srxTimer = null;
+async function loadSrxReport(){
+  srxLoaded = true;
+  try{ renderSrxReport(await readJSON(await fetch("/api/sevenrooms-report"))); }catch(e){ $("srxMsg").textContent = "Could not read the settings: " + e.message; }
+}
+function renderSrxReport(st){
+  const s = st.settings || {}, m = st.mail || {};
+  const dayText = {daily: "Every day", mon_sat: "Monday to Saturday", weekdays: "Monday to Friday"};
+  $("srxTo").value = s.to || ""; $("srxCc").value = s.cc || ""; $("srxDays").value = s.days || "daily"; $("srxTime").value = s.time || "10:00";
+  $("srxCo").value = s.companies || ""; $("srxLines").value = s.email_lines ?? "50"; $("srxOn").checked = !!s.enabled;
+  if (!$("srxTestTo").value) $("srxTestTo").value = (s.to || "").split(",")[0].trim();
+  $("srxPill").className = "rhg-pill " + (s.enabled ? (m.configured ? "ok" : "warning") : "info");
+  $("srxPill").textContent = !s.enabled ? "Off" : !m.configured ? "On · mail server not ready" : `On · next ${st.next_run ? st.next_run.replace("T", " ") : "–"}`;
+  const r = st.recipients || {};
+  $("srxInfo").textContent = `${dayText[s.days || "daily"]} at ${s.time || "10:00"}. Companies: ${(st.companies || []).join(", ")}. `
+    + "The people come from Email recipients by company (Reservations against Simphony · daily); " + ((r.to || []).length ? `when nobody is set there: ${r.to.join(", ")}${(r.cc || []).length ? " · Cc: " + r.cc.join(", ") : ""}.` : "no address here for when nobody is set there.")
+    + (m.configured ? "" : ` Mail server: ${m.error || "not set up in Purchasing → Settings"}.`);
+  const runs = st.runs || [];
+  $("srxRuns").innerHTML = runs.length ? `<tr><th>When</th><th>Company</th><th>Status</th><th>To</th><th>Detail</th></tr>` +
+    runs.slice(0, 10).map(x => `<tr><td class="meta">${esc(x.ts)}</td><td>${esc(x.company)}</td>
+      <td>${esc(x.status)}${x.test ? " · test" : ""}</td><td class="meta">${esc((x.to || []).join(", "))}</td><td class="meta">${esc(x.detail || "")}</td></tr>`).join("") : "";
+  ["srxSave", "srxTest", "srxPreview"].forEach(id => { $(id).disabled = !can("settings") || (id !== "srxSave" && !!srxJob);
+    $(id).title = can("settings") ? "" : "Your role cannot change Settings (needs finance.settings.manage)."; });
+}
+$("srxSave").onclick = async () => {
+  $("srxMsg").textContent = "Saving…";
+  try{
+    const st = await simphonyPost("/api/sevenrooms-report/settings", {to: $("srxTo").value, cc: $("srxCc").value, days: $("srxDays").value,
+      time: $("srxTime").value, companies: $("srxCo").value, email_lines: $("srxLines").value, enabled: $("srxOn").checked});
+    renderSrxReport(st); $("srxMsg").textContent = st.settings.enabled ? "Saved. The report goes out on the days set." : "Saved. Tick Send on the days above to switch it on.";
+  }catch(e){ $("srxMsg").textContent = "Could not save: " + e.message; }
+};
+async function startSrxReport(to, win){
+  $("srxMsg").textContent = "Reading SevenRooms and Simphony…";
+  try{
+    const job = await simphonyPost("/api/sevenrooms-report/job", {company: ($("srxCo").value.split(",")[0] || "").trim() || $("company").value, to});
+    srxJob = job; ["srxTest", "srxPreview"].forEach(id => $(id).disabled = true);
+    if (win) win.location = "/api/sevenrooms-report/preview?id=" + encodeURIComponent(job.id);
+    pollSrxReport();
+  }catch(e){ $("srxMsg").textContent = "Could not start: " + e.message; if (win) win.close(); }
+}
+async function pollSrxReport(){
+  clearTimeout(srxTimer);
+  if (!srxJob) return;
+  try{
+    const j = await readJSON(await fetch("/api/sevenrooms-report/job?id=" + encodeURIComponent(srxJob.id)));
+    if (j.status === "running") { srxTimer = setTimeout(pollSrxReport, 5000); return; }
+    $("srxMsg").textContent = j.status === "done" ? (j.detail || "Built. The preview is open in its own tab.") : "Failed: " + (j.detail || j.error || "");
+  }catch(e){ $("srxMsg").textContent = "Lost track of the report: " + e.message; }
+  srxJob = null; loadSrxReport();
+}
+$("srxPreview").onclick = () => { const w = window.open("", "_blank"); if (w) w.document.write("<p style='font-family:sans-serif;padding:20px'>Building the SevenRooms report…</p>"); startSrxReport("", w); };
+$("srxTest").onclick = () => { const to = $("srxTestTo").value.trim(); if (!to) { $("srxMsg").textContent = "Enter an address for the test."; return; } startSrxReport(to, null); };
 // ---------- brand performance email (weekly and monthly, one email per brand) ----------
 let brLoaded = false, brJob = null, brTimer = null, brBrands = [];
 async function loadBrandReport(){

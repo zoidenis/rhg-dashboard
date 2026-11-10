@@ -32,15 +32,19 @@ def res(i, day, status, guests, checks="", arrived=None, created="2026-11-01T10:
     return x
 
 
-RES = {V1: {D1: [res(1, D1, "COMPLETE", 4, "101", 4, client="A"),
-                 res(2, D1, "PAID", 2, "", 2, tickets=[{"code": 102, "total": 99, "table_no": "5"}], client="A"),
-                 res(3, D1, "ARRIVED", 3, "", None),                                  # seated, no check
+D_NEXT = "2026-11-12"                                                                 # a Thursday, as D1
+RES = {V1: {D1: [res(1, D1, "COMPLETE", 4, "101", 4, client="A", tags=[{"tag_display": "Birthday"}]),
+                 res(2, D1, "PAID", 2, "", 2, tickets=[{"code": 102, "total": 99, "table_no": "5"}], client="A", is_vip=True),
+                 res(3, D1, "ARRIVED", 3, "", None, seated_time="8:05 PM", left_time="9:35 PM"),   # seated, no check
                  res(4, D1, "NO_SHOW", 2, ""),
                  res(5, D1, "CANCELED", 6, "103"),                                    # cancelled, with a check
                  res(6, D1, "COMPLETE", 2, "999", 2),                                 # a check Simphony does not have
                  res(7, D1, "CONFIRMED", 2, "")],                                     # left confirmed
-            D2: [res(8, D2, "COMPLETE", 5, "201, 202", 5, created="2026-11-06T09:00:00", source="Phone"),
-                 res(9, D2, "COMPLETE", 2, "201", 2)]},                              # the same check as 8
+            D2: [res(8, D2, "COMPLETE", 5, "201, 202", 5, created="2026-11-06T09:00:00", source="Phone",
+                     tags=[{"tag_display": "Birthday"}]),
+                 res(9, D2, "COMPLETE", 2, "201", 2)],                               # the same check as 8
+            D_NEXT: [res(20, D_NEXT, "CONFIRMED", 4, created="2026-11-09T10:00:00"),
+                     res(21, D_NEXT, "CANCELED", 2, created="2026-11-09T10:00:00")]},
        V2: {D1: [res(10, D1, "COMPLETE", 2, "301", 2, venue=V2)], D2: []}}
 FB = {V1: [{"overall": "5", "food": "4", "service": "5", "reservation_id": "R1", "reservation_date": D1, "received_date": "2026-11-06T10:00:00"},
            {"overall": "1", "food": "2", "service": "1", "reservation_id": "R8", "reservation_date": D2, "received_date": "2026-11-07T10:00:00"},
@@ -173,6 +177,80 @@ class SevenRooms(unittest.TestCase):
         wb = load_workbook(io.BytesIO(srsim.render_xlsx(self.r)), read_only=True)
         self.assertEqual(wb.sheetnames[:3], ["Restaurants", "Days", "Reservations"])
         self.assertEqual(sum(1 for _ in wb["Reservations"].iter_rows()) - 1, 10)
+
+    def test_guests_and_value(self):
+        p = srsim.public(self.r)
+        M = {k: {m["key"]: m for m in L} for k, L in p["mixes"].items()}
+        self.assertEqual((M["guest"]["First visit"]["res"], M["guest"]["Returning"]["res"]), (8, 1))   # A's second table
+        self.assertEqual(M["tag"]["Birthday"]["seated"], 2)
+        self.assertEqual(M["vip"]["VIP"]["covers"], 2)
+        web = M["source"]["Website"]
+        self.assertEqual((web["all"], web["cancel"], web["no_show"], web["ns_covers"]), (9, 1, 1, 2))
+        pc = p["kpis"]["per_cover_res"]
+        self.assertAlmostEqual(web["ns_cost"], 2 * pc, places=2)
+        self.assertAlmostEqual(p["kpis"]["ns_cost"], 2 * pc)
+
+    def test_time_and_tables(self):
+        p = srsim.public(self.r)
+        self.assertEqual(p["kpis"]["dwell_n"], 6)                                    # 5 by the checks, REF3 by SevenRooms
+        self.assertAlmostEqual(p["kpis"]["dwell"], (60 * 5 + 90) / 6)
+        row = {x["res"]: x for x in p["rows"]}
+        self.assertEqual((row["REF3"]["dwell"], row["REF3"]["dwell_src"]), (90, "sr"))
+        self.assertEqual((row["REF1"]["dwell"], row["REF1"]["dwell_src"]), (60, "sim"))
+        t = {m["key"]: m for m in p["mixes"]["turns"]}["Terrace"]
+        self.assertEqual((t["seated"], t["slots"]), (7, 3))
+        H = {m["key"]: m for m in p["mixes"]["hour"]}
+        S = {m["key"]: m for m in p["mixes"]["simhour"]}
+        self.assertEqual((H["3|20"]["booked"], S["3|20"]["checks"]), (4 + 2 + 3 + 2 + 2 + 2 + 2, 6))  # Thursday 20:00, OPA too
+        self.assertEqual(srsim._hm("12:30 AM"), 30)
+        self.assertEqual(srsim._hm("2026-11-05T19:15:00"), 19 * 60 + 15)
+
+    def test_the_next_14_days(self):
+        F = {(x["ref"], x["day"]): x for x in self.r["forecast"]}
+        self.assertEqual(len(F), 2 * srsim.AHEAD)
+        x = F[("R1", D_NEXT)]
+        self.assertEqual((x["res"], x["covers"], x["lead"], x["weeks"]), (1, 4, 2, 1))          # not the cancelled one
+        self.assertEqual((x["hist_booked"], x["hist_seated"]), (21, 11))         # on the books 3 Nov at noon; seated 5 Nov
+        self.assertEqual(x["method"], "pickup")
+        self.assertAlmostEqual(x["fc_covers"], round(4 * 11 / 21, 1))
+        self.assertAlmostEqual(x["fc_guests"], round(20 + 4 * 11 / 21 - 11, 1))
+        self.assertAlmostEqual(x["fc_net"], round(x["fc_guests"] * 100 / 20, 2))
+        y = F[("R2", D_NEXT)]
+        self.assertEqual((y["method"], y["added"], y["fc_covers"]), ("added", 0, 0))  # too few then; all booked by then
+        self.assertEqual(F[("R1", "2026-11-11")]["weeks"], 0)                           # no Wednesday the restaurant was open
+        self.assertEqual([x["ref"] for x in srsim.public(srsim.cut(self.r, {"OPA1"}))["forecast"]], ["R2"] * srsim.AHEAD)
+
+    def test_staff_and_the_register(self):
+        p = srsim.public(self.r)
+        s = {m["key"]: m for m in p["mixes"]["server"]}["Server A"]
+        self.assertEqual((s["res"], s["seated"], s["linked"], s["no_check"], s["fb_n"], s["fb_sum"], s["fb_low"], s["emps"]),
+                         (9, 7, 5, 1, 2, 6, 1, ["1"]))
+        F = srsim.findings(self.r)
+        self.assertEqual(sorted((f["subject"], f["severity"]) for f in F),
+                         [(f"{D1} sr_check_on_noshow R1", "warning"), (f"{D1} sr_no_check R1", "warning"),
+                          (f"{D1} sr_not_found R1", "warning"), (f"{D1} sr_open R1", "info"), (f"{D2} sr_shared R1", "info")])
+        self.assertTrue(all(f["location"] == "SALT" for f in F))
+        self.assertTrue(srsim.in_scope(self.r)({"subject": f"{D2} sr_open R1"}))
+        self.assertFalse(srsim.in_scope(self.r)({"subject": "2026-11-01 sr_open R1"}))
+        low = dict(self.r, agg={"R1": dict(self.r["agg"]["R1"], linked=1)})               # SevenRooms links few tables there
+        self.assertNotIn("no_check", {f["kind"] for f in srsim.findings(low)})
+
+    def test_the_daily_email(self):
+        import sevenrooms_report as SR
+        rep = SR.Reporter(lambda company: "ALL", lambda ref: "2026-11-09")
+        raw, p = rep.view(self.r, "SALT")
+        self.assertEqual(SR.day_totals(p, D2)["covers"], 7)
+        sub = SR.subject(p)
+        self.assertIn("Reservations vs Simphony 06 Nov 2026 · 7 covers seated, 0 no-shows, 1 case", sub)
+        body, text = SR.render(p, "https://dashboard.example", 50)
+        self.assertIn("/finance/#sevenrooms", body)
+        self.assertIn("Left booked on a closed day", body)                     # the 5 Nov case, in the 7 days
+        for word in ("Ana", "Hoxha", "ana@example.com", "+355690000000"):
+            self.assertNotIn(word, body + text)
+        raw2, p2 = rep.view(self.r, "SALT", "OPA1")                            # the location's own email
+        self.assertEqual([L["ref"] for L in p2["locations"]], ["R2"])
+        self.assertEqual(p2["label"], "SALT · OPA1")
+        self.assertTrue(SR.render(p2)[0])
 
     def test_an_account_that_may_not_list_the_venues(self):
         def denied(path, params=None):

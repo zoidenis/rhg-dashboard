@@ -50,6 +50,7 @@ import xlsxtable
 import emcpriv
 import sevenrooms
 import srsim
+import sevenrooms_report
 import requests
 import cost_report
 import negstock
@@ -108,6 +109,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/cost-report/settings": "settings", "/api/cost-report/job": "settings",
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/stockstop-report/settings": "settings", "/api/stockstop-report/job": "settings",
+                     "/api/sevenrooms-report/settings": "settings", "/api/sevenrooms-report/job": "settings",
                      "/api/emcpriv/settings": "settings", "/api/emcpriv/check": "settings",
                      "/api/sevenrooms/settings": "settings", "/api/sevenrooms/test": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
@@ -1706,6 +1708,7 @@ def cost_report_status():
 
 negrep = negstock.Reporter(client, company_currency, config.BC_COMPANY)
 ssrep = salestop_report.Reporter(client, company_currency, config.BC_COMPANY)
+srrep = sevenrooms_report.Reporter(company_currency, _latest)
 
 
 # ---------------------------------------------------------------- the exceptions register (exreg.py)
@@ -1750,6 +1753,16 @@ def register_after_billy(company, r):
 
 
 billyrec.on_built = register_after_billy
+
+
+def register_after_sevenrooms(company, r):
+    """After every complete SevenRooms ↔ Simphony read of the last 7 days: its cases into the register."""
+    if not r.get("complete"):
+        return None
+    return exreg.sync("sevenrooms", company, srsim.findings(r), in_scope=srsim.in_scope(r))
+
+
+srsim.on_built = register_after_sevenrooms
 
 
 def register_after_receipts(company, r):
@@ -1814,6 +1827,28 @@ def register_controls(actor="scheduler", force=False):
         except Exception as exc:                                    # noqa: BLE001
             traceback.print_exc()
             out.append({"company": c, "control": "billy_rec", "status": "failed", "detail": str(exc)[:300]})
+    try:
+        sr_companies = srsim.companies()           # SevenRooms ↔ Simphony: every company with a SevenRooms venue placed
+    except Exception as exc:                                        # noqa: BLE001
+        sr_companies = []
+        out.append({"company": "", "control": "sevenrooms", "status": "failed", "detail": str(exc)[:300]})
+    for c in sr_companies:
+        if known is not None and c.upper() not in known:
+            continue
+        if not force and exreg.synced_today("sevenrooms", c):
+            out.append({"company": c, "control": "sevenrooms", "status": "already read today"})
+            continue
+        try:
+            frm, to = srsim.default_range()
+            r = srsim.build(c, frm, to, _latest)
+            reg = register_after_sevenrooms(c, r)
+            r["register"] = reg
+            srsim.remember(c, r)
+            out.append({"company": c, "control": "sevenrooms", "status": "synced" if reg else "not synced",
+                        "sevenrooms": reg, "detail": "" if reg else "; ".join(r.get("errors") or [])[:300]})
+        except Exception as exc:                                    # noqa: BLE001
+            traceback.print_exc()
+            out.append({"company": c, "control": "sevenrooms", "status": "failed", "detail": str(exc)[:300]})
     for c in negrep.companies():
         if not force and exreg.synced_today("negative_stock", c):
             out.append({"company": c, "status": "already read today"})
@@ -2926,8 +2961,12 @@ class Handler(BaseHTTPRequestHandler):
                                  "entries": finance.party_entries(rows, kind, q.get("party") or "", date.today())})
             elif url.path == "/api/stockstop-report":
                 self._send(200, salestop_report.status(ssrep))
-            elif url.path in ("/api/stockstop-report/job", "/api/stockstop-report/preview"):
-                job = ssrep.job(q.get("id") or "", user["username"])
+            elif url.path == "/api/sevenrooms-report":
+                self._send(200, sevenrooms_report.status(srrep))
+            elif url.path in ("/api/stockstop-report/job", "/api/stockstop-report/preview",
+                              "/api/sevenrooms-report/job", "/api/sevenrooms-report/preview"):
+                sr = url.path.startswith("/api/sevenrooms-report")
+                job = (srrep if sr else ssrep).job(q.get("id") or "", user["username"])
                 if not job:
                     self._send(404, {"error": "This report is no longer held; build it again."})
                 elif url.path.endswith("/job"):
@@ -2935,7 +2974,8 @@ class Handler(BaseHTTPRequestHandler):
                 elif job.get("html"):
                     self._send(200, job["html"].encode("utf-8"), "text/html; charset=utf-8")
                 else:
-                    msg = ("Reading the open assembly orders in Business Central and today's sales in Simphony…"
+                    msg = (("Reading SevenRooms and Simphony…" if sr else
+                            "Reading the open assembly orders in Business Central and today's sales in Simphony…")
                            if job["status"] == "running" else html.escape(job.get("detail") or ""))
                     self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
                                      f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
@@ -3727,10 +3767,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
                 store.audit("export", "table · " + str(body.get("name") or "")[:120], actor, {},
                             {"rows": sum(len(x.get("rows") or []) for x in body.get("sheets") or [] if isinstance(x, dict))}, "")
-            elif url.path in ("/api/stockstop-report/settings", "/api/stockstop-report/job"):
+            elif url.path in ("/api/stockstop-report/settings", "/api/stockstop-report/job",
+                              "/api/sevenrooms-report/settings", "/api/sevenrooms-report/job"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
                     return
+                sr = url.path.startswith("/api/sevenrooms-report")
+                rep, key, mod = (srrep, "sevenrooms_report", sevenrooms_report) if sr else (ssrep, "stockstop_report", salestop_report)
                 if url.path.endswith("/settings"):
                     bad = arap_notify.parse_emails(body.get("to"))[1] + arap_notify.parse_emails(body.get("cc"))[1]
                     if bad:
@@ -3739,16 +3782,19 @@ class Handler(BaseHTTPRequestHandler):
                     if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(body.get("time") or "")):
                         self._send(400, {"error": "The time must be HH:MM, for example 09:30."})
                         return
-                    store.save_settings({"stockstop_report": {k: body.get(k) for k in
-                                                              ("to", "cc", "days", "time", "companies", "email_lines", "enabled")}}, actor)
-                    self._send(200, salestop_report.status(ssrep))
+                    store.save_settings({key: {k: body.get(k) for k in
+                                               ("to", "cc", "days", "time", "companies", "email_lines", "enabled")}}, actor)
+                    self._send(200, mod.status(rep))
                     return
                 only, bad = arap_notify.parse_emails(body.get("to"))
                 if bad:
                     self._send(400, {"error": "Not an email address: " + ", ".join(bad)})
                     return
-                company = body.get("company") or ssrep.companies()[0]
-                self._send(202, ssrep.start_job(company, actor, only or None))
+                company = body.get("company") or (rep.companies() or [""])[0]
+                if not company:
+                    self._send(400, {"error": "No company has a SevenRooms venue yet."})
+                    return
+                self._send(202, rep.start_job(company, actor, only or None))
             elif url.path == "/api/recipients":
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
@@ -3976,6 +4022,7 @@ def main():
     costrep.start()
     negrep.start()
     ssrep.start()
+    srrep.start()
     exreg.start(register_controls)
     billyrec.start(_latest)                 # Simphony ↔ Billy: the daily read before the 08:00 reports
     brandrep.start()

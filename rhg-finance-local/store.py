@@ -127,6 +127,10 @@ DEFAULT_SETTINGS = {
     # now and today's Simphony sales at risk, every line in Excel; email_lines: lines per section (0 = all)
     "stockstop_report": {"enabled": False, "to": "", "cc": "", "time": "09:30", "days": "daily", "companies": "",
                          "email_lines": "50"},
+    # daily email of Sales → SevenRooms ↔ Simphony (sevenrooms_report.py): yesterday's reservations against the
+    # checks, the cases, today's book and the forecast; companies blank = every company with a SevenRooms venue
+    "sevenrooms_report": {"enabled": False, "to": "", "cc": "", "time": "10:00", "days": "daily", "companies": "",
+                          "email_lines": "50"},
     # the exceptions register (exreg.py): the controls run every day at time (negative stock and received vs
     # discharged, synced into the register); enabled: the daily email to every owner of open items; items overdue
     # more than escalate_days put the escalate_roles of Email recipients in Cc
@@ -213,6 +217,7 @@ def get_settings():
     merged["cost_report"].update(s.get("cost_report", {}))
     merged["negative_report"].update(s.get("negative_report", {}))
     merged["stockstop_report"].update(s.get("stockstop_report", {}))
+    merged["sevenrooms_report"].update(s.get("sevenrooms_report", {}))
     merged["exception_register"].update(s.get("exception_register", {}))
     merged["sales_rec"].update(s.get("sales_rec", {}))
     merged["billy_rec"].update(s.get("billy_rec", {}))
@@ -301,6 +306,22 @@ def save_settings(patch, actor="director"):
                 else:
                     v = str(v)[:400]
                 current.setdefault("stockstop_report", {})[k] = v
+        for k, v in (patch.get("sevenrooms_report") or {}).items():
+            if k in DEFAULT_SETTINGS["sevenrooms_report"]:
+                if isinstance(DEFAULT_SETTINGS["sevenrooms_report"][k], bool):
+                    v = bool(v)
+                elif k == "time":
+                    v = str(v)[:5] if re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(v)) else "10:00"
+                elif k == "days":
+                    v = str(v) if str(v) in ("daily", "mon_sat", "weekdays") else "daily"
+                elif k == "email_lines":
+                    try:
+                        v = str(max(0, min(1000, int(float(v)))))
+                    except (TypeError, ValueError):
+                        v = "50"
+                else:
+                    v = str(v)[:400]
+                current.setdefault("sevenrooms_report", {})[k] = v
         for k, v in (patch.get("sales_rec") or {}).items():
             if k in DEFAULT_SETTINGS["sales_rec"]:
                 try:

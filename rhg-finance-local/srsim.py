@@ -43,6 +43,14 @@ LINK = {"linked": "Linked to a Simphony check", "not_found": "Check numbers Simp
 CASES = ("not_found", "no_check", "shared", "check_on_noshow")
 LEAD = [(0, "Same day"), (2, "1–2 days"), (7, "3–7 days"), (30, "8–30 days"), (10 ** 6, "Over 30 days")]
 PARTY = [(2, "1–2"), (4, "3–4"), (6, "5–6"), (10, "7–10"), (10 ** 6, "Over 10")]
+DWELL = [(60, "Under 1 h"), (90, "1–1½ h"), (120, "1½–2 h"), (180, "2–3 h"), (10 ** 6, "Over 3 h")]
+GUEST = ("First visit", "Returning", "Not known")
+AHEAD = 14                      # days ahead in the forecast
+HIST_WEEKS = 4                  # the same weekday of the weeks before: what the forecast learns from
+MIN_HIST_COVERS = 10            # covers on the books at the same lead (a week's average) for the pickup ratio
+BIG_PARTY = 8
+LINK_FOR_REGISTER = 0.5         # "seated, no check" goes to the register only where SevenRooms links half the tables
+on_built = None                 # server.py: the cases of the default read into the exceptions register
 DEFINITIONS = {
     "sources": "SevenRooms: the reservations of each venue by reservation date, with the party, the guests who came, "
                "the status, the channel and the Simphony check numbers SevenRooms holds for them, and the guests' "
@@ -59,6 +67,23 @@ DEFINITIONS = {
     "cases": "A seated reservation with no check number; check numbers Simphony does not have that day; a no-show or "
              "cancelled reservation with a check; one check claimed by two reservations; a reservation of a day "
              "already closed left booked or confirmed.",
+    "guests": "Returning: a guest (by SevenRooms' client, kept only as a code) seated at the restaurant before, within "
+              "the days read (this period and the one before it); first visit: not seated there before in them; not "
+              "known: a reservation with no client. VIP as SevenRooms marks it. Tags: SevenRooms' reservation tags "
+              "(occasions, preferences).",
+    "time": "Time at the table: from the first Simphony check opened to the last closed of the reservation's checks, "
+            "else from SevenRooms' seated to left time; under 5 minutes or over 10 hours is not counted. Table turns: "
+            "seated reservations over the tables used, by day and shift. Hours: the reservations' covers by the hour "
+            "of the slot, against the Simphony checks by the hour they were opened.",
+    "forecast": "The next 14 days: the reservations on the books now. Each day learns from the same weekday of the "
+                "4 weeks before (the days the restaurant was open): covers seated, against covers on the books then at "
+                "the same number of days ahead. Forecast covers: on the books × their ratio (the pickup) when 10 covers "
+                "or more were on the books then, else on the books + the covers added after; Simphony guests: the "
+                "weeks' guests moved by the difference in covers; net sales: the guests × the weeks' net sales per guest.",
+    "staff": "By who served the reservation in SevenRooms: covers, the share linked to a Simphony check, the spend "
+             "per cover, the cases and the feedback; the Simphony employee numbers are those of the checks linked.",
+    "no_show_cost": "No-show covers × the spend per cover of reservations in the same period: the sales the tables "
+                    "would have made.",
 }
 
 
@@ -128,6 +153,38 @@ def _bucket(x, table):
     return next(label for top, label in table if x <= top)
 
 
+def _hm(s):
+    """'7:15 PM', '19:15', '19:15:00' or a date and time → minutes from midnight, or None."""
+    m = re.search(r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?", str(s or ""))
+    if not m:
+        return None
+    h, mi = int(m.group(1)), int(m.group(2))
+    if m.group(3):
+        h = h % 12 + (12 if m.group(3).upper() == "PM" else 0)
+    return h * 60 + mi if h < 24 and mi < 60 else None
+
+
+def _dwell(x, found):
+    """Minutes at the table: the Simphony checks' first opened to last closed, else SevenRooms' seated to left."""
+    o = [t for t in (billyrec._ts(c.get("opn")) for c in found) if t]
+    c = [t for t in (billyrec._ts(c.get("clsd")) for c in found) if t]
+    if o and c:
+        m = (max(c) - min(o)) / 60
+        if 5 <= m <= 600:
+            return round(m), "sim"
+    a, b = _hm(x.get("seated")), _hm(x.get("left"))
+    if a is not None and b is not None:
+        m = b - a + (1440 if b < a else 0)
+        if 5 <= m <= 600:
+            return m, "sr"
+    return None, ""
+
+
+def _hour(t):
+    m = _hm(t)
+    return m // 60 if m is not None else None
+
+
 # ---------------------------------------------------------------- the read
 def build(company, frm, to, latest_fn=None, progress=None, today=None):
     today = today or date.today()
@@ -153,11 +210,15 @@ def build(company, frm, to, latest_fn=None, progress=None, today=None):
             except Exception:                                                # noqa: BLE001
                 latest[r["ref"]] = None
     every = before + days
-    jobs = [("sr", v["id"], d) for v, r in venues for d in every] + [("fb", v["id"], None) for v, r in venues]
+    hist = billyrec._dates(today - timedelta(days=7 * HIST_WEEKS), today - timedelta(days=1))    # the forecast's past
+    ahead = [today + timedelta(days=i) for i in range(AHEAD)]
+    sr_days = sorted(set(every) | set(hist) | set(ahead))
+    tot_days = sorted(set(every) | set(hist))
+    jobs = [("sr", v["id"], d) for v, r in venues for d in sr_days] + [("fb", v["id"], None) for v, r in venues]
     if sim_on:
         refs = sorted({r["ref"] for v, r in venues})
         jobs += [("chk", ref, d) for ref in refs for d in every if not latest.get(ref) or d.isoformat() <= latest[ref]]
-        jobs += [("tot", ref, d) for ref in refs for d in every if not latest.get(ref) or d.isoformat() <= latest[ref]]
+        jobs += [("tot", ref, d) for ref in refs for d in tot_days if not latest.get(ref) or d.isoformat() <= latest[ref]]
     errors = []
     say(f"{len(every)} days · {len(jobs):,} reads ({len(venues)} venues)")
 
@@ -184,20 +245,34 @@ def build(company, frm, to, latest_fn=None, progress=None, today=None):
     if sim_on:
         simphony.flush_days()
     say("matching the reservations with the checks")
-    r = analyse(company, days, venues, placed, regs, latest, today, sim_on)
-    r["prev_agg"] = analyse(company, before, venues, placed, regs, latest, today, sim_on)["agg"]
+    prev = analyse(company, before, venues, placed, regs, latest, today, sim_on)
+    r = analyse(company, days, venues, placed, regs, latest, today, sim_on, history=prev.pop("seen"))
+    r.pop("seen")
+    r["prev_agg"] = prev["agg"]
     r["prev_range"] = {"from": before[0].isoformat(), "to": before[-1].isoformat()}
+    say("the next 14 days")
+    now = datetime.now() if today == date.today() else datetime.combine(today, datetime.min.time()).replace(hour=12)
+    r["forecast"] = forecast(venues, today, now, sim_on)
+    r["forecast_at"] = now.isoformat(timespec="minutes")
     r.update(errors=errors, complete=not errors, checked_at=datetime.now().isoformat(timespec="seconds"),
              simphony=sim_on, connection={k: conn[k] for k in ("env", "configured")})
     return r
 
 
-def analyse(company, days, venues, placed, regs, latest, today, sim_on):
+MIX_KINDS = ("shift", "source", "lead", "party", "area", "guest", "vip", "tag", "dwell", "hour", "simhour", "server", "turns")
+
+
+def analyse(company, days, venues, placed, regs, latest, today, sim_on, history=None):
+    """history: {ref: client codes seated there before these days} (for first visit / returning)."""
     a, b = days[0], days[-1]
     settled = (today - timedelta(days=2)).isoformat()
     rows, agg, cells = [], {}, {}
-    mix = {k: defaultdict(lambda: defaultdict(Counter)) for k in ("shift", "source", "lead", "party", "area")}   # kind → ref → value
+    mix = {k: defaultdict(lambda: defaultdict(Counter)) for k in MIX_KINDS}      # kind → ref → value → counters
+    slots = defaultdict(lambda: defaultdict(set))                                # ref → area → (day, shift, tables)
     clients = Counter()
+    seen = defaultdict(set)
+    for ref, codes in (history or {}).items():
+        seen[ref].update(codes)
     fb_all = []
 
     def A(ref):
@@ -247,9 +322,17 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
                 lead = (date.fromisoformat(day) - date.fromisoformat(x["created"][:10])).days if x.get("created") else None
             except ValueError:
                 pass
+            dwell, dwell_src = _dwell(x, found) if cat == "seated" else (None, "")
+            cl = x.get("client") or ""
+            guest = GUEST[2] if not cl else GUEST[1] if cl in seen[ref] else GUEST[0]
+            if cl and cat == "seated":
+                seen[ref].add(cl)
             k = A(ref)
             k["res"] += 1
             k["cat_" + cat] += 1
+            if dwell is not None:
+                k["dwell_sum"] += dwell
+                k["dwell_n"] += 1
             k["booked_covers"] += x["guests"] if cat != "cancel" else 0
             if cat == "seated":
                 k["seated_covers"] += covers
@@ -274,17 +357,50 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
             cell["covers"] += covers
             cell["cases"] += link in CASES or cat == "open"
             cell["linked_sales"] += (spend or 0) if link in ("linked", "shared") else 0
-            if cat != "cancel" and not x["walk_in"]:
-                shift = x.get("shift") or "–"
-                for kind, key in (("shift", shift), ("source", x.get("source") or "–"), ("area", x.get("area") or "–"),
-                                  ("party", _bucket(x["guests"] or 0, PARTY)),
-                                  ("lead", _bucket(lead, LEAD) if lead is not None and lead >= 0 else "–")):
-                    D = mix[kind][ref]
-                    D[key]["res"] += 1
-                    D[key][cat] += 1
-                    D[key]["covers"] += covers
-                    D[key]["sales"] += spend or 0
-                    D[key]["linked_covers"] += covers if link in ("linked", "shared") else 0
+            linked = link in ("linked", "shared")
+
+            def add(C):
+                C["all"] += 1
+                if cat == "cancel":
+                    C["cancel"] += 1
+                    return
+                C["res"] += 1
+                C[cat] += 1
+                C["covers"] += covers
+                C["booked"] += x["guests"] or 0
+                C["sales"] += spend or 0
+                C["linked_covers"] += covers if linked else 0
+                C["linked"] += linked
+                C["cases"] += link in CASES
+                if cat == "no_show":
+                    C["ns_covers"] += x["guests"] or 0
+                if dwell is not None:
+                    C["dwell_sum"] += dwell
+                    C["dwell_n"] += 1
+            if not x["walk_in"]:
+                keys = [("shift", x.get("shift") or "–"), ("source", x.get("source") or "–"), ("area", x.get("area") or "–"),
+                        ("party", _bucket(x["guests"] or 0, PARTY)),
+                        ("lead", _bucket(lead, LEAD) if lead is not None and lead >= 0 else "–"),
+                        ("guest", guest), ("vip", "VIP" if x["vip"] else "Not VIP")]
+                keys += [("tag", t) for t in dict.fromkeys(x.get("tags") or [])]
+                hh = _hour(x.get("time"))
+                if hh is not None:
+                    keys.append(("hour", f"{date.fromisoformat(day).weekday()}|{hh}"))
+                if dwell is not None:
+                    keys.append(("dwell", _bucket(dwell, DWELL)))
+                for kind, key in keys:
+                    add(mix[kind][ref][key])
+            if cat != "cancel":                                  # the staff: every table served, walk-ins too
+                S = mix["server"][ref][x.get("server") or "–"]
+                add(S)
+                S["no_check"] += link == "no_check"
+                for c in found:
+                    if c.get("emp") not in (None, ""):
+                        S["emp_" + str(c["emp"])] += 1
+            if cat == "seated" and x.get("tables"):
+                area = x.get("area") or "–"
+                slots[ref][area].add((day, x.get("shift") or "", x["tables"]))
+                add(mix["turns"][ref][area])
             if x.get("client") and cat == "seated":
                 clients[(ref, x["client"])] += 1
             rows.append({"ref": ref, "day": day, "time": (x.get("time") or "")[:5], "res": x["ref"], "id": x["id"],
@@ -295,7 +411,8 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
                          "sr_spend": round(sum(t["total"] or 0 for t in x["tickets"]), 2) if x["tickets"] else None,
                          "lead": lead, "link": link, "prepay": x.get("prepay"), "client": x.get("client") or "",
                          "created": x.get("created") or "", "seated": x.get("seated") or "", "left": x.get("left") or "",
-                         "duration": x.get("duration"), "real": x.get("real") or "",
+                         "duration": x.get("duration"), "real": x.get("real") or "", "dwell": dwell, "dwell_src": dwell_src,
+                         "guest": guest, "booked": x.get("guests") or 0,
                          "sim": [{"num": c.get("num"), "opn": c.get("opn") or "", "clsd": c.get("clsd") or "", "total": c["total"],
                                   "emp": c.get("emp"), "rvc": c.get("rvc")} for c in found],
                          "tickets": [{"code": t["code"] or t["pos_id"], "total": t["total"], "start": t["start"], "end": t["end"],
@@ -315,6 +432,12 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
             cell["sim_checks"] += len(dc)
             cell["sim_sales"] += sum(c["total"] for c in dc)
             cell["sim_guests"] += (t or {}).get("guests") or 0
+            for c in dc:
+                hh = _hour((c.get("opn") or "")[11:])
+                if hh is not None:
+                    H = mix["simhour"][ref][f"{d.weekday()}|{hh}"]
+                    H["checks"] += 1
+                    H["sales"] += c["total"]
         fbs = sevenrooms.feedback_held(v["id"], a, b)
         for f in fbs:
             f["ref"] = ref
@@ -346,14 +469,22 @@ def analyse(company, days, venues, placed, regs, latest, today, sim_on):
                         "food": f.get("food"), "drinks": f.get("drinks"), "service": f.get("service"), "ambience": f.get("ambience"),
                         "recommend": f.get("recommend"), "type": f.get("type"), "res": x.get("res") or "", "tables": x.get("tables") or "",
                         "server": x.get("server") or "", "guests": x.get("guests")})
+        if x and f.get("overall") is not None:                # the feedback of the tables each one served
+            S = mix["server"][f["ref"]][x.get("server") or "–"]
+            S["fb_n"] += 1
+            S["fb_sum"] += f["overall"]
+            S["fb_low"] += f["overall"] <= 2
     fb_rows.sort(key=lambda f: (f["overall"] if f["overall"] is not None else 9, f["day"]))
+    for ref, by_area in slots.items():
+        for area, S in by_area.items():
+            mix["turns"][ref][area]["slots"] = len(S)
     mix_raw = {kind: {ref: {k: dict(c) for k, c in D.items()} for ref, D in by_ref.items()} for kind, by_ref in mix.items()}
     venues_out = [{"id": v["id"], "name": v["name"] or v["id"], "internal_name": v.get("internal_name") or "", "ref": (r or {}).get("ref") or "",
                    "restaurant": (r or {}).get("name") or "", "how": how,
                    "company": (r or {}).get("company") or ""} for v, r, how in placed]
     return {"company": company, "days": [d.isoformat() for d in days], "range": {"from": a.isoformat(), "to": b.isoformat()},
             "agg": {ref: dict(k) for ref, k in agg.items()}, "locations": locs, "rows": rows, "feedback": fb_rows,
-            "mix_raw": mix_raw, "venues": venues_out, "cat": CAT, "link": LINK, "cases": list(CASES), "definitions": DEFINITIONS}
+            "mix_raw": mix_raw, "venues": venues_out, "seen": {ref: sorted(v) for ref, v in seen.items()}, "cat": CAT, "link": LINK, "cases": list(CASES), "definitions": DEFINITIONS}
 
 
 def _cell(c):
@@ -362,8 +493,9 @@ def _cell(c):
             ("res", "seated", "no_show", "cancel", "open", "covers", "cases", "linked_sales", "sim_checks", "sim_sales", "sim_guests")}
 
 
-def mixes(r):
-    """The shift, channel, lead time, party and area tables of the restaurants of r (after cut: of the scope)."""
+def mixes(r, per_cover=None):
+    """The tables by shift, channel, lead time, party, area, guest, VIP, tag, time at the table, hour, server and
+    area turns of the restaurants of r (after cut: of the scope). per_cover: the no-show cost per cover."""
     refs = set(r["agg"])
     out = {}
     for kind, by_ref in (r.get("mix_raw") or {}).items():
@@ -372,15 +504,142 @@ def mixes(r):
             if ref in refs:
                 for k, c in vals.items():
                     D[k].update(c)
-        order = [l for _t, l in LEAD] + ["–"] if kind == "lead" else [l for _t, l in PARTY] if kind == "party" else None
-        out[kind] = _mix(D, order)
+        order = {"lead": [l for _t, l in LEAD] + ["–"], "party": [l for _t, l in PARTY], "dwell": [l for _t, l in DWELL],
+                 "guest": list(GUEST), "vip": ["VIP", "Not VIP"]}.get(kind)
+        by = "covers" if kind in ("server", "turns") else "checks" if kind == "simhour" else "res"
+        out[kind] = _mix(D, order, by=by, top=25 if kind == "tag" else 60 if kind == "server" else None, per_cover=per_cover)
     return out
 
 
-def _mix(D, order=None):
-    keys = order or sorted(D, key=lambda k: -D[k]["res"])
-    return [{"key": k, "res": D[k]["res"], "seated": D[k]["seated"], "no_show": D[k]["no_show"], "covers": D[k]["covers"],
-             "sales": round(D[k]["sales"], 2), "linked_covers": D[k]["linked_covers"]} for k in keys if k in D]
+BASE = ("res", "all", "cancel", "seated", "no_show", "covers", "booked", "sales", "linked_covers", "linked", "ns_covers",
+        "dwell_sum", "dwell_n", "cases")
+
+
+def _mix(D, order=None, by="res", top=None, per_cover=None):
+    keys = [k for k in order if k in D] if order else sorted(D, key=lambda k: (-D[k][by], k))
+    out = []
+    for k in keys[:top] if top else keys:
+        row, emps = {"key": k}, []
+        for f, v in D[k].items():
+            if f.startswith("emp_"):
+                emps.append((-v, f[4:]))
+            else:
+                row[f] = round(v, 2) if isinstance(v, float) else v
+        for f in BASE:
+            row.setdefault(f, 0)
+        if emps:
+            row["emps"] = [e for _n, e in sorted(emps)[:3]]
+        row["ns_cost"] = round(row["ns_covers"] * per_cover, 2) if per_cover else None
+        out.append(row)
+    return out
+
+
+# ---------------------------------------------------------------- the next 14 days
+def forecast(venues, today, now, sim_on):
+    """Each restaurant's next AHEAD days: on the books now, and the forecast learnt from the same weekday of the
+    HIST_WEEKS weeks before (see DEFINITIONS["forecast"])."""
+    lo = today - timedelta(days=7 * HIST_WEEKS)
+    settled = (today - timedelta(days=2)).isoformat()
+    vids = defaultdict(list)
+    for v, reg in venues:
+        vids[reg["ref"]].append(v["id"])
+    out = []
+    for ref, ids in sorted(vids.items()):
+        by_day = defaultdict(list)
+        for vid in ids:
+            for x in sevenrooms.held(vid, lo, today + timedelta(days=AHEAD - 1)):
+                if not x.get("deleted") and not x.get("walk_in"):
+                    by_day[x["date"]].append(x)
+        past = {}
+        for i in range(1, 7 * HIST_WEEKS + 1):
+            H = today - timedelta(days=i)
+            hs = H.isoformat()
+            seated = sum((x["arrived"] if x["arrived"] not in (None, 0) else x["guests"]) or 0
+                         for x in by_day[hs] if _cat(x, hs <= settled) == "seated")
+            h = simphony.held_day(ref, hs) if sim_on else None
+            f = simphony.day_figures(h.get("rvcs") or []) if h else None
+            if by_day[hs] or (f and f["guests"]):              # open that day (else closed, or not read)
+                past[hs] = (seated, f)
+        for i in range(AHEAD):
+            P = today + timedelta(days=i)
+            ps = P.isoformat()
+            book = [x for x in by_day[ps] if _cat(x, False) != "cancel"]
+            row = {"ref": ref, "day": ps, "lead": i, "res": len(book), "covers": sum(x["guests"] or 0 for x in book),
+                   "vip": sum(1 for x in book if x["vip"]), "big": sum(1 for x in book if (x["guests"] or 0) >= BIG_PARTY),
+                   "weeks": 0, "hist_seated": None, "hist_booked": None, "pickup": None, "added": None, "fc_covers": None, "method": "",
+                   "hist_guests": None, "fc_guests": None, "fc_net": None}
+            then, seat, G, N, seat_g = 0, 0, [], 0.0, 0
+            for w in range(1, HIST_WEEKS + 1):
+                H = P - timedelta(days=7 * w)
+                hs = H.isoformat()
+                if hs not in past:
+                    continue
+                cut_at = (datetime.combine(H, now.time()) - timedelta(days=i)).isoformat(timespec="seconds")
+                at = lambda t: str(t or "")[:19].replace(" ", "T")
+                then += sum(x["guests"] or 0 for x in by_day[hs] if x.get("created") and at(x["created"]) <= cut_at
+                            and not (_cat(x, True) == "cancel" and x.get("updated") and at(x["updated"]) <= cut_at))
+                s_, f = past[hs]
+                seat += s_
+                row["weeks"] += 1
+                if f and f["guests"]:
+                    G.append(f["guests"])
+                    N += f["net"]
+                    seat_g += s_
+            n = row["weeks"]
+            if not n:
+                out.append(row)
+                continue
+            row["hist_seated"], row["hist_booked"] = round(seat / n, 1), round(then / n, 1)
+            if then / n >= MIN_HIST_COVERS and row["covers"]:          # enough on the books then: the ratio
+                row["pickup"] = round(seat / then, 3)
+                fc, row["method"] = row["covers"] * seat / then, "pickup"
+            else:                                                    # few then: what was added after, on what is booked
+                row["added"] = round((seat - then) / n, 1)
+                fc, row["method"] = max(row["covers"], row["covers"] + (seat - then) / n), "added"
+            row["fc_covers"] = round(fc, 1)
+            if G:
+                g = sum(G) / len(G)
+                row["hist_guests"] = round(g, 1)
+                row["fc_guests"] = round(max(fc, g + fc - seat_g / len(G)), 1)
+                row["fc_net"] = round(row["fc_guests"] * N / sum(G), 2) if sum(G) else None
+            out.append(row)
+    return out
+
+
+# ---------------------------------------------------------------- the exceptions register
+CASE_TITLE = {"not_found": "with check numbers Simphony does not have", "no_check": "seated with no Simphony check",
+              "shared": "on a check another reservation has too", "check_on_noshow": "no-show or cancelled, with a check",
+              "open": "left booked on a closed day"}
+CASE_SEVERITY = {"not_found": "warning", "no_check": "warning", "shared": "info", "check_on_noshow": "warning", "open": "info"}
+
+
+def findings(r):
+    """The cases for exreg.sync (source "sevenrooms"): one by restaurant, day and kind. "Seated, no check" only for
+    a restaurant where SevenRooms links at least half the seated tables (else its POS link is not on there)."""
+    names = {L["ref"]: (L["name"], L["bc"] or L["ref"]) for L in r["locations"]}
+    rate = {ref: kpis({ref: k})["link_rate"] for ref, k in r["agg"].items()}
+    groups = defaultdict(list)
+    for x in r["rows"]:
+        kind = x["link"] if x["link"] in CASES else "open" if x["cat"] == "open" else ""
+        if kind == "no_check" and (rate.get(x["ref"]) or 0) < LINK_FOR_REGISTER:
+            continue
+        if kind:
+            groups[(x["ref"], x["day"], kind)].append(x)
+    out = []
+    for (ref, d, kind), xs in sorted(groups.items()):
+        nm, loc = names.get(ref, (ref, ref))
+        ex = [f"{x['res'] or x['id']} {x['time']} party {x['guests']}" + (f" checks {', '.join(x['checks'])}" if x["checks"] else "")
+              for x in xs[:12]]
+        out.append({"subject": f"{d} sr_{kind} {ref}", "kind": kind, "location": loc,
+                    "title": f"{nm} {d}: {len(xs)} {'reservation' if len(xs) == 1 else 'reservations'} {CASE_TITLE[kind]}",
+                    "detail": "SevenRooms: " + "; ".join(ex) + (" …" if len(xs) > 12 else ""),
+                    "severity": CASE_SEVERITY[kind], "value": round(sum(x["spend"] or 0 for x in xs), 2)})
+    return out
+
+
+def in_scope(r):
+    days = set(r["days"])
+    return lambda x: (x["subject"] or "")[:10] in days
 
 
 # ---------------------------------------------------------------- the scope, the totals
@@ -399,7 +658,8 @@ def cut(r, allowed):
     return dict(r, locations=[L for L in r["locations"] if L["ref"] in keep], rows=[x for x in r["rows"] if ok(x)],
                 feedback=[f for f in r["feedback"] if ok(f)], agg={k: v for k, v in r["agg"].items() if k in keep},
                 prev_agg={k: v for k, v in (r.get("prev_agg") or {}).items() if k in keep},
-                venues=[v for v in r["venues"] if v["ref"] in keep], cut=True)
+                venues=[v for v in r["venues"] if v["ref"] in keep], forecast=[x for x in r.get("forecast") or [] if ok(x)],
+                cut=True)
 
 
 def kpis(agg):
@@ -423,7 +683,9 @@ def kpis(agg):
             "cases": t["cases"], **{c: t["case_" + c] for c in CASES},
             "fb_n": t["fb_n"], "fb_overall": t["fb_overall"] / t["fb_n"] if t["fb_n"] else None, "fb_low": t["fb_low"],
             **{"fb_" + x: (t["fb_" + x] / t["fb_n_" + x] if t["fb_n_" + x] else None) for x in ("food", "drinks", "service", "ambience")},
-            "guests_known": t["guests_known"], "guests_back": t["guests_back"], "prepay": round(t["prepay"], 2)}
+            "guests_known": t["guests_known"], "guests_back": t["guests_back"], "prepay": round(t["prepay"], 2),
+            "dwell": t["dwell_sum"] / t["dwell_n"] if t["dwell_n"] else None, "dwell_n": t["dwell_n"],
+            "ns_cost": t["no_show_covers"] * t["linked_sales"] / t["linked_covers"] if t["linked_covers"] else None}
 
 
 def public(r):
@@ -438,8 +700,10 @@ def public(r):
     rest = sorted((x for x in rows if not (x["link"] in CASES or x["cat"] == "open")), key=lambda x: (x["day"], x["time"]), reverse=True)
     shown = cases[:SHOW_ROWS] + rest[:max(0, SHOW_ROWS - len(cases))]
     out = {k: v for k, v in r.items() if k not in ("agg", "rows", "mix_raw", "prev_agg")}
-    out.update(kpis=kpis(r["agg"]), kpis_prev=kpis(P) if "prev_agg" in r else None, mixes=mixes(r), locations=locs, rows=shown, rows_count=len(rows), cases_count=len(cases),
-               feedback=r["feedback"][:1500])
+    K = kpis(r["agg"])
+    out.update(kpis=K, kpis_prev=kpis(P) if "prev_agg" in r else None, mixes=mixes(r, K["per_cover_res"]), locations=locs,
+               rows=shown, rows_count=len(rows), cases_count=len(cases), feedback=r["feedback"][:1500],
+               forecast=r.get("forecast") or [])
     return out
 
 
@@ -448,18 +712,45 @@ def key_of(company, frm, to):
     return f"{company}|{frm}|{to}"
 
 
+def default_range(today=None):
+    b = (today or date.today()) - timedelta(days=1)
+    return (b - timedelta(days=6)).isoformat(), b.isoformat()
+
+
+def _after(company):
+    """The default read (the last 7 days) puts its cases in the exceptions register; a range of one's own does not."""
+    def after(r):
+        if on_built and r.get("complete"):
+            return on_built(company, r)
+        return None
+    return after
+
+
 def request(company, frm=None, to=None, refresh=False, latest_fn=None):
     today = date.today()
     if not (frm and to):
-        b = today - timedelta(days=1)
-        frm, to = (b - timedelta(days=6)).isoformat(), b.isoformat()
+        frm, to = default_range(today)
     a, b = billyrec.check_range(frm, to, today)
     if not sevenrooms.info()["configured"]:
         return {"available": False, "not_connected": True, "range": {"from": a.isoformat(), "to": b.isoformat()},
                 "error": "SevenRooms is not connected yet: the API account goes in Connection & mapping."}
+    default = (a.isoformat(), b.isoformat()) == default_range(today)
     return _held.request(key_of(company, a.isoformat(), b.isoformat()),
                          lambda progress: build(company, a.isoformat(), b.isoformat(), latest_fn, progress), refresh,
-                         note="Reading SevenRooms and Simphony…")
+                         after=_after(company) if default else None, note="Reading SevenRooms and Simphony…")
+
+
+def remember(company, r):
+    _held.remember(key_of(company, r["range"]["from"], r["range"]["to"]), r)
+
+
+def companies():
+    """The companies with a restaurant placed for a SevenRooms venue (the daily control run reads them)."""
+    conn = sevenrooms.info()
+    if not conn["configured"]:
+        return []
+    regs = locintel.registry() if callable(getattr(locintel, "registry", None)) else []
+    return sorted({(r.get("company") or "").upper() for _v, r, _h in place(sevenrooms.venues(), regs, conn["map"]) if r and r.get("company")})
 
 
 def held(company, frm, to):
@@ -482,7 +773,32 @@ def render_xlsx(r):
                  "yes" if x["walk_in"] else "", x["source"], x["shift"], x["area"], x["tables"], x["server"], "yes" if x["vip"] else "",
                  ", ".join(x["checks"]), ", ".join(x["found"]), x["spend"], x["sr_spend"], x["lead"], r["link"].get(x["link"], ""),
                  x["prepay"]] for x in sorted(r["rows"], key=lambda x: (x["ref"], x["day"], x["time"]))[:XLSX_ROWS]]
-    mix_rows = [[kind, m["key"], m["res"], m["seated"], m["no_show"], m["covers"], m["sales"]] for kind, L in mixes(r).items() for m in L]
+    K = kpis(r["agg"])
+    M = mixes(r, K["per_cover_res"])
+    pcv = lambda m: m["sales"] / m["linked_covers"] if m["linked_covers"] else None
+    avg = lambda a, n: a / n if n else None
+    by_label = {"shift": "Shift", "source": "Booked by", "lead": "Lead time", "party": "Party", "area": "Area", "guest": "Guest",
+                "vip": "VIP", "tag": "Tag", "dwell": "Time at the table"}
+    mix_rows = [[by_label[kind], m["key"], m["all"], m["res"], m["cancel"], pc(m["cancel"] / m["all"] if m["all"] else None),
+                 m["seated"], m["no_show"], pc(m["no_show"] / (m["seated"] + m["no_show"]) if m["seated"] + m["no_show"] else None),
+                 m["covers"], m["ns_covers"], m["ns_cost"], m["sales"], pcv(m), avg(m["dwell_sum"], m["dwell_n"])]
+                for kind in by_label for m in M.get(kind) or []]
+    turn_rows = [[m["key"], m["seated"], m.get("slots", 0), avg(m["seated"], m.get("slots", 0)), m["covers"],
+                  avg(m["dwell_sum"], m["dwell_n"])] for m in M.get("turns") or []]
+    WD = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    hours = defaultdict(dict)
+    for kind in ("hour", "simhour"):
+        for m in M.get(kind) or []:
+            hours[m["key"]][kind] = m
+    hour_rows = [[WD[int(k.split("|")[0])], int(k.split("|")[1]), v.get("hour", {}).get("res", 0), v.get("hour", {}).get("booked", 0),
+                  v.get("hour", {}).get("covers", 0), v.get("simhour", {}).get("checks", 0), v.get("simhour", {}).get("sales", 0)]
+                 for k, v in sorted(hours.items(), key=lambda kv: tuple(int(p) for p in kv[0].split("|")))]
+    staff_rows = [[m["key"], m["res"], m["seated"], m["covers"], m["linked"], pc(m["linked"] / m["seated"] if m["seated"] else None),
+                   m["sales"], pcv(m), avg(m["dwell_sum"], m["dwell_n"]), m.get("no_check", 0), m["cases"], m.get("fb_n", 0),
+                   avg(m.get("fb_sum", 0), m.get("fb_n", 0)), m.get("fb_low", 0), ", ".join(m.get("emps") or [])] for m in M.get("server") or []]
+    fc_rows = [[names.get(x["ref"], x["ref"]), x["day"], x["res"], x["covers"], x["vip"], x["big"], x["weeks"], x["hist_booked"],
+                x["hist_seated"], x["pickup"], x.get("added"), x["fc_covers"], x["hist_guests"], x["fc_guests"], x["fc_net"], x["method"]]
+               for x in r.get("forecast") or []]
     fb_rows = [[names.get(f["ref"], f["ref"]), f["day"], f["received"], f["overall"], f["food"], f["drinks"], f["service"], f["ambience"],
                 f["recommend"], f["res"], f["tables"], f["server"]] for f in r["feedback"]]
     ven_rows = [[v["name"], v["internal_name"], v["id"], v["restaurant"], v["ref"], v["how"]] for v in r["venues"]]
@@ -500,8 +816,23 @@ def render_xlsx(r):
                                              "Shift", "Area", "Tables", "Served by", "VIP", "Check numbers", "Found in Simphony",
                                              "Spend (Simphony)", "Spend (SevenRooms)", "Lead days", "Link", "Prepaid"],
          "formats": [T, D, T, T, I, I, T, T, T, T, T, T, T, T, T, T, T, N, N, I, T, N], "rows": res_rows},
-        {"title": "Shift, channel, lead", "header": ["By", "Value", "Reservations", "Seated", "No-shows", "Covers", "Sales"],
-         "formats": [T, T, I, I, I, I, N], "rows": mix_rows},
+        {"title": "Guests & value", "header": ["By", "Value", "Reservations, all", "Reservations", "Cancelled", "Cancel rate", "Seated",
+                                               "No-shows", "No-show rate", "Covers seated", "No-show covers", "No-show cost",
+                                               "Sales with a reservation", "Per cover", "Minutes at the table"],
+         "formats": [T, T, I, I, I, P, I, I, P, I, I, N, N, N, "qty"], "rows": mix_rows},
+        {"title": "Tables & hours", "header": ["Area", "Seated", "Tables used (day, shift)", "Turns", "Covers", "Minutes at the table"],
+         "formats": [T, I, I, "qty", I, "qty"], "rows": turn_rows},
+        {"title": "Hours", "header": ["Weekday", "Hour", "Reservations", "Covers booked", "Covers seated", "Simphony checks opened",
+                                      "Simphony sales"],
+         "formats": [T, I, I, I, I, I, N], "rows": hour_rows},
+        {"title": "Staff", "header": ["Served by", "Reservations", "Seated", "Covers", "Linked to a check", "Linked rate", "Sales",
+                                      "Per cover", "Minutes at the table", "Seated, no check", "Cases", "Feedback", "Overall rating",
+                                      "Rated 1–2", "Simphony employees"],
+         "formats": [T, I, I, I, I, P, N, N, "qty", I, I, I, "qty", I, T], "rows": staff_rows},
+        {"title": "Next 14 days", "header": ["Restaurant", "Day", "Reservations", "Covers on the books", "VIP", f"Parties of {BIG_PARTY}+",
+                                             "Weeks learnt from", "Covers on the books then", "Covers seated then", "Pickup",
+                                             "Covers added after", "Forecast covers", "Simphony guests then", "Forecast guests", "Forecast net sales", "Method"],
+         "formats": [T, D, I, I, I, I, I, "qty", "qty", "qty", "qty", "qty", "qty", "qty", N, T], "rows": fc_rows},
         {"title": "Feedback", "header": ["Restaurant", "Reservation day", "Received", "Overall", "Food", "Drinks", "Service", "Ambience",
                                          "Recommend", "Reference", "Tables", "Served by"],
          "formats": [T, D, T, "qty", "qty", "qty", "qty", "qty", T, T, T, T], "rows": fb_rows},

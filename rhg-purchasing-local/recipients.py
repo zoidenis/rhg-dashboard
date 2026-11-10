@@ -61,6 +61,10 @@ REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
            # sales at risk: cost control and operations; at a location its unit manager, head chef and stock manager
            ("stockstop_daily", "Sales blocked by stock · daily", "Finance",
             ["cost_controller", "operations"], ["stock_manager", "unit_manager", "head_chef"]),
+           # SevenRooms ↔ Simphony: yesterday's reservations against the checks, the cases, today's book; the
+           # restaurant's unit manager and operations, finance in Cc (the cases are takings)
+           ("sevenrooms_daily", "Reservations against Simphony · daily", "Finance",
+            ["unit_manager", "operations"], ["finance", "head_chef"]),
            ("fiscal_daily", "Fiscal invoices against BC · daily", "Finance", ["accounting"], ["finance", "inputer"]),
            ("brand_performance", "Brand performance · weekly and monthly", "Finance",
             [], ["finance", "operations"]),
@@ -69,7 +73,7 @@ REPORTS = [("purchasing_daily", "Invoices without a PO · daily", "Purchasing",
            ("pl_monthly", "P&L memo · monthly", "Finance", ["cfo", "ceo"], ["coo", "finance", "accounting", "management"])]
 # the reports that also go out location by location, with that location's figures only
 LOCATION_REPORTS = {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly",
-                    "pl_monthly", "negative_daily", "stockstop_daily"}
+                    "pl_monthly", "negative_daily", "stockstop_daily", "sevenrooms_daily"}
 ROLE_KEYS = {k for k, _ in ROLES}
 REPORT_KEYS = {r[0] for r in REPORTS}
 
@@ -191,7 +195,7 @@ def resolve(report, companies, general_to=(), general_cc=(), promote_cc=True):
 def location_targets_in(d, report, company):
     """[(location, to, cc)]: the locations of a company that have people in the roles of a report, for
     the reports cut by location. Nobody in To: the first Cc moves up. Same function in Finance."""
-    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly", "pl_monthly", "negative_daily", "stockstop_daily"}:
+    if report not in {"purchasing_daily", "purchasing_weekly", "savings_monthly", "cost_weekly", "sales_weekly", "pl_monthly", "negative_daily", "stockstop_daily", "sevenrooms_daily"}:
         return []
     route = (d.get("routing") or {}).get(report) or {"to": [], "cc": []}
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).strip().upper() == str(company or "").strip().upper()), {})

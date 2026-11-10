@@ -34,7 +34,8 @@ SEVERITY = ("critical", "warning", "info")
 SLA = {"critical": 2, "warning": 5, "info": 10}
 # source → label, and type → the role that owns it (Email recipients roles)
 SOURCES = {"negative_stock": "Negative stock", "discharge": "Received vs discharged", "sales_rec": "Simphony ↔ BC",
-           "data_quality": "Data quality", "receipts_rec": "Takings POS ↔ BC", "billy_rec": "Simphony ↔ Billy"}
+           "data_quality": "Data quality", "receipts_rec": "Takings POS ↔ BC", "billy_rec": "Simphony ↔ Billy",
+           "sevenrooms": "SevenRooms ↔ Simphony"}
 OWNER_ROLE = {
     ("negative_stock", "stock"): "stock_manager", ("negative_stock", "cost"): "cost_controller",
     ("negative_stock", "purchasing"): "purchasing_manager",
@@ -50,6 +51,8 @@ OWNER_ROLE = {
     ("receipts_rec", "unmapped"): "accounting", ("receipts_rec", "tips"): "accounting", ("receipts_rec", "*"): "finance",
     # Simphony ↔ Billy: the fiscalization of the checks and the sales book to the chief accountant
     ("billy_rec", "*"): "accounting",
+    # SevenRooms ↔ Simphony: a reservation's tables against the checks (the takings of the restaurant) to finance
+    ("sevenrooms", "*"): "finance",
 }
 ROLE_LABEL = {"stock_manager": "Stock manager", "cost_controller": "Cost controller",
               "purchasing_manager": "Purchasing manager", "finance": "Finance", "accounting": "Chief accountant"}
