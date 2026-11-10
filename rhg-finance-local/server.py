@@ -48,6 +48,8 @@ import salestop
 import salestop_report
 import xlsxtable
 import emcpriv
+import sevenrooms
+import srsim
 import requests
 import cost_report
 import negstock
@@ -107,6 +109,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/negative-report/settings": "settings", "/api/negative-report/job": "settings",
                      "/api/stockstop-report/settings": "settings", "/api/stockstop-report/job": "settings",
                      "/api/emcpriv/settings": "settings", "/api/emcpriv/check": "settings",
+                     "/api/sevenrooms/settings": "settings", "/api/sevenrooms/test": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
@@ -1955,6 +1958,8 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/shrinkage/count",
                          # Sales → Blocked by stock: cut to the person's locations
                          "/api/sales/stockstop", "/api/sales/stockstop/xlsx",
+                         # Sales → SevenRooms ↔ Simphony: cut to the person's restaurants
+                         "/api/sevenrooms", "/api/sevenrooms/xlsx",
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
                          "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx", "/api/billyrec/rows",
                          # Budget & forecast → Location intelligence, by department
@@ -2077,6 +2082,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path in ("/api/sales/stockstop", "/api/sales/stockstop/xlsx"):
             self._scope_filter = lambda b: salestop.cut(b, self._allowed)
+        elif path in ("/api/sevenrooms", "/api/sevenrooms/xlsx"):
+            self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
         elif path == "/api/salesrec":
@@ -2457,6 +2464,53 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 r = salestop.request(client, company, q.get("refresh") == "1")
                 self._send(200, dict(r, can_export=auth.can(user, "export")) if isinstance(r, dict) else r)
+            elif url.path in ("/api/sevenrooms", "/api/sevenrooms/xlsx", "/api/sevenrooms/settings"):
+                # Sales → SevenRooms ↔ Simphony: reservations, covers and feedback against Simphony's checks (srsim.py)
+                if not auth.can(user, "finance.s.sales.sevenrooms"):
+                    self._send(403, {"error": "Your role does not include SevenRooms ↔ Simphony."})
+                    return
+                if url.path.endswith("/settings"):           # the connection and the venues (Settings permission)
+                    if not auth.can(user, "settings"):
+                        self._send(403, {"error": "Your role does not include Settings."})
+                        return
+                    out = {"connection": sevenrooms.info(), "venues": [], "restaurants": []}
+                    try:
+                        if out["connection"]["configured"]:
+                            regs = locintel.registry()
+                            out["restaurants"] = [{"ref": r["ref"], "name": r.get("name") or r["ref"], "company": r.get("company") or ""}
+                                                  for r in regs if r.get("ref")]
+                            out["venues"] = [dict(v, ref=(r or {}).get("ref") or "", restaurant=(r or {}).get("name") or "", how=how)
+                                             for v, r, how in srsim.place(sevenrooms.venues(), regs, out["connection"]["map"])]
+                    except sevenrooms.Error as exc:
+                        out["error"] = str(exc)[:300]
+                    self._send(200, out)
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                frm, to = q.get("from") or None, q.get("to") or None
+                if url.path.endswith("/xlsx"):
+                    hit = srsim.held(company, frm, to) if frm and to else None
+                    if not hit or "agg" not in hit:
+                        self._send(409, {"error": "Read SevenRooms ↔ Simphony first."})
+                        return
+                    hit = srsim.cut(hit, self._allowed)
+                    body = srsim.render_xlsx(hit)
+                    store.audit("export", f"sevenrooms · {company}", user["username"], None, {"from": frm, "to": to}, "")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    self.send_header("Content-Disposition", f'attachment; filename="RHG_{re.sub(r"[^A-Za-z0-9_-]+", "_", company)}_sevenrooms_simphony_{frm}_{to}.xlsx"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                try:
+                    r = srsim.request(company, frm, to, q.get("refresh") == "1", _latest)
+                except ValueError as exc:
+                    r = {"available": False, "error": str(exc)}
+                if isinstance(r, dict) and "agg" in r:
+                    r = srsim.public(srsim.cut(r, self._allowed))
+                self._send(200, dict(r, can_settings=auth.can(user, "settings"), configured=sevenrooms.info()["configured"])
+                           if isinstance(r, dict) else r)
             elif url.path in ("/api/sales/channel-profit", "/api/sales/channel-profit/xlsx"):
                 # Sales → Channel profitability: a P&L of every order type (Simphony) with costs from BC and parameters
                 if not simphony.info()["configured"]:
@@ -3611,6 +3665,19 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/sevenrooms/settings", "/api/sevenrooms/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                try:
+                    if url.path.endswith("/settings"):
+                        conn = sevenrooms.save(body, actor)
+                        srsim._held.forget()                 # the next read applies the account and the mapping
+                        self._send(200, {"connection": conn})
+                    else:
+                        self._send(200, sevenrooms.test())
+                except (ValueError, sevenrooms.Error) as exc:
+                    self._send(400, {"error": str(exc)[:300]})
             elif url.path in ("/api/emcpriv/settings", "/api/emcpriv/check"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

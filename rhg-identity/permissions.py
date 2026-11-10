@@ -251,6 +251,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.billyrec": "finance.s.salesrec",
                  # Control → EMC privileges (who can do what in Simphony): whoever holds Settings
                  "finance.s.emcpriv": "finance.s.settings",
+                 # Sales → SevenRooms ↔ Simphony: whoever reads Sales
+                 "finance.s.sales.sevenrooms": "finance.s.sales.main",
                  # Sales → Menu & food cost: whoever reads Menu engineering
                  "finance.s.sales.menucost": "finance.s.sales.menu",
                  # the owners of exceptions: action center, recipe integrity (cost control, stock) and purchasing
