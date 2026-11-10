@@ -31,25 +31,21 @@ FINANCE = [
         # the sales BC cannot post for want of stock (open assembly orders), and what today's Simphony sales will block
         ("stockstop", "Blocked by stock", "location", []),
         # SevenRooms reservations, covers and feedback against Simphony's checks
-        ("sevenrooms", "SevenRooms ↔ Simphony", "location", []),
-        ("today", "Today", "location", [])]),
+        ("sevenrooms", "SevenRooms ↔ Simphony", "location", [])]),
     ("pl", "Financial statements", "Statements", "stTabs", [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),
         ("bs", "Balance sheet", "company", ["finance.bs.view"]),
         ("liquidity", "Liquidity & capital", "company", ["finance.bs.view"]),
-        ("treasury", "Cash flow & treasury", "company", ["finance.treasury.view", "finance.cash.view"]),
-        ("charts", "P&L charts", "company", ["finance.pl.view"])]),
+        ("treasury", "Cash flow & treasury", "company", ["finance.treasury.view", "finance.cash.view"])]),
     ("gl", "G/L entries", "Statements", None, [], "company", ["finance.gl.view"]),
     ("cash", "Cash & bank", "Working capital", "clTabs", [
         ("main", "Cash & bank", "company", ["finance.cash.view"]),
-        ("loc", "Location intelligence", "location", ["finance.cash.view"]),
-        ("today", "Today", "location", ["finance.cash.view"])]),
+        ("loc", "Location intelligence", "location", ["finance.cash.view"])]),
     ("kartela", "Kartela", "Working capital", "kaTabs", [
         ("ap", "Accounts payable", "company", ["finance.ap.view"]),
         ("ar", "Accounts receivable", "company", ["finance.ar.view"]),
         ("loc", "Location intelligence", "location", ["finance.ap.view", "finance.ar.view"]),
-        ("sup", "Suppliers & stock", "company", ["finance.ap.view"]),
-        ("today", "Today", "location", ["finance.ap.view", "finance.ar.view"])]),
+        ("sup", "Suppliers & stock", "company", ["finance.ap.view"])]),
     ("fiscal", "Fiscal vs BC", "Working capital", "fbTabs", [
         ("fiscal", "Fiscal purchases vs BC", "company", ["finance.ap.view"]),
         ("fsales", "Fiscal sales vs BC", "company", ["finance.ar.view"])]),
@@ -67,16 +63,13 @@ FINANCE = [
         # count differences by category against the waste allowance, every month (the SIN KPI workbook, automated)
         ("shrinkage", "Shrinkage KPIs", "location", ["finance.inventory.view"]),
         ("stockwc", "Stock & working capital", "company", ["finance.inventory.view", "purchasing.view"]),
-        ("invcharts", "Inventory charts", "location", ["finance.inventory.view"]),
-        ("today", "Today", "location", ["finance.inventory.view"])]),
+        ("invcharts", "Inventory charts", "location", ["finance.inventory.view"])]),
     ("budget", "Budget & forecast", "Planning", "bgTabs", [
         ("budget", "Budget & forecast", "company", ["finance.pl.view"]),
-        ("loc", "Location intelligence", "location", ["finance.pl.view"]),
-        ("today", "Today", "location", ["finance.pl.view"])]),
+        ("loc", "Location intelligence", "location", ["finance.pl.view"])]),
     ("assets", "Fixed assets", "Planning", "faTabs", [
         ("main", "Fixed assets", "company", ["finance.assets.view"]),
-        ("loc", "Location intelligence", "location", ["finance.assets.view"]),
-        ("today", "Today", "location", ["finance.assets.view"])]),
+        ("loc", "Location intelligence", "location", ["finance.assets.view"])]),
     ("closing", "Month-end close", "Control", None, [], "company", []),
     ("actions", "Action center", "Control", None, [], "company", []),
     ("exceptions", "Exceptions", "Control", None, [], "company", []),
@@ -113,8 +106,7 @@ PURCHASING = [
     ("actions", "Action center", "Control", None, [], "location", []),
     ("exceptions", "Exceptions", "Control", "exTabs", [
         ("list", "Exceptions", "location", ["purchasing.quality.view"]),
-        ("loc", "Location intelligence", "location", ["purchasing.quality.view"]),
-        ("today", "Today", "location", ["purchasing.quality.view"])]),
+        ("loc", "Location intelligence", "location", ["purchasing.quality.view"])]),
     ("compliance", "Invoices without PO", "Control", None, [], "company", ["purchasing.invoices.view"]),
     ("feed", "Posting follow-up", "Control", None, [], "location", ["purchasing.invoices.view"]),
     ("suppliers", "Supplier performance", "Performance", "spTabs", [

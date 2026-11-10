@@ -152,6 +152,12 @@ def _seed_roles(conn):
                 conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + [new]), r["name"]))
         given.append(new)
         _added_write(given)
+    # screens taken out of the catalogue (after ADDED_SCREENS gave their holders the screen that replaces them)
+    gone = set(permissions.REMOVED_SCREENS)
+    for r in conn.execute("SELECT name, permissions FROM roles").fetchall():
+        held = json.loads(r["permissions"] or "[]")
+        if gone & set(held):
+            conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps([p for p in held if p not in gone]), r["name"]))
     # A system role (Administrator) holds every permission, including ones added to the
     # catalogue after it was stored.
     for r in conn.execute("SELECT name, permissions FROM roles WHERE system=1").fetchall():

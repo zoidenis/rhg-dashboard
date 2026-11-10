@@ -164,7 +164,7 @@ DEFAULT_ROLES = {
                            "description": "Payables and receivables: Kartela AP and AR, suppliers & stock, fiscal "
                                           "purchases and sales, invoices without PO, sales.",
                            "permissions": ["finance.s.kartela.ap", "finance.s.kartela.ar", "finance.s.kartela.sup",
-                                           "finance.s.kartela.loc", "finance.s.kartela.today",
+                                           "finance.s.kartela.loc", "finance.s.overview.today",
                                            "finance.s.fiscal.fiscal", "finance.s.fiscal.fsales",
                                            "finance.s.sales.main", "finance.s.sales.loc", "finance.s.actions",
                                            "finance.s.salesrec", "finance.s.register",
@@ -221,9 +221,8 @@ DEFAULT_ROLES = {
     "Unit manager": {"department": "Sales", "system": False,
                      "description": "One restaurant: its sales, today, stock and SKU planning (give the account "
                                     "its locations).",
-                     "permissions": ["finance.s.sales.loc", "finance.s.sales.today", "finance.s.overview.today",
-                                     "finance.s.inventory.loc", "finance.s.inventory.sku",
-                                     "finance.s.inventory.today", "purchasing.s.overview.overview",
+                     "permissions": ["finance.s.sales.loc", "finance.s.overview.today",
+                                     "finance.s.inventory.loc", "finance.s.inventory.sku", "purchasing.s.overview.overview",
                                      "purchasing.s.reqs.reqs", "purchasing.s.reqs.po"]},
     "Sales analyst": {"department": "Sales", "system": False,
                       "description": "Sales, location intelligence and the sales tabs of the executive dashboard.",
@@ -265,8 +264,6 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.inventory.invcharts": "finance.s.inventory.movement",
                  # Buying → Purchasing charts: whoever reads Purchase types
                  "purchasing.s.reqs.buycharts": "purchasing.s.reqs.streams",
-                 # Financial statements → P&L charts: whoever reads the P&L
-                 "finance.s.pl.charts": "finance.s.pl.pl",
                  # Executive dashboard → Balance & capital: whoever holds its Executive KPIs
                  "platform.s.executive.balance": "platform.s.executive.overview",
                  # takings POS ↔ BC: whoever reads the sales reconciliation or cash & bank
@@ -290,7 +287,19 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.inventory.itemmaster": ("finance.s.inventory.movement", "finance.s.inventory.sku",
                                                     "finance.s.inventory.loc", "finance.s.inventory.stockcount"),
                  # scheduled reports: whoever sets the towers' email settings
-                 "reports.manage": ("finance.settings.manage", "purchasing.settings.manage")}
+                 "reports.manage": ("finance.settings.manage", "purchasing.settings.manage"),
+                 # the dashboard audit of 2026-11: "Today" stays only on the Executive overview (Finance) and the
+                 # Overview (Purchasing); whoever held it on another screen gets the one that stays. P&L charts went
+                 # into the P&L ("From revenue to EBITDA"); its holders get the P&L.
+                 "finance.s.overview.today": ("finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today",
+                                              "finance.s.inventory.today", "finance.s.budget.today",
+                                              "finance.s.assets.today"),
+                 "purchasing.s.overview.today": ("purchasing.s.exceptions.today",),
+                 "finance.s.pl.pl": ("finance.s.pl.charts",)}
+# Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
+REMOVED_SCREENS = ("finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
+                   "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",
+                   "finance.s.pl.charts")
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 

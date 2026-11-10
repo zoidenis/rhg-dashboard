@@ -4801,9 +4801,9 @@ document.addEventListener("keydown", e => {
   if (d.sploc != null || d.spsup != null || d.spcsup != null || d.spfrom != null || d.spto != null || d.sptr != null) { e.preventDefault(); e.target.click(); }
 });
 // ---------------------------------------------------------------- Location intelligence → Today
-// A "Today" tab next to each Location intelligence: what every location received, was invoiced and ordered
-// today so far, and its requisitions due. /api/today/locations; refreshed every 5 minutes while open.
-var TD_TABS = {ovTabs: "purchasing", exTabs: "exceptions"};
+// A "Today" tab on the Overview (once on Exceptions too, the same read): what every location received, was invoiced
+// and ordered today so far, and its requisitions due. /api/today/locations; refreshed every 5 minutes while open.
+var TD_TABS = {ovTabs: "purchasing"};
 var tdState = {bar: null, focus: "", data: {}, timer: null, auto: null};
 const tdQ = () => "company=" + encodeURIComponent($("company").value || "");
 function tdView(){ const bar = $(tdState.bar); return bar && bar.parentNode ? bar.parentNode.querySelector(":scope > .td-view") : null; }
