@@ -45,6 +45,9 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
 .pz-case{all:unset;box-sizing:border-box;display:block;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--card)}
 .pz-case:hover,.pz-case:focus-visible{border-color:var(--accent)}.pz-case .n{font-size:20px;font-weight:700}.pz-case .n.zero{color:var(--sub)}
 .pz-case .t{font-size:13px;font-weight:600;margin:2px 0}.pz-case .w{font-size:12px;color:var(--sub)}
+:where(:root){--ch-0:#3b6fd8;--ch-1:#c47f1f;--ch-2:#7a5bbf;--ch-3:#00978b;--ch-4:#9a9ca1}
+@media (prefers-color-scheme: dark){:where(:root:not([data-theme="light"])){--ch-0:#5b86e0;--ch-1:#b97a22;--ch-2:#8c72d4;--ch-3:#1aa196;--ch-4:#6b6e74}}
+:where(:root[data-theme="dark"]){--ch-0:#5b86e0;--ch-1:#b97a22;--ch-2:#8c72d4;--ch-3:#1aa196;--ch-4:#6b6e74}
 @media (max-width:640px){.pz-hr{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.pz-hr .b{grid-column:1/-1;grid-row:2}}`;
   const st = document.createElement("style");
   st.textContent = CSS;

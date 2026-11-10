@@ -580,7 +580,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     </div>
     <div class="card"><h2>Contracted price</h2>
       <p class="hint">Average price paid against the agreed purchase price, where a price list is published in BC.</p>
-      <div class="scroll"><table id="contractTable"></table></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="contractTable"></table></div></details>
     </div>
   </section>
 
@@ -617,16 +617,16 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <div class="card" style="margin-bottom:16px"><p class="hint" id="ctDefs"></p></div>
     <div class="grid">
       <div class="card"><h2>By supplier</h2><p class="hint">Ranked by what was bought from them in this period. Coverage is the share of that spend with an agreed price behind it.</p>
-        <div class="scroll"><table id="ctSup"></table></div></div>
+        <div id="ctSupBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctSup"></table></div></details></div>
       <div class="card"><h2>By category</h2><p class="hint">Where the agreed prices reach, and where buying happens without one.</p>
-        <div class="scroll"><table id="ctCat"></table></div></div>
+        <div id="ctCatBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctCat"></table></div></details></div>
     </div>
     <div class="grid">
       <div class="card"><h2>Largest spend with no agreed price</h2><p class="hint" id="ctUncNote"></p>
-        <div class="scroll"><table id="ctUnc"></table></div></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctUnc"></table></div></details></div>
       <div class="card"><h2>Largest gaps against the agreed price</h2>
         <p class="hint">Summary only. The item-by-item comparison lives on the Comparisons screen.</p>
-        <div class="scroll"><table id="ctGap"></table></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctGap"></table></div></details>
         <button class="mini" style="margin-top:10px" data-goto2="Comparisons">Open Comparisons</button></div>
     </div>
   </section>
@@ -641,13 +641,13 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     </div>
     <div class="grid">
       <div class="card"><h2>Where it happens</h2><p class="hint" id="cplWhereNote"></p>
-        <div class="scroll"><table id="cplUnits"></table></div>
+        <div id="cplUnitBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="cplUnits"></table></div></details>
         <h2 style="margin-top:18px">Suppliers</h2>
-        <div class="scroll"><table id="cplVendors"></table></div></div>
+        <div id="cplVendBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="cplVendors"></table></div></details></div>
       <div class="card"><h2>Why, and who owns it</h2><p class="hint">Grouped by cause. The person who posted the invoice is usually the inputter, not the person who decided to buy, so responsibility is set by unit and category.</p>
         <div id="cplReasons"></div>
         <h2 style="margin-top:18px">Compliance by month</h2>
-        <div class="scroll"><table id="cplTrend"></table></div></div>
+        <div id="cplTrendCols"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="cplTrend"></table></div></details></div>
     </div>
     <div class="card" style="margin-bottom:16px"><h2>Decisions that need action</h2>
       <p class="hint" id="cplDecNote"></p>
@@ -770,7 +770,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <p class="hint">The purchaser of a supplier is the Purchaser Code on its card in Business Central; names and addresses in Settings → Purchasers. Click a purchaser to see only their lines.</p></div></div>
       <div class="scroll"><table id="pqWhoTable"></table></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Lines</h2><p class="hint" id="pqLinesNote"></p></div></div>
-      <div class="scroll"><table id="pqLines"></table></div><p class="meta" id="pqMore"></p></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="pqLines"></table></div></details><p class="meta" id="pqMore"></p></div>
     <div class="card" style="margin-bottom:16px" id="pqMailCard"><div class="card-head"><div><h2>Weekly email</h2>
       <p class="hint">Every Monday at the time set, last week's report: to each purchaser with an address in Settings → Purchasers, their suppliers' lines; to the Purchasing manager (Email recipients by company → Purchase price changes) every line. The limit is in Settings → Thresholds (Price change, %).</p></div>
         <span class="pill" id="pqPill"><span class="dot"></span><span id="pqPillT">Off</span></span></div>
@@ -790,7 +790,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input class="search" id="search" placeholder="Search item or location">
           <button class="mini" id="pricesCsv">Export CSV</button></div></div>
-      <div class="scroll"><table id="moversTable"></table></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="moversTable"></table></div></details>
     </div>
   </section>
 
@@ -807,12 +807,12 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <div class="card"><h2>Invoice size</h2><p class="hint">Item invoices by number of lines</p><div class="bars" id="invBuckets"></div></div>
     </div>
     <div class="grid">
-      <div class="card"><h2>Invoices to check</h2><p class="hint">Negative lines on an invoice usually mean a return that should have been a credit memo. Zero-cost lines mean a missing price.</p><div class="scroll"><table id="susTable"></table></div></div>
-      <div class="card"><h2>Late postings</h2><p class="hint" id="lateHint"></p><div class="scroll"><table id="lateTable"></table></div></div>
+      <div class="card"><h2>Invoices to check</h2><p class="hint">Negative lines on an invoice usually mean a return that should have been a credit memo. Zero-cost lines mean a missing price.</p><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="susTable"></table></div></details></div>
+      <div class="card"><h2>Late postings</h2><p class="hint" id="lateHint"></p><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="lateTable"></table></div></details></div>
     </div>
     <div class="grid">
-      <div class="card"><h2>Vendors by invoice count</h2><p class="hint">Average delay between the vendor's invoice date and posting in BC</p><div class="scroll"><table id="vendTable"></table></div></div>
-      <div class="card"><h2>Largest invoices by lines</h2><p class="hint">Item lines per posted invoice</p><div class="scroll"><table id="bigTable"></table></div></div>
+      <div class="card"><h2>Vendors by invoice count</h2><p class="hint">Average delay between the vendor's invoice date and posting in BC</p><div id="vendBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="vendTable"></table></div></details></div>
+      <div class="card"><h2>Largest invoices by lines</h2><p class="hint">Item lines per posted invoice</p><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="bigTable"></table></div></details></div>
     </div>
   </section>
 
@@ -1151,7 +1151,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <div class="card">
       <h2>Same item, different price by location</h2>
       <p class="hint">Items bought at two or more locations this period where the dearest average cost is well above the cheapest. "Extra paid" prices the dearest location's quantity at the cheapest location's cost.</p>
-      <div class="scroll"><table id="spreadTable"></table></div>
+      <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="spreadTable"></table></div></details>
     </div>
   </section>
 
@@ -1656,7 +1656,7 @@ function renderMovers(){
   rows.sort((a,b) => { const A = a[sortKey], B = b[sortKey]; return (typeof A === "string" ? A.localeCompare(B) : ((sortKey==="impact"||sortKey==="pct") ? Math.abs(A)-Math.abs(B) : A-B)) * sortDir; });
   const cols = [["desc","Item"],["prev_avg","Previous","num"],["cur_avg","Current","num"],["pct","Change","num"],["cur_qty","Qty","num"],["impact",`Impact (${CUR})`,"num"]];
   $("moversTable").innerHTML = `<tr>${cols.map(c => `<th class="${c[2]||""}" data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir<0?" ↓":" ↑"):""}</th>`).join("")}</tr>` +
-    (rows.length ? rows.map(m => `<tr><td class="name">${esc(m.desc||m.item_no)}<div class="meta">${esc(m.item_no)} · ${esc(m.locations.join(", "))}</div></td>
+    (rows.length ? rows.map(m => `<tr data-pulse="pitem|${esc(m.item_no)}" tabindex="0" style="cursor:pointer"><td class="name">${esc(m.desc||m.item_no)}<div class="meta">${esc(m.item_no)} · ${esc(m.locations.join(", "))}</div></td>
       <td class="num">${fmt(m.prev_avg,2)}</td><td class="num"><b>${fmt(m.cur_avg,2)}</b></td>
       <td class="num"><span class="chip ${m.pct>0?"up":"down"}">${m.pct>0?"+":""}${fmt(m.pct,1)}%</span></td>
       <td class="num">${fmt(m.cur_qty,2)}</td><td class="num ${m.impact>0?"up":"down"}"><b>${sign(m.impact)}</b></td></tr>`).join("")
@@ -1667,7 +1667,7 @@ function renderMovers(){
 function renderSpreads(){
   const rows = data.spreads;
   $("spreadTable").innerHTML = `<tr><th>Item</th><th>Cheapest</th><th class="num">Cost</th><th>Dearest</th><th class="num">Cost</th><th class="num">Spread</th><th class="num">Extra paid (${CUR})</th></tr>` +
-    (rows.length ? rows.map(s => `<tr><td class="name">${esc(s.desc||s.item_no)}<div class="meta">${esc(s.item_no)}</div></td>
+    (rows.length ? rows.map(s => `<tr data-pulse="pitem|${esc(s.item_no)}" tabindex="0" style="cursor:pointer"><td class="name">${esc(s.desc||s.item_no)}<div class="meta">${esc(s.item_no)}</div></td>
       <td>${esc(s.low_loc)}</td><td class="num">${fmt(s.low,2)}</td><td>${esc(s.high_loc)}</td><td class="num">${fmt(s.high,2)}</td>
       <td class="num"><span class="chip up">+${fmt(s.spread,0)}%</span></td><td class="num up"><b>${fmt(s.overpay)}</b></td></tr>`).join("")
       : `<tr><td colspan="7" class="empty">No big price gaps between locations this period.</td></tr>`);
@@ -1778,6 +1778,7 @@ function renderInvoices(){
   $("vendTable").innerHTML = `<tr><th>Vendor</th><th class="num">Invoices</th><th class="num">Value</th><th class="num">Avg delay</th></tr>` +
     (I.vendors.length ? I.vendors.map(v => `<tr><td class="name">${esc(v.name)}<div class="meta">${esc(v.no)}</div></td><td class="num">${v.invoices}</td><td class="num">${fmt(v.value)}</td><td class="num ${v.avg_lag>data.meta.late_days?"up":""}">${v.avg_lag==null?"–":fmt(v.avg_lag,1)+" d"}</td></tr>`).join("")
       : `<tr><td colspan="4" class="empty">No invoices yet.</td></tr>`);
+  invViz();
   $("bigTable").innerHTML = `<tr><th>Invoice</th><th>User</th><th class="num">Lines</th><th class="num">Value</th></tr>` +
     (I.biggest.length ? I.biggest.map(x => `<tr><td class="name">${esc(x.doc)}<div class="meta">${esc(x.locations.join(", "))}</div></td><td>${esc(x.user||"–")}</td><td class="num"><b>${x.lines}</b></td><td class="num">${fmt(x.value)}</td></tr>`).join("")
       : `<tr><td colspan="4" class="empty">No item invoices yet.</td></tr>`);
@@ -2594,12 +2595,12 @@ function renderContract(){
     : `<span class="up">${esc(st.reason || "No price list is published.")}</span>`;
   $("contractTable").innerHTML = st.available
     ? `<tr><th>Item</th><th class="num">Contracted</th><th class="num">Paid (avg)</th><th class="num">Difference</th><th class="num">Quantity</th><th class="num">Over/under paid (${CUR})</th><th>Supplier</th></tr>` +
-      (rows.length ? rows.map(r => `<tr class="${r.pct>data.settings.thresholds.price_above_contract_pct?"warnrow":""}">
+      (rows.length ? rows.map(r => `<tr class="${r.pct>data.settings.thresholds.price_above_contract_pct?"warnrow":""}" data-pulse="pitem|${esc(r.item_no)}" tabindex="0" style="cursor:pointer">
         <td class="name">${esc(r.desc||r.item_no)}<div class="meta">${esc(r.item_no)}</div></td>
         <td class="num">${fmt(r.contract,2)}</td><td class="num"><b>${fmt(r.paid,2)}</b></td>
         <td class="num"><span class="chip ${r.pct>0?"up":"down"}">${r.pct>0?"+":""}${fmt(r.pct,1)}%</span></td>
         <td class="num">${fmt(r.qty,2)}</td><td class="num ${r.overpaid>0?"up":"down"}"><b>${sign(r.overpaid)}</b></td>
-        <td>${esc(r.vendor||"–")}</td></tr>`).join("")
+        <td>${r.vendor ? `<span data-pulse="sup|${esc(r.vendor)}" role="button" tabindex="0" style="text-decoration:underline dotted">${esc(r.vendor)}</span>` : "–"}</td></tr>`).join("")
         : `<tr><td colspan="7" class="empty">No purchased item matched the published price list this period.</td></tr>`)
     : `<tr><td class="empty">No contracted price list published. In BC: Web Services → New → Page → <b>Purchase Prices</b> (or <b>Price List Lines</b> on newer versions) → Service Name <code>PurchasePrices</code> → Published.${st.reason?`<div class="meta" style="margin-top:6px">${esc(st.reason).slice(0,220)}</div>`:""}</td></tr>`;
 }
@@ -2742,12 +2743,13 @@ function renderContracts(){
       <td class="num ${s.above>0?"up":""}">${fmt(s.above)}</td></tr>`).join("");
   $("ctUncNote").textContent = "The items worth adding to the price list first, by what was spent on them.";
   $("ctUnc").innerHTML = `<tr><th>Item</th><th>Supplier</th><th>Category</th><th class="num">Spend</th></tr>` +
-    (c.biggest_uncovered.length ? c.biggest_uncovered.map(u=>`<tr><td class="name">${esc(u.description||u.item)}<div class="meta">${esc(u.item)}</div></td>
+    (c.biggest_uncovered.length ? c.biggest_uncovered.map(u=>`<tr data-pulse="pitem|${esc(u.item)}" tabindex="0" style="cursor:pointer"><td class="name">${esc(u.description||u.item)}<div class="meta">${esc(u.item)}</div></td>
       <td class="meta">${esc(u.vendor||"–")}</td><td class="meta">${esc(u.category||"–")}</td>
       <td class="num"><b>${fmt(u.cost)}</b></td></tr>`).join("")
       : `<tr><td colspan="4" class="empty">Everything bought this period had an agreed price.</td></tr>`);
+  ctViz();
   $("ctGap").innerHTML = `<tr><th>Item</th><th class="num">Agreed</th><th class="num">Paid</th><th class="num">%</th><th class="num">Value</th></tr>` +
-    (c.biggest_gaps.length ? c.biggest_gaps.map(g=>`<tr><td class="name">${esc(g.description||g.item)}<div class="meta">${esc(g.vendor||"")}</div></td>
+    (c.biggest_gaps.length ? c.biggest_gaps.map(g=>`<tr data-pulse="pitem|${esc(g.item)}" tabindex="0" style="cursor:pointer"><td class="name">${esc(g.description||g.item)}<div class="meta">${esc(g.vendor||"")}</div></td>
       <td class="num">${fmt(g.agreed,2)}</td><td class="num">${fmt(g.paid_unit,2)}</td>
       <td class="num up">${fmt(g.pct,1)}%</td><td class="num"><b>${fmt(g.gap_value)}</b></td></tr>`).join("")
       : `<tr><td colspan="5" class="empty">Nothing was paid above the agreed price beyond the tolerance.</td></tr>`);
@@ -2757,6 +2759,81 @@ function renderContracts(){
   });
 }
 
+// ---- Purchasing: a supplier and an item as Pulse pop-ups, from what the tower has read (suppliers by location, price
+// changes, contract prices, the price movers and location prices); bars on Prices & contracts, Invoices and no PO
+async function puEnsureSp(){
+  if (spData && spKey === spQs()) return true;
+  await loadSp(false);
+  for (let i = 0; i < 30 && !(spData && spKey === spQs()); i++) await new Promise(r => setTimeout(r, 1000));
+  return !!spData;
+}
+async function supPop(name){
+  Pulse.pop({title: esc(name), sub: span("Supplier"), body: async el => {
+    el.innerHTML = `<p class="meta">${span("Reading the purchases of the period…")}</p>`;
+    let html = "";
+    try {
+      if (await puEnsureSp()) {
+        const A = spAgg(), y = A.C[name];
+        if (y) {
+          const D = spDetail(name, null), tot = Object.values(A.C).reduce((a, x) => a + x.value, 0), p = spPctOf(y.value, y.prev);
+          const byLoc = {}; spData.rows.filter(r => r[1] === name).forEach(r => byLoc[r[0]] = (byLoc[r[0]] || 0) + r[4]);
+          html += Pulse.tiles([{l: "Purchases", v: plM(y.value), s: `vs before ${y.prev ? plPct(p) : "new"}`, cls: p > 10 ? "up" : ""}, {l: "Share of the company", v: tot ? fmt(y.value / tot * 100, 1) + "%" : "–"},
+            {l: "Invoices", v: fmt(y.inv), s: `${fmt(y.cm)} credit memos`}, {l: "Items", v: fmt(D.items), s: `${fmt(D.cats)} categories · ${fmt(D.locN)} locations`}])
+            + Pulse.panel("By location", Pulse.bars(Object.entries(byLoc).sort((a, b) => b[1] - a[1]).map(([l, v]) => ({key: plName(l) || l || "No location", segs: [[Math.abs(v), "var(--ch-0)", "purchases"]], text: plM(v)}))))
+            + Pulse.panel("By category", D.catT) + Pulse.panel("By item", `<div class="scroll" style="max-height:360px">${D.itT.replace(/<tr><td><b>([^<]+)<\/b>/g, (m, no) => `<tr data-pulse="pitem|${no}" tabindex="0" style="cursor:pointer"><td><b>${no}</b>`)}</div>`);
+        } else html += `<p class="meta">${span("No purchase from this supplier in the period of Supplier performance.")}</p>`;
+      }
+    } catch (e) { html += `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+    const C = (data.contracts || {}).suppliers || [], c = C.find(s => s.supplier === name);
+    if (c) html += Pulse.panel("Agreed prices", Pulse.tiles([{l: "Under an agreed price", v: fmt(c.covered)}, {l: "No agreed price", v: fmt(c.uncovered)}, {l: "Coverage", v: fmt(c.share, 0) + "%", cls: c.share < 50 ? "up" : "down"},
+      {l: "Paid above the agreed price", v: fmt(c.above), cls: c.above > 0 ? "up" : ""}]));
+    const L = pqData ? pqData.lines.filter(x => x.vendor_name === name) : [];
+    if (L.length) html += Pulse.panel(`Price changes · ${fmt(L.length)}`, Pulse.list([["Item"], ["Last price", 1], ["Now", 1], ["Change", 1], ["Impact", 1]],
+      L.slice(0, 50).map(x => ({cells: [`<b>${esc(x.desc || x.item)}</b>`, pqP(x.prev), pqP(x.price), x.d_prev == null ? "–" : (x.d_prev > 0 ? "+" : "") + x.d_prev.toFixed(1) + "%", pqS(x.impact)], open: `pitem|${x.item}`}))));
+    el.innerHTML = html || `<p class="meta">${span("Nothing read about this supplier yet.")}</p>`;
+  }});
+}
+Pulse.on("sup", n => supPop(n));
+function pitemPop(no){
+  const mv = (data.movers || []).find(m => m.item_no === no), sp = (data.spreads || []).find(s => s.item_no === no);
+  const ct = ((data.operations || {}).contract_prices || []).find(r => r.item_no === no);
+  const L = pqData ? pqData.lines.filter(x => x.item === no) : [];
+  const name = (mv && mv.desc) || (sp && sp.desc) || (ct && ct.desc) || (L[0] && L[0].desc) || (typeof spItem === "function" && spData ? spItem(no)[0] : "") || "";
+  Pulse.pop({title: esc(`${no}${name ? " · " + name : ""}`), sub: span("Item"), body: el => {
+    let html = "";
+    if (mv) html += Pulse.tiles([{l: "Average cost now", v: fmt(mv.cur_avg, 2), s: `before ${fmt(mv.prev_avg, 2)}`}, {l: "Change", v: (mv.pct > 0 ? "+" : "") + fmt(mv.pct, 1) + "%", cls: mv.pct > 0 ? "up" : "down"},
+      {l: "Quantity", v: fmt(mv.cur_qty, 2)}, {l: "Impact", v: sign(mv.impact), s: CUR, cls: mv.impact > 0 ? "up" : "down"}]);
+    if (ct) html += Pulse.panel("Agreed price", Pulse.tiles([{l: "Contracted", v: fmt(ct.contract, 2)}, {l: "Paid (avg)", v: fmt(ct.paid, 2), cls: ct.pct > 0 ? "up" : "down", s: (ct.pct > 0 ? "+" : "") + fmt(ct.pct, 1) + "%"},
+      {l: "Over/under paid", v: sign(ct.overpaid), cls: ct.overpaid > 0 ? "up" : ""}, {l: "Supplier", v: esc(ct.vendor || "–"), open: ct.vendor ? `sup|${ct.vendor}` : null}]));
+    if (sp) html += Pulse.panel("Between locations", Pulse.bars([{key: sp.low_loc, segs: [[sp.low, "var(--ch-0)", "cheapest"]], text: fmt(sp.low, 2)}, {key: sp.high_loc, segs: [[sp.high, "var(--ch-1)", "dearest"]], text: fmt(sp.high, 2)}])
+      + `<p class="meta" style="margin:6px 0 0">${span(`+${fmt(sp.spread, 0)}% · ${fmt(sp.overpay)} ${CUR} extra paid`)}</p>`);
+    if (spData) { const R = spData.rows.filter(r => r[2] === no), bs = {}; R.forEach(r => bs[r[1]] = (bs[r[1]] || 0) + r[4]);
+      if (R.length) html += Pulse.panel("By supplier", Pulse.bars(Object.entries(bs).sort((a, b) => b[1] - a[1]).map(([s, v]) => ({key: s, segs: [[Math.abs(v), "var(--ch-0)", "purchases"]], text: plM(v), open: `sup|${s}`})))); }
+    if (L.length) html += Pulse.panel("Price changes", Pulse.list([["Supplier"], ["Last price", 1], ["Now", 1], ["Change", 1], ["Contract", 1], ["Impact", 1]],
+      L.map(x => ({cells: [esc(x.vendor_name), pqP(x.prev), `<b>${pqP(x.price)}</b>`, x.d_prev == null ? "–" : (x.d_prev > 0 ? "+" : "") + x.d_prev.toFixed(1) + "%", pqP(x.contract), pqS(x.impact)], open: `sup|${x.vendor_name}`}))));
+    el.innerHTML = html || `<p class="meta">${span("Open Price changes or Supplier performance to read this item's purchases.")}</p>`;
+  }});
+}
+Pulse.on("pitem", no => pitemPop(no));
+function ctViz(){
+  const c = data.contracts; if (!c || !c.available) { $("ctSupBars").innerHTML = $("ctCatBars").innerHTML = ""; return; }
+  const seg = s => [[Math.max(0, s.covered - Math.max(0, s.above)), "var(--ch-0)", "under an agreed price"], [Math.max(0, s.above), "var(--ch-1)", "paid above it"], [Math.max(0, s.uncovered), "var(--ch-4)", "no agreed price"]];
+  const LG = [["var(--ch-0)", "under an agreed price"], ["var(--ch-1)", "paid above it"], ["var(--ch-4)", "no agreed price"]];
+  $("ctSupBars").innerHTML = Pulse.bars(c.suppliers.slice(0, 20).map(s => ({key: s.supplier, segs: seg(s), text: `<span class="${s.share < 50 ? "up" : ""}">${fmt(s.share, 0)}%</span> <span class="meta">covered</span>`, open: `sup|${s.supplier}`})), LG);
+  $("ctCatBars").innerHTML = Pulse.bars(c.categories.slice(0, 20).map(s => ({key: s.category, segs: seg(s), text: `<span class="${s.share < 50 ? "up" : ""}">${fmt(s.share, 0)}%</span>`})), LG);
+}
+function cplViz(){
+  const d = cplData; if (!d || !d.available) return;
+  $("cplUnitBars").innerHTML = Pulse.bars(d.by_unit.map(u => ({key: u.name, segs: [[u.value, "var(--ch-1)", "value with no order"]], text: `<b>${fmt(u.value)}</b> <span class="meta">${fmt(u.invoices)} invoices</span>`})), null, {none: "Every invoice this month came from an order."});
+  $("cplVendBars").innerHTML = Pulse.bars(d.vendors.map(v => ({key: v.vendor, segs: [[v.value, v.repeat ? "var(--up)" : "var(--ch-1)", v.repeat ? "repeat" : "value"]], text: `<b>${fmt(v.value)}</b> <span class="meta">${fmt(v.invoices)} invoices${v.repeat ? " · repeat" : ""}</span>`, open: `sup|${v.vendor}`})), null, {none: "None."});
+  $("cplTrendCols").innerHTML = Pulse.cols(d.trend.slice().reverse().map(t => ({label: t.month, segs: [[t.breaches || 0, "var(--ch-1)", "without an order"], [Math.max(0, (t.invoices || 0) - (t.breaches || 0)), "var(--ch-0)", "with an order"]],
+    tip: `${t.month}: ${t.rate == null ? "not read" : fmt(t.rate, 1) + "% without an order"}`})), [["var(--ch-1)", "without an order"], ["var(--ch-0)", "with an order"]], {h: 150, maxLabel: m => fmt(m) + " invoices"});
+}
+function invViz(){
+  const I = data.invoices; if (!I) return;
+  $("vendBars").innerHTML = Pulse.bars(I.vendors.slice(0, 15).map(v => ({key: v.name, segs: [[v.value, v.avg_lag > data.meta.late_days ? "var(--ch-1)" : "var(--ch-0)", "value"]], text: `<b>${fmt(v.value)}</b> <span class="meta">${fmt(v.invoices)} invoices · ${v.avg_lag == null ? "–" : fmt(v.avg_lag, 1) + " d"}</span>`, open: `sup|${v.name}`})),
+    [["var(--ch-0)", "posted in time"], ["var(--ch-1)", "posted late on average"]], {none: "No invoices yet."});
+}
 // ---------- invoices without a purchase order ----------
 let cplData = null;
 async function loadCompliance(){
@@ -2806,6 +2883,7 @@ function renderCompliance(){
       <td class="num">${fmt(v.invoices)}</td><td class="num"><b>${fmt(v.value)}</b></td>
       <td class="meta">${esc(v.units.join(", "))}</td></tr>`).join("");
 
+  cplViz();
   $("cplReasons").innerHTML = d.reasons.length ? d.reasons.map(r=>`<div class="act">
       <div class="row1"><h4>${esc(r.reason)}</h4><span class="chip ${r.confidence==="confirmed"?"up":""}">${esc(r.confidence)}</span></div>
       <p class="hint" style="margin:6px 0 0">${esc(r.detail)} <b>${fmt(r.invoices)} invoices · ${all(r.value)}</b>
@@ -2834,7 +2912,7 @@ function renderCompliance(){
       const follow = act ? `<span class="chip">${esc(act.status)}</span><div class="meta">${esc(act.owner||"")}</div>`
         : `<button class="mini" data-cpltrack="${n}" ${can("actions")?"":"disabled"}>Track</button>`;
       return `<tr><td class="name">${esc(i.invoice)}<div class="meta">${esc(i.reference)}${i.vendor_invoice?` · supplier ref ${esc(i.vendor_invoice)}`:""}</div></td>
-      <td>${esc(i.vendor)}</td><td class="meta">${esc(i.posted)}</td><td>${esc(i.unit)}</td>
+      <td><span data-pulse="sup|${esc(i.vendor)}" role="button" tabindex="0" style="text-decoration:underline dotted">${esc(i.vendor)}</span></td><td class="meta">${esc(i.posted)}</td><td>${esc(i.unit)}</td>
       <td class="meta">${esc(i.category)}</td><td class="meta">${esc(i.line_types.join(", ")||i.state)}</td>
       <td class="num"><b>${fmt(i.unlinked_value)}</b></td><td>${follow}</td></tr>`;}).join("");
   document.querySelectorAll("#cplList [data-cpltrack]").forEach(b => b.onclick = () => {
@@ -3714,8 +3792,8 @@ function renderPqLines(){
   $("pqLinesNote").textContent = `${fmt(rows.length)} lines · the largest impact first · prices per base unit, excluding VAT, after discounts`;
   const fl = {up: "Dearer", down: "Cheaper", contract: "Above contract", check: "To check"};
   $("pqLines").innerHTML = rows.length ? `<tr><th>Item</th><th>Supplier</th><th>Purchaser</th><th class="num">Last price</th><th class="num">Now</th><th class="num">Change</th><th class="num">Contract</th><th class="num">Quantity</th><th class="num">Impact</th><th class="num">A year</th></tr>` +
-    rows.slice(0, 300).map(x => `<tr><td><b>${esc(x.desc || x.item)}</b> <span class="meta">${esc(x.item)}</span><div class="meta">${esc(x.locations.slice(0, 4).join(", "))}${x.flag === "check" ? ` · <span class="warn">${fl.check}: over 4× apart</span>` : ""}</div></td>
-      <td>${esc(x.vendor_name)}</td><td class="meta">${esc(x.purchaser_name)}</td>
+    rows.slice(0, 300).map(x => `<tr data-pulse="pitem|${esc(x.item)}" tabindex="0" style="cursor:pointer"><td><b>${esc(x.desc || x.item)}</b> <span class="meta">${esc(x.item)}</span><div class="meta">${esc(x.locations.slice(0, 4).join(", "))}${x.flag === "check" ? ` · <span class="warn">${fl.check}: over 4× apart</span>` : ""}</div></td>
+      <td><span data-pulse="sup|${esc(x.vendor_name)}" role="button" tabindex="0" style="text-decoration:underline dotted">${esc(x.vendor_name)}</span></td><td class="meta">${esc(x.purchaser_name)}</td>
       <td class="num">${pqP(x.prev)}<div class="meta">${esc(x.prev_day || "")}${x.basis ? " · " + esc(x.basis) : ""}</div></td>
       <td class="num"><b>${pqP(x.price)}</b></td>
       <td class="num ${(x.d_prev || 0) > 0 ? "up" : "down"}">${x.d_prev == null ? "–" : (x.d_prev > 0 ? "+" : "") + x.d_prev.toFixed(1) + "%"}</td>
