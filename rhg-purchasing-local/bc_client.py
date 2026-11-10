@@ -443,10 +443,14 @@ class BCClient:
             heads = self._get_all(self._url(company, config.BC_PRICE_HEADER_ENTITY),
                                   {"$select": "Code,PriceIncludesVAT"})
         except BCError as exc:
-            return (lambda *_: 0.0), (f"Whether the price lists include VAT could not be read ({config.BC_PRICE_HEADER_ENTITY}: "
-                                      f"{str(exc)[:120]}); their prices are taken as excluding VAT.")
+            if not any(co == company for co, _ in config.BC_PRICE_LISTS_INCL_VAT):
+                return (lambda *_: 0.0), (f"Whether the price lists include VAT could not be read ({config.BC_PRICE_HEADER_ENTITY}: "
+                                          f"{str(exc)[:120]}); their prices are taken as excluding VAT.")
+            heads = []
         incl = {str(h.get("Code") or "") for h in heads if h.get("PriceIncludesVAT") in (True, "true", "True", 1)}
-        incl &= codes
+        forced = {code for co, code in config.BC_PRICE_LISTS_INCL_VAT if co == company} - incl
+        incl = (incl | forced) & codes
+        forced &= incl
         if not incl:
             return (lambda *_: 0.0), "The price lists exclude VAT."
         rates = self.vat_rates(company)
@@ -470,7 +474,10 @@ class BCClient:
         return vat_of, (f"Price list{'s' if len(incl) > 1 else ''} {', '.join(sorted(incl))} include{'' if len(incl) > 1 else 's'} VAT: "
                         f"each price is taken back to excluding VAT with the VAT % of the VAT Posting Setup for the "
                         f"vendor's VAT business group and the item's VAT product group, so it compares with what was "
-                        f"paid excluding VAT.")
+                        f"paid excluding VAT."
+                        + (f" {', '.join(sorted(forced))} {'are' if len(forced) > 1 else 'is'} taken as including VAT "
+                           f"by RHG's decision, although {'their cards' if len(forced) > 1 else 'its card'} in Business "
+                           f"Central {'do' if len(forced) > 1 else 'does'} not tick Price Includes VAT." if forced else ""))
 
     def _parse_price_rows(self, rows, entity, vat_of=None):
         keys = [k for k in rows[0].keys() if not k.startswith("@")]

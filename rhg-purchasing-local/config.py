@@ -53,6 +53,11 @@ BC_PRICE_ENTITIES = [e.strip() for e in get(
     "BC_PRICE_ENTITIES", "PriceListLines,PurchasePrices").split(",") if e.strip()]
 # the price list card (page 7016): its "Price Includes VAT" decides whether its prices are taken back to excluding VAT
 BC_PRICE_HEADER_ENTITY = get("BC_PRICE_HEADER_ENTITY", "PurchasePriceList")
+# price lists whose prices include VAT although their card in BC does not say so ("company|code", separated by ";"):
+# RKS P00001 holds the prices with VAT 18% (Geri, 2026-11-10). Ticking "Price Includes VAT" on the card in BC does the
+# same, and then the entry here is no longer needed.
+BC_PRICE_LISTS_INCL_VAT = {tuple(x.split("|", 1)) for x in get(
+    "BC_PRICE_LISTS_INCL_VAT", "RKS Revo Hospitality Group|P00001").split(";") if "|" in x}
 BC_ITEMS_ENTITY = get("BC_ITEMS_ENTITY", "PbItems")
 BC_ILE_ENTITY = get("BC_ILE_ENTITY", "ItemLedgerEntries")
 BC_LOCATIONS_ENTITY = get("BC_LOCATIONS_ENTITY", "NavLocations")
