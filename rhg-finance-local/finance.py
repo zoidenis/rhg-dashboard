@@ -436,7 +436,9 @@ BUCKETS = [("Not due", -10 ** 6, 0), ("1-30 days", 1, 30), ("31-60 days", 31, 60
 def _aging(rows, party_no, party_name, today, settings, kind):
     th = settings["thresholds"]
     buckets = {b[0]: 0.0 for b in BUCKETS}
-    parties = defaultdict(lambda: {"name": "", "total": 0.0, "overdue": 0.0, "oldest": None, "entries": 0})
+    parties = defaultdict(lambda: {"name": "", "total": 0.0, "overdue": 0.0, "oldest": None, "entries": 0,
+                                   "b": [0.0] * len(BUCKETS), "due7": 0.0, "due30": 0.0, "next_due": None,
+                                   "last_posting": None, "unapplied": 0, "unapplied_amt": 0.0, "currencies": set()})
     total = overdue = 0.0
     detail, exceptions = [], []
     for r in rows:
@@ -455,12 +457,32 @@ def _aging(rows, party_no, party_name, today, settings, kind):
         if days > 0:
             overdue += remaining
         p = parties[r.get(party_no)]
+        p["no"] = r.get(party_no) or ""
         p["name"] = r.get(party_name) or r.get(party_no)
         p["total"] += remaining
         p["entries"] += 1
+        for i, (_n, lo, hi) in enumerate(BUCKETS):
+            if lo <= days <= hi:
+                p["b"][i] += remaining
+                break
         if days > 0:
             p["overdue"] += remaining
             p["oldest"] = max(p["oldest"] or 0, days)
+        elif due:                                       # not yet due: what falls due soon, and when next
+            if days >= -7:
+                p["due7"] += remaining
+            if days >= -30:
+                p["due30"] += remaining
+            if remaining > 0 and (p["next_due"] is None or str(r.get("Due_Date")) < p["next_due"]):
+                p["next_due"] = str(r.get("Due_Date"))[:10]
+        pd = str(r.get("Posting_Date") or "")[:10]
+        if pd and (p["last_posting"] is None or pd > p["last_posting"]):
+            p["last_posting"] = pd
+        if remaining < 0:                               # a payment or credit note left open: to apply
+            p["unapplied"] += 1
+            p["unapplied_amt"] += remaining
+        if r.get("Currency_Code"):
+            p["currencies"].add(r.get("Currency_Code"))
         detail.append({"party": p["name"], "document": r.get("Document_No"), "type": r.get("Document_Type"),
                        "posting": r.get("Posting_Date"), "due": r.get("Due_Date"), "days": days,
                        "currency": r.get("Currency_Code") or "", "remaining": remaining})
@@ -488,8 +510,12 @@ def _aging(rows, party_no, party_name, today, settings, kind):
                 "party": p["name"], "days": days, "due": r.get("Due_Date"),
                 "next_action": "Apply the credit note or request a refund.",
                 "drill": {"kind": "ap", "key": ""}})
-    party_rows = sorted(({"party": v["name"], "total": v["total"], "overdue": v["overdue"],
-                          "oldest_days": v["oldest"], "entries": v["entries"]}
+    party_rows = sorted(({"party": v["name"], "no": v.get("no", ""), "total": round(v["total"], 2),
+                          "overdue": round(v["overdue"], 2), "oldest_days": v["oldest"], "entries": v["entries"],
+                          "buckets": [round(x, 2) for x in v["b"]], "due7": round(v["due7"], 2),
+                          "due30": round(v["due30"], 2), "next_due": v["next_due"], "last_posting": v["last_posting"],
+                          "unapplied": v["unapplied"], "unapplied_amt": round(v["unapplied_amt"], 2),
+                          "currencies": sorted(v["currencies"])}
                          for v in parties.values()), key=lambda x: -abs(x["total"]))
     detail.sort(key=lambda x: -abs(x["remaining"]))
     if party_rows and total and abs(total) >= th["materiality"]:
@@ -509,8 +535,33 @@ def _aging(rows, party_no, party_name, today, settings, kind):
                 "drill": {"kind": kind, "key": ""}})
     return {"total": total, "overdue": overdue, "current": total - overdue,
             "buckets": [{"label": b[0], "value": buckets[b[0]]} for b in BUCKETS],
-            "parties": party_rows[:40], "detail": detail[:400], "exceptions": exceptions,
+            # every party with an open balance (Kartela filters them on the screen); the entries of one on request
+            "parties": party_rows, "detail": detail[:400], "exceptions": exceptions,
+            "bucket_labels": [b[0] for b in BUCKETS],
             "concentration": (abs(party_rows[0]["total"]) / abs(total) * 100) if party_rows and total else None}
+
+
+def party_entries(rows, kind, no, today):
+    """The open entries of one supplier or customer (Kartela, a row opened): oldest due first."""
+    key = "Vendor_No" if kind == "ap" else "Customer_No"
+    out = []
+    for r in rows:
+        if str(r.get(key) or "") != str(no):
+            continue
+        remaining = _f(r.get("Remaining_Amt_LCY"))
+        if kind == "ap":
+            remaining = -remaining
+        if abs(remaining) < 0.01:
+            continue
+        original = _f(r.get("Original_Amt_LCY") or r.get("Amount_LCY"))
+        due = _d(r.get("Due_Date"))
+        out.append({"entry": r.get("Entry_No"), "document": r.get("Document_No") or "", "type": r.get("Document_Type") or "",
+                    "posting": str(r.get("Posting_Date") or "")[:10], "document_date": str(r.get("Document_Date") or "")[:10],
+                    "due": str(r.get("Due_Date") or "")[:10], "days": (today - due).days if due else None,
+                    "currency": r.get("Currency_Code") or "", "remaining": round(remaining, 2),
+                    "original": round(-original if kind == "ap" else original, 2)})
+    out.sort(key=lambda x: (x["due"] or "9999", x["posting"]))
+    return out
 
 
 def payables(rows, today, settings):

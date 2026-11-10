@@ -457,6 +457,22 @@ td.num,th.num{text-align:right}
 .sh-pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--down-bg);color:var(--down)}
 .sh-pill.inv{background:var(--up-bg);color:var(--up)}
 .sh-by-f{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.ka-age .bar{cursor:pointer;border-radius:8px;padding:2px 4px;margin:0 -4px}.ka-age .bar:hover{background:var(--bg)}.ka-age .bar.on{background:var(--bg);box-shadow:inset 3px 0 0 var(--accent)}
+.ka-chips{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
+.ka-chips button{font:inherit;font-size:12.5px;display:inline-flex;gap:6px;align-items:center;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.ka-chips button:hover{background:var(--bg)}.ka-chips button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.ka-chips button .n{font-size:11px;font-weight:700;opacity:.75}.ka-chips button:disabled{opacity:.45;cursor:default}
+.ka-f{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 8px}.ka-f label{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--sub)}
+.ka-f input,.ka-f select{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}.ka-f input{width:170px}.ka-f input[type=number]{width:120px}
+.ka-t th[data-k]{cursor:pointer;white-space:nowrap}.ka-t th[data-k]:hover{text-decoration:underline}.ka-t th.on::after{content:" \25BC";font-size:.7em}.ka-t th.on.asc::after{content:" \25B2"}
+.ka-t tr.ka-p{cursor:pointer}.ka-t tr.ka-p:hover td{background:var(--bg)}.ka-t tr.ka-p.open td{background:var(--bg)}
+.ka-t td.b0{color:var(--sub)}.ka-t td.bo{color:var(--up)}
+.ka-t .ka-d td{background:var(--bg);font-size:12.5px}.ka-t .ka-d table{width:100%}.ka-t .ka-d th{font-size:11.5px}
+.ka-t .ka-d .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
+.ka-pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:5px;vertical-align:1px;background:var(--bg);color:var(--sub);border:1px solid var(--line)}
+.ka-pill.r{background:var(--up-bg);color:var(--up);border-color:transparent}.ka-pill.w{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.ka-sel{position:sticky;bottom:0;z-index:4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px -4px 0;padding:10px 14px;border-radius:12px;background:#0c475e;color:#fff;box-shadow:0 -6px 20px rgba(0,0,0,.25)}
+.ka-sel[hidden]{display:none}.ka-sel b{font-size:15px}.ka-sel .mini{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.35)}
 .sh-save{position:sticky;top:0;z-index:3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 12px;border-radius:10px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--line)}
 .sh-save[hidden]{display:none}
 tr.sh-dirty td{background:var(--bg)}tr.sh-dirty input[data-f="waste_pct"]{border-color:var(--accent,#2f80ed)}
@@ -788,13 +804,25 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
   <section class="view" id="v-kartela">
     <div class="ov-tabs" id="kaTabs" role="tablist"><button data-t="ap" class="on" role="tab" aria-selected="true" aria-controls="kaAp">Accounts payable</button><button data-t="ar" role="tab" aria-selected="false" aria-controls="kaAr">Accounts receivable</button><button data-t="loc" role="tab" aria-selected="false" aria-controls="kaLoc">Location intelligence</button><button data-t="sup" role="tab" aria-selected="false" aria-controls="kaSup">Suppliers &amp; stock</button></div>
     <div id="kaAp" role="tabpanel"><div class="card"><div class="card-head"><div><h2>Accounts payable</h2><p class="hint" id="apHint"></p></div>
-    <button class="mini" data-drill="ap">Open entries</button></div>
-    <div class="money" id="apTotals"></div><div id="apBuckets"></div>
-    <div class="scroll" style="margin-top:12px"><table id="apTable"></table></div></div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp" type="button" id="apExp">Export ▾</button><button class="mini" data-drill="ap">Open entries</button></div></div>
+    <div class="money" id="apTotals"></div><div id="apBuckets" class="ka-age"></div>
+    <div class="ka-chips" id="apChips" role="toolbar" aria-label="Smart filters"></div>
+    <div class="ka-f"><label>Find<input id="apQ" placeholder="supplier name or number" autocomplete="off"></label>
+      <label>From<input id="apMin" type="number" min="0" step="any" placeholder="any amount"></label>
+      <label>Order<select id="apSort"><option value="total">largest balance</option><option value="overdue">most overdue</option><option value="oldest">oldest overdue</option><option value="due7">due in 7 days</option><option value="next_due">next due date</option><option value="name">name</option><option value="entries">most entries</option></select></label></div>
+    <p class="meta" id="apCount" style="margin:2px 0 8px"></p>
+    <div class="scroll" data-nosort><table id="apTable" class="ka-t"></table></div>
+    <div class="ka-sel" id="apSel" hidden></div></div></div>
     <div id="kaAr" role="tabpanel" hidden><div class="card"><div class="card-head"><div><h2>Accounts receivable</h2><p class="hint" id="arHint"></p></div>
-    <button class="mini" data-drill="ar">Open entries</button></div>
-    <div class="money" id="arTotals"></div><div id="arBuckets"></div>
-    <div class="scroll" style="margin-top:12px"><table id="arTable"></table></div></div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp" type="button" id="arExp">Export ▾</button><button class="mini" data-drill="ar">Open entries</button></div></div>
+    <div class="money" id="arTotals"></div><div id="arBuckets" class="ka-age"></div>
+    <div class="ka-chips" id="arChips" role="toolbar" aria-label="Smart filters"></div>
+    <div class="ka-f"><label>Find<input id="arQ" placeholder="customer name or number" autocomplete="off"></label>
+      <label>From<input id="arMin" type="number" min="0" step="any" placeholder="any amount"></label>
+      <label>Order<select id="arSort"><option value="total">largest balance</option><option value="overdue">most overdue</option><option value="oldest">oldest overdue</option><option value="due7">due in 7 days</option><option value="next_due">next due date</option><option value="name">name</option><option value="entries">most entries</option></select></label></div>
+    <p class="meta" id="arCount" style="margin:2px 0 8px"></p>
+    <div class="scroll" data-nosort><table id="arTable" class="ka-t"></table></div>
+    <div class="ka-sel" id="arSel" hidden></div></div></div>
     <div id="kaSup" role="tabpanel" hidden>
       <div class="card">
         <div class="card-head"><div><h2>Suppliers: what we owe and their stock on hand</h2>
@@ -2717,21 +2745,142 @@ function renderCash(){
   document.querySelectorAll("#cashTable .acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
 }
 
+// ---------- Kartela · Accounts payable / receivable: every open party, smart filters, the entries of one, a selection
+const KA = {ap: {chip: "all", bucket: -1, sort: "total", asc: false, open: "", ent: {}, sel: new Map()},
+            ar: {chip: "all", bucket: -1, sort: "total", asc: false, open: "", ent: {}, sel: new Map()}};
+const KA_AGE = ["Not due", "1–30", "31–60", "61–90", "90+"];
+function kaWords(kind){
+  return kind === "ap"
+    ? {who: "supplier", whos: "suppliers", Who: "Supplier", debit: "In debit", debitT: "The supplier owes us: payments or credit notes above the invoices", due7: "To pay in 7 days", plan: "Payment plan", label: "payable"}
+    : {who: "customer", whos: "customers", Who: "Customer", debit: "In credit", debitT: "We owe the customer: payments or credit notes above the invoices", due7: "To collect in 7 days", plan: "Collection list", label: "receivable"};
+}
+function kaChipDefs(kind){
+  const th = data.settings.thresholds, W = kaWords(kind), crit = kind === "ap" ? th.ap_critical_days : th.ar_critical_days;
+  const P = data[kind === "ap" ? "payables" : "receivables"].parties || [];
+  const tot = P.reduce((a, p) => a + Math.max(0, p.total), 0);
+  let run = 0; const big = new Set();
+  [...P].filter(p => p.total > 0).sort((a, b) => b.total - a.total).forEach(p => { if (run < tot * 0.8) big.add(p.no); run += p.total; });
+  const stale = new Date(Date.now() - 180 * 864e5).toISOString().slice(0, 10);
+  return [
+    ["all", "All open", "Every " + W.who + " with an open balance", () => true],
+    ["overdue", "Overdue", "With an amount past its due date", p => p.overdue > 0.5],
+    ["critical", `Over ${fmt(crit)} days`, `Something overdue more than ${fmt(crit)} days (Settings → thresholds)`, p => (p.oldest_days || 0) > crit],
+    ["due7", W.due7, "Falls due in the next seven days", p => p.due7 > 0.5],
+    ["notdue", "Not yet due", "Nothing overdue", p => p.overdue <= 0.5 && p.total > 0.5],
+    ["big", "80% of the balance", "The fewest " + W.whos + " that make up 80% of what is open", p => big.has(p.no)],
+    ["apply", "To apply", "A payment or credit note left open next to open invoices: apply it in Business Central", p => p.unapplied > 0 && p.entries > p.unapplied && p.total > 0],
+    ["debit", W.debit, W.debitT, p => p.total < -0.5],
+    ["stale", "No posting in 180 days", "An old balance nothing has moved since: to clear or write off", p => p.last_posting && p.last_posting < stale]];
+}
+function kaRows(kind){
+  const d = data[kind === "ap" ? "payables" : "receivables"], S = KA[kind];
+  const defs = kaChipDefs(kind), chip = (defs.find(c => c[0] === S.chip) || defs[0])[3];
+  const q = ($(kind + "Q").value || "").trim().toLowerCase(), min = parseFloat($(kind + "Min").value);
+  const rows = (d.parties || []).filter(p => chip(p) && (S.bucket < 0 || Math.abs((p.buckets || [])[S.bucket] || 0) > 0.5)
+    && (!q || (p.party + " " + p.no).toLowerCase().includes(q)) && (isNaN(min) || Math.abs(p.total) >= min));
+  const key = {total: p => p.total, overdue: p => p.overdue, oldest: p => p.oldest_days || 0, due7: p => p.due7,
+    next_due: p => p.next_due ? -Date.parse(p.next_due) : -Infinity, entries: p => p.entries}[S.sort];
+  rows.sort(S.sort === "name" ? (a, b) => a.party.localeCompare(b.party) * (S.asc ? -1 : 1) : (a, b) => (key(b) - key(a)) * (S.asc ? -1 : 1));
+  return rows;
+}
 function renderLedger(kind){
-  const d = kind==="ap" ? data.payables : data.receivables;
-  const label = kind==="ap" ? "payable" : "receivable";
-  $(kind+"Hint").textContent = `Open entries at ${data.meta.checked_at.slice(0,10)} · concentration on the largest ${kind==="ap"?"supplier":"customer"}: ${d.concentration==null?"–":fmt(d.concentration,1)+"%"}`;
-  $(kind+"Totals").innerHTML = `<div>Total ${label}s<b>${cur(d.total)}</b></div><div>Not yet due<b>${cur(d.current)}</b></div>
+  const d = kind==="ap" ? data.payables : data.receivables, S = KA[kind], W = kaWords(kind);
+  if (!$(kind + "Q")) return;
+  $(kind+"Hint").textContent = `Open entries at ${data.meta.checked_at.slice(0,10)} · ${fmt((d.parties || []).length)} ${W.whos} with an open balance · concentration on the largest ${W.who}: ${d.concentration==null?"–":fmt(d.concentration,1)+"%"}`;
+  $(kind+"Totals").innerHTML = `<div>Total ${W.label}s<b>${cur(d.total)}</b></div><div>Not yet due<b>${cur(d.current)}</b></div>
     <div>Overdue<b class="up">${cur(d.overdue)}</b></div>`;
   const max = Math.max(1, ...d.buckets.map(b=>Math.abs(b.value)));
-  $(kind+"Buckets").innerHTML = d.buckets.map(b=>`<div class="bar"><div>${esc(b.label)}</div>
+  $(kind+"Buckets").innerHTML = d.buckets.map((b, i)=>`<div class="bar${S.bucket === i ? " on" : ""}" data-b="${i}" role="button" tabindex="0" title="Show the ${W.whos} with an amount ${i ? esc(b.label) + " overdue" : "not yet due"}"><div>${esc(b.label)}</div>
     <div class="track"><div class="fill" style="width:${Math.abs(b.value)/max*100}%"></div></div>
     <div class="num" style="text-align:right;font-weight:700">${fmt(b.value)}</div></div>`).join("");
-  $(kind+"Table").innerHTML = `<tr><th>${kind==="ap"?"Supplier":"Customer"}</th><th class="num">Total</th><th class="num">Overdue</th><th class="num">Oldest (days)</th><th class="num">Entries</th></tr>` +
-    (d.parties.length ? d.parties.map(p=>`<tr><td class="name">${esc(p.party)}</td><td class="num"><b>${fmt(p.total)}</b></td>
-      <td class="num ${p.overdue?"up":""}">${fmt(p.overdue)}</td><td class="num">${p.oldest_days??"–"}</td><td class="num">${p.entries}</td></tr>`).join("")
-      : `<tr><td colspan="5" class="empty">No open entries.</td></tr>`);
+  $(kind + "Buckets").querySelectorAll("[data-b]").forEach(el => { const go = () => { S.bucket = S.bucket === +el.dataset.b ? -1 : +el.dataset.b; S.open = ""; renderLedger(kind); };
+    el.onclick = go; el.onkeydown = ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } }; });
+  const P = d.parties || [], defs = kaChipDefs(kind);
+  $(kind + "Chips").innerHTML = defs.map(([k, l, t, f]) => { const xs = P.filter(f), n = xs.length;
+    return `<button type="button" data-c="${k}" class="${S.chip === k ? "on" : ""}" title="${esc(t)} · ${fmt(xs.reduce((a, p) => a + p.total, 0))}" aria-pressed="${S.chip === k}"${n || k === "all" ? "" : " disabled"}>${esc(l)}<span class="n">${fmt(n)}</span></button>`; }).join("");
+  $(kind + "Chips").querySelectorAll("[data-c]").forEach(b => b.onclick = () => { S.chip = b.dataset.c; S.open = ""; renderLedger(kind); });
+  const rows = kaRows(kind), sum = k => rows.reduce((a, p) => a + (p[k] || 0), 0);
+  $(kind + "Count").innerHTML = `<b>${fmt(rows.length)}</b> ${rows.length === 1 ? W.who : W.whos} · total <b>${fmt(sum("total"))}</b> · overdue <b class="up">${fmt(sum("overdue"))}</b> · ${esc(W.due7.toLowerCase())} <b>${fmt(sum("due7"))}</b>` +
+    (S.bucket >= 0 ? ` · <span class="ka-pill">${esc(d.buckets[S.bucket].label)} <a href="#" data-clr style="color:inherit">×</a></span>` : "");
+  const clr = $(kind + "Count").querySelector("[data-clr]"); if (clr) clr.onclick = ev => { ev.preventDefault(); S.bucket = -1; renderLedger(kind); };
+  const H = (k, l, n) => `<th${n ? ' class="num' + (S.sort === k ? " on" + (S.asc ? " asc" : "") : "") + '"' : (S.sort === k ? ' class="on' + (S.asc ? " asc" : "") + '"' : "")}${k ? ` data-k="${k}"` : ""}>${l}</th>`;
+  $(kind+"Table").innerHTML = `<tr>${H("name", W.Who)}${H("total", "Total", 1)}${KA_AGE.map((l, i) => `<th class="num">${l}</th>`).join("")}${H("oldest", "Oldest (days)", 1)}${H("due7", W.due7, 1)}${H("next_due", "Next due", 1)}${H("entries", "Entries", 1)}</tr>` +
+    (rows.length ? rows.map(p => { const o = S.open === p.no, bk = p.buckets || [];
+      return `<tr class="ka-p${o ? " open" : ""}" data-p="${esc(p.no)}" aria-expanded="${o}"><td class="name"><b>${esc(p.party)}</b> <span class="meta">${esc(p.no)}</span>${p.total < -0.5 ? `<span class="ka-pill w" title="${esc(W.debitT)}">${esc(W.debit.toLowerCase())}</span>` : ""}${p.unapplied && p.entries > p.unapplied && p.total > 0 ? `<span class="ka-pill" title="Payments or credit notes left open: ${fmt(p.unapplied_amt)}">to apply ${fmt(p.unapplied)}</span>` : ""}${(p.currencies || []).length ? `<span class="ka-pill">${esc(p.currencies.join(" "))}</span>` : ""}</td>
+        <td class="num"><b>${fmt(p.total)}</b></td>${bk.map((v, i) => `<td class="num ${Math.abs(v) < 0.5 ? "b0" : i ? "bo" : ""}">${Math.abs(v) < 0.5 ? "–" : fmt(v)}</td>`).join("")}
+        <td class="num">${p.oldest_days ?? "–"}</td><td class="num">${p.due7 > 0.5 ? fmt(p.due7) : "–"}</td><td class="num">${esc(p.next_due || "–")}</td><td class="num">${fmt(p.entries)}</td></tr>` +
+        (o ? `<tr class="ka-d"><td colspan="12">${kaDetail(kind, p)}</td></tr>` : ""); }).join("")
+      : `<tr><td colspan="12" class="empty">No ${esc(W.who)} matches these filters.</td></tr>`);
+  $(kind + "Table").querySelectorAll("th[data-k]").forEach(th => th.onclick = () => { const k = th.dataset.k; if (S.sort === k) S.asc = !S.asc; else { S.sort = k; S.asc = k === "name"; } $(kind + "Sort").value = k; renderLedger(kind); });
+  $(kind + "Table").querySelectorAll("tr.ka-p").forEach(tr => tr.onclick = ev => { if (ev.target.closest("a,button,input")) return; S.open = S.open === tr.dataset.p ? "" : tr.dataset.p; renderLedger(kind); if (S.open && !S.ent[S.open]) kaLoad(kind, S.open); });
+  kaWire(kind); kaSelBar(kind);
 }
+function kaDetail(kind, p){
+  const S = KA[kind], E = S.ent[p.no], W = kaWords(kind);
+  if (!E) return `<p class="meta">Reading the open entries of ${esc(p.party)}…</p>`;
+  if (E.error) return `<p class="meta">Could not read: ${esc(E.error)}</p>`;
+  const sel = e => S.sel.has(String(e.entry));
+  return `<div class="acts"><span class="meta">${fmt(E.rows.length)} open entries of ${esc(p.party)} · tick the ones for the ${esc(W.plan.toLowerCase())}:</span>
+      <button class="mini" type="button" data-pick="overdue">Overdue</button><button class="mini" type="button" data-pick="due7">Due in 7 days</button><button class="mini" type="button" data-pick="all">All</button><button class="mini" type="button" data-pick="none">None</button></div>
+    <div class="scroll"><table><tr><th></th><th>Document</th><th>Type</th><th>Posted</th><th>Due</th><th class="num">Days</th><th class="num">Original</th><th class="num">Open</th></tr>` +
+    E.rows.map(e => `<tr><td><input type="checkbox" data-e="${esc(String(e.entry))}"${sel(e) ? " checked" : ""} aria-label="Select ${esc(e.document)}"></td><td><b>${esc(e.document)}</b></td><td>${esc(e.type)}</td><td>${esc(e.posting)}</td><td>${esc(e.due)}</td>
+      <td class="num ${e.days > 0 ? "up" : ""}">${e.days == null ? "–" : e.days > 0 ? fmt(e.days) + " late" : e.days === 0 ? "today" : "in " + fmt(-e.days)}</td><td class="num">${fmt(e.original)}</td><td class="num"><b class="${e.remaining < 0 ? "up" : ""}">${fmt(e.remaining)}</b></td></tr>`).join("") + `</table></div>`;
+}
+async function kaLoad(kind, no){
+  const S = KA[kind];
+  try {
+    const j = await readJSON(await fetch("/api/kartela/entries?" + new URLSearchParams({kind, party: no, company: $("company").value || ""})));
+    if (j.error) throw new Error(j.error);
+    S.ent[no] = {rows: j.entries};
+  } catch (e) { S.ent[no] = {error: e.message}; }
+  if (S.open === no) renderLedger(kind);
+}
+function kaWire(kind){
+  const S = KA[kind], p = (data[kind === "ap" ? "payables" : "receivables"].parties || []).find(x => x.no === S.open), E = S.ent[S.open];
+  if (!p || !E || !E.rows) return;
+  const put = (e, on) => { const k = String(e.entry); if (on) S.sel.set(k, Object.assign({party: p.party, no: p.no}, e)); else S.sel.delete(k); };
+  $(kind + "Table").querySelectorAll("input[data-e]").forEach(cb => cb.onchange = () => { put(E.rows.find(e => String(e.entry) === cb.dataset.e), cb.checked); kaSelBar(kind); });
+  $(kind + "Table").querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { const k = b.dataset.pick;
+    E.rows.forEach(e => put(e, k === "all" || (k === "overdue" && e.days > 0 && e.remaining > 0) || (k === "due7" && e.days != null && e.days <= 0 && e.days >= -7 && e.remaining > 0)));
+    renderLedger(kind); });
+}
+function kaSelBar(kind){
+  const S = KA[kind], W = kaWords(kind), bar = $(kind + "Sel"), xs = [...S.sel.values()];
+  bar.hidden = !xs.length;
+  if (!xs.length) return;
+  const tot = xs.reduce((a, e) => a + e.remaining, 0), od = xs.filter(e => e.days > 0).reduce((a, e) => a + e.remaining, 0);
+  bar.innerHTML = `<span>${esc(W.plan)}:</span><b>${fmt(tot)}</b><span>${fmt(xs.length)} documents · ${fmt(new Set(xs.map(e => e.no)).size)} ${new Set(xs.map(e => e.no)).size === 1 ? W.who : W.whos} · overdue ${fmt(od)}</span>
+    <span style="flex:1"></span><button class="mini exp" type="button" id="${kind}SelExp">Export ▾</button><button class="mini" type="button" id="${kind}SelClr">Clear</button>`;
+  $(kind + "SelClr").onclick = () => { S.sel.clear(); renderLedger(kind); };
+  $(kind + "SelExp").onclick = () => kaExport(kind, true);
+}
+function kaExport(kind, selection){
+  const W = kaWords(kind), co = $("company").value || "", day = data.meta.checked_at.slice(0, 10), S = KA[kind];
+  if (selection) {
+    const xs = [...S.sel.values()].sort((a, b) => a.party.localeCompare(b.party) || (a.due || "").localeCompare(b.due || ""));
+    return xlsxTable(`RHG ${co} ${W.plan} ${day}`, [{title: W.plan, formats: ["text", "text", "text", "text", "date", "date", "int", "num", "num"], widths: [30, 10, 16, 14, 11, 11, 8, 14, 14],
+      header: [W.Who, "No.", "Document", "Type", "Posted", "Due", "Days late", "Original", "Open"],
+      rows: xs.map(e => [e.party, e.no, e.document, e.type, e.posting, e.due, e.days > 0 ? e.days : null, e.original, e.remaining])
+        .concat([["Total", "", "", "", "", "", null, null, xs.reduce((a, e) => a + e.remaining, 0)]])}],
+      [`${W.plan} · ${co} · open entries at ${day}, read from Business Central (read only).`, `${xs.length} documents chosen on Kartela.`]);
+  }
+  const rows = kaRows(kind), d = data[kind === "ap" ? "payables" : "receivables"], defs = kaChipDefs(kind);
+  const chip = (defs.find(c => c[0] === S.chip) || defs[0])[1];
+  return xlsxTable(`RHG ${co} ${kind === "ap" ? "accounts payable" : "accounts receivable"} ${day}`, [{title: kind === "ap" ? "Payables" : "Receivables",
+    formats: ["text", "text", "num", "num", "num", "num", "num", "num", "int", "num", "date", "int", "text"], widths: [34, 10],
+    header: [W.Who, "No.", "Total", ...d.buckets.map(b => b.label), "Oldest (days)", W.due7, "Next due", "Entries", "Flags"],
+    rows: rows.map(p => [p.party, p.no, p.total, ...(p.buckets || []), p.oldest_days, p.due7, p.next_due, p.entries,
+      [p.total < -0.5 ? W.debit.toLowerCase() : "", p.unapplied && p.entries > p.unapplied && p.total > 0 ? `to apply ${p.unapplied}` : ""].filter(Boolean).join(", ")])}],
+    [`${kind === "ap" ? "Accounts payable" : "Accounts receivable"} · ${co} · open entries at ${day}, read from Business Central (read only).`,
+     `Filters: ${chip}${S.bucket >= 0 ? " · " + d.buckets[S.bucket].label : ""}${$(kind + "Q").value ? ` · "${$(kind + "Q").value}"` : ""}${$(kind + "Min").value ? " · from " + $(kind + "Min").value : ""} · ${rows.length} ${W.whos}.`]);
+}
+["ap", "ar"].forEach(kind => {
+  $(kind + "Q").oninput = () => { KA[kind].open = ""; renderLedger(kind); };
+  $(kind + "Min").oninput = () => { KA[kind].open = ""; renderLedger(kind); };
+  $(kind + "Sort").onchange = () => { KA[kind].sort = $(kind + "Sort").value; KA[kind].asc = KA[kind].sort === "name"; renderLedger(kind); };
+  $(kind + "Exp").onclick = () => kaExport(kind, false);
+});
+$("company").addEventListener("change", () => ["ap", "ar"].forEach(k => { KA[k].ent = {}; KA[k].open = ""; KA[k].sel.clear(); }));
 
 async function loadGL(){
   $("glNote").textContent = "Reading the ledger…";

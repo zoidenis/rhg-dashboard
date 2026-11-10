@@ -2822,6 +2822,19 @@ class Handler(BaseHTTPRequestHandler):
                            else html.escape(job.get("detail") or ""))
                     self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
                                      f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path == "/api/kartela/entries":
+                # Kartela: the open entries of one supplier or customer, when its row is opened
+                kind = q.get("kind")
+                if kind not in ("ap", "ar"):
+                    self._send(400, {"error": "kind is ap or ar."})
+                    return
+                if not auth.can(user, f"finance.s.kartela.{kind}"):
+                    self._send(403, {"error": "Your role does not include this screen."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                rows = client.open_vendor_entries(company) if kind == "ap" else client.open_customer_entries(company)
+                self._send(200, {"kind": kind, "company": company, "party": q.get("party") or "",
+                                 "entries": finance.party_entries(rows, kind, q.get("party") or "", date.today())})
             elif url.path == "/api/stockstop-report":
                 self._send(200, salestop_report.status(ssrep))
             elif url.path in ("/api/stockstop-report/job", "/api/stockstop-report/preview"):
