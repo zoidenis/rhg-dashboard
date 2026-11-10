@@ -414,12 +414,16 @@ def analyse(val, count, master):
         else:
             d = f["counted"] - bq
             line["status"] = "match" if abs(d) <= TOL else "short" if d < 0 else "surplus"
+        # the unit cost the item card holds in BC today, and the difference valued at it (beside the average cost)
+        card_cost = _f((card or {}).get("Unit_Cost")) if card else None
+        line["card_cost"] = round(card_cost, 4) if card_cost is not None else None
         if f and f.get("counted") is not None:
             line["diff_qty"] = round(f["counted"] - bq, 4)
             line["diff_value"] = round(line["diff_qty"] * cost, 2)
             line["counted_value"] = round(f["counted"] * cost, 2)
+            line["card_diff_value"] = round(line["diff_qty"] * card_cost, 2) if card_cost is not None else None
         else:
-            line["diff_qty"] = line["diff_value"] = line["counted_value"] = None
+            line["diff_qty"] = line["diff_value"] = line["counted_value"] = line["card_diff_value"] = None
         if f and line["unit"] and line["form_unit"] and _norm(line["unit"]) != _norm(line["form_unit"]):
             line["flags"].append("unit")
         if f and f.get("system") is not None and abs(f["system"] - bq) > 0.001:
@@ -457,6 +461,10 @@ def analyse(val, count, master):
             net_value=round(sum(x["diff_value"] for x in cnt), 2),
             shortage_value=round(sum(x["diff_value"] for x in cnt if x["diff_value"] < 0), 2),
             surplus_value=round(sum(x["diff_value"] for x in cnt if x["diff_value"] > 0), 2),
+            card_net_value=round(sum(x["card_diff_value"] or 0 for x in cnt), 2),
+            card_shortage_value=round(sum(x["card_diff_value"] for x in cnt if (x["card_diff_value"] or 0) < 0), 2),
+            card_surplus_value=round(sum(x["card_diff_value"] for x in cnt if (x["card_diff_value"] or 0) > 0), 2),
+            n_no_card_cost=sum(1 for x in cnt if x["diff_qty"] and not x["card_cost"]),
             not_counted_value=round(sum(x["bc_value"] for x in lines if x["status"] in ("not_counted", "not_on_form")), 2),
             **{f"n_{k}": sum(1 for x in lines if x["status"] == k) for k in STATUSES},
             n_unit=sum(1 for x in lines if "unit" in x["flags"]),
@@ -468,7 +476,7 @@ def analyse(val, count, master):
         k = x["category"] or x["form_category"] or "(none)"
         c = cats.setdefault(k, {"category": k, "opening_value": 0.0, "in_value": 0.0, "out_value": 0.0,
                                 "bc_value": 0.0, "counted_value": 0.0, "shortage": 0.0, "surplus": 0.0, "net": 0.0,
-                                "lines": 0})
+                                "card_net": 0.0, "lines": 0})
         c["bc_value"] += x["bc_value"]
         for f in ("opening_value", "in_value", "out_value"):
             c[f] += x[f]
@@ -478,6 +486,7 @@ def analyse(val, count, master):
             if x["status"] == "cutoff":
                 continue
             c["net"] += x["diff_value"]
+            c["card_net"] += x["card_diff_value"] or 0
             c["shortage" if x["diff_value"] < 0 else "surplus"] += x["diff_value"]
     lines.sort(key=lambda x: (x["status"] == "cutoff", -(abs(x["diff_value"]) if x["diff_value"] is not None else -1),
                               -abs(x["bc_value"])))
@@ -559,14 +568,14 @@ def render_xlsx(r):
     sheet(ws, ["Item", "Description", "Category", "Unit (BC)", "Unit (form)", "Opening qty", "Increases qty",
                "Decreases qty", "BC closing qty", "Form system qty", "Counted", "Difference qty", "Average cost",
                "Cost from", "Opening value", "Increases value", "Decreases value", "BC closing value",
-               "Difference value", "Status", "Checks", "BC entries after the form", "Comment"],
+               "Difference value", "Unit cost (item card)", "Difference value at the item card's unit cost", "Status", "Checks", "BC entries after the form", "Comment"],
           [[x["item"], x["description"], x["category"] or x["form_category"], x["unit"], x["form_unit"],
             x["opening_qty"], x["in_qty"], x["out_qty"], x["bc_qty"], x["form_system"], x["counted"], x["diff_qty"],
             x["cost"], x["cost_source"], x["opening_value"], x["in_value"], x["out_value"], x["bc_value"],
-            x["diff_value"], STATUSES.get(x["status"], ""), ", ".join(FLAGS.get(f, f) for f in x["flags"]),
+            x["diff_value"], x.get("card_cost"), x.get("card_diff_value"), STATUSES.get(x["status"], ""), ", ".join(FLAGS.get(f, f) for f in x["flags"]),
             "; ".join(f"{e['type']} {e['document']} {e['date']} {e['qty']:g}" for e in x.get("late") or []),
             x["comment"]] for x in r["lines"]],
-          [12, 40, 16, 9, 9, 12, 12, 12, 12, 12, 11, 12, 12, 14, 14, 14, 14, 15, 14, 18, 14, 40, 40])
+          [12, 40, 16, 9, 9, 12, 12, 12, 12, 12, 11, 12, 12, 14, 14, 14, 14, 15, 14, 13, 18, 18, 14, 40, 40])
     v = wb.create_sheet("Inventory valuation")
     sheet(v, ["Item", "Description", "Category", "Unit", "Opening qty", "Opening value", "Increases qty",
               "Increases value", "Decreases qty", "Decreases value", "Closing qty", "Closing value", "Average cost"],
@@ -581,10 +590,10 @@ def render_xlsx(r):
           [12, 40, 9, 11, 20, 12, 14])
     c = wb.create_sheet("By category")
     sheet(c, ["Category", "Lines", "Opening value", "Increases value", "Decreases value", "BC closing value",
-              "Counted value", "Shortages", "Surpluses", "Net difference"],
+              "Counted value", "Shortages", "Surpluses", "Net difference", "Net difference at the item card's unit cost"],
           [[x["category"], x["lines"], x.get("opening_value"), x.get("in_value"), x.get("out_value"), x["bc_value"],
-            x["counted_value"], x["shortage"], x["surplus"], x["net"]] for x in r["categories"]],
-          [24, 8, 16, 16, 16, 16, 16, 14, 14, 16])
+            x["counted_value"], x["shortage"], x["surplus"], x["net"], x.get("card_net")] for x in r["categories"]],
+          [24, 8, 16, 16, 16, 16, 16, 14, 14, 16, 20])
     rd = wb.create_sheet("Read me")
     for t in (f"Stock count analysis · {r['company']} · {r['location']} · {r['from']} to {r['to']}",
               f"Read from Business Central at {r['read_at']} (read only).",
@@ -599,6 +608,8 @@ def render_xlsx(r):
               "Unit Cost (column Cost from).",
               "Difference = counted − BC closing qty; value = difference × average cost. A blank count is not counted, "
               "not zero.",
+              "Unit cost (item card) = the Unit Cost on the item card in BC when the analysis was read; the difference "
+              "valued at it is shown beside the value at the average cost of the month end.",
               "Posted after the form: counted = the form's system stock (Gjendje Finance), but BC changed after the form "
               "was printed with documents dated in the month (named in BC entries after the form). These lines are "
               "kept out of the shortages, surpluses and net difference: check the cut-off of those documents.",
