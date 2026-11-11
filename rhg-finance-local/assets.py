@@ -1,8 +1,7 @@
 """Fixed assets: the postings of the period (the full register is faregister.py).
 
 The FA ledger holds hundreds of thousands of entries across the years, so only
-the selected period is read. Net book value per asset needs the full history and
-the asset card, neither of which is published; that stays under Data quality & reconciliation.
+the selected period is read here; the register (faregister.py) has every asset from the FA ledger summary.
 """
 from collections import defaultdict
 
@@ -86,6 +85,6 @@ def build(rows, settings, period):
         "by_type": sorted(({"type": k, "amount": v} for k, v in by_type.items()), key=lambda x: -abs(x["amount"])),
         "classes": classes[:25], "assets": assets[:60], "entries": entries[:300],
         "exceptions": exceptions,
-        "note": "Only the selected period is read from the FA ledger. Net book value, useful life and "
-                "custodian need the asset card, which is not published; see Data quality & reconciliation.",
+        "note": "The FA ledger entries of the dates chosen, as posted. Every asset with its cost, depreciation and "
+                "net book value is in the register above.",
     }
