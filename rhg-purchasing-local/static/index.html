@@ -638,20 +638,24 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 
   <section class="view" id="v-contracts">
     <div class="kpis" id="ctKpis"></div>
-    <div class="card" style="margin-bottom:16px"><p class="hint" id="ctDefs"></p></div>
+    <div class="card" style="margin-bottom:16px" id="ctDefsCard"><details class="pz-fold" style="margin:0"><summary>How these figures are built: coverage, adherence, limits, VAT</summary><p class="hint" id="ctDefs" style="margin:8px 0 0"></p></details></div>
     <div class="grid">
-      <div class="card"><h2>By supplier</h2><p class="hint">Ranked by what was bought from them in this period. Coverage is the share of that spend with an agreed price behind it.</p>
+      <div class="card"><h2>By supplier</h2><p class="hint">Ranked by what was bought from them in this period: the supplier that invoiced the item. Coverage is the share of that spend with an agreed price behind it. Click a supplier for its items.</p>
         <div id="ctSupBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctSup"></table></div></details></div>
-      <div class="card"><h2>By category</h2><p class="hint">Where the agreed prices reach, and where buying happens without one.</p>
+      <div class="card"><h2>By category</h2><p class="hint">Where the agreed prices reach, and where buying happens without one. Click a category for its items.</p>
         <div id="ctCatBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctCat"></table></div></details></div>
     </div>
     <div class="grid">
-      <div class="card"><h2>Largest spend with no agreed price</h2><p class="hint" id="ctUncNote"></p>
+      <div class="card"><div class="card-head"><div><h2>Largest spend with no agreed price</h2><p class="hint" id="ctUncNote"></p></div>
+          <button class="mini" data-pulse="ctlist|none" style="white-space:nowrap">All of them</button></div>
+        <div id="ctUncBars"></div>
         <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctUnc"></table></div></details></div>
-      <div class="card"><h2>Largest gaps against the agreed price</h2>
-        <p class="hint">Summary only. The item-by-item comparison lives on the Comparisons screen.</p>
+      <div class="card"><div class="card-head"><div><h2>Largest gaps against the agreed price</h2>
+          <p class="hint">What was paid above the agreed price beyond the tolerance, by its value on the period's quantity. Click an item for its prices.</p></div>
+          <button class="mini" data-pulse="ctlist|above" style="white-space:nowrap">All of them</button></div>
+        <div id="ctGapBars"></div>
         <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="ctGap"></table></div></details>
-        <button class="mini" style="margin-top:10px" data-goto2="Comparisons">Open Comparisons</button></div>
+        <button class="mini" style="margin-top:10px" id="ctToCompare">Item by item: Comparisons</button></div>
     </div>
   </section>
 
@@ -2733,18 +2737,19 @@ function renderContracts(){
     return;
   }
   const k = c.kpis;
+  const ck = (kind, html) => html.replace('<div class="card kpi">', `<div class="card kpi clickable" data-pulse="ctlist|${kind}" role="button" tabindex="0">`);
   $("ctKpis").innerHTML = [
-    stockCard("Spend under an agreed price", fmt(k.coverage_pct,1) + "%",
+    ck("all", stockCard("Spend under an agreed price", fmt(k.coverage_pct,1) + "%",
       [`${all(k.covered_cost)} of ${all(k.total_cost)} bought`,
        `${fmt(k.items_covered)} of ${fmt(k.items_bought)} items bought carry a price`,
-       `${fmt(k.agreed_items)} items priced in the list`]),
-    stockCard("Bought with no agreed price", all(k.uncovered_cost),
-      [`${fmt(100 - k.coverage_pct,1)}% of the period`, "Nothing to compare these purchases against"]),
-    stockCard("Paid above the agreed price", all(k.above_value),
-      [`${fmt(k.above_pct,1)}% of the covered spend`, `Outside a ${fmt(k.tolerance,0)}% tolerance`,
-       "Measured on the period's average unit cost"]),
-    stockCard("Paid below the agreed price", all(Math.abs(k.below_value)),
-      ["Usually a discount or a price that has fallen", "Worth updating the list to the real price"]),
+       `${fmt(k.agreed_items)} items priced in the list`])),
+    ck("none", stockCard("Bought with no agreed price", all(k.uncovered_cost),
+      [`${fmt(100 - k.coverage_pct,1)}% of the period · ${fmt(k.items_bought - k.items_covered)} items`, "Nothing to compare these purchases against"])),
+    ck("above", stockCard("Paid above the agreed price", all(k.above_value),
+      [`${fmt(k.above_pct,1)}% of the covered spend · ${fmt((c.items || []).filter(x => x.status === "above").length)} items`, `Outside a ${fmt(k.tolerance,0)}% tolerance`,
+       "Measured on the period's average unit cost"])),
+    ck("below", stockCard("Paid below the agreed price", all(Math.abs(k.below_value)),
+      [`${fmt((c.items || []).filter(x => x.status === "below").length)} items`, "Usually a discount or a price that has fallen", "Worth updating the list to the real price"])),
   ].join("");
   $("ctDefs").innerHTML = `<b>Coverage:</b> ${esc(c.definitions.coverage)}<br>`
     + `<b>Adherence:</b> ${esc(c.definitions.adherence)}<br><b>Limits:</b> ${esc(c.definitions.limits)}`
@@ -2771,10 +2776,7 @@ function renderContracts(){
       <td class="num">${fmt(g.agreed,2)}</td><td class="num">${fmt(g.paid_unit,2)}</td>
       <td class="num up">${fmt(g.pct,1)}%</td><td class="num"><b>${fmt(g.gap_value)}</b></td></tr>`).join("")
       : `<tr><td colspan="5" class="empty">Nothing was paid above the agreed price beyond the tolerance.</td></tr>`);
-  document.querySelectorAll("[data-goto2]").forEach(b => b.onclick = () => {
-    const t = Array.from(document.querySelectorAll("#nav button")).find(n => n.textContent.trim() === b.dataset.goto2);
-    if (t) t.click();
-  });
+  $("ctToCompare").onclick = () => { const t = document.querySelector('#pcTabs button[data-t="compare"]'); if (t) t.click(); };
 }
 
 // ---- Purchasing: a supplier and an item as Pulse pop-ups, from what the tower has read (suppliers by location, price
@@ -2804,7 +2806,10 @@ async function supPop(name){
     } catch (e) { html += `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
     const C = (data.contracts || {}).suppliers || [], c = C.find(s => s.supplier === name);
     if (c) html += Pulse.panel("Agreed prices", Pulse.tiles([{l: "Under an agreed price", v: fmt(c.covered)}, {l: "No agreed price", v: fmt(c.uncovered)}, {l: "Coverage", v: fmt(c.share, 0) + "%", cls: c.share < 50 ? "up" : "down"},
-      {l: "Paid above the agreed price", v: fmt(c.above), cls: c.above > 0 ? "up" : ""}]));
+      {l: "Paid above the agreed price", v: fmt(c.above), cls: c.above > 0 ? "up" : "", open: c.above > 0 ? `ctsup|${name}` : null}]));
+    const CI = typeof ctItems === "function" ? ctItems({supplier: name}) : [];
+    if (CI.length) html += Pulse.panel(`Items against their agreed price · ${fmt(CI.length)}`, Pulse.list([["Item"], ["Spend", 1], ["Paid (avg)", 1], ["Agreed", 1], ["Against it", 1]],
+      CI.slice(0, 60).map(x => ({cells: [`<b>${esc(x.description || x.item)}</b>`, fmt(x.cost), fmt(x.paid_unit, 2), x.agreed ? fmt(x.agreed, 2) : "–", ctSt(x)], open: `pitem|${x.item}`})), {max: 360}));
     const L = pqData ? pqData.lines.filter(x => x.vendor_name === name) : [];
     if (L.length) html += Pulse.panel(`Price changes · ${fmt(L.length)}`, Pulse.list([["Item"], ["Last price", 1], ["Now", 1], ["Change", 1], ["Impact", 1]],
       L.slice(0, 50).map(x => ({cells: [`<b>${esc(x.desc || x.item)}</b>`, pqP(x.prev), pqP(x.price), x.d_prev == null ? "–" : (x.d_prev > 0 ? "+" : "") + x.d_prev.toFixed(1) + "%", pqS(x.impact)], open: `pitem|${x.item}`}))));
@@ -2814,13 +2819,16 @@ async function supPop(name){
 Pulse.on("sup", n => supPop(n));
 function pitemPop(no){
   const mv = (data.movers || []).find(m => m.item_no === no), sp = (data.spreads || []).find(s => s.item_no === no);
-  const ct = ((data.operations || {}).contract_prices || []).find(r => r.item_no === no);
+  const ci = ((data.contracts || {}).items || []).find(x => x.item === no);
+  const ct = ((data.operations || {}).contract_prices || []).find(r => r.item_no === no)
+    || (ci && ci.agreed ? {contract: ci.agreed, paid: ci.paid_unit, pct: ci.pct, overpaid: ci.gap_value, vendor: ci.vendor, desc: ci.description} : null);
   const L = pqData ? pqData.lines.filter(x => x.item === no) : [];
-  const name = (mv && mv.desc) || (sp && sp.desc) || (ct && ct.desc) || (L[0] && L[0].desc) || (typeof spItem === "function" && spData ? spItem(no)[0] : "") || "";
+  const name = (mv && mv.desc) || (sp && sp.desc) || (ct && ct.desc) || (ci && ci.description) || (L[0] && L[0].desc) || (typeof spItem === "function" && spData ? spItem(no)[0] : "") || "";
   Pulse.pop({title: esc(`${no}${name ? " · " + name : ""}`), sub: span("Item"), body: el => {
     let html = "";
     if (mv) html += Pulse.tiles([{l: "Average cost now", v: fmt(mv.cur_avg, 2), s: `before ${fmt(mv.prev_avg, 2)}`}, {l: "Change", v: (mv.pct > 0 ? "+" : "") + fmt(mv.pct, 1) + "%", cls: mv.pct > 0 ? "up" : "down"},
       {l: "Quantity", v: fmt(mv.cur_qty, 2)}, {l: "Impact", v: sign(mv.impact), s: CUR, cls: mv.impact > 0 ? "up" : "down"}]);
+    if (!ct && ci) html += Pulse.panel("Agreed price", `<p class="meta" style="margin:0">${span(`No agreed price in the price list: ${fmt(ci.cost)} ${CUR} bought this period at ${fmt(ci.paid_unit, 2)} on average, from ${ci.vendor || "a supplier not known"}.`)}</p>`);
     if (ct) html += Pulse.panel("Agreed price", Pulse.tiles([{l: "Contracted", v: fmt(ct.contract, 2)}, {l: "Paid (avg)", v: fmt(ct.paid, 2), cls: ct.pct > 0 ? "up" : "down", s: (ct.pct > 0 ? "+" : "") + fmt(ct.pct, 1) + "%"},
       {l: "Over/under paid", v: sign(ct.overpaid), cls: ct.overpaid > 0 ? "up" : ""}, {l: "Supplier", v: esc(ct.vendor || "–"), open: ct.vendor ? `sup|${ct.vendor}` : null}]));
     if (sp) html += Pulse.panel("Between locations", Pulse.bars([{key: sp.low_loc, segs: [[sp.low, "var(--ch-0)", "cheapest"]], text: fmt(sp.low, 2)}, {key: sp.high_loc, segs: [[sp.high, "var(--ch-1)", "dearest"]], text: fmt(sp.high, 2)}])
@@ -2834,12 +2842,62 @@ function pitemPop(no){
 }
 Pulse.on("pitem", no => pitemPop(no));
 function ctViz(){
-  const c = data.contracts; if (!c || !c.available) { $("ctSupBars").innerHTML = $("ctCatBars").innerHTML = ""; return; }
+  const c = data.contracts; if (!c || !c.available) { ["ctSupBars", "ctCatBars", "ctUncBars", "ctGapBars"].forEach(id => $(id).innerHTML = ""); return; }
+  $("ctUncBars").innerHTML = Pulse.bars(c.biggest_uncovered.map(u => ({key: u.item, label: u.description || u.item, segs: [[u.cost, "var(--ch-4)", "spend"]],
+    text: `<b>${fmt(u.cost)}</b> <span class="meta">${esc(u.vendor || "")}</span>`, open: `pitem|${u.item}`})), null, {none: "Everything bought this period had an agreed price."});
+  $("ctGapBars").innerHTML = Pulse.bars(c.biggest_gaps.map(g => ({key: g.item, label: g.description || g.item, segs: [[g.gap_value, "var(--ch-1)", "paid above"]],
+    text: `<b>${fmt(g.gap_value)}</b> <span class="up">+${fmt(g.pct, 1)}%</span>`, open: `pitem|${g.item}`})), null, {none: "Nothing was paid above the agreed price beyond the tolerance."});
   const seg = s => [[Math.max(0, s.covered - Math.max(0, s.above)), "var(--ch-0)", "under an agreed price"], [Math.max(0, s.above), "var(--ch-1)", "paid above it"], [Math.max(0, s.uncovered), "var(--ch-4)", "no agreed price"]];
   const LG = [["var(--ch-0)", "under an agreed price"], ["var(--ch-1)", "paid above it"], ["var(--ch-4)", "no agreed price"]];
-  $("ctSupBars").innerHTML = Pulse.bars(c.suppliers.slice(0, 20).map(s => ({key: s.supplier, segs: seg(s), text: `<span class="${s.share < 50 ? "up" : ""}">${fmt(s.share, 0)}%</span> <span class="meta">covered</span>`, open: `sup|${s.supplier}`})), LG);
-  $("ctCatBars").innerHTML = Pulse.bars(c.categories.slice(0, 20).map(s => ({key: s.category, segs: seg(s), text: `<span class="${s.share < 50 ? "up" : ""}">${fmt(s.share, 0)}%</span>`})), LG);
+  const tx = s => `<b>${plM(s.covered + s.uncovered)}</b> <span class="${s.share < 50 ? "up" : ""}">${fmt(s.share, 0)}%</span> <span class="meta">covered</span>`;
+  $("ctSupBars").innerHTML = Pulse.bars(c.suppliers.slice(0, 20).map(s => ({key: s.supplier, segs: seg(s), text: tx(s),
+    open: s.supplier.startsWith("(") ? `ctsup|${s.supplier}` : `sup|${s.supplier}`})), LG);
+  $("ctCatBars").innerHTML = Pulse.bars(c.categories.slice(0, 20).map(s => ({key: s.category, segs: seg(s), text: `<b>${plM(s.covered + s.uncovered)}</b> <span class="${s.share < 50 ? "up" : ""}">${fmt(s.share, 0)}%</span>`, open: `ctcat|${s.category}`})), LG);
 }
+// ---- Contract prices as pop-ups: the items by status (all, no agreed price, above, below), a category, a supplier
+const CT_ST = {all: "Every item bought", none: "Bought with no agreed price", above: "Paid above the agreed price",
+  below: "Paid below the agreed price", within: "Within the tolerance"};
+const ctSt = x => x.status === "none" ? `<span class="meta">no agreed price</span>` : x.status === "above" ? `<span class="up">+${fmt(x.pct, 1)}%</span>`
+  : x.status === "below" ? `<span class="down">${fmt(x.pct, 1)}%</span>` : `<span class="meta">${x.pct > 0 ? "+" : ""}${fmt(x.pct, 1)}%</span>`;
+function ctItems(f){ return ((data.contracts || {}).items || []).filter(x => (!f.category || (x.category || "(no category)") === f.category) && (!f.supplier || (x.vendor || "(supplier not known)") === f.supplier)); }
+function ctListBody(el, f, st){
+  const all = ctItems(f), k = (data.contracts || {}).kpis || {};
+  const n = s => s === "all" ? all.length : all.filter(x => x.status === s).length;
+  const cost = s => (s === "all" ? all : all.filter(x => x.status === s)).reduce((a, x) => a + x.cost, 0);
+  const rows = (st === "all" ? all : all.filter(x => x.status === st)).slice()
+    .sort((a, b) => st === "above" || st === "below" ? Math.abs(b.gap_value || 0) - Math.abs(a.gap_value || 0) : b.cost - a.cost);
+  const chips = ["all", "none", "above", "below", "within"].map(s => `<button type="button" class="${s === st ? "on" : ""}" data-ctst="${s}">${esc(CT_ST[s])} · ${fmt(n(s))}</button>`).join("");
+  const tot = cost("all"), cov = tot - cost("none");
+  el.innerHTML = Pulse.tiles([{l: "Bought", v: plM(tot), s: `${fmt(all.length)} items`}, {l: "Under an agreed price", v: tot ? fmt(cov / tot * 100, 1) + "%" : "–", s: plM(cov)},
+      {l: "Paid above", v: plM(all.filter(x => x.status === "above").reduce((a, x) => a + x.gap_value, 0)), cls: n("above") ? "up" : "", s: `outside ${fmt(k.tolerance, 0)}%`},
+      {l: "Paid below", v: plM(Math.abs(all.filter(x => x.status === "below").reduce((a, x) => a + x.gap_value, 0))), cls: n("below") ? "down" : ""}])
+    + `<div class="sk-chips" style="margin:4px 0 10px">${chips}</div>`
+    + Pulse.list([["Item"], ["Supplier"], ["Category"], ["Spend", 1], ["Paid (avg)", 1], ["Agreed", 1], ["Against it", 1], ["Value", 1]],
+      rows.map(x => ({cells: [`<b>${esc(x.description || x.item)}</b><div class="meta">${esc(x.item)}${x.uom ? " · agreed per " + esc(x.uom) : ""}</div>`, esc(x.vendor || "–"), `<span class="meta">${esc(x.category || "–")}</span>`,
+        fmt(x.cost), fmt(x.paid_unit, 2), x.agreed ? fmt(x.agreed, 2) : "–", ctSt(x), x.status === "none" ? "" : x.status === "within" ? "" : `<b class="${x.gap_value > 0 ? "up" : "down"}">${x.gap_value > 0 ? "+" : ""}${fmt(x.gap_value)}</b>`],
+        open: `pitem|${x.item}`})), {max: 460, limit: 300, none: "No item in this group."})
+    + ((data.contracts || {}).items_total > ((data.contracts || {}).items || []).length ? `<p class="meta">${esc(`The ${fmt(data.contracts.items.length)} items with the largest spend of ${fmt(data.contracts.items_total)} are shown.`)}</p>` : "");
+  el.querySelectorAll("[data-ctst]").forEach(b => b.onclick = () => ctListBody(el, f, b.dataset.ctst));
+}
+function ctListPop(st, f, title){
+  f = f || {};
+  Pulse.pop({title: esc(title || CT_ST[st] || "Contract prices"), sub: esc(`Contract prices · ${(data.meta || {}).period_label || ""}`), body: el => ctListBody(el, f, st)});
+}
+Pulse.on("ctlist", st => ctListPop(st));
+Pulse.on("ctcat", cat => {
+  const c = (data.contracts || {}), x = (c.categories || []).find(s => s.category === cat), items = ctItems({category: cat});
+  const sups = {}; items.forEach(i => { const k = i.vendor || "(supplier not known)", o = sups[k] = sups[k] || {covered: 0, uncovered: 0, above: 0}; o[i.status === "none" ? "uncovered" : "covered"] += i.cost; if (i.status === "above") o.above += i.gap_value; });
+  Pulse.pop({title: esc(cat), sub: esc("Category · contract prices"), body: el => {
+    const top = document.createElement("div");
+    top.innerHTML = Pulse.panel("Its suppliers", Pulse.bars(Object.entries(sups).sort((a, b) => (b[1].covered + b[1].uncovered) - (a[1].covered + a[1].uncovered)).slice(0, 12)
+      .map(([k, o]) => ({key: k, segs: [[Math.max(0, o.covered - Math.max(0, o.above)), "var(--ch-0)", "under an agreed price"], [Math.max(0, o.above), "var(--ch-1)", "paid above it"], [o.uncovered, "var(--ch-4)", "no agreed price"]],
+        text: `<b>${plM(o.covered + o.uncovered)}</b>`, open: k.startsWith("(") ? `ctsup|${k}` : `sup|${k}`})),
+      [["var(--ch-0)", "under an agreed price"], ["var(--ch-1)", "paid above it"], ["var(--ch-4)", "no agreed price"]]));
+    const list = document.createElement("div"); el.innerHTML = ""; el.append(list, top);
+    ctListBody(list, {category: cat}, "all");
+  }});
+});
+Pulse.on("ctsup", sup => ctListPop("all", {supplier: sup}, sup));
 function cplViz(){
   const d = cplData; if (!d || !d.available) return;
   $("cplUnitBars").innerHTML = Pulse.bars(d.by_unit.map(u => ({key: u.name, segs: [[u.value, "var(--ch-1)", "value with no order"]], text: `<b>${fmt(u.value)}</b> <span class="meta">${fmt(u.invoices)} invoices</span>`})), null, {none: "Every invoice this month came from an order."});

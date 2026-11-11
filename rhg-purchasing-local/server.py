@@ -431,7 +431,12 @@ def _dashboard_build(company, week, location, mode="week", remember=True):
             catalog = client.item_catalog(company)
         except BCError:
             catalog = {}
-        data["contracts"] = contracts.build(ve_cur, prices or {}, price_status, catalog, settings, label)
+        try:
+            vendor_names = {str(v.get("No") or ""): v.get("Name") or "" for v in client.vendor_cards(company)}
+        except BCError:
+            vendor_names = {}
+        data["contracts"] = contracts.build(ve_cur, prices or {}, price_status, catalog, settings, label,
+                                            suppliers, vendor_names)
         if data.get("by_location") is not None:
             # Supplier performance → Location intelligence / Whole company (sent by /api/suppliers/locations only)
             data["_supplier_matrix"] = operations.supplier_matrix(

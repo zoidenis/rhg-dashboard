@@ -30,7 +30,7 @@
 .pz-lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--sub);margin:0 0 6px}
 .pz-sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .pz-hb{display:grid;gap:2px}
-.pz-hr{display:grid;grid-template-columns:minmax(90px,200px) minmax(0,1fr) auto;gap:12px;align-items:center;padding:5px 8px;border-radius:8px}
+.pz-hr{display:grid;grid-template-columns:minmax(80px,min(200px,34%)) minmax(70px,1fr) auto;gap:12px;align-items:center;padding:5px 8px;border-radius:8px}
 .pz-hr[data-pulse],.pz-hr[data-act]{cursor:pointer}.pz-hr[data-pulse]:hover,.pz-hr[data-act]:hover,.pz-hr:focus-visible{background:var(--bg);outline:none}
 .pz-hr:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}
 .pz-hr .k{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
