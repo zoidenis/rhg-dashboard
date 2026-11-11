@@ -42,6 +42,7 @@ import unicorn_facts
 import faloc
 import faregister
 import transit
+import ocdiag
 import recipients
 import exmail
 import itemstock
@@ -3477,6 +3478,22 @@ class Handler(BaseHTTPRequestHandler):
                                              q.get("mode", "month"), stock_summary, q.get("refresh") == "1"))
             elif url.path == "/api/simphony/status":
                 self._send(200, simphony.info())
+            elif url.path == "/api/simphony/orderchannels":
+                # a read-only check of the order channels on the checks (ocdiag.py), for whoever holds Settings
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role cannot read this check."})
+                    return
+                try:
+                    a = date.fromisoformat(q.get("from") or f"{date.today().year}-01-01")
+                    b = date.fromisoformat(q.get("to") or (date.today() - timedelta(days=1)).isoformat())
+                except ValueError:
+                    self._send(400, {"error": "Dates as YYYY-MM-DD."})
+                    return
+                refs = {x.strip() for x in (q.get("refs") or "").split(",") if x.strip()} or None
+                try:
+                    self._send(200, ocdiag.build(a, b, refs))
+                except simphony.SimphonyError as exc:
+                    self._send(200, {"error": str(exc)[:300]})
             elif url.path == "/api/inventory":
                 self._send(200, inventory_request(q.get("company") or config.BC_COMPANY, q.get("period"),
                                                   q.get("mode", "month"), q.get("dimension"), q.get("location"),
