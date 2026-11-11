@@ -1757,6 +1757,25 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(200, recipients.public())
             return
+        if url.path == "/internal/compliance":
+            # Finance → Control → Document control: the same reading as Invoices without PO, with the follow-up
+            # each invoice has in this tower's register, so Finance shows one figure and tracks nothing twice
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            month = (q.get("month") or "")[:7]
+            if not re.match(r"^\d{4}-\d{2}$", month):
+                self._send(400, {"error": "Choose a month, e.g. 2026-10."})
+                return
+            company = q.get("company") or config.BC_COMPANY
+            out = dict(compliance_screen(company, month))
+            if out.get("available"):
+                keys = {f"nopo-{company}-{i['invoice']}" for i in out.get("invoices") or []}
+                out["followup"] = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"]}
+                                   for x in exreg.query("all", company=company, limit=100000)["items"]
+                                   if x["subject"] in keys}
+            self._send(200, out)
+            return
         if url.path == "/internal/mail/status":
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})
@@ -2202,6 +2221,21 @@ class Handler(BaseHTTPRequestHandler):
                                                       day, bool(body.get("refresh"))))
             except ValueError:
                 self._send(400, {"error": "Bad date."})
+            return
+        if url.path == "/internal/compliance/track":     # Finance tracking an invoice without a PO, for its user
+            # the item goes into this tower's register, where the daily notice reads it: one follow-up per invoice
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            p = body.get("payload") or {}
+            if not str(p.get("source_exception") or "").startswith("nopo-"):
+                self._send(400, {"error": "Only an invoice without a PO is tracked from Finance."})
+                return
+            try:
+                self._send(200, exreg.track(p, f"{str(body.get('actor') or 'finance')[:60]} (Finance)",
+                                            str(body.get("email") or "")[:200]))
+            except ValueError as exc:
+                self._send(400, {"error": str(exc)})
             return
         if url.path == "/internal/recipients":           # Finance saving the directory for its user
             if not self._service_call():

@@ -41,6 +41,7 @@ import today as todayloc
 import unicorn_facts
 import faloc
 import faregister
+import transit
 import recipients
 import exmail
 import itemstock
@@ -105,6 +106,7 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "login.html": "text/html; charset=utf-8"}
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
+                     "/api/control/nopo/track": "actions",
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/billy/settings": "settings", "/api/billy/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
@@ -2052,6 +2054,8 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/inventory/items", "/api/inventory/items/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/locations/registry",
+                         # Control → Document control → Transfers in transit: the transfers leaving or reaching them
+                         "/api/transit",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
                          "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
                          "/api/sales/foodcost",
@@ -2069,6 +2073,90 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx", "/api/billyrec/rows",
                          # Budget & forecast → Location intelligence, by department
                          "/api/executive"}
+
+
+_transit_cache, _transit_lock = {}, threading.Lock()
+
+
+def transit_screen(company, refresh=False):
+    """Control → Document control → Transfers in transit (transit.py): what is shipped and not yet received.
+    Read straight from BC, held five minutes: the open entries at the in-transit locations are a few dozen."""
+    key = company.upper()
+    with _transit_lock:
+        hit = _transit_cache.get(key)
+        if hit and not refresh and time.time() - hit[0] < 300:
+            return hit[1]
+    t0 = time.time()
+    notes = []
+    try:
+        cards = {}
+        for r in client._get_all(client._url(company, config.E_LOCATION_CARD), {"$select": "Code,Name,Use_As_In_Transit"}):
+            code = str(r.get("Code") or "").strip().upper()
+            if code:
+                cards[code] = {"name": (r.get("Name") or "").strip(), "transit": bool(r.get("Use_As_In_Transit"))}
+    except Exception as exc:                                       # noqa: BLE001
+        cards = None
+        notes.append("The location cards could not be read, so the in-transit locations are the codes naming "
+                     f"TRANSIT ({str(exc)[:120]}).")
+    try:
+        codes = sorted(c for c, v in cards.items() if v["transit"]) if cards is not None else \
+            [c for c in client.locations(company) if transit.is_transit(c)]
+        if not codes:
+            return {"available": True, "company": company, "empty": True, "transfers": [], "rows": [],
+                    "note": "No location in this company is set to Use As In-Transit, so nothing can be in transit.",
+                    **transit.summarise([], [], 3)}
+        flt = " or ".join(f"Location_Code eq '{c}'" for c in codes)
+        entries = client._get_all(client._url(company, config.E_ILE), {
+            "$filter": f"Open eq true and Remaining_Quantity gt 0 and ({flt})",
+            "$select": "Entry_No,Item_No,Item_Description,Item_Category_Code,Location_Code,Posting_Date,Document_No,"
+                       "Document_Type,Quantity,Remaining_Quantity,Cost_Amount_Actual,Cost_Amount_Expected,"
+                       "Unit_of_Measure_Code"})
+    except BCError as exc:
+        return {"available": False, "error": "Data unavailable or not verified in Business Central.",
+                "reason": str(exc)[:300]}
+    try:
+        headers = client._get_all(client._url(company, config.E_TRANSFER_HEADERS))
+        lines = client._get_all(client._url(company, config.E_TRANSFER_LINES))
+    except BCError as exc:
+        headers, lines = [], []
+        notes.append(f"The open transfer orders could not be read, so no destination is known ({str(exc)[:120]}).")
+    ship_from = {}
+    docs = sorted({str(e.get("Document_No")) for e in entries if e.get("Document_No")})
+    try:
+        for i in range(0, len(docs), 15):
+            part = " or ".join(f"Document_No eq '{d}'" for d in docs[i:i + 15])
+            for r in client._get_all(client._url(company, config.E_ILE), {
+                    "$filter": f"Document_Type eq 'Transfer Shipment' and Quantity lt 0 and ({part})",
+                    "$select": "Document_No,Location_Code"}):
+                loc = str(r.get("Location_Code") or "")
+                if loc and not transit.is_transit(loc, cards):
+                    ship_from[str(r.get("Document_No"))] = loc
+    except BCError as exc:
+        notes.append(f"The shipments' outgoing entries could not be read; the sending location is the order's "
+                     f"({str(exc)[:120]}).")
+    th = store.get_settings().get("thresholds") or {}
+    out = transit.build(company, entries, headers, lines, ship_from, cards,
+                        flag_days=int(float(th.get("transit_days") or 3)), currency=company_currency(company))
+    out.update(available=True, notes=notes, ms=int((time.time() - t0) * 1000), read_at=datetime.now().isoformat(timespec="seconds"))
+    with _transit_lock:
+        _transit_cache[key] = (time.time(), out)
+    return out
+
+
+def nopo_screen(company, month):
+    """Control → Document control → Invoices without PO: the Purchasing tower's reading (compliance.py), asked
+    over the internal network so the two towers show one figure. Purchasing's follow-up of each invoice comes
+    with it."""
+    try:
+        r = requests.get(f"{config.PURCHASING_URL}/internal/compliance", timeout=180,
+                         params={"company": company, "month": month},
+                         headers={"X-Service-Token": auth.SERVICE_TOKEN})
+        j = r.json()
+    except (requests.RequestException, ValueError) as exc:
+        return {"available": False, "error": "The Purchasing tower could not be reached.", "reason": str(exc)[:200]}
+    if not r.ok:
+        return {"available": False, "error": j.get("error") or f"Purchasing answered {r.status_code}."}
+    return j
 
 
 def scope_expand(company, codes):
@@ -2191,6 +2279,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
+        elif path == "/api/transit":
+            self._scope_filter = lambda b: transit.cut(b, self._allowed)
         elif path == "/api/salesrec":
             self._scope_filter = lambda b: salesrec.cut(b, self._allowed)
         elif path == "/api/billyrec":
@@ -3357,6 +3447,28 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
+            elif url.path == "/api/transit":
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                out = dict(transit_screen(company, q.get("refresh") == "1"))
+                if out.get("available"):
+                    # the follow-up of each transfer in the register (Track on the screen), read fresh every time
+                    keys = {f"transit-{company}-{t['shipment']}" for t in out.get("transfers") or []}
+                    out["followup"] = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"], "id": x["id"]}
+                                       for x in exreg.query("all", company=company, limit=100000)["items"]
+                                       if x["subject"] in keys and x["status"] in exreg.ACTIVE}
+                self._send(200, out)
+            elif url.path == "/api/control/nopo":
+                if not auth.can(user, "finance.ap.view"):
+                    self._send(403, {"error": "Your role does not include Accounts payable."})
+                    return
+                month = (q.get("month") or "")[:7]
+                if not re.match(r"^\d{4}-\d{2}$", month):
+                    self._send(400, {"error": "Choose a month, e.g. 2026-10."})
+                    return
+                self._send(200, nopo_screen(q.get("company") or config.BC_COMPANY, month))
             elif url.path == "/api/inventory/locations":
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})
@@ -3594,6 +3706,20 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, exreg.track(body or {}, actor, user.get("email") or ""))
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
+            elif url.path == "/api/control/nopo/track":
+                # Invoices without PO: tracked in Purchasing's register, where the daily notice reads the follow-up
+                if not auth.can(user, "finance.ap.view"):
+                    self._send(403, {"error": "Your role does not include Accounts payable."})
+                    return
+                try:
+                    r = requests.post(f"{config.PURCHASING_URL}/internal/compliance/track", timeout=30,
+                                      headers={"X-Service-Token": auth.SERVICE_TOKEN},
+                                      json={"payload": body or {}, "actor": actor, "email": user.get("email") or ""})
+                    j = r.json()
+                except (requests.RequestException, ValueError) as exc:
+                    self._send(502, {"error": "The Purchasing tower could not be reached: " + str(exc)[:160]})
+                    return
+                self._send(200 if r.ok else 400, j if r.ok else {"error": j.get("error") or f"Purchasing answered {r.status_code}."})
             elif url.path.startswith("/api/actions/"):
                 self._send(410, {"error": "The Action center is now the Exceptions register: change the item there."})
             elif url.path == "/api/settings":

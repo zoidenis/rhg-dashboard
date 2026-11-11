@@ -653,6 +653,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="grp">Control</div>
     <button data-view="closing">Month-end close <span class="count" id="closeCount">0</span></button>
     <button data-view="register">Exceptions register <span class="count" id="regCount">0</span></button>
+    <button data-view="doccontrol">Document control</button>
     <button data-view="salesrec">Simphony ↔ BC</button>
     <button data-view="receipts">Takings POS ↔ BC</button>
     <button data-view="billyrec">Simphony ↔ Billy</button>
@@ -1732,6 +1733,56 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     </div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the register works</summary>
       <div class="hint" id="rgDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+  </section>
+
+  <section class="view" id="v-doccontrol">
+    <div class="ov-tabs" id="dkTabs" role="tablist"><button data-t="nopo" class="on" role="tab" aria-selected="true">Invoices without PO</button><button data-t="transit" role="tab" aria-selected="false">Transfers in transit</button></div>
+    <div id="npView">
+      <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Invoices posted without a purchase order</h2>
+        <p class="hint"><span>The rule is one approved order before every purchase.</span> <span>The same reading as Purchasing → Invoices without PO, asked from the Purchasing tower, so both show one figure; an invoice tracked here is followed up in Purchasing's register, where the daily email reads it.</span> <span>Click any figure, bar or invoice for the detail.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="month" id="npMonth" aria-label="Month" style="font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);color-scheme:light dark"><button class="mini dark" id="npRead" type="button">Read</button><button class="mini exp" id="npExp" type="button">Export ▾</button></div></div>
+        <p class="meta" id="npStatus" style="margin:6px 0 0">Choose a month and read.</p></div>
+      <div class="kpis" id="npKpis"></div>
+      <div class="grid">
+        <div class="card"><h2>Where it happens</h2><p class="hint">By unit, ranked by the value without an order. Click a unit for its invoices.</p><div id="npUnits"></div></div>
+        <div class="card"><h2>Suppliers</h2><p class="hint">Ranked by the value without an order; a supplier with more than one invoice is a repeat. Click a supplier for its invoices.</p><div id="npVendors"></div></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>Why, and who owns it</h2><p class="hint">Grouped by cause. The person who posted the invoice is usually the inputter, not the person who decided to buy, so responsibility is set by unit and category. Click a cause for its invoices.</p><div id="npReasons"></div></div>
+        <div class="card"><h2>By month</h2><p class="hint">Invoices without an order, the chosen month and the six before it. Click a month to read it.</p><div id="npTrend"></div></div>
+      </div>
+      <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>The invoices behind the figures</h2><p class="hint" id="npListNote"></p></div></div>
+        <div class="filters" style="margin:0 0 10px">
+          <label>Search<input id="npQ" placeholder="invoice, supplier, unit"></label>
+          <label>Follow-up<select id="npFu"><option value="">All</option><option value="none">Not tracked</option><option value="active">Tracked, open</option><option value="closed">Closed</option></select></label></div>
+        <div class="scroll"><table id="npList"></table></div></div>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="npDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="trView" style="display:none">
+      <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Transfers in transit</h2>
+        <p class="hint"><span>Every transfer shipped from one location and not yet received at the other, as Business Central holds it now: the open entries at the in-transit location.</span> <span>Each with where it left, where it is going, the day it left and its cost.</span> <span>Click any figure, bar or transfer for the detail.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="mini dark" id="trRead" type="button">Read again</button><button class="mini exp" id="trExp" type="button">Export ▾</button></div></div>
+        <p class="meta" id="trStatus" style="margin:6px 0 0">Open the tab to read.</p></div>
+      <div class="kpis" id="trKpis"></div>
+      <div class="grid">
+        <div class="card"><h2>How long in transit</h2><p class="hint" id="trAgeNote">Days since each shipment was posted. Click an age for its transfers.</p><div id="trAges"></div></div>
+        <div class="card"><h2>Where it is going</h2><p class="hint">The value in transit by receiving location. Click a location for its transfers.</p><div id="trDest"></div></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>Routes</h2><p class="hint">From one location to another. Click a route for its transfers.</p><div id="trRoutes"></div></div>
+        <div class="card"><h2>What is in transit</h2><p class="hint">The value in transit by item category. Click a category for its lines.</p><div id="trCats"></div></div>
+      </div>
+      <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Every transfer in transit</h2><p class="hint" id="trListNote"></p></div></div>
+        <div class="filters" style="margin:0 0 10px">
+          <label>Search<input id="trQ" placeholder="shipment, order, location, item"></label>
+          <label>From<select id="trFromF"><option value="">All</option></select></label>
+          <label>To<select id="trToF"><option value="">All</option></select></label>
+          <label>Show<select id="trShowF"><option value="">All</option><option value="over">Flagged: in transit too long</option><option value="unlinked">Destination unknown</option><option value="partly">Partly received</option></select></label></div>
+        <div class="scroll"><table id="trTable"></table></div></div>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="trDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
   </section>
 
   <section class="view" id="v-emcpriv">
@@ -3450,7 +3501,7 @@ const TH_LABEL = {materiality:"Materiality (ALL)", stock_monitor_days:"Stock unc
   ap_critical_days:"Payable overdue, critical (days)", ar_warning_days:"Receivable overdue, warning (days)",
   ar_critical_days:"Receivable overdue, critical (days)", concentration_pct:"Concentration warning (%)",
   cash_warning:"Cash warning level (ALL)", stock_deadstock_days:"No consumption, dead stock (days)",
-  stock_new_days:"First receipt within, new item (days)"};
+  stock_new_days:"First receipt within, new item (days)", transit_days:"Transfer in transit, flag after (days)"};
 const OW_LABEL = {default:"Default owner", accounting:"Accounting", treasury:"Treasury", receivables:"Receivables", payables:"Payables", inventory:"Inventory"};
 let settingsDone = false;
 function renderSettings(){
@@ -8589,6 +8640,289 @@ $("acApprove").onclick = () => acPost("approve");
 $("acReset").onclick = () => acPost("reset");
 $("acCo").onchange = () => { delete $("acMethod").dataset.touched; loadAc(); };
 $("acMethod").onchange = () => { $("acMethod").dataset.touched = "1"; if (acData) renderAc(); };
+// ---------- Control → Document control: invoices without a PO (from Purchasing) and transfers in transit ----------
+var dkTab = "nopo";
+function dkShowTab(tab){
+  dkTab = tab;
+  document.querySelectorAll("#dkTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("npView").style.display = tab === "nopo" ? "" : "none";
+  $("trView").style.display = tab === "transit" ? "" : "none";
+  if (tab === "transit") { if (!trData || trData.company !== ($("company").value || trData.company)) loadTr(false); else renderTr(); }
+  else { if (!$("npMonth").value) $("npMonth").value = (($("anchor").value || new Date().toISOString()).slice(0, 7)); if (!npData) loadNp(); }
+}
+document.querySelectorAll("#dkTabs button").forEach(b => b.onclick = () => dkShowTab(b.dataset.t));
+const dkCard = (l, v, sub, open, cls) => `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-pulse="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub}</div></div>`;
+const dkFollow = f => f ? `<span class="chip ${f.status === "Closed" || f.status === "Dismissed" ? "down" : ""}">${esc(f.status)}</span><div class="meta">${esc(f.owner || "")}${f.due ? " · " + esc(f.due) : ""}</div>` : "";
+
+// --- invoices without a purchase order
+var npData = null, npBusy = false;
+async function loadNp(){
+  if (npBusy) return;
+  const month = $("npMonth").value; if (!month) { $("npStatus").textContent = "Choose a month."; return; }
+  npBusy = true; $("npRead").disabled = true;
+  $("npStatus").textContent = `Reading the posted invoices of ${flMon(month)} through Purchasing…`;
+  try {
+    const j = await readJSON(await fetch("/api/control/nopo?" + new URLSearchParams({company: $("company").value || "", month})));
+    if (j.error && !j.kpis) throw new Error(j.error + (j.reason ? " " + j.reason : ""));
+    npData = j; npData._month = month; renderNp();
+  } catch (e) { $("npStatus").textContent = "Could not read: " + e.message; $("npKpis").innerHTML = ""; }
+  finally { npBusy = false; $("npRead").disabled = false; }
+}
+$("npRead").onclick = loadNp;
+$("npMonth").onchange = loadNp;
+const npKey = i => `nopo-${npData.company}-${i.invoice}`;
+const npFu = i => ((npData && npData.followup) || {})[npKey(i)];
+function npRows(){
+  const d = npData, q = ($("npQ").value || "").trim().toLowerCase(), fu = $("npFu").value;
+  return d.invoices.filter(i => {
+    const f = npFu(i);
+    if (fu === "none" && f) return false;
+    if (fu === "active" && !(f && f.status !== "Closed" && f.status !== "Dismissed")) return false;
+    if (fu === "closed" && !(f && (f.status === "Closed" || f.status === "Dismissed"))) return false;
+    return !q || [i.invoice, i.vendor, i.vendor_invoice, i.unit, i.category, i.buyer].join(" ").toLowerCase().includes(q);
+  });
+}
+function renderNp(){
+  const d = npData; if (!d) return;
+  if (!d.available) { $("npStatus").innerHTML = `<span class="up">${esc(d.error || "Unavailable")}</span> ${esc(d.reason || "")}`; $("npKpis").innerHTML = ""; return; }
+  const k = d.kpis, C = d.currency || "";
+  const tracked = d.invoices.filter(i => npFu(i)).length;
+  $("npStatus").textContent = `${d.company} · ${d.period} · ${fmt(k.invoices)} posted invoices examined · ${d.lines_note || ""}`;
+  $("npKpis").innerHTML = dkCard("Invoices with no order", fmt(k.no_order + k.partial), `${fmt(k.rate, 1)}% of ${fmt(k.invoices)} invoices · ${k.partial ? fmt(k.partial) + " partly linked" : "none partly linked"}`, "nplist|all", k.no_order + k.partial ? "up" : "")
+    + dkCard("Value with no order", flM(k.value_breach), `${fmt(k.value_rate, 1)}% of ${flM(k.value_total)} ${C} bought, excluding VAT`, "nplist|all")
+    + dkCard("Tracked", fmt(tracked), `of ${fmt(d.invoices.length)} · in Purchasing's register`, "nplist|tracked")
+    + dkCard("Not tracked", fmt(d.invoices.length - tracked), "no follow-up yet", "nplist|untracked", d.invoices.length - tracked ? "warn" : "")
+    + dkCard("Order number present", fmt(k.with_order), "compliant on the order number; the date the order was raised stays unverified")
+    + dkCard("Corrections excluded", fmt(k.corrections), "cancelled or corrective documents, out of the denominator");
+  $("npUnits").innerHTML = Pulse.bars(d.by_unit.slice(0, 15).map(u => ({key: u.name, segs: [[u.value, "var(--ch-1)", "without an order"]], text: `<b>${flM(u.value)}</b> <span class="meta">${fmt(u.invoices)} invoices</span>`, open: `nplist|unit:${u.name}`})), null, {none: "Every invoice of the month came from an order."});
+  $("npVendors").innerHTML = Pulse.bars(d.vendors.slice(0, 15).map(v => ({key: v.vendor, segs: [[v.value, v.repeat ? "var(--ch-1)" : "var(--ch-0)", "without an order"]], text: `<b>${flM(v.value)}</b> <span class="meta">${fmt(v.invoices)} invoices</span>`, open: `nplist|vendor:${v.vendor}`})),
+    [["var(--ch-1)", "repeat: more than one invoice"], ["var(--ch-0)", "one invoice"]], {none: "No supplier."});
+  $("npReasons").innerHTML = d.reasons.length ? Pulse.cases(d.reasons.map((r, n) => ({n: r.invoices, t: r.reason, w: `${flM(r.value)} ${C} · owner ${r.owner}`, open: `nplist|reason:${n}`}))) : `<p class="meta">Nothing to explain: no invoice without an order this month.</p>`;
+  $("npTrend").innerHTML = Pulse.cols(d.trend.map(t => ({label: flMonS(t.month), segs: [[t.breaches || 0, t.month === d._month ? "var(--ch-1)" : "var(--ch-0)", "invoices without an order"]], open: `npmonth|${t.month}`,
+    tip: `${flMon(t.month)}: ${t.breaches == null ? "not read" : fmt(t.breaches) + " of " + fmt(t.invoices) + " invoices (" + fmt(t.rate, 1) + "%) · " + fmt(t.value)}`})), null, {w: 440, h: 190, aria: "Invoices without an order by month", maxLabel: m => fmt(m)});
+  $("npDefs").innerHTML = ["denominator", "breach", "value", "unverifiable"].filter(x => (d.definitions || {})[x]).map(x => `<p><span>${esc(d.definitions[x])}</span></p>`).join("")
+    + `<p><span>Partly linked invoices are counted in the month read only; the months before are read on the invoice header's order number.</span></p>`;
+  npTable();
+}
+function npTable(){
+  const d = npData, R = npRows(), act = can("actions");
+  $("npListNote").textContent = `${fmt(R.length)} of ${fmt(d.invoices.length)} invoice(s) with no order. Click an invoice for its detail; Track puts it in Purchasing's register.`;
+  $("npList").innerHTML = `<tr><th>Invoice</th><th>Supplier</th><th>Posted</th><th>Unit</th><th>Category</th><th>Lines</th><th class="num">Value</th><th>Follow-up</th></tr>`
+    + (R.map(i => { const f = npFu(i), n = d.invoices.indexOf(i);
+      return `<tr data-pulse="npinv|${n}" tabindex="0" style="cursor:pointer"><td class="name">${esc(i.invoice)}<div class="meta">${i.vendor_invoice ? "supplier ref " + esc(i.vendor_invoice) : esc(i.reference)}</div></td>
+        <td>${esc(i.vendor)}</td><td class="meta">${esc(i.posted)}</td><td>${esc(i.unit)}</td><td class="meta">${esc(i.category)}</td><td class="meta">${esc(i.line_types.join(", ") || i.state)}</td>
+        <td class="num"><b>${fmt(i.unlinked_value)}</b></td><td>${f ? dkFollow(f) : `<button class="mini" type="button" data-nptrack="${n}" ${act ? "" : "disabled"}>Track</button>`}</td></tr>`; }).join("")
+      || `<tr><td colspan="8" class="empty">No invoice.</td></tr>`);
+  document.querySelectorAll("#npList [data-nptrack]").forEach(b => b.onclick = ev => { ev.stopPropagation(); npTrack(+b.dataset.nptrack, b); });
+}
+["npQ"].forEach(id => $(id).oninput = () => npData && npData.available && npTable());
+$("npFu").onchange = () => npData && npData.available && npTable();
+async function npTrack(n, btn){
+  const d = npData, i = d.invoices[n];
+  const big = i.unlinked_value >= ((data && data.settings && data.settings.thresholds.materiality) || 50000);
+  const services = /SHERBIME|INVESTIME/i.test(i.category || "") && i.state === "No order";
+  if (btn) btn.disabled = true;
+  try {
+    const j = await readJSON(await fetch("/api/control/nopo/track", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+      title: `Invoice ${i.invoice} without a PO: ${i.vendor}`,
+      description: `Posted ${i.posted} with no purchase order (${i.state}). ${i.unit} · ${i.category}. Record who approved it, then close it; it stops appearing in the daily email.`,
+      source_exception: npKey(i), bc_document: i.invoice, document_type: "Posted purchase invoice", company: d.company, supplier: i.vendor,
+      impact: i.unlinked_value, priority: big ? "High" : "Medium", owner: services ? "Purchasing Manager" : "Purchasing Coordinator", confidence: "high"})}));
+    if (j.error) throw new Error(j.error);
+    (d.followup = d.followup || {})[npKey(i)] = {status: j.status || "Open", owner: j.owner || "", due: j.due || ""};
+    npTable(); renderNpKpisOnly();
+  } catch (e) { alert("Could not track it: " + e.message); if (btn) btn.disabled = false; }
+}
+function renderNpKpisOnly(){ const keep = $("npQ").value; renderNp(); $("npQ").value = keep; }
+function npListPop(kind){
+  const d = npData; if (!d || !d.available) return;
+  let R = d.invoices, title = "Invoices without an order";
+  if (kind === "tracked") { R = R.filter(i => npFu(i)); title = "Tracked in Purchasing's register"; }
+  else if (kind === "untracked") { R = R.filter(i => !npFu(i)); title = "Not tracked yet"; }
+  else if (kind.startsWith("unit:")) { title = kind.slice(5); R = R.filter(i => i.unit === title); }
+  else if (kind.startsWith("vendor:")) { title = kind.slice(7); R = R.filter(i => i.vendor === title); }
+  else if (kind.startsWith("reason:")) { const r = d.reasons[+kind.slice(7)]; title = r.reason; R = R.filter(i => npReason(i) === r.reason); }
+  R = R.slice().sort((a, b) => b.unlinked_value - a.unlinked_value);
+  const sum = R.reduce((a, i) => a + i.unlinked_value, 0);
+  Pulse.pop({title: esc(title), sub: esc(`Invoices without PO · ${d.company} · ${d.period}`), body:
+    Pulse.tiles([{l: "Invoices", v: fmt(R.length)}, {l: "Value with no order", v: flM(sum)}, {l: "Suppliers", v: fmt(new Set(R.map(i => i.vendor)).size)}, {l: "Tracked", v: fmt(R.filter(i => npFu(i)).length)}])
+    + Pulse.list([["Invoice"], ["Supplier"], ["Posted"], ["Unit"], ["Category"], ["Value", 1], ["Follow-up"]],
+      R.map(i => ({cells: [`<b>${esc(i.invoice)}</b><div class="meta">${esc(i.state)}</div>`, esc(i.vendor), esc(i.posted), esc(i.unit), `<span class="meta">${esc(i.category)}</span>`, `<b>${fmt(i.unlinked_value)}</b>`, dkFollow(npFu(i)) || `<span class="meta">not tracked</span>`],
+        open: `npinv|${d.invoices.indexOf(i)}`})), {max: 480, none: "No invoice."})});
+}
+// the cause compliance.py gives an invoice, from the same rules
+function npReason(i){
+  if (i.state === "Partly without an order") return "Lines added onto an order's invoice";
+  if (/SHERBIME/i.test(i.category || "")) return "Services bought without an order";
+  if (/INVESTIME/i.test(i.category || "")) return "Investments bought without an order";
+  return "Goods bought without an order";
+}
+function npInvPop(n){
+  const d = npData, i = d.invoices[n]; if (!i) return;
+  const f = npFu(i), others = d.invoices.filter(x => x.vendor === i.vendor && x !== i);
+  Pulse.pop({title: esc(`Invoice ${i.invoice}`), sub: esc(`${i.vendor} · posted ${i.posted} · ${i.state}`),
+    actions: f ? "" : `<button class="close" type="button" data-nptrackpop="${n}" ${can("actions") ? "" : "disabled"}>Track</button>`,
+    body: Pulse.tiles([{l: "Value with no order", v: fmt(i.unlinked_value), s: i.state === "Partly without an order" ? `of ${fmt(i.amount)} on the invoice` : "excluding VAT"},
+        {l: "Including VAT", v: fmt(i.amount_vat)}, {l: "Supplier", v: esc(i.vendor), s: esc(i.vendor_no), open: i.vendor_no ? `ap|${i.vendor_no}` : ""},
+        {l: "Unit", v: esc(i.unit), s: esc(i.category)}, {l: "Follow-up", v: f ? esc(f.status) : "Not tracked", s: f ? esc(`${f.owner || ""}${f.due ? " · due " + f.due : ""}`) : "Track puts it in Purchasing's register", cls: f ? "" : "warn"}])
+      + Pulse.panel("The document", Pulse.list([["Field"], ["Value"]], [["Invoice in BC", i.invoice], ["Supplier's invoice number", i.vendor_invoice || "–"], ["Order number on the header", i.order || "none"],
+          ["Lines without an order", i.line_types.join(", ") || (i.order ? "–" : "the whole invoice")], ["Document date", i.document_date || "–"], ["Posted", i.posted], ["Location", i.location || "–"], ["Purchaser", i.buyer || "–"], ["Reference", i.reference]]
+          .map(([a, b]) => ({cells: [esc(a), esc(b)]}))))
+      + (others.length ? Pulse.panel(`The supplier's other invoices without an order this month`, Pulse.list([["Invoice"], ["Posted"], ["Unit"], ["Value", 1]],
+          others.map(x => ({cells: [esc(x.invoice), esc(x.posted), esc(x.unit), fmt(x.unlinked_value)], open: `npinv|${d.invoices.indexOf(x)}`})))) : "")
+      + `<p class="meta">${esc(npReason(i))}. Nothing is changed in Business Central.</p>`});
+}
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-nptrackpop]"); if (!b) return; ev.preventDefault(); b.disabled = true;
+  npTrack(+b.dataset.nptrackpop).then(() => { if (npFu(npData.invoices[+b.dataset.nptrackpop])) npInvPop(+b.dataset.nptrackpop); }); });
+Pulse.on("nplist", k => npListPop(k));
+Pulse.on("npinv", n => npInvPop(+n));
+Pulse.on("npmonth", m => { $("npMonth").value = m; loadNp(); });
+$("npExp").onclick = () => {
+  const d = npData; if (!d || !d.available) { alert("Read a month first."); return; }
+  const R = npRows();
+  xlsxTable(`Invoices without PO ${d.company} ${d._month}`, [
+    {title: "Invoices", header: ["Invoice", "Supplier invoice", "Supplier", "Supplier no", "Posted", "Document date", "Unit", "Category", "State", "Lines without an order", "Value without an order", "Invoice amount", "Including VAT", "Follow-up", "Owner", "Due"],
+     formats: ["text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "num", "num", "num", "text", "text", "text"],
+     rows: R.map(i => { const f = npFu(i) || {}; return [i.invoice, i.vendor_invoice, i.vendor, i.vendor_no, i.posted, i.document_date, i.unit, i.category, i.state, i.line_types.join(", "), i.unlinked_value, i.amount, i.amount_vat, f.status || "Not tracked", f.owner || "", f.due || ""]; })},
+    {title: "By unit", header: ["Unit", "Invoices", "Value", "Suppliers"], formats: ["text", "num", "num", "num"], rows: d.by_unit.map(u => [u.name, u.invoices, u.value, u.vendors])},
+    {title: "Suppliers", header: ["Supplier", "Invoices", "Value", "Repeat", "Units"], formats: ["text", "num", "num", "text", "text"], rows: d.vendors.map(v => [v.vendor, v.invoices, v.value, v.repeat ? "yes" : "", v.units.join(", ")])},
+    {title: "Causes", header: ["Cause", "Invoices", "Value", "Owner"], formats: ["text", "num", "num", "text"], rows: d.reasons.map(r => [r.reason, r.invoices, r.value, r.owner])},
+    {title: "By month", header: ["Month", "Invoices", "Without an order", "Rate", "Value"], formats: ["text", "num", "num", "pct", "num"], rows: d.trend.map(t => [t.month, t.invoices, t.breaches, t.rate == null ? "" : t.rate / 100, t.value])}],
+    [`${d.company} · ${d.period}`, `Filters of the list: ${[$("npQ").value, $("npFu").selectedOptions[0].text].filter(x => x && x !== "All").join(", ") || "none"}`].concat(Object.values(d.definitions || {})));
+};
+
+// --- transfers in transit
+var trData = null, trBusy = false;
+const trLoc = (code, name) => code ? (name && name.toUpperCase() !== code.toUpperCase() ? `${name} (${code})` : code) : "unknown";
+const trKey = t => `transit-${trData.company}-${t.shipment}`;
+const trFu = t => ((trData && trData.followup) || {})[trKey(t)];
+async function loadTr(refresh){
+  if (trBusy) return;
+  trBusy = true; $("trRead").disabled = true;
+  $("trStatus").textContent = "Reading Business Central: the open entries at the in-transit location, the open transfer orders, the location cards…";
+  try {
+    const j = await readJSON(await fetch("/api/transit?" + new URLSearchParams({company: $("company").value || "", refresh: refresh ? "1" : ""})));
+    if (j.error && !j.transfers) throw new Error(j.error + (j.reason ? " " + j.reason : ""));
+    trData = j; renderTr();
+  } catch (e) { $("trStatus").textContent = "Could not read: " + e.message; $("trKpis").innerHTML = ""; }
+  finally { trBusy = false; $("trRead").disabled = false; }
+}
+$("trRead").onclick = () => loadTr(true);
+function renderTr(){
+  const d = trData; if (!d) return;
+  const t = d.totals, C = d.currency || "", N = d.names || {};
+  $("trStatus").textContent = d.empty ? `${d.company} · ${d.note}` : `${d.company} · ${d.read_at ? "read " + new Date(d.read_at).toLocaleString("en-GB", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"}) : ""} · in-transit location${(d.transit_locations || []).length === 1 ? "" : "s"} ${(d.transit_locations || []).join(", ") || "–"} · ${fmt(d.orders_open)} open transfer orders`
+    + (d.scoped ? " · only the transfers leaving or reaching your locations" : "") + ((d.notes || []).length ? " · " + d.notes.join(" ") : "");
+  const oldest = d.transfers[0];
+  $("trKpis").innerHTML = dkCard("In transit", flM(t.value), `${C} · ${fmt(t.transfers)} transfers · ${fmt(t.lines)} lines · ${fmt(t.items)} items`, "trlist|all")
+    + dkCard(`Over ${fmt(d.flag_days)} days`, fmt(t.over), t.over ? `${flM(t.over_value)} ${C} not received in time` : "everything is recent", t.over ? "trlist|over" : "", t.over ? "up" : "down")
+    + dkCard("Oldest", t.transfers ? `${fmt(t.oldest_days)} d` : "–", oldest ? `${esc(trLoc(oldest.from, oldest.from_name))} → ${esc(trLoc(oldest.to, oldest.to_name))} · shipped ${esc(oldest.shipped)}` : "nothing in transit", oldest ? `trship|${oldest.shipment}` : "", t.oldest_days > d.flag_days ? "up" : "")
+    + dkCard("Destination unknown", fmt(t.unlinked), "no open transfer order matches the shipment", t.unlinked ? "trlist|unlinked" : "", t.unlinked ? "warn" : "")
+    + dkCard("Partly received", fmt(t.partly), "part of the shipment received, the rest still in transit", t.partly ? "trlist|partly" : "")
+    + dkCard("Lines without a cost", fmt(t.no_cost), "in transit at zero value in BC", t.no_cost ? "trlist|nocost" : "", t.no_cost ? "warn" : "");
+  $("trAgeNote").textContent = `Days since each shipment was posted; flagged after ${d.flag_days} days (Settings → thresholds). Click an age for its transfers.`;
+  $("trAges").innerHTML = Pulse.bars(d.ages.map((a, i) => ({key: a.age, segs: [[a.value, a.from > d.flag_days ? "var(--ch-1)" : "var(--ch-0)", "value in transit"]], text: `<b>${flM(a.value)}</b> <span class="meta">${fmt(a.transfers)} transfers</span>`, open: a.transfers ? `trlist|age:${i}` : ""})),
+    [["var(--ch-0)", `up to ${d.flag_days} days`], ["var(--ch-1)", "longer: flagged"]]);
+  $("trDest").innerHTML = Pulse.bars(d.destinations.map(x => ({key: x.location || "unknown", label: x.location || "unknown", segs: [[x.value, x.over ? "var(--ch-1)" : "var(--ch-0)", "value in transit"]], text: `<b>${flM(x.value)}</b> <span class="meta">${fmt(x.transfers)} · oldest ${fmt(x.oldest)} d</span>`, open: `trlist|to:${x.location}`})),
+    [["var(--ch-0)", "all recent"], ["var(--ch-1)", "something flagged"]], {none: "Nothing in transit."});
+  $("trRoutes").innerHTML = Pulse.bars(d.routes.slice(0, 15).map(r => ({key: `${r.from || "?"} → ${r.to || "?"}`, segs: [[r.value, r.oldest > d.flag_days ? "var(--ch-1)" : "var(--ch-0)", "value in transit"]], text: `<b>${flM(r.value)}</b> <span class="meta">${fmt(r.transfers)} · oldest ${fmt(r.oldest)} d</span>`, open: `trlist|route:${r.from}>${r.to}`})), null, {none: "Nothing in transit."});
+  $("trCats").innerHTML = Pulse.bars(d.categories.slice(0, 15).map(c => ({key: c.category, segs: [[c.value, "var(--ch-0)", "value in transit"]], text: `<b>${flM(c.value)}</b> <span class="meta">${fmt(c.lines)} lines</span>`, open: `trcat|${c.category}`})), null, {none: "Nothing in transit."});
+  const keepF = $("trFromF").value, keepT = $("trToF").value;
+  const opts = key => [...new Set(d.transfers.map(x => x[key]))].sort().map(c => `<option value="${esc(c)}">${esc(c ? trLoc(c, N[c.toUpperCase()]) : "unknown")}</option>`).join("");
+  $("trFromF").innerHTML = `<option value="">All</option>` + opts("from"); $("trToF").innerHTML = `<option value="">All</option>` + opts("to");
+  $("trFromF").value = keepF; $("trToF").value = keepT;
+  $("trDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p><span>${esc(x)}</span></p>`).join("");
+  trTable();
+}
+function trRows(){
+  const d = trData, q = ($("trQ").value || "").trim().toLowerCase(), f = $("trFromF").value, to = $("trToF").value, sh = $("trShowF").value;
+  const items = q ? new Set(d.rows.filter(r => [r.item, r.description].join(" ").toLowerCase().includes(q)).map(r => r.shipment)) : null;
+  return d.transfers.filter(t => (!f || t.from === f) && (!to || t.to === to) && (!sh || (sh === "over" ? t.over : sh === "unlinked" ? !t.order : t.partly))
+    && (!q || items.has(t.shipment) || [t.shipment, t.order, t.from, t.to, t.from_name, t.to_name].join(" ").toLowerCase().includes(q)));
+}
+function trTable(){
+  const d = trData, R = trRows(), act = can("actions");
+  $("trListNote").textContent = `${fmt(R.length)} of ${fmt(d.transfers.length)} transfer(s), the longest in transit first. Click a transfer for its lines; Track puts it in the Exceptions register.`;
+  $("trTable").innerHTML = `<tr><th>Shipment</th><th>Transfer order</th><th>From</th><th>To</th><th>Shipped</th><th class="num">Days</th><th class="num">Lines</th><th class="num">Value</th><th>Follow-up</th></tr>`
+    + (R.map(t => { const f = trFu(t);
+      return `<tr data-pulse="trship|${esc(t.shipment)}" tabindex="0" style="cursor:pointer" class="${t.over ? "warnrow" : ""}"><td class="name">${esc(t.shipment)}${t.partly ? '<div class="meta">partly received</div>' : ""}</td>
+        <td>${t.order ? esc(t.order) + (t.link !== "items" ? ` <span class="meta">${esc(t.link)}</span>` : "") : `<span class="chip warn">${t.link === "ambiguous" ? "two orders match" : "not found"}</span>`}</td>
+        <td title="${esc(t.from_name)}">${esc(t.from || "–")}</td><td title="${esc(t.to_name)}">${t.to ? esc(t.to) : '<span class="meta">unknown</span>'}</td><td class="meta">${esc(t.shipped)}</td>
+        <td class="num ${t.over ? "up" : ""}"><b>${fmt(t.days)}</b></td><td class="num">${fmt(t.lines)}</td><td class="num"><b>${fmt(t.value)}</b></td>
+        <td>${f ? dkFollow(f) : `<button class="mini" type="button" data-trtrack="${esc(t.shipment)}" ${act ? "" : "disabled"}>Track</button>`}</td></tr>`; }).join("")
+      || `<tr><td colspan="9" class="empty">${d.transfers.length ? "No transfer for these filters." : "Nothing is in transit."}</td></tr>`);
+  document.querySelectorAll("#trTable [data-trtrack]").forEach(b => b.onclick = ev => { ev.stopPropagation(); trTrack(b.dataset.trtrack); });
+}
+$("trQ").oninput = () => trData && trTable();
+["trFromF", "trToF", "trShowF"].forEach(id => $(id).onchange = () => trData && trTable());
+function trTrack(doc){
+  const x = document.querySelector(".pl-bd.show [data-pzclose]"); if (x) x.click();      // the register opens in its place
+  const d = trData, t = d.transfers.find(x => x.shipment === doc); if (!t) return;
+  createAction({title: `Transfer ${t.shipment} in transit ${t.days} days: ${t.from || "?"} → ${t.to || "?"}`,
+    description: `Shipped ${t.shipped}${t.order ? " on transfer order " + t.order : ""}, ${t.lines} lines, ${fmt(t.value)} ${d.currency || ""} not received yet. If the goods arrived, post the receipt; if not, find them; if the shipment was wrong, undo it.`,
+    source_exception: trKey(t), bc_document: t.shipment, document_type: "Posted transfer shipment", company: d.company, location: t.to || t.from,
+    impact: t.value, priority: t.over ? "High" : "Medium", owner: (data && data.settings && (data.settings.owners.inventory || data.settings.owners.default)) || "", confidence: "high"});
+}
+function trShipPop(doc){
+  const d = trData, t = d && d.transfers.find(x => x.shipment === doc); if (!t) return;
+  const L = d.rows.filter(r => r.shipment === doc).sort((a, b) => b.value - a.value), f = trFu(t);
+  Pulse.pop({title: esc(`Shipment ${t.shipment}`), sub: esc(`${trLoc(t.from, t.from_name)} → ${trLoc(t.to, t.to_name)} · shipped ${t.shipped} · ${t.days} days in transit`),
+    actions: f ? "" : `<button class="close" type="button" data-trtrackpop="${esc(t.shipment)}" ${can("actions") ? "" : "disabled"}>Track</button>`,
+    body: Pulse.tiles([{l: "Value in transit", v: fmt(t.value), s: t.partly ? `of ${fmt(t.value_shipped)} shipped` : d.currency},
+        {l: "Days in transit", v: fmt(t.days), s: t.over ? `over ${d.flag_days}: flagged` : `flagged after ${d.flag_days}`, cls: t.over ? "up" : ""},
+        {l: "From", v: esc(t.from || "–"), s: esc(t.from_name), open: t.from ? `loc|${t.from}` : ""},
+        {l: "To", v: esc(t.to || "unknown"), s: esc(t.to ? t.to_name : t.link === "ambiguous" ? "two orders match equally" : "no open order matches"), open: t.to ? `loc|${t.to}` : "", cls: t.to ? "" : "warn"},
+        {l: "Transfer order", v: esc(t.order || "–"), s: t.order ? `found by its ${t.link}` : "BC gives no order number on the shipment"},
+        {l: "Follow-up", v: f ? esc(f.status) : "Not tracked", s: f ? esc(`${f.owner || ""}${f.due ? " · due " + f.due : ""}`) : "Track puts it in the Exceptions register"}])
+      + Pulse.panel("What is in transit", Pulse.list([["Item"], ["Category"], ["Shipped", 1], ["Still in transit", 1], ["Unit"], ["Value", 1]],
+          L.map(r => ({cells: [`<b>${esc(r.description || r.item)}</b><div class="meta">${esc(r.item)} · entry ${esc(r.entry)}</div>`, `<span class="meta">${esc(r.category || "–")}</span>`, fmt(r.quantity, 3), `<b>${fmt(r.remaining, 3)}</b>`, esc(r.uom),
+            r.no_cost ? `<span class="chip warn">no cost</span>` : `<b>${fmt(r.value)}</b>`], open: `item|${r.item}`})), {max: 420}), `${fmt(L.length)} lines`)
+      + `<p class="meta">${esc(d.definitions.fix)}</p>`});
+}
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-trtrackpop]"); if (!b) return; ev.preventDefault(); trTrack(b.dataset.trtrackpop); });
+function trListPop(kind){
+  const d = trData; if (!d) return;
+  let R = d.transfers, title = "Transfers in transit";
+  if (kind === "over") { R = R.filter(t => t.over); title = `In transit over ${d.flag_days} days`; }
+  else if (kind === "unlinked") { R = R.filter(t => !t.order); title = "Destination unknown"; }
+  else if (kind === "partly") { R = R.filter(t => t.partly); title = "Partly received"; }
+  else if (kind === "nocost") { const s = new Set(d.rows.filter(r => r.no_cost).map(r => r.shipment)); R = R.filter(t => s.has(t.shipment)); title = "With lines without a cost"; }
+  else if (kind.startsWith("age:")) { const a = d.ages[+kind.slice(4)]; R = R.filter(t => t.days != null && t.days >= a.from && (a.to == null || t.days <= a.to)); title = `In transit ${a.age}`; }
+  else if (kind.startsWith("to:")) { const c = kind.slice(3); R = R.filter(t => t.to === c); title = `To ${trLoc(c, (d.names || {})[c.toUpperCase()])}`; }
+  else if (kind.startsWith("route:")) { const [a, b] = kind.slice(6).split(">"); R = R.filter(t => t.from === a && t.to === b); title = `${a || "?"} → ${b || "?"}`; }
+  const sum = R.reduce((a, t) => a + t.value, 0);
+  Pulse.pop({title: esc(title), sub: esc(`Transfers in transit · ${d.company} · ${d.as_of}`), body:
+    Pulse.tiles([{l: "Transfers", v: fmt(R.length)}, {l: "Value in transit", v: flM(sum)}, {l: "Lines", v: fmt(R.reduce((a, t) => a + t.lines, 0))}, {l: "Oldest", v: R.length ? fmt(Math.max(...R.map(t => t.days || 0))) + " d" : "–"},
+      {l: "Flagged", v: fmt(R.filter(t => t.over).length), cls: R.some(t => t.over) ? "up" : ""}])
+    + Pulse.list([["Shipment"], ["From"], ["To"], ["Shipped"], ["Days", 1], ["Lines", 1], ["Value", 1], ["Follow-up"]],
+      R.map(t => ({cells: [`<b>${esc(t.shipment)}</b><div class="meta">${esc(t.order ? "order " + t.order : "order not found")}</div>`, esc(t.from || "–"), t.to ? esc(t.to) : `<span class="meta">unknown</span>`, esc(t.shipped),
+        `<b class="${t.over ? "up" : ""}">${fmt(t.days)}</b>`, fmt(t.lines), `<b>${fmt(t.value)}</b>`, dkFollow(trFu(t)) || `<span class="meta">not tracked</span>`], open: `trship|${t.shipment}`})), {max: 480, none: "No transfer."})});
+}
+function trCatPop(cat){
+  const d = trData; if (!d) return;
+  const L = d.rows.filter(r => (r.category || "(no category)") === cat).sort((a, b) => b.value - a.value);
+  Pulse.pop({title: esc(cat), sub: esc(`Item category · in transit · ${d.company}`), body:
+    Pulse.tiles([{l: "Lines", v: fmt(L.length)}, {l: "Value in transit", v: flM(L.reduce((a, r) => a + r.value, 0))}, {l: "Transfers", v: fmt(new Set(L.map(r => r.shipment)).size)}])
+    + Pulse.list([["Item"], ["Shipment"], ["From → to"], ["Days", 1], ["Still in transit", 1], ["Value", 1]],
+      L.map(r => ({cells: [`<b>${esc(r.description || r.item)}</b><div class="meta">${esc(r.item)}</div>`, esc(r.shipment), esc(`${r.from || "?"} → ${r.to || "?"}`), fmt(r.days), `${fmt(r.remaining, 3)} ${esc(r.uom)}`, `<b>${fmt(r.value)}</b>`], open: `trship|${r.shipment}`})), {max: 480})});
+}
+Pulse.on("trship", doc => trShipPop(doc));
+Pulse.on("trlist", k => trListPop(k));
+Pulse.on("trcat", c => trCatPop(c));
+$("trExp").onclick = () => {
+  const d = trData; if (!d || !d.transfers) { alert("Nothing read yet."); return; }
+  const R = trRows(), keep = new Set(R.map(t => t.shipment));
+  xlsxTable(`Transfers in transit ${d.company} ${d.as_of}`, [
+    {title: "Transfers", header: ["Shipment", "Transfer order", "Linked by", "From", "From name", "To", "To name", "Shipped", "Days in transit", "Flagged", "Lines", "Items", "Value in transit", "Value shipped", "Partly received", "Follow-up", "Owner", "Due"],
+     formats: ["text", "text", "text", "text", "text", "text", "text", "text", "num", "text", "num", "num", "num", "num", "text", "text", "text", "text"],
+     rows: R.map(t => { const f = trFu(t) || {}; return [t.shipment, t.order, t.link, t.from, t.from_name, t.to, t.to_name, t.shipped, t.days, t.over ? "yes" : "", t.lines, t.items, t.value, t.value_shipped, t.partly ? "yes" : "", f.status || "Not tracked", f.owner || "", f.due || ""]; })},
+    {title: "Lines", header: ["Shipment", "Transfer order", "From", "To", "Shipped", "Days", "Item", "Description", "Category", "Unit", "Quantity shipped", "Still in transit", "Value in transit", "Item ledger entry"],
+     formats: ["text", "text", "text", "text", "text", "num", "text", "text", "text", "text", "num", "num", "num", "text"],
+     rows: d.rows.filter(r => keep.has(r.shipment)).map(r => [r.shipment, r.order, r.from, r.to, r.shipped, r.days, r.item, r.description, r.category, r.uom, r.quantity, r.remaining, r.value, String(r.entry)])},
+    {title: "Routes", header: ["From", "To", "Transfers", "Value", "Oldest (days)"], formats: ["text", "text", "num", "num", "num"], rows: d.routes.map(r => [r.from, r.to, r.transfers, r.value, r.oldest])},
+    {title: "By age", header: ["Days in transit", "Transfers", "Value"], formats: ["text", "num", "num"], rows: d.ages.map(a => [a.age, a.transfers, a.value])}],
+    [`${d.company} · as of ${d.as_of} · flagged after ${d.flag_days} days`, `Filters of the list: ${[$("trQ").value, $("trFromF").value, $("trToF").value, $("trShowF").value].filter(Boolean).join(", ") || "none"}`].concat(Object.values(d.definitions || {})));
+};
 // ---- Settings: the registry and the limits
 async function liSettings(){
   try{
@@ -8627,6 +8961,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
   if(b.dataset.view==="billyrec" && (!biData || biData.company !== ($("company").value || biData.company))) loadBilly(false);
   if(b.dataset.view==="emcpriv" && !epData) loadEp(false);
+  if(b.dataset.view==="doccontrol") dkShowTab(dkTab);
   if(b.dataset.view==="settings") { liSettings(); loadKm(); loadAc(); }
   if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
   if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
@@ -8734,6 +9069,7 @@ function openFromHash(){
   if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
   if (v === "stockstop") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("stockstop"); return; }
+  if (v === "transit" || v === "nopo") { dkTab = v; const db = document.querySelector(`#nav button[data-view="doccontrol"]`); if (db && !db.classList.contains("on")) db.click(); else dkShowTab(v); return; }
   if (v === "sevenrooms") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("sevenrooms"); return; }
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();

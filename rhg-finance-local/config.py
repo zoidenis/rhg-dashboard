@@ -49,6 +49,8 @@ E_ITEMS = get("E_ITEMS", "PbItems")
 E_ILE = get("E_ILE", "ItemLedgerEntries")
 E_REGISTERS = get("E_REGISTERS", "ItemRegisters")
 E_LOCATIONS = get("E_LOCATIONS", "NavLocations")
+# the location card (name, Use As In-Transit): the in-transit locations of Transfers in transit
+E_LOCATION_CARD = get("E_LOCATION_CARD", "LocationCard")
 
 # Background warm-up and instant serving, as in the purchasing tower.
 WARM_AT = get("WARM_AT", "05:15")

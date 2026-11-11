@@ -43,6 +43,7 @@ DEFAULT_SETTINGS = {
         "stock_new_days": 30,            # a first receipt this recent makes a new item
         "stock_value_floor": 10000,      # ignore small balances in the slow-stock lists
         "inventory_difference": 100000,  # inventory against G/L difference worth an exception
+        "transit_days": 3,               # a transfer in transit longer than this is flagged
     },
     "owners": {"default": "", "accounting": "", "treasury": "", "receivables": "",
                "payables": "", "inventory": ""},

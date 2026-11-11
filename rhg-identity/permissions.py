@@ -248,6 +248,11 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.sales.chanprofit": "finance.s.sales.main",
                  # Control → Simphony ↔ Billy: whoever reads Simphony ↔ BC
                  "finance.s.billyrec": "finance.s.salesrec",
+                 # Control → Document control: invoices without PO for whoever reads them in Purchasing or reads
+                 # payables; transfers in transit for whoever reads stock
+                 "finance.s.doccontrol.nopo": ("purchasing.s.compliance", "finance.s.kartela.ap"),
+                 "finance.s.doccontrol.transit": ("finance.s.inventory.movement", "finance.s.inventory.overview",
+                                                  "finance.s.inventory.loc"),
                  # Control → EMC privileges (who can do what in Simphony): whoever holds Settings
                  "finance.s.emcpriv": "finance.s.settings",
                  # Sales → SevenRooms ↔ Simphony: whoever reads Sales
