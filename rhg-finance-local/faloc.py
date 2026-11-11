@@ -203,14 +203,35 @@ def build(S, company, period, currency, settings):
             "definitions": DEFINITIONS}
 
 
+def held(client, company, refresh_now=False):
+    """(summary, stage): the summary of the company when it was topped up in the last ten minutes (stage None);
+    else a background top-up is started and the summary already held answers meanwhile (stage = what it reads),
+    or (None, {"pending": …}) the very first time."""
+    with _file_lock:
+        S = _read().get(company)
+    if S and time.time() - (S.get("at") or 0) < KEEP and not refresh_now:
+        return S, None
+    job = _start(client, company, refresh_now)
+    if isinstance(job, dict) and job.get("available") is False:
+        return None, job
+    if S:
+        return S, job.get("stage", "") or "reading"
+    return None, {"pending": True, "stage": job.get("stage", ""), "elapsed": int(time.time() - job["started"])}
+
+
 def request(client, company, period, currency, refresh_now=False):
     """The screen: from the summary when it was topped up in the last ten minutes, else a background
     read (the first one reads the whole FA ledger; later ones only the newer entries)."""
-    with _file_lock:
-        S = _read().get(company)
-    fresh = S and time.time() - (S.get("at") or 0) < KEEP and not refresh_now
-    if fresh:
-        return build(S, company, period, currency, store.get_settings())
+    S, stage = held(client, company, refresh_now)
+    if S is None:
+        return stage
+    r = build(S, company, period, currency, store.get_settings())
+    if stage:
+        r["refreshing"] = stage
+    return r
+
+
+def _start(client, company, refresh_now):
     key = company or ""
     with _lock:
         job = _jobs.get(key)
@@ -230,12 +251,7 @@ def request(client, company, period, currency, refresh_now=False):
                     traceback.print_exc()
                     job.update(state="failed", finished=time.time(), error=str(exc)[:300])
             threading.Thread(target=run, daemon=True, name="faloc").start()
-    # while the top-up runs, the summary already held answers (marked as being refreshed)
-    if S:
-        r = build(S, company, period, currency, store.get_settings())
-        r["refreshing"] = job.get("stage", "")
-        return r
-    return {"pending": True, "stage": job.get("stage", ""), "elapsed": int(time.time() - job["started"])}
+    return job
 
 
 DEFINITIONS = {

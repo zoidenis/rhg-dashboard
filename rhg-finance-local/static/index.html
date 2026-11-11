@@ -1364,13 +1364,40 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div class="hint" id="faDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
     <div id="faMain">
-    <div class="money" id="faKpis"></div>
-    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Fixed assets and CAPEX</h2><p class="hint" id="faNote"></p></div>
-      <div style="display:flex;gap:8px"><button class="mini dark" id="faLoad">Read</button>
-      <button class="mini" data-drill="assets">Open entries</button></div></div>
-      <div class="scroll"><table id="faTypes"></table></div></div>
-    <div class="card"><h2>Assets touched in the period</h2><p class="hint">Acquisitions and depreciation per asset</p>
-      <div class="scroll"><table id="faAssets"></table></div></div>
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Fixed assets register</h2>
+      <p class="hint">Every asset of the company at the end of the period chosen above: its cost, accumulated depreciation and net book value, and the depreciation of the period, the year and the last month. From the whole FA ledger, kept summed per asset and month (the same read as Location intelligence). Click any figure, bar or asset for the detail.</p></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="mini dark" id="frRead">Read again</button><button class="mini exp" id="frExp" type="button">Export ▾</button></div></div>
+      <p class="meta" id="frStatus" style="margin:6px 0 0">Open the screen to read the register.</p></div>
+    <div class="kpis" id="frKpis"></div>
+    <div class="grid">
+      <div class="card"><h2>Depreciation by month</h2><p class="hint" id="frDepNote">This year to the period's month. Click a month for its assets.</p><div id="frDepCols"></div></div>
+      <div class="card"><h2>Additions by month</h2><p class="hint">Acquisition cost posted, this year. Click a month for its assets.</p><div id="frAddCols"></div></div>
+    </div>
+    <div class="card" style="margin-bottom:15px"><h2>Depreciation checks</h2><p class="hint">On the assets in use at the end of the period. Click a check for its assets.</p><div id="frChecks"></div></div>
+    <div class="grid">
+      <div class="card"><h2>By class</h2><p class="hint">Net book value and accumulated depreciation of each FA class. Click a class for its assets.</p><div id="frClass"></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="frClassT"></table></div></details></div>
+      <div class="card"><h2>By location</h2><p class="hint">The FA location on each asset's latest entry. Click a location for its pop-up.</p><div id="frLoc"></div>
+        <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="frLocT"></table></div></details></div>
+    </div>
+    <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Every asset</h2><p class="hint" id="frListNote"></p></div></div>
+      <div class="filters" style="margin:0 0 10px">
+        <label>Search<input id="frQ" placeholder="asset, description"></label>
+        <label>Class<select id="frClassF"><option value="">All</option></select></label>
+        <label>Location<select id="frLocF"><option value="">All</option></select></label>
+        <label>Status<select id="frStF"><option value="">In use and fully depreciated</option><option value="in use">In use</option><option value="fully">Fully depreciated</option><option value="disposed">Disposed this year</option><option value="all">All</option></select></label>
+        <label>Order<select id="frSort"><option value="nbv">by net book value</option><option value="cost">by cost</option><option value="dep_ytd">by depreciation this year</option><option value="acquired">by acquisition, newest first</option><option value="dep_pct">by % depreciated</option></select></label></div>
+      <div class="scroll"><table id="frTable"></table></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><span class="meta" id="frMore"></span><button class="mini" id="frMoreBtn" style="display:none">Show 200 more</button></div></div>
+    <div class="card" style="margin-bottom:15px"><details class="pz-fold" style="margin:0"><summary>Postings of the period: the FA ledger entries of the dates chosen</summary>
+      <div class="card-head" style="margin-top:10px"><div><p class="hint" id="faNote"></p></div>
+        <div style="display:flex;gap:8px"><button class="mini dark" id="faLoad">Read</button><button class="mini" data-drill="assets">Open entries</button></div></div>
+      <div class="money" id="faKpis"></div>
+      <div class="scroll"><table id="faTypes"></table></div>
+      <h3 style="font-size:14px;margin:14px 0 6px">Assets with postings in the period</h3>
+      <div class="scroll"><table id="faAssets"></table></div></details></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+      <div class="hint" id="frDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
   </section>
 
@@ -2476,6 +2503,7 @@ function render(){
   if($("v-inventory").classList.contains("on") && ilTab === "sku" && skData && skKey !== skQuery()) loadSk(false);
   if(typeof tdState !== "undefined" && tdState.bar){ tdRender(); if (!tdCur()) tdLoad(false); }
   if($("v-assets").classList.contains("on") && faTab === "loc" && faKey !== faQuery()) loadFa(false);
+  if($("v-assets").classList.contains("on") && faTab !== "loc" && frKey !== faQuery()) loadFr(false);
   if($("v-budget").classList.contains("on") && blTab === "loc") { if (blKey !== blQuery()) loadBl(false); else blRender(); }
   if($("v-inventory").classList.contains("on")){
     if (!data.stockSummary) loadStockSummary(); else renderStockSummary();
@@ -8616,6 +8644,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="treasury" && data && !(data.treasury||{}).loaded) loadPane("/api/treasury","treasury",renderTreasury,"trsNote");
   if(b.dataset.view==="pl" && data) fcWaterfall();
   if(b.dataset.view==="assets" && data && !(data.assets||{}).loaded) loadPane("/api/assets","assets",renderAssets,"faNote");
+  if(b.dataset.view==="assets" && faTab !== "loc" && (!frData || frKey !== faQuery())) loadFr(false);
   if(b.dataset.view==="budget" && data && !(data.budget||{}).loaded) loadPane("/api/budget","budget",renderBudget,"bgNote");
   if(b.dataset.view==="group" && data && !(data.group||{}).loaded) loadPane("/api/consolidation","group",renderGroup,"grpNote");
   // the open screen is part of the address, so the control center can link straight to it
@@ -10197,10 +10226,166 @@ function faShowTab(tab){
   $("faMain").style.display = tab === "loc" ? "none" : "";
   $("faLocView").style.display = tab === "loc" ? "" : "none";
   if (tab === "loc") { if (!faData || faKey !== faQuery()) loadFa(false); else faRender(); }
+  else if (!frData || frKey !== faQuery()) loadFr(false);
 }
 document.querySelectorAll("#faTabs button").forEach(b => b.onclick = () => faShowTab(b.dataset.t));
 $("faSort").onchange = () => { faSort = $("faSort").value; faRender(); };
 $("faRead").onclick = () => loadFa(true);
+// ---------- Fixed assets register (faregister.py): every asset, its depreciation, the checks, as pop-ups ----------
+var frData = null, frKey = "", frTimer = null, frShow = 200;
+const FR_ST = {"in use": "In use", fully: "Fully depreciated", disposed: "Disposed this year"};
+const frRow = r => Object.fromEntries(frData.columns.map((c, i) => [c, r[i]]));
+const frLocName = (code, name) => name || code || "No FA location";
+async function loadFr(refresh){
+  clearTimeout(frTimer);
+  const q = faQuery();
+  if (frKey !== q) { frData = null; frKey = q; }
+  $("frStatus").textContent = "Reading the register…";
+  try {
+    const j = await readJSON(await fetch("/api/assets/register?" + q + (refresh ? "&refresh=1" : "")));
+    if (frKey !== q) return;
+    if (j.error && !j.available) throw new Error(j.error);
+    if (j.pending) {
+      $("frStatus").textContent = `Reading the whole FA ledger the first time (${j.stage || "starting"}, ${fmt(j.elapsed || 0)} s): the register shows when it is in.`;
+      frTimer = setTimeout(() => loadFr(false), 5000); return;
+    }
+    frData = j; frShow = 200; renderFr();
+    if (j.refreshing) frTimer = setTimeout(() => loadFr(false), 15000);
+  } catch (e) { $("frStatus").textContent = "Could not read: " + e.message; }
+}
+function frFiltered(){
+  const q = $("frQ").value.trim().toLowerCase(), cl = $("frClassF").value, lo = $("frLocF").value, st = $("frStF").value, so = $("frSort").value;
+  let R = frData.rows.map(frRow).filter(x => (st === "all" || (st ? x.status === st : x.status !== "disposed"))
+    && (!cl || (x.class || "—") === cl) && (!lo || x.location === lo) && (!q || (x.asset + " " + x.description).toLowerCase().includes(q)));
+  const key = {nbv: x => -x.nbv, cost: x => -x.cost, dep_ytd: x => -x.dep_ytd, acquired: x => (x.acquired ? -Number(x.acquired.replace("-", "")) : 0), dep_pct: x => -(x.dep_pct || 0)}[so];
+  return R.sort((a, b) => key(a) - key(b));
+}
+const frStatusTag = x => x.status === "disposed" ? `<span class="meta">disposed</span>` : x.status === "fully" ? `<span class="meta">fully depreciated</span>` : "in use";
+function frTable(){
+  const R = frFiltered(), shown = R.slice(0, frShow), C = frData.currency || "";
+  $("frListNote").textContent = `${fmt(R.length)} assets · cost ${flM(R.reduce((a, x) => a + x.cost, 0))} · net book value ${flM(R.reduce((a, x) => a + x.nbv, 0))} ${C} · depreciation this year ${flM(R.reduce((a, x) => a + x.dep_ytd, 0))}`;
+  $("frTable").innerHTML = `<tr><th>Asset</th><th>Class</th><th>Location</th><th>Acquired</th><th class="num">Cost</th><th class="num">Accumulated depreciation</th><th class="num">Net book value</th><th class="num">% depreciated</th><th class="num">Depreciation this year</th><th class="num">Last month</th><th>Last depreciated</th><th>Status</th></tr>`
+    + (shown.map(x => `<tr data-pulse="faasset|${esc(x.asset)}" tabindex="0" style="cursor:pointer"><td><b>${esc(x.description || x.asset)}</b><div class="meta">${esc(x.asset)}</div></td><td class="meta">${esc(x.class || "–")}</td>
+      <td class="meta">${esc(frLocName(x.location, x.location_name))}</td><td class="meta">${esc(x.acquired || "–")}</td><td class="num">${fmt(x.cost)}</td><td class="num">${fmt(x.acc_dep)}</td>
+      <td class="num"><b class="${x.nbv < -1 ? "up" : ""}">${fmt(x.nbv)}</b></td><td class="num">${x.dep_pct == null ? "–" : fmt(x.dep_pct, 0) + "%"}</td><td class="num">${fmt(x.dep_ytd)}</td>
+      <td class="num">${x.dep_month ? fmt(x.dep_month) : "–"}</td><td class="meta">${esc(x.last_dep || "never")}</td><td>${frStatusTag(x)}</td></tr>`).join("")
+      || `<tr><td colspan="12" class="meta">No asset matches.</td></tr>`);
+  $("frMore").textContent = R.length > shown.length ? `The first ${fmt(shown.length)} of ${fmt(R.length)}; Export gives every one.` : "";
+  $("frMoreBtn").style.display = R.length > shown.length ? "" : "none";
+}
+function renderFr(){
+  const d = frData; if (!d || !d.available) return;
+  const t = d.totals, C = d.currency || "", P = d.period || {}, ck = d.checks || {};
+  $("frStatus").textContent = `${d.company} · depreciation book ${d.book || "–"} · at the end of ${flMon(P.months[1])} · ${fmt(d.entries)} FA ledger entries read`
+    + (d.read_at ? `, topped up ${new Date(d.read_at * 1000).toLocaleString("en-GB", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"})}` : "") + (d.refreshing ? ` · reading the newer entries (${d.refreshing})` : "");
+  const card = (l, v, sub, open, cls) => `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-pulse="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  const pct = t.cost ? t.acc / t.cost * 100 : null;
+  $("frKpis").innerHTML = card("Assets in use", fmt(t.assets), `cost ${flM(t.cost)} ${C}`, "frlist|all")
+    + card("Accumulated depreciation", flM(t.acc), `${pct == null ? "–" : fmt(pct, 1) + "%"} of the cost`, "frlist|all")
+    + card("Net book value", flM(t.nbv), `${C} at the end of ${flMon(P.months[1])}`, "frlist|all")
+    + card(`Depreciation · ${P.months[0] === P.months[1] ? flMon(P.months[1]) : "the period"}`, flM(t.dep_period), `this year ${flM(t.dep_ytd)}` + (P.months[0] !== P.months[1] ? ` · ${flMon(P.months[1])} ${flM(t.dep_month)}` : ""), `frmonth|${P.months[1]}`)
+    + card("Additions this year", flM(t.add_ytd), `in the period ${flM(t.add_period)}`, "frlist|added")
+    + card("Fully depreciated", fmt(t.fully), `cost ${flM(t.fully_cost)} still on the books`, "frlist|fully")
+    + card("Disposed this year", fmt(t.disposed_ytd), `book value taken off ${flM(t.disp_ytd)} · proceeds ${flM(t.proc_ytd)}`, t.disposed_ytd ? "frlist|disposed" : "");
+  const ms = d.months || [];
+  $("frDepCols").innerHTML = Pulse.cols(ms.map((m, i) => ({label: flMonS(m), segs: [[d.m_dep[i], "var(--ch-1)", "depreciation"]], open: `frmonth|${m}`,
+    tip: `${flMon(m)}: depreciation ${fmt(d.m_dep[i])} · net book value at its end ${fmt(d.m_nbv[i])}`})), null, {h: 150, aria: "Depreciation by month"});
+  $("frAddCols").innerHTML = Pulse.cols(ms.map((m, i) => ({label: flMonS(m), segs: [[d.m_add[i], "var(--ch-0)", "additions"]], open: `frmonth|${m}`,
+    tip: `${flMon(m)}: additions ${fmt(d.m_add[i])}`})), null, {h: 150, aria: "Additions by month"});
+  $("frDepNote").textContent = `This year to ${flMon(P.months[1])}: ${flM(t.dep_ytd)} ${C}. Click a month for its assets.`;
+  $("frChecks").innerHTML = Pulse.cases([
+    {n: (ck.missed || []).length, t: "Not depreciated in the month", w: d.closed ? `in use, depreciated before, nothing posted in ${flMon(P.months[1])}` : "the month has not ended yet", open: "frlist|missed"},
+    {n: (ck.never || []).length, t: "Never depreciated", w: "acquired before the month, book value left", open: "frlist|never"},
+    {n: (ck.beyond || []).length, t: "Depreciated beyond cost", w: "accumulated depreciation larger than the cost", open: "frlist|beyond"},
+    {n: (ck.fully || []).length, t: "Fully depreciated, still on the books", w: "for information", open: "frlist|fully"}]);
+  const seg = r => [[Math.max(0, r.nbv), "var(--ch-0)", "net book value"], [Math.max(0, r.acc), "var(--ch-4)", "accumulated depreciation"]];
+  const LG = [["var(--ch-0)", "net book value"], ["var(--ch-4)", "accumulated depreciation"]];
+  $("frClass").innerHTML = Pulse.bars(d.classes.slice(0, 15).map(c => ({key: c[0], segs: seg({nbv: c[4], acc: c[3]}), text: `<b>${flM(c[4])}</b> <span class="meta">${fmt(c[1])} assets</span>`, open: `frclass|${c[0]}`})), LG);
+  $("frClassT").innerHTML = `<tr><th>Class</th><th class="num">Assets</th><th class="num">Cost</th><th class="num">Accumulated depreciation</th><th class="num">Net book value</th><th class="num">Depreciation this year</th></tr>`
+    + d.classes.map(c => `<tr data-pulse="frclass|${esc(c[0])}" tabindex="0" style="cursor:pointer"><td>${esc(c[0])}</td><td class="num">${fmt(c[1])}</td><td class="num">${fmt(c[2])}</td><td class="num">${fmt(c[3])}</td><td class="num"><b>${fmt(c[4])}</b></td><td class="num">${fmt(c[5])}</td></tr>`).join("");
+  $("frLoc").innerHTML = Pulse.bars(d.locations.slice(0, 15).map(l => ({key: frLocName(l[0], l[1]), segs: seg({nbv: l[5], acc: l[4]}), text: `<b>${flM(l[5])}</b> <span class="meta">${fmt(l[2])} assets</span>`,
+    open: l[0] ? `loc|${l[0]}` : "frlist|noloc"})), LG);
+  $("frLocT").innerHTML = `<tr><th>Location</th><th class="num">Assets</th><th class="num">Cost</th><th class="num">Accumulated depreciation</th><th class="num">Net book value</th><th class="num">Depreciation this year</th></tr>`
+    + d.locations.map(l => `<tr><td>${esc(frLocName(l[0], l[1]))} <span class="meta">${esc(l[1] ? l[0] : "")}</span></td><td class="num">${fmt(l[2])}</td><td class="num">${fmt(l[3])}</td><td class="num">${fmt(l[4])}</td><td class="num"><b>${fmt(l[5])}</b></td><td class="num">${fmt(l[6])}</td></tr>`).join("");
+  const keepC = $("frClassF").value, keepL = $("frLocF").value;
+  $("frClassF").innerHTML = `<option value="">All</option>` + d.classes.map(c => `<option>${esc(c[0])}</option>`).join("");
+  $("frLocF").innerHTML = `<option value="">All</option>` + d.locations.map(l => `<option value="${esc(l[0])}">${esc(frLocName(l[0], l[1]))}</option>`).join("");
+  $("frClassF").value = keepC; $("frLocF").value = keepL;
+  $("frDefs").innerHTML = ["register", "source", "values", "movements", "checks"].filter(k => d.definitions[k]).map(k => `<p><span>${esc(d.definitions[k])}</span></p>`).join("");
+  frTable();
+}
+$("frRead").onclick = () => loadFr(true);
+["frQ"].forEach(id => $(id).oninput = () => { frShow = 200; frTable(); });
+["frClassF", "frLocF", "frStF", "frSort"].forEach(id => $(id).onchange = () => { frShow = 200; frTable(); });
+$("frMoreBtn").onclick = () => { frShow += 200; frTable(); };
+$("frExp").onclick = () => {
+  const d = frData; if (!d || !d.available) { alert("The register is not read yet."); return; }
+  const R = frFiltered(), P = d.period || {};
+  const H = ["Asset", "Description", "Class", "Location", "Location name", "Acquired", "Cost", "Accumulated depreciation", "Net book value", "% depreciated", "Depreciation in the period", "Depreciation this year", "Depreciation last month", "Last depreciated", "Status", "Additions this year"];
+  xlsxTable(`Fixed assets register ${d.company} ${P.months[1]}`, [
+    {title: "Register", header: H, formats: ["text", "text", "text", "text", "text", "text", "num", "num", "num", "pct", "num", "num", "num", "text", "text", "num"],
+     rows: R.map(x => [x.asset, x.description, x.class, x.location, x.location_name, x.acquired, x.cost, x.acc_dep, x.nbv, x.dep_pct == null ? "" : x.dep_pct / 100, x.dep_period, x.dep_ytd, x.dep_month, x.last_dep, FR_ST[x.status] || x.status, x.add_ytd])},
+    {title: "By class", header: ["Class", "Assets", "Cost", "Accumulated depreciation", "Net book value", "Depreciation this year"], formats: ["text", "num", "num", "num", "num", "num"], rows: d.classes},
+    {title: "By location", header: ["Location", "Name", "Assets", "Cost", "Accumulated depreciation", "Net book value", "Depreciation this year"], formats: ["text", "text", "num", "num", "num", "num", "num"], rows: d.locations},
+    {title: "By month", header: ["Month", "Additions", "Depreciation", "Net book value at its end"], formats: ["text", "num", "num", "num"], rows: d.months.map((m, i) => [m, d.m_add[i], d.m_dep[i], d.m_nbv[i]])}],
+    [`${d.company} · depreciation book ${d.book} · at the end of ${P.months[1]}`, `Filters of the list: ${[$("frQ").value, $("frClassF").value, $("frLocF").value, $("frStF").value].filter(Boolean).join(", ") || "none"}`]
+    .concat(Object.values(d.definitions || {})));
+};
+// pop-ups: a list of assets (a check, a class, the added, the disposed), one asset, one month
+function frListPop(kind){
+  const d = frData; if (!d) return;
+  const ck = d.checks || {}, all = d.rows.map(frRow);
+  const by = new Set(ck[kind] || []), cls = kind.startsWith("class:") ? kind.slice(6) : null;
+  const T = {all: "Assets in use", missed: "Not depreciated in the month", never: "Never depreciated", beyond: "Depreciated beyond cost",
+    fully: "Fully depreciated, still on the books", added: "Added this year", disposed: "Disposed this year", noloc: "Assets with no FA location"};
+  const R = all.filter(x => cls != null ? (x.class || "—") === cls && x.status !== "disposed" : kind === "all" ? x.status !== "disposed" : kind === "added" ? x.add_ytd > 0
+    : kind === "disposed" ? x.status === "disposed" : kind === "noloc" ? !x.location && x.status !== "disposed" : by.has(x.asset)).sort((a, b) => b.nbv - a.nbv || b.cost - a.cost);
+  const sum = k => R.reduce((a, x) => a + (x[k] || 0), 0);
+  Pulse.pop({title: esc(cls != null ? cls : T[kind] || kind), sub: esc(`${cls != null ? "FA class · " : ""}Fixed assets · ${d.company} · ${flMon(d.period.months[1])}`), body:
+    Pulse.tiles([{l: "Assets", v: fmt(R.length)}, {l: "Cost", v: flM(sum("cost"))}, {l: "Accumulated depreciation", v: flM(sum("acc_dep"))}, {l: "Net book value", v: flM(sum("nbv"))},
+      {l: "Depreciation this year", v: flM(sum("dep_ytd"))}])
+    + Pulse.list([["Asset"], ["Class"], ["Location"], ["Acquired"], ["Cost", 1], ["Net book value", 1], ["% depreciated", 1], ["This year", 1], ["Last depreciated"]],
+      R.map(x => ({cells: [`<b>${esc(x.description || x.asset)}</b><div class="meta">${esc(x.asset)}</div>`, `<span class="meta">${esc(x.class || "–")}</span>`, esc(frLocName(x.location, x.location_name)),
+        esc(x.acquired || "–"), fmt(x.cost), `<b>${fmt(x.nbv)}</b>`, x.dep_pct == null ? "–" : fmt(x.dep_pct, 0) + "%", fmt(x.dep_ytd), esc(x.last_dep || "never")], open: `faasset|${x.asset}`})),
+      {max: 480, limit: 400, none: "No asset."})});
+}
+Pulse.on("frlist", k => frListPop(k));
+Pulse.on("frclass", c => frListPop("class:" + c));
+Pulse.on("faasset", no => {
+  Pulse.pop({title: esc(no), sub: esc("Fixed asset"), body: async el => {
+    el.innerHTML = `<p class="meta"><span>Reading the asset…</span></p>`;
+    try {
+      const a = await readJSON(await fetch(`/api/assets/asset?${faQuery()}&no=${encodeURIComponent(no)}`));
+      if (!a.available) throw new Error(a.error || "not found");
+      const h2 = el.closest(".pl-pop").querySelector(".ph h2"), sub = el.closest(".pl-pop").querySelector(".ph .sub");
+      if (h2) h2.textContent = `${a.description || a.asset} · ${a.asset}`;
+      if (sub) sub.textContent = [a.class, a.location, `book ${a.book}`].filter(Boolean).join(" · ");
+      const H = a.history.slice().reverse();
+      el.innerHTML = Pulse.tiles([{l: "Cost", v: fmt(a.cost), s: `acquired ${a.first || "–"}`}, {l: "Accumulated depreciation", v: fmt(a.acc_dep), s: a.cost ? fmt(a.acc_dep / a.cost * 100, 1) + "% of the cost" : ""},
+          {l: "Net book value", v: fmt(a.nbv), cls: a.nbv < -1 ? "up" : "", s: a.disposed ? "disposed" : ""},
+          {l: "Depreciation this year", v: fmt(a.dep_ytd), s: `last month ${fmt(a.dep_month)} · last posted ${a.last_dep || "never"}`},
+          {l: "Pace", v: a.pace ? fmt(a.pace) + " / month" : "–", s: a.months_left != null ? `about ${fmt(a.months_left)} months of book value left at this pace` : "the last three months"}])
+        + Pulse.panel("Net book value by month", Pulse.cols(a.history.slice(-36).map(r => ({label: r[0].slice(2), segs: [[Math.max(0, r[7]), "var(--ch-0)", "net book value"]],
+            tip: `${r[0]}: cost ${fmt(r[5])} · accumulated depreciation ${fmt(r[6])} · net book value ${fmt(r[7])}${r[2] ? " · depreciation " + fmt(r[2]) : ""}`})), null, {h: 140, labels: 12, aria: "Net book value by month"}),
+          "the months with a posting")
+        + Pulse.panel("Month by month", Pulse.list([["Month"], ["Acquisition", 1], ["Depreciation", 1], ["Write-down", 1], ["Proceeds", 1], ["Cost", 1], ["Accumulated depreciation", 1], ["Net book value", 1]],
+            H.map(r => ({cells: [esc(r[0]), r[1] ? fmt(r[1]) : "", r[2] ? fmt(r[2]) : "", r[3] ? fmt(r[3]) : "", r[4] ? fmt(r[4]) : "", fmt(r[5]), fmt(r[6]), `<b>${fmt(r[7])}</b>`], open: `frmonth|${r[0]}`})), {max: 380}));
+    } catch (e) { el.innerHTML = `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+  }});
+});
+Pulse.on("frmonth", m => {
+  Pulse.pop({title: esc(flMon(m)), sub: esc("Fixed assets · the month's postings"), body: async el => {
+    el.innerHTML = `<p class="meta"><span>Reading the month…</span></p>`;
+    try {
+      const j = await readJSON(await fetch(`/api/assets/month?${faQuery()}&month=${encodeURIComponent(m)}`));
+      const sum = i => j.rows.reduce((a, r) => a + r[i], 0);
+      el.innerHTML = Pulse.tiles([{l: "Assets", v: fmt(j.count)}, {l: "Additions", v: fmt(sum(4))}, {l: "Depreciation", v: fmt(sum(5))}, {l: "Disposals", v: fmt(sum(6)), s: "book value taken off"}])
+        + Pulse.list([["Asset"], ["Class"], ["Location"], ["Additions", 1], ["Depreciation", 1], ["Disposal", 1]],
+          j.rows.map(r => ({cells: [`<b>${esc(r[1] || r[0])}</b><div class="meta">${esc(r[0])}</div>`, `<span class="meta">${esc(r[2] || "–")}</span>`, esc(r[3] || "–"),
+            r[4] ? fmt(r[4]) : "", r[5] ? fmt(r[5]) : "", r[6] ? fmt(r[6]) : ""], open: `faasset|${r[0]}`})), {max: 460, limit: 400, none: "Nothing posted in this month."});
+    } catch (e) { el.innerHTML = `<p class="meta">${esc("Could not read: " + e.message)}</p>`; }
+  }});
+});
 async function loadFa(refresh){
   clearTimeout(faTimer);
   const q = faQuery();
@@ -10281,8 +10466,8 @@ function faDraw(code){
   const chart = M.length ? `<div class="scroll"><table class="fl-tab" data-nosort><tr><th>Month</th><th class="num">Additions</th><th class="num">Depreciation</th><th style="width:45%"></th></tr>${M.map((m, i) => `<tr><td>${esc(flMon(m))}</td><td class="num">${fmt(L.m_add[i])}</td><td class="num">${fmt(L.m_dep[i])}</td>
       <td><div class="fl-split" style="height:6px"><i class="cl-c1" style="flex:${L.m_add[i]}"></i><i style="flex:${mx - L.m_add[i]};background:transparent"></i></div><div class="fl-split" style="height:6px;margin-top:2px"><i class="cl-c4" style="flex:${L.m_dep[i]}"></i><i style="flex:${mx - L.m_dep[i]};background:transparent"></i></div></td></tr>`).join("")}</table></div>` : "";
   const cls = L.by_class.length ? `<table data-nosort><tr><th>Class</th><th class="num">Assets</th><th class="num">Cost</th><th class="num">Book value</th></tr>${L.by_class.map(c => `<tr><td>${esc(c[0])}</td><td class="num">${fmt(c[1])}</td><td class="num">${fmt(c[2])}</td><td class="num"><b>${fmt(c[3])}</b></td></tr>`).join("")}</table>` : `<p class="hint">No asset in use.</p>`;
-  const top = L.top.length ? `<table><tr><th>Asset</th><th>Class</th><th class="num">Cost</th><th class="num">Book value</th><th class="num">Depr. YTD</th></tr>${L.top.map(x => `<tr><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="num">${fmt(x[3])}</td><td class="num"><b>${fmt(x[4])}</b></td><td class="num">${fmt(x[5])}</td></tr>`).join("")}</table>` : `<p class="hint">No asset in use.</p>`;
-  const added = L.added.length ? `<table><tr><th>Asset</th><th>Class</th><th>Month</th><th class="num">Cost</th></tr>${L.added.map(x => `<tr><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="meta">${esc(flMon(x[3]))}</td><td class="num">${fmt(x[4])}</td></tr>`).join("")}</table>` : `<p class="hint">Nothing added this year.</p>`;
+  const top = L.top.length ? `<table><tr><th>Asset</th><th>Class</th><th class="num">Cost</th><th class="num">Book value</th><th class="num">Depr. YTD</th></tr>${L.top.map(x => `<tr data-pulse="faasset|${esc(x[0])}" tabindex="0" style="cursor:pointer"><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="num">${fmt(x[3])}</td><td class="num"><b>${fmt(x[4])}</b></td><td class="num">${fmt(x[5])}</td></tr>`).join("")}</table>` : `<p class="hint">No asset in use.</p>`;
+  const added = L.added.length ? `<table><tr><th>Asset</th><th>Class</th><th>Month</th><th class="num">Cost</th></tr>${L.added.map(x => `<tr data-pulse="faasset|${esc(x[0])}" tabindex="0" style="cursor:pointer"><td>${esc(x[1] || x[0])}<div class="meta">${esc(x[0])}</div></td><td class="meta">${esc(x[2])}</td><td class="meta">${esc(flMon(x[3]))}</td><td class="num">${fmt(x[4])}</td></tr>`).join("")}</table>` : `<p class="hint">Nothing added this year.</p>`;
   $("faPop").innerHTML = `<div class="ph"><div class="ic">${flGlyph(L)}</div>
       <div><h2>${esc(L.name || code || "No FA location")}</h2><div class="sub">${esc(code || "no FA location")} · end of ${esc(faData.period.months[1])} · book ${esc(faData.book || "")} · ${esc(C)}</div></div><div class="sp"></div>
       <button class="close" data-faclose="1">Close ✕</button></div>

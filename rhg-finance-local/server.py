@@ -40,6 +40,7 @@ import chanprof
 import today as todayloc
 import unicorn_facts
 import faloc
+import faregister
 import recipients
 import exmail
 import itemstock
@@ -2805,6 +2806,27 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = q.get("company") or config.BC_COMPANY
                 self._send(200, faloc.request(client, company, period, company_currency(company), q.get("refresh") == "1"))
+            elif url.path in ("/api/assets/register", "/api/assets/asset", "/api/assets/month"):
+                # Fixed assets: every asset from the FA ledger summary (faregister.py), one asset, one month
+                try:
+                    period = periods(q.get("period"), q.get("mode") or "month")[:8]
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                S, stage = faloc.held(client, company, q.get("refresh") == "1")
+                if S is None:
+                    self._send(200, stage)
+                    return
+                if url.path.endswith("/register"):
+                    r = faregister.register(S, company, period, company_currency(company), store.get_settings())
+                elif url.path.endswith("/asset"):
+                    r = faregister.asset(S, q.get("no") or "", period)
+                else:
+                    r = faregister.month(S, (q.get("month") or "")[:7])
+                if stage:
+                    r["refreshing"] = stage
+                self._send(200, r)
             elif url.path == "/api/today/locations":
                 company = q.get("company") or config.BC_COMPANY
                 scope = "all" if q.get("scope") == "all" else "company"

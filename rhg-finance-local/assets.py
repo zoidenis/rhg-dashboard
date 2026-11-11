@@ -1,4 +1,4 @@
-"""Fixed assets and CAPEX for the period.
+"""Fixed assets: the postings of the period (the full register is faregister.py).
 
 The FA ledger holds hundreds of thousands of entries across the years, so only
 the selected period is read. Net book value per asset needs the full history and
