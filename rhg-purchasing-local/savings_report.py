@@ -161,14 +161,14 @@ def render_pdf(r, currency):
 
     if len(r["months"]) > 1:
         story.append(Paragraph("By month", st["h2"]))
-        story.append(grid([["Month", "Last year", "This year", "Savings", "Extra", "Net price effect", "Volume and mix"]]
+        story.append(grid([["Month", "Spend last year", "Spend this year", "Savings", "Extra", "Net price effect", "Volume and mix"]]
                           + [[m["month"], _m(m["ly"]), _m(m["cur"]), _m(m["save"]), _m(m["extra"]), _m(m["net"]),
                               _m(m["volume"])] for m in r["months"]],
                           [26 * mm] + [34 * mm] * 6, num_cols=range(1, 7), color_col=5))
 
     def group_table(title, rows_in, label, name_of=lambda g: g["key"]):
         story.append(Paragraph(title, st["h2"]))
-        story.append(grid([[label, "Last year", "This year", "Savings", "Extra", "Net price effect", "Items"]]
+        story.append(grid([[label, "Spend last year", "Spend this year", "Savings", "Extra", "Net price effect", "Items"]]
                           + [[Paragraph(e(name_of(g)), st["c"]), _m(g["ly"]), _m(g["cur"]), _m(g["save"]),
                               _m(g["extra"]), _m(g["net"]), str(g["items"])] for g in rows_in],
                           [78 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 32 * mm, 18 * mm], num_cols=range(1, 7),
@@ -176,7 +176,7 @@ def render_pdf(r, currency):
     group_table("By purchase type", r["streams"], "Type")
     if r.get("tree"):
         story.append(Paragraph("By purchase type and sub-category", st["h2"]))
-        rows_t = [["Type / sub-category", "Last year", "This year", "Savings", "Extra", "Net price effect", "Volume and mix"]]
+        rows_t = [["Type / sub-category", "Spend last year", "Spend this year", "Savings", "Extra", "Net price effect", "Volume and mix"]]
         for t in r["tree"]:
             rows_t.append([Paragraph(f"<b>{e(t['key'])}</b>", st["c"]), _m(t["ly"]), _m(t["cur"]), _m(t["save"]),
                            _m(t["extra"]), _m(t["net"]), _m(t["volume"])])
@@ -189,7 +189,7 @@ def render_pdf(r, currency):
     group_table("By location", r["locations"], "Location", lambda g: g["key"] or "(no location)")
 
     story.append(Paragraph(f"Every item ({r['items_total']})", st["h2"]))
-    rows_ = [["Item", "Category", "Status", "Unit cost LY", "Unit cost now", "Change", "Quantity", "Spend now",
+    rows_ = [["Item", "Category", "Status", "Unit cost\nlast year", "Unit cost\nnow", "Change", "Quantity", "Spend now",
               "Price effect", "Main suppliers"]]
     status_label = {"both": "compared", "new": "new", "dropped": "not bought", "excluded": "left out", "other": ""}
     for it in r["items"]:

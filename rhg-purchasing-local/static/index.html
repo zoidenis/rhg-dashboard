@@ -3935,7 +3935,7 @@ function renderSavings(){
   const netGood = s.net <= 0;
   const g = v => `<span class="down">${fmt(v)}</span>`, r = v => `<span class="up">${fmt(v)}</span>`;
   const net = v => v <= 0 ? `<span class="down">${sign(v)}</span>` : `<span class="up">${sign(v)}</span>`;
-  const grpTable = (rows, label, nameOf) => `<table><tr><th>${label}</th><th class="num">Last year</th><th class="num">This period</th><th class="num">Savings</th><th class="num">Extra</th><th class="num">Net price effect</th><th class="num">Items</th></tr>` +
+  const grpTable = (rows, label, nameOf) => `<table><tr><th>${label}</th><th class="num">Spend last year</th><th class="num">Spend this period</th><th class="num">Savings</th><th class="num">Extra</th><th class="num">Net price effect</th><th class="num">Items</th></tr>` +
     (rows.length ? rows.map(x => `<tr><td>${nameOf(x)}</td><td class="num">${fmt(x.ly)}</td><td class="num">${fmt(x.cur)}</td><td class="num">${x.save ? g(x.save) : "0"}</td><td class="num">${x.extra ? r(x.extra) : "0"}</td><td class="num"><b>${net(x.net)}</b></td><td class="num">${fmt(x.items)}</td></tr>`).join("")
       : `<tr><td colspan="7" class="meta">Nothing for this selection.</td></tr>`) + `</table>`;
   const status = {both: "compared", new: "new", dropped: "not bought now", excluded: "left out", other: ""};
@@ -3986,7 +3986,7 @@ function renderSavings(){
       <div class="card"><h2>By supplier</h2><p class="hint">${esc(d.definitions.suppliers)}</p><div class="scroll sv-cap">${grpTable(d.vendors, "Supplier", x => `${esc(x.name)} <span class="meta">${esc(x.key)}</span>`)}</div></div></div>` +
     `<div class="card"><div class="card-head"><div><h2>Items (${fmt(d.items_total)})</h2><p class="hint">Showing ${fmt(Math.min(300, items.length))}; the Excel file has every item. Sort by:
        <button class="mini" data-svsort="effect">price effect</button> <button class="mini" data-svsort="pct">change %</button> <button class="mini" data-svsort="spend">spend</button></p></div></div>
-      <div class="scroll"><table><tr><th>Item</th><th>Sub-category</th><th>Status</th><th class="num">Unit cost LY</th><th class="num">Now</th><th class="num">Change</th><th class="num">Quantity</th><th class="num">Spend now</th><th class="num">Price effect</th><th>Suppliers</th></tr>` +
+      <div class="scroll"><table><tr><th>Item</th><th>Sub-category</th><th>Status</th><th class="num">Unit cost last year</th><th class="num">Unit cost now</th><th class="num">Change</th><th class="num">Quantity</th><th class="num">Spend now</th><th class="num">Price effect</th><th>Suppliers</th></tr>` +
       items.slice(0, 300).map(i => `<tr><td>${esc(i.desc || i.item)} <span class="meta">${esc(i.item)}</span></td><td class="meta">${esc(i.sub || i.category)}</td><td class="meta">${status[i.status] || ""}</td>
         <td class="num">${i.ly_avg == null ? "–" : fmt(i.ly_avg, 2)}</td><td class="num">${i.cur_avg == null ? "–" : fmt(i.cur_avg, 2)}</td>
         <td class="num">${i.pct == null ? "" : (i.pct <= 0 ? `<span class="down">${fmt(i.pct, 1)}%</span>` : `<span class="up">+${fmt(i.pct, 1)}%</span>`)}</td>
@@ -4009,7 +4009,7 @@ function svTree(){
   const z = (v, cls) => v ? `<span class="${cls}">${fmt(v)}</span>` : `<span class="meta">0</span>`;
   const bar = (v, mx) => `<span class="sv-nb"><i class="${v <= 0 ? "sv-save" : "sv-extra"}" style="width:${Math.min(100, Math.abs(v) / Math.max(1, mx) * 100)}%"></i></span>`;
   const mxT = Math.max(1, ...tree.map(t => Math.abs(t.net)));
-  const head = `<tr><th>Purchase type / sub-category / item</th><th class="num">Last year</th><th class="num">This period</th><th class="num">Savings</th><th class="num">Extra</th><th class="num" colspan="2">Net price effect</th><th class="num">Volume and mix</th><th class="num">Items</th></tr>`;
+  const head = `<tr><th>Purchase type / sub-category / item</th><th class="num">Spend last year</th><th class="num">Spend this period</th><th class="num">Savings</th><th class="num">Extra</th><th class="num" colspan="2">Net price effect</th><th class="num">Volume and mix</th><th class="num">Items</th></tr>`;
   let rows = "";
   for (const t of tree) {
     const kt = "t" + SEP + t.key, ot = svOpen.has(kt);
