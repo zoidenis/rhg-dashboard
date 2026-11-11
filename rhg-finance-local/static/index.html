@@ -4714,6 +4714,8 @@ async function xlsxTable(name, sheets, notes){
   a.href = url; a.download = name.replace(/[^A-Za-z0-9._ -]+/g, "").replace(/ /g, "_") + (fmt === "pdf" ? ".pdf" : ".xlsx");
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
+// every pop-up: Export ▾ (Excel, PDF, Send by email) of what it shows, for the roles that can export
+Pulse.exporter((name, sheets, notes) => xlsxTable(name, sheets, notes), () => can("export"));
 async function simphonyPost(path, body){
   const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json", "X-Requested-With":"RHG-Finance"},
     body: JSON.stringify(body || {})});

@@ -1391,6 +1391,19 @@ function exportGo(url){ if (exportMode === "capture") { exportCaptured = {url}; 
   window.addEventListener("resize", close);
   document.addEventListener("scroll", ev => { if (menu && Date.now() - openedAt > 300 && !menu.contains(ev.target)) close(); }, true);
 })();
+// one table or a pop-up as an Excel file (xlsxtable.py), or a PDF of it: the screen sends the rows it shows
+async function xlsxTable(name, sheets, notes){
+  if (exportMode === "capture") { exportCaptured = {table: {name, sheets, notes: notes || []}}; return; }
+  const fmt = exportFmt;
+  const r = await fetch("/api/xlsx/table", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Purchasing"},
+    body: JSON.stringify({name, sheets, notes: notes || [], format: fmt})});
+  if (!r.ok) { let j = {}; try { j = await r.json(); } catch (e) { /* not JSON */ } throw new Error(j.error || `failed (${r.status})`); }
+  const url = URL.createObjectURL(await r.blob()), a = document.createElement("a");
+  a.href = url; a.download = name.replace(/[^A-Za-z0-9._ -]+/g, "").replace(/ /g, "_") + (fmt === "pdf" ? ".pdf" : ".xlsx");
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+// every pop-up: Export ▾ (Excel, PDF, Send by email) of what it shows, for the roles that can export
+Pulse.exporter((name, sheets, notes) => xlsxTable(name, sheets, notes), () => can("export"));
 const fmt = (n, d=0) => n == null || isNaN(n) ? "–" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 let CUR = "ALL";
 const all = n => fmt(n) + " " + CUR;

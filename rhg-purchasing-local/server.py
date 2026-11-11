@@ -27,6 +27,7 @@ from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse
 
 import analytics
 import xlsxpdf
+import xlsxtable
 import exportmail
 import auth
 import brief
@@ -1698,9 +1699,7 @@ class Handler(BaseHTTPRequestHandler):
         """Export → Send by email (exportmail.py): the file built here as its download would be, then sent."""
         try:
             to, fmt = exportmail.check(body)
-            if body.get("table"):
-                if tower != "Finance":
-                    raise ValueError("This export cannot be sent by email.")
+            if body.get("table"):                  # a table or a pop-up as the screen shows it (xlsxtable.py)
                 t = body["table"]
                 fname = xlsxtable.filename(t.get("name"))
                 data = xlsxtable.render(t.get("sheets"), t.get("notes") or [])
@@ -2311,6 +2310,33 @@ class Handler(BaseHTTPRequestHandler):
                         self._send(400, {"error": str(exc)})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path == "/api/xlsx/table":
+                # a table or a pop-up as the person sees it (xlsxtable.py): nothing is read from BC here
+                if self.headers.get("X-Requested-With") != "RHG-Purchasing":
+                    self._send(403, {"error": "This request must come from Purchasing."})
+                    return
+                if not auth.can(user, "export"):
+                    self._send(403, {"error": "Your role cannot export (needs purchasing.export)."})
+                    return
+                fname = xlsxtable.filename(body.get("name"))
+                ctype = xlsxpdf.XLSX
+                try:
+                    data = xlsxtable.render(body.get("sheets"), body.get("notes") or [])
+                    if body.get("format") == "pdf":
+                        data = xlsxpdf.render(data, str(body.get("name") or "")[:150])
+                        fname, ctype = xlsxpdf.pdf_name(fname), "application/pdf"
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                store.audit("export", "table · " + str(body.get("name") or "")[:120], actor, {},
+                            {"rows": sum(len(x.get("rows") or []) for x in body.get("sheets") or [] if isinstance(x, dict))}, "")
             elif url.path == "/api/export/email":
                 if self.headers.get("X-Requested-With") != "RHG-Purchasing":
                     self._send(403, {"error": "This request must come from Purchasing."})

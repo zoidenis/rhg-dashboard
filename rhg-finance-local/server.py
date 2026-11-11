@@ -2428,9 +2428,7 @@ class Handler(BaseHTTPRequestHandler):
         """Export → Send by email (exportmail.py): the file built here as its download would be, then sent."""
         try:
             to, fmt = exportmail.check(body)
-            if body.get("table"):
-                if tower != "Finance":
-                    raise ValueError("This export cannot be sent by email.")
+            if body.get("table"):                  # a table or a pop-up as the screen shows it (xlsxtable.py)
                 t = body["table"]
                 fname = xlsxtable.filename(t.get("name"))
                 data = xlsxtable.render(t.get("sheets"), t.get("notes") or [])

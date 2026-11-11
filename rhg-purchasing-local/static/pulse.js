@@ -12,6 +12,8 @@
    4. The pieces: Pulse.tiles, Pulse.panel, Pulse.bars (horizontal bars), Pulse.cols (a column per day or month,
       clickable), Pulse.list (a table whose rows open something), Pulse.fold (a table kept closed under "Table").
    5. Pulse.places: one pop-up per location, its areas side by side (see below); "loc|code" opens a location.
+   6. Export: with Pulse.exporter(fn, allowed) set by the tower, every pop-up gets "Export ▾" (Excel, PDF, Send by
+      email: the tower's Export menu); what the pop-up shows (cards, lists, tables, bars, columns) goes as sheets.
    Texts are English; the towers' i18n runtime translates them as they are drawn. */
 (function () {
   "use strict";
@@ -63,6 +65,97 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
   const num = (v, d) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("en-US", {maximumFractionDigits: d || 0, minimumFractionDigits: d || 0});
   const money = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? num(v / 1e6, 1) + " M" : Math.abs(v) >= 1e4 ? num(Math.round(v / 1e3)) + " k" : num(Math.round(v));
 
+  // ---- Export: what a pop-up shows, as the sheets of a workbook (the tower's xlsxTable: Excel, PDF or email)
+  let exporter = null, exportAllowed = () => true;
+  function addExport(bd){
+    const ph = bd.querySelector(".pl-pop .ph");
+    if (!ph || !exporter || ph.querySelector("[data-pzexp]") || !exportAllowed()) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "close exp"; b.textContent = "Export ▾"; b.setAttribute("data-pzexp", "1");
+    b.setAttribute("aria-haspopup", "menu"); b.title = "Excel, PDF or send by email: what this pop-up shows";
+    const close = [...ph.querySelectorAll(":scope > .close:not(.exp), :scope > [data-pzclose]")].pop();   // next to Close
+    ph.insertBefore(b, close || null);
+  }
+  // the text of a cell: lines kept apart with " · ", buttons and inputs left out
+  function cellText(el){
+    const c = el.cloneNode(true);
+    c.querySelectorAll("button, input, select, textarea, svg, .pz-sw").forEach(x => x.remove());
+    const h = c.innerHTML.replace(/<(br|\/?div|\/?p|\/li|\/h[1-6])\b[^>]*>/gi, " · ").replace(/<[^>]+>/g, " ");
+    const t = document.createElement("textarea"); t.innerHTML = h;
+    return t.value.replace(/\s+/g, " ").replace(/( · )+/g, " · ").replace(/^\s*·\s*|\s*·\s*$/g, "").replace(/\s+·/g, " ·").trim();
+  }
+  // a number stays a number (a percentage as a percentage cell); anything else is text
+  function cellValue(text){
+    const n = text.replace(/\u2212/g, "-").replace(/[,\s]/g, "").replace(/^\+/, "");
+    if (/^-?\d+(\.\d+)?%$/.test(n)) return {pct: Number(n.slice(0, -1)) / 100, t: text};
+    return /^-?\d+(\.\d+)?$/.test(n) ? Number(n) : text;
+  }
+  function heading(el, body){
+    const box = el.closest(".pz-panel, .pl-panel, .card, .sv-sec, .rg-sec");
+    const h = box && body.contains(box) ? box.querySelector("h3, h2, h4") : null;
+    if (h && !el.contains(h)) return cellText(h);
+    for (let x = el; x && x !== body; x = x.parentElement)
+      for (let y = x.previousElementSibling; y; y = y.previousElementSibling) {
+        const hh = y.matches("h2, h3, h4") ? y : y.querySelector && y.querySelector("h2, h3, h4");
+        if (hh) return cellText(hh);
+      }
+    return "";
+  }
+  function sheetOf(title, header, rows){
+    const w = Math.max(header.length, ...rows.map(r => r.length));
+    rows = rows.map(r => r.concat(Array(w - r.length).fill("")));
+    header = header.concat(Array(w - header.length).fill(""));
+    const formats = header.map((_, i) => {
+      const v = rows.map(r => r[i]).filter(x => x !== "" && x != null);
+      if (v.length && v.every(x => x && typeof x === "object")) return "pct";
+      return v.length && v.every(x => typeof x === "number") ? (v.every(x => Number.isInteger(x)) ? "num" : "qty") : "text";
+    });
+    rows = rows.map(r => r.map((x, i) => x && typeof x === "object" ? (formats[i] === "pct" ? x.pct : x.t) : x));
+    return {title: (title || "Sheet").slice(0, 31), header, rows, formats};
+  }
+  function popSheets(pop){
+    const body = pop.querySelector(".pl-body") || pop, out = [];
+    const popTitle = cellText(pop.querySelector(".ph h2") || document.createElement("i")) || "Table";
+    const tiles = [...body.querySelectorAll(".pz-tile, .pl-tile, .kpi")].filter(t => !t.closest("table"));
+    if (tiles.length) out.push(sheetOf("Summary", ["Figure", "Value", "Note"], tiles.map(t =>
+      [cellText(t.querySelector(".l") || t), cellValue(cellText(t.querySelector(".v") || t)), cellText(t.querySelector(".s") || document.createElement("i"))])));
+    // the Summary's values mix numbers and text: a percentage there stays as written
+    body.querySelectorAll("table, .pz-hb, .pz-cols").forEach(el => {
+      if (el.closest(".pz-tile, .pl-tile") || (el.tagName === "TABLE" && el.parentElement.closest("table"))) return;
+      const title = heading(el, body) || popTitle;
+      if (el.tagName === "TABLE") {
+        const trs = [...el.rows].filter(r => r.cells.length);
+        if (!trs.length) return;
+        const first = [...trs[0].cells].every(c => c.tagName === "TH") ? trs.shift() : null;
+        const head = first ? [...first.cells].flatMap(c => [cellText(c)].concat(Array(Math.max(0, (c.colSpan || 1) - 1)).fill(""))) : [];
+        const rows = trs.filter(r => !r.classList.contains("rg-det")).map(r => [...r.cells].flatMap(c => [cellValue(cellText(c))].concat(Array(Math.max(0, (c.colSpan || 1) - 1)).fill(""))));
+        if (rows.length) out.push(sheetOf(title, head, rows));
+      } else if (el.classList.contains("pz-hb")) {
+        const rows = [...el.querySelectorAll(".pz-hr")].map(r => [cellText(r.querySelector(".k") || r), cellValue(cellText(r.querySelector(".t") || document.createElement("i"))),
+          (r.querySelector(".b") || {}).title || ""]);
+        if (rows.length) out.push(sheetOf(title, ["", "Value", "Detail"], rows));
+      } else {
+        const rows = [...el.querySelectorAll("g > title")].map(t => { const v = t.textContent, i = v.indexOf(": "); return i < 0 ? [v, ""] : [v.slice(0, i), v.slice(i + 2)]; });
+        if (rows.length) out.push(sheetOf(title, ["", "Value"], rows));
+      }
+    });
+    if (out.length > 8) {                                // a workbook keeps eight sheets: the rest together, by section
+      const rest = out.splice(7);
+      out.push(sheetOf("More", ["Section"].concat(rest[0].header), rest.flatMap(sh => sh.rows.map(r => [sh.title].concat(r)))));
+    }
+    return out;
+  }
+  document.addEventListener("click", ev => {
+    const b = ev.target.closest("[data-pzexp]"); if (!b || !exporter) return;
+    const pop = b.closest(".pl-pop"), ph = pop && pop.querySelector(".ph");
+    const title = ph ? cellText(ph.querySelector("h2") || ph) : "Pop-up", sub = ph && ph.querySelector(".sub") ? cellText(ph.querySelector(".sub")) : "";
+    const sheets = popSheets(pop);
+    if (!sheets.length) { alert("This pop-up shows nothing to export yet."); return; }
+    const p = exporter(`${title}${sub ? " · " + sub : ""}`.slice(0, 150), sheets,
+      [title, sub, "What the pop-up showed, " + new Date().toLocaleString("en-GB"), "Read from the tower; nothing was changed in Business Central."].filter(Boolean));
+    if (p && p.catch) p.catch(e => alert("Could not export: " + e.message));
+  });
+
   // ---- the way back, over every .pl-bd of the page
   const stack = [];                       // the backdrops put aside, the newest last
   let going = false;                      // Back is closing the top one
@@ -85,6 +178,7 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
         const others = shown().filter(x => x !== bd);
         others.forEach(o => { if (!stack.includes(o)) stack.push(o); o.__pzQuiet = true; o.classList.remove("show"); });
         if (stack.length) addBack(bd);
+        addExport(bd);
       } else {
         if (bd.__pzQuiet) { bd.__pzQuiet = false; return; }       // put aside under a new one
         if (going) {
@@ -98,7 +192,7 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
     }).observe(bd, {attributes: true, attributeFilter: ["class"]});
     // the screens draw their pop-ups again (another item, more data): Back stays
     const p = bd.querySelector(".pl-pop");
-    if (p) new MutationObserver(() => { if (stack.length && bd.classList.contains("show")) addBack(bd); }).observe(p, {childList: true});
+    if (p) new MutationObserver(() => { if (stack.length && bd.classList.contains("show")) addBack(bd); addExport(bd); }).observe(p, {childList: true});
   }
   function scan(){ document.querySelectorAll(".pl-bd").forEach(watch); }
   new MutationObserver(scan).observe(document.documentElement, {childList: true, subtree: true});
@@ -292,6 +386,10 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
     for (const b of have) { if (!b.load) continue; const k = await placeFind(b, ids); if (k != null) { b.open(k); return; } }
   });
 
-  window.Pulse = {pop, on, open, tiles, panel, legend, bars, cols, list, fold, foldEl, cases, esc, num, money, scan, places: placesInit};
+  // the tower's export of sheets (xlsxTable) and who may use it; every pop-up open now gets the button too
+  function exporterInit(fn, allowed){ exporter = fn; exportAllowed = allowed || (() => true); shown().forEach(addExport); }
+
+  window.Pulse = {pop, on, open, tiles, panel, legend, bars, cols, list, fold, foldEl, cases, esc, num, money, scan, places: placesInit,
+    exporter: exporterInit, sheets: popSheets};
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan); else scan();
 })();
