@@ -813,7 +813,7 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
             irows = _cat_rows(item_lines[ym], cfg)
             per_month[ym]["item"] = {"rows": irows, "totals": _totals(irows) if irows else None}
 
-    def year(months_in, pick, lines):
+    def span(months_in, pick, lines):
         rows = _cat_rows([ln for ym in months_in for ln in lines.get(ym, [])], cfg)
         for r in rows:                                  # the thresholds are monthly: sum the months' figures
             mine = [x for ym in months_in for x in pick(ym)["rows"] if x["kat2"] == r["kat2"]]
@@ -826,9 +826,9 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
                 r["waste_pct"] = round(r["justified"] / loss * 100, 2) if loss > 0 else 0
             r["months_investigate"] = sum(1 for x in mine if x["target"] == "Investigate")
         return {"rows": rows, "totals": _totals(rows) if rows else None, "months": list(months_in)}
-    ytd = year(counted, lambda ym: per_month[ym], cat_lines)
+    ytd = span(counted, lambda ym: per_month[ym], cat_lines)
     item_months = [ym for ym in counted if per_month[ym]["item"]]
-    ytd["item"] = year(item_months, lambda ym: per_month[ym]["item"], item_lines) if item_months else None
+    ytd["item"] = span(item_months, lambda ym: per_month[ym]["item"], item_lines) if item_months else None
     progress("putting it together")
     return {"available": True, "company": company, "location": location, "year": year,
             "read_at": datetime.now().isoformat(timespec="seconds"), "months": months, "per_month": per_month,

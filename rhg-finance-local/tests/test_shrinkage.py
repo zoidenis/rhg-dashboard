@@ -126,6 +126,7 @@ class Shrinkage(unittest.TestCase):
         self.assertAlmostEqual(cat_basis["Peshk"]["unjust"], 22053.47 - 0.55 * 7800, 2)
         self.assertIsNone(r["per_month"]["2026-08"]["item"])
         self.assertEqual(r["ytd"]["item"]["months"], ["2026-09"])
+        self.assertEqual(r["year"], 2026)
         # the % Waste applies to the difference (physical count against BC): 55% of 22,053 is justified
         self.assertAlmostEqual(cats["Peshk"]["justified"], 0.55 * 22053.47, 2)
         self.assertAlmostEqual(cats["Peshk"]["unjust"], 0.45 * 22053.47, 2)
