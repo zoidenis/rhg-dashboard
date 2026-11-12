@@ -3713,7 +3713,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if body.get("delete"):
                     ok = stockcount.delete(company, location, month, actor)
-                    shrinkage._held.forget()
+                    shrinkage.mark_changed()
                     self._send(200, {"ok": ok})
                     return
                 try:
@@ -3722,7 +3722,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, {"error": str(exc)})
                     return
                 c = stockcount.save(company, location, month, parsed, body.get("filename"), actor)
-                shrinkage._held.forget()
+                shrinkage.mark_changed()
                 self._send(200, {"ok": True, "sheet": c["sheet"], "sheets": c["sheets"], "month_on_form": c["month"],
                                  "lines": len(c["rows"]), "counted_lines": c["counted_lines"],
                                  "warnings": c["warnings"][:10]})

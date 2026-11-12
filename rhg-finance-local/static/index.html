@@ -7306,6 +7306,7 @@ function shRender(){
     shCard("Justified waste", ilM(t.justified), t.waste_mode === "item" ? `<span>its own % Waste × each item's difference (count against BC)</span>` : t.waste_mode === "mixed" ? `<span>per item where the month's file was uploaded, else by category</span>` : `<span>the loss within the % Waste of its category</span>`, "", t.justified) +
     shCard("Unjustified", ilM(t.unjust), t.waste_mode === "item" ? `<span>item by item: the difference − the item's % Waste of it; not on the file = 0%; CHECK = YES ${fmt(t.unjust_yes)}</span>`
       : `<span>loss − % Waste × KMSH / Dalje; CHECK = YES ${fmt(t.unjust_yes)}</span>` + (t.unjust_excel != null ? `<br><span title="The whole loss of the categories to investigate, as the KPI workbook counts it">Excel method ${fmt(t.unjust_excel)}; CHECK = YES ${fmt(t.unjust_excel_yes)}</span>` : ""), t.unjust ? "up" : "", t.unjust)
+    : shItemBasis() && P.missing && d.reading ? shCard("By item", "…", `<span>Building the analysis by item with the % Waste just uploaded…</span>`, "")
     : shItemBasis() && P.missing ? shCard("By item", "–", `<span>No % Waste per item uploaded for ${esc(shMonth(shMon))} at ${esc(d.location)}: upload it above for the month, or choose By category.</span>`, "warn")
     : shCard("Count", "–", `<span>No count posted in ${esc(shMonth(shMon))} for ${esc(d.location)}.</span>`, "warn");
   const mi = shMon !== "ytd" ? (d.months.find(m => m.month === shMon) || {}) : {};

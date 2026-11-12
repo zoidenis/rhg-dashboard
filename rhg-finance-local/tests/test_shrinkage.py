@@ -155,6 +155,20 @@ class Shrinkage(unittest.TestCase):
         r = shrinkage.build(Client(), "SALT", "SIN", 2026)
         self.assertIsNone(r["per_month"]["2026-09"]["item"])
 
+    def test_a_change_builds_again_from_the_months_on_disk(self):
+        c = Client()
+        calls = []
+        real = c._get_all
+        c._get_all = lambda url, params=None, **k: calls.append(url) or real(url, params, **k)
+        shrinkage.build(c, "SALT", "SIN", 2026)                       # reads BC and keeps the months
+        n = len([u for u in calls if u != "PbItems"])
+        self.assertGreater(n, 0)
+        with patch.object(shrinkage.time, "time", return_value=shrinkage.time.time() + 7 * 3600):
+            shrinkage.build(c, "SALT", "SIN", 2026, offline=True)     # a recent month, 7 h old: kept, not read
+        self.assertEqual(len([u for u in calls if u != "PbItems"]), n)
+        shrinkage.mark_changed()
+        self.assertGreater(shrinkage._soft["until"], shrinkage.time.time())
+
     def test_waste_file_of_sin(self):
         f = Path(__file__).parent / "fixtures" / "SIN_WASTE_TOLERANCE.xlsx"
         if not f.exists():

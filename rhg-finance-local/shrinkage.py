@@ -37,6 +37,14 @@ from stockcount import etype, month_range
 DIR = store.DATA_DIR / "shrinkage"
 CFG_FILE = store.DATA_DIR / "shrinkage.json"
 _held = heldjob.Held("shrinkage", 900)
+_soft = {"until": 0.0}
+
+
+def mark_changed():
+    """A setting, a % Waste file or a count form changed: the KPIs are built again from the months kept on disk,
+    without reading Business Central again (seconds, not minutes); "Read again" still reads it."""
+    _soft["until"] = time.time() + 900
+    _held.forget()
 _lock = threading.Lock()
 ADJ = {"Positive Adjmt.", "Negative Adjmt."}
 UNITS = ("KG", "LITER", "COPE", "PAKO")
@@ -209,7 +217,7 @@ def save_config(company, patch, actor, note=""):
                           "status": c["status"], "note": str(note or "")[:300]}] + c["history"])[:200]
         _write(c)
     store.audit("shrinkage_config", company, actor, before, {"status": c["status"], "changed": changed}, note or "")
-    _held.forget()
+    mark_changed()
     return c
 
 
@@ -300,7 +308,7 @@ def import_excel(company, data, actor, items):
                           "status": c["status"], "note": f"Excel import: {len(ov)} exceptions"}] + c["history"])[:200]
         _write(c)
     store.audit("shrinkage_config", company, actor, None, {"import": len(ov)}, "Excel import")
-    _held.forget()
+    mark_changed()
     return {"items": len(item_kat), "same_as_map": same, "exceptions": len(ov), "not_found": missing[:50],
             "n_not_found": len(missing), "categories": len(cats or [])}
 
@@ -435,7 +443,7 @@ def save_waste(company, location, ym, parsed, filename, actor):
     tmp.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
     tmp.replace(p)
     store.audit("shrinkage_waste", f"{company} {location} {ym}", actor, None, {"items": len(c["rows"]), "file": c["file"]}, "")
-    _held.forget()
+    mark_changed()
     return c
 
 
@@ -452,7 +460,7 @@ def delete_waste(company, location, ym, actor):
         return False
     p.unlink()
     store.audit("shrinkage_waste", f"{company} {location} {ym}", actor, None, {"deleted": True}, "")
-    _held.forget()
+    mark_changed()
     return True
 
 
@@ -508,7 +516,7 @@ def _cls(et, doc, q):
                                                                   else "transfer_out" if et == "Transfer" else "other")
 
 
-def read_month(client, company, location, ym, prefixes, refresh=False, say=lambda s: None):
+def read_month(client, company, location, ym, prefixes, refresh=False, say=lambda s: None, offline=False):
     """One month of one location, per item: [in_q, in_v, out_q, out_v, count_q, count_v, {class: [q, v]}], the
     stock at the month end before and at its end, and the count documents. Kept on disk."""
     first, last = month_range(ym)
@@ -518,7 +526,8 @@ def read_month(client, company, location, ym, prefixes, refresh=False, say=lambd
     except (OSError, ValueError):
         old = None
     recent = (date.today() - last).days < RECENT_DAYS
-    if old and old.get("prefixes") == prefixes and not refresh and (not recent or time.time() - old.get("at", 0) < 6 * 3600):
+    if old and old.get("prefixes") == prefixes and not refresh and (offline or not recent or
+                                                                    time.time() - old.get("at", 0) < 6 * 3600):
         return old
     loc = location.replace("'", "''")
     say(f"{location} {ym}: entries")
@@ -719,7 +728,7 @@ def _unit_cost(iq, iv, oq, ov, cq, cv, card):
     return _f(card.get("Unit_Cost"))
 
 
-def build(client, company, location, year, refresh=False, progress=lambda s: None):
+def build(client, company, location, year, refresh=False, progress=lambda s: None, offline=False):
     """A location's year. The count of a month is the count form uploaded for it when there is one (theoretical =
     the count before, or BC's stock, + in − out; difference = counted − theoretical, at KMSH), else the count
     adjustments posted in BC (documents starting with IF)."""
@@ -729,7 +738,7 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
     yms = months_of(year)
     months, items, prev, waste_by_month = [], {}, None, {}
     for ym in yms:
-        m = read_month(client, company, location, ym, cfg["prefixes"], refresh, progress)
+        m = read_month(client, company, location, ym, cfg["prefixes"], refresh, progress, offline)
         form = stockcount.get(company, location, ym)
         fc = form_counts(form, set(cards)) if form else None
         wf = get_waste(company, location, ym)
@@ -855,7 +864,9 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
 
 
 def request(client, company, location, year, refresh=False):
-    return _held.request(f"{company}|{location}|{year}", lambda p: build(client, company, location, year, refresh, p),
+    offline = not refresh and time.time() < _soft["until"]
+    return _held.request(f"{company}|{location}|{year}", lambda p: build(client, company, location, year, refresh, p,
+                                                                         offline),
                          refresh, note="Reading the month's entries of the location from Business Central…")
 
 
