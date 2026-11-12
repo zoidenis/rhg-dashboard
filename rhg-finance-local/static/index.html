@@ -1321,7 +1321,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <p><span>Opening = stock at the end of the month before; counted = stock at the month end, with the count posted; theoretical = opening + in − out.</span></p>
         <p><span>KMSH / Dalje = the cost of the month's outs, as posted. Diferenca / Dalje = loss ÷ KMSH / Dalje. % Delta = difference ÷ out, in quantity.</span></p>
         <p><span>Investigate: Diferenca / Dalje above the % Waste of the category. Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero. Unjustified (Excel) = the whole loss of a category marked Investigate, as the KPI workbook counts it.</span></p>
-        <p><span>% Waste per item: a month for which the location's % Waste per item was uploaded (Item No. and Waste % i aplikuar, e.g. SIN_WASTE_TOLERANCE.xlsx) is judged item by item.</span> <span>Justified = the item's loss up to its % Waste × its KMSH / Dalje; Unjustified = the rest; an item not on the file has 0%; a surplus of one item does not offset another's loss.</span> <span>A category's % Waste is then its items' allowed waste ÷ its KMSH / Dalje, and the Excel method does not apply. Months without the file keep the % Waste by category.</span></p>
+        <p><span>% Waste per item: a month for which the location's % Waste per item was uploaded (Item No. and Waste % i aplikuar, e.g. SIN_WASTE_TOLERANCE.xlsx) is judged item by item.</span> <span>Justified = the item's loss up to its % Waste × its KMSH / Dalje, and at 100% the whole difference; Unjustified = the rest; an item not on the file has 0%; a surplus of one item does not offset another's loss.</span> <span>A category's % Waste is then its items' allowed waste ÷ its KMSH / Dalje, and the Excel method does not apply. Months without the file keep the % Waste by category.</span></p>
         <p><span>Category: from the item card (Item Category Group 4 and 5; Group 2 for PN) through the map in Categories &amp; waste, with exceptions per item. An item the map does not reach (packaging, cleaning, uniforms) takes its card's own group in Business Central (Group 4, else Group 3 or 2), marked "from BC", with no % Waste until one is set.</span></p>
         <p><span>Values are exact once the cost adjustment (Adjust Cost – Item Entries) has run for the month.</span></p>
       </div></details></div>
@@ -7366,7 +7366,8 @@ function shAgg(it, months, waste){
     const own = m in iw, w = (own ? iw[m] : (waste[it.kat2] || 0)) / 100;
     if (own) { a.item++; if ((it.w_missing || []).includes(m)) a.miss++; } else a.cat++;
     a.in += v[1]; a.out += -v[3]; a.kmsh += -v[4]; a.cnt += v[5]; a.val += v[6]; a.cl = v[7];
-    const loss = Math.max(0, -v[6]), allowed = w * Math.max(0, -v[4]);
+    // 100% (or more): the whole difference is justified, whatever the outs (shrinkage.allowed_waste)
+    const loss = Math.max(0, -v[6]), allowed = w >= 1 ? loss : w * Math.max(0, -v[4]);
     a.allowed += allowed; a.just += Math.min(loss, allowed);
     a.beyond += Math.max(0, loss - allowed);                     // per month, as the thresholds are monthly
     if ((it.not_counted || []).includes(m)) a.nc = true; });
@@ -7403,7 +7404,7 @@ function shTable(rows, months, withCat){
       return `<tr class="sh-it${shOpenIt === k ? " on" : ""}" data-shit="${esc(k)}"><td><b>${esc(r.it.no)}</b> ${esc(r.it.desc)}${r.it.exception ? ` <span class="sh-pill st" title="Category set by an exception, not by the map">exception</span>` : ""}${r.nc ? ` <span class="sh-pill inv" title="Stock in BC, not counted on the form: no difference taken">not counted</span>` : ""}</td>
       ${withCat ? `<td>${esc(r.it.kat2)}</td>` : ""}<td>${esc(r.it.unit)}</td><td class="num">${cnN(r.op)}</td><td class="num">${cnN(r.in)}</td><td class="num">${cnN(r.out)}</td><td class="num">${cnN((r.op || 0) + r.in - r.out)}</td><td class="num">${cnN(r.cl)}</td>
       <td class="num"><b class="${r.cnt < 0 ? "neg" : ""}">${cnN(r.cnt)}</b></td><td class="num"><b>${shV(r.val)}</b></td><td class="num">${fmt(r.kmsh)}</td>
-      <td class="num"><span class="${r.ratio != null && r.ratio * 100 > (r.waste || 0) ? "neg" : ""}">${shPct(r.ratio)}</span>${r.ratio != null || r.item ? `<div class="meta">${r.item && r.miss === r.item ? "not on the file: 0%" : r.waste ? "waste " + fmt(r.waste, r.waste % 1 ? 1 : 0) + "%" + (r.item ? " item" : "") : "no % Waste"}</div>` : ""}</td>
+      <td class="num"><span class="${r.ratio != null && r.beyond > 0.5 && r.ratio * 100 > (r.waste || 0) ? "neg" : ""}">${shPct(r.ratio)}</span>${r.ratio != null || r.item ? `<div class="meta">${r.item && r.miss === r.item ? "not on the file: 0%" : r.waste ? "waste " + fmt(r.waste, r.waste % 1 ? 1 : 0) + "%" + (r.item ? " item" : "") : "no % Waste"}</div>` : ""}</td>
       <td class="num">${r.just > 0.5 ? fmt(r.just) : "–"}</td><td class="num">${r.beyond > 0.5 ? `<b class="neg">${fmt(r.beyond)}</b>` : "–"}</td></tr>` + (shOpenIt === k ? shDetail(r.it, months, span) : ""); }).join("")
       || `<tr><td colspan="${span}" class="meta">No item.</td></tr>`);
 }
@@ -7449,7 +7450,7 @@ function shBy(){                                       // every item of the peri
   const sum = k => rows.reduce((a, r) => a + r[k], 0);
   $("shByT").textContent = `By item · ${shMonth(shMon)}`;
   $("shByNote").innerHTML = `<span>Every item of ${esc(d.location)} in the period, with its category; click an item for its months and movements (purchases, transfers, consumption by the recipes, staff, FIRO).</span> <span>${shSrcNote(months)}</span>` +
-    ` <span>Diferenca / Dalje of an item = its loss ÷ its KMSH / Dalje, red above its % Waste: its own where the month's % Waste per item was uploaded (not on the file = 0%), else its category's.</span> <span>Justified = the loss up to % Waste × KMSH / Dalje; Unjustified = the rest; month by month.</span>` +
+    ` <span>Diferenca / Dalje of an item = its loss ÷ its KMSH / Dalje, red above its % Waste: its own where the month's % Waste per item was uploaded (not on the file = 0%), else its category's.</span> <span>Justified = the loss up to % Waste × KMSH / Dalje (at 100% the whole difference); Unjustified = the rest; month by month.</span>` +
     (shMon === "ytd" ? ` <span>Year to date: opening of the first counted month, counted of the last, ins, outs and differences summed.</span>` : "");
   $("shByCount").textContent = `${fmt(rows.length)} items · difference value ${fmt(sum("val"))}` + (rows.length > 400 ? " · the first 400 shown; the Excel has every item" : "");
   $("shBy").innerHTML = shTable(rows, months, true);

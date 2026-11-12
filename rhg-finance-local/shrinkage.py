@@ -583,10 +583,19 @@ def months_of(year, today=None):
 
 
 # ---------------------------------------------------------------- the KPIs
+FULL = 100                 # a % Waste of 100: the whole difference is justified, whatever the outs (Geri, 12 Nov 2026)
+
+
+def allowed_waste(pct, kmsh, loss):
+    """The waste allowed: pct × KMSH / Dalje; at 100% the whole loss, even when the outs are small (ice: lost
+    41,734 on 58 of outs in Sep 2026 at SIN)."""
+    return loss if pct >= FULL else pct / 100 * max(0.0, kmsh)
+
+
 def _item_waste(ln):
     """An item line of a month with its own % Waste: (loss, allowed, justified, unjustified)."""
     loss = max(0.0, -ln["cnt_v"])
-    allowed = ln["pct"] / 100 * max(0.0, -ln["out_v"])
+    allowed = allowed_waste(ln["pct"], -ln["out_v"], loss)
     just = min(loss, allowed)
     return loss, allowed, just, loss - just
 
@@ -631,9 +640,11 @@ def _cat_rows(lines, cfg):
         # the lines judged by their category
         c_loss = max(0.0, -a["c_net"])
         c_ratio = -a["c_net"] / a["c_kmsh"] if a["c_kmsh"] > 0 else None
-        c_inv = a["items"] > a["i_n"] and (c_ratio is not None and c_ratio > waste or (a["c_kmsh"] <= 0 and c_loss > 0))
-        c_allowed = waste * a["c_kmsh"]
+        c_inv = a["items"] > a["i_n"] and c["waste_pct"] < FULL and (
+            c_ratio is not None and c_ratio > waste or (a["c_kmsh"] <= 0 and c_loss > 0))
+        c_allowed = allowed_waste(c["waste_pct"], a["c_kmsh"], c_loss)
         c_just = min(c_loss, c_allowed)
+        c_excel = a["items"] > a["i_n"] and (c_ratio is not None and c_ratio > waste or (a["c_kmsh"] <= 0 and c_loss > 0))
         mode = "item" if a["i_n"] == a["items"] else "category" if not a["i_n"] else "mixed"
         allowed = c_allowed + a["i_allowed"]
         unjust = max(0.0, c_loss - c_allowed) + a["i_unj"]
@@ -650,7 +661,8 @@ def _cat_rows(lines, cfg):
                      "ratio": None if ratio_signed is None else round(ratio_signed, 4),
                      "target": "Investigate" if investigate else "OK", "allowed": round(allowed, 2),
                      "justified": round(c_just + a["i_just"], 2), "unjust": round(unjust, 2),
-                     "unjust_excel": None if mode == "item" else round(c_loss if c_inv else 0.0, 2)})
+                     # the Excel method as the workbook counts it (a 100% category above 100% is still flagged there)
+                     "unjust_excel": None if mode == "item" else round(c_loss if c_excel else 0.0, 2)})
     rows.sort(key=lambda r: r["net"])
     return rows
 
@@ -811,10 +823,12 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
                 "in_out": "In and out = the month's other entries of the location by sign; other adjustments (staff "
                           "consumption, FIRO, corrections) netted per item.",
                 "kmsh": "KMSH / Dalje = the cost of the month's outs, as posted.",
-                "unjust": "Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero. Unjustified "
+                "unjust": "Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero; a % Waste of 100 "
+                  "justifies the whole difference. Unjustified "
                           "(Excel) = the whole loss of a category whose Diferenca / Dalje is above its % Waste.",
                 "per_item": "A month whose % Waste per item was uploaded is judged item by item: justified = the item's "
-                            "loss up to its % Waste × its KMSH / Dalje, unjustified = the rest; an item not on the file "
+                            "loss up to its % Waste × its KMSH / Dalje (at 100% the whole difference), unjustified = "
+                            "the rest; an item not on the file "
                             "has 0%; surpluses of other items do not offset a loss. A category's % Waste is then the "
                             "allowed waste of its items ÷ its KMSH / Dalje, and the Excel method does not apply."}}
 
@@ -962,7 +976,7 @@ def render_xlsx(r):
                     continue
                 pct = it["w"][ym]
                 loss, kmsh = max(0.0, -v[6]), max(0.0, -v[4])
-                allowed = pct / 100 * kmsh
+                allowed = allowed_waste(pct, kmsh, loss)
                 just = min(loss, allowed)
                 wrows.append([it["no"], it["desc"], it["unit"], it["kat2"], it.get("wcat") or "", label(ym),
                               "not on the file (0%)" if ym in (it.get("w_missing") or []) else "file",
