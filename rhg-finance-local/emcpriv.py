@@ -175,6 +175,11 @@ def _post(path, body, _retry=True):
     if r.status_code == 401 and _retry:
         _token(force=True)
         return _post(path, body, False)
+    if r.status_code == 405 or (r.status_code >= 400 and "text/html" in (r.headers.get("Content-Type") or "")):
+        # not the Configuration API: usually the BI API's application server or the sign-in server was entered
+        raise Error(f"{path} answered {r.status_code}: {cfg['cc_server']} is not the Configuration API. The Configuration "
+                    "API server is the Simphony base URL shown in EMC → Enterprise → Enterprise Parameters (for example "
+                    "https://…-ohsim.oracleindustry.com), not the Reporting and Analytics, BI API or sign-in address.")
     if r.status_code >= 400:
         raise Error(f"{path} answered {r.status_code}: {simphony._msg(r)}")
     try:
