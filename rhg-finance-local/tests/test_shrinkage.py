@@ -119,8 +119,13 @@ class Shrinkage(unittest.TestCase):
         shrinkage.save_waste("SALT", "SIN", "2026-09", parsed, "w.xlsx", "geri")
         r = shrinkage.build(Client(), "SALT", "SIN", 2026)
         self.assertEqual(r["months"][1]["waste"]["items"], 2)
-        cats = {x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}
+        cats = {x["kat2"]: x for x in r["per_month"]["2026-09"]["item"]["rows"]}
         self.assertEqual(cats["Peshk"]["waste_mode"], "item")
+        cat_basis = {x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}          # the other basis, as before
+        self.assertEqual(cat_basis["Peshk"]["waste_mode"], "category")
+        self.assertAlmostEqual(cat_basis["Peshk"]["unjust"], 22053.47 - 0.55 * 7800, 2)
+        self.assertIsNone(r["per_month"]["2026-08"]["item"])
+        self.assertEqual(r["ytd"]["item"]["months"], ["2026-09"])
         # the % Waste applies to the difference (physical count against BC): 55% of 22,053 is justified
         self.assertAlmostEqual(cats["Peshk"]["justified"], 0.55 * 22053.47, 2)
         self.assertAlmostEqual(cats["Peshk"]["unjust"], 0.45 * 22053.47, 2)
@@ -133,7 +138,7 @@ class Shrinkage(unittest.TestCase):
         it = {x["no"]: x for x in r["items"]}
         self.assertEqual((it["AMB1"]["w"], it["AMB1"]["w_missing"]), ({"2026-09": 0.0}, ["2026-09"]))
         self.assertEqual(it["A508"]["wcat"], "PESHK")
-        t = r["per_month"]["2026-09"]["totals"]
+        t = r["per_month"]["2026-09"]["item"]["totals"]
         self.assertAlmostEqual(t["justified"] + t["unjust"], 22053.47 + 5995 + 5000, 1)
         self.assertEqual(t["waste_mode"], "item")
         self.assertTrue(shrinkage.render_xlsx(r).startswith(b"PK"))
@@ -141,13 +146,13 @@ class Shrinkage(unittest.TestCase):
         parsed["rows"].append({"item": "AMB1", "pct": 100.0, "desc": "Gote", "unit": "COPE", "wcat": "KONSUM"})
         shrinkage.save_waste("SALT", "SIN", "2026-09", parsed, "w.xlsx", "geri")
         r = shrinkage.build(Client(), "SALT", "SIN", 2026)
-        amb = {x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}["AMBALAZH"]
+        amb = {x["kat2"]: x for x in r["per_month"]["2026-09"]["item"]["rows"]}["AMBALAZH"]
         self.assertEqual((amb["justified"], amb["unjust"], amb["target"]), (5000, 0, "OK"))
         self.assertEqual(shrinkage.allowed_waste(100, 58, 41734), 41734)
         self.assertEqual(shrinkage.allowed_waste(55, 7800, 22053.47), 0.55 * 7800)
         self.assertTrue(shrinkage.delete_waste("SALT", "SIN", "2026-09", "geri"))
         r = shrinkage.build(Client(), "SALT", "SIN", 2026)
-        self.assertEqual({x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}["Peshk"]["waste_mode"], "category")
+        self.assertIsNone(r["per_month"]["2026-09"]["item"])
 
     def test_waste_file_of_sin(self):
         f = Path(__file__).parent / "fixtures" / "SIN_WASTE_TOLERANCE.xlsx"

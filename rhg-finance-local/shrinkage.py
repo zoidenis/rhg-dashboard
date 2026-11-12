@@ -798,29 +798,41 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
         for ym, v in per.items():
             lines_by_month.setdefault(ym, []).append({"kat2": k2, "kat1_bc": kat1, "unit": unit, "out_q": v[3],
                                                       "out_v": v[4], "cnt_q": v[5], "cnt_v": v[6], "pct": w.get(ym)})
+    # two bases, chosen on the screen (Geri, 12 Nov 2026): by category (% Waste of the category × KMSH / Dalje, the
+    # Excel's method beside it) for every counted month; by item (each item's % Waste of its difference) for the
+    # months whose file per item was uploaded
+    cat_lines = {ym: [dict(ln, pct=None) for ln in L] for ym, L in lines_by_month.items()}
+    item_lines = {ym: L for ym, L in lines_by_month.items() if ym in waste_by_month}
+    counted = [m["month"] for m in months if m["counted"]]
     per_month = {}
     for mm in months:
         ym = mm["month"]
-        rows = _cat_rows(lines_by_month.get(ym, []), cfg) if mm["counted"] else []
-        per_month[ym] = {"rows": rows, "totals": _totals(rows) if rows else None}
-    counted = [m["month"] for m in months if m["counted"]]
-    ytd_lines = [ln for ym in counted for ln in lines_by_month.get(ym, [])]
-    ytd_rows = _cat_rows(ytd_lines, cfg)
-    for r in ytd_rows:                                  # the thresholds are monthly: sum the months' figures
-        mine = [x for ym in counted for x in per_month[ym]["rows"] if x["kat2"] == r["kat2"]]
-        for k in ("unjust", "justified", "allowed"):
-            r[k] = round(sum(x[k] for x in mine), 2)
-        ex = [x["unjust_excel"] for x in mine if x["unjust_excel"] is not None]
-        r["unjust_excel"] = round(sum(ex), 2) if ex else None
-        if r["waste_mode"] == "item":
-            loss = sum(max(0.0, x["justified"] + x["unjust"]) for x in mine)
-            r["waste_pct"] = round(r["justified"] / loss * 100, 2) if loss > 0 else 0
-        r["months_investigate"] = sum(1 for ym in counted for x in per_month[ym]["rows"]
-                                      if x["kat2"] == r["kat2"] and x["target"] == "Investigate")
+        rows = _cat_rows(cat_lines.get(ym, []), cfg) if mm["counted"] else []
+        per_month[ym] = {"rows": rows, "totals": _totals(rows) if rows else None, "item": None}
+        if mm["counted"] and ym in item_lines:
+            irows = _cat_rows(item_lines[ym], cfg)
+            per_month[ym]["item"] = {"rows": irows, "totals": _totals(irows) if irows else None}
+
+    def year(months_in, pick, lines):
+        rows = _cat_rows([ln for ym in months_in for ln in lines.get(ym, [])], cfg)
+        for r in rows:                                  # the thresholds are monthly: sum the months' figures
+            mine = [x for ym in months_in for x in pick(ym)["rows"] if x["kat2"] == r["kat2"]]
+            for k in ("unjust", "justified", "allowed"):
+                r[k] = round(sum(x[k] for x in mine), 2)
+            ex = [x["unjust_excel"] for x in mine if x["unjust_excel"] is not None]
+            r["unjust_excel"] = round(sum(ex), 2) if ex else None
+            if r["waste_mode"] == "item":
+                loss = sum(max(0.0, x["justified"] + x["unjust"]) for x in mine)
+                r["waste_pct"] = round(r["justified"] / loss * 100, 2) if loss > 0 else 0
+            r["months_investigate"] = sum(1 for x in mine if x["target"] == "Investigate")
+        return {"rows": rows, "totals": _totals(rows) if rows else None, "months": list(months_in)}
+    ytd = year(counted, lambda ym: per_month[ym], cat_lines)
+    item_months = [ym for ym in counted if per_month[ym]["item"]]
+    ytd["item"] = year(item_months, lambda ym: per_month[ym]["item"], item_lines) if item_months else None
     progress("putting it together")
     return {"available": True, "company": company, "location": location, "year": year,
             "read_at": datetime.now().isoformat(timespec="seconds"), "months": months, "per_month": per_month,
-            "ytd": {"rows": ytd_rows, "totals": _totals(ytd_rows) if ytd_rows else None, "months": counted},
+            "ytd": ytd,
             "items": sorted(item_rows, key=lambda r: r["no"]),
             "config": {k: cfg[k] for k in ("categories", "status", "prefixes", "updated_at", "updated_by")},
             "notes": {
@@ -962,11 +974,15 @@ def render_xlsx(r):
                         else "count adjustments posted in BC")
            + (f" · % Waste per item {m['waste']['file']}" if m.get("waste") else "") for m in r["months"] if m["counted"]}
     num = lambda v: "–" if v is None else f"{v:,.0f}"                                  # noqa: E731
+    sheets = []
     for ym in reversed(counted):
-        pm = r["per_month"][ym]
-        w = wb.create_sheet(f"KPI {label(ym).replace(' ', '')}")
+        sheets.append((ym, r["per_month"][ym], "", "by category"))
+        if r["per_month"][ym].get("item"):
+            sheets.append((ym, r["per_month"][ym]["item"], " item", "by item (% Waste per item of the difference)"))
+    for ym, pm, suffix, basis in sheets:
+        w = wb.create_sheet(f"KPI {label(ym).replace(' ', '')}{suffix}")
         sheet(w, head, [catrow(x) for x in pm["rows"]], [7, 8, 10, 14, 6] + [9] * 5 + [12] * 5 + [12, 13, 11, 12, 12, 12, 14, 14, 14],
-              f"KPI {label(ym)} · {r['location']} · {src[ym]} · net {num(pm['totals']['net'])} · justified "
+              f"KPI {label(ym)} {basis} · {r['location']} · {src[ym]} · net {num(pm['totals']['net'])} · justified "
               f"{num(pm['totals']['justified'])} · unjustified {num(pm['totals']['unjust'])} (Excel method "
               f"{num(pm['totals']['unjust_excel'])})")
         for row in w.iter_rows(min_row=4):

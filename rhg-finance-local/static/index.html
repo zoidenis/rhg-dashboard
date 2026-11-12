@@ -1280,6 +1280,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
           <select id="shLoc" aria-label="Location"><option value="">All locations</option></select>
           <select id="shYear" aria-label="Year"></select>
           <select id="shMonth" aria-label="Month"></select>
+          <select id="shBasis" aria-label="Analysis basis" title="Which analysis the screen shows: by the % Waste of each category, or by the % Waste of each item (the month's file)"><option value="category">By category</option><option value="item">By item</option></select>
           <button class="mini dark" id="shRead" type="button">Read again</button><button class="mini exp" id="shXlsx" type="button">Export ▾</button><button class="mini" id="shCfgBtn" type="button">Categories &amp; waste</button></div></div>
       <div class="sh-up" id="shUp" hidden>
         <label class="mini dark">Upload the count<input type="file" id="shCntFile" accept=".xlsx" hidden></label>
@@ -7200,6 +7201,16 @@ const SH_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const shMonth = m => m === "ytd" ? "Year to date" : (m ? SH_MON[+m.slice(5, 7) - 1] + " " + m.slice(0, 4) : "");
 const shPct = (v, d = 1) => v == null || !isFinite(v) ? "–" : fmt(v * 100, d) + "%";
 const shV = v => v == null ? "–" : `<span class="${v < 0 ? "neg" : ""}">${fmt(v)}</span>`;
+// the analysis basis (Geri, 12 Nov 2026): by category (% Waste of the category × KMSH / Dalje) or by item (each item's
+// % Waste of its difference, for the months whose file per item was uploaded); the screen shows one at a time
+var shBasis = (() => { try { return localStorage.getItem("pulse-sh-basis") || ""; } catch (e) { return ""; } })();
+const shItemBasis = () => shBasis === "item";
+function shP(m){                                       // the period's rows and totals on the basis chosen; null = none
+  const d = shData; if (!d) return null;
+  if (m === "ytd") return shItemBasis() ? d.ytd.item : d.ytd;
+  const x = d.per_month[m]; if (!x) return null;
+  return shItemBasis() ? x.item : x;
+}
 function shQs(extra){
   return new URLSearchParams(Object.assign({company: $("company").value || "", location: $("shLoc").value, year: $("shYear").value || ""}, extra || {})).toString();
 }
@@ -7283,7 +7294,9 @@ function shRender(){
   mon.dataset.mode = "loc";
   mon.innerHTML = `<option value="ytd">Year to date</option>` + counted.slice().reverse().map(m => `<option value="${m}">${shMonth(m)}</option>`).join("");
   mon.value = shMon;
-  const P = shMon === "ytd" ? d.ytd : d.per_month[shMon] || {rows: [], totals: null};
+  if (!shBasis) shBasis = Object.values(d.per_month).some(x => x.item) ? "item" : "category";
+  $("shBasis").value = shBasis;
+  const P = shP(shMon) || {rows: [], totals: null, missing: true};
   const t = P.totals;
   $("shKpis").innerHTML = t ?
     shCard("Net difference", ilM(t.net), `<span>losses ${fmt(t.losses)}</span> · <span>surpluses ${fmt(t.surpluses)}</span>`, t.net < 0 ? "up" : "", t.net) +
@@ -7293,16 +7306,18 @@ function shRender(){
     shCard("Justified waste", ilM(t.justified), t.waste_mode === "item" ? `<span>its own % Waste × each item's difference (count against BC)</span>` : t.waste_mode === "mixed" ? `<span>per item where the month's file was uploaded, else by category</span>` : `<span>the loss within the % Waste of its category</span>`, "", t.justified) +
     shCard("Unjustified", ilM(t.unjust), t.waste_mode === "item" ? `<span>item by item: the difference − the item's % Waste of it; not on the file = 0%; CHECK = YES ${fmt(t.unjust_yes)}</span>`
       : `<span>loss − % Waste × KMSH / Dalje; CHECK = YES ${fmt(t.unjust_yes)}</span>` + (t.unjust_excel != null ? `<br><span title="The whole loss of the categories to investigate, as the KPI workbook counts it">Excel method ${fmt(t.unjust_excel)}; CHECK = YES ${fmt(t.unjust_excel_yes)}</span>` : ""), t.unjust ? "up" : "", t.unjust)
+    : shItemBasis() && P.missing ? shCard("By item", "–", `<span>No % Waste per item uploaded for ${esc(shMonth(shMon))} at ${esc(d.location)}: upload it above for the month, or choose By category.</span>`, "warn")
     : shCard("Count", "–", `<span>No count posted in ${esc(shMonth(shMon))} for ${esc(d.location)}.</span>`, "warn");
   const mi = shMon !== "ytd" ? (d.months.find(m => m.month === shMon) || {}) : {};
   const docs = mi.source === "bc" ? Object.keys(mi.docs || {}) : [];
   const off = d.months.reduce((a, m) => a + (m.qty_off || 0), 0);
-  $("shStatus").innerHTML = [`${esc(d.company)} · ${esc(d.location)} · ${esc(shMonth(shMon))}${shMon === "ytd" ? ` (${d.ytd.months.length} counted months of ${d.year})` : ""}`,
+  $("shStatus").innerHTML = [`${esc(d.company)} · ${esc(d.location)} · ${esc(shMonth(shMon))}${shMon === "ytd" ? ` (${(shP("ytd") || {months: []}).months.length} ${shItemBasis() ? "months with % Waste per item" : "counted months"} of ${d.year})` : ""}`,
+    `<span><b>${shItemBasis() ? "By item: each item's % Waste of its difference" : "By category: % Waste of the category × KMSH / Dalje"}</b></span>`,
     `<span>read at ${esc((d.read_at || "").replace("T", " ").slice(0, 16))}</span>`,
     docs.length ? `<span>count posted in BC: ${esc(docs.slice(0, 4).join(", "))}${docs.length > 4 ? " …" : ""}</span>` : "",
     mi.source === "form" ? `<span>count form: ${esc(mi.form.file || "")} · ${fmt(mi.form.counted_lines)} of ${fmt(mi.form.lines)} lines counted · uploaded by ${esc(mi.form.uploaded_by || "")}</span>` : "",
-    mi.waste ? `<span>% Waste per item: ${esc(mi.waste.file || "")} · ${fmt(mi.waste.items)} items · uploaded by ${esc(mi.waste.uploaded_by || "")}</span>${mi.waste.n_not_in_bc ? ` <span class="neg" title="${esc((mi.waste.not_in_bc || []).join(", "))}">${fmt(mi.waste.n_not_in_bc)} items of the file not in BC</span>` : ""}`
-      : shMon !== "ytd" && shMon ? `<span>% Waste by category (no file per item for the month)</span>` : "",
+    mi.waste && shItemBasis() ? `<span>% Waste per item: ${esc(mi.waste.file || "")} · ${fmt(mi.waste.items)} items · uploaded by ${esc(mi.waste.uploaded_by || "")}</span>${mi.waste.n_not_in_bc ? ` <span class="neg" title="${esc((mi.waste.not_in_bc || []).join(", "))}">${fmt(mi.waste.n_not_in_bc)} items of the file not in BC</span>` : ""}`
+      : mi.waste ? `<span>a % Waste per item is uploaded for the month: choose By item to see it</span>` : shMon !== "ytd" && shMon && shItemBasis() ? `<span class="neg">no % Waste per item uploaded for the month</span>` : "",
     mi.not_counted ? `<span class="neg">${fmt(mi.not_counted)} items with stock not counted (${fmt(mi.not_counted_value)}): no difference taken for them</span>` : "",
     mi.posted_mismatch ? `<span>${fmt(mi.posted_mismatch)} items whose difference is not the one posted in BC</span>` : "",
     off ? `<span class="neg">${fmt(off)} item-months where opening + in + out + difference does not give the closing stock</span>` : "",
@@ -7315,11 +7330,11 @@ function shRender(){
   const mrow = (m, T, label, on) => `<tr data-shm="${m}" class="${on ? "on" : ""}"><td><b>${esc(label)}</b> ${m === "ytd" ? "" : srcOf(m)}</td>` + (T ?
     `<td class="num">${shV(T.net)}</td><td class="num">${fmt(T.losses)}</td><td class="num">${fmt(T.surpluses)}</td><td class="num">${fmt(T.kmsh)}</td><td class="num">${shPct(T.ratio)}</td>
      <td class="num">${fmt(T.investigate)}</td><td class="num">${fmt(T.justified)}</td><td class="num"><b>${fmt(T.unjust)}</b></td><td class="num">${T.unjust_excel == null ? "–" : fmt(T.unjust_excel)}</td>` :
-    `<td colspan="9" class="meta">no count posted</td>`) + `</tr>`;
+    `<td colspan="9" class="meta">${m !== "ytd" && shItemBasis() && (d.per_month[m] || {}).totals ? "no % Waste per item uploaded" : "no count posted"}</td>`) + `</tr>`;
   $("shMonths").innerHTML = `<tr><th>Month</th><th class="num">Net difference</th><th class="num">Losses</th><th class="num">Surpluses</th><th class="num">KMSH / Dalje</th><th class="num">Diferenca / Dalje</th><th class="num">Investigate</th><th class="num">Justified</th><th class="num">Unjustified</th><th class="num">Unjustified (Excel)</th></tr>` +
-    d.months.slice().reverse().map(m => mrow(m.month, (d.per_month[m.month] || {}).totals, shMonth(m.month), shMon === m.month)).join("") +
-    (d.ytd.totals ? mrow("ytd", d.ytd.totals, "Year to date", shMon === "ytd") : "");
-  $("shMonthsViz").innerHTML = Pulse.cols(d.months.map(m => { const T = (d.per_month[m.month] || {}).totals;
+    d.months.slice().reverse().map(m => mrow(m.month, (shP(m.month) || {}).totals, shMonth(m.month), shMon === m.month)).join("") +
+    ((shP("ytd") || {}).totals ? mrow("ytd", shP("ytd").totals, "Year to date", shMon === "ytd") : "");
+  $("shMonthsViz").innerHTML = Pulse.cols(d.months.map(m => { const T = (shP(m.month) || {}).totals;
       return {label: shMonth(m.month), segs: T ? [[Math.max(0, (T.unjust || 0)), "var(--up)", "unjustified"], [Math.max(0, T.justified || 0), "var(--ch-1)", "justified"]] : [], open: T ? `data-shmbar="${m.month}"` : null,
         tip: T ? `${shMonth(m.month)}: losses ${fmt(T.losses)}, justified ${fmt(T.justified)}, unjustified ${fmt(T.unjust)}, ${fmt(T.investigate)} categories to investigate${m.waste ? " · % Waste per item" : ""}` : `${shMonth(m.month)}: no count posted`}; }),
     [["var(--up)", "unjustified (beyond the % Waste)"], ["var(--ch-1)", "justified (within the % Waste)"]], {h: 150, labels: 12});
@@ -7363,7 +7378,7 @@ function shAgg(it, months, waste){
   const iw = it.w || {};
   months.forEach(m => { const v = it.m[m]; if (!v) return; if (a.op == null) a.op = v[0];
     // the month's % Waste of the item when its file was uploaded (not on it = 0%), else its category's
-    const own = m in iw, w = (own ? iw[m] : (waste[it.kat2] || 0)) / 100;
+    const own = shItemBasis() && m in iw, w = (own ? iw[m] : (waste[it.kat2] || 0)) / 100;
     if (own) { a.item++; if ((it.w_missing || []).includes(m)) a.miss++; } else a.cat++;
     a.in += v[1]; a.out += -v[3]; a.kmsh += -v[4]; a.cnt += v[5]; a.val += v[6]; a.cl = v[7];
     // its own % Waste: that share of the difference (count against BC) is justified (shrinkage.item_allowed);
@@ -7373,7 +7388,7 @@ function shAgg(it, months, waste){
     a.beyond += Math.max(0, loss - allowed);                     // per month, as the thresholds are monthly
     if ((it.not_counted || []).includes(m)) a.nc = true; });
   a.ratio = a.kmsh > 0 && a.val < 0 ? -a.val / a.kmsh : null;
-  const own = months.filter(m => m in iw && it.m[m]);
+  const own = months.filter(m => shItemBasis() && m in iw && it.m[m]);
   a.waste = a.item ? (own.length === 1 ? iw[own[0]] : a.just + a.beyond > 0 ? a.just / (a.just + a.beyond) * 100 : (iw[own[0]] || 0)) : waste[it.kat2];
   a.over = a.beyond > 0.5;
   return a;
@@ -7413,7 +7428,7 @@ function shTable(rows, months, withCat){
 function shWire(tb, again){
   tb.querySelectorAll("tr[data-shit]").forEach(tr => tr.onclick = () => { shOpenIt = shOpenIt === tr.dataset.shit ? "" : tr.dataset.shit; again(); });
 }
-function shPerMonths(){ return shMon === "ytd" ? shData.ytd.months : [shMon]; }
+function shPerMonths(){ return shMon === "ytd" ? (shP("ytd") || {months: []}).months : [shMon]; }
 function shSrcNote(months){
   const src = new Set(months.map(m => (shData.months.find(x => x.month === m) || {}).source));
   return src.has("form") && !src.has("bc") ? "Difference = counted − theoretical from the uploaded count form, at the item's KMSH."
@@ -7422,13 +7437,13 @@ function shSrcNote(months){
 }
 function shItems(){                                    // the pop-up: the items of one category
   if (!shData || !shCat) return;
-  const months = shPerMonths(), P = shMon === "ytd" ? shData.ytd : shData.per_month[shMon] || {rows: []};
+  const months = shPerMonths(), P = shP(shMon) || {rows: []};
   const c = P.rows.find(x => x.kat2 === shCat) || {};
   const rows = shRows(months, {cat: shCat, q: $("shQ").value, show: $("shPShow").value, sort: "val"});
   $("shPopT").textContent = `${shCat} · ${shMonth(shMon)}`;
   const all = shData.items.filter(it => it.kat2 === shCat && months.some(m => it.m[m])).length;
   $("shPopNote").innerHTML = `${esc(shData.location)} · <span>${fmt(rows.length)} items shown of ${fmt(all)}.</span> <span>Largest loss first; click an item for its months and movements.</span> <span>${shSrcNote(months)}</span>` +
-    (months.some(m => (shData.months.find(x => x.month === m) || {}).waste) ? ` <span>% Waste per item uploaded for the month: each item is judged by its own % Waste (not on the file = 0%), and the category's figures are the sum of its items.</span>`
+    (shItemBasis() && months.some(m => (shData.months.find(x => x.month === m) || {}).waste) ? ` <span>% Waste per item uploaded for the month: each item is judged by its own % Waste (not on the file = 0%), and the category's figures are the sum of its items.</span>`
       : ` <span>Unjustified per item is before the surpluses of other items are netted: the category's Unjustified nets them.</span>`);
   $("shPopKpis").innerHTML = c.kat2 ? shCard("Net difference", ilM(c.net), `<span>losses ${fmt(c.losses)}</span> · <span>surpluses ${fmt(c.surpluses)}</span>`, c.net < 0 ? "up" : "", c.net) +
     shCard("KMSH / Dalje", ilM(c.kmsh), `<span>the cost of the outs</span>`, "", c.kmsh) +
@@ -7442,7 +7457,7 @@ function shItems(){                                    // the pop-up: the items 
 function shPopClose(){ $("shPop").classList.remove("on"); shCat = ""; shOpenIt = ""; $("shQ").value = "";
   document.querySelectorAll("#shCats tr.on").forEach(tr => tr.classList.remove("on")); }
 function shBy(){                                       // every item of the period
-  const d = shData, months = shPerMonths(), P = shMon === "ytd" ? d.ytd : d.per_month[shMon] || {rows: []};
+  const d = shData, months = shPerMonths(), P = shP(shMon) || {rows: []};
   if (!P.rows.length) return;
   $("shByCard").hidden = false;
   const sel = $("shBCat"), want = sel.value;
@@ -7501,17 +7516,17 @@ async function shExport(what, btn){
   } else if (what === "months") {
     const row = (m, Tt, label) => { const x = d.months.find(y => y.month === m) || {};
       return [label, m === "ytd" ? "" : x.source === "form" ? "count form" : x.source === "bc" ? "posted in BC" : "no count",
-        m === "ytd" ? "" : x.waste ? "per item: " + (x.waste.file || "") : x.counted ? "category" : "",
+        m === "ytd" ? (shItemBasis() ? "by item" : "by category") : shItemBasis() ? (x.waste ? "by item: " + (x.waste.file || "") : "no file per item") : x.counted ? "by category" : "",
         Tt ? Tt.net : null, Tt ? Tt.losses : null, Tt ? Tt.surpluses : null, Tt ? Tt.kmsh : null, Tt ? Tt.ratio : null, Tt ? Tt.investigate : null,
         Tt ? Tt.justified : null, Tt ? Tt.unjust : null, Tt ? Tt.unjust_excel : null, m === "ytd" ? null : x.not_counted || null, m === "ytd" ? null : x.not_counted_value || null]; };
     name = `${base} by month ${d.year}`;
     sheets = [{title: "By month", formats: [T, T, T, N, N, N, N, P, I, N, N, N, I, N], widths: [16, 14, 20],
       header: ["Month", "Count from", "% Waste", "Net difference", "Losses", "Surpluses", "KMSH / Dalje", "Diferenca / Dalje", "Categories to investigate",
         "Justified", "Unjustified", "Unjustified (Excel)", "Items not counted", "Not counted value"],
-      rows: d.months.map(m => row(m.month, (d.per_month[m.month] || {}).totals, shMonth(m.month))).concat(d.ytd.totals ? [row("ytd", d.ytd.totals, "Year to date")] : [])}];
+      rows: d.months.map(m => row(m.month, (shP(m.month) || {}).totals, shMonth(m.month))).concat((shP("ytd") || {}).totals ? [row("ytd", shP("ytd").totals, "Year to date")] : [])}];
     notes = shNotes("by month", [d.notes.difference, d.notes.kmsh, d.notes.unjust, d.notes.per_item]);
   } else if (what === "cats") {
-    const Pp = shMon === "ytd" ? d.ytd : d.per_month[shMon], t = Pp.totals;
+    const Pp = shP(shMon) || {rows: [], totals: {}}, t = Pp.totals || {};
     name = `${base} by category ${per}`;
     sheets = [{title: "By category", formats: [T, T, T, T, P, T, I, P, N, N, N, N, P, T, N, N, N, N], widths: [18, 14, 10, 8],
       header: ["Category", "Kat. 1", "From BC", "CHECK", "% Waste", "% Waste from", "Items", "% Delta", "Net difference", "Losses", "Surpluses", "KMSH / Dalje",
@@ -7716,6 +7731,7 @@ async function shWaste(f, data0){
     const data = data0 || await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
     const j = await simphonyPost("/api/shrinkage/waste", {company: $("company").value || "", location: loc, month, data, filename: f.name});
     shWLast = {f, data, month, loc};
+    shBasis = "item"; try { localStorage.setItem("pulse-sh-basis", "item"); } catch (e) { /* storage off */ }
     msg.innerHTML = `<span>% Waste per item of ${esc(loc)}, ${esc(shMonth(month))}: ${esc(f.name)}</span> · <span>${fmt(j.items)} items</span>` +
       (j.n_not_in_bc ? ` · <span class="neg" title="${esc((j.not_in_bc || []).join(", "))}">${fmt(j.n_not_in_bc)} not in Business Central</span>` : "") +
       (j.n_warnings ? ` · <span title="${esc((j.warnings || []).join("\n"))}">${fmt(j.n_warnings)} notes on reading the file</span>` : "") +
@@ -7759,6 +7775,7 @@ $("shUpSheet").onchange = () => { if (shCntLast) shCount(shCntLast.f, $("shUpShe
 })();
 $("shLoc").onchange = () => { shUpHint(); shMon = ""; shCat = ""; shData = null; $("shMonth").dataset.mode = ""; $("shByCard").hidden = true; $("shPop").classList.remove("on"); loadSh(false); };
 $("shYear").onchange = () => { shMon = ""; shCat = ""; loadSh(false); };
+$("shBasis").onchange = () => { shBasis = $("shBasis").value; try { localStorage.setItem("pulse-sh-basis", shBasis); } catch (e) { /* storage off */ } shCat = ""; shOpenIt = ""; if (shData) shRender(); };
 $("shMonth").onchange = () => { if ($("shMonth").dataset.mode === "ov") { loadShOv(false); return; } shMon = $("shMonth").value; shCat = ""; shRender(); };
 $("shRead").onclick = () => $("shLoc").value ? loadSh(true) : loadShOv(true);
 $("shXlsx").onclick = () => { if (shData) exportGo("/api/shrinkage/xlsx?" + shQs()); };
