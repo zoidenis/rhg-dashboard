@@ -338,6 +338,142 @@ def category_of(card, cfg, company, item):
     return (k, "map") if k else (bc_group(card), "bc")
 
 
+# ---------------------------------------------------------------- % Waste per item, a location's month
+def _wdir():
+    return DIR / "waste"
+
+
+def _wfile(company, location, ym):
+    return _wdir() / (re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{company}__{location}__{ym}") + ".json")
+
+
+def parse_waste(data):
+    """The % Waste allowed per item of a location (e.g. SIN_WASTE_TOLERANCE.xlsx: Item No., Description, UoM, Kategoria
+    waste, Waste % i aplikuar, Location Code): {rows: [{item, pct, desc, unit, wcat}], locations, sheet, warnings}.
+    A cell formatted as a percentage (0.55 shown 55%) is read as 55; a plain number column whose values are all at or
+    below 1 is read as fractions, else as percent."""
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(io.BytesIO(data), data_only=True)
+    except Exception as exc:                                        # noqa: BLE001
+        raise ValueError("The file could not be read as an Excel workbook.") from exc
+    for ws in wb.worksheets:
+        head_row, cols = None, {}
+        for n, row in enumerate(ws.iter_rows(min_row=1, max_row=30)):
+            h = _header([c.value for c in row])
+            item = next((i for i, x in enumerate(h) if x in ("itemno", "item", "kartela", "artikulli", "artikull",
+                                                             "kodi", "itemnumber", "no", "nr")), None)
+            pct = next((i for i, x in enumerate(h) if "waste" in x and ("%" in x or "aplikuar" in x or "pct" in x)), None)
+            if item is not None and pct is not None:
+                head_row = n + 1
+                find = lambda *keys: next((i for i, x in enumerate(h) if x in keys), None)      # noqa: E731
+                cols = {"item": item, "pct": pct, "desc": find("description", "pershkrimi", "emertimi"),
+                        "unit": find("uom", "njesia", "unit", "baseunitofmeasure"),
+                        "wcat": next((i for i, x in enumerate(h) if x.startswith("kategoria") or x == "wastecategory"), None),
+                        "loc": find("locationcode", "location", "lokacioni")}
+                break
+        if head_row is None:
+            continue
+        raw, warnings, locs = [], [], set()
+        for row in ws.iter_rows(min_row=head_row + 1):
+            cell = lambda k: row[cols[k]] if cols.get(k) is not None and cols[k] < len(row) else None    # noqa: E731
+            c = cell("item")
+            no = c.value if c is not None else None
+            if no is None or str(no).strip() == "":
+                continue
+            no = str(int(no)) if isinstance(no, float) and no.is_integer() else str(no).strip()
+            pc = cell("pct")
+            v = pc.value if pc is not None else None
+            if v is None or str(v).strip() == "":
+                warnings.append(f"{no}: no % Waste, taken as 0%")
+                v = 0
+            if isinstance(v, str):
+                t = v.strip().replace(",", ".")
+                pct_sign = t.endswith("%")
+                try:
+                    v = float(t.rstrip("%").strip())
+                except ValueError:
+                    warnings.append(f"{no}: % Waste '{t}' is not a number, taken as 0%")
+                    v, pct_sign = 0.0, True
+                raw.append([no, v, "pct" if pct_sign else "?", row, cell])
+            else:
+                raw.append([no, float(v), "frac" if "%" in str(getattr(pc, "number_format", "") or "") else "?", row, cell])
+            lc = cell("loc")
+            if lc is not None and lc.value:
+                locs.add(str(lc.value).strip())
+        if not raw:
+            continue
+        plain = [r[1] for r in raw if r[2] == "?"]
+        plain_frac = bool(plain) and all(0 <= x <= 1 for x in plain)
+        out, seen = [], set()
+        for no, v, kind, row, cell in raw:
+            pct = v * 100 if kind == "frac" or (kind == "?" and plain_frac) else v
+            if not 0 <= pct <= 100:
+                warnings.append(f"{no}: % Waste {pct:g} is outside 0–100, left out")
+                continue
+            if no in seen:
+                warnings.append(f"{no}: on the file twice, the first line kept")
+                continue
+            seen.add(no)
+            val = lambda k: (str(cell(k).value).strip() if cell(k) is not None and cell(k).value is not None else "")  # noqa: E731
+            out.append({"item": no, "pct": round(pct, 4), "desc": val("desc")[:120], "unit": val("unit")[:20],
+                        "wcat": val("wcat")[:40]})
+        return {"rows": out, "locations": sorted(locs), "sheet": ws.title, "warnings": warnings[:200]}
+    raise ValueError("No sheet with an item column (Item No., Kartela) and a % Waste column (Waste % i aplikuar) "
+                     "was found.")
+
+
+def save_waste(company, location, ym, parsed, filename, actor):
+    if parsed["locations"] and not any(_norm(x) == _norm(location) for x in parsed["locations"]):
+        raise ValueError(f"The file is for {', '.join(parsed['locations'])}, not {location}.")
+    c = {"company": company, "location": location, "month": ym, "file": str(filename or "")[:120],
+         "uploaded_by": actor, "uploaded_at": datetime.now().isoformat(timespec="seconds"), "sheet": parsed["sheet"],
+         "rows": parsed["rows"], "warnings": parsed["warnings"]}
+    _wdir().mkdir(parents=True, exist_ok=True)
+    p = _wfile(company, location, ym)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(p)
+    store.audit("shrinkage_waste", f"{company} {location} {ym}", actor, None, {"items": len(c["rows"]), "file": c["file"]}, "")
+    _held.forget()
+    return c
+
+
+def get_waste(company, location, ym):
+    try:
+        return json.loads(_wfile(company, location, ym).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def delete_waste(company, location, ym, actor):
+    p = _wfile(company, location, ym)
+    if not p.exists():
+        return False
+    p.unlink()
+    store.audit("shrinkage_waste", f"{company} {location} {ym}", actor, None, {"deleted": True}, "")
+    _held.forget()
+    return True
+
+
+def waste_map(w, known):
+    """{BC item: % Waste} of an uploaded file; a code Excel stripped of its leading zeros finds the one BC item that
+    has them. Returns (map, items of the file not in BC)."""
+    zeros = {}
+    for no in known:
+        if no.isdigit() and no.startswith("0"):
+            zeros.setdefault(no.lstrip("0"), []).append(no)
+    out, missing = {}, []
+    for r in w.get("rows") or []:
+        no = r["item"]
+        if no not in known and no.isdigit() and len(zeros.get(no.lstrip("0"), [])) == 1:
+            no = zeros[no.lstrip("0")][0]
+        if no not in known:
+            missing.append(r["item"])
+        out[no] = r["pct"]
+    return out, missing
+
+
 # ---------------------------------------------------------------- reading Business Central
 _items_cache = {}
 ITEM_SELECT = ("No,Description,Base_Unit_of_Measure,Item_Category_Code,Item_Category_Group_2,Item_Category_Group_3,"
@@ -447,13 +583,25 @@ def months_of(year, today=None):
 
 
 # ---------------------------------------------------------------- the KPIs
+def _item_waste(ln):
+    """An item line of a month with its own % Waste: (loss, allowed, justified, unjustified)."""
+    loss = max(0.0, -ln["cnt_v"])
+    allowed = ln["pct"] / 100 * max(0.0, -ln["out_v"])
+    just = min(loss, allowed)
+    return loss, allowed, just, loss - just
+
+
 def _cat_rows(lines, cfg):
-    """lines: [{kat2, unit, out_q, out_v, cnt_q, cnt_v}] in scope → one row per category + the totals."""
+    """lines: [{kat2, unit, out_q, out_v, cnt_q, cnt_v, pct}] in scope → one row per category + the totals. A line with
+    pct (the month's % Waste per item was uploaded) is judged item by item: justified = its loss up to pct × its KMSH /
+    Dalje, unjustified = the rest; the other lines by their category's % Waste, as before."""
     cats = {x["kat2"]: x for x in cfg["categories"]}
     acc = {}
     for ln in lines:
         a = acc.setdefault(ln["kat2"], {"u": {}, "kmsh": 0.0, "net": 0.0, "loss_items": 0.0, "gain_items": 0.0,
-                                          "items": 0, "kat1": ln.get("kat1_bc") or ""})
+                                          "items": 0, "kat1": ln.get("kat1_bc") or "",
+                                          "c_kmsh": 0.0, "c_net": 0.0, "i_n": 0, "i_allowed": 0.0, "i_just": 0.0,
+                                          "i_unj": 0.0, "i_kmsh": 0.0})
         u = ln["unit"] if ln["unit"] in UNITS else "Other"
         b = a["u"].setdefault(u, [0.0, 0.0, 0.0])              # count qty, out qty (positive), value
         b[0] += ln["cnt_q"]
@@ -463,6 +611,16 @@ def _cat_rows(lines, cfg):
         a["net"] += ln["cnt_v"]
         a["loss_items" if ln["cnt_v"] < 0 else "gain_items"] += ln["cnt_v"]
         a["items"] += 1
+        if ln.get("pct") is not None:
+            _, al, ju, un = _item_waste(ln)
+            a["i_n"] += 1
+            a["i_allowed"] += al
+            a["i_just"] += ju
+            a["i_unj"] += un
+            a["i_kmsh"] += -ln["out_v"]
+        else:
+            a["c_kmsh"] += -ln["out_v"]
+            a["c_net"] += ln["cnt_v"]
     rows = []
     for k2, a in acc.items():
         c = cats.get(k2) or {"kat1": a["kat1"], "waste_pct": 0, "check": False, "from_bc": True}
@@ -470,10 +628,20 @@ def _cat_rows(lines, cfg):
         loss = max(0.0, -a["net"])
         ratio_signed = -a["net"] / a["kmsh"] if a["kmsh"] > 0 else None
         waste = c["waste_pct"] / 100
-        investigate = ratio_signed is not None and ratio_signed > waste or (a["kmsh"] <= 0 and loss > 0)
-        allowed = waste * a["kmsh"]
-        rows.append({"kat2": k2, "kat1": c["kat1"], "check": c["check"], "waste_pct": c["waste_pct"], "items": a["items"],
-                     "from_bc": bool(c.get("from_bc")),
+        # the lines judged by their category
+        c_loss = max(0.0, -a["c_net"])
+        c_ratio = -a["c_net"] / a["c_kmsh"] if a["c_kmsh"] > 0 else None
+        c_inv = a["items"] > a["i_n"] and (c_ratio is not None and c_ratio > waste or (a["c_kmsh"] <= 0 and c_loss > 0))
+        c_allowed = waste * a["c_kmsh"]
+        c_just = min(c_loss, c_allowed)
+        mode = "item" if a["i_n"] == a["items"] else "category" if not a["i_n"] else "mixed"
+        allowed = c_allowed + a["i_allowed"]
+        unjust = max(0.0, c_loss - c_allowed) + a["i_unj"]
+        investigate = c_inv or a["i_unj"] > 0.5
+        rows.append({"kat2": k2, "kat1": c["kat1"], "check": c["check"], "items": a["items"],
+                     "waste_pct": c["waste_pct"] if mode == "category" else
+                     round(allowed / a["kmsh"] * 100, 2) if a["kmsh"] > 0 else 0,
+                     "waste_mode": mode, "from_bc": bool(c.get("from_bc")) and mode == "category",
                      "delta": {u: (round(b[0] / b[1], 4) if b[1] else None) for u, b in a["u"].items()},
                      "delta_all": round(dq / oq, 4) if oq else None,
                      "value": {u: round(b[2], 2) for u, b in a["u"].items()}, "net": round(a["net"], 2),
@@ -481,20 +649,25 @@ def _cat_rows(lines, cfg):
                      "kmsh": round(a["kmsh"], 2),
                      "ratio": None if ratio_signed is None else round(ratio_signed, 4),
                      "target": "Investigate" if investigate else "OK", "allowed": round(allowed, 2),
-                     "unjust": round(max(0.0, loss - allowed), 2),
-                     "unjust_excel": round(loss if investigate else 0.0, 2)})
+                     "justified": round(c_just + a["i_just"], 2), "unjust": round(unjust, 2),
+                     "unjust_excel": None if mode == "item" else round(c_loss if c_inv else 0.0, 2)})
     rows.sort(key=lambda r: r["net"])
     return rows
 
 
 def _totals(rows):
-    t = {k: round(sum(r[k] for r in rows), 2) for k in ("net", "losses", "surpluses", "kmsh", "allowed", "unjust",
-                                                         "unjust_excel")}
+    t = {k: round(sum(r[k] or 0 for r in rows), 2) for k in ("net", "losses", "surpluses", "kmsh", "allowed", "justified",
+                                                              "unjust")}
+    ex = [r["unjust_excel"] for r in rows if r["unjust_excel"] is not None]
+    t["unjust_excel"] = round(sum(ex), 2) if ex else None
     yes = [r for r in rows if r["check"]]
     t["unjust_yes"] = round(sum(r["unjust"] for r in yes), 2)
-    t["unjust_excel_yes"] = round(sum(r["unjust_excel"] for r in yes), 2)
+    ey = [r["unjust_excel"] for r in yes if r["unjust_excel"] is not None]
+    t["unjust_excel_yes"] = round(sum(ey), 2) if ey else None
     t["ratio"] = round(-t["net"] / t["kmsh"], 4) if t["kmsh"] else None
     t["investigate"] = sum(1 for r in rows if r["target"] == "Investigate")
+    modes = {r["waste_mode"] for r in rows}
+    t["waste_mode"] = modes.pop() if len(modes) == 1 else "mixed"
     return t
 
 
@@ -534,17 +707,25 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
     progress("reading the item cards")
     cards = item_cards(client, company)
     yms = months_of(year)
-    months, items, prev = [], {}, None
+    months, items, prev, waste_by_month = [], {}, None, {}
     for ym in yms:
         m = read_month(client, company, location, ym, cfg["prefixes"], refresh, progress)
         form = stockcount.get(company, location, ym)
         fc = form_counts(form, set(cards)) if form else None
+        wf = get_waste(company, location, ym)
+        if wf:
+            wmap, wmissing = waste_map(wf, set(cards))
+            waste_by_month[ym] = (wmap, {r["item"]: r.get("wcat") or "" for r in wf.get("rows") or []})
         src = "form" if fc is not None else ("bc" if m["docs"] else None)
         info = {"month": ym, "counted": bool(src), "source": src, "docs": m["docs"], "read_at": m["read_at"],
                 "entries": m["entries"]}
         if form:
             info["form"] = {k: form.get(k) for k in ("file", "uploaded_by", "uploaded_at", "sheet", "sheets",
                                                      "counted_lines")} | {"lines": len(form.get("rows") or [])}
+        if wf:
+            info["waste"] = {k: wf.get(k) for k in ("file", "uploaded_by", "uploaded_at", "sheet")} | {
+                "items": len(wf.get("rows") or []), "not_in_bc": wmissing[:30], "n_not_in_bc": len(wmissing),
+                "warnings": (wf.get("warnings") or [])[:30]}
         seen = set(m["items"]) | {k for k, v in m["opening"].items() if v} | {k for k, v in m["closing"].items() if v}
         if fc:
             seen |= set(fc)
@@ -584,15 +765,19 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
         card = cards.get(no) or {}
         k2, src = category_of(card, cfg, company, no)
         unit = _norm(card.get("Base_Unit_of_Measure"))
+        # % Waste of the item in the months whose per-item file was uploaded: not on the file = 0% (Geri, 12 Nov 2026)
+        w = {ym: wm[0].get(no, 0.0) for ym, wm in waste_by_month.items() if ym in per}
+        wcat = next((wm[1].get(no) for ym, wm in sorted(waste_by_month.items(), reverse=True) if wm[1].get(no)), "")
         item_rows.append({"no": no, "desc": (card.get("Description") or "").strip(), "unit": unit,
                           "kat2": k2, "from": src, "g4": card.get("Item_Category_Group_4") or "",
                           "g5": card.get("Item_Category_Group_5") or "", "exception": src == "exception",
                           "m": {ym: v[:8] for ym, v in per.items()}, "cls": {ym: v[8] for ym, v in per.items() if v[8]},
-                          "not_counted": [ym for ym, v in per.items() if v[9]]})
+                          "not_counted": [ym for ym, v in per.items() if v[9]], "w": w,
+                          "w_missing": [ym for ym in w if no not in waste_by_month[ym][0]], "wcat": wcat})
         kat1 = str(card.get("Item_Category_Group_3") or "").strip() if src == "bc" else ""
         for ym, v in per.items():
             lines_by_month.setdefault(ym, []).append({"kat2": k2, "kat1_bc": kat1, "unit": unit, "out_q": v[3],
-                                                      "out_v": v[4], "cnt_q": v[5], "cnt_v": v[6]})
+                                                      "out_v": v[4], "cnt_q": v[5], "cnt_v": v[6], "pct": w.get(ym)})
     per_month = {}
     for mm in months:
         ym = mm["month"]
@@ -601,10 +786,14 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
     counted = [m["month"] for m in months if m["counted"]]
     ytd_lines = [ln for ym in counted for ln in lines_by_month.get(ym, [])]
     ytd_rows = _cat_rows(ytd_lines, cfg)
-    for r in ytd_rows:                                  # the thresholds are monthly: sum the months' unjustified
-        r["unjust"] = round(sum(x["unjust"] for ym in counted for x in per_month[ym]["rows"] if x["kat2"] == r["kat2"]), 2)
-        r["unjust_excel"] = round(sum(x["unjust_excel"] for ym in counted for x in per_month[ym]["rows"]
-                                      if x["kat2"] == r["kat2"]), 2)
+    for r in ytd_rows:                                  # the thresholds are monthly: sum the months' figures
+        mine = [x for ym in counted for x in per_month[ym]["rows"] if x["kat2"] == r["kat2"]]
+        for k in ("unjust", "justified", "allowed"):
+            r[k] = round(sum(x[k] for x in mine), 2)
+        ex = [x["unjust_excel"] for x in mine if x["unjust_excel"] is not None]
+        r["unjust_excel"] = round(sum(ex), 2) if ex else None
+        r["waste_pct"] = r["waste_pct"] if r["waste_mode"] == "category" else (
+            round(r["allowed"] / r["kmsh"] * 100, 2) if r["kmsh"] > 0 else 0)
         r["months_investigate"] = sum(1 for ym in counted for x in per_month[ym]["rows"]
                                       if x["kat2"] == r["kat2"] and x["target"] == "Investigate")
     progress("putting it together")
@@ -623,7 +812,11 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
                           "consumption, FIRO, corrections) netted per item.",
                 "kmsh": "KMSH / Dalje = the cost of the month's outs, as posted.",
                 "unjust": "Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero. Unjustified "
-                          "(Excel) = the whole loss of a category whose Diferenca / Dalje is above its % Waste."}}
+                          "(Excel) = the whole loss of a category whose Diferenca / Dalje is above its % Waste.",
+                "per_item": "A month whose % Waste per item was uploaded is judged item by item: justified = the item's "
+                            "loss up to its % Waste × its KMSH / Dalje, unjustified = the rest; an item not on the file "
+                            "has 0%; surpluses of other items do not offset a loss. A category's % Waste is then the "
+                            "allowed waste of its items ÷ its KMSH / Dalje, and the Excel method does not apply."}}
 
 
 def request(client, company, location, year, refresh=False):
@@ -719,14 +912,15 @@ def render_xlsx(r):
 
     head = ["CHECK", "% Waste", "Kat. 1", "Kat. 2", "Items"] + [f"% Delta {u}" for u in UNITS] + ["% Delta All"] + \
            [f"Value {u}" for u in UNITS] + ["Value Other", "Net value", "KMSH / Dalje", "Diferenca / Dalje",
-                                            "TARGET", "Allowed waste", "Unjustified (loss − allowed)",
-                                            "Unjustified (Excel method)"]
+                                            "TARGET", "Allowed waste", "Justified", "Unjustified (loss − allowed)",
+                                            "Unjustified (Excel method)", "% Waste from"]
 
     def catrow(x):
         return (["YES" if x["check"] else "NO", x["waste_pct"] / 100, x["kat1"], x["kat2"], x["items"]] +
                 [x["delta"].get(u) for u in UNITS] + [x["delta_all"]] + [x["value"].get(u) for u in UNITS] +
-                [x["value"].get("Other"), x["net"], x["kmsh"], x["ratio"], x["target"], x["allowed"], x["unjust"],
-                 x["unjust_excel"]])
+                [x["value"].get("Other"), x["net"], x["kmsh"], x["ratio"], x["target"], x["allowed"], x["justified"],
+                 x["unjust"], x["unjust_excel"],
+                 {"item": "per item", "category": "category", "mixed": "per item and category"}.get(x.get("waste_mode"), "")])
     ws = wb.active
     ws.title = f"KPI Summary {r['year']}"
     counted = [m["month"] for m in r["months"] if m["counted"]]
@@ -742,18 +936,43 @@ def render_xlsx(r):
           f"Shrinkage KPIs · {r['company']} · {r['location']} · {r['year']} · read {r['read_at']} · "
           f"status {r['config']['status']}")
     src = {m["month"]: (f"count form {m['form']['file']}" if m.get("source") == "form"
-                        else "count adjustments posted in BC") for m in r["months"] if m["counted"]}
+                        else "count adjustments posted in BC")
+           + (f" · % Waste per item {m['waste']['file']}" if m.get("waste") else "") for m in r["months"] if m["counted"]}
+    num = lambda v: "–" if v is None else f"{v:,.0f}"                                  # noqa: E731
     for ym in reversed(counted):
         pm = r["per_month"][ym]
         w = wb.create_sheet(f"KPI {label(ym).replace(' ', '')}")
-        sheet(w, head, [catrow(x) for x in pm["rows"]], [7, 8, 10, 14, 6] + [9] * 5 + [12] * 5 + [12, 13, 11, 12, 12, 14, 14],
-              f"KPI {label(ym)} · {r['location']} · {src[ym]} · net {pm['totals']['net']:,.0f} · unjustified "
-              f"{pm['totals']['unjust']:,.0f} (Excel method {pm['totals']['unjust_excel']:,.0f})")
+        sheet(w, head, [catrow(x) for x in pm["rows"]], [7, 8, 10, 14, 6] + [9] * 5 + [12] * 5 + [12, 13, 11, 12, 12, 12, 14, 14, 14],
+              f"KPI {label(ym)} · {r['location']} · {src[ym]} · net {num(pm['totals']['net'])} · justified "
+              f"{num(pm['totals']['justified'])} · unjustified {num(pm['totals']['unjust'])} (Excel method "
+              f"{num(pm['totals']['unjust_excel'])})")
         for row in w.iter_rows(min_row=4):
             for c in row[5:10]:
                 c.number_format = "0.0%"
             row[1].number_format = "0%"
-            row[20].number_format = "0.0%"
+            row[17].number_format = "0.0%"
+    wm = [m["month"] for m in r["months"] if m.get("waste") and m["counted"]]
+    if wm:                                            # the months judged item by item: every item's waste
+        wsx = wb.create_sheet("Waste per item")
+        wrows = []
+        for it in r["items"]:
+            for ym in wm:
+                v = it["m"].get(ym)
+                if not v or ym not in (it.get("w") or {}):
+                    continue
+                pct = it["w"][ym]
+                loss, kmsh = max(0.0, -v[6]), max(0.0, -v[4])
+                allowed = pct / 100 * kmsh
+                just = min(loss, allowed)
+                wrows.append([it["no"], it["desc"], it["unit"], it["kat2"], it.get("wcat") or "", label(ym),
+                              "not on the file (0%)" if ym in (it.get("w_missing") or []) else "file",
+                              pct / 100, kmsh, v[6], loss, allowed, just, loss - just])
+        sheet(wsx, ["Kartela", "Pershkrimi", "Njesia", "Kat. 2", "Waste category (file)", "Month", "% Waste from",
+                    "% Waste", "KMSH / Dalje", "Difference value", "Loss", "Allowed waste", "Justified", "Unjustified"],
+              wrows, [11, 34, 8, 14, 14, 10, 18, 9, 13, 13, 12, 12, 12, 12],
+              f"% Waste per item · {r['location']} · " + ", ".join(f"{label(ym)}: {next(m['waste']['file'] for m in r['months'] if m['month'] == ym)}" for ym in wm))
+        for row in wsx.iter_rows(min_row=4):
+            row[7].number_format = "0.0%"
     a = wb.create_sheet("Analize")
     ah = ["Kartela", "Pershkrimi", "Njesia", "Kat. 2", "Group 4", "Group 5", "Category from"]
     for ym in r["months"]:

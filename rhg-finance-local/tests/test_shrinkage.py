@@ -97,6 +97,59 @@ class Shrinkage(unittest.TestCase):
         shrinkage.save_config("SALT", {"status": "Reconciled"}, "geri", "matches the Excel May-Sep")
         self.assertEqual(shrinkage.get_config()["status"], "Reconciled")
 
+    def test_waste_per_item(self):
+        """A month with % Waste per item: justified / unjustified item by item; not on the file = 0%."""
+        import io
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Kompania", "Location Code", "Segmenti", "Item No.", "Description", "UoM", "Kategoria waste",
+                   "Waste % i aplikuar"])
+        ws.append(["SALT", "SIN", "Restorant", "A508", "Kallamare", "KG", "PESHK", 0.55])
+        ws.append(["SALT", "SIN", "Restorant", "A1232", "Corona", "COPE", "BIRRE", 0.015])
+        for row in ws.iter_rows(min_row=2):
+            row[7].number_format = "0.00%"
+        buf = io.BytesIO()
+        wb.save(buf)
+        parsed = shrinkage.parse_waste(buf.getvalue())
+        self.assertEqual([(r["item"], r["pct"]) for r in parsed["rows"]], [("A508", 55.0), ("A1232", 1.5)])
+        self.assertEqual(parsed["locations"], ["SIN"])
+        with self.assertRaises(ValueError):
+            shrinkage.save_waste("SALT", "LIFT", "2026-09", parsed, "w.xlsx", "geri")       # the file is for SIN
+        shrinkage.save_waste("SALT", "SIN", "2026-09", parsed, "w.xlsx", "geri")
+        r = shrinkage.build(Client(), "SALT", "SIN", 2026)
+        self.assertEqual(r["months"][1]["waste"]["items"], 2)
+        cats = {x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}
+        self.assertEqual(cats["Peshk"]["waste_mode"], "item")
+        self.assertAlmostEqual(cats["Peshk"]["justified"], 0.55 * 7800, 2)
+        self.assertAlmostEqual(cats["Peshk"]["unjust"], 22053.47 - 0.55 * 7800, 2)
+        kb = 39240 + 27432 + 8720
+        self.assertAlmostEqual(cats["Birre"]["justified"], 0.015 * kb, 2)                  # 1.5% instead of 5%
+        self.assertAlmostEqual(cats["Birre"]["unjust"], 5995 - 0.015 * kb, 2)
+        self.assertIsNone(cats["Birre"]["unjust_excel"])
+        self.assertEqual((cats["AMBALAZH"]["justified"], cats["AMBALAZH"]["unjust"]), (0, 5000))   # not on the file
+        it = {x["no"]: x for x in r["items"]}
+        self.assertEqual((it["AMB1"]["w"], it["AMB1"]["w_missing"]), ({"2026-09": 0.0}, ["2026-09"]))
+        self.assertEqual(it["A508"]["wcat"], "PESHK")
+        t = r["per_month"]["2026-09"]["totals"]
+        self.assertAlmostEqual(t["justified"] + t["unjust"], 22053.47 + 5995 + 5000, 2)
+        self.assertEqual(t["waste_mode"], "item")
+        self.assertTrue(shrinkage.render_xlsx(r).startswith(b"PK"))
+        self.assertTrue(shrinkage.delete_waste("SALT", "SIN", "2026-09", "geri"))
+        r = shrinkage.build(Client(), "SALT", "SIN", 2026)
+        self.assertEqual({x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}["Peshk"]["waste_mode"], "category")
+
+    def test_waste_file_of_sin(self):
+        f = Path(__file__).parent / "fixtures" / "SIN_WASTE_TOLERANCE.xlsx"
+        if not f.exists():
+            self.skipTest("no sample file")
+        p = shrinkage.parse_waste(f.read_bytes())
+        pct = {r["item"]: r["pct"] for r in p["rows"]}
+        self.assertEqual((len(p["rows"]), p["locations"]), (470, ["SIN"]))
+        self.assertEqual((pct["A508"] if "A508" in pct else None, pct["A10245"], pct["A8510"], pct["A10745"]),
+                         (pct.get("A508"), 100.0, 55.0, 0.05))
+        self.assertIn("201597", pct)                                   # a numeric item number read as text
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -131,7 +131,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/recipients": "settings",
                      "/api/exceptions/email": "actions",
                      "/api/shrinkage/config": "settings", "/api/shrinkage/import": "settings",
-                     "/api/shrinkage/count": "actions",
+                     "/api/shrinkage/count": "actions", "/api/shrinkage/waste": "actions",
                      "/api/fiscal/fetch": "settings", "/api/fiscal/import": "settings",
                      "/api/fiscal/settings": "settings", "/api/fiscal/test": "settings", "/api/fiscal/probe": "settings",
                      "/api/users": "users", "/api/password": "view"}
@@ -2067,7 +2067,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
                          "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
                          "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview", "/api/shrinkage/config",
-                         "/api/shrinkage/count",
+                         "/api/shrinkage/count", "/api/shrinkage/waste",
                          # Sales → Blocked by stock: cut to the person's locations
                          "/api/sales/stockstop", "/api/sales/stockstop/xlsx",
                          # Sales → SevenRooms ↔ Simphony: cut to the person's restaurants
@@ -2274,7 +2274,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: recipeuse.cut(b, self._allowed)
         elif path in ("/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
                       "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx",
-                      "/api/shrinkage/overview", "/api/shrinkage/config", "/api/shrinkage/count"):
+                      "/api/shrinkage/overview", "/api/shrinkage/config", "/api/shrinkage/count",
+                      "/api/shrinkage/waste"):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path in ("/api/sales/stockstop", "/api/sales/stockstop/xlsx"):
             self._scope_filter = lambda b: salestop.cut(b, self._allowed)
@@ -3725,6 +3726,38 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True, "sheet": c["sheet"], "sheets": c["sheets"], "month_on_form": c["month"],
                                  "lines": len(c["rows"]), "counted_lines": c["counted_lines"],
                                  "warnings": c["warnings"][:10]})
+            elif url.path == "/api/shrinkage/waste":
+                # the % Waste allowed per item of a location for a month: justified / unjustified item by item
+                if not auth.can(user, "finance.s.inventory.shrinkage"):
+                    self._send(403, {"error": "Your role does not include Shrinkage KPIs."})
+                    return
+                company, location = body.get("company") or config.BC_COMPANY, str(body.get("location") or "").strip()
+                month = str(body.get("month") or "")
+                try:
+                    stockcount.month_range(month)
+                except (ValueError, TypeError):
+                    self._send(400, {"error": "Choose the month the % Waste is for."})
+                    return
+                codes = client.locations(company)
+                if self._allowed is not None:
+                    codes = [c for c in codes if c.upper() in self._allowed]
+                if not location or location not in codes:
+                    self._send(400, {"error": "Choose the location first."})
+                    return
+                if body.get("delete"):
+                    self._send(200, {"ok": shrinkage.delete_waste(company, location, month, actor)})
+                    return
+                try:
+                    parsed = shrinkage.parse_waste(stockcount.decode(body.get("data")))
+                    c = shrinkage.save_waste(company, location, month, parsed, body.get("filename"), actor)
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+                    return
+                known = set(shrinkage.item_cards(client, company))
+                _, missing = shrinkage.waste_map(c, known)
+                self._send(200, {"ok": True, "items": len(c["rows"]), "sheet": c["sheet"], "not_in_bc": missing[:20],
+                                 "n_not_in_bc": len(missing), "warnings": c["warnings"][:10],
+                                 "n_warnings": len(c["warnings"])})
             elif url.path in ("/api/shrinkage/config", "/api/shrinkage/import"):
                 company = body.get("company") or config.BC_COMPANY
                 try:
