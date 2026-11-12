@@ -7241,6 +7241,7 @@ async function loadSh(refresh){
     else shWant = "";
     if (!shWant && (!shMon || (shMon !== "ytd" && !counted.includes(shMon)))) shMon = counted.length ? counted[counted.length - 1] : "ytd";
     shRender();
+    shWNoCount(j, counted);
     if (j.reading) { $("shStatus").textContent += ` · reading again: ${j.stage || "…"}`; shTimer = setTimeout(() => loadSh(false), 4000); }
   } catch (e) { $("shStatus").textContent = "Could not read: " + e.message; }
 }
@@ -7693,14 +7694,25 @@ async function shCount(f, sheet){
 }
 $("shCntFile").onchange = ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) shCount(f); };
 // ---- the month's % Waste per item of a location (e.g. SIN_WASTE_TOLERANCE.xlsx): justified / unjustified item by item
-async function shWaste(f){
+var shWLast = null;
+// a % Waste file uploaded for a month with no count: say so, and offer the counted months that have no file
+function shWNoCount(j, counted){
+  const w = shWLast; if (!w || j.reading || w.loc !== j.location || counted.includes(w.month)) return;
+  const free = counted.filter(m => !(j.months.find(x => x.month === m) || {}).waste).slice(-3).reverse();
+  $("shUpMsg").innerHTML = `<span class="neg">% Waste per item of ${esc(w.loc)} saved for ${esc(shMonth(w.month))}, but ${esc(shMonth(w.month))} has no count yet (no count form uploaded, no IF count posted in Business Central): its analysis shows once the count is in.</span>` +
+    (counted.length ? ` <span>Months with a count: ${esc(counted.map(shMonth).join(", "))}.</span>` : "") +
+    free.map(m => ` <button class="mini" type="button" data-shwfor="${m}">Use the same file for ${esc(shMonth(m))}</button>`).join("");
+  $("shUpMsg").querySelectorAll("[data-shwfor]").forEach(b => b.onclick = () => { $("shUpMonth").value = b.dataset.shwfor; shWaste(w.f, w.data); });
+}
+async function shWaste(f, data0){
   const loc = $("shLoc").value, month = $("shUpMonth").value, msg = $("shUpMsg");
   if (!loc) { msg.textContent = "Choose the location first (above), then the month the % Waste is for."; return; }
   if (!/\.xlsx$/i.test(f.name)) { msg.textContent = "Upload the % Waste per item as an Excel file (.xlsx)."; return; }
   msg.textContent = "Reading the % Waste per item…";
   try {
-    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+    const data = data0 || await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
     const j = await simphonyPost("/api/shrinkage/waste", {company: $("company").value || "", location: loc, month, data, filename: f.name});
+    shWLast = {f, data, month, loc};
     msg.innerHTML = `<span>% Waste per item of ${esc(loc)}, ${esc(shMonth(month))}: ${esc(f.name)}</span> · <span>${fmt(j.items)} items</span>` +
       (j.n_not_in_bc ? ` · <span class="neg" title="${esc((j.not_in_bc || []).join(", "))}">${fmt(j.n_not_in_bc)} not in Business Central</span>` : "") +
       (j.n_warnings ? ` · <span title="${esc((j.warnings || []).join("\n"))}">${fmt(j.n_warnings)} notes on reading the file</span>` : "") +
