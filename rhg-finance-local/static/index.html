@@ -1805,6 +1805,11 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="epSave" type="button">Save</button><button class="btn" id="epCheck" type="button">Check the connection</button><span class="meta" id="epMsg"></span></div>
     </div>
+    <div class="card" id="eaCard" hidden>
+      <div class="card-head"><div><h2>EMC audit: read the whole configuration</h2>
+        <p class="hint"><span>Reads every part of the EMC configuration the Configuration API gives (locations, revenue centres, workstations, menu items and prices, discounts, service charges, tenders, taxes, order types and channels, roles, employees without personal data) and the audit trail of the last 180 days, into one file to download.</span> <span>Only get calls: nothing is changed in Simphony. It takes several minutes.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="mini dark" id="eaRun" type="button">Read</button><a class="mini" id="eaGet" href="/api/emcaudit/file" hidden>Download</a></div></div>
+      <p class="meta" id="eaStatus"></p></div>
     <div class="card" id="epCmp" hidden>
       <div class="ep-pick">
         <div><label class="meta" for="epQa">User A</label><input id="epQa" placeholder="find by name, EMC user or number" autocomplete="off"><select id="epA" size="6" aria-label="User A"></select><div class="ep-who" id="epWa"></div></div>
@@ -5732,12 +5737,29 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-kago
 // ---------- Control → EMC privileges (emcpriv.py): one Simphony user against another ----------
 let epData = null, epTimer = null, epF = "diff", epA = "", epB = "";
 const EP_RANK = {view: 1, add: 2, edit: 3, "delete": 4}, EP_FLD = {excluded: 0, "view only": 1, editable: 2};
+// EMC audit: the configuration read into one file (emcaudit.py), for whoever holds Settings
+var eaTimer = null;
+function eaShow(j){
+  $("eaGet").hidden = !j.file;
+  const parts = Object.entries(j.summary || {}).map(([k, v]) => `${k} ${v.error ? "error" : fmt(v.rows ?? v.locations)}`);
+  $("eaStatus").textContent = j.running ? `Reading… ${j.step}` : j.error ? `Failed: ${j.error}`
+    : j.file ? `Read ${new Date(j.file_at).toLocaleString("en-GB", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"})} · ${fmt(j.file_bytes / 1048576, 1)} MB` + (parts.length ? ` · ${parts.join(" · ")}` : "") : "Not read yet.";
+  clearTimeout(eaTimer); if (j.running) eaTimer = setTimeout(eaPoll, 4000);
+}
+async function eaPoll(){ try { eaShow(await readJSON(await fetch("/api/emcaudit"))); } catch (e) { $("eaStatus").textContent = "Could not read the status: " + e.message; } }
+$("eaRun").onclick = async () => {
+  $("eaRun").disabled = true;
+  try { const j = await readJSON(await fetch("/api/emcaudit", {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"}, body: "{}"}));
+    if (j.error && !j.running) throw new Error(j.error); eaShow(j); }
+  catch (e) { $("eaStatus").textContent = "Could not start: " + e.message; } finally { $("eaRun").disabled = false; }
+};
 async function loadEp(refresh){
   clearTimeout(epTimer);
   $("epStatus").textContent = "Reading…";
   try {
     const j = await readJSON(await fetch("/api/emcpriv" + (refresh ? "?refresh=1" : "")));
     $("epSetBtn").hidden = !j.can_settings;
+    $("eaCard").hidden = !j.can_settings; if (j.can_settings && !$("eaStatus").textContent) eaPoll();
     epConn(j.connection || {});
     if (j.pending) { $("epStatus").textContent = `Reading the Simphony Configuration API: ${j.stage || "starting"}…`; epTimer = setTimeout(() => loadEp(false), 3000); return; }
     if (j.available === false) {

@@ -43,6 +43,7 @@ import faloc
 import faregister
 import transit
 import ocdiag
+import emcaudit
 import recipients
 import exmail
 import itemstock
@@ -116,6 +117,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/stockstop-report/settings": "settings", "/api/stockstop-report/job": "settings",
                      "/api/sevenrooms-report/settings": "settings", "/api/sevenrooms-report/job": "settings",
                      "/api/emcpriv/settings": "settings", "/api/emcpriv/check": "settings",
+                     "/api/emcaudit": "settings",
                      "/api/sevenrooms/settings": "settings", "/api/sevenrooms/test": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
@@ -3123,6 +3125,25 @@ class Handler(BaseHTTPRequestHandler):
                            else html.escape(job.get("detail") or ""))
                     self._send(200, (f"<!doctype html><meta http-equiv='refresh' content='5'><p style='font-family:sans-serif;"
                                      f"padding:20px'>{msg}</p>").encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path in ("/api/emcaudit", "/api/emcaudit/file"):
+                # Control → EMC privileges → EMC audit: the whole configuration read into one file (emcaudit.py)
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role cannot read the EMC audit."})
+                    return
+                if url.path.endswith("/status") or url.path == "/api/emcaudit":
+                    self._send(200, emcaudit.status())
+                    return
+                if not emcaudit.FILE.exists():
+                    self._send(404, {"error": "The EMC configuration has not been read yet."})
+                    return
+                raw = emcaudit.FILE.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/gzip")
+                self.send_header("Content-Disposition", f'attachment; filename="emc_audit_{date.today().isoformat()}.json.gz"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
             elif url.path == "/api/emcpriv":
                 # Control → EMC privileges: the Simphony users, their roles and what each role allows (emcpriv.py)
                 if not auth.can(user, "finance.s.emcpriv"):
@@ -3963,6 +3984,11 @@ class Handler(BaseHTTPRequestHandler):
                         self._send(200, sevenrooms.test())
                 except (ValueError, sevenrooms.Error) as exc:
                     self._send(400, {"error": str(exc)[:300]})
+            elif url.path == "/api/emcaudit":
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                self._send(200, emcaudit.start(actor))
             elif url.path in ("/api/emcpriv/settings", "/api/emcpriv/check"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})
