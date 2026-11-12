@@ -592,10 +592,16 @@ def allowed_waste(pct, kmsh, loss):
     return loss if pct >= FULL else pct / 100 * max(0.0, kmsh)
 
 
+def item_allowed(pct, loss):
+    """% Waste per item: the share of the difference (physical count against BC) that is justified (Geri, 12 Nov
+    2026: 50% on a difference of 10,000 → 5,000 justified, 5,000 unjustified; 100% → all of it)."""
+    return min(loss, max(0.0, pct) / 100 * loss)
+
+
 def _item_waste(ln):
     """An item line of a month with its own % Waste: (loss, allowed, justified, unjustified)."""
     loss = max(0.0, -ln["cnt_v"])
-    allowed = allowed_waste(ln["pct"], -ln["out_v"], loss)
+    allowed = item_allowed(ln["pct"], loss)
     just = min(loss, allowed)
     return loss, allowed, just, loss - just
 
@@ -610,7 +616,7 @@ def _cat_rows(lines, cfg):
         a = acc.setdefault(ln["kat2"], {"u": {}, "kmsh": 0.0, "net": 0.0, "loss_items": 0.0, "gain_items": 0.0,
                                           "items": 0, "kat1": ln.get("kat1_bc") or "",
                                           "c_kmsh": 0.0, "c_net": 0.0, "i_n": 0, "i_allowed": 0.0, "i_just": 0.0,
-                                          "i_unj": 0.0, "i_kmsh": 0.0})
+                                          "i_unj": 0.0, "i_kmsh": 0.0, "i_loss": 0.0})
         u = ln["unit"] if ln["unit"] in UNITS else "Other"
         b = a["u"].setdefault(u, [0.0, 0.0, 0.0])              # count qty, out qty (positive), value
         b[0] += ln["cnt_q"]
@@ -627,6 +633,7 @@ def _cat_rows(lines, cfg):
             a["i_just"] += ju
             a["i_unj"] += un
             a["i_kmsh"] += -ln["out_v"]
+            a["i_loss"] += max(0.0, -ln["cnt_v"])
         else:
             a["c_kmsh"] += -ln["out_v"]
             a["c_net"] += ln["cnt_v"]
@@ -650,8 +657,9 @@ def _cat_rows(lines, cfg):
         unjust = max(0.0, c_loss - c_allowed) + a["i_unj"]
         investigate = c_inv or a["i_unj"] > 0.5
         rows.append({"kat2": k2, "kat1": c["kat1"], "check": c["check"], "items": a["items"],
+                     # per item: the share of the category's losses its items' % Waste justifies
                      "waste_pct": c["waste_pct"] if mode == "category" else
-                     round(allowed / a["kmsh"] * 100, 2) if a["kmsh"] > 0 else 0,
+                     round(a["i_allowed"] / a["i_loss"] * 100, 2) if a["i_loss"] > 0 else 0,
                      "waste_mode": mode, "from_bc": bool(c.get("from_bc")) and mode == "category",
                      "delta": {u: (round(b[0] / b[1], 4) if b[1] else None) for u, b in a["u"].items()},
                      "delta_all": round(dq / oq, 4) if oq else None,
@@ -804,8 +812,9 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
             r[k] = round(sum(x[k] for x in mine), 2)
         ex = [x["unjust_excel"] for x in mine if x["unjust_excel"] is not None]
         r["unjust_excel"] = round(sum(ex), 2) if ex else None
-        r["waste_pct"] = r["waste_pct"] if r["waste_mode"] == "category" else (
-            round(r["allowed"] / r["kmsh"] * 100, 2) if r["kmsh"] > 0 else 0)
+        if r["waste_mode"] == "item":
+            loss = sum(max(0.0, x["justified"] + x["unjust"]) for x in mine)
+            r["waste_pct"] = round(r["justified"] / loss * 100, 2) if loss > 0 else 0
         r["months_investigate"] = sum(1 for ym in counted for x in per_month[ym]["rows"]
                                       if x["kat2"] == r["kat2"] and x["target"] == "Investigate")
     progress("putting it together")
@@ -826,11 +835,11 @@ def build(client, company, location, year, refresh=False, progress=lambda s: Non
                 "unjust": "Unjustified (recommended) = loss − % Waste × KMSH / Dalje, never below zero; a % Waste of 100 "
                   "justifies the whole difference. Unjustified "
                           "(Excel) = the whole loss of a category whose Diferenca / Dalje is above its % Waste.",
-                "per_item": "A month whose % Waste per item was uploaded is judged item by item: justified = the item's "
-                            "loss up to its % Waste × its KMSH / Dalje (at 100% the whole difference), unjustified = "
-                            "the rest; an item not on the file "
+                "per_item": "A month whose % Waste per item was uploaded is judged item by item: the % Waste applies to "
+                            "the item's difference between the physical count and BC: justified = % Waste × the loss "
+                            "(50% of 10,000 = 5,000), unjustified = the rest; an item not on the file "
                             "has 0%; surpluses of other items do not offset a loss. A category's % Waste is then the "
-                            "allowed waste of its items ÷ its KMSH / Dalje, and the Excel method does not apply."}}
+                            "share of its items' losses that is justified, and the Excel method does not apply."}}
 
 
 def request(client, company, location, year, refresh=False):
@@ -976,7 +985,7 @@ def render_xlsx(r):
                     continue
                 pct = it["w"][ym]
                 loss, kmsh = max(0.0, -v[6]), max(0.0, -v[4])
-                allowed = allowed_waste(pct, kmsh, loss)
+                allowed = item_allowed(pct, loss)
                 just = min(loss, allowed)
                 wrows.append([it["no"], it["desc"], it["unit"], it["kat2"], it.get("wcat") or "", label(ym),
                               "not on the file (0%)" if ym in (it.get("w_missing") or []) else "file",

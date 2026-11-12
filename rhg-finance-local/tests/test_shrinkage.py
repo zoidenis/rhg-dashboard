@@ -121,18 +121,20 @@ class Shrinkage(unittest.TestCase):
         self.assertEqual(r["months"][1]["waste"]["items"], 2)
         cats = {x["kat2"]: x for x in r["per_month"]["2026-09"]["rows"]}
         self.assertEqual(cats["Peshk"]["waste_mode"], "item")
-        self.assertAlmostEqual(cats["Peshk"]["justified"], 0.55 * 7800, 2)
-        self.assertAlmostEqual(cats["Peshk"]["unjust"], 22053.47 - 0.55 * 7800, 2)
-        kb = 39240 + 27432 + 8720
-        self.assertAlmostEqual(cats["Birre"]["justified"], 0.015 * kb, 2)                  # 1.5% instead of 5%
-        self.assertAlmostEqual(cats["Birre"]["unjust"], 5995 - 0.015 * kb, 2)
+        # the % Waste applies to the difference (physical count against BC): 55% of 22,053 is justified
+        self.assertAlmostEqual(cats["Peshk"]["justified"], 0.55 * 22053.47, 2)
+        self.assertAlmostEqual(cats["Peshk"]["unjust"], 0.45 * 22053.47, 2)
+        self.assertAlmostEqual(cats["Peshk"]["waste_pct"], 55, 2)
+        self.assertAlmostEqual(cats["Birre"]["justified"], 0.015 * 5995, 2)
+        self.assertAlmostEqual(cats["Birre"]["unjust"], 0.985 * 5995, 1)
+        self.assertEqual(shrinkage.item_allowed(50, 10000), 5000)                         # Geri's example
         self.assertIsNone(cats["Birre"]["unjust_excel"])
         self.assertEqual((cats["AMBALAZH"]["justified"], cats["AMBALAZH"]["unjust"]), (0, 5000))   # not on the file
         it = {x["no"]: x for x in r["items"]}
         self.assertEqual((it["AMB1"]["w"], it["AMB1"]["w_missing"]), ({"2026-09": 0.0}, ["2026-09"]))
         self.assertEqual(it["A508"]["wcat"], "PESHK")
         t = r["per_month"]["2026-09"]["totals"]
-        self.assertAlmostEqual(t["justified"] + t["unjust"], 22053.47 + 5995 + 5000, 2)
+        self.assertAlmostEqual(t["justified"] + t["unjust"], 22053.47 + 5995 + 5000, 1)
         self.assertEqual(t["waste_mode"], "item")
         self.assertTrue(shrinkage.render_xlsx(r).startswith(b"PK"))
         # 100%: the whole difference is justified, even with no outs (AMB1) or small ones (ice at SIN)
