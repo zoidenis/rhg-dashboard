@@ -43,7 +43,6 @@ EMP_KEEP = ("objectNum", "firstName", "lastName", "checkName", "userName", "emai
             "level", "group", "roles", "emcVisibility")
 _lock, _auth_lock = threading.Lock(), threading.Lock()
 _held = heldjob.Held("emcpriv", KEEP)
-_URL = re.compile(r"^https://[A-Za-z0-9.-]+(:\d+)?/?$")
 
 
 class Error(Exception):
@@ -106,9 +105,13 @@ def save(patch, actor):
                 raise ValueError(f"{k} must be text.")
             v = v.strip()
             if k in ("auth_server", "cc_server") and v:
-                if not _URL.match(v):
-                    raise ValueError("A server is the https:// address only, without a path.")
-                v = v.rstrip("/")
+                # the address as EMC or a browser shows it (with /config/…, /oidc-provider/… or a query): its server
+                if not re.match(r"^[a-z]+://", v, re.I):
+                    v = "https://" + v
+                m = re.match(r"^(https://[A-Za-z0-9.-]+(:\d+)?)(/.*)?$", v, re.I)
+                if not m:
+                    raise ValueError("A server is an https:// address, e.g. https://…-ohsim.oracleindustry.com.")
+                v = m.group(1)
             if k == "org" and v and not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", v):
                 raise ValueError("The enterprise short name is letters and digits only.")
             if k == "client_id" and v and not re.fullmatch(r"[A-Za-z0-9+/=_.-]{10,400}", v):
