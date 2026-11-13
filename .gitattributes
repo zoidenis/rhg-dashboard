@@ -1,0 +1,25 @@
+# Line endings: LF in the repository and in every checkout (the servers run Linux), so a Windows
+# checkout (OneDrive) does not show whole files as changed. Windows scripts keep CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# never converted
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.xlsx binary
+*.xls binary
+*.docx binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.p12 binary
+*.pfx binary
