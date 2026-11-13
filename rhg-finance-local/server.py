@@ -1228,7 +1228,7 @@ def dq_screen(company, anchor, mode, sync=True):
                              f"invoices", float(k["sim"]), float(k["imp"]),
                              "Pass" if not k["issues"] else "Difference",
                              f"{k['ok']} of {k['days']} restaurant-days agree; {k['issues']} issues "
-                             f"(import gap {k['imp_gap']:,.0f}, invoice gap {k['inv_gap']:,.0f}).", "salesrec"))
+                             f"(import gap {k['imp_gap']:,.2f}, invoice gap {k['inv_gap']:,.2f}).", "salesrec"))
     else:
         checks.append(dq.row("sales_rec", "Simphony sales against Business Central",
                              "Every restaurant and day: Simphony, the POS import, the invoices", None, None, "Not read",
@@ -3021,9 +3021,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = q.get("company") or config.BC_COMPANY
                 try:
-                    r = salesrec.request(client, company, _latest, q.get("refresh") == "1")
+                    r = salesrec.request(client, company, _latest, q.get("refresh") == "1",
+                                         q.get("from") or None, q.get("to") or None)
                 except ValueError as exc:
                     r = {"available": False, "error": str(exc)}
+                # the departments chosen above (the registry's department of each restaurant): their days only
+                depts = [x.strip() for x in (q.get("dimension") or "").split(",") if x.strip()]
+                if depts and isinstance(r, dict) and r.get("locations") is not None:
+                    r = dict(salesrec.cut(r, depts), departments=depts)
                 self._send(200, dict(r, companies=salesrec.companies()) if isinstance(r, dict) else r)
             elif url.path in ("/api/billyrec", "/api/billyrec/xlsx", "/api/billyrec/rows"):
                 # Control → Simphony ↔ Billy: every check against its fiscalized invoice, tills, shifts, sales book

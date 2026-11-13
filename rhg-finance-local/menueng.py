@@ -77,14 +77,14 @@ def _db():
     return _conn
 
 
-def read_day(ref, day, latest=None, vat=False):
+def read_day(ref, day, latest=None, vat=False, force=False):
     """The menu item totals of one location and business day, read from Simphony unless held: a closed day
     (two days before the last business day) is never read again, a recent one after 15 minutes. vat: the day must
     also be held VAT included (miv), which days read before the sales reconciliation are not."""
     with _db_lock:
         hit = _db().execute("SELECT final, at FROM dayso WHERE ref=? AND day=?", (ref, day)).fetchone()
         held_v = not vat or _db().execute("SELECT 1 FROM dayv WHERE ref=? AND day=?", (ref, day)).fetchone()
-    if hit and held_v and (hit[0] or time.time() - hit[1] < KEEP_SECONDS):
+    if hit and held_v and not force and (hit[0] or time.time() - hit[1] < KEEP_SECONDS):
         return False
     j = simphony.call("getMenuItemDailyTotals", {"locRef": ref, "busDt": day}) or {}
     agg, inc = {}, {}
@@ -127,6 +127,20 @@ def items_vat(ref, a, b):
     out = {d: {} for d in held}
     for day, mi, sls, cnt, dsc in rows:
         out.setdefault(day, {})[mi] = (sls or 0.0, cnt or 0.0, dsc or 0.0)
+    return out
+
+
+def vat_by_item(ref, a, b):
+    """{day: {menu item: VAT}} of one location: Simphony's VAT on the item after its discounts (vatTtl), as the
+    sales VAT included (miv) less the sales without VAT (mio, every order type) of the same read."""
+    with _db_lock:
+        inc = _db().execute("SELECT day, mi, sls FROM miv WHERE ref=? AND day>=? AND day<=?", (ref, a, b)).fetchall()
+        ex = _db().execute("SELECT day, mi, SUM(net) FROM mio WHERE ref=? AND day>=? AND day<=? GROUP BY day, mi",
+                           (ref, a, b)).fetchall()
+    net = {(d, mi): v or 0.0 for d, mi, v in ex}
+    out = {}
+    for day, mi, sls in inc:
+        out.setdefault(day, {})[mi] = round((sls or 0.0) - net.get((day, mi), 0.0), 2)
     return out
 
 

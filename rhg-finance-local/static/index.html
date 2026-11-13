@@ -227,7 +227,7 @@ td.num,th.num{text-align:right}
 #kmCard table input{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;font-size:12.5px;box-sizing:border-box}
 #kmCo{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit}
 /* Simphony ↔ BC */
-#sxKpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.sx-wtxt{display:block;white-space:normal;min-width:260px;max-width:520px}
 #sxGrid,#tkGrid,#biGrid,#svGrid{border-collapse:separate;border-spacing:3px}
 #svGrid th{font-size:11px;font-weight:600;color:var(--sub);text-align:center;padding:2px;white-space:nowrap;background:none}
 #svGrid td.loc,#svGrid th.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px;position:sticky;left:0;background:var(--card);z-index:1}
@@ -293,12 +293,13 @@ td.num,th.num{text-align:right}
 #sxGrid th.loc,#sxGrid td.loc{text-align:left;white-space:nowrap;padding:4px 8px 4px 0;font-size:12.5px}
 #sxGrid td.loc,#sxGrid th.loc{position:sticky;left:0;background:var(--card);z-index:1}
 #sxGrid td.loc .meta{font-size:11px}
-#sxGrid td.c{width:44px;min-width:44px;height:34px;border-radius:6px;text-align:center;font-size:10.5px;font-weight:600;cursor:pointer;padding:0;
+#sxGrid td.c{min-width:46px;height:34px;border-radius:6px;text-align:center;font-size:10.5px;font-weight:600;cursor:pointer;padding:0 4px;white-space:nowrap;
   background:var(--bg);color:var(--sub);border:2px solid transparent}
 #sxGrid td.c.ok{background:var(--down-bg);color:var(--down)}
 #sxGrid td.c.not_imported,#sxGrid td.c.invoice_diff{background:var(--up-bg);color:var(--up)}
-#sxGrid td.c.import_diff,#sxGrid td.c.not_posted,#sxGrid td.c.unpaid{background:var(--warn-bg);color:var(--warn)}
+#sxGrid td.c.import_diff,#sxGrid td.c.not_posted{background:var(--warn-bg);color:var(--warn)}
 #sxGrid td.c.pending{background:var(--card);border:2px dashed var(--line)}
+#sxGrid td.c.open_wait{background:var(--card);border:2px dashed var(--warn);color:var(--warn)}
 #sxGrid td.c.no_sales{background:none;color:var(--line)}
 #sxGrid td.c.sel{border-color:var(--ink)}
 .sx-lg i.ok{background:var(--down-bg);border:1px solid var(--down)}.sx-lg i.bad{background:var(--up-bg);border:1px solid var(--up)}
@@ -601,6 +602,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 .bl-tools{margin:0}
 .bl-tab .bad{color:var(--up)}.bl-tab .good{color:var(--down)}
 .bl-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px}
+.sx-ctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.sx-ctl input[type=date]{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);color-scheme:light dark}
+@media(max-width:600px){#v-salesrec .card-head{flex-direction:column}.sx-ctl{width:100%;justify-content:flex-start}.sx-ctl input[type=date]{flex:1 1 120px}}
+.sx-read{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13px}
+.sx-read b{font-weight:650}.sx-read .sx-busy{color:var(--warn)}
+#sxSplit td.num,#sxByLoc td.num{white-space:nowrap}
+#sxKpis{grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr))}#sxKpis .v{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}#sxKpis .s span{white-space:nowrap}
+#sxSplit tr.sx-tot td{border-top:2px solid var(--line);font-weight:650}
+.sx-why{margin:6px 0 0;padding:10px 12px;border-left:3px solid var(--warn);background:var(--bg);border-radius:6px}
+.sx-why h4{margin:0 0 4px;font-size:13px}.sx-why p{margin:2px 0}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -1911,17 +1922,24 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
   <section class="view" id="v-salesrec">
     <div class="card">
       <div class="card-head"><div><h2>Simphony ↔ BC</h2>
-        <p class="hint" id="sxNote">Every restaurant and business day: what Simphony sold, what the POS import brought into Business Central, what was invoiced to the restaurant's customer and what is still open on the invoice. A day that does not meet becomes an exception in the register, with its owner; it closes when the figures meet.</p></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button class="mini dark" id="sxRead">Read again</button><button class="mini" id="sxReg">Exceptions in the register</button></div></div>
-      <div class="kpis six" id="sxKpis" style="margin-top:14px"></div>
+        <p class="hint" id="sxNote">Every restaurant and business day: what Simphony sold, what the POS import brought into Business Central, and what was posted in BC. A day not posted in BC stays open; a day that does not meet becomes an exception in the register, with its owner, and closes when the figures meet.</p></div>
+        <div class="sx-ctl">
+          <label class="meta" for="sxFrom">From</label><input type="date" id="sxFrom"><label class="meta" for="sxTo">to</label><input type="date" id="sxTo">
+          <button class="mini" id="sxApply" type="button">Show the range</button><button class="mini" id="sxLast" type="button" hidden>Back to the last days</button>
+          <button class="mini dark" id="sxRead" type="button">Read again</button><button class="mini exp" id="sxExp" type="button">Export ▾</button><button class="mini" id="sxReg" type="button">Exceptions in the register</button></div></div>
+      <div class="sx-read" id="sxRead2"></div>
+      <div class="kpis" id="sxKpis" style="margin-top:12px"></div>
       <p class="meta" id="sxStatus"></p>
     </div>
+    <div class="card"><div class="card-head"><div><h2>Sales in four parts</h2>
+      <p class="hint" id="sxSplitNote">Before discounts, the discounts, with VAT, the VAT and without VAT: as Simphony sold them, as the POS import brought them into BC, and as BC posted them. Exact to the cent.</p></div></div>
+      <div class="scroll"><table id="sxSplit"></table></div>
+      <details class="pz-fold"><summary>By restaurant</summary><div class="scroll"><table id="sxByLoc"></table></div></details></div>
     <div class="card"><div class="card-head"><div><h2>Day by day</h2>
-      <p class="hint">Every restaurant together: what came into Business Central through the POS import against what Simphony sold (the dashed mark). Click a day for its restaurants; a case below for its days.</p></div></div>
+      <p class="hint">Every restaurant together: what came into Business Central through the POS import against what Simphony sold (the dashed mark). Click a day for its restaurants, a case for its days and what to do.</p></div></div>
       <div id="sxChart"></div><div id="sxCases" style="margin-top:14px"></div></div>
     <div class="card"><div class="card-head"><div><h2>Every restaurant, every day</h2>
-      <p class="hint">A square per day: green when Simphony, the import and the invoice meet; the gap of the import against Simphony in the square. Click a square for the day.</p></div></div>
+      <p class="hint">A square per day: green when Simphony, the import and the posting meet; "open" when the day is not posted in BC; the gap of the import against Simphony in the square. Click a square for the day.</p></div></div>
       <div class="il-lg sx-lg" id="sxLegend" style="margin:0 0 8px"></div>
       <div class="scroll" data-nosort><table id="sxGrid"></table></div></div>
     <div class="card"><div class="card-head"><div><h2>Menu items and BC items</h2>
@@ -1933,7 +1951,6 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <label class="field">Days read (back from yesterday)<input id="sxSDays" type="number" min="3" max="62"></label>
         <label class="field">Import lag (days)<input id="sxSImp" type="number" min="0" max="30"></label>
         <label class="field">Posting lag (days)<input id="sxSPost" type="number" min="0" max="30"></label>
-        <label class="field">Settle within (days)<input id="sxSSettle" type="number" min="0" max="90"></label>
         <label class="field">Tolerance (amount)<input id="sxSAbs" type="number" min="0"></label>
         <label class="field">Tolerance (%)<input id="sxSPct" type="number" min="0" max="100" step="0.1"></label>
       </div>
@@ -6234,99 +6251,155 @@ $("biSave").onclick = async () => {
     biCfg.connection = j.connection; biDrawAccts(j.connection.accounts || []); $("biMsg").textContent = "Saved. Read again to apply."; } catch(e){ $("biMsg").textContent = e.message; }
 };
 // ---------------------------------------------------------------- Simphony ↔ BC
-let sxData = null, sxTimer = null, sxSel = null;
-const SX_SHORT = {not_imported: "none", import_diff: "", invoice_diff: "inv", not_posted: "post", unpaid: "open", pending: "…", ok: "✓", no_sales: "·"};
+const SX_SHORT = {not_imported: "none", import_diff: "", invoice_diff: "inv", not_posted: "open", open_wait: "open", pending: "…", ok: "✓", no_sales: "·"};
 const sxM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
 const sxS = v => (v > 0 ? "+" : v < 0 ? "−" : "") + sxM(Math.abs(v));
+// Simphony ↔ BC shows every amount exact, to the cent (Geri, 13 Nov 2026: no rounding)
+const sxE = v => v == null || isNaN(v) ? "–" : (Number(v) + 0).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const sxES = v => v == null || isNaN(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + sxE(Math.abs(v));
+let sxData = null, sxTimer = null, sxSel = null, sxRng = null;
+const SX_BAD = ["not_imported", "import_diff", "invoice_diff", "not_posted"];
+const SX_WAIT = ["pending", "open_wait"];
+function sxQuery(refresh){
+  const p = new URLSearchParams({company: $("company").value || ""});
+  if (sxRng) { p.set("from", sxRng.from); p.set("to", sxRng.to); }
+  if (dimValues().length) p.set("dimension", dimValues().join(","));
+  if (refresh) p.set("refresh", "1");
+  return p.toString();
+}
 async function loadSalesrec(refresh){
   clearTimeout(sxTimer);
-  $("sxStatus").textContent = "Reading…";
+  $("sxStatus").textContent = refresh ? "Reading Simphony and Business Central again…" : "Reading…";
+  if (refresh) $("sxRead2").innerHTML = `<span class="sx-busy">${fcSp("Reading again: Business Central anew, and Simphony's last seven days…")}</span>`;
   try{
-    const p = new URLSearchParams({company: $("company").value || ""});
-    const j = await readJSON(await fetch("/api/salesrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
+    const j = await readJSON(await fetch("/api/salesrec?" + sxQuery(refresh)));
     if (j.error && j.available !== false) throw new Error(j.error);
     if (j.pending) { $("sxStatus").textContent = `${j.note || "Reading…"} ${j.stage || ""}`; sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
     if (j.available === false) throw new Error(j.error || "not available");
-    const prev = sxData; sxData = j; sxTimer = heldPoll(prev, j, renderSalesrec, "sxStatus", () => loadSalesrec(false));
+    sxData = j; renderSalesrec();
+    if (j.reading) sxTimer = setTimeout(() => loadSalesrec(false), 5000);
   }catch(e){
     if (/HTTP 50[234]|restarting/i.test(e.message)) { $("sxStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; sxTimer = setTimeout(() => loadSalesrec(false), 15000); return; }
     $("sxStatus").textContent = "Could not read: " + e.message; }
 }
+const sxWhen = t => t ? new Date(t).toLocaleString("en-GB", {day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "–";
+function sxSum(L, f){ return sxData.days.reduce((a, x) => a + (((L.cells[x] || {})[f]) || 0), 0); }
+function sxSplitOf(locs, src){                          // the four parts of a set of restaurants, summed over the days
+  const t = {gross: 0, disc: 0, incl: 0, vat: 0, ex: 0, vat_unknown: 0, n: 0};
+  locs.forEach(L => Object.values(L.cells).forEach(c => { const b = (c.b || {})[src]; if (!b) return; t.n++; Object.keys(t).forEach(k => { if (k !== "n") t[k] += b[k] || 0; }); }));
+  return t;
+}
 function renderSalesrec(){
-  const d = sxData, k = d.kpis, c = d.currency;
-  const card = (l, val, sub, cls, open) => `<div class="card kpi"${open ? ` data-pulse="${open}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
+  const d = sxData, k = d.kpis, c = d.currency, sp = k.split || {};
+  const card = (l, val, sub, cls, open) => `<div class="card kpi"${open ? ` data-pulse="${open}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}" style="font-size:22px">${val}</div><div class="s">${sub}</div></div>`;
+  const parts = x => x ? `<span>without VAT ${sxE(x.ex)}</span><br><span>VAT ${sxE(x.vat)}</span><br><span>discounts ${sxE(x.disc)}</span>` : "";
+  const open = (k.counts || {}).not_posted || 0, openV = d.locations.reduce((a, L) => a + Object.values(L.cells).filter(x => x.status === "not_posted").reduce((b, x) => b + (x.imp || 0), 0), 0);
   $("sxKpis").innerHTML =
-    card("Simphony sales", sxM(k.sim), `${c} · VAT included, after discounts`) +
-    card("Imported in BC", sxM(k.imp), `${sxS(k.imp_gap)} against Simphony, the same days`, Math.abs(k.imp_gap) > d.settings.tol_abs ? "warn" : "", "sxissue|import_diff") +
-    card("Invoiced", sxM(k.inv), `${sxS(k.inv_gap)} against the import, the same days`, Math.abs(k.inv_gap) > d.settings.tol_abs ? "warn" : "", "sxissue|invoice_diff") +
-    card("Days reconciled", `${fmt(k.ok)} / ${fmt(k.days)}`, "past their lag", k.ok === k.days ? "down" : "warn") +
-    card("Open on the invoices", sxM(k.remaining), "takings not yet applied", k.remaining ? "warn" : "", "sxissue|unpaid") +
-    card("Exceptions", fmt(k.issues), `${fmt(k.mapping)} menu items`, k.issues ? "up" : "down", "sxissue|not_imported");
-  $("sxNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.length} restaurants` + (d.simphony ? "" : " · Simphony is not connected: only the import, the invoices and the takings are checked");
-  $("sxStatus").dataset.base = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
+    card("Simphony sales", sxE(k.sim), `${c} · with VAT, after discounts<br>${parts(sp.sim)}`, "", "sxsplit|sim") +
+    card("Imported in BC", sxE(k.imp), `${sxES(k.imp_gap)} against Simphony<br>${parts(sp.imp)}`, Math.abs(k.imp_gap) > d.settings.tol_abs ? "warn" : "", "sxsplit|imp") +
+    card("Posted in BC", sxE(k.inv), `${sxES(k.inv_gap)} against the import<br>${parts(sp.inv)}`, Math.abs(k.inv_gap) > d.settings.tol_abs ? "warn" : "", "sxsplit|inv") +
+    card("Days reconciled", `${fmt(k.ok)} / ${fmt(k.days)}`, "past their lags", k.ok === k.days ? "down" : "warn", "sxissue|all") +
+    card("Open: not posted in BC", fmt(open), open ? `restaurant days · ${sxE(openV)} ${c} imported, not posted` : "every day past its lag is posted", open ? "warn" : "down", "sxissue|not_posted") +
+    card("Exceptions", fmt(k.issues), `${fmt(k.cases ?? k.issues - k.mapping)} restaurant days · ${fmt(k.mapping)} menu items`, k.issues ? "up" : "down", "sxissue|all");
+  const lat = d.locations.map(L => L.latest).filter(Boolean).sort();
+  $("sxRead2").innerHTML = `<span>${fcSp("Last read")}: <b>${esc(sxWhen(d.checked_at))}</b></span>`
+    + `<span>${fcSp("Period")}: <b>${esc(d.from)} → ${esc(d.to)}</b> ${d.custom ? fcSp("(a range chosen here)") : fcSp(`(the last ${d.settings.days} days)`)}</span>`
+    + (d.departments ? `<span>${fcSp("Departments")}: <b>${esc(d.departments.join(", "))}</b></span>` : "")
+    + (lat.length ? `<span>${fcSp("Simphony closed through")} <b>${esc(lat[0])}${lat[0] !== lat[lat.length - 1] ? " – " + esc(lat[lat.length - 1]) : ""}</b></span>` : "")
+    + (d.reading ? `<span class="sx-busy">${fcSp("reading again")}: ${esc(d.stage || "…")}</span>` : "");
+  $("sxNote").textContent = `${d.company} · ${d.locations.length} restaurants` + (d.simphony ? "" : " · Simphony is not connected: only the import and the posting are checked");
+  $("sxStatus").textContent = (d.register ? `Register: ${d.register.opened} opened, ${d.register.closed} closed` : d.custom ? "A range chosen here does not change the exceptions register." : d.complete ? "" : "Not put in the register: the read was incomplete.")
     + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
-  $("sxStatus").textContent = heldNote(d) + $("sxStatus").dataset.base;
+  if (!sxRng) { if (document.activeElement !== $("sxFrom")) $("sxFrom").value = d.from; if (document.activeElement !== $("sxTo")) $("sxTo").value = d.to; }
+  $("sxLast").hidden = !sxRng;
+  sxSplitTable();
   $("sxLegend").innerHTML = `<span><i class="ok"></i>${esc(d.statuses.ok)}</span><span><i class="bad"></i>${esc(d.statuses.not_imported)} · ${esc(d.statuses.invoice_diff)}</span>
-    <span><i class="warn"></i>${esc(d.statuses.import_diff)} · ${esc(d.statuses.not_posted)} · ${esc(d.statuses.unpaid)}</span><span><i class="pend"></i>${esc(d.statuses.pending)}</span>`;
+    <span><i class="warn"></i>${esc(d.statuses.import_diff)} · ${esc(d.statuses.not_posted)}</span><span><i class="pend"></i>${esc(d.statuses.pending)} · ${esc(d.statuses.open_wait)}</span>`;
   const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   $("sxGrid").innerHTML = `<tr><th class="loc"></th>${days.map(x => `<th>${wd[new Date(x + "T12:00:00").getDay()]}<br>${x.slice(8)}</th>`).join("")}</tr>` +
-    d.locations.map((L, li) => `<tr><td class="loc" data-pulse="sxloc|${li}" role="button" tabindex="0" style="cursor:pointer"><b>${esc(L.name)}</b><div class="meta">${esc(L.bc)}${L.issues ? ` · ${fmt(L.issues)} ${L.issues === 1 ? "issue" : "issues"}` : ""}</div></td>` +
-      days.map(x => { const cc = L.cells[x]; const g = cc.sim != null && cc.imp != null ? cc.imp - cc.sim : null;
-        const txt = cc.status === "import_diff" && g != null ? sxS(g) : SX_SHORT[cc.status];
+    d.locations.map((L, li) => `<tr><td class="loc" data-pulse="sxloc|${li}" role="button" tabindex="0" style="cursor:pointer"><b>${esc(L.name)}</b><div class="meta">${esc(L.bc)}${L.dept ? " · " + esc(L.dept) : ""}${L.issues ? ` · ${fmt(L.issues)} ${L.issues === 1 ? "issue" : "issues"}` : ""}</div></td>` +
+      days.map(x => { const cc = L.cells[x]; if (!cc) return "<td></td>"; const g = cc.sim != null && cc.imp != null ? cc.imp - cc.sim : null;
+        const txt = cc.status === "import_diff" && g != null ? sxES(g) : SX_SHORT[cc.status];
         return `<td class="c ${cc.status}${sxSel && sxSel[0] === li && sxSel[1] === x ? " sel" : ""}" data-l="${li}" data-d="${x}" title="${esc(L.name)} ${x}: ${esc(cc.issues.map(i => d.statuses[i]).join(", ") || d.statuses[cc.status])}">${txt}</td>`; }).join("") + `</tr>`).join("");
   $("sxGrid").querySelectorAll("td.c").forEach(td => { td.tabIndex = 0; td.setAttribute("role", "button"); td.setAttribute("data-pulse", `sxcell|${td.dataset.l}|${td.dataset.d}`); });
   sxChart();
   const maps = d.mapping || [];
   $("sxMap").innerHTML = maps.length ? `<tr><th>Menu item</th><th>Problem</th><th>BC item</th><th>Where</th><th class="num">Days</th><th class="num">Sold</th><th class="num">Value</th></tr>` +
     maps.slice(0, 150).map(M => `<tr><td><b>${esc(M.mi)}</b> ${esc(M.name)}</td><td>${esc(M.label)}</td><td>${esc(M.item || "–")}</td><td class="meta">${esc(M.locations.join(", "))}</td>
-      <td class="num">${fmt(M.days)}</td><td class="num">${dcQ(M.qty)}</td><td class="num">${sxM(M.value)}</td></tr>`).join("")
+      <td class="num">${fmt(M.days)}</td><td class="num">${dcQ(M.qty)}</td><td class="num">${sxE(M.value)}</td></tr>`).join("")
     : `<tr><td class="meta">Every menu item of the period is imported with a BC item that exists, is not blocked and has its recipe.</td></tr>`;
   $("sxSetCard").style.display = can("settings") ? "" : "none";
   const S = d.settings;
-  [["sxSDays", "days"], ["sxSImp", "import_lag"], ["sxSPost", "post_lag"], ["sxSSettle", "settle_days"], ["sxSAbs", "tol_abs"], ["sxSPct", "tol_pct"]].forEach(([id, key]) => { if (document.activeElement !== $(id)) $(id).value = S[key]; });
-  $("sxDefs").innerHTML = `<p><b>Simphony.</b> Menu items sold by business day (Reporting and Analytics), VAT included, after item discounts; items marked not included in sales are left out.</p>
-    <p><b>Imported.</b> The POS import of Business Central (MID Simphony Archive): line totals plus line discounts, by transaction date and the restaurant's customer (Settings → Locations registry).</p>
-    <p><b>Invoiced.</b> Sales invoices less credit memos of that customer on that posting date, in the customer ledger; what is still open on them is the takings not yet applied.</p>
-    <p><b>Exceptions.</b> Not imported after ${S.import_lag} days → Chief accountant. Import ≠ Simphony, beyond ${fmt(S.tol_abs)} or ${S.tol_pct}% → Chief accountant, with the menu items that differ. Not posted after ${S.post_lag} days → Chief accountant. Invoice ≠ import → Chief accountant. Still open after ${S.settle_days} days → Finance. Menu item problems → Cost controller. Owners come from Email recipients by company; every exception closes by itself when the data meets.</p>`;
+  [["sxSDays", "days"], ["sxSImp", "import_lag"], ["sxSPost", "post_lag"], ["sxSAbs", "tol_abs"], ["sxSPct", "tol_pct"]].forEach(([id, key]) => { if (document.activeElement !== $(id)) $(id).value = S[key]; });
+  $("sxDefs").innerHTML = `<p><b>Simphony.</b> Menu items sold by business day (Reporting and Analytics), VAT included, after item discounts; items marked not included in sales are left out. Without VAT and the VAT: from the same read (Simphony's VAT on each item after its discounts).</p>
+    <p><b>Imported.</b> The POS import of Business Central (MID Simphony Archive): line totals (before discounts) plus the line discounts, by transaction date and the restaurant's customer (Settings → Locations registry). Its VAT: each BC item at the VAT % BC posted it at in the period; an item never posted in the period has its VAT unknown, shown apart.</p>
+    <p><b>Posted.</b> Sales invoices less credit memos of that customer on that posting date (customer ledger); without VAT and the VAT from their posted lines.</p>
+    <p><b>Open.</b> A day imported and not posted in BC: imported lines not in a sales document, or no sales invoice of the customer on that date. RHG does not post a day whose value is wrong, so an open day after the ${S.post_lag}-day posting lag is a day to correct. What is still unpaid on a posted invoice is the takings: Control → Takings POS ↔ BC checks them.</p>
+    <p><b>Exceptions.</b> Not imported after ${S.import_lag} days → Chief accountant. Import ≠ Simphony, beyond ${sxE(S.tol_abs)} or ${S.tol_pct}% → Chief accountant, with the menu items that differ. Open (not posted) after ${S.post_lag} days → Chief accountant. Invoice ≠ import → Chief accountant. Menu item problems → Cost controller. Owners come from Email recipients by company; every exception closes by itself when the data meets.</p>
+    <p><b>Read again.</b> Business Central is read anew every time (the import, the invoices and their lines), Simphony's last seven days too; older Simphony days are kept as read.</p>`;
 }
-// ---- Simphony ↔ BC: the day by day chart, the cases and the pop-ups (a restaurant's day, a day of every restaurant,
-// a kind of exception, a restaurant, a menu item problem)
-const SX_BAD = ["not_imported", "import_diff", "invoice_diff", "not_posted", "unpaid"];
+function sxSplitTable(){
+  const d = sxData, sp = {sim: sxSplitOf(d.locations, "sim"), imp: sxSplitOf(d.locations, "imp"), inv: sxSplitOf(d.locations, "inv")};
+  const rows = [["gross", "Sales before discounts"], ["disc", "Discounts"], ["incl", "Sales with VAT"], ["vat", "VAT"], ["ex", "Sales without VAT"]];
+  $("sxSplit").innerHTML = `<tr><th></th><th class="num">Simphony</th><th class="num">Imported in BC</th><th class="num">Posted in BC</th><th class="num">Import − Simphony</th><th class="num">Posted − import</th></tr>` +
+    rows.map(([f, l]) => `<tr class="${f === "incl" ? "sx-tot" : ""}" data-pulse="sxsplit|${f === "incl" ? "imp" : "sim"}" style="cursor:pointer"><td>${esc(l)}</td><td class="num">${sxE(sp.sim[f])}</td><td class="num">${sxE(sp.imp[f])}</td><td class="num">${sxE(sp.inv[f])}</td>
+      <td class="num">${sxES(sp.imp[f] - sp.sim[f])}</td><td class="num">${sxES(sp.inv[f] - sp.imp[f])}</td></tr>`).join("")
+    + (sp.imp.vat_unknown ? `<tr><td colspan="6" class="meta">${esc(`${sxE(sp.imp.vat_unknown)} of the import is on BC items not posted in the period: its VAT is unknown and left out of the import's VAT.`)}</td></tr>` : "");
+  $("sxSplitNote").textContent = `${d.from} to ${d.to}: before discounts, the discounts, with VAT, the VAT and without VAT, as Simphony sold, as imported and as posted in BC. Exact to the cent; click a row for the restaurants.`;
+  $("sxByLoc").innerHTML = `<tr><th>Restaurant</th><th class="num">Simphony with VAT</th><th class="num">without VAT</th><th class="num">VAT</th><th class="num">Discounts</th><th class="num">Imported with VAT</th><th class="num">without VAT</th><th class="num">VAT</th><th class="num">Posted with VAT</th><th class="num">without VAT</th><th class="num">VAT</th><th class="num">Import − Simphony</th><th class="num">Open days</th></tr>` +
+    d.locations.map((L, li) => { const a = sxSplitOf([L], "sim"), b = sxSplitOf([L], "imp"), v = sxSplitOf([L], "inv"), o = Object.values(L.cells).filter(x => x.status === "not_posted").length;
+      return `<tr data-pulse="sxloc|${li}" style="cursor:pointer"><td><b>${esc(L.name)}</b> <span class="meta">${esc(L.bc)}</span></td><td class="num">${sxE(a.incl)}</td><td class="num">${sxE(a.ex)}</td><td class="num">${sxE(a.vat)}</td><td class="num">${sxE(a.disc)}</td>
+        <td class="num">${sxE(b.incl)}</td><td class="num">${sxE(b.ex)}</td><td class="num">${sxE(b.vat)}</td><td class="num">${sxE(v.incl)}</td><td class="num">${sxE(v.ex)}</td><td class="num">${sxE(v.vat)}</td>
+        <td class="num">${sxES(b.incl - a.incl)}</td><td class="num">${o ? `<b class="neg">${fmt(o)}</b>` : "–"}</td></tr>`; }).join("");
+}
 function sxDayTotals(day, li){
-  const t = {sim: 0, imp: 0, inv: 0, remaining: 0, bad: 0, n: 0};
+  const t = {sim: 0, imp: 0, inv: 0, remaining: 0, bad: 0, open: 0, n: 0};
   sxData.locations.forEach((L, i) => { if (li != null && i !== li) return; const c = L.cells[day]; if (!c) return;
-    t.sim += c.sim || 0; t.imp += c.imp || 0; t.inv += c.inv || 0; t.remaining += c.remaining || 0; t.bad += SX_BAD.includes(c.status) ? 1 : 0; t.n++; });
+    t.sim += c.sim || 0; t.imp += c.imp || 0; t.inv += c.inv || 0; t.remaining += c.remaining || 0; t.bad += SX_BAD.includes(c.status) ? 1 : 0; t.open += c.status === "not_posted" ? 1 : 0; t.n++; });
   return t;
 }
 function sxChart(){
   const d = sxData;
   $("sxChart").innerHTML = Pulse.cols(d.days.map(x => { const t = sxDayTotals(x);
       return {label: x.slice(8), segs: [[t.imp, "var(--ch-0)", "imported in BC"]], line: t.sim || null, open: "sxday|" + x,
-        tip: `${x}: Simphony ${sxM(t.sim)}, imported ${sxM(t.imp)}, invoiced ${sxM(t.inv)}${t.bad ? `, ${t.bad} restaurants with an exception` : ""}`}; }),
-    [["var(--ch-0)", "imported in BC"], ["var(--ink)", "Simphony (the dashed mark)"]], {aria: "Simphony against the import, day by day"});
-  const k = d.kpis, cnt = {};
+        tip: `${x}: Simphony ${sxE(t.sim)}, imported ${sxE(t.imp)}, posted ${sxE(t.inv)}${t.bad ? `, ${t.bad} restaurants with an exception` : ""}`}; }),
+    [["var(--ch-0)", "imported in BC"], ["var(--ink)", "Simphony (the dashed mark)"]], {aria: "Simphony against the import, day by day", maxLabel: m => sxE(m)});
+  const cnt = {};
   d.locations.forEach(L => Object.values(L.cells).forEach(c => (c.issues || []).forEach(i => cnt[i] = (cnt[i] || 0) + 1)));
-  $("sxCases").innerHTML = Pulse.cases([...SX_BAD.map(s => ({n: cnt[s] || 0, t: d.statuses[s], w: "restaurant days", open: "sxissue|" + s})),
+  $("sxCases").innerHTML = Pulse.cases([...SX_BAD.map(s => ({n: cnt[s] || 0, t: d.statuses[s], w: "restaurant days · click for what it means and what to do", open: "sxissue|" + s})),
+    ...SX_WAIT.map(s => ({n: cnt[s] || 0, t: d.statuses[s], w: "not an exception yet", open: "sxissue|" + s})),
     {n: (d.mapping || []).length, t: "Menu items and BC items", w: "items to map, block or give a recipe", open: "sxmap|"}]);
 }
-function sxCellRow(L, li, x){
+function sxCellRow(L, li, x, kind){
   const c = L.cells[x] || {};
+  const why = kind && kind !== "all" ? (c.why || {})[kind] : Object.values(c.why || {}).join(" ");
   return {cells: [`<b>${esc(L.name)}</b> <span class="meta">${esc(L.bc)}</span>`, esc(x), `<span class="rhg-pill ${c.status === "ok" ? "low" : SX_BAD.includes(c.status) ? "critical" : ""}">${esc((c.issues || []).map(i => sxData.statuses[i]).join(", ") || sxData.statuses[c.status] || "")}</span>`,
-    sxM(c.sim), sxM(c.imp), sxM(c.inv), sxM(c.remaining)], open: `sxcell|${li}|${x}`};
+    sxE(c.sim), sxE(c.imp), sxE(c.inv), why ? `<span class="meta sx-wtxt">${esc(why)}</span>` : ""], open: `sxcell|${li}|${x}`};
 }
-const SX_HEAD = [["Restaurant"], ["Day"], ["Status"], ["Simphony", 1], ["Imported", 1], ["Invoiced", 1], ["Open", 1]];
+const SX_HEAD = [["Restaurant"], ["Day"], ["Status"], ["Simphony", 1], ["Imported", 1], ["Posted", 1], ["Why"]];
+function sxHelp(k){
+  const h = (sxData.help || {})[k]; if (!h) return "";
+  return `<div class="sx-why"><h4>${esc(sxData.statuses[k] || k)}</h4><p><b>${fcSp("What it means")}:</b> <span>${esc(h.means)}</span></p><p><b>${fcSp("Usual causes")}:</b> <span>${esc(h.causes)}</span></p>`
+    + `<p><b>${fcSp("What to do")}:</b> <span>${esc(h.fix)}</span></p>${h.owner ? `<p><b>${fcSp("Owner")}:</b> <span>${esc(h.owner)}</span></p>` : ""}</div>`;
+}
+function sxSplitRows(c){
+  const rows = [["gross", "Before discounts"], ["disc", "Discounts"], ["incl", "With VAT"], ["vat", "VAT"], ["ex", "Without VAT"]], b = c.b || {};
+  return Pulse.list([[""], ["Simphony", 1], ["Imported", 1], ["Posted", 1]], rows.map(([f, l]) => ({cells: [esc(l), sxE((b.sim || {})[f]), sxE((b.imp || {})[f]), sxE((b.inv || {})[f])]})));
+}
 function sxCellPop(li, x){
   const d = sxData, L = d.locations[li], c = L && L.cells[x]; if (!c) return;
   const it = c.items || [];
   Pulse.pop({title: esc(`${L.name} · ${x}`), sub: esc((c.issues.length ? c.issues.map(i => d.statuses[i]).join(" · ") : d.statuses[c.status]) + ` · ${c.age} days ago`),
-    body: Pulse.tiles([{l: "Simphony", v: sxM(c.sim), s: c.sim == null ? "not read: the day is not closed in Simphony, or Simphony is not connected" : "sold at the till"},
-        {l: "Imported in BC", v: sxM(c.imp), s: c.imp == null ? "nothing in the POS import" : `${fmt(c.rows)} lines${c.unposted ? `, ${fmt(c.unposted)} not in a sales document` : ""}`, cls: c.sim != null && c.imp != null && Math.abs(c.imp - c.sim) > d.settings.tol_abs ? "warn" : ""},
-        {l: "Invoiced", v: sxM(c.inv), s: c.inv == null ? "no sales invoice of " + esc(L.customer) : esc((c.docs || []).join(", "))},
-        {l: "Open on the invoice", v: sxM(c.remaining), s: c.remaining ? "takings not yet applied" : c.inv == null ? "–" : "settled", cls: c.remaining ? "warn" : ""}])
-      + Pulse.panel("Menu items that differ", it.length ? Pulse.bars(it.slice(0, 12).map(m => ({key: `${m.mi} ${m.name || ""}`, segs: [[Math.abs(m.diff), m.diff < 0 ? "var(--ch-1)" : "var(--ch-0)", m.diff < 0 ? "imported less" : "imported more"]], text: sxS(m.diff)})),
+    body: Pulse.tiles([{l: "Simphony", v: sxE(c.sim), s: c.sim == null ? "not read: the day is not closed in Simphony, or Simphony is not connected" : "sold at the till, with VAT"},
+        {l: "Imported in BC", v: sxE(c.imp), s: c.imp == null ? "nothing in the POS import" : `${fmt(c.rows)} lines${c.unposted ? `, ${fmt(c.unposted)} not in a sales document` : ""}${c.imported_at ? " · imported " + esc(c.imported_at.replace("T", " ")) : ""}`, cls: c.sim != null && c.imp != null && Math.abs(c.imp - c.sim) > d.settings.tol_abs ? "warn" : ""},
+        {l: "Posted in BC", v: sxE(c.inv), s: c.inv == null ? "open: no sales invoice of " + esc(L.customer) : esc((c.docs || []).join(", ")), cls: c.inv == null && c.imp != null ? "warn" : ""},
+        {l: "Unpaid on the invoice", v: sxE(c.remaining), s: c.remaining ? "the takings not applied yet: Takings POS ↔ BC" : c.inv == null ? "–" : "settled"}])
+      + (c.issues || []).map(k => `<div class="sx-why"><h4>${esc(d.statuses[k])}</h4><p>${esc((c.why || {})[k] || "")}</p>${(d.help || {})[k] ? `<p class="meta"><b>${fcSp("What to do")}:</b> <span>${esc(d.help[k].fix)}</span>${d.help[k].owner ? ` · <b>${fcSp("Owner")}:</b> <span>${esc(d.help[k].owner)}</span>` : ""}</p>` : ""}</div>`).join("")
+      + Pulse.panel("Sales in four parts", sxSplitRows(c))
+      + Pulse.panel("Menu items that differ", it.length ? Pulse.bars(it.slice(0, 12).map(m => ({key: `${m.mi} ${m.name || ""}`, segs: [[Math.abs(m.diff), m.diff < 0 ? "var(--ch-1)" : "var(--ch-0)", m.diff < 0 ? "imported less" : "imported more"]], text: sxES(m.diff)})),
           [["var(--ch-0)", "imported more than Simphony"], ["var(--ch-1)", "imported less"]])
         + Pulse.fold(Pulse.list([["Menu item"], ["BC item"], ["Simphony qty", 1], ["Imported qty", 1], ["Simphony", 1], ["Imported", 1], ["Difference", 1]],
-          it.map(m => ({cells: [`<b>${esc(m.mi)}</b> ${esc(m.name || "")}`, esc(m.item || "–"), dcQ(m.sim_qty), dcQ(m.imp_qty), fmt(Math.round(m.sim)), fmt(Math.round(m.imp)), sxS(m.diff)]}))))
+          it.map(m => ({cells: [`<b>${esc(m.mi)}</b> ${esc(m.name || "")}`, esc(m.item || "–"), dcQ(m.sim_qty), dcQ(m.imp_qty), sxE(m.sim), sxE(m.imp), sxES(m.diff)]}))))
         : `<p class="meta">${c.sim != null && c.imp != null ? "Every menu item meets, quantity and value." : "Menu items are compared when both Simphony and the import have the day."}</p>`,
         c.items_n > it.length ? esc(`${fmt(c.items_n - it.length)} more differ by less`) : "")
       + `<p style="margin:12px 0 0"><button class="btn" type="button" data-pulse="sxloc|${li}">${fcSp("The whole period of " + L.name)}</button></p>`});
@@ -6334,26 +6407,41 @@ function sxCellPop(li, x){
 function sxDayPop(x){
   const d = sxData, t = sxDayTotals(x);
   Pulse.pop({title: esc(x), sub: fcSp("Every restaurant"),
-    body: Pulse.tiles([{l: "Simphony", v: sxM(t.sim)}, {l: "Imported in BC", v: sxM(t.imp), s: sxS(t.imp - t.sim) + " against Simphony"}, {l: "Invoiced", v: sxM(t.inv)},
-        {l: "Restaurants with an exception", v: fmt(t.bad), cls: t.bad ? "up" : "down"}])
+    body: Pulse.tiles([{l: "Simphony", v: sxE(t.sim)}, {l: "Imported in BC", v: sxE(t.imp), s: sxES(t.imp - t.sim) + " against Simphony"}, {l: "Posted in BC", v: sxE(t.inv)},
+        {l: "Open: not posted", v: fmt(t.open), cls: t.open ? "warn" : ""}, {l: "Restaurants with an exception", v: fmt(t.bad), cls: t.bad ? "up" : "down"}])
       + Pulse.panel("Restaurants", Pulse.list(SX_HEAD, d.locations.map((L, li) => sxCellRow(L, li, x)).filter(r => r))) });
 }
 function sxIssuePop(s){
-  const d = sxData, rows = [];
-  d.locations.forEach((L, li) => d.days.forEach(x => { const c = L.cells[x]; if (c && (c.issues || []).includes(s)) rows.push(sxCellRow(L, li, x)); }));
-  const by = {}; d.locations.forEach(L => { const n = Object.values(L.cells).filter(c => (c.issues || []).includes(s)).length; if (n) by[L.name] = n; });
-  Pulse.pop({title: esc(d.statuses[s]), sub: esc(`${d.from} to ${d.to}`),
-    body: (Object.keys(by).length > 1 ? Pulse.panel("By restaurant", Pulse.bars(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({key: k, segs: [[n, "var(--ch-1)", "days"]], text: fmt(n) + " days"})))) : "")
-      + Pulse.panel(`The days · ${fmt(rows.length)}`, Pulse.list(SX_HEAD, rows.reverse(), {none: "None in these days."}))});
+  const d = sxData, rows = [], kinds = s === "all" ? SX_BAD : [s];
+  d.locations.forEach((L, li) => d.days.forEach(x => { const c = L.cells[x]; if (c && (c.issues || []).some(i => kinds.includes(i))) rows.push(sxCellRow(L, li, x, s)); }));
+  const by = {}; d.locations.forEach(L => { const n = Object.values(L.cells).filter(c => (c.issues || []).some(i => kinds.includes(i))).length; if (n) by[L.name] = n; });
+  const cnt = {}; d.locations.forEach(L => Object.values(L.cells).forEach(c => (c.issues || []).forEach(i => cnt[i] = (cnt[i] || 0) + 1)));
+  Pulse.pop({title: esc(s === "all" ? "Every exception" : d.statuses[s]), sub: esc(`${d.from} to ${d.to}`), wide: true,
+    body: (s === "all" ? Pulse.cases([...SX_BAD.map(k => ({n: cnt[k] || 0, t: d.statuses[k], w: "restaurant days", open: "sxissue|" + k})), {n: (d.mapping || []).length, t: "Menu items and BC items", w: "menu items", open: "sxmap|"}])
+        : sxHelp(s))
+      + (Object.keys(by).length > 1 ? Pulse.panel("By restaurant", Pulse.bars(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({key: k, segs: [[n, "var(--ch-1)", "days"]], text: fmt(n) + " days"})))) : "")
+      + Pulse.panel(`The days · ${fmt(rows.length)}`, Pulse.list(SX_HEAD, rows.reverse(), {none: s === "all" ? "No restaurant day is an exception in these days." : "None in these days."}))
+      + (s === "all" && (d.mapping || []).length ? `<p class="meta">${esc(`${fmt(d.mapping.length)} menu items are exceptions too: Menu items and BC items.`)}</p>` : "")});
+}
+function sxSplitPop(src){
+  const d = sxData, lab = {sim: "Simphony", imp: "Imported in BC", inv: "Posted in BC"}[src] || src;
+  const rows = d.locations.map((L, li) => ({L, li, t: sxSplitOf([L], src)})).filter(x => x.t.n);
+  const T = sxSplitOf(d.locations, src);
+  Pulse.pop({title: esc(lab), sub: esc(`${d.from} to ${d.to} · ${d.currency}`), wide: true,
+    body: Pulse.tiles([{l: "Before discounts", v: sxE(T.gross)}, {l: "Discounts", v: sxE(T.disc)}, {l: "With VAT", v: sxE(T.incl)}, {l: "VAT", v: sxE(T.vat), s: T.vat_unknown ? `${sxE(T.vat_unknown)} with VAT unknown` : ""}, {l: "Without VAT", v: sxE(T.ex)}])
+      + Pulse.panel("By restaurant", Pulse.list([["Restaurant"], ["Before discounts", 1], ["Discounts", 1], ["With VAT", 1], ["VAT", 1], ["Without VAT", 1]],
+        rows.map(x => ({cells: [`<b>${esc(x.L.name)}</b>`, sxE(x.t.gross), sxE(x.t.disc), sxE(x.t.incl), sxE(x.t.vat), sxE(x.t.ex)], open: `sxloc|${x.li}`}))))});
 }
 function sxLocPop(li){
   const d = sxData, L = d.locations[li]; if (!L) return;
-  const sum = f => d.days.reduce((a, x) => a + ((L.cells[x] || {})[f] || 0), 0);
-  Pulse.pop({title: esc(L.name), sub: esc(`${L.bc} · ${L.customer || ""} · ${d.from} to ${d.to}`),
-    body: Pulse.tiles([{l: "Simphony", v: sxM(sum("sim"))}, {l: "Imported in BC", v: sxM(sum("imp")), s: sxS(sum("imp") - sum("sim")) + " against Simphony"}, {l: "Invoiced", v: sxM(sum("inv"))},
-        {l: "Open on the invoices", v: sxM(sum("remaining")), cls: sum("remaining") ? "warn" : ""}, {l: "Exceptions", v: fmt(L.issues), cls: L.issues ? "up" : "down"}])
+  const a = sxSplitOf([L], "sim"), b = sxSplitOf([L], "imp"), v = sxSplitOf([L], "inv");
+  Pulse.pop({title: esc(L.name), sub: esc(`${L.bc} · ${L.customer || ""}${L.dept ? " · " + L.dept : ""} · ${d.from} to ${d.to}`), wide: true,
+    body: Pulse.tiles([{l: "Simphony", v: sxE(sxSum(L, "sim")), s: `without VAT ${sxE(a.ex)} · VAT ${sxE(a.vat)}`}, {l: "Imported in BC", v: sxE(sxSum(L, "imp")), s: sxES(sxSum(L, "imp") - sxSum(L, "sim")) + " against Simphony"},
+        {l: "Posted in BC", v: sxE(sxSum(L, "inv")), s: `without VAT ${sxE(v.ex)} · VAT ${sxE(v.vat)}`},
+        {l: "Open: not posted", v: fmt(Object.values(L.cells).filter(c => c.status === "not_posted").length), s: "restaurant days"}, {l: "Exceptions", v: fmt(L.issues), cls: L.issues ? "up" : "down"}])
+      + Pulse.panel("Sales in four parts", Pulse.list([[""], ["Simphony", 1], ["Imported", 1], ["Posted", 1]], [["gross", "Before discounts"], ["disc", "Discounts"], ["incl", "With VAT"], ["vat", "VAT"], ["ex", "Without VAT"]].map(([f, l]) => ({cells: [esc(l), sxE(a[f]), sxE(b[f]), sxE(v[f])]}))))
       + Pulse.panel("Day by day", Pulse.cols(d.days.map(x => { const c = L.cells[x] || {}; return {label: x.slice(8), segs: [[c.imp || 0, SX_BAD.includes(c.status) ? "var(--ch-1)" : "var(--ch-0)", "imported"]], line: c.sim || null, open: `sxcell|${li}|${x}`}; }),
-          [["var(--ch-0)", "imported, reconciled or pending"], ["var(--ch-1)", "imported, with an exception"], ["var(--ink)", "Simphony (the dashed mark)"]], {h: 150}))
+          [["var(--ch-0)", "imported, reconciled or pending"], ["var(--ch-1)", "imported, with an exception"], ["var(--ink)", "Simphony (the dashed mark)"]], {h: 150, maxLabel: m => sxE(m)}))
       + Pulse.panel("The days with an exception", Pulse.list(SX_HEAD, d.days.filter(x => SX_BAD.includes((L.cells[x] || {}).status)).reverse().map(x => sxCellRow(L, li, x)), {none: "None: every day meets."}))});
 }
 function sxMapPop(kind){
@@ -6362,19 +6450,45 @@ function sxMapPop(kind){
   Pulse.pop({title: fcSp(kind ? lab[kind] || kind : "Menu items and BC items"), sub: fcSp("each one is an exception for the cost controller"),
     body: (!kind ? Pulse.panel("By problem", Pulse.bars(Object.entries(by).map(([k, n]) => ({key: lab[k] || k, segs: [[n, "var(--ch-1)", "menu items"]], text: fmt(n), open: "sxmap|" + k})))) : "")
       + Pulse.panel(`The menu items · ${fmt(M.length)}`, Pulse.list([["Menu item"], ["Problem"], ["BC item"], ["Where"], ["Days", 1], ["Sold", 1], ["Value", 1]],
-        M.map(m => ({cells: [`<b>${esc(m.mi)}</b> ${esc(m.name)}`, esc(m.label), esc(m.item || "–"), `<span class="meta">${esc(m.locations.join(", "))}</span>`, fmt(m.days), dcQ(m.qty), sxM(m.value)]})), {max: 480, none: "None."}))});
+        M.map(m => ({cells: [`<b>${esc(m.mi)}</b> ${esc(m.name)}`, esc(m.label), esc(m.item || "–"), `<span class="meta">${esc(m.locations.join(", "))}</span>`, fmt(m.days), dcQ(m.qty), sxE(m.value)]})), {max: 480, none: "None."}))});
 }
 Pulse.on("sxday", x => sxDayPop(x));
 Pulse.on("sxcell", v => { const [li, x] = v.split("|"); sxCellPop(+li, x); });
 Pulse.on("sxissue", s => sxIssuePop(s));
 Pulse.on("sxloc", li => sxLocPop(+li));
 Pulse.on("sxmap", k => sxMapPop(k));
+Pulse.on("sxsplit", s => sxSplitPop(s));
 $("sxRead").onclick = () => loadSalesrec(true);
+$("sxApply").onclick = () => {
+  const a = $("sxFrom").value, b = $("sxTo").value;
+  if (!a || !b) { $("sxStatus").textContent = "Choose the first and the last day."; return; }
+  sxRng = {from: a, to: b}; loadSalesrec(false);
+};
+$("sxLast").onclick = () => { sxRng = null; loadSalesrec(false); };
+$("dimension").addEventListener("change", () => { if ($("v-salesrec").classList.contains("on")) loadSalesrec(false); });
+$("sxExp").onclick = () => {
+  const d = sxData; if (!d) { alert("Read the reconciliation first."); return; }
+  const P = ["gross", "disc", "incl", "vat", "ex"], PL = ["before discounts", "discounts", "with VAT", "VAT", "without VAT"];
+  const head = ["Restaurant", "BC", "Department", "Day", "Status", "Exceptions"].concat(...["Simphony", "Imported", "Posted"].map(s => PL.map(l => `${s} ${l}`)), ["Imported VAT unknown", "Unpaid on the invoice", "Invoices", "Imported lines", "Not in a sales document", "Why"]);
+  const rows = [];
+  d.locations.forEach(L => d.days.forEach(x => { const c = L.cells[x]; if (!c || c.status === "no_sales") return; const b = c.b || {};
+    rows.push([L.name, L.bc, L.dept || "", x, d.statuses[c.status], (c.issues || []).map(i => d.statuses[i]).join(", ")].concat(...["sim", "imp", "inv"].map(s => P.map(f => (b[s] || {})[f] ?? null)),
+      [(b.imp || {}).vat_unknown || null, c.remaining, (c.docs || []).join(", "), c.rows || null, c.unposted || null, Object.values(c.why || {}).join(" ")])); }));
+  const loc = d.locations.map(L => { const a = sxSplitOf([L], "sim"), b = sxSplitOf([L], "imp"), v = sxSplitOf([L], "inv");
+    return [L.name, L.bc, L.dept || ""].concat(P.map(f => a[f]), P.map(f => b[f]), P.map(f => v[f]), [Object.values(L.cells).filter(c => c.status === "not_posted").length, L.issues]); });
+  xlsxTable(`Simphony BC ${d.company} ${d.from} ${d.to}`, [
+    {title: "Days", header: head, formats: ["text", "text", "text", "text", "text", "text"].concat(Array(15).fill("qty"), ["qty", "qty", "text", "int", "int", "text"]), rows},
+    {title: "By restaurant", header: ["Restaurant", "BC", "Department"].concat(...["Simphony", "Imported", "Posted"].map(s => PL.map(l => `${s} ${l}`)), ["Open days", "Exceptions"]),
+     formats: ["text", "text", "text"].concat(Array(15).fill("qty"), ["int", "int"]), rows: loc},
+    {title: "Menu items", header: ["Menu item", "Name", "Problem", "BC item", "Where", "Days", "Sold", "Value"], formats: ["text", "text", "text", "text", "text", "int", "qty", "qty"],
+     rows: (d.mapping || []).map(m => [m.mi, m.name, m.label, m.item, m.locations.join(", "), m.days, m.qty, m.value])}],
+    [`${d.company} · ${d.from} to ${d.to} · read ${sxWhen(d.checked_at)}${d.departments ? " · departments " + d.departments.join(", ") : ""}`].concat(Object.entries(d.help || {}).map(([k, h]) => `${d.statuses[k]}: ${h.means}`)));
+};
 $("sxReg").onclick = () => { navTo("register"); $("rgSource").innerHTML = `<option value="sales_rec">Simphony ↔ BC</option>`; $("rgSource").value = "sales_rec"; loadRegister(); };
 $("sxSave").onclick = async () => {
   $("sxMsg").textContent = "Saving…";
   try{ await simphonyPost("/api/salesrec/settings", {days: $("sxSDays").value, import_lag: $("sxSImp").value, post_lag: $("sxSPost").value,
-      settle_days: $("sxSSettle").value, tol_abs: $("sxSAbs").value, tol_pct: $("sxSPct").value});
+      tol_abs: $("sxSAbs").value, tol_pct: $("sxSPct").value});
     $("sxMsg").textContent = "Saved. Reading again with the new limits…"; loadSalesrec(true); }
   catch(e){ $("sxMsg").textContent = "Could not save: " + e.message; }
 };
