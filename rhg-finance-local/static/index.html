@@ -75,6 +75,7 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
 .filters .dimf{position:relative;flex:1 1 150px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
   border-radius:12px;padding:0 14px 0 20px;min-height:38px;font-size:12px;color:var(--ink);white-space:nowrap;min-width:0}
 .filters .dimf:focus-within,.filters .dimf.open{border-color:var(--accent)}
+.dimf.na .dimf-btn{display:none}.dimf-na{flex:1;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dimf-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:6px;border:0;background:transparent;
   padding:9px 0;font:inherit;font-size:12px;color:var(--ink);cursor:pointer;text-align:left}
 .dimf-btn span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -710,7 +711,8 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="dimf" id="dimPick"><span>Department</span>
       <button type="button" class="dimf-btn" id="dimBtn" aria-haspopup="listbox" aria-expanded="false"><span id="dimText">All departments</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
       <div class="dimf-list" id="dimList" hidden></div>
-      <select id="dimension" multiple hidden><option value="">All departments</option></select></div>
+      <select id="dimension" multiple hidden><option value="">All departments</option></select>
+      <span class="dimf-na" id="dimNa" hidden>not used</span></div>
     <label>Compare <select id="cmpMode">
       <option value="prior">Period before</option>
       <option value="last_year">Same dates last year</option>
@@ -2458,6 +2460,38 @@ function params(){
   p.set("mode",$("mode").value);
   p.set("compare",$("cmpMode").value);
   return p.toString();
+}
+// The departments chosen above go to every location screen (Geri, 14 Nov 2026: "the filter must work in every section"):
+// each read and export of these addresses carries them, and the server cuts the answer to their places, as it does for a
+// person limited to some locations. Named without "/api/" (nginx rewrites that prefix in this page).
+const DEPT_API = new Set(["finance/locations", "cash/locations", "kartela/locations", "inventory/locations", "inventory/sku",
+  "today/locations", "assets/locations", "locations", "transit", "discharge", "discharge/xlsx", "movement", "movement/rows",
+  "movement/xlsx", "typology", "typology/xlsx", "stockcount", "stockcount/xlsx", "shrinkage", "shrinkage/xlsx",
+  "shrinkage/overview", "shrinkage/config", "sales/stockstop", "sales/stockstop/xlsx", "sevenrooms", "sevenrooms/xlsx",
+  "receipts", "billyrec", "billyrec/xlsx", "billyrec/rows", "executive"]);
+function withDept(url){
+  if (typeof url !== "string") return url;
+  const m = url.match(/\/api\/([^?#]*)(\?[^#]*)?/);
+  if (!m || !DEPT_API.has(m[1])) return url;
+  const d = dimValues(); if (!d.length) return url;
+  const p = new URLSearchParams((m[2] || "").slice(1));
+  if (p.has("dimension")) return url;
+  p.set("dimension", d.join(","));
+  return url.slice(0, m.index) + "/api/" + m[1] + "?" + p.toString();
+}
+(function(){
+  const f = window.fetch.bind(window);
+  window.fetch = (input, init) => f((!init || !init.method || String(init.method).toUpperCase() === "GET") ? withDept(input) : input, init);
+})();
+// the screens where the department does not apply (company-wide figures): the picker says so
+const DIM_NA = new Set(["bs", "liquidity", "gl", "fiscal", "fsales", "recipes", "itemmaster", "closing", "group", "emcpriv",
+  "gaps", "settings", "accounts", "register", "stockwc"]);
+function dimNaSync(){
+  const b = document.querySelector("#nav button.on"), v = (b && b.dataset.view) || "overview";
+  const na = DIM_NA.has(v) || (v === "kartela" && typeof kaTab !== "undefined" && kaTab !== "loc")
+    || (v === "doccontrol" && typeof dkTab !== "undefined" && dkTab === "nopo");
+  $("dimPick").classList.toggle("na", na); $("dimNa").hidden = !na;
+  $("dimPick").title = na ? "This screen shows the whole company: the department filter does not apply here." : "";
 }
 // the Sales screens follow the company and the departments chosen above (QA 14 Nov 2026)
 function scopeQs(o){
@@ -4701,7 +4735,7 @@ function renderSimphony(st){
 // email runs it in "capture" mode: the export's address (or the table a screen sends) is kept, the person writes
 // the addresses and a message, and the server builds the file itself and sends it (exportmail.py).
 var exportFmt = "xlsx", exportMode = "", exportCaptured = null;
-function exportUrl(url){ return exportFmt === "pdf" ? url + (url.includes("?") ? "&" : "?") + "format=pdf" : url; }
+function exportUrl(url){ url = withDept(url); return exportFmt === "pdf" ? url + (url.includes("?") ? "&" : "?") + "format=pdf" : url; }
 function exportGo(url){ if (exportMode === "capture") { exportCaptured = {url}; return; } location.href = exportUrl(url); }
 (function(){
   const TOWER = "RHG-Finance";                              // the header this tower's POSTs carry
@@ -8892,7 +8926,7 @@ $("acMethod").onchange = () => { $("acMethod").dataset.touched = "1"; if (acData
 // ---------- Control → Document control: invoices without a PO (from Purchasing) and transfers in transit ----------
 var dkTab = "nopo";
 function dkShowTab(tab){
-  dkTab = tab;
+  dkTab = tab; dimNaSync();
   document.querySelectorAll("#dkTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
   $("npView").style.display = tab === "nopo" ? "" : "none";
   $("trView").style.display = tab === "transit" ? "" : "none";
@@ -9254,7 +9288,7 @@ function currentView(){
 // (#ap, #ar, links and buttons that open "ap" or "ar") land on the matching tab.
 var kaTab = "ap";
 function kaShow(tab){
-  kaTab = tab === "ar" || tab === "loc" || tab === "sup" ? tab : "ap";
+  kaTab = tab === "ar" || tab === "loc" || tab === "sup" ? tab : "ap"; dimNaSync();
   document.querySelectorAll("#kaTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === kaTab); b.setAttribute("aria-selected", b.dataset.t === kaTab); });
   $("kaAp").hidden = kaTab !== "ap"; $("kaAr").hidden = kaTab !== "ar"; $("kaLoc").hidden = kaTab !== "loc"; $("kaSup").hidden = kaTab !== "sup";
   if ($("v-kartela").classList.contains("on")) {
@@ -9271,6 +9305,7 @@ function navTo(view){
   if (b) { if (b.classList.contains("on") && view === "kartela") kaShow(kaTab); else b.click(); }
 }
 function setHeader(){
+  dimNaSync();
   const v = currentView();
   const inv = v.id === "inventory", invTower = inv || INV_TABS.has(v.id);
   const salesTower = v.id === "sales", finTower = !invTower && !salesTower;
@@ -9279,21 +9314,22 @@ function setHeader(){
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "sales"){
-    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : typeof slTab !== "undefined" && slTab === "stockstop" ? "Sales · Blocked by stock" : typeof slTab !== "undefined" && slTab === "sevenrooms" ? "Sales · SevenRooms ↔ Simphony" : "Sales") + " · all restaurants";
+    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : typeof slTab !== "undefined" && slTab === "stockstop" ? "Sales · Blocked by stock" : typeof slTab !== "undefined" && slTab === "sevenrooms" ? "Sales · SevenRooms ↔ Simphony" : "Sales") + " · " + ($("company").value || "all restaurants") + (dimValues().length ? " · " + dimValues().join(" + ") : "");
     $("period").textContent = typeof slTab !== "undefined" && slTab === "stockstop"
       ? "Open assembly orders in Business Central and today's sales in Simphony · read every few minutes"
       : typeof slTab !== "undefined" && slTab === "sevenrooms"
       ? (svData && svData.range ? `Reservations ${svData.range.from} → ${svData.range.to} · SevenRooms and Simphony, read only` : "Reservations from SevenRooms, checks from Simphony · read only")
       : salesData && salesData.available
       ? `${salesData.period.label} · ${salesData.period.from} → ${salesData.period.to} · against ${salesData.prior.from} → ${salesData.prior.to}`
-      : "Point-of-sale totals from Simphony Reporting and Analytics · company and department filters do not apply";
+      : "Point-of-sale totals from Simphony Reporting and Analytics · the restaurants of the company and departments chosen";
     return;
   }
-  $("title").textContent = `${v.label} · ${m.company}${m.dimension ? " · " + m.dimension.split(",").join(" + ") : ""}`;
+  const dimOn = m.dimension && !$("dimPick").classList.contains("na");
+  $("title").textContent = `${v.label} · ${m.company}${dimOn ? " · " + m.dimension.split(",").join(" + ") : ""}`;
   const ss = data.stockSummary;
   $("period").textContent = inv && ss && ss.available
     ? `Stock position · company-wide · Opening ${ss.opening_date} → closing ${ss.as_of}`
-    : `${m.period_label} · against ${m.compare_label}${m.dimension ? " · " + m.dimension.split(",").join(" + ") : ""} · ${m.currency}`;
+    : `${m.period_label} · against ${m.compare_label}${dimOn ? " · " + m.dimension.split(",").join(" + ") : ""} · ${m.currency}`;
 }
 // Filters in the address (the Executive dashboard opens a screen here with its own filters):
 // ?company=SALT&mode=month|quarter|ytd|range&period=2026-10-01 (or 2026-01-01..2026-10-31)&dimension=SALT1,SALT2
@@ -9350,6 +9386,25 @@ $("pdfBtn").onclick = () => { document.body.classList.add("printing"); window.pr
 window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
 $("refreshBtn").onclick=()=>load();
 ["company","dimension"].forEach(id=>$(id).onchange=()=>load());
+// the departments changed: every location screen is read again for them (the open one now, the others when opened)
+$("dimension").addEventListener("change", () => {
+  flKey = clKey = klKey = ilKey = faKey = blKey = ""; if (typeof frKey !== "undefined") frKey = "";
+  skKey = null; tdState.data = {};
+  mvData = tyData = dcData = tkData = biData = svData = stData = trData = cnData = shData = shOvData = null;
+  $("shLoc").dataset.co = ""; $("shMonth").dataset.mode = ""; $("cnLoc").dataset.co = "";
+  const on = id => $(id).classList.contains("on");
+  if (on("v-movement") || on("v-invcharts")) loadMovement(false);
+  if (on("v-typology")) loadTypology(false);
+  if (on("v-discharge")) loadDischarge(false);
+  if (on("v-stockcount")) loadCn(false);
+  if (on("v-shrinkage")) loadSh(false);
+  if (on("v-receipts")) loadReceipts(false);
+  if (on("v-billyrec")) loadBilly(false);
+  if (on("v-doccontrol") && dkTab === "transit") loadTr(false);
+  if (on("v-sales") && $("slSrView").style.display !== "none") svLoad(false);
+  if (on("v-sales") && $("slStView").style.display !== "none") stLoad(false);
+  dimNaSync();
+});
 $("cmpMode").onchange=()=>load();
 $("anchor").onchange=()=>{ if($("anchor").value) $("anchor").value=snap($("anchor").value); rangeSync(); load(); };
 $("anchorTo").onchange=()=>{
@@ -9672,7 +9727,7 @@ function skSquare(code, L){
 function skRender(){
   if (ilTab !== "sku" || !skData) return;
   const d = skData, B = d.locations || {}, codes = Object.keys(B);
-  $("skXlsx").href = "/api/inventory/sku/xlsx?" + skQuery();
+  $("skXlsx").href = withDept("/api/inventory/sku/xlsx?" + skQuery());
   $("skStatus").innerHTML = `Use of ${esc(d.window.from)} → ${esc(d.window.to)} (${d.window.days} days) · ${fmt(d.cards_total)} SKU cards read ${esc((d.cards_read_at || "").replace("T", " ").slice(0, 16))} · lead time ${esc(d.params.lead_text)} days · service level ${fmt(d.params.service)}% · read ${esc(d.read_at)}`
     + ((d.errors || []).length ? ` · <span class="up">${esc(d.errors.join(" · "))}</span>` : "");
   const sum = f => codes.reduce((a, c) => a + (f(B[c]) || 0), 0);

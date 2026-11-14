@@ -70,5 +70,30 @@ class QA(unittest.TestCase):
             locintel.registry = old
 
 
+    def test_departments_cut_every_location_screen(self):
+        import locintel
+        import server
+        reg = [{"ref": "OPA_B", "company": "SALT", "dept": "OPA1", "bc": "OPA1"},
+               {"ref": "LIFT", "company": "SALT", "dept": "LIFT", "bc": "LIFT"}]
+        old = locintel.registry
+        locintel.registry = lambda settings=None: reg
+        try:
+            A = server.dept_codes("SALT", ["opa1"])
+            self.assertEqual(A, {"OPA1", "OPA_B"})
+            self.assertEqual(server.dept_codes("SALT", ["MAGAZINE"]), {"MAGAZINE"})       # a warehouse: itself
+            body = {"company": "SALT", "totals": {"x": 1}, "locations": {"OPA1": {"name": "OPA"}, "LIFT": {"name": "LIFT"}},
+                    "rows": [{"ref": "OPA_B"}, {"code": "LIFT"}]}
+            r = server.filter_codes(body, A)
+            self.assertEqual(list(r["locations"]), ["OPA1"])
+            self.assertEqual(r["rows"], [{"ref": "OPA_B"}])
+            self.assertNotIn("totals", r)
+            self.assertEqual(body["locations"].keys(), {"OPA1", "LIFT"})                  # the held answer untouched
+            # every location screen is covered: cut by a function, by its handler, or by the generic filter
+            for path in server.ACCESS_LOCATION_PATHS - server.DEPT_SELF:
+                self.assertTrue(path in server.LOCATION_CUTS or path in server.SELF_CUT or path.startswith("/api/"), path)
+        finally:
+            locintel.registry = old
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2128,6 +2128,58 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/executive"}
 
 
+# the departments chosen above: the screens that read them themselves, the cuts of the location screens (the same as for a
+# person limited to some locations), and the screens whose handler cuts by self._allowed
+DEPT_SELF = {"/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
+             "/api/sales/menu/xlsx", "/api/sales/foodcost", "/api/salesrec", "/api/locations/registry",
+             "/api/inventory/items", "/api/inventory/items/xlsx", "/api/inventory/sku/location", "/api/inventory/sku/xlsx"}
+LOCATION_CUTS = {
+    "/api/discharge": lambda b, A: recipeuse.cut(b, A), "/api/discharge/xlsx": lambda b, A: recipeuse.cut(b, A),
+    "/api/sales/stockstop": lambda b, A: salestop.cut(b, A), "/api/sales/stockstop/xlsx": lambda b, A: salestop.cut(b, A),
+    "/api/executive": lambda b, A: executive.cut(b, A), "/api/transit": lambda b, A: transit.cut(b, A),
+    "/api/billyrec": lambda b, A: billyrec.cut(b, A), "/api/receipts": lambda b, A: rcpt.cut(b, A)}
+SELF_CUT = {"/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
+            "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview",
+            "/api/shrinkage/config", "/api/shrinkage/count", "/api/shrinkage/waste", "/api/sevenrooms",
+            "/api/sevenrooms/xlsx", "/api/billyrec/rows", "/api/billyrec/xlsx"}
+
+
+def dept_codes(company, depts):
+    """The departments chosen → every code of their places (upper case): the departments themselves, and the BC
+    location, department and Simphony reference the registry gives a restaurant of the company in one of them."""
+    D = {str(d).strip().upper() for d in depts if str(d).strip()}
+    out = set(D)
+    co = str(company or "").strip().upper()
+    for r in locintel.registry():
+        if co and (r.get("company") or "").strip().upper() != co:
+            continue
+        keys = {(r.get(k) or "").strip().upper() for k in ("dept", "bc", "ref")} - {""}
+        if keys & D:
+            out |= keys
+    return out
+
+
+def filter_codes(body, A, fields=("locations", "rows", "all_locations")):
+    """A copy of a location screen's answer with only the places whose codes are in A (the departments chosen): the
+    rows of its lists, and none of the company-wide totals (as for a person limited to some locations)."""
+    if not isinstance(body, dict) or A is None:
+        return body
+    out, cut = dict(body), False
+    for f in fields:
+        val = body.get(f)
+        if isinstance(val, dict):
+            new = {k: v for k, v in val.items() if access._keys(k, v) & A}
+        elif isinstance(val, list) and val and isinstance(val[0], dict):
+            new = [r for r in val if access._keys(None, r) & A]
+        else:
+            continue
+        cut = cut or len(new) != len(val)
+        out[f] = new
+    for k in access.COMPANY_WIDE_KEYS:
+        out.pop(k, None)
+    return dict(out, departments=sorted(A), dept_cut=True)
+
+
 _transit_cache, _transit_lock = {}, threading.Lock()
 
 
@@ -2347,6 +2399,34 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand)
         return None
 
+    def _scope(self, path, q, user):
+        """The person's access (a refusal, or None), then the departments chosen above."""
+        refusal = self._access(path, q, user)
+        if not refusal:
+            self._dept_scope(path, q)
+        return refusal
+
+    def _dept_scope(self, path, q):
+        """The departments chosen above cut every location screen to their restaurants and locations, as the access
+        of a person limited to some locations does (Geri, 14 Nov 2026: "the filter must work in every section"):
+        self._allowed narrows to their codes (with the person's own, if limited), and the answer is cut by the same
+        functions. The Sales screens and Simphony ↔ BC read the departments themselves (sales_refs, salesrec.cut);
+        Item cards show every warehouse by decision."""
+        D = depts_of(q)
+        if not D or path not in ACCESS_LOCATION_PATHS or path in DEPT_SELF:
+            return
+        company = q.get("company") or config.BC_COMPANY
+        codes = dept_codes(company, D)
+        self._allowed = codes if self._allowed is None else (self._allowed & codes)
+        self._depts = D
+        cut = LOCATION_CUTS.get(path)
+        if cut is not None:
+            if self._scope_filter is None:      # a limited person's cut reads self._allowed already, now narrowed
+                self._scope_filter = lambda b: cut(b, self._allowed)
+        elif path not in SELF_CUT:
+            prev = self._scope_filter
+            self._scope_filter = lambda b: filter_codes(prev(b) if prev else b, self._allowed)
+
     def _stockcount(self, q, user, xlsx):
         """Inventory → Stock count analysis: the month's valuation of a location against its count."""
         company = q.get("company") or config.BC_COMPANY
@@ -2371,7 +2451,7 @@ class Handler(BaseHTTPRequestHandler):
                  "months": [(today - timedelta(days=1 + 31 * i)).strftime("%Y-%m") for i in range(13)],
                  "locations": [{"code": c, "name": names.get(c.upper()) or ""} for c in codes],
                  "counts": [c for c in stockcount.counts(company) if A is None or (c.get("location") or "").upper() in A],
-                 "can_upload": auth.can(user, "actions") and A is None,
+                 "can_upload": auth.can(user, "actions") and not access.limited(user),
                  "can_export": auth.can(user, "export")}
         if xlsx:
             hit = stockcount.request(client, company, location, month) if location in codes else {}
@@ -2394,7 +2474,7 @@ class Handler(BaseHTTPRequestHandler):
         if location not in codes:
             self._send(200, {"available": False, "setup": setup,
                              "error": f"{location} is not a location of {company}." if A is None
-                             else f"Choose one of your locations: {', '.join(codes) or 'none'}."})
+                             else f"Choose one of the locations in view: {', '.join(codes) or 'none'}."})
             return
         r = stockcount.request(client, company, location, month, q.get("refresh") == "1")
         self._send(200, dict(r, setup=setup))
@@ -2437,7 +2517,7 @@ class Handler(BaseHTTPRequestHandler):
                  "years": [today.year - i for i in range(3)], "default_month": stockcount.default_month(),
                  "months": [(today.replace(day=1) - timedelta(days=1 + 31 * i)).strftime("%Y-%m") for i in range(13)],
                  "can_settings": auth.can(user, "settings"), "can_export": auth.can(user, "export"),
-                 "can_upload": auth.can(user, "actions") and A is None,     # as Stock count analysis: not by location
+                 "can_upload": auth.can(user, "actions") and not access.limited(user),     # as Stock count analysis
                  "status": shrinkage.get_config()["status"]}
         if path == "/api/shrinkage/overview":
             month = q.get("month") or stockcount.default_month()
@@ -2625,6 +2705,7 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         self._scope_filter = None
         self._allowed = None
+        self._depts = None
         if url.path == "/internal/registry":
             # Purchasing → Negotiations: the restaurants' brand, BC location and department, to filter by brand
             if not self._service_call():
@@ -2658,7 +2739,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Your role does not have access to this application."})
                 else:
                     self._redirect("/")
-            elif url.path.startswith("/api/") and (refusal := self._access(url.path, q, user)):
+            elif url.path.startswith("/api/") and (refusal := self._scope(url.path, q, user)):
                 self._send(403, refusal)
             elif url.path in EXPORT_PATHS and not auth.can(user, "export"):
                 self._send(403, {"error": "Your role cannot export."})
