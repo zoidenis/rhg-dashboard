@@ -76,6 +76,8 @@ h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.01em}
   border-radius:12px;padding:0 14px 0 20px;min-height:38px;font-size:12px;color:var(--ink);white-space:nowrap;min-width:0}
 .filters .dimf:focus-within,.filters .dimf.open{border-color:var(--accent)}
 #slLoc tr.sub td{background:var(--bg)}
+.sl-rank{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--muted);margin:-2px 0 6px;padding-bottom:6px;border-bottom:1px dashed var(--line)}
+.sl-rank>b{color:var(--ink);font-size:12.5px}.sl-rank span b{color:var(--ink)}
 .dimf.na .dimf-btn{display:none}.dimf-na{flex:1;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dimf-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:6px;border:0;background:transparent;
   padding:9px 0;font:inherit;font-size:12px;color:var(--ink);cursor:pointer;text-align:left}
@@ -1673,14 +1675,15 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <div class="card-head"><div><h2>Sales by location</h2>
           <p class="hint">Every restaurant as a square: net sales of the period chosen above against the comparison, day by day, checks, guests and the average check, and the control signals (discounts, voids, error corrects, checks still open) against the limits of Settings → Location intelligence. Click a restaurant for its days.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-            <label class="meta" for="slSort">Order</label><select id="slSort" title="By change: the % of net sales against the comparison chosen above (period before or last year), the largest fall first"><option value="net">by net sales</option><option value="change">by change vs the comparison (falls first)</option><option value="avg">by average check</option><option value="disc">by discounts</option><option value="alerts">by alerts</option><option value="name">by name</option></select>
-            <button class="mini dark" id="slRead">Read again</button></div></div>
+            <label class="meta" for="slSort">Order</label><select id="slSort" title="How the restaurants are ranked; the figure appears on each square with its rank"><option value="net">by net sales (highest first)</option><option value="change">by change vs the comparison (largest fall first)</option><option value="avg">by average check (highest first)</option><option value="disc">by discounts, % of gross (highest first)</option><option value="alerts">by control signals (most serious first)</option><option value="name">by name (brands together)</option></select>
+            <button class="mini exp" id="slLiExp" type="button">Export ▾</button><button class="mini dark" id="slRead">Read again</button></div></div>
         <p class="meta" id="slStatus" style="margin:6px 0 0"></p>
+        <p class="hint" id="slSortNote" style="margin:6px 0 0"></p>
       </div>
       <div class="kpis" id="slTotals"></div>
       <div class="card" id="slCh" style="margin-bottom:16px">
         <h2>Channels, revenue centres and day parts</h2>
-        <p class="hint">Every restaurant together, from Simphony's order types: how dine in, take away and delivery sold against the period before and the same dates last year, where (revenue centre) and when (day part). Delivery partners are what was paid through Wolt, Glovo and the like.</p>
+        <p class="hint">Every restaurant together, from Simphony's order types: how dine in, take away and delivery sold against the period before and the same dates last year, where (revenue centre) and when (day part). Delivery partners are the order types of Wolt, Glovo and the like: their net sales, as the other channels.</p>
           <div class="ov-tabs" id="chTabs" role="tablist" style="margin:4px 0 10px"><button data-ch="channels" class="on" role="tab" aria-selected="true">Channels</button><button data-ch="rvcs" role="tab" aria-selected="false">Revenue centres</button><button data-ch="dayparts" role="tab" aria-selected="false">Day parts</button><button data-ch="partners" role="tab" aria-selected="false">Delivery partners</button></div>
         <p class="meta" id="chStatus" style="margin:0 0 8px"></p>
         <div class="kpis" id="chKpis" style="margin-bottom:10px"></div>
@@ -1691,7 +1694,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div id="slMain">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Sales from Simphony</h2>
       <p class="hint" id="slNote">Net sales, checks and guests by restaurant, read from Simphony Reporting and Analytics.</p></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="slEmail" title="The weekly email against last year and budget">Weekly email</button><button class="mini dark" id="slLoad" title="Reads the period's daily totals from Simphony again, not only what was kept (Refresh now above reads Business Central and shows what was kept)">Read Simphony again</button></div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="slEmail" title="The weekly email against last year and budget">Weekly email</button><button class="mini exp" id="slExp" type="button">Export ▾</button><button class="mini dark" id="slLoad" title="Reads the period's daily totals from Simphony again, not only what was kept (Refresh now above reads Business Central and shows what was kept)">Read Simphony again</button></div></div>
       <div class="kpis six" id="slKpis"></div></div>
     <div class="card" style="margin-bottom:15px"><h2>By restaurant</h2>
       <p class="hint" id="slLocNote"></p>
@@ -2120,7 +2123,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <label class="field">Voids, alert from (% of gross)<input id="liThVoid" type="number" step="any" placeholder="2"></label>
         <label class="field">Sales drop vs last year, alert from (%)<input id="liThDrop" type="number" step="any" placeholder="15"></label>
         <label class="field" style="grid-column:1/-1">Delivery order types (words in the Simphony order type name, comma separated)<input id="liDelOt" placeholder="deliver, derges, wolt, glovo"></label>
-        <label class="field" style="grid-column:1/-1">Delivery partners (words in the tender media name, comma separated)<input id="liDelTm" placeholder="wolt, glovo, bolt"></label>
+        <label class="field" style="grid-column:1/-1">Delivery partners (words in the order type name, comma separated)<input id="liDelTm" placeholder="wolt, glovo, bolt"></label>
         <label class="field">Inventory: slow or not moving stock, alert from (% of stock)<input id="liThSlow" type="number" step="any" placeholder="15"></label>
         <label class="field">Inventory: recipe coverage, alert below (%)<input id="liThRc" type="number" step="any" placeholder="90"></label>
         <label class="field">Finance: prime cost, alert from (% of sales)<input id="liThPrime" type="number" step="any" placeholder="65"></label>
@@ -3920,6 +3923,37 @@ function slCaseRows(d, k){
   return out;
 }
 Pulse.on("slr", i => slOpen(+i));
+$("slExp").onclick = () => {
+  const d = salesData; if (!d || !d.available) { alert("Read the sales first."); return; }
+  const C = d.currency || "ALL", P = d.prior.label === "same dates last year" ? "Last year" : "Before", ch = l => l.change_pct == null ? null : l.change_pct / 100;
+  xlsxTable(`Sales ${d.company || ""} ${d.period.from} ${d.period.to}`, [
+    {title: "By restaurant", header: ["Restaurant", "Simphony", "BC", "Ownership", "Currency", "Net sales", P, "Change", "Service charge", "Checks", "Guests", "Average check", "Per guest", "Discounts", "Gross", "Voids by the employee", "Manager voids", "Returns", "Error corrects", "Checks still open", "Open value", "Days read", "Days not read"],
+     formats: ["text", "text", "text", "text", "text", "num", "num", "pct", "num", "int", "int", "num", "num", "num", "num", "num", "num", "num", "num", "int", "num", "int", "int"],
+     rows: d.locations.map(l => [l.reg_name || l.name, l.locRef, l.bc || "", l.ownership || "", l.currency, l.cur.net, l.prev.net, ch(l), l.cur.service, l.cur.checks, l.cur.guests, l.avg_check, l.avg_guest,
+       l.cur.discounts, l.cur.gross, l.cur.voids_emp ?? l.cur.voids, l.cur.voids_mgr, l.cur.returns, l.cur.error_corrects, l.cur.open_checks, l.cur.open_value, l.days_read, l.days_missing])},
+    {title: "By day", header: ["Day", `Net sales ${C}`, "Checks", "Guests", `${P}, same day`], formats: ["text", "num", "int", "int", "num"],
+     rows: (() => { const pv = slPrevDays(d, C); return (d.days || []).map((x, i) => [x.date, x.net[C] || 0, x.checks, x.guests, pv[i] ?? null]); })()},
+    {title: "Control signals", header: ["Restaurant", "Signal"], formats: ["text", "text"],
+     rows: d.locations.flatMap(l => slSignals(l, d.limits || {}).al.map(a => [l.reg_name || l.name, a[1]]))}],
+    [`${d.company || ""} · ${d.period.label} · ${d.period.from} to ${d.period.to} against ${d.prior.from} to ${d.prior.to}${(d.departments || []).length ? " · departments " + d.departments.join(", ") : ""}`].concat(Object.values(d.definitions || {})));
+};
+$("slLiExp").onclick = () => {
+  const d = salesData; if (!d || !d.available) { alert("Read the sales first."); return; }
+  const lim = d.limits || {}, ch = v => v == null ? null : v / 100, sheets = [
+    {title: "Restaurants", header: ["Restaurant", "Simphony", "Brand", "Currency", "Net sales", d.prior.label, "Change", "Checks", "Average check", "Guests", "Discounts % of gross", "Voids % of gross", "Error corrects % of gross", "Checks still open", "Signals"],
+     formats: ["text", "text", "text", "text", "num", "num", "pct", "int", "num", "int", "pct", "pct", "pct", "int", "text"],
+     rows: d.locations.map(l => { const g = slSignals(l, lim); return [l.reg_name || l.name, l.locRef, l.brand || "", l.currency, l.cur.net, l.prev.net, ch(l.change_pct), l.cur.checks, l.avg_check, l.cur.guests,
+       ch(g.disc), ch(g.voids), ch(g.ec), l.cur.open_checks, g.al.map(a => a[1]).join(" · ")]; })}];
+  const t = chData && chData.available && (chData.totals || {})[chData.currency];
+  if (t) [["Channels", t.channels], ["Revenue centres", t.rvcs], ["Day parts", t.dayparts]].forEach(([n, list]) => sheets.push({title: n,
+    header: [n === "Revenue centres" ? "Revenue centre" : n === "Day parts" ? "Day part" : "Channel", "Restaurant", "Net sales", "Before", "Last year", "Checks", "Average check"],
+    formats: ["text", "text", "num", "num", "num", "int", "num"],
+    rows: (list || []).map(x => [x.rvc ?? x.name, x.place || "", x.cur.net, x.prev.net, x.ly.net, x.cur.checks, x.cur.avg])}));
+  if (t && (t.partners || []).length) sheets.push({title: "Delivery partners", header: ["Partner (order type)", "Net sales", "Before", "Last year", "Checks"], formats: ["text", "num", "num", "num", "int"],
+    rows: t.partners.map(x => [x.name, x.cur.value, x.prev.value, x.ly.value, x.cur.count])});
+  xlsxTable(`Sales location intelligence ${d.company || ""} ${d.period.from} ${d.period.to}`, sheets,
+    [`${d.company || ""} · ${d.period.from} to ${d.period.to} against ${d.prior.label} ${d.prior.from} to ${d.prior.to} · order: ${(SL_SORT[slSort] || SL_SORT.net).t(d.prior.label)}`]);
+};
 Pulse.on("slk", m => {
   const d = salesData, K = SL_KPI[m]; if (!d || !K) return;
   const C = d.currency || "ALL", t = (d.totals || {})[C] || {cur: {}, prev: {}}, base = (d.prior && d.prior.label) || "the period before";
@@ -4569,12 +4603,21 @@ function slSpark(l){
   const line = (arr, col, dash) => arr.length > 1 ? `<polyline points="${arr.map((x, i) => `${(i / (n - 1) * W).toFixed(1)},${(H - 2 - x / mx * (H - 4)).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${dash ? 1.4 : 2}" ${dash ? 'stroke-dasharray="3 3"' : ""} vector-effect="non-scaling-stroke"/>` : "";
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:22px;display:block" aria-hidden="true">${line(w, "var(--sub)", true)}${line(v, "var(--data-cur)")}</svg>`;
 }
-function slSquare(i, l, lim){
+// the orders of Sales → Location intelligence: what each means, and the figure shown on every square (rank and value)
+const SL_SORT = {
+  net: {l: "Net sales", h: "Ranked by net sales", t: () => "net sales of the period, the highest first (VAT included, after discounts).", v: l => flM(l.cur.net)},
+  change: {l: "Change", h: "Ranked by change, the largest fall first", t: c => `the % change of net sales against ${c}, the largest fall first: the restaurants losing ground come to the top.`, v: l => flPct(l.change_pct)},
+  avg: {l: "Average check", h: "Ranked by average check", t: () => "net sales ÷ checks, the highest first (a table at SALT and a counter order at OPA are different things: compare like with like).", v: l => flM(l.avg_check)},
+  disc: {l: "Discounts", h: "Ranked by discounts", t: () => "discounts as a % of gross sales, the highest first: who gives away the most.", v: l => { const x = slPctOf(l.cur.discounts, l.cur.gross); return x == null ? "–" : fmt(x, 1) + "%"; }},
+  alerts: {l: "Signals", h: "Ranked by control signals", t: () => "the restaurants with the most serious control signals first: a fall beyond the limit, then discounts, voids or error corrects above their limits, then checks still open and days not read.", v: (l, al) => al && al.length ? `${al.length} signal${al.length > 1 ? "s" : ""}` : "none"},
+  name: {l: "Name", h: "Restaurants", t: () => "by name, the restaurants of a brand together.", v: () => ""}};
+function slSquare(i, l, lim, rk){
   const c = l.cur || {}, p = l.prev || {}, sg = slSignals(l, lim), a = sg.al[0] || ["good", "Within the limits"];
   const stat = (lb, v, cls, t) => `<div${t ? ` title="${esc(t)}"` : ""}><span>${lb}</span><b class="${cls || ""}">${v}</b></div>`;
   const avgp = p.checks ? p.net / p.checks : null, ck = l.change_pct;
   const L = {group: "restaurant", brand: l.brand || ""};
   return `<div class="pl-sq" role="button" tabindex="0" data-slloc="${i}" aria-label="${esc(l.reg_name || l.name)}: sales">
+    ${rk ? `<div class="sl-rank"><b>#${rk.n}</b><span>${esc(rk.l)}: <b>${rk.v}</b></span></div>` : ""}
     <div class="hd"><div class="ic">${flGlyph(L)}</div><div class="nm"><b>${esc(l.reg_name || l.name)}</b><span>${esc([l.locRef, l.currency, l.seasonal ? "seasonal" : "", l.ownership === "Franchise" ? "franchise" : ""].filter(Boolean).join(" · "))}</span></div></div>
     <div class="big"><span class="v">${flM(c.net)}</span><span class="cmp">net · vs comparison <b class="${ck == null ? "" : ck < -(lim.sales_drop || 15) ? "up" : ck > 0 ? "down" : ""}">${flPct(ck)}</b> · ${flM(p.net)}</span></div>
     <div class="sp">${slSpark(l)}</div>
@@ -4604,18 +4647,22 @@ function slRender(){
   const key = {net: i => -(rows[i].cur.net || 0), change: i => rows[i].change_pct ?? 1e9, avg: i => -(rows[i].avg_check || 0),
     disc: i => -(slPctOf(rows[i].cur.discounts, rows[i].cur.gross) || 0), alerts: i => -score(i), name: i => 0}[slSort];
   const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (rows[a].reg_name || rows[a].name).localeCompare(rows[b].reg_name || rows[b].name));
+  const SN = SL_SORT[slSort] || SL_SORT.net;
+  $("slSortNote").innerHTML = `<b>${fcSp("Order")}:</b> ${fcSp(SN.t(d.prior.label))}`;
   const reg = idx.filter(i => rows[i].in_registry), other = idx.filter(i => !rows[i].in_registry), by = {};
   reg.forEach(i => { const b = (rows[i].brand || rows[i].locRef).toUpperCase(); (by[b] = by[b] || []).push(i); });
   const multi = Object.keys(by).filter(b => by[b].length > 1).sort((a, b) => by[b].length - by[a].length);
   const singles = reg.filter(i => !multi.includes((rows[i].brand || rows[i].locRef).toUpperCase()));
-  const groups = [];
-  if (singles.length) groups.push({t: "Restaurants", c: singles});
-  multi.forEach(b => groups.push({t: b, c: by[b]}));
+  let groups = [];
+  if (slSort === "name") {                      // by name: the brands apart, as before
+    if (singles.length) groups.push({t: "Restaurants", c: singles});
+    multi.forEach(b => groups.push({t: b, c: by[b]}));
+  } else if (reg.length) groups.push({t: SN.h, c: reg, rank: true});   // a figure: one ranked list, its value on each square
   if (other.length) groups.push({t: "Other Simphony locations", c: other, hint: "not in the restaurant registry of Settings"});
   $("slGrid").innerHTML = rows.length ? groups.map(g => {
       const cur = {}; g.c.forEach(i => cur[rows[i].currency] = (cur[rows[i].currency] || 0) + (rows[i].cur.net || 0));
       return `<div class="pl-grp"><b>${esc(g.t)}</b><span>${g.c.length} location${g.c.length > 1 ? "s" : ""} · ${Object.entries(cur).map(([c, v]) => `${flM(v)} ${esc(c)}`).join(" · ")}${g.hint ? " · " + esc(g.hint) : ""}</span></div>
-        <div class="pl-grid">${sorted(g.c).map(i => slSquare(i, rows[i], lim)).join("")}</div>`; }).join("")
+        <div class="pl-grid">${sorted(g.c).map((i, n) => slSquare(i, rows[i], lim, g.rank ? {n: n + 1, v: SN.v(rows[i], alerts[i]), l: SN.l} : null)).join("")}</div>`; }).join("")
     : `<p class="hint">No sales in this period.</p>`;
   if ($("slBd").classList.contains("show") && $("slPop").dataset.i != null) slDraw(+$("slPop").dataset.i);
 }
@@ -4657,10 +4704,10 @@ function chColors(){
 const chChip = v => v == null ? '<span class="meta">–</span>' : `<span class="chip ${v >= 0 ? "down" : "up"}">${v >= 0 ? "+" : ""}${fmt(v, 1)}%</span>`;
 function chTable(list, total, opts){
   const col = chColors(), part = opts && opts.partners;
-  if (!list.length) return `<tr><td class="hint">${part ? "No tender medium matches the delivery partner words of Settings → Location intelligence." : "Nothing in this period."}</td></tr>`;
+  if (!list.length) return `<tr><td class="hint">${part ? "No order type matches the delivery partner words of Settings → Location intelligence." : "Nothing in this period."}</td></tr>`;
   const val = (x, p) => part ? x[p].value : x[p].net;
   const sum = list.reduce((a, x) => a + val(x, "cur"), 0);
-  return `<tr><th>${part ? "Partner (tender)" : opts && opts.label || "Channel"}</th><th class="num">${part ? "Paid through" : "Net sales"}</th><th class="num">Share</th><th class="num">Before</th><th class="num">vs before</th><th class="num">Last year</th><th class="num">vs last year</th><th class="num">${part ? "Payments" : "Checks"}</th><th class="num">${part ? "Average" : "Avg check"}</th>${part ? "" : '<th class="num">Avg check LY</th>'}</tr>` +
+  return `<tr><th>${part ? "Partner (order type)" : opts && opts.label || "Channel"}</th><th class="num">Net sales</th><th class="num">Share</th><th class="num">Before</th><th class="num">vs before</th><th class="num">Last year</th><th class="num">vs last year</th><th class="num">${part ? "Payments" : "Checks"}</th><th class="num">${part ? "Average" : "Avg check"}</th>${part ? "" : '<th class="num">Avg check LY</th>'}</tr>` +
     list.map(x => { const c = val(x, "cur"), pv = val(x, "prev"), ly = val(x, "ly"), n = part ? x.cur.count : x.cur.checks;
       return `<tr><td>${opts && opts.swatch ? `<span class="ch-sw ${col(x.name)}"></span>` : ""}${x.rvc != null ? `${esc(x.rvc)} <span class="meta">${esc(x.place)}</span>` : esc(x.name)}${x.delivery ? '<span class="ch-tag">delivery</span>' : ""}</td>
         <td class="num"><b>${fmt(c)}</b></td><td class="num">${sum ? fmt(c / sum * 100, 1) + "%" : "–"}</td>
@@ -4683,7 +4730,7 @@ function chRender(){
     k(`Delivery · ${esc(C)}`, flM(D.cur), `${flPct(flVar(D.cur, D.prev))} vs before · ${flPct(flVar(D.cur, D.ly))} vs last year`, flVar(D.cur, D.ly) != null && flVar(D.cur, D.ly) < 0 ? "up" : "") +
     k("Delivery share of sales", share == null ? "–" : fmt(share, 1) + "%", `${shareLy == null ? "–" : fmt(shareLy, 1) + "%"} last year · ${share == null || shareLy == null ? "" : (share - shareLy >= 0 ? "+" : "") + fmt(share - shareLy, 1) + " pts"}`) +
     k("In the restaurant", flM(T.cur - D.cur), `${flPct(flVar(T.cur - D.cur, T.prev - D.prev))} vs before · ${flPct(flVar(T.cur - D.cur, T.ly - D.ly))} vs last year`) +
-    k("Paid through partners", flM(P), `${t.partners.length} partner${t.partners.length === 1 ? "" : "s"} · ${flPct(flVar(P, Pl))} vs last year · VAT and tips included`);
+    k("Sold through partners", flM(P), `${t.partners.length} partner${t.partners.length === 1 ? "" : "s"} (order types) · ${flPct(flVar(P, Pl))} vs last year · VAT included`);
   const lists = {channels: [t.channels, {swatch: true, label: "Channel (order type)"}], rvcs: [t.rvcs, {label: "Revenue centre"}],
     dayparts: [t.dayparts, {label: "Day part"}], partners: [t.partners, {partners: true}]};
   const [list, opts] = lists[chView];

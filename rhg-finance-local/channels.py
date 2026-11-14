@@ -1,14 +1,14 @@
 """Sales → Location intelligence, channels: each restaurant's sales by order type (the channel: dine in, take
 away, delivery…), by revenue centre and by day part and hour, against the period before and the same dates last
-year, and what the delivery partners (Wolt, Glovo… as tender media) brought in.
+year, and what the delivery partners (Wolt, Glovo… as order types) sold.
 
 Source: Simphony Reporting and Analytics, one call per restaurant and business day:
 getOrderTypeQuarterHourTotals gives the sales of every quarter hour by revenue centre and order type, with the
-day part it belongs to, so the three views come from the same figures and add up to the same total. Delivery
-partners come from getTenderMediaDailyTotals (what was paid through the partner's tender, VAT included).
+day part it belongs to, so the three views come from the same figures and add up to the same total. A delivery
+partner is the order type of its name (Wolt, Glovo…): its net sales, as RHG follows the partners' turnover.
 Days already closed are kept in the local file and never read again (simphony.py).
 
-Which order types are delivery, and which tender media are delivery partners, is set in Settings → Location
+Which order types are delivery, and which order types are delivery partners, is set in Settings → Location
 intelligence (words found in the names).
 """
 import threading
@@ -157,7 +157,6 @@ def build(periods, latest_fn, progress=None):
                 if last and d > last:
                     continue
                 jobs[("Q", ref, d)] = (lambda r=ref, dd=d, lt=last: simphony.order_type_hours(r, dd, lt))
-                jobs[("T", ref, d)] = (lambda r=ref, dd=d, lt=last: simphony.tender_totals(r, dd, lt))
     total_jobs, done = len(jobs), 0
     results = {}
     if progress:
@@ -186,10 +185,6 @@ def build(periods, latest_fn, progress=None):
         except Exception as exc:                                   # noqa: BLE001
             ots, rvcs = {}, {}
             errors.append(f"{ref}: dimensions: {str(exc)[:120]}")
-        try:
-            tms = simphony.tender_dims(ref)
-        except Exception:                                          # noqa: BLE001
-            tms = {}
         ch, rv, dp, hr, partners = {}, {}, {}, {}, {}
         dp_hour, read, missing = {}, 0, 0
         delivery = {p: 0.0 for p in PERIODS}
@@ -219,13 +214,12 @@ def build(periods, latest_fn, progress=None):
                     tot[p] += v[0]
                     if _matches(otname, deliv_ot):
                         delivery[p] += v[0]
-                t, err = results.get(("T", ref, d), (None, None))
-                for num, (amt, cnt) in (t or {}).items():
-                    name = ((tms.get(int(num)) or {}).get("name") or "").strip() if str(num).isdigit() else ""
-                    if name and _matches(name, deliv_tm):
-                        x = partners.setdefault(name, {pp: [0.0, 0] for pp in PERIODS})[p]
-                        x[0] += float(amt or 0)
-                        x[1] += int(cnt or 0)
+                    # a delivery partner is the order type of its name (Wolt, Glovo…): its net sales and checks,
+                    # as RHG follows the partners' turnover (Geri, 14 Nov 2026), not the tender media paid through
+                    if _matches(otname, deliv_tm):
+                        x = partners.setdefault(otname, {pp: [0.0, 0] for pp in PERIODS})[p]
+                        x[0] += v[0]
+                        x[1] += int(v[2] or 0)
         if not any(tot.values()):
             continue
         dps = _rows(dp)
@@ -261,9 +255,9 @@ def build(periods, latest_fn, progress=None):
                         "part and hour. The three views add up to the same total.",
             "delivery": "Delivery is the order types whose name holds one of the words in Settings → Location "
                         "intelligence.",
-            "partners": "Delivery partners are the tender media whose name holds one of the words in Settings: "
-                        "what was paid through them, VAT and tips included, so it does not equal the delivery "
-                        "order types' net sales.",
+            "partners": "Delivery partners are the order types whose name holds one of the partner words in "
+                        "Settings → Location intelligence (Wolt, Glovo…): their net sales and checks, VAT included, "
+                        "after discounts, as the other channels.",
             "period": "The current period stops at the last business day Simphony has closed; the period before "
                       "and the same dates last year get as many days, so all three compare like for like.",
         },

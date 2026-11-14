@@ -2674,7 +2674,8 @@ class Handler(BaseHTTPRequestHandler):
         return cap["status"], cap["headers"], buf.getvalue()
 
     def _as_pdf(self, url):
-        rest = [(k, v) for k, v in parse_qsl(url.query, keep_blank_values=True) if k != "format"]
+        # pdf=1 tells a screen that builds a workbook for the page (Menu prices) that it is for a PDF
+        rest = [(k, v) for k, v in parse_qsl(url.query, keep_blank_values=True) if k != "format"] + [("pdf", "1")]
         status, headers, body = self._capture_get(url.path + ("?" + urlencode(rest) if rest else ""))
         cap = {"status": status, "headers": headers}
         h = {k.lower(): v for k, v in cap["headers"]}
@@ -3013,7 +3014,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not xlsx:
                     self._send(200, r)
                     return
-                body = pricelist.render_xlsx(r)
+                body = pricelist.render_xlsx(r, pdf=q.get("pdf") == "1")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 self.send_header("Content-Disposition",

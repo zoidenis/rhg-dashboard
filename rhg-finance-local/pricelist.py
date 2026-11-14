@@ -140,7 +140,10 @@ def _spread(rows):
     return out
 
 
-def render_xlsx(r):
+def render_xlsx(r, pdf=False):
+    """The price list as Excel. pdf=True (Export → PDF): a workbook a page can hold — the items priced differently
+    across locations, then the prices with the columns that matter; the matrix by location (a column per location)
+    stays in the Excel file, too wide for a page (Geri, 14 Nov 2026: the PDF did not work)."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -155,6 +158,39 @@ def render_xlsx(r):
             c.alignment = Alignment(wrap_text=True, vertical="top")
         for i, w in enumerate(widths, start=1):
             ws.column_dimensions[get_column_letter(i)].width = w
+
+    if pdf:
+        ws = wb.active
+        ws.title = "Same item, different prices"
+        head(ws, ["Item no.", "Item", "Lowest", "at", "Highest", "at", "Gap %", "Locations"], [10, 34, 11, 22, 11, 22, 9, 9])
+        for x in r.get("spread") or []:
+            ws.append([x["num"], x["name"], x["low"], x["low_at"], x["high"], x["high_at"], x["gap_pct"] / 100, x["locations"]])
+        for row in ws.iter_rows(min_row=2):
+            row[0].number_format = "0"
+            row[2].number_format = row[4].number_format = "#,##0.00"
+            row[6].number_format = "0.0%"
+        ws = wb.create_sheet("Price list")
+        head(ws, ["Location", "Item no.", "Item", "Major group", "Revenue centre", "Price level", "Price", "Cost % of price"],
+             [22, 10, 34, 18, 16, 14, 11, 9])
+        for x in sorted(r["rows"], key=lambda x: (x["location"], x["name"], x["rvc_name"] or "", x["level"] or 0)):
+            ws.append([x["location"], x["num"], x["name"], x["major"], x["rvc_name"], x["level_name"], x["price"],
+                       x["cost_pct"] / 100 if x.get("cost_pct") is not None else None])
+        for row in ws.iter_rows(min_row=2):
+            row[1].number_format = "0"
+            row[6].number_format = "#,##0.00"
+            row[7].number_format = "0.0%"
+        ws = wb.create_sheet("Read me")
+        f = r["filters"]
+        for line in ["Menu prices from Simphony, read " + r["read_at"] + ".",
+                     "Filters: " + (", ".join(f"{k} {v}" for k, v in f.items() if v) or "none") + ".",
+                     "The PDF holds the items priced differently across locations and the prices (the first pages of a "
+                     "long list); Export → Excel has every price and the matrix by location.",
+                     "A price of 1 or less is a placeholder or an open price and is left out of the comparison."]:
+            ws.append([line])
+        ws.column_dimensions["A"].width = 140
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
 
     rows = r["rows"]
     ws = wb.active
