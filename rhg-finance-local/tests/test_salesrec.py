@@ -14,7 +14,7 @@ REG = [{"ref": "SALT", "name": "SALT Tirana", "customer": "SALT", "bc": "SALT", 
 DAYS = ["2026-11-01", "2026-11-11"]
 
 
-def run(**k):
+def run(svc=None, inv_extra=0.0, **k):
     # SALT 11 Nov as BC holds it: import 958,043 − 6,910 = 951,133, posted F047494 951,133 with VAT 158,472.17
     sim = {"SALT": {"2026-11-01": {1: (500000.5, 10, 0.0)}, "2026-11-11": {1: (958043.0, 1036, 6910.0)}},
            "OPA_TI": {"2026-11-01": {2: (682304.0, 50, 0.0)}}}
@@ -25,11 +25,11 @@ def run(**k):
                                     "imported_at": ""},
            ("OPA TIA", "2026-11-01"): {"mi": {"2": [682304.0, 50, 0.0, "I2", "Item 2"]}, "unposted": 0, "rows": 9,
                                        "imported_at": ""}}
-    inv = {("SALT", "2026-11-11"): {"amount": 951133.0, "remaining": 951133.0, "docs": ["F047494"]},
+    inv = {("SALT", "2026-11-11"): {"amount": 951133.0 + inv_extra, "remaining": 951133.0, "docs": ["F047494"]},
            ("OPA TIA", "2026-11-01"): {"amount": 682304.0, "remaining": 682304.0, "docs": ["F047388"]}}
     posted = {("SALT", "2026-11-11"): {"ex": 792660.83, "incl": 951133.0, "disc": 0.0, "lines": 191}}
     return salesrec.analyse("SALT", REG, DAYS, sim, {}, imp, inv, {}, S, date(2026, 11, 13), "ALL", True, {}, posted,
-                            {"I1": 20.0}, sim_vat, **k)
+                            {"I1": 20.0}, sim_vat, svc, **k)
 
 
 class SalesRec(unittest.TestCase):
@@ -53,6 +53,23 @@ class SalesRec(unittest.TestCase):
         self.assertAlmostEqual(c["b"]["imp"]["vat"], 951133 * 20 / 120, 2)
         self.assertEqual(c["b"]["inv"]["vat"], 158472.17)
         self.assertEqual(c["b"]["inv"]["ex"], 792660.83)
+
+    def test_service_charge(self):
+        # LIFT 1 and 6 Nov (QA 14 Nov 2026): a service charge in Simphony, the day posted as the menu items only
+        svc = {"SALT": {"2026-11-11": 16973.84}}
+        c = run(svc)["locations"][0]["cells"]["2026-11-11"]
+        self.assertEqual(c["issues"], ["service_charge"])
+        self.assertEqual(c["status"], "service_charge")
+        self.assertIn("16,973.84", c["why"]["service_charge"])
+        r = run(svc, inv_extra=16973.84)                      # the invoice carries it: reconciled
+        c = r["locations"][0]["cells"]["2026-11-11"]
+        self.assertEqual((c["status"], c["svc_posted"]), ("ok", 16973.84))
+        self.assertEqual(r["kpis"]["svc"], 16973.84)
+        self.assertEqual(r["kpis"]["svc_missing"], 0.0)
+        small = run({"SALT": {"2026-11-11": 600.0}}, inv_extra=600.0)["locations"][0]["cells"]["2026-11-11"]
+        self.assertEqual((small["status"], small["svc_posted"]), ("ok", 600.0))       # below the tolerance too
+        small = run({"SALT": {"2026-11-11": 600.0}})["locations"][0]["cells"]["2026-11-11"]
+        self.assertEqual(small["status"], "service_charge")
 
     def test_departments_and_scope(self):
         r = salesrec.cut(run(), ["OPATIA"])

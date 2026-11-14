@@ -93,11 +93,20 @@ def request(refs=None, location="", level="", group="", q="", limit=600, refresh
             "filters": {"location": location, "level": level, "group": group, "q": q}}
 
 
+# a price of 1 or less is not a price: a placeholder or an open price keyed at the till (SALT's wines at 1.00 against
+# 12,000 at LIFT showed a gap of 1,199,900%, QA 14 Nov 2026)
+PLACEHOLDER = 1.0
+
+
+def _real(p):
+    return p is not None and p > PLACEHOLDER
+
+
 def _base_price(rs):
-    """The price of an item at a location for the matrix: the lowest price level, the most common price across
-    revenue centres."""
-    lv = min((r["level"] for r in rs if r["level"] is not None), default=None)
-    ps = [r["price"] for r in rs if r["level"] == lv and r["price"] is not None]
+    """The price of an item at a location for the matrix: the lowest price level with a real price, the most common
+    price across revenue centres."""
+    lv = min((r["level"] for r in rs if r["level"] is not None and _real(r["price"])), default=None)
+    ps = [r["price"] for r in rs if r["level"] == lv and _real(r["price"])]
     return Counter(ps).most_common(1)[0][0] if ps else None
 
 
@@ -109,7 +118,8 @@ def _matrix(rows):
 
 
 def _spread(rows):
-    """Items sold at more than one location at different base prices (same currency), widest gap first."""
+    """Items sold at more than one location at different base prices (same currency), widest gap first. Prices of 1
+    or less are left out (placeholders, open prices)."""
     out = []
     for num, locs in _matrix(rows).items():
         by_cur = {}
@@ -195,7 +205,7 @@ def render_xlsx(r):
         "prices are as set in Simphony, which usually includes VAT.",
         "By location: one row per item, the base price at each location (the lowest price level; where revenue "
         "centres differ, the most common price), and the gap between the lowest and the highest location. Prices "
-        "are in each location's currency.",
+        "are in each location's currency. A price of 1 or less is a placeholder or an open price and is left out.",
         "Not in sales: items Simphony marks as not included in sales.",
     ]:
         ws.append([line])

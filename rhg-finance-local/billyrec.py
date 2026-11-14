@@ -16,7 +16,8 @@ like a kiosk with its own software, stays a till of its unit with no Simphony ch
 Matching, each invoice used once, restaurant by restaurant:
   1. the invoice's IIC, FIC or number written in the check's information lines or reference;
   2. the same total (within the tolerance) and the invoice issued within the time window of the check's closing,
-     the nearest first.
+     the nearest first; then, for a check still alone, the same total issued while the check was open (the bill
+     fiscalized when asked for, the check closed when paid), the latest first;
 A check left is "Not fiscalized" (or still "Pending" on the last business day); an invoice left is "No Simphony check";
 an invoice of the bridge with no FIC did not reach the Tax Administration. Fiscalized more than the late minutes after
 the check closed is "Late", more than 48 hours (the offline limit) "Over 48 h".
@@ -71,6 +72,7 @@ INFO = ("no_fic", "no_detail")                      # not a mapping error of the
 KEEP = 3 * 3600                 # the days end yesterday: a read holds for three hours (Read again reads at once)
 DETAIL_CAP = 4000               # invoices read in full per read (the rest the next read)
 LATE_LIMIT = 72 * 3600
+OPEN_LIMIT = 12 * 3600          # an invoice issued while its check was open: at most this long before the closing
 SIM_WORKERS = 6                 # Simphony days read at the same time (Reporting and Analytics answers each in seconds)
 _billy_gate = threading.Semaphore(3)
 _TOKEN = re.compile(r"[A-Z0-9][A-Z0-9/_-]{5,}")          # a check is looked for in invoices fiscalized up to three days after it closed
@@ -305,6 +307,28 @@ def _match(checks, invs, S, used, late_step=True, early=True, hold=frozenset()):
         if c.get("inv") or i["_k"] in used:
             continue
         used.add(i["_k"]); c["inv"] = i["_k"]; c["how"] = "amount and time"; pairs.append((c, i))
+    # 2b. the bill fiscalized while the check was still open (printed when the guest asked for it, the check closed
+    # when paid, after the window): the same total, issued after the opening, the latest first (QA 14 Nov 2026:
+    # SALT's checks closed after midnight showed "Not fiscalized" with every invoice fiscalized in Billy)
+    opened = []
+    for c in (checks if early else ()):
+        o = c.get("_o")
+        if c.get("inv") or c["_t"] is None or o is None or o >= c["_t"] - win:
+            continue
+        o = max(o, c["_t"] - OPEN_LIMIT)
+        h0, h1 = int(o // 3600), int((c["_t"] - win) // 3600)
+        for a in range(round(c["total"] - S["tol"]) - 1, round(c["total"] + S["tol"]) + 2):
+            for h in range(h0, h1 + 1):
+                for i in by_amt.get((a, h), ()):
+                    if i["_k"] in used or abs(i["total"] - c["total"]) > S["tol"] + 0.005:
+                        continue
+                    if o <= i["_t"] < c["_t"] - win:
+                        opened.append((c["_t"] - i["_t"], c["id"], i["_k"], c, i))
+    opened.sort(key=lambda x: (x[0], x[1], x[2]))
+    for _d, _cid, _ik, c, i in opened:
+        if c.get("inv") or i["_k"] in used:
+            continue
+        used.add(i["_k"]); c["inv"] = i["_k"]; c["how"] = "amount, fiscalized while the check was open"; pairs.append((c, i))
     # 3. fiscalized late: the same total, issued after the window and up to three days after the closing
     late = []
     for c in (checks if late_step else ()):
@@ -639,7 +663,8 @@ def build(company, latest_fn, progress=None, today=None, frm=None, to=None):
             checks = {r["ref"]: checks_held(r["ref"], a.isoformat(), z.isoformat()) for r in regs} if sim_on else {}
             nxt = None
             if sim_on and hi > z:              # the next part's checks, to leave them the invoices they take at once
-                nxt = {r["ref"]: [{"id": c["id"], "total": c["total"], "info": c["info"], "_t": _ts(c["clsd"]), "inv": None}
+                nxt = {r["ref"]: [{"id": c["id"], "total": c["total"], "info": c["info"], "_t": _ts(c["clsd"]),
+                                   "_o": _ts(c.get("opn") or ""), "inv": None}
                                   for c in checks_held(r["ref"], (z + timedelta(days=1)).isoformat(), hi.isoformat())
                                   if not c["cancel"] and abs(c["total"]) >= 0.01] for r in regs}
             say(f"{tag}matching {sum(map(len, checks.values())):,} checks with {len(inv):,} invoices of {len(part)} days")
@@ -734,6 +759,7 @@ def analyse(company, nuis, regs, days, inv, checks, latest, S, today, last_day=N
     for ref, lst in checks.items():
         for c in lst:
             c["_t"] = _ts(c["clsd"])
+            c["_o"] = _ts(c.get("opn") or "")
             c["inv"] = None
             c.pop("how", None)
     sold = {ref: [c for c in lst if not c["cancel"] and abs(c["total"]) >= 0.01] for ref, lst in checks.items()}
@@ -1129,7 +1155,9 @@ DEFINITIONS = {
                "till whose invoices match no check (a kiosk with its own software) is listed apart. Restaurants not "
                "fiscalized with the company's NUIS (a franchise) are left out in Settings.",
     "match": "First the invoice's IIC, FIC or number written on the check; then the same total within the tolerance "
-             "and issued within the window of the check's closing time, the nearest first. Each invoice is used once.",
+             "and issued within the window of the check's closing time, the nearest first; then the same total issued "
+             "while the check was open (the bill fiscalized when asked for, the check closed when paid). Each invoice "
+             "is used once.",
     "status": "Not fiscalized: a check with no invoice, or with an invoice of the bridge that has no FIC. Late: "
               "fiscalized more than the late minutes after the check closed; over 48 hours is beyond the offline limit. "
               "The last business day is Pending.",

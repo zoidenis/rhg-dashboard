@@ -591,13 +591,8 @@ def sales_totals(rows):
     return totals
 
 
-def sales_cut(body, user, company):
-    """Sales for a person limited to some locations: their rows (access.filter_payload), the totals and the days
-    summed again from them, so the screen shows their restaurants as the whole of it."""
-    out = access.filter_payload(body, user, company, scope_expand)
-    if out is body or not isinstance(out.get("locations"), list) or not body.get("available"):
-        return out
-    rows = out["locations"]
+def _sales_resum(out, rows, body):
+    """Sales of some rows: the totals and the days summed again from them."""
     by_day = {}
     for r in rows:
         for d, net in (r.get("daily") or {}).items():
@@ -607,8 +602,39 @@ def sales_cut(body, user, company):
             day["checks"] += cg[0]
             day["guests"] += cg[1]
     totals = sales_totals(rows)
-    return dict(out, totals=totals, days=sorted(by_day.values(), key=lambda d: d["date"]), cut=True,
+    return dict(out, locations=rows, totals=totals, days=sorted(by_day.values(), key=lambda d: d["date"]), cut=True,
                 currency=max(totals, key=lambda k: totals[k]["cur"]["net"]) if totals else body.get("currency"))
+
+
+def sales_cut(body, user, company):
+    """Sales for a person limited to some locations: their rows (access.filter_payload), the totals and the days
+    summed again from them, so the screen shows their restaurants as the whole of it."""
+    out = access.filter_payload(body, user, company, scope_expand)
+    if out is body or not isinstance(out.get("locations"), list) or not body.get("available"):
+        return out
+    return _sales_resum(out, out["locations"], body)
+
+
+def company_refs(company):
+    """The Simphony references (upper case) of the restaurants of a company in the registry; None = no company."""
+    co = str(company or "").strip().upper()
+    if not co:
+        return None
+    return {(r.get("ref") or "").upper() for r in locintel.registry() if (r.get("company") or "").strip().upper() == co} - {""}
+
+
+def sales_of_company(body, company):
+    """Sales of the company chosen above only (QA 14 Nov 2026: TBM showed the restaurants of RHG): the restaurants
+    the registry gives to that company; the totals and the days summed again. The Simphony locations that are not in
+    the registry are left out and named."""
+    refs = company_refs(company)
+    if refs is None or not isinstance(body, dict) or not body.get("available") or not isinstance(body.get("locations"), list):
+        return body
+    rows = [r for r in body["locations"] if (r.get("locRef") or "").upper() in refs]
+    other = [r["name"] for r in body["locations"] if not r.get("in_registry")]
+    out = _sales_resum(body, rows, body)
+    out.update(company=company, not_in_registry=other)
+    return out
 
 
 def sales_screen(anchor, mode, compare="prior"):
@@ -718,6 +744,8 @@ def sales_screen(anchor, mode, compare="prior"):
         "definitions": {
             "net": "Net sales as Simphony totals them (netSlsTtl): after item and subtotal discounts, "
                    "before service charges. VAT is included (the tax collected is inside it).",
+            "service": "Service charge as Simphony totals it (svcTtl): charged on the checks on top of the net "
+                       "sales, so it is not in them.",
             "checks": "Checks counted by Simphony for the business day (chkCnt). Guests are the covers "
                       "entered at the POS (gstCnt), so they are only as good as the entry.",
             "open": "Checks rung on the day and still open: sales that are not yet final.",
@@ -2819,6 +2847,9 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"error": "The Simphony connection is not set."})
                     return
                 refs = simphony_refs_in_scope(user)
+                mine = company_refs(q.get("company"))                     # the company chosen above
+                if mine is not None:
+                    refs = mine if refs is None else refs & mine
                 xlsx = url.path.endswith("xlsx")
                 try:
                     r = pricelist.request(refs, (q.get("location") or "")[:40], (q.get("level") or "")[:99],
@@ -2851,11 +2882,12 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError:
                     self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
                     return
-                self._send(200, channels.request(per, _latest, (q.get("period") or "", q.get("mode", "month")),
-                                                 q.get("refresh") == "1"))
+                self._send(200, channels.cut(channels.request(per, _latest, (q.get("period") or "", q.get("mode", "month")),
+                                                              q.get("refresh") == "1"), company_refs(q.get("company"))))
             elif url.path == "/api/sales":
-                self._send(200, sales_request(q.get("period"), q.get("mode", "month"), q.get("refresh") == "1",
-                                              q.get("compare") or "prior"))
+                self._send(200, sales_of_company(sales_request(q.get("period"), q.get("mode", "month"),
+                                                               q.get("refresh") == "1", q.get("compare") or "prior"),
+                                                 q.get("company")))
             elif url.path == "/api/locations/registry":
                 # the restaurants of the company as the registry names them (Settings → Location intelligence): one
                 # place's department, BC location and Simphony reference, so its pop-up finds it in every area

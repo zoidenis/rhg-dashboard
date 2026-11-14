@@ -50,6 +50,7 @@ OWNER_ROLE = {
     # the menu item mapping (BC item, recipe) to the cost controller
     ("sales_rec", "not_imported"): "accounting", ("sales_rec", "import_diff"): "accounting",
     ("sales_rec", "not_posted"): "accounting", ("sales_rec", "invoice_diff"): "accounting",
+    ("sales_rec", "service_charge"): "accounting",
     ("sales_rec", "unpaid"): "finance", ("sales_rec", "*"): "cost_controller",
     # Data quality & reconciliation: the checks of a closed month and the postings after its freeze
     ("data_quality", "*"): "accounting",

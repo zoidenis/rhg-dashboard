@@ -39,9 +39,9 @@ MAX_RANGE = 93
 # "Open" = the day's sales are not posted in BC: RHG does not post a day whose value is wrong (Geri, 13 Nov 2026).
 # What is still open on a posted invoice (the takings not applied to it) is shown, but checked in Takings POS ↔ BC.
 STATUS = {"not_imported": "Not imported", "import_diff": "Import ≠ Simphony", "invoice_diff": "Invoice ≠ import",
-          "not_posted": "Open: not posted in BC", "pending": "Not imported yet (within the lag)",
+          "not_posted": "Open: not posted in BC", "service_charge": "Service charge not in BC", "pending": "Not imported yet (within the lag)",
           "open_wait": "Open: not posted yet (within the lag)", "ok": "Reconciled", "no_sales": "No sales"}
-RANK = ("not_imported", "import_diff", "invoice_diff", "not_posted", "pending", "open_wait", "ok", "no_sales")
+RANK = ("not_imported", "import_diff", "service_charge", "invoice_diff", "not_posted", "pending", "open_wait", "ok", "no_sales")
 MAPPING = {"no_item": "Imported with no BC item", "unknown_item": "BC item does not exist",
            "blocked_item": "BC item is blocked", "no_recipe": "Needs a recipe, has none",
            "not_in_import": "Sold in Simphony, never imported"}
@@ -60,6 +60,14 @@ HELP = {
                               "another price; discounts imported differently; items not included in sales.",
                     "fix": "Compare the listed menu items with Simphony's report of the day; re-import the day or "
                            "correct the lines before posting.", "owner": "Chief accountant"},
+    "service_charge": {"means": "Simphony charged a service charge on the day's checks, on top of the menu items, and the "
+                                "day was posted in BC without it: the POS import carries the menu items only, and the "
+                                "invoice of the day does not add the service charge either.",
+                       "causes": "The service charge (service fee) is not part of the MID Simphony import; it was not "
+                                 "added to the sales document by hand before posting.",
+                       "fix": "Post the service charge of the day in BC (a line on the day's invoice or its own "
+                              "document), or confirm it is not RHG's revenue and set it so in Simphony.",
+                       "owner": "Chief accountant"},
     "invoice_diff": {"means": "The sales invoice posted for the day (less credit memos) does not equal the import "
                               "(or Simphony when nothing was imported).",
                      "causes": "Lines changed or deleted in the sales document before posting; part of the day posted "
@@ -190,9 +198,16 @@ def read_bc(client, company, a, b, customers):
     return imp, inv, posted, vat
 
 
+def _svc_of(ref, day, latest):
+    """The service charge of one restaurant's business day (operations daily totals, svcTtl)."""
+    row = simphony.daily_totals(ref, day, latest) or {}
+    return round(sum(float(r.get("svcTtl") or 0) for r in row.get("rvcs") or []), 2)
+
+
 def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
     """{ref: {day: {menu item: (sales, count, discounts)}}} for the days each location has closed, {ref: {day: {menu
-    item: VAT}}}; errors. force_from: the days from it are read from Simphony again ("Read again")."""
+    item: VAT}}}, {ref: {day: service charge}}; errors. force_from: the days from it are read from Simphony again
+    ("Read again")."""
     errors, latest = [], {}
     for ref in refs:
         try:
@@ -200,14 +215,19 @@ def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
         except Exception:                                           # noqa: BLE001
             latest[ref] = None
     jobs = [(r, d) for r in refs for d in days if latest.get(r) and d <= latest[r]]
-    done = 0
+    done, svc = 0, {}
+
+    def one(r, d):
+        menueng.read_day(r, d, latest.get(r), True, bool(force_from and d >= force_from))
+        return _svc_of(r, d, latest.get(r))
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futs = {pool.submit(menueng.read_day, r, d, latest.get(r), True, bool(force_from and d >= force_from)): (r, d)
-                for r, d in jobs}
+        futs = {pool.submit(one, r, d): (r, d) for r, d in jobs}
         for f in as_completed(futs):
             done += 1
             try:
-                f.result()
+                v = f.result()
+                if v:
+                    svc.setdefault(futs[f][0], {})[futs[f][1]] = v
             except Exception as exc:                                # noqa: BLE001
                 if len(errors) < 6:
                     errors.append(f"Simphony {futs[f][0]} {futs[f][1]}: {str(exc)[:140]}")
@@ -215,7 +235,7 @@ def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
                 progress(f"Simphony · {done} of {len(jobs)} days")
     out = {r: menueng.items_vat(r, days[0], days[-1]) for r in refs}
     vat = {r: menueng.vat_by_item(r, days[0], days[-1]) for r in refs}
-    return out, latest, errors, vat
+    return out, latest, errors, vat, svc
 
 
 # ---------------------------------------------------------------- the reconciliation
@@ -251,6 +271,10 @@ def explain(L, d, c, k, S, ccy):
         return (f"Imported {money(c['imp'])} {ccy}; {what}, {c['age']} days later "
                 + (f"(posting lag {S['post_lag']} days): the day is open." if k == "not_posted"
                    else f"(within the {S['post_lag']}-day posting lag)."))
+    if k == "service_charge":
+        return (f"Simphony charged a service charge of {money(c['svc'])} {ccy} on {d}, on top of the menu items "
+                f"({money(c['sim'])}); the day is posted in BC at {money(c['inv'])} ({', '.join(c['docs'])}), the "
+                f"menu items only: the service charge is not in BC.")
     if k == "invoice_diff":
         return (f"Invoiced {money(c['inv'])} ({', '.join(c['docs'])}) against "
                 f"{'the import' if c['imp'] is not None else 'Simphony'} {money(base)} {ccy} "
@@ -260,7 +284,8 @@ def explain(L, d, c, k, S, ccy):
 
 def totals(locs, maps):
     """The KPIs of a set of restaurants: the sums of their days (to the cent), the breakdowns and the counts."""
-    tot = {"sim": 0.0, "imp": 0.0, "inv": 0.0, "remaining": 0.0, "imp_gap": 0.0, "inv_gap": 0.0}
+    tot = {"sim": 0.0, "imp": 0.0, "inv": 0.0, "remaining": 0.0, "imp_gap": 0.0, "inv_gap": 0.0, "svc": 0.0,
+           "svc_posted": 0.0, "svc_missing": 0.0}
     br = {s: {"gross": 0.0, "disc": 0.0, "incl": 0.0, "vat": 0.0, "ex": 0.0, "vat_unknown": 0.0} for s in ("sim", "imp", "inv")}
     counts = {k: 0 for k in RANK}
     for L in locs:
@@ -272,6 +297,10 @@ def totals(locs, maps):
                     if f in br[k]:
                         br[k][f] += v or 0
             tot["remaining"] += max(c.get("remaining") or 0, 0)
+            tot["svc"] += c.get("svc") or 0
+            tot["svc_posted"] += c.get("svc_posted") or 0
+            if "service_charge" in c["issues"]:
+                tot["svc_missing"] += c.get("svc") or 0
             if c.get("sim") is not None and c.get("imp") is not None:
                 tot["imp_gap"] += c["imp"] - c["sim"]
             if c.get("inv") is not None and c.get("imp") is not None:
@@ -285,10 +314,11 @@ def totals(locs, maps):
 
 
 def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, currency="ALL", sim_on=True,
-            dims=None, posted=None, vat_item=None, sim_vat=None):
-    """dims: {ref: simphony.menu_items(ref)}: names, and the items not included in sales (left out)."""
+            dims=None, posted=None, vat_item=None, sim_vat=None, svc=None):
+    """dims: {ref: simphony.menu_items(ref)}: names, and the items not included in sales (left out). svc: {ref: {day:
+    service charge}}: on top of the menu items; never in the POS import, so the invoice is expected to carry it."""
     today = today or date.today()
-    dims, posted, vat_item, sim_vat = dims or {}, posted or {}, vat_item or {}, sim_vat or {}
+    dims, posted, vat_item, sim_vat, svc = dims or {}, posted or {}, vat_item or {}, sim_vat or {}, svc or {}
     items = (master or {}).get("items") or {}
     has_bom = {p for p, *_ in (master or {}).get("bom") or []}
 
@@ -320,10 +350,19 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
                 issues.append("import_diff")
             if i_t is not None and (im["unposted"] or v_t is None):
                 issues.append("not_posted" if age > S["post_lag"] else "open_wait")
+            svc_t = round((svc.get(ref) or {}).get(d) or 0.0, 2) if sd is not None else 0.0
+            svc_posted = 0.0
             if v_t is not None:
                 base = i_t if i_t is not None else s_t
-                if base is not None and gap(v_t, base):
+                # the invoice carries the service charge on top (as it should) when it is nearer to it than without
+                if base is not None and svc_t >= 0.5 and abs(v_t - base - svc_t) < abs(v_t - base):
+                    svc_posted = svc_t
+                    if gap(v_t, base + svc_t):
+                        issues.append("invoice_diff")
+                elif base is not None and gap(v_t, base):
                     issues.append("invoice_diff")
+                elif svc_t >= 0.5:
+                    issues.append("service_charge")     # posted as the menu items only
             if not issues:
                 issues = ["no_sales"] if not (s_t or i_t or v_t) else ["ok"]
             status = min(issues, key=RANK.index)
@@ -368,7 +407,7 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
                     "remaining": round(iv["remaining"], 2) if iv else None, "docs": iv["docs"] if iv else [],
                     "unposted": im["unposted"] if im else 0, "rows": im["rows"] if im else 0,
                     "imported_at": im["imported_at"] if im else "", "items": diffs[:25], "items_n": len(diffs),
-                    "unmapped": unmapped, "b": split}
+                    "unmapped": unmapped, "b": split, "svc": svc_t, "svc_posted": svc_posted}
             cell["why"] = {k: explain(L, d, cell, k, S, currency) for k in cell["issues"]}
             L["cells"][d] = cell
             L["issues"] += sum(1 for i in cell["issues"] if i not in ("pending", "open_wait"))
@@ -479,11 +518,11 @@ def build(client, company, latest_fn, progress=None, today=None, frm=None, to=No
     days = _dates(a, b)
     errors = []
     sim_on = bool(simphony.info().get("configured"))
-    sim, latest, dims, sim_vat = {}, {}, {}, {}
+    sim, latest, dims, sim_vat, svc = {}, {}, {}, {}, {}
     if sim_on:
         (progress or (lambda *_: None))("Simphony · menu items by day")
         force = (today - timedelta(days=7)).isoformat() if refresh else None
-        sim, latest, errs, sim_vat = read_simphony([r["ref"] for r in regs], days, latest_fn, progress, force)
+        sim, latest, errs, sim_vat, svc = read_simphony([r["ref"] for r in regs], days, latest_fn, progress, force)
         errors += errs
         for ref in sim:
             try:
@@ -498,7 +537,8 @@ def build(client, company, latest_fn, progress=None, today=None, frm=None, to=No
     except Exception as exc:                                        # noqa: BLE001
         m, errors = {}, errors + [f"Item cards: {str(exc)[:160]}"]
     ccy = ((settings.get("group") or {}).get("reporting_currency") or "ALL")
-    r = analyse(company, regs, days, sim, latest, imp, inv, m, S, today, ccy, sim_on, dims, posted, vat_item, sim_vat)
+    r = analyse(company, regs, days, sim, latest, imp, inv, m, S, today, ccy, sim_on, dims, posted, vat_item, sim_vat,
+                svc)
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"),
              complete=not errors, custom=bool(frm and to))
     return r
@@ -530,8 +570,10 @@ def request(client, company, latest_fn, refresh=False, frm=None, to=None):
 def findings(r):
     """The exceptions of a reconciliation for exreg.sync (source "sales_rec") and the days it covered."""
     out, ccy = [], r.get("currency") or ""
-    sev = {"not_imported": "critical", "import_diff": "warning", "invoice_diff": "critical", "not_posted": "warning"}
+    sev = {"not_imported": "critical", "import_diff": "warning", "invoice_diff": "critical", "not_posted": "warning",
+           "service_charge": "warning"}
     titles = {"not_imported": "sales not imported in BC", "import_diff": "import differs from Simphony",
+              "service_charge": "service charge not in BC",
               "not_posted": "open: sales not posted in BC", "invoice_diff": "invoice differs from the import"}
     for L in r["locations"]:
         for d, c in L["cells"].items():
@@ -540,7 +582,8 @@ def findings(r):
                     continue
                 base = c["imp"] if c["imp"] is not None else c["sim"]
                 value = {"not_imported": c["sim"], "import_diff": (c["imp"] or 0) - (c["sim"] or 0) + c["unmapped"],
-                         "not_posted": base, "invoice_diff": (c["inv"] or 0) - (base or 0)}[k]
+                         "not_posted": base, "invoice_diff": (c["inv"] or 0) - (base or 0),
+                         "service_charge": c.get("svc") or 0}[k]
                 out.append({"subject": f"{d} {k}", "kind": k, "location": L["bc"], "title": f"{L['name']} {d}: {titles[k]}",
                             "detail": (c.get("why") or {}).get(k) or explain(L, d, c, k, r["settings"], ccy),
                             "severity": "critical" if k == "import_diff" and base and abs(value) > 0.05 * abs(base)

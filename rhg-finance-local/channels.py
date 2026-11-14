@@ -68,6 +68,58 @@ def _rows(table, extra=None):
     return out
 
 
+def summarise(rows, deliv_ot, dp_order):
+    """The totals by currency of a set of restaurants, from their rows. A revenue centre is a restaurant's own: the
+    same name at two restaurants ("Restaurant") is two lines, "restaurant · revenue centre" (QA 14 Nov 2026)."""
+    totals = {}
+    for row in rows:
+        t = totals.setdefault(row["currency"], {"locations": 0, "total": {p: 0.0 for p in PERIODS},
+                                                "delivery": {p: 0.0 for p in PERIODS}, "channels": {}, "partners": {},
+                                                "dayparts": {}, "rvcs": {}})
+        t["locations"] += 1
+        for p in PERIODS:
+            t["total"][p] += row["total"][p]
+            t["delivery"][p] += row["delivery"][p]
+        place = row.get("reg_name") or row["name"]
+        for src, dst in (("channels", "channels"), ("dayparts", "dayparts"), ("rvcs", "rvcs")):
+            for x in row.get(src) or []:
+                n = f"{place} · {x['name']}" if dst == "rvcs" else x["name"]
+                acc = t[dst].setdefault(n, _blank())
+                for p in PERIODS:
+                    v = x[p]
+                    _add(acc[p], (v["net"], v["disc"], v["checks"], v["guests"]))
+                if dst == "rvcs":
+                    t.setdefault("rvc_of", {})[n] = (place, x["name"], row["locRef"])
+        for x in row.get("partners") or []:
+            acc = t["partners"].setdefault(x["name"], {p: [0.0, 0] for p in PERIODS})
+            for p in PERIODS:
+                acc[p][0] += x[p]["value"]
+                acc[p][1] += x[p]["count"]
+    out = {}
+    for c, t in totals.items():
+        rv_of = t.get("rvc_of") or {}
+        out[c] = {"locations": t["locations"], "total": {p: round(v) for p, v in t["total"].items()},
+                  "delivery": {p: round(v) for p, v in t["delivery"].items()},
+                  "channels": _rows(t["channels"], lambda n: {"delivery": _matches(n, deliv_ot)}),
+                  "dayparts": sorted(_rows(t["dayparts"]), key=lambda r: (dp_order.get(r["name"], 99), r["name"])),
+                  "rvcs": _rows(t["rvcs"], lambda n: {"place": rv_of[n][0], "rvc": rv_of[n][1], "locRef": rv_of[n][2]}),
+                  "partners": sorted(({"name": n, **{p: {"value": round(v[p][0]), "count": v[p][1]} for p in PERIODS}}
+                                      for n, v in t["partners"].items()), key=lambda x: -x["cur"]["value"])}
+    return out
+
+
+def cut(r, refs):
+    """Location intelligence of some restaurants only (refs: upper-case Simphony references; None = all): their rows
+    and the totals summed again from them."""
+    if refs is None or not isinstance(r, dict) or not isinstance(r.get("locations"), list):
+        return r
+    rows = [x for x in r["locations"] if (x.get("locRef") or "").upper() in refs]
+    deliv = _words((r.get("settings") or {}).get("delivery_order_types", ""))
+    tot = summarise(rows, deliv, r.get("dp_order") or {})
+    main = max(tot, key=lambda k: tot[k]["total"]["cur"]) if tot else ""
+    return dict(r, locations=rows, totals=tot, currency=main, cut=True)
+
+
 def build(periods, latest_fn, progress=None):
     c_from, c_to, p_from, p_to, ly_from, ly_to, running, label = periods[:8]
     settings = store.get_settings()
@@ -193,35 +245,10 @@ def build(periods, latest_fn, progress=None):
             "days_read": read, "days_missing": missing, "latest": latest.get(ref),
         }
         rows.append(row)
-        t = totals.setdefault(cur_code, {"locations": 0, "total": {p: 0.0 for p in PERIODS},
-                                         "delivery": {p: 0.0 for p in PERIODS}, "channels": {}, "partners": {},
-                                         "dayparts": {}, "rvcs": {}})
-        t["locations"] += 1
-        for p in PERIODS:
-            t["total"][p] += tot[p]
-            t["delivery"][p] += delivery[p]
-        for src, dst in ((ch, "channels"), (dp, "dayparts"), (rv, "rvcs")):
-            for n, v in src.items():
-                x = t[dst].setdefault(n, _blank())
-                for p in PERIODS:
-                    _add(x[p], v[p])
-        for n, v in partners.items():
-            x = t["partners"].setdefault(n, {p: [0.0, 0] for p in PERIODS})
-            for p in PERIODS:
-                x[p][0] += v[p][0]
-                x[p][1] += v[p][1]
     rows.sort(key=lambda r: -r["total"]["cur"])
-    out_tot = {}
-    for c, t in totals.items():
-        out_tot[c] = {"locations": t["locations"], "total": {p: round(v) for p, v in t["total"].items()},
-                      "delivery": {p: round(v) for p, v in t["delivery"].items()},
-                      "channels": _rows(t["channels"], lambda n: {"delivery": _matches(n, deliv_ot)}),
-                      "dayparts": sorted(_rows(t["dayparts"]), key=lambda r: (dp_order.get(r["name"], 99), r["name"])),
-                      "rvcs": _rows(t["rvcs"]),
-                      "partners": sorted(({"name": n, **{p: {"value": round(v[p][0]), "count": v[p][1]} for p in PERIODS}}
-                                          for n, v in t["partners"].items()), key=lambda x: -x["cur"]["value"])}
+    out_tot = summarise(rows, deliv_ot, dp_order)
     main = max(out_tot, key=lambda k: out_tot[k]["total"]["cur"]) if out_tot else ""
-    return {
+    return {"dp_order": dp_order,
         "available": True,
         "period": {"from": c_from.isoformat(), "to": c_to.isoformat(), "label": label, "running": running},
         "prev": {"from": p_from.isoformat(), "to": p_to.isoformat()},
