@@ -1696,11 +1696,10 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <div class="card" style="margin-bottom:15px"><h2>By restaurant</h2>
       <p class="hint" id="slLocNote"></p>
       <div class="scroll"><table id="slLoc"></table></div></div>
-    <div class="grid even">
-      <div class="card"><h2>Net sales by day</h2><p class="hint" id="slDayNote"></p><div id="slDays" class="rhg-bars"></div></div>
-      <div class="card"><h2>Control signals</h2><p class="hint">Voids, returns, discounts and checks still open, by restaurant. Large values here are worth a question to the manager.</p>
-        <div class="scroll"><table id="slCtl"></table></div></div>
-    </div>
+    <div class="card" style="margin-bottom:15px"><h2>Net sales by day</h2><p class="hint" id="slDayNote"></p><div id="slDays"></div></div>
+    <div class="card"><h2>Control signals</h2><p class="hint">Discounts, voids, error corrects, checks still open and falls against the comparison, by restaurant, against the limits of Settings → Location intelligence. Click a case for its restaurants, a restaurant for its picture.</p>
+      <div id="slCases" style="margin-bottom:12px"></div>
+      <div class="scroll"><table id="slCtl"></table></div></div>
     </div>
     <details class="card" id="slHow" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
   </section>
@@ -3886,6 +3885,71 @@ function slOwnRows(d, C, chip){
     <td class="num"><b>${fmt(x.net)}</b></td><td class="num">${fmt(x.prev)}</td><td class="num">${chip(x.prev ? (x.net - x.prev) / Math.abs(x.prev) * 100 : null)}</td><td class="num">${fmt(x.service)}</td>
     <td class="num">${fmt(x.checks)}</td><td class="num">${fmt(x.guests)}</td><td class="num">${x.checks ? fmt(x.net / x.checks) : "–"}</td><td class="num">${x.guests ? fmt(x.net / x.guests) : "–"}</td><td></td></tr>`).join("");
 }
+// ---- Sales: every figure opens its restaurants, every day and every case too (Pulse pop-ups)
+const slP = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + "%";
+const SL_KPI = {
+  net: {t: "Net sales", v: (c) => c.net},
+  checks: {t: "Checks", v: (c) => c.checks, n: 1},
+  guests: {t: "Guests", v: (c) => c.guests, n: 1},
+  avg: {t: "Average check", v: (c) => c.checks ? c.net / c.checks : null},
+  guest: {t: "Per guest", v: (c) => c.guests ? c.net / c.guests : null},
+  disc: {t: "Discounts", v: (c) => c.discounts, low: 1},
+  svc: {t: "Service charge", v: (c) => c.service},
+  voids: {t: "Voids", v: (c) => c.voids, low: 1}};
+function slPrevDays(d, C){            // the comparison's days, summed, in the order of the current days
+  const by = {};
+  (d.locations || []).filter(l => (l.currency || C) === C).forEach(l => Object.entries(l.daily_prev || {}).forEach(([k, v]) => by[k] = (by[k] || 0) + v));
+  return Object.keys(by).sort().map(k => by[k]);
+}
+const SL_CASES = [
+  {k: "fall", t: "Falling", w: L => `more than ${fmt(L.sales_drop || 15)}% under the comparison`},
+  {k: "disc", t: "Discounts", w: L => `above ${fmt(L.discounts || 8)}% of gross`},
+  {k: "voids", t: "Voids", w: L => `above ${fmt(L.voids || 2)}% of gross`},
+  {k: "ec", t: "Error corrects", w: L => `above ${fmt(L.error_corrects || 5)}% of gross`},
+  {k: "open", t: "Checks still open", w: () => "restaurants with checks left open"},
+  {k: "missing", t: "Days not read", w: () => "restaurants with days Simphony did not give"}];
+function slCaseRows(d, k){
+  const L = d.limits || {}, out = [];
+  (d.locations || []).forEach((l, i) => { const c = l.cur || {}, g = c.gross || 0;
+    const v = {fall: l.change_pct != null && l.change_pct < -(L.sales_drop || 15) ? l.change_pct : null,
+      disc: g && c.discounts / g * 100 > (L.discounts || 8) ? c.discounts / g * 100 : null,
+      voids: g && c.voids / g * 100 > (L.voids || 2) ? c.voids / g * 100 : null,
+      ec: g && c.error_corrects / g * 100 > (L.error_corrects || 5) ? c.error_corrects / g * 100 : null,
+      open: c.open_checks ? c.open_checks : null, missing: l.days_missing ? l.days_missing : null}[k];
+    if (v != null) out.push({l, i, v}); });
+  return out;
+}
+Pulse.on("slr", i => slOpen(+i));
+Pulse.on("slk", m => {
+  const d = salesData, K = SL_KPI[m]; if (!d || !K) return;
+  const C = d.currency || "ALL", t = (d.totals || {})[C] || {cur: {}, prev: {}}, base = (d.prior && d.prior.label) || "the period before";
+  const rows = d.locations.map((l, i) => ({l, i, a: K.v(l.cur || {}), b: K.v(l.prev || {})})).filter(x => x.a != null && (x.l.currency || C) === C).sort((x, y) => y.a - x.a);
+  const a = K.v(t.cur), b = K.v(t.prev), f = v => v == null ? "–" : fmt(v);
+  Pulse.pop({title: esc(K.t), sub: esc(`${d.period.from} to ${d.period.to} · against ${base} · ${C}`), wide: true,
+    body: Pulse.tiles([{l: "Now", v: f(a)}, {l: base, v: f(b)}, {l: "Change", v: slP(flVar(a, b)), cls: K.low ? (flVar(a, b) > 0 ? "warn" : "") : (flVar(a, b) < 0 ? "up" : "down")}])
+      + Pulse.panel("By restaurant", Pulse.bars(rows.map(x => ({key: x.l.name, segs: [[x.a, "var(--ch-0)", "now"]], text: `${f(x.a)} <span class="meta">${slP(flVar(x.a, x.b))}</span>`, open: "slr|" + x.i})),
+          [["var(--ch-0)", "now"]]))
+      + Pulse.fold(Pulse.list([["Restaurant"], ["Now", 1], [base, 1], ["Change", 1], ["Share", 1]],
+          rows.map(x => ({cells: [`<b>${esc(x.l.name)}</b>`, f(x.a), f(x.b), slP(flVar(x.a, x.b)), K.n || m === "net" || m === "disc" || m === "svc" || m === "voids" ? (a ? fmt(x.a / a * 100, 1) + "%" : "–") : "–"], open: "slr|" + x.i}))))});
+});
+Pulse.on("sld", day => {
+  const d = salesData; if (!d) return;
+  const C = d.currency || "ALL", x = (d.days || []).find(y => y.date === day); if (!x) return;
+  const rows = d.locations.map((l, i) => ({l, i, n: (l.daily || {})[day], cg: (l.daily_cg || {})[day] || [0, 0]})).filter(r => r.n != null && (r.l.currency || C) === C).sort((p, q) => q.n - p.n);
+  Pulse.pop({title: esc(day), sub: esc(`${new Date(day + "T12:00:00").toLocaleDateString("en-GB", {weekday: "long"})} · every restaurant · ${C}`),
+    body: Pulse.tiles([{l: "Net sales", v: fmt(x.net[C] || 0)}, {l: "Checks", v: fmt(x.checks)}, {l: "Guests", v: fmt(x.guests)}, {l: "Average check", v: x.checks ? fmt((x.net[C] || 0) / x.checks) : "–"}])
+      + Pulse.panel("By restaurant", Pulse.bars(rows.map(r => ({key: r.l.name, segs: [[r.n, "var(--ch-0)", "net sales"]], text: fmt(r.n), open: "slr|" + r.i}))))
+      + Pulse.fold(Pulse.list([["Restaurant"], ["Net sales", 1], ["Checks", 1], ["Guests", 1], ["Average check", 1]],
+          rows.map(r => ({cells: [`<b>${esc(r.l.name)}</b>`, fmt(r.n), fmt(r.cg[0]), fmt(r.cg[1]), r.cg[0] ? fmt(r.n / r.cg[0]) : "–"], open: "slr|" + r.i}))))});
+});
+Pulse.on("slc", k => {
+  const d = salesData, c = SL_CASES.find(x => x.k === k); if (!d || !c) return;
+  const rows = slCaseRows(d, k), pct = ["fall", "disc", "voids", "ec"].includes(k);
+  Pulse.pop({title: esc(c.t), sub: esc(`${c.w(d.limits || {})} · ${d.period.from} to ${d.period.to}`),
+    body: Pulse.panel(`The restaurants · ${fmt(rows.length)}`, rows.length ? Pulse.bars(rows.sort((p, q) => Math.abs(q.v) - Math.abs(p.v)).map(r => ({key: r.l.name,
+      segs: [[Math.abs(r.v), "var(--ch-1)", c.t]], text: pct ? fmt(r.v, 1) + "%" : k === "open" ? `${fmt(r.v)} · ${fmt(r.l.cur.open_value)}` : fmt(r.v) + " days", open: "slr|" + r.i})))
+      : `<p class="meta">${fcSp("None: every restaurant is inside the limit.")}</p>`)});
+});
 function renderSales(){
   const d = salesData; if(!d) return;
   if (currentView().id === "sales") setHeader();
@@ -3893,14 +3957,15 @@ function renderSales(){
     $("slNote").innerHTML = `<span class="warn">${esc(d.error||"Sales unavailable.")}</span>` +
       (d.configured === false ? ` <a href="#settings" data-goto-view="settings">Open Settings</a>` : "");
     bindGotoViews && bindGotoViews($("slNote"));
-    ["slKpis","slLoc","slDays","slCtl"].forEach(id => $(id).innerHTML = ""); return;
+    ["slKpis","slLoc","slDays","slCtl","slCases"].forEach(id => $(id).innerHTML = ""); return;
   }
   const C = d.currency || "ALL", t = (d.totals||{})[C] || {cur:{}, prev:{}};
   const base = (d.prior && d.prior.label) || "the period before";
   const chip = v => v==null ? "" : `<span class="chip ${v>=0?"down":"up"}">${v>=0?"+":""}${fmt(v,1)}%</span>`;
   $("slNote").textContent = `${d.period.label} · ${d.period.from} to ${d.period.to}, against ${d.prior.from} to ${d.prior.to}` +
     `${d.errors.length ? ` · ${d.errors.length} read(s) failed` : ""}`;
-  const k = (l, v, s) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const KM = {"Net sales": "net", "Checks": "checks", "Guests": "guests", "Average check": "avg", "Per guest": "guest", "Discounts": "disc", "Service charge": "svc", "Voids": "voids"};
+  const k = (l, v, s) => `<div class="card kpi"${KM[l] ? ` data-pulse="slk|${KM[l]}" role="button" tabindex="0" style="cursor:pointer" title="${esc(l)} by restaurant"` : ""}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   const others = Object.keys(d.totals||{}).filter(c => c !== C);
   $("slKpis").innerHTML = [
     k("Net sales", fmt(t.cur.net), `${C} ${chip(t.change_pct)} vs ${fmt(t.prev.net)}, ${esc(base)}`),
@@ -3920,7 +3985,7 @@ function renderSales(){
     (others.length ? ` Restaurants reporting in ${others.join(", ")} are listed but kept out of the ${C} totals.` : "");
   $("slLoc").innerHTML = `<tr><th>Restaurant</th><th>BC</th><th class="num">Net sales</th><th class="num">${d.prior.label === "same dates last year" ? "Last year" : "Before"}</th><th class="num">Change</th>
     <th class="num">Service charge</th><th class="num">Checks</th><th class="num">Guests</th><th class="num">Avg check</th><th class="num">Per guest</th><th class="num">Days</th></tr>` +
-    d.locations.map(l => `<tr><td class="name">${esc(l.name)} <span class="meta">${esc(l.locRef)}${l.currency&&l.currency!==C?" · "+esc(l.currency):""}${l.ownership === "Franchise" ? " · franchise" : ""}</span></td>
+    d.locations.map((l, i) => `<tr data-pulse="slr|${i}" style="cursor:pointer"><td class="name">${esc(l.name)} <span class="meta">${esc(l.locRef)}${l.currency&&l.currency!==C?" · "+esc(l.currency):""}${l.ownership === "Franchise" ? " · franchise" : ""}</span></td>
       <td class="meta">${esc(l.bc||"")}</td><td class="num"><b>${fmt(l.cur.net)}</b></td><td class="num">${fmt(l.prev.net)}</td>
       <td class="num">${chip(l.change_pct)}</td><td class="num">${fmt(l.cur.service)}</td><td class="num">${fmt(l.cur.checks)}</td><td class="num">${fmt(l.cur.guests)}</td>
       <td class="num">${fmt(l.avg_check)}</td><td class="num">${fmt(l.avg_guest)}</td>
@@ -3929,16 +3994,18 @@ function renderSales(){
     `<tr class="total"><td>Total ${esc(C)}</td><td></td><td class="num">${fmt(t.cur.net)}</td><td class="num">${fmt(t.prev.net)}</td>
       <td class="num">${chip(t.change_pct)}</td><td class="num">${fmt(t.cur.service)}</td><td class="num">${fmt(t.cur.checks)}</td><td class="num">${fmt(t.cur.guests)}</td>
       <td class="num">${fmt(t.avg_check)}</td><td class="num">${fmt(t.avg_guest)}</td><td></td></tr>`;
-  const days = d.days || [], max = Math.max(1, ...days.map(x => x.net[C]||0));
-  $("slDayNote").textContent = days.length ? `${C} net sales, every restaurant together.` : "No business day read yet.";
-  $("slDays").innerHTML = days.map(x => `<div class="rhg-row"><span class="meta" style="width:86px">${esc(x.date)}</span>
-    <div style="flex:1;height:10px;background:var(--rhg-sky);border-radius:5px"><div style="height:10px;border-radius:5px;background:var(--rhg-primary);width:${Math.max(0.5,(x.net[C]||0)/max*100)}%"></div></div>
-    <span class="num" style="width:110px;text-align:right">${fmt(x.net[C]||0)}</span></div>`).join("");
+  const days = d.days || [], prev = slPrevDays(d, C), wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  $("slDayNote").textContent = days.length ? `${C} net sales, every restaurant together; the dashed mark is the same day of ${base}. Click a day for its restaurants.` : "No business day read yet.";
+  $("slDays").innerHTML = days.length ? Pulse.cols(days.map((x, i) => ({label: x.date.slice(8), open: "sld|" + x.date, line: prev[i] ?? null,
+      segs: [[x.net[C] || 0, "var(--ch-0)", "net sales"]],
+      tip: `${wd[new Date(x.date + "T12:00:00").getDay()]} ${x.date}: ${fmt(x.net[C] || 0)} ${C}${prev[i] != null ? ` · ${base} ${fmt(prev[i])} (${slP(flVar(x.net[C] || 0, prev[i]))})` : ""} · ${fmt(x.checks)} checks`})),
+    [["var(--ch-0)", "net sales"], ["var(--ink)", base + " (the dashed mark)"]], {aria: "Net sales by day", maxLabel: m => fmt(m)}) : "";
   $("slCtl").innerHTML = `<tr><th>Restaurant</th><th class="num">Discounts %</th><th class="num">Voids</th><th class="num">Manager voids</th><th class="num">Returns</th><th class="num">Error corrects</th><th class="num">Open checks</th></tr>` +
-    d.locations.map(l => `<tr><td class="name">${esc(l.name)}</td><td class="num ${l.discount_pct>10?"up":""}">${l.discount_pct==null?"–":fmt(l.discount_pct,1)+"%"}</td>
+    d.locations.map((l, i) => `<tr data-pulse="slr|${i}" style="cursor:pointer"><td class="name">${esc(l.name)}</td><td class="num ${l.discount_pct>10?"up":""}">${l.discount_pct==null?"–":fmt(l.discount_pct,1)+"%"}</td>
       <td class="num">${fmt(l.cur.voids_emp ?? l.cur.voids)}</td><td class="num">${fmt(l.cur.voids_mgr)}</td><td class="num">${fmt(l.cur.returns)}</td><td class="num">${fmt(l.cur.error_corrects)}</td>
       <td class="num ${l.cur.open_checks?"warn":""}">${fmt(l.cur.open_checks)}${l.cur.open_value?` <span class="meta">· ${fmt(l.cur.open_value)}</span>`:""}</td></tr>`).join("") +
     `<tr class="total"><td>Total ${esc(C)}</td><td class="num">${t.cur.gross ? fmt(t.cur.discounts / t.cur.gross * 100, 1) + "%" : "–"}</td><td class="num">${fmt(t.cur.voids_emp ?? t.cur.voids)}</td><td class="num">${fmt(t.cur.voids_mgr)}</td><td class="num">${fmt(t.cur.returns)}</td><td class="num">${fmt(t.cur.error_corrects)}</td><td class="num">${fmt(t.cur.open_checks)}${t.cur.open_value ? ` <span class="meta">· ${fmt(t.cur.open_value)}</span>` : ""}</td></tr>`;
+  $("slCases").innerHTML = Pulse.cases(SL_CASES.map(c => ({n: slCaseRows(d, c.k).length, t: c.t, w: c.w(d.limits || {}), open: "slc|" + c.k})));
   $("slDefs").innerHTML = Object.values(d.definitions||{}).map(x => `<p>${esc(x)}</p>`).join("") +
     `<p>${fmt(d.calls)} daily totals checked in ${fmt(d.ms/1000,1)} s. ${d.errors.map(esc).join(" · ")}</p>`;
   if (slTab === "loc") slRender();
