@@ -43,9 +43,31 @@ def _add_months(d, months):
 
 def specs(c_from, c_to, mode):
     """Comparison periods for the selected mode, always covering the same number of days."""
-    mode = (mode or "week").lower()
+    mode = (mode or "week").lower().partition("+")[0]
     span = (c_to - c_from).days
     out = []
+    if mode == "quarter":
+        full = c_to.day == monthrange(c_to.year, c_to.month)[1] and c_to.month % 3 == 0
+        for n, label, method in [(3, "Previous quarter", "The same days of the previous quarter."),
+                                 (6, "Two quarters ago", "The same days, two quarters earlier."),
+                                 (12, "Same quarter previous year", "The same quarter a year earlier.")]:
+            p_from = _add_months(c_from, -n).replace(day=1)
+            q_end = _add_months(p_from, 2)
+            q_end = q_end.replace(day=monthrange(q_end.year, q_end.month)[1])
+            p_to = q_end if full else min(p_from + timedelta(days=span), q_end)
+            out.append({"offset": n, "label": label, "method": method, "from": p_from, "to": p_to, "rolling": False})
+        return out, None
+    if mode == "range":
+        days = span + 1
+        before_to = c_from - timedelta(days=1)
+        for n, label, method, p_from, p_to in [
+                (1, "Period before", f"The {days} days just before.", before_to - timedelta(days=days - 1), before_to),
+                (2, "Two periods before", f"The {days} days before those.", before_to - timedelta(days=2 * days - 1),
+                 before_to - timedelta(days=days)),
+                (364, "Same weekdays previous year", "The same weekdays, 364 days earlier (52 weeks), so trading days match.",
+                 c_from - timedelta(days=364), c_to - timedelta(days=364))]:
+            out.append({"offset": n, "label": label, "method": method, "from": p_from, "to": p_to, "rolling": n in (1, 2)})
+        return out, "Average of the two periods before"
     if mode == "month":
         full_month = c_to.day == monthrange(c_to.year, c_to.month)[1]
         plan = [(1, "Previous month", "The same days of the previous month."),

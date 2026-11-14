@@ -381,15 +381,16 @@ def sla_exceptions(docs, pos, movers, settings, meta):
 
 
 def supplier_summary(docs, settings, limit=20):
-    """Supplier spend and concentration from posted documents (vendor comes from the ledger join)."""
+    """Supplier spend (item lines of invoices less credit memos, at BC cost) and concentration from posted documents
+    (vendor comes from the ledger join). Supplier performance itself reads every line of the documents (suppliers.py)."""
     agg = defaultdict(lambda: {"spend": 0.0, "invoices": 0, "credit_notes": 0, "lines": 0,
                                "items": set(), "locations": set(), "issues": 0})
     for d in docs.values():
         if d["type"] not in (INV, CM) or not d["supplier"]:
             continue
         a = agg[d["supplier"]]
+        a["spend"] += d["value"]          # a credit memo's value is negative: it is taken off the invoices
         if d["type"] == INV:
-            a["spend"] += d["value"]
             a["invoices"] += 1
         else:
             a["credit_notes"] += 1
@@ -397,7 +398,7 @@ def supplier_summary(docs, settings, limit=20):
         a["items"].update(d["items"])
         a["locations"].update(d["locations"])
         a["issues"] += (1 if d["neg_lines"] or d["zero_lines"] else 0)
-    total = sum(a["spend"] for a in agg.values()) or 1
+    total = sum(max(0.0, a["spend"]) for a in agg.values()) or 1
     rows = [{"supplier": k, "spend": v["spend"], "share": v["spend"] / total * 100, "invoices": v["invoices"],
              "credit_notes": v["credit_notes"], "lines": v["lines"], "items": len(v["items"]),
              "locations": sorted(v["locations"]), "issues": v["issues"],

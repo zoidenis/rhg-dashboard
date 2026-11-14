@@ -177,6 +177,7 @@ table.ng-t td:first-child{min-width:180px}
 h2{font-size:15.5px;margin:0;font-weight:700}
 .hint{color:var(--sub);font-size:12.5px;margin:3px 0 14px}
 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+@media (max-width:640px){#v-items .card-head,#v-suppliers .card-head{flex-direction:column;align-items:stretch}#v-items .card-head select,#v-items .card-head .search,#v-suppliers .card-head .search{flex:1 1 140px;min-width:0}}
 .scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 th{font-size:11.5px;color:var(--sub);text-align:left;font-weight:700;padding:0 10px 9px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
@@ -314,6 +315,12 @@ td.num,th.num{text-align:right}
 .ov-tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px;width:max-content;max-width:100%}
 .ov-tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;cursor:pointer;color:var(--sub);font-weight:600;font:inherit}
 .ov-tabs button.on{background:var(--accent);color:#fff}
+/* Purchasing: the four areas on the first row, the screens of the one open on the second, smaller */
+.pu-tabs{margin-bottom:8px}.pu-tabs button{font-size:14.5px;padding:8px 16px}
+.pu-tabs+.ov-tabs{background:transparent;border-color:transparent;padding:0;gap:6px}
+.pu-tabs+.ov-tabs button{font-size:12.5px;padding:5px 12px;border:1px solid var(--line);background:var(--card)}
+.pu-tabs+.ov-tabs button.on{background:var(--accent);border-color:var(--accent)}
+@media (max-width:640px){.ov-tabs{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}.ov-tabs button{flex:none}}
 .pl-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .pl-grp{display:flex;align-items:baseline;gap:10px;margin:14px 0 8px;font-size:13px}
 .pl-grp span{font-size:11.5px;color:var(--sub)}
@@ -461,10 +468,11 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <div class="grp">Overview</div>
     <button class="on" data-view="overview">Overview</button>
     <button data-view="live">Live operations</button>
-
-    <div class="grp">Buying &amp; prices</div>
-    <!-- Buying: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
-    <button data-view="reqs" data-tab="Requisitions" data-group="Buying">Buying</button>
+    <!-- Purchasing: one item; its four areas (Buying, Prices & contracts, Supplier performance, Purchaser performance)
+         are the first row of tabs, the screens of each the second (Geri, 14 Nov 2026). Each area stays a menu item of
+         the catalogue (roles, addresses and loading unchanged), only hidden from the side menu. -->
+    <button data-view="purch" id="purchNav">Purchasing</button>
+    <button data-view="reqs" data-tab="Requisitions" data-group="Buying" style="display:none">Buying</button>
     <button data-view="po" data-parent="reqs" data-tab="Purchase orders" style="display:none">Purchase orders</button>
     <button data-view="invoices" data-parent="reqs" data-tab="Invoices" style="display:none">Invoices</button>
     <button data-view="streams" data-parent="reqs" data-tab="Purchase types" style="display:none">Purchase types</button>
@@ -472,11 +480,12 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <button data-view="buyloc" data-parent="reqs" data-tab="Location intelligence" style="display:none">Location intelligence</button>
     <button data-view="buycharts" data-parent="reqs" data-tab="Purchasing charts" style="display:none">Purchasing charts</button>
     <!-- Prices & contracts: one item, its screens as tabs (they stay views: addresses and loading unchanged) -->
-    <button data-view="compare" data-tab="Comparisons" data-group="Prices &amp; contracts">Prices &amp; contracts</button>
+    <button data-view="compare" data-tab="Comparisons" data-group="Prices &amp; contracts" style="display:none">Prices &amp; contracts</button>
     <button data-view="contracts" data-parent="compare" data-tab="Contract prices" style="display:none">Contract prices</button>
     <button data-view="savings" data-parent="compare" data-tab="Price savings" style="display:none">Price savings</button>
     <button data-view="prices" data-parent="compare" data-tab="Price changes" style="display:none">Price changes</button>
     <button data-view="locations" data-parent="compare" data-tab="Location prices" style="display:none">Location prices</button>
+    <button data-view="items" data-parent="compare" data-tab="Item history" style="display:none">Item history</button>
     <button data-view="negotiations" data-parent="compare" data-tab="Negotiations" style="display:none">Negotiations</button>
     <!-- Stock & working capital is a tab of Finance → Inventory now (this view, embedded); #stock still opens it here -->
     <button data-view="stock" style="display:none">Stock &amp; working capital</button>
@@ -487,10 +496,10 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <button data-view="feed">Posting follow-up</button>
 
     <div class="grp">Performance</div>
-    <button data-view="suppliers">Supplier performance</button>
+    <button data-view="suppliers" data-group="Supplier performance" style="display:none">Supplier performance</button>
     <button data-view="suploc" data-parent="suppliers" data-tab="Location intelligence" style="display:none">Location intelligence</button>
     <button data-view="supco" data-parent="suppliers" data-tab="Whole company" style="display:none">Whole company</button>
-    <button data-view="purchasers">Purchaser performance</button>
+    <button data-view="purchasers" style="display:none">Purchaser performance</button>
     <button data-view="users">User performance</button>
     <button data-view="reports">Reports</button>
 
@@ -532,9 +541,14 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <label>Company <select id="company"></select></label>
     <label>Location <select id="location"><option value="">All locations</option></select></label>
     <label>Period <select id="mode">
-      <option value="week">Week</option><option value="month">Month</option><option value="ytd">Year to date</option>
+      <option value="week">Week</option><option value="month">Month</option><option value="quarter">Quarter</option><option value="ytd">Year to date</option><option value="range">Custom range (from – until)</option>
     </select></label>
-    <label id="anchorLabel">Week starting <input type="date" id="week"></label>
+    <label id="anchorLabel">Week starting <input type="date" id="week"></label><button type="button" class="mini" id="rangeBtn" title="Choose the first and the last day">Range…</button>
+    <label id="toLabel" style="display:none">Until <input type="date" id="weekTo"></label>
+    <label id="cmpLabel">Compare <select id="cmpMode">
+      <option value="prior">Period before</option>
+      <option value="last_year">Same dates last year</option>
+    </select></label>
   </div>
 
   <div class="banner" id="banner"></div>
@@ -591,7 +605,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-compare">
-    <div class="ov-tabs" id="pcTabs" role="tablist"><button data-t="compare" class="on" role="tab" aria-selected="true">Comparisons</button><button data-t="contracts" role="tab" aria-selected="false">Contract prices</button><button data-t="savings" role="tab" aria-selected="false">Price savings</button><button data-t="prices" role="tab" aria-selected="false">Price changes</button><button data-t="locations" role="tab" aria-selected="false">Location prices</button><button data-t="negotiations" role="tab" aria-selected="false">Negotiations</button></div>
+    <div class="ov-tabs" id="pcTabs" role="tablist"><button data-t="compare" class="on" role="tab" aria-selected="true">Comparisons</button><button data-t="contracts" role="tab" aria-selected="false">Contract prices</button><button data-t="savings" role="tab" aria-selected="false">Price savings</button><button data-t="prices" role="tab" aria-selected="false">Price changes</button><button data-t="locations" role="tab" aria-selected="false">Location prices</button><button data-t="items" role="tab" aria-selected="false">Item history</button><button data-t="negotiations" role="tab" aria-selected="false">Negotiations</button></div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-head"><div><h2>Equivalent period comparisons</h2>
         <p class="hint" id="cmpHint">Every comparison uses the same weekdays, so trading days match. Loaded on demand and cached for 15 minutes.</p></div>
@@ -752,6 +766,23 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <div id="svBody"></div>
   </section>
 
+  <section class="view" id="v-items">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Item history</h2>
+        <p class="hint"><span>Every item bought in the period chosen above: from which suppliers, what it cost, the lowest, highest, average and last price, and how the average moved against the comparison period.</span> <span>From the posted purchase invoice lines, excluding VAT, in the item's base unit.</span> <span>Click an item for its price over time, its suppliers, its locations and every purchase.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input class="search" id="ihQ" placeholder="Search item code or name" aria-label="Search item">
+          <select id="ihVendor" aria-label="Supplier"><option value="">All suppliers</option></select>
+          <select id="ihStream" aria-label="Purchase type"><option value="">All purchase types</option></select>
+          <select id="ihSort" aria-label="Order"><option value="cost">by spend</option><option value="change">by price change</option><option value="spread">by price spread</option><option value="suppliers">by suppliers</option><option value="name">by name</option></select>
+          <button class="mini dark" id="ihRead" type="button">Read again</button><button class="mini exp" id="ihExp" type="button">Export ▾</button></div></div>
+      <p class="meta" id="ihStatus" style="margin:6px 0 0">Open the screen to read the items.</p>
+    </div>
+    <div id="ihKpis"></div>
+    <div class="card" style="margin-bottom:14px"><div class="scroll"><table id="ihTable" data-nosort></table></div><p class="meta" id="ihMore"></p></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:15px;font-weight:600">How these figures are built</summary><div class="hint" id="ihDefs" style="margin-top:10px;line-height:1.55"></div></details></div>
+  </section>
+
   <section class="view" id="v-negotiations">
     <div class="card" style="margin-bottom:16px">
       <div class="card-head"><div><h2>Negotiations <span class="ng-pill warn" title="Until the reconciliation is approved">Pilot</span></h2>
@@ -879,6 +910,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-reqs">
+    <div class="ov-tabs pu-tabs" id="puTabs" role="tablist" aria-label="Purchasing"><button data-t="reqs" class="on" role="tab" aria-selected="true">Buying</button><button data-t="compare" role="tab" aria-selected="false">Prices &amp; contracts</button><button data-t="suppliers" role="tab" aria-selected="false">Supplier performance</button><button data-t="purchasers" role="tab" aria-selected="false">Purchaser performance</button></div>
     <div class="ov-tabs" id="byTabs" role="tablist"><button data-t="reqs" class="on" role="tab" aria-selected="true">Requisitions <span class="count" id="reqCount">0</span></button><button data-t="po" role="tab" aria-selected="false">Purchase orders <span class="count" id="poCount">0</span></button><button data-t="invoices" role="tab" aria-selected="false">Invoices</button><button data-t="streams" role="tab" aria-selected="false">Purchase types</button><button data-t="services" role="tab" aria-selected="false">Services &amp; CAPEX</button><button data-t="buyloc" role="tab" aria-selected="false">Location intelligence</button><button data-t="buycharts" role="tab" aria-selected="false">Purchasing charts</button></div>
     <div id="reqSetup"></div>
     <div id="reqBody">
@@ -965,11 +997,18 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 
   <section class="view" id="v-suppliers">
     <div class="ov-tabs" id="spTabs" role="tablist"><button data-t="suppliers" class="on" role="tab" aria-selected="true">Supplier performance</button><button data-t="suploc" role="tab" aria-selected="false">Location intelligence</button><button data-t="supco" role="tab" aria-selected="false">Whole company</button></div>
-    <div class="card">
-      <h2>Supplier performance</h2>
-      <p class="hint">Supplier comes from the vendor ledger entry matched to each posted document number. Delivery performance is not shown because expected receipt dates are empty in BC.</p>
-      <div class="scroll"><table id="supTable"></table></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2>Supplier performance</h2>
+        <p class="hint"><span>What the company bought from each supplier in the period chosen above: the posted purchase invoices less the credit memos, every line (items, services, assets), excluding VAT, in local currency, against the comparison period.</span> <span>Click a figure, a bar or a supplier for the detail.</span></p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input class="search" id="supQ" placeholder="Search supplier" aria-label="Search supplier">
+          <button class="mini dark" id="supRead" type="button">Read again</button><button class="mini exp" id="supExp" type="button">Export ▾</button></div></div>
+      <p class="meta" id="supStatus" style="margin:6px 0 0">Open the screen to read the suppliers.</p>
     </div>
+    <div id="supKpis"></div>
+    <div class="card" style="margin-bottom:14px"><h2>Largest suppliers</h2><p class="hint" id="supBarsNote"></p><div id="supBars"></div></div>
+    <div class="card" style="margin-bottom:14px"><h2>Every supplier</h2><p class="hint">Click a column to sort, a supplier for its documents, locations and items.</p>
+      <div class="scroll"><table id="supTable" data-nosort></table></div><p class="meta" id="supMore"></p></div>
+    <div class="card"><details><summary style="cursor:pointer;font-size:15px;font-weight:600">How these figures are built</summary><div class="hint" id="supDefs" style="margin-top:10px;line-height:1.55"></div></details></div>
   </section>
 
   <section class="view" id="v-suploc">
@@ -1413,15 +1452,45 @@ const dayName = iso => new Date(iso + "T00:00:00").toLocaleDateString("en-GB",{w
 
 let data = null, refreshSec = 30, countdown = 30, timer = null, busy = false, seenEntries = new Set(), sortKey = "impact", sortDir = -1;
 
-const MODE_LABEL = {week:"Week starting", month:"Month starting", ytd:"Year"};
+const MODE_LABEL = {week:"Week starting", month:"Month starting", quarter:"Quarter starting", ytd:"Year", range:"From"};
 function modeValue(){ return $("mode").value || "week"; }
+const isoDay = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
 function snapDate(v){
   if (!v) return v;
   const m = modeValue();
+  if (m === "range") return v;
   if (m === "week") return mondayOf(v);
   const d = new Date(v + "T00:00:00");
-  const iso = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
-  return m === "month" ? iso(new Date(d.getFullYear(), d.getMonth(), 1)) : iso(new Date(d.getFullYear(), 0, 1));
+  if (m === "quarter") return isoDay(new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1));
+  return m === "month" ? isoDay(new Date(d.getFullYear(), d.getMonth(), 1)) : isoDay(new Date(d.getFullYear(), 0, 1));
+}
+// the period sent to the server: the anchor date, or "from..until" for a custom range (as Finance → Sales)
+function periodValue(){
+  const a = $("week").value;
+  if (modeValue() !== "range" || !a) return a;
+  return `${a}..${$("weekTo").value || a}`;
+}
+function rangeSync(){
+  const on = modeValue() === "range", today = isoDay(new Date());
+  $("toLabel").style.display = on ? "" : "none"; $("rangeBtn").hidden = on;
+  $("week").max = on ? today : ""; $("weekTo").max = today;
+  if (!on) return;
+  if (!$("week").value) $("week").value = today.slice(0, 8) + "01";
+  if ($("week").value > today) $("week").value = today;
+  if (!$("weekTo").value || $("weekTo").value < $("week").value) {
+    const d = new Date($("week").value + "T00:00:00"), end = isoDay(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    $("weekTo").value = end < today ? end : today;
+  }
+}
+// the words of the period and of what it is compared with, for the labels of every screen
+function perWord(m, cap){
+  const w = {week: "this week", month: "this month", quarter: "this quarter", ytd: "this year", range: "the dates chosen"}[(m || {}).mode] || "this period";
+  return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+}
+function vsWord(m, cap){
+  const w = (m || {}).compare === "last_year" ? "the same dates last year"
+    : {week: "last week", month: "last month", quarter: "last quarter", ytd: "last year", range: "the period before"}[(m || {}).mode] || "the period before";
+  return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
 function mondayOf(d){
   const x = typeof d === "string" ? new Date(d + "T00:00:00") : new Date(d);
@@ -1459,8 +1528,9 @@ function params(){
   const p = new URLSearchParams();
   if ($("company").value) p.set("company", $("company").value);
   if ($("location").value) p.set("location", $("location").value);
-  if ($("week").value) p.set("week", $("week").value);
+  if ($("week").value) p.set("week", periodValue());
   p.set("mode", modeValue());
+  if ($("cmpMode").value === "last_year") p.set("compare", "last_year");
   return p.toString();
 }
 
@@ -1479,14 +1549,41 @@ function showLoading(on){
   tick(); loadTimer = setInterval(tick, 1000);
 }
 
+// an answer that is not JSON (the proxy's HTML page when a read outlasts it) says so in words, never
+// "Unexpected token '<'": every screen of this page reads its answers through this
+(() => {
+  const plain = Response.prototype.json;
+  Response.prototype.json = async function(){
+    const t = await this.clone().text();
+    try { return JSON.parse(t); }
+    catch (e) {
+      if (/^\s*</.test(t) || this.status >= 500)
+        throw new Error(`the server did not answer in time (HTTP ${this.status}). A long period is read from Business Central once and then kept: try again in a minute.`);
+      return plain.call(this);
+    }
+  };
+})();
+let pendingTimer = null;
+let loadAgain = false;
 async function load(manual){
-  if (busy) return; busy = true;
+  if (busy) { if (manual) loadAgain = true; return; }     // a filter changed while reading: read again after
+  busy = true;
   showLoading(true);
+  clearTimeout(pendingTimer);
+  const asked = params();
   try{
-    const r = await fetch("/api/dashboard?" + params());
+    const r = await fetch("/api/dashboard?" + asked);
     if (r.status === 401) { location.href = "/login"; return; }
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+    if (j.pending) {           // a period read for the first time: Business Central is still being read, ask again
+      $("banner").textContent = `${j.label || "This period"}: ${j.note || "still reading Business Central."}`;
+      $("banner").style.display = "block";
+      setPill("load", "Reading Business Central… the first read of a long period takes a few minutes");
+      busy = false;
+      pendingTimer = setTimeout(() => { if (params() === asked) load(manual); }, 5000);
+      return;
+    }
     data = j; refreshSec = j.meta.refresh_seconds || 30;
     $("banner").style.display = "none";
     render();
@@ -1494,13 +1591,19 @@ async function load(manual){
     $("banner").textContent = "Couldn't refresh from Business Central: " + e.message + " The last good numbers stay on screen; retrying automatically.";
     $("banner").style.display = "block";
     setPill("err", "Connection problem");
-  }finally{ busy = false; countdown = refreshSec; showLoading(false); }
+  }finally{
+    busy = false; countdown = refreshSec; showLoading(false);
+    if (loadAgain) { loadAgain = false; setTimeout(() => load(true), 0); }
+  }
 }
 
 function setHeader(){
   if (!data) return;
   const m = data.meta, lfl = m.like_for_like ? " (like for like, period to date)" : "";
-  $("period").textContent = `${m.period_label ? m.period_label + " · " : ""}${dayName(m.current[0])} – ${dayName(m.current[1])} vs ${dayName(m.prior[0])} – ${dayName(m.prior[1])}${lfl}`;
+  // the year is written when the two periods are not in the same one (a year, the same dates last year)
+  const yr = m.current[0].slice(0, 4) !== m.prior[0].slice(0, 4) || m.current[0].slice(0, 4) !== m.current[1].slice(0, 4);
+  const dn = d => dayName(d) + (yr ? " " + d.slice(0, 4) : "");
+  $("period").textContent = `${m.period_label ? m.period_label + " · " : ""}${dn(m.current[0])} – ${dn(m.current[1])} vs ${dn(m.prior[0])} – ${dn(m.prior[1])}${lfl}`;
   const v = currentView();
   $("title").textContent = (v.id === "overview" ? "Purchasing overview" : v.label) + " · " + m.company + (m.location ? " · " + m.location : "");
 }
@@ -1515,8 +1618,7 @@ function render(){
   locSel.innerHTML = (mine ? '<option value="">All my locations</option>' : '<option value="">All locations</option>') + (mine || data.all_locations).map(l => `<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
 
   const ops = data.operations || {}, po = ops.po_summary || {}, sla = ops.sla || [];
-  const per = {week:"this week", month:"this month", ytd:"this year"}[m.mode] || "this period";
-  const vs = {week:"last week", month:"last month", ytd:"last year"}[m.mode] || "the comparison";
+  const per = perWord(m), vs = vsWord(m);
   $("kTotalL").textContent = "Purchase spend " + per;
   $("kTotal").textContent = fmt(k.total_cur);
   $("kTotalS").innerHTML = k.total_pct == null ? `${CUR} · no comparison data`
@@ -1535,7 +1637,7 @@ function render(){
   renderBars("byLoc", data.locations.slice(0,12).map(t => ({l:t.code, v:t.cur, p:t.prev})));
   renderOvExceptions(); renderOvPostings(); bindGotoViews($("v-overview"));
   renderMovers(); renderSpreads(); renderExceptions(); renderPostings(); renderContracts(); renderInvoices(); renderUsers();
-  renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); renderGaps(); renderSettings();
+  renderBrief(); renderLive(); renderReqs(); renderPOs(); renderContract(); renderQuality(); renderSuppliers(); if ($("v-items").classList.contains("on")) ihLoad(false); renderGaps(); renderSettings();
   plRender();
   if ($("v-buyloc").classList.contains("on")) { byRender(); if (!streams) loadStreams(false); }
   if ($("v-buycharts").classList.contains("on")) renderBuyCharts();
@@ -2084,21 +2186,265 @@ function renderPOs(){
   document.querySelectorAll(".podrill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("po", a.dataset.key); });
 }
 
-// ---------- suppliers ----------
-function renderSuppliers(){
-  const rows = (data.operations||{}).suppliers || [];
-  $("supTable").innerHTML = `<tr><th>Supplier</th><th class="num">Spend (${CUR})</th><th class="num">Share</th><th class="num">Invoices</th><th class="num">Avg invoice</th><th class="num">Credit notes</th><th class="num">Items</th><th>Locations</th><th>Assessment</th></tr>` +
-    (rows.length ? rows.map(s => {
-      const conc = s.share >= (data.settings.thresholds.supplier_concentration_pct||35);
-      const note = conc ? "Concentration risk: test a second source" : s.credit_notes ? "Credit notes issued: check quality or pricing" :
-        s.issues ? "Documents with data problems" : "Normal";
-      return `<tr><td class="name"><a href="#" class="supdrill" data-key="${esc(s.supplier)}">${esc(s.supplier)}</a><div class="meta">${s.lines} lines</div></td>
-      <td class="num"><b>${fmt(s.spend)}</b></td><td class="num ${conc?"up":""}">${fmt(s.share,1)}%</td><td class="num">${s.invoices}</td>
-      <td class="num">${fmt(s.avg_invoice)}</td><td class="num">${s.credit_notes}</td><td class="num">${s.items}</td>
-      <td class="meta">${esc(s.locations.join(", "))}</td><td class="meta">${esc(note)}</td></tr>`;}).join("")
-      : `<tr><td colspan="9" class="empty">Supplier names come from the vendor ledger; nothing matched in this period.</td></tr>`);
-  document.querySelectorAll(".supdrill").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("suppliers", ""); });
+// ---------- Prices & contracts → Item history (/api/items/history, itemhist.py) ----------
+var ihData = null, ihKey = "", ihTimer = null, ihDeb = null, ihWant = null;
+function ihQs(extra){
+  const p = new URLSearchParams(params());
+  [["q", $("ihQ").value.trim()], ["vendor", $("ihVendor").value], ["stream", $("ihStream").value]].forEach(([k, v]) => { if (v) p.set(k, v); });
+  Object.entries(extra || {}).forEach(([k, v]) => v ? p.set(k, v) : p.delete(k));
+  return p.toString();
 }
+async function ihLoad(force){
+  const q = ihQs();
+  if (ihData && ihKey === q && !force) { ihRender(); return; }
+  clearTimeout(ihTimer);
+  $("ihStatus").textContent = "Reading…";
+  try {
+    const r = await fetch("/api/items/history?" + q + (force ? "&refresh=1" : "")), j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.status);
+    if (ihQs() !== q) return;
+    if (j.pending) {
+      const pr = j.progress || {};
+      $("ihStatus").textContent = `Reading the purchase invoice lines from Business Central: ${fmt(pr.done || 0)} of ${fmt(pr.total || 0)} months… A month is read once, then kept.`;
+      ihTimer = setTimeout(() => { if (ihQs() === q && $("v-items").classList.contains("on")) ihLoad(false); }, 3000);
+      return;
+    }
+    ihData = j; ihKey = q; ihOptions(j); ihRender();
+    if (ihWant) { const w = ihWant; ihWant = null; Pulse.open ? Pulse.open("ih", w) : null; }
+  } catch (e) { $("ihStatus").textContent = "Could not read: " + e.message; }
+}
+function ihOptions(j){
+  const fill = (id, list, all) => { const sel = $(id), cur = sel.value;
+    if (sel.options.length > 1 && sel.dataset.co === j.company) return;
+    sel.innerHTML = `<option value="">${all}</option>` + list.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+    sel.value = cur; sel.dataset.co = j.company; };
+  fill("ihVendor", (j.options.vendors || []).map(v => [v.no, v.name || v.no]), "All suppliers");
+  fill("ihStream", (j.options.streams || []).map(t => [t, t]), "All purchase types");
+}
+const ihP = v => v == null ? "–" : Math.abs(v) >= 1000 ? fmt(v) : fmt(v, 2);
+function ihSorted(){
+  const k = $("ihSort").value, R = [...(ihData.rows || [])];
+  const f = {cost: r => -r.cost, change: r => -Math.abs(r.change_pct ?? 0), spread: r => -(r.spread ?? -1), suppliers: r => -r.suppliers}[k];
+  return k === "name" ? R.sort((a, b) => (a.desc || a.item).localeCompare(b.desc || b.item)) : R.sort((a, b) => f(a) - f(b) || b.cost - a.cost);
+}
+function ihRender(){
+  const d = ihData; if (!d) return;
+  const k = d.kpis, C = d.currency || CUR;
+  $("ihStatus").textContent = `${d.company}${d.location ? " · " + d.location : ""} · ${d.period_label || ""} · ${d.period.from} to ${d.period.to} against ${d.prior.from} to ${d.prior.to}`
+    + (d.errors && d.errors.length ? ` · not read: ${d.errors.join("; ")}` : "");
+  $("ihKpis").innerHTML = Pulse.tiles([
+    {l: "Items bought", v: fmt(k.items), s: `${fmt(k.suppliers)} suppliers`},
+    {l: `Spend · ${C}`, v: fmt(k.spend), s: "item lines, excluding VAT"},
+    {l: "Average price up", v: fmt(k.up), s: "2% or more against the comparison period", cls: k.up ? "up" : "", open: "ihk|up"},
+    {l: "Average price down", v: fmt(k.down), s: "2% or more against the comparison period", cls: k.down ? "down" : "", open: "ihk|down"},
+    {l: "Bought from several suppliers", v: fmt(k.multi), s: "compare their prices", open: "ihk|multi"},
+    {l: "Price spread 10% or more", v: fmt(k.spread), s: "between the highest and the lowest price", cls: k.spread ? "warn" : "", open: "ihk|spread"}]);
+  const rows = ihSorted(), lim = 300;
+  $("ihTable").innerHTML = `<tr><th>Item</th><th>Main supplier</th><th class="num">Suppliers</th><th class="num">Quantity</th><th class="num">Spend (${C})</th><th class="num">Average</th><th class="num">Min</th><th class="num">Max</th><th class="num">Last</th><th class="num">Spread</th><th class="num">Comparison average</th><th class="num">Change</th></tr>` +
+    (rows.length ? rows.slice(0, lim).map(r => `<tr data-pulse="ih|${esc(r.item)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(r.desc || r.item)}</b><div class="meta">${esc(r.item)}${r.uom ? " · per " + esc(r.uom) : ""}${r.stream ? " · " + esc(r.stream) : ""}</div></td>
+      <td class="meta">${esc(r.main_supplier)}</td><td class="num">${fmt(r.suppliers)}</td><td class="num">${fmt(r.qty, r.qty < 100 ? 2 : 0)}</td><td class="num"><b>${fmt(r.cost)}</b></td>
+      <td class="num"><b>${ihP(r.avg)}</b></td><td class="num">${ihP(r.min)}</td><td class="num">${ihP(r.max)}</td><td class="num">${ihP(r.last)}<div class="meta">${esc(r.last_day || "")}</div></td>
+      <td class="num ${(r.spread || 0) >= 10 ? "warn" : ""}">${r.spread == null ? "–" : fmt(r.spread, 1) + "%"}</td><td class="num">${ihP(r.prev_avg)}</td><td class="num">${supPct(r.change_pct)}</td></tr>`).join("")
+      : `<tr><td colspan="12" class="empty">No item was bought in this period${$("ihQ").value || $("ihVendor").value || $("ihStream").value ? " with these filters" : ""}.</td></tr>`);
+  $("ihMore").textContent = (d.count > (d.rows || []).length ? `The ${fmt(d.rows.length)} largest of ${fmt(d.count)} items: search or filter to find the others. ` : "")
+    + (rows.length > lim ? `The table shows the first ${lim}; the export holds them all.` : "");
+  $("ihDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
+}
+$("ihQ").oninput = () => { clearTimeout(ihDeb); ihDeb = setTimeout(() => ihLoad(false), 400); };
+["ihVendor", "ihStream"].forEach(id => $(id).onchange = () => ihLoad(false));
+$("ihSort").onchange = () => ihData && ihRender();
+$("ihRead").onclick = () => ihLoad(true);
+function ihOpenVendor(no){
+  const n = document.querySelector('#nav button[data-view="items"]'); if (n) n.click();
+  if ($("ihVendor").querySelector(`option[value="${CSS.escape(no)}"]`) || !ihData) { $("ihVendor").value = no; if (!$("ihVendor").value) $("ihVendor").innerHTML += `<option value="${esc(no)}" selected>${esc(no)}</option>`; }
+  ihLoad(false);
+}
+Pulse.on("ihk", kind => {
+  const d = ihData; if (!d) return;
+  const R = d.rows, f = {up: r => (r.change_pct || 0) >= 2, down: r => (r.change_pct || 0) <= -2, multi: r => r.suppliers > 1, spread: r => (r.spread || 0) >= 10}[kind];
+  const t = {up: "Average price up", down: "Average price down", multi: "Bought from several suppliers", spread: "Price spread 10% or more"}[kind];
+  const rows = R.filter(f).sort((a, b) => kind === "spread" ? b.spread - a.spread : kind === "multi" ? b.cost - a.cost : Math.abs(b.change_pct) - Math.abs(a.change_pct));
+  Pulse.pop({title: esc(t), sub: esc(`${d.period.from} to ${d.period.to} against ${d.prior.from} to ${d.prior.to}`),
+    body: Pulse.list([["Item"], ["Suppliers", 1], ["Average", 1], ["Min", 1], ["Max", 1], ["Comparison average", 1], ["Change", 1], [`Spend ${d.currency || CUR}`, 1]],
+      rows.map(r => ({cells: [esc(r.desc || r.item), fmt(r.suppliers), ihP(r.avg), ihP(r.min), ihP(r.max), ihP(r.prev_avg), supPct(r.change_pct), fmt(r.cost)], open: "ih|" + r.item})), {max: 480})});
+});
+Pulse.on("ih", item => {
+  const row = ihData && (ihData.rows || []).find(r => r.item === item);
+  Pulse.pop({title: esc(row ? row.desc || item : item), sub: esc(`${item}${row && row.uom ? " · prices per " + row.uom : ""} · ${ihData ? ihData.period.from + " to " + ihData.period.to : ""}`),
+    body: async el => {
+      el.innerHTML = '<p class="meta">Reading…</p>';
+      try {
+        const r = await fetch("/api/items/history?" + ihQs({item, q: ""})), j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || r.status);
+        if (j.pending) { el.innerHTML = '<p class="meta">The months are still being read; open the item again in a moment.</p>'; return; }
+        const D = j.detail || {}, s = D.row || row || {}, C = j.currency || CUR, pv = D.prev;
+        el.innerHTML = Pulse.tiles([
+            {l: "Average price", v: ihP(s.avg), s: pv ? `comparison ${ihP(pv.avg)} · ${supPct(s.change_pct)}` : "not bought in the comparison period"},
+            {l: "Lowest price", v: ihP(s.min), s: s.outliers ? `${s.outliers} prices left out as unit or data errors` : ""},
+            {l: "Highest price", v: ihP(s.max), s: s.spread == null ? "" : `spread ${fmt(s.spread, 1)}%`, cls: (s.spread || 0) >= 10 ? "warn" : ""},
+            {l: "Last price", v: ihP(s.last), s: s.last_day || ""},
+            {l: "Quantity", v: fmt(s.qty, (s.qty || 0) < 100 ? 2 : 0), s: `${fmt(s.buys)} purchases`},
+            {l: `Spend · ${C}`, v: fmt(s.cost), s: `${fmt(s.suppliers)} suppliers · ${fmt(s.locations)} locations`}])
+          + Pulse.panel(`Price by ${D.by || "month"}`, ihChart(D.series || [], D.by, pv && pv.avg))
+          + Pulse.panel("By supplier", Pulse.list([["Supplier"], ["Quantity", 1], [`Spend ${C}`, 1], ["Average", 1], ["Min", 1], ["Max", 1], ["Last", 1], ["Comparison average", 1]],
+              (D.suppliers || []).map(v => ({cells: [esc(v.name), fmt(v.qty, 2), fmt(v.cost), `<b>${ihP(v.avg)}</b>`, ihP(v.min), ihP(v.max), `${ihP(v.last)}<div class="meta">${esc(v.last_day || "")}</div>`, ihP(v.prev_avg)]}))))
+          + Pulse.panel("By location", Pulse.list([["Location"], ["Quantity", 1], [`Spend ${C}`, 1], ["Average", 1], ["Min", 1], ["Max", 1], ["Last", 1]],
+              (D.locations || []).map(v => ({cells: [esc(v.code), fmt(v.qty, 2), fmt(v.cost), `<b>${ihP(v.avg)}</b>`, ihP(v.min), ihP(v.max), ihP(v.last)]}))))
+          + Pulse.panel("Every purchase", Pulse.list([["Day"], ["Location"], ["Supplier"], ["Quantity", 1], ["Price", 1], [`Cost ${C}`, 1]],
+              (D.purchases || []).map(x => ({cells: [esc(x[0]), esc(x[1]), esc(x[2]), fmt(x[3], 2), `${ihP(x[4])}${x[6] ? ' <span class="chip warn" title="Over four times or under a quarter of the median: a unit or data error">check</span>' : ""}`, fmt(x[5])]})), {max: 360}),
+              D.purchases_count > (D.purchases || []).length ? esc(`the latest ${D.purchases.length} of ${D.purchases_count}`) : "");
+      } catch (e) { el.innerHTML = `<p class="meta">Could not read: ${esc(e.message)}</p>`; }
+    }});
+});
+// the price of an item over time: a bar from the lowest to the highest price of each week or month, a dot at its
+// average; the axis starts near the lowest price (not at zero), so a move of a few percent shows
+function ihChart(series, by, prevAvg){
+  if (!series.length) return '<p class="meta">No purchase with a price in this period.</p>';
+  const W = 900, H = 220, L = 64, R = 12, T = 14, B = 26, lo0 = Math.min(...series.map(p => p[2]), prevAvg || Infinity), hi0 = Math.max(...series.map(p => p[3]), prevAvg || 0);
+  const pad = Math.max((hi0 - lo0) * 0.12, hi0 * 0.02), lo = Math.max(0, lo0 - pad), hi = hi0 + pad;
+  const y = v => T + (hi - v) / (hi - lo || 1) * (H - T - B), n = series.length, bw = (W - L - R) / n;
+  const every = Math.ceil(n / 14), ticks = [lo, (lo + hi) / 2, hi];
+  const g = series.map((p, i) => { const cx = L + bw * i + bw / 2, w = Math.min(28, Math.max(6, bw * 0.45));
+    return `<g><title>${esc(`${p[0]}: average ${ihP(p[1])}, lowest ${ihP(p[2])}, highest ${ihP(p[3])}, quantity ${fmt(p[4], 2)}`)}</title>
+      <rect x="${L + bw * i}" y="${T}" width="${bw}" height="${H - T - B}" fill="transparent"/>
+      <rect x="${cx - w / 2}" y="${y(p[3])}" width="${w}" height="${Math.max(2, y(p[2]) - y(p[3]))}" rx="3" fill="var(--ch-0)" opacity=".35"/>
+      <circle cx="${cx}" cy="${y(p[1])}" r="5" fill="var(--ch-0)" stroke="var(--card)" stroke-width="2"/>
+      ${i % every === 0 ? `<text x="${cx}" y="${H - 8}" text-anchor="middle">${esc(by === "week" ? p[0].slice(5) : p[0])}</text>` : ""}</g>`; }).join("");
+  const line = series.length > 1 ? `<polyline fill="none" stroke="var(--ch-0)" stroke-width="2" points="${series.map((p, i) => `${L + bw * i + bw / 2},${y(p[1])}`).join(" ")}"/>` : "";
+  const prev = prevAvg ? `<line x1="${L}" x2="${W - R}" y1="${y(prevAvg)}" y2="${y(prevAvg)}" stroke="var(--ink)" stroke-dasharray="5 4" opacity=".6"/><text x="${W - R}" y="${y(prevAvg) - 4}" text-anchor="end">${esc("comparison average " + ihP(prevAvg))}</text>` : "";
+  return Pulse.legend([["var(--ch-0)", "average price (dot) and the lowest to the highest (bar)"]].concat(prevAvg ? [["var(--ink)", "average of the comparison period (dashed)"]] : []))
+    + `<div class="pz-cols"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Price by " + by)}">`
+    + ticks.map(t => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(t) + 3}" text-anchor="end">${esc(ihP(t))}</text>`).join("")
+    + prev + line + g + `</svg></div>`;
+}
+$("ihExp").onclick = () => {
+  const d = ihData; if (!d) { alert("Wait for the items to finish reading."); return; }
+  const C = d.currency || CUR;
+  xlsxTable(`Item history ${d.company} ${d.period.from} ${d.period.to}`, [
+    {title: "Items", header: ["Item", "Description", "Base unit", "Category", "Purchase type", "Main supplier", "Suppliers", "Locations", "Quantity", `Spend ${C}`, "Average price", "Min price", "Max price", "Median price", "Last price", "Last purchase", "First price", "First purchase", "Spread", "Comparison average", "Comparison quantity", "Change", "Purchases", "Prices left out"],
+     formats: ["text", "text", "text", "text", "text", "text", "int", "int", "qty", "num", "qty", "qty", "qty", "qty", "qty", "text", "qty", "text", "pct", "qty", "qty", "pct", "int", "int"],
+     rows: ihSorted().map(r => [r.item, r.desc, r.uom, r.category, r.stream, r.main_supplier, r.suppliers, r.locations, r.qty, r.cost, r.avg, r.min, r.max, r.median, r.last, r.last_day, r.first, r.first_day,
+       r.spread == null ? null : r.spread / 100, r.prev_avg, r.prev_qty, r.change_pct == null ? null : r.change_pct / 100, r.buys, r.outliers])}],
+    [`${d.company}${d.location ? " · " + d.location : ""} · ${d.period.from} to ${d.period.to} against ${d.prior.from} to ${d.prior.to}`,
+     `Filters: ${[$("ihQ").value && "search " + $("ihQ").value, $("ihVendor").value && "supplier " + ($("ihVendor").selectedOptions[0] || {}).text, $("ihStream").value && "type " + $("ihStream").value].filter(Boolean).join(", ") || "none"}`]
+      .concat(Object.values(d.definitions || {})).concat(d.count > d.rows.length ? [`The ${d.rows.length} largest of ${d.count} items.`] : []));
+};
+
+// ---------- suppliers ----------
+// Supplier performance (/api/suppliers/summary, suppliers.py): invoices less credit memos, every line, excluding VAT,
+// read in the background for the period and the comparison chosen above
+var supData = null, supKey = "", supTimer = null, supSort = "net", supDir = -1;
+function renderSuppliers(){ if ($("v-suppliers").classList.contains("on")) loadSup(false); }
+async function loadSup(force){
+  const q = params();
+  if (supData && supKey === q && !force) { supRender(); return; }
+  clearTimeout(supTimer);
+  $("supStatus").textContent = "Reading Business Central…";
+  try {
+    const r = await fetch("/api/suppliers/summary?" + q + (force ? "&refresh=1" : "")), j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.status);
+    if (params() !== q) return;
+    if (j.pending) {
+      $("supStatus").textContent = "Reading Business Central: " + (j.step || "") + "… a long period is read once, then kept.";
+      supTimer = setTimeout(() => { if (params() === q && $("v-suppliers").classList.contains("on")) loadSup(false); }, 3000);
+      return;
+    }
+    supData = j; supKey = q; supRender();
+  } catch (e) { $("supStatus").textContent = "Could not read: " + e.message; }
+}
+const supPct = v => v == null ? "–" : `<span class="${v > 0 ? "up" : v < 0 ? "down" : ""}">${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v), 1)}%</span>`;
+const SUP_NOTE = {concentration: "Concentration risk: test a second source", credit: "Credit notes: check quality or pricing", new: "New supplier"};
+function supRows(){
+  const d = supData, ql = ($("supQ").value || "").trim().toLowerCase();
+  const rows = d.rows.filter(r => !ql || (r.name + " " + r.no).toLowerCase().includes(ql));
+  const val = {name: r => r.name.toLowerCase(), net: r => r.net, prev: r => r.prev ?? -1e18, change: r => r.change_pct ?? -1e18, share: r => r.share,
+    invoices: r => r.invoices, credit: r => r.credit, avg: r => r.avg_invoice ?? 0, items: r => r.items_cost}[supSort] || (r => r.net);
+  return rows.sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * supDir; });
+}
+function supRender(){
+  const d = supData; if (!d) return;
+  const k = d.kpis, m = d.meta, C = d.currency || CUR;
+  $("supStatus").textContent = `${d.company}${d.location ? " · " + d.location : ""} · ${m.period_label} · ${m.current[0]} to ${m.current[1]} against ${m.prior[0]} to ${m.prior[1]} · read ${m.checked_at.slice(11, 16)}`
+    + (k.unconverted ? ` · ${k.unconverted} documents in a foreign currency without a rate are left out` : "");
+  $("supKpis").innerHTML = Pulse.tiles([
+    {l: `Net purchases · ${C}`, v: fmt(k.net), s: `${supPct(k.change_pct)} vs ${fmt(k.prev)}`, open: "suppk|all"},
+    {l: "Suppliers with purchases", v: fmt(k.suppliers), s: `${fmt(k.new)} new · ${fmt(k.lost)} with none this period`, open: "suppk|new"},
+    {l: "Five largest suppliers", v: k.top5_share == null ? "–" : fmt(k.top5_share, 1) + "%", s: "of the net purchases", open: "suppk|top5"},
+    {l: "Concentration risk", v: fmt(k.concentrated), s: `a supplier with ${fmt(d.concentration_pct)}% or more`, cls: k.concentrated ? "warn" : "", open: "suppk|concentration"},
+    {l: `Credit memos · ${C}`, v: fmt(k.credit), s: `${fmt(k.credit_memos)} credit memos against ${fmt(k.invoices)} invoices`, open: "suppk|credit"},
+    {l: `Items at BC cost · ${C}`, v: fmt(k.items_cost), s: k.net ? `${fmt(k.items_cost / k.net * 100, 1)}% of the net purchases went into stock` : "", open: "suppk|items"}]);
+  const top = d.rows.filter(r => r.net > 0).slice(0, 15);
+  $("supBarsNote").textContent = `The 15 largest of ${fmt(k.suppliers)} suppliers by net purchases, with the change against the comparison period.`;
+  $("supBars").innerHTML = Pulse.bars(top.map(r => ({key: r.name, segs: [[r.net, "var(--ch-0)", "net purchases"]],
+    text: `<b>${fmt(r.net)}</b> <span class="meta">${fmt(r.share, 1)}% · ${r.prev == null ? "new" : supPct(r.change_pct)}</span>`, open: "supp|" + r.no})),
+    [["var(--ch-0)", "net purchases " + perWord(m)]], {none: "No purchases in this period."});
+  const rows = supRows(), lim = 300;
+  const th = (k2, l, n) => `<th class="${n ? "num " : ""}sortable" data-supsort="${k2}" style="cursor:pointer">${esc(l)}${supSort === k2 ? (supDir < 0 ? " ▾" : " ▴") : ""}</th>`;
+  $("supTable").innerHTML = `<tr>${th("name", "Supplier")}${th("net", `Net purchases (${C})`, 1)}${th("prev", "Comparison", 1)}${th("change", "Change", 1)}${th("share", "Share", 1)}${th("invoices", "Invoices", 1)}${th("credit", "Credit memos", 1)}${th("avg", "Average invoice", 1)}${th("items", "Items at BC cost", 1)}<th>Locations</th><th>Assessment</th></tr>` +
+    (rows.length ? rows.slice(0, lim).map(r => `<tr data-pulse="supp|${esc(r.no)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(r.name)}</b><div class="meta">${esc(r.no)}${r.purchasers.length ? " · " + esc(r.purchasers.join(", ")) : ""}</div></td>
+      <td class="num"><b>${fmt(r.net)}</b></td><td class="num">${r.prev == null ? "–" : fmt(r.prev)}</td><td class="num">${r.prev == null ? '<span class="meta">new</span>' : supPct(r.change_pct)}</td>
+      <td class="num ${r.notes.includes("concentration") ? "up" : ""}">${fmt(r.share, 1)}%</td><td class="num">${fmt(r.invoices)}</td>
+      <td class="num">${r.credit_memos ? `${fmt(r.credit)}<div class="meta">${r.credit_memos} memos</div>` : "–"}</td><td class="num">${r.avg_invoice == null ? "–" : fmt(r.avg_invoice)}</td>
+      <td class="num">${r.items_cost ? fmt(r.items_cost) : "–"}</td><td class="meta">${esc(r.locations.slice(0, 4).map(l => l[0]).join(", "))}${r.locations.length > 4 ? ` +${r.locations.length - 4}` : ""}</td>
+      <td class="meta">${esc(r.notes.filter(n => SUP_NOTE[n]).map(n => SUP_NOTE[n]).join(" · ") || "Normal")}</td></tr>`).join("")
+      : `<tr><td colspan="11" class="empty">${d.rows.length ? "No supplier matches the search." : "No purchase invoice was posted in this period."}</td></tr>`);
+  $("supMore").textContent = rows.length > lim ? `The first ${lim} of ${fmt(rows.length)} suppliers: search to find the others, or export them all.` : "";
+  document.querySelectorAll("#supTable [data-supsort]").forEach(h => h.onclick = () => { const k2 = h.dataset.supsort; supDir = supSort === k2 ? -supDir : (k2 === "name" ? 1 : -1); supSort = k2; supRender(); });
+  $("supDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
+}
+$("supQ").oninput = () => supData && supRender();
+$("supRead").onclick = () => loadSup(true);
+Pulse.on("supp", no => {
+  const d = supData, r = d && d.rows.find(x => x.no === no); if (!r) return;
+  const C = d.currency || CUR;
+  Pulse.pop({title: esc(r.name), sub: esc(`${r.no} · ${d.meta.current[0]} to ${d.meta.current[1]}${r.purchasers.length ? " · purchaser " + r.purchasers.join(", ") : ""}`),
+    actions: `<button class="mini" type="button" data-supitems="${esc(r.no)}">Items and prices</button>`,
+    body: Pulse.tiles([{l: `Net purchases · ${C}`, v: fmt(r.net), s: `${fmt(r.share, 1)}% of the company`},
+        {l: "Comparison period", v: r.prev == null ? "–" : fmt(r.prev), s: r.prev == null ? "no purchases: a new supplier" : supPct(r.change_pct)},
+        {l: "Invoiced", v: fmt(r.invoiced), s: `${fmt(r.invoices)} invoices · average ${r.avg_invoice == null ? "–" : fmt(r.avg_invoice)}`},
+        {l: "Credit memos", v: fmt(r.credit), s: `${fmt(r.credit_memos)} memos${r.invoiced ? ` · ${fmt(r.credit / r.invoiced * 100, 1)}% of the invoiced` : ""}`},
+        {l: "Items at BC cost", v: fmt(r.items_cost), s: `${fmt(r.items)} items`},
+        {l: "First and last purchase", v: r.last || "–", s: r.first ? "first " + r.first : ""}])
+      + Pulse.panel("By location", Pulse.bars(r.locations.filter(l => l[1] > 0).map(l => ({key: l[0], segs: [[l[1], "var(--ch-0)", "net purchases"]], text: fmt(l[1])}))))
+      + Pulse.panel("Documents", Pulse.list([["Type"], ["Document"], ["Supplier's no."], ["Posted"], ["Location"], [`Amount ${C}`, 1]],
+          r.docs.map(x => ({cells: [x[0] === "invoice" ? "Invoice" : "Credit memo", esc(x[1]), esc(x[2]), esc(x[3]), esc(x[4]), fmt(x[5])]})), {max: 360}),
+          r.docs_count > r.docs.length ? esc(`the latest ${r.docs.length} of ${r.docs_count}`) : "")});
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-supitems]"); if (!b) return;
+  const bd = document.getElementById("pzBd"); if (bd) bd.classList.remove("show");
+  ihOpenVendor(b.dataset.supitems);
+});
+Pulse.on("suppk", kind => {
+  const d = supData; if (!d) return;
+  const C = d.currency || CUR, R = d.rows;
+  const lst = (rows, extra) => Pulse.list([["Supplier"], [`Net purchases ${C}`, 1], ["Comparison", 1], ["Change", 1], ["Share", 1]].concat(extra ? [extra[0]] : []),
+    rows.map(r => ({cells: [esc(r.name), fmt(r.net), r.prev == null ? "–" : fmt(r.prev), r.prev == null ? "new" : supPct(r.change_pct), fmt(r.share, 1) + "%"].concat(extra ? [extra[1](r)] : []), open: "supp|" + r.no})), {max: 460});
+  const T = {all: ["Net purchases by supplier", lst(R)],
+    new: ["New suppliers, and suppliers with no purchases this period", Pulse.panel("New: no purchases in the comparison period", lst(R.filter(r => r.notes.includes("new") && r.net > 0.5)))
+      + Pulse.panel("No purchases this period", Pulse.list([["Supplier"], [`Comparison ${C}`, 1]], d.lost.map(x => ({cells: [esc(x[1]), fmt(x[2])]})), {max: 360}))],
+    top5: ["The five largest suppliers", lst(R.slice(0, 5))],
+    concentration: ["Concentration risk", lst(R.filter(r => r.notes.includes("concentration")))],
+    credit: ["Suppliers with credit memos", lst(R.filter(r => r.credit_memos).sort((a, b) => b.credit - a.credit), [[`Credit memos ${C}`, 1], r => fmt(r.credit)])],
+    items: ["Items at BC cost by supplier", lst(R.filter(r => r.items_cost).sort((a, b) => b.items_cost - a.items_cost), [[`Items at BC cost ${C}`, 1], r => fmt(r.items_cost)])]}[kind];
+  if (!T) return;
+  Pulse.pop({title: esc(T[0]), sub: esc(`${d.company} · ${d.meta.current[0]} to ${d.meta.current[1]}`), body: T[1]
+    + (kind === "all" && d.unconverted.length ? Pulse.panel("Left out: a foreign currency without a rate", Pulse.list([["Document"], ["Supplier"], ["Currency"], ["Amount", 1]],
+        d.unconverted.map(x => ({cells: [esc(x.no), esc(x.vendor), esc(x.currency), fmt(x.amount)]})))) : "")});
+});
+$("supExp").onclick = () => {
+  const d = supData; if (!d) { alert("Wait for the suppliers to finish reading."); return; }
+  const C = d.currency || CUR, pct = v => v == null ? null : v / 100;
+  xlsxTable(`Supplier performance ${d.company} ${d.meta.current[0]} ${d.meta.current[1]}`, [
+    {title: "Suppliers", header: ["Supplier no.", "Supplier", `Net purchases ${C}`, "Comparison", "Change", "Share", "Invoiced", "Invoices", "Credit memos", "Credit memo count", "Average invoice", "Items at BC cost", "Items", "Locations", "Purchasers", "First purchase", "Last purchase", "Assessment"],
+     formats: ["text", "text", "num", "num", "pct", "pct", "num", "int", "num", "int", "num", "num", "int", "text", "text", "text", "text", "text"],
+     rows: supRows().map(r => [r.no, r.name, r.net, r.prev, pct(r.change_pct), pct(r.share), r.invoiced, r.invoices, r.credit, r.credit_memos, r.avg_invoice, r.items_cost, r.items,
+       r.locations.map(l => l[0]).join(", "), r.purchasers.join(", "), r.first, r.last, r.notes.filter(n => SUP_NOTE[n]).map(n => SUP_NOTE[n]).join(" · ") || "Normal"])},
+    {title: "By location", header: ["Supplier", "Location", `Net purchases ${C}`], formats: ["text", "text", "num"],
+     rows: d.rows.flatMap(r => r.locations.map(l => [r.name, l[0], l[1]]))},
+    {title: "No purchases this period", header: ["Supplier no.", "Supplier", `Comparison ${C}`], formats: ["text", "text", "num"], rows: d.lost}],
+    [`${d.company}${d.location ? " · " + d.location : ""} · ${d.meta.period_label} · ${d.meta.current[0]} to ${d.meta.current[1]} against ${d.meta.prior[0]} to ${d.meta.prior[1]}`].concat(Object.values(d.definitions || {})));
+};
 
 // Track (an exception, the brief, an invoice without a PO, a data quality finding): an item of the Exceptions register,
 // tracked by hand, owned by who tracks it; something the register holds already is handed over instead (exreg.track)
@@ -3594,7 +3940,7 @@ function plRender(){
     awaiting: c => -(((B[c].orders || {}).awaiting) || 0), exceptions: c => -(((B[c].exceptions || {}).critical || 0) * 1000 + ((B[c].exceptions || {}).warning || 0)),
     name: c => 0}[plSort];
   const sorted = list => [...list].sort((a, b) => key(a) - key(b) || (plSort === "name" ? a.localeCompare(b) : (B[b].cur || 0) - (B[a].cur || 0)));
-  const per = {week: "this week", month: "this month", ytd: "this year"}[data.meta.mode] || "this period";
+  const per = perWord(data.meta);
   const tot = codes.reduce((s, c) => s + (B[c].cur || 0), 0), totp = codes.reduce((s, c) => s + (B[c].prev || 0), 0);
   const up = codes.reduce((s, c) => s + ((B[c].price_up || [0, 0])[1] || 0), 0), aw = codes.reduce((s, c) => s + (((B[c].orders || {}).awaiting) || 0), 0);
   const ex = codes.reduce((s, c) => s + (((B[c].exceptions || {}).critical) || 0), 0);
@@ -3625,7 +3971,7 @@ async function plOpen(code){
 function plDraw(code, j){
   const k = j.kpis || {}, ops = j.operations || {}, po = ops.po_summary || {}, m = j.meta || {};
   const B = (data && data.by_location && data.by_location[code]) || {};
-  const per = {week: "this week", month: "this month", ytd: "this year"}[m.mode] || "this period";
+  const per = perWord(m);
   const tile = (l, v, s, c) => `<div class="pl-tile"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
   const sev = s => `<span class="sev ${esc(s)}"></span>`;
   // spend by day: this period against the comparison
@@ -3688,9 +4034,8 @@ function renderBuyCharts(){
   if (fresh) plLoadNames().then(() => { if ($("v-buycharts").classList.contains("on")) pcLocations(); });
 }
 function pcLocations(){
-  const m = data.meta, per = {week: "This week", month: "This month", ytd: "This year"}[m.mode] || "This period",
-    vs = {week: "Last week", month: "Last month", ytd: "Last year"}[m.mode] || "The period before";
-  $("pcLocH").innerHTML = pcSp(m.mode === "week" ? "Spend by location: this week against last week" : `Spend by location: ${per.toLowerCase()} against ${vs.toLowerCase()}`);
+  const m = data.meta, per = perWord(m, true), vs = vsWord(m, true);
+  $("pcLocH").innerHTML = pcSp(`Spend by location: ${per.toLowerCase()} against ${vs.toLowerCase()}`);
   $("pcLocKeys").innerHTML = `<span><i style="background:var(--pc-cur)"></i>${pcSp(per)}</span><span><i style="background:var(--pc-prev)"></i>${pcSp(vs)}</span>`;
   const L = (data.locations || []).filter(x => x.cur || x.prev), tc = L.reduce((a, x) => a + x.cur, 0), tp = L.reduce((a, x) => a + x.prev, 0);
   const up = L.filter(x => x.cur > x.prev).length, dn = L.filter(x => x.cur < x.prev).length, d = pcPct(tc, tp);
@@ -3778,7 +4123,7 @@ function pcPareto(){
 window.addEventListener("resize", () => { if ($("v-buycharts") && $("v-buycharts").classList.contains("on") && data) { pcVariance(); pcPareto(); } });
 // Buying and Prices & contracts: views under one menu item each, with one tab bar on top of the open one
 var TAB_BARS = {byTabs: ["reqs", "po", "invoices", "streams", "services", "buyloc", "buycharts"],
-                pcTabs: ["compare", "contracts", "savings", "prices", "locations", "negotiations"],
+                pcTabs: ["compare", "contracts", "savings", "prices", "locations", "items", "negotiations"],
                 spTabs: ["suppliers", "suploc", "supco"]};
 function pcTabsSync(view){
   for (const [id, views] of Object.entries(TAB_BARS)) {
@@ -3788,14 +4133,53 @@ function pcTabsSync(view){
     bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === view); b.setAttribute("aria-selected", b.dataset.t === view); });
     const on = bar.querySelector("button.on"); if (on && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
   }
+  puSync(view);
 }
+// Purchasing: the area of a screen (the menu item it belongs to), the first row of tabs and the side menu item
+const PU_BAR = {reqs: "byTabs", compare: "pcTabs", suppliers: "spTabs", purchasers: null};
+const puLast = {};
+function puArea(view){
+  if (view === "purchasers") return "purchasers";
+  return Object.keys(PU_BAR).find(m => PU_BAR[m] && TAB_BARS[PU_BAR[m]].includes(view)) || null;
+}
+function puNav(m){ return document.querySelector(`#nav button[data-view="${m}"]`); }
+function puAllowed(){       // the areas the role holds (Admin → Roles hides the menu items it does not)
+  const bar = $("puTabs");
+  bar.querySelectorAll("button").forEach(b => { const n = puNav(b.dataset.t); b.classList.toggle("scr-off", !n || n.classList.contains("scr-off")); });
+  const off = !bar.querySelector("button:not(.scr-off)");
+  if ($("purchNav").classList.contains("scr-off") !== off) $("purchNav").classList.toggle("scr-off", off);
+}
+function puSync(view){
+  const area = puArea(view), bar = $("puTabs"), sec = $("v-" + view);
+  puAllowed();
+  $("purchNav").classList.toggle("sub-on", !!area);
+  if (!area || !sec) return;
+  puLast[area] = view;
+  if (bar.parentNode !== sec || sec.firstElementChild !== bar) sec.insertBefore(bar, sec.firstChild);
+  bar.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.t === area); b.setAttribute("aria-selected", b.dataset.t === area); });
+}
+// an area opens on the screen last seen in it, else its first screen the role holds
+function puOpen(area){
+  const sub = PU_BAR[area] && $(PU_BAR[area]);
+  let v = puLast[area];
+  if (sub) {
+    const ok = [...sub.querySelectorAll("button")].filter(b => !b.classList.contains("scr-off")).map(b => b.dataset.t);
+    if (!ok.includes(v)) v = ok[0];
+  } else v = area;
+  const n = v && document.querySelector(`#nav button[data-view="${v}"]`);
+  if (n) n.click();
+}
+$("puTabs").querySelectorAll("button").forEach(b => b.onclick = () => puOpen(b.dataset.t));
+new MutationObserver(puAllowed).observe($("nav"), {subtree: true, attributes: true, attributeFilter: ["class"]});
 document.querySelectorAll("#pcTabs button, #byTabs button, #spTabs button").forEach(b => b.onclick = () => { const n = document.querySelector(`#nav button[data-view="${b.dataset.t}"]`); if (n) n.click(); });
-document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
+document.querySelectorAll("#nav button:not(#purchNav)").forEach(b => b.onclick = () => {
   document.querySelectorAll("#nav button").forEach(x => { x.classList.toggle("on", x===b); x.classList.toggle("sub-on", !!b.dataset.parent && x.dataset.view === b.dataset.parent); });
   if ($("v-exdetail").classList.contains("on")) exCurrent = null;
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.view));
   if (b.dataset.view === "compare") loadComparisons(false);
   if (b.dataset.view === "suploc" || b.dataset.view === "supco") loadSp(false);
+  if (b.dataset.view === "suppliers") loadSup(false);
+  if (b.dataset.view === "items") ihLoad(false);
   if ((b.dataset.view === "streams" || b.dataset.view === "services" || b.dataset.view === "buyloc") && data) loadStreams(false);
   if (b.dataset.view === "buycharts") renderBuyCharts();
   if (b.dataset.view === "stock") fillStockControls();
@@ -3808,6 +4192,10 @@ document.querySelectorAll("#nav button").forEach(b => b.onclick = () => {
   pcTabsSync(b.dataset.view);
   setHeader();
 });
+$("purchNav").onclick = () => {
+  const first = [...$("puTabs").querySelectorAll("button")].find(b => !b.classList.contains("scr-off"));
+  if (first) puOpen(first.dataset.t);
+};
 function openFromHash(){
   let v = (location.hash || "").slice(1);
   if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
@@ -4505,12 +4893,19 @@ $("pricesCsv").onclick = () => {
   a.download = `price-changes-${data.meta.company}-${data.meta.current[0]}.csv`; a.click();
 };
 ["company","location"].forEach(id => $(id).onchange = () => { seenEntries.clear(); cmp = null; streams = null; stockLocations = null; stockData = null; load(true); });
-$("week").onchange = () => { if ($("week").value) $("week").value = snapDate($("week").value); seenEntries.clear(); cmp = null; streams = null; load(true); };
+const periodChanged = () => { seenEntries.clear(); cmp = null; report = null; streams = null; spData = null; load(true); };
+$("week").onchange = () => { if ($("week").value) $("week").value = snapDate($("week").value); rangeSync(); periodChanged(); };
+$("weekTo").onchange = () => {
+  if ($("weekTo").value && $("weekTo").value < $("week").value) { const a = $("week").value; $("week").value = $("weekTo").value; $("weekTo").value = a; }
+  rangeSync(); periodChanged(); };
+$("cmpMode").onchange = periodChanged;
+$("rangeBtn").onclick = () => { $("mode").value = "range"; $("mode").onchange(); setTimeout(() => { try { $("weekTo").showPicker(); } catch(e) { $("weekTo").focus(); } }, 50); };
 $("mode").onchange = () => {
   const m = modeValue();
   $("anchorLabel").firstChild.textContent = MODE_LABEL[m] + " ";
   if ($("week").value) $("week").value = snapDate($("week").value);
-  seenEntries.clear(); cmp = null; report = null; streams = null;
+  rangeSync();
+  seenEntries.clear(); cmp = null; report = null; streams = null; spData = null;
   if (m !== "week") { $("banner").textContent = "Loading a longer period from Business Central. The first load reads month by month and can take a while; after that it is cached."; $("banner").dataset.longRead = "1"; }
   $("banner").style.display = m === "week" ? "none" : "block";
   load(true);
@@ -4741,6 +5136,10 @@ async function loadSp(force){
     const r = await fetch("/api/suppliers/locations?" + q + (force ? "&refresh=1" : "")), j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || r.status);
     if (spQs() !== q) return;
+    if (j.pending) {
+      ["spStatus", "spcStatus"].forEach(id => $(id).textContent = "Reading Business Central: " + (j.note || "the first read of this period takes a while."));
+      spPoll = setTimeout(() => { if (spQs() === q) loadSp(false); }, 5000); return;
+    }
     spData = j; spKey = q; spAggC = null; spRender(); spWaitTr(q);
   } catch (e) { ["spStatus", "spcStatus"].forEach(id => $(id).textContent = "Could not read: " + e.message); }
 }

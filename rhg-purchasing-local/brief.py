@@ -15,6 +15,13 @@ def _money(v):
 
 def _methodology(meta):
     mode = meta.get("mode", "week")
+    if meta.get("compare") == "last_year":
+        return "The period chosen against the same dates last year."
+    if mode == "range":
+        return "The dates chosen against the same number of days just before them."
+    if mode == "quarter":
+        return ("Quarter to date against the same number of days of the previous quarter."
+                if meta["like_for_like"] else "Full quarter against the preceding full quarter.")
     if mode == "month":
         return ("Month to date against the same number of days of the previous month."
                 if meta["like_for_like"] else "Full month against the preceding full month.")

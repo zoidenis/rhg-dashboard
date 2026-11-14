@@ -7,17 +7,59 @@ from datetime import date, timedelta
 import config
 
 
-def periods_for(start=None, mode="week", today=None):
+MODES = ("week", "month", "quarter", "ytd", "range")
+
+
+def split_mode(mode):
+    """"month" or "month+ly" (compared with the same dates last year) -> ("month", "prior" | "last_year")."""
+    base, _, cmp = str(mode or "week").lower().partition("+")
+    base = "ytd" if base == "year" else base
+    return (base if base in MODES else "week"), ("last_year" if cmp == "ly" else "prior")
+
+
+def _last_year(d):
+    try:
+        return d.replace(year=d.year - 1)
+    except ValueError:          # 29 February
+        return date(d.year - 1, 2, 28)
+
+
+def periods_for(start=None, mode="week", today=None, end=None):
     """Returns (current_from, current_to, prior_from, prior_to, like_for_like, label).
 
-    mode: week   - Monday to Sunday, or Monday to today for the running week
-          month  - first of the month to month end, or to today for the running month
-          ytd    - 1 January to today, or a full calendar year when a past year is chosen
-    The prior period always covers the same number of days, so a part-period is
-    never compared against a full one.
+    mode: week    - Monday to Sunday, or Monday to today for the running week
+          month   - first of the month to month end, or to today for the running month
+          quarter - first of the quarter to its end, or to today for the running quarter
+          ytd     - 1 January to today, or a full calendar year when a past year is chosen
+          range   - start to end, chosen by hand (never past today)
+    "+ly" after the mode compares with the same dates last year instead of the period before.
+    The period before covers the same number of days while the period is running, so a
+    part-period is never compared against a full one; a finished month or quarter is
+    compared with the whole month or quarter before it.
     """
     today = today or date.today()
-    mode = (mode or "week").lower()
+    mode, cmp = split_mode(mode)
+    c_from, c_to, p_from, p_to, running, label = _periods(start, mode, today, end)
+    if cmp == "last_year":
+        p_from, p_to = _last_year(c_from), _last_year(c_to)
+    return c_from, c_to, p_from, p_to, running, label
+
+
+def _periods(start, mode, today, end):
+    if mode == "range":
+        a = start or today.replace(day=1)
+        b = min(end or today, today)
+        a = min(a, today)
+        if b < a:
+            a, b = b, a
+        a = max(a, b - timedelta(days=3 * 366))         # at most three years
+        days = (b - a).days + 1
+        p_to = a - timedelta(days=1)
+        p_from = p_to - timedelta(days=days - 1)
+        running = b >= today
+        label = (f"{a:%d %b}" + ("" if a.year == b.year else f" {a.year}") + f" – {b:%d %b %Y}"
+                 + (" to date" if running else ""))
+        return a, b, p_from, p_to, running, label
 
     if mode == "month":
         anchor = start or today
@@ -26,24 +68,31 @@ def periods_for(start=None, mode="week", today=None):
         month_end = c_from.replace(day=monthrange(c_from.year, c_from.month)[1])
         c_to = today if running else month_end
         p_from = (c_from - timedelta(days=1)).replace(day=1)
-        span = (c_to - c_from).days
-        p_end_of_month = p_from.replace(day=monthrange(p_from.year, p_from.month)[1])
-        p_to = min(p_from + timedelta(days=span), p_end_of_month)
+        p_end = p_from.replace(day=monthrange(p_from.year, p_from.month)[1])
+        p_to = min(p_from + timedelta(days=(c_to - c_from).days), p_end) if running else p_end
         label = f"{c_from:%B %Y}" + (" to date" if running else "")
         return c_from, c_to, p_from, p_to, running, label
 
-    if mode in ("ytd", "year"):
+    if mode == "quarter":
+        anchor = start or today
+        q = (anchor.month - 1) // 3
+        c_from = date(anchor.year, q * 3 + 1, 1)
+        q_end = date(anchor.year, q * 3 + 3, monthrange(anchor.year, q * 3 + 3)[1])
+        running = c_from <= today <= q_end
+        c_to = today if running else q_end
+        p_from = date(c_from.year - (1 if q == 0 else 0), ((c_from.month - 4) % 12) + 1, 1)
+        p_end = date(p_from.year, p_from.month + 2, monthrange(p_from.year, p_from.month + 2)[1])
+        p_to = min(p_from + timedelta(days=(c_to - c_from).days), p_end) if running else p_end
+        label = f"Q{q + 1} {anchor.year}" + (" to date" if running else "")
+        return c_from, c_to, p_from, p_to, running, label
+
+    if mode == "ytd":
         anchor = start or today
         c_from = date(anchor.year, 1, 1)
         running = anchor.year == today.year
         c_to = today if running else date(anchor.year, 12, 31)
-        p_from = date(anchor.year - 1, 1, 1)
-        try:
-            p_to = c_to.replace(year=c_to.year - 1)
-        except ValueError:          # 29 February
-            p_to = date(c_to.year - 1, 2, 28)
         label = f"{anchor.year}" + (" to date" if running else "")
-        return c_from, c_to, p_from, p_to, running, label
+        return c_from, c_to, date(anchor.year - 1, 1, 1), _last_year(c_to), running, label
 
     # --- week ---
     monday_this_week = today - timedelta(days=today.weekday())

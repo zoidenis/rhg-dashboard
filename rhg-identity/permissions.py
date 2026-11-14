@@ -296,6 +296,8 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # Prices & contracts → Negotiations: whoever reads Price savings; proposed prices: whoever manages
                  # purchasing actions (the Purchasing roles), Finance and management stay read-only
                  "purchasing.s.compare.negotiations": "purchasing.s.compare.savings",
+                 # Prices & contracts → Item history: whoever reads the price changes or the location prices
+                 "purchasing.s.compare.items": ("purchasing.s.compare.prices", "purchasing.s.compare.locations"),
                  "purchasing.negotiations.edit": "purchasing.actions.manage",
                  # Inventory → Item cards (was Item master control): with its stock by location it is also for the
                  # people of the warehouses, so whoever reads an inventory screen by location gets it once

@@ -38,6 +38,8 @@ import notify
 import savings
 import savings_report
 import negotiations
+import suppliers as supplier_view
+import itemhist
 import pricechg
 import purchasers
 import weekly_report
@@ -99,8 +101,20 @@ def company_currency(company, settings=None):
 
 
 def _period(start, mode="week"):
-    anchor = date.fromisoformat(start) if start else None
-    return analytics.periods_for(anchor, mode)
+    """start: the anchor date, or "from..until" for a chosen range (mode "range")."""
+    a_txt, _, b_txt = str(start or "").partition("..")
+    try:
+        anchor = date.fromisoformat(a_txt.strip()[:10]) if a_txt.strip() else None
+        until = date.fromisoformat(b_txt.strip()[:10]) if b_txt.strip() else None
+    except ValueError:
+        anchor = until = None
+    return analytics.periods_for(anchor, mode, end=until)
+
+
+def mode_of(q):
+    """The period mode of a request, with "+ly" when it compares with the same dates last year."""
+    base, _ = analytics.split_mode(q.get("mode", "week"))
+    return base + ("+ly" if q.get("compare") == "last_year" else "")
 
 
 def _month_chunks(c_from, c_to):
@@ -150,13 +164,21 @@ _dash_building = set()
 _dash_lock = threading.Lock()
 
 
-def dashboard(company, week, location, mode="week"):
+_dash_failed = {}                 # key -> (time, error) of a first read that failed, for the screen that waits on it
+FIRST_WAIT = 25                   # seconds a request waits for a first read before it answers "pending"
+
+
+def dashboard(company, week, location, mode="week", wait=FIRST_WAIT):
     """Answers from what is already held and refreshes behind the screen.
 
     Waiting for Business Central is what made the app feel slow, not the figures
     themselves. The last good payload goes out at once, marked as refreshing, and the
-    new one replaces it as soon as it arrives. The very first request for a period has
-    nothing to show, so that one waits.
+    new one replaces it as soon as it arrives. A period read for the first time (a year,
+    a long range) can take minutes, longer than the proxy in front of the app waits, which
+    then answered with an HTML error page ("Unexpected token '<'"). So the first read runs
+    in the background: the request waits up to `wait` seconds and otherwise answers
+    {"pending": True}; the screen asks again until the figures are there. wait=None waits
+    for the read (the reports).
     """
     key = (company, week or "", location or "", mode)
     if not config.SERVE_WHILE_REFRESHING:
@@ -168,20 +190,85 @@ def dashboard(company, week, location, mode="week"):
         if held and age < fresh_for:
             return held[1]
         building = key in _dash_building
-        if held and not building:
+        failed = _dash_failed.get(key)
+        if not building and (held or not failed or time.time() - failed[0] > 30):
             _dash_building.add(key)
+            _dash_failed.pop(key, None)
+            building = True
             threading.Thread(target=_refresh_dashboard, args=(key, company, week, location, mode),
-                             daemon=True).start()
+                             daemon=True, name="dashboard").start()
     if held:
         payload = dict(held[1])
         payload["meta"] = {**payload["meta"], "serving": "held figures, refreshing now",
                            "held_seconds": int(age)}
         return payload
-    out = _dashboard_build(company, week, location, mode)
-    with _dash_lock:
-        _dash_cache[key] = (time.time(), out)
-    _trim_dash()
-    return out
+    started = time.time()
+    while wait is None or time.time() - started < wait:
+        with _dash_lock:
+            got, failed = _dash_cache.get(key), _dash_failed.get(key)
+            building = key in _dash_building
+        if got:
+            return got[1]
+        if failed and not building:
+            raise failed[1] if isinstance(failed[1], Exception) else BCError(str(failed[1]))
+        time.sleep(0.5)
+    c_from, c_to, _p0, _p1, _lfl, label = _period(week, mode)
+    return {"pending": True, "period": [c_from.isoformat(), c_to.isoformat()], "label": label,
+            "note": "This period is read from Business Central for the first time, month by month. "
+                    "It is cached once read; the screen asks again on its own."}
+
+
+_sup_jobs, _sup_lock = {}, threading.Lock()
+
+
+def supplier_summary(company, week, location, mode):
+    """Supplier performance (suppliers.py): read in the background, {"pending": True, "step": …} until ready.
+    location: one code, "" for all, or a frozenset (a person limited to some locations)."""
+    loc, only = _scope_of(location)
+    key = (company, week or "", loc, tuple(sorted(only)) if only else None, mode)
+    with _sup_lock:
+        j = _sup_jobs.get(key)
+        if j and j["state"] == "done" and time.time() - j["at"] < 600:
+            return j["value"]
+        if j and j["state"] == "running":
+            return {"pending": True, "step": j.get("step", "")}
+        if j and j["state"] == "failed" and time.time() - j["at"] < 30:
+            return {"error": j["error"]}
+        j = _sup_jobs[key] = {"state": "running", "at": time.time(), "step": "starting"}
+        for k in [k for k, v in _sup_jobs.items() if time.time() - v["at"] > 3600]:
+            _sup_jobs.pop(k, None)
+
+    def go():
+        try:
+            c_from, c_to, p_from, p_to, lfl, label = _period(week, mode)
+            settings = store.get_settings()
+            local = company_currency(company, settings)
+            j["step"] = "posted purchase invoices"
+            ci = supplier_view.headers(client, company, config.BC_PINV_ENTITY, supplier_view.INV_FIELDS, c_from, c_to)
+            j["step"] = "posted purchase credit memos"
+            cc = supplier_view.headers(client, company, config.BC_PCR_ENTITY, supplier_view.CR_FIELDS, c_from, c_to)
+            j["step"] = "the comparison period"
+            pi = supplier_view.headers(client, company, config.BC_PINV_ENTITY, supplier_view.INV_FIELDS, p_from, p_to)
+            pc = supplier_view.headers(client, company, config.BC_PCR_ENTITY, supplier_view.CR_FIELDS, p_from, p_to)
+            j["step"] = "the vendor ledger and the item lines"
+            cv = period_rows(company, c_from, c_to, 600, kind="vendor")["rows"]
+            pv = period_rows(company, p_from, p_to, 3600, kind="vendor")["rows"]
+            try:
+                ve = period_rows(company, c_from, c_to, 600)["rows"]
+            except BCError:
+                ve = []
+            out = supplier_view.build(ci, cc, cv, pi, pc, pv, ve, local, settings, loc or None,
+                                      {x.upper() for x in only} if only else None)
+            out.update(available=True, company=company, location=loc, currency=local,
+                       meta={"current": [c_from.isoformat(), c_to.isoformat()], "prior": [p_from.isoformat(), p_to.isoformat()],
+                             "period_label": label, "mode": analytics.split_mode(mode)[0],
+                             "compare": analytics.split_mode(mode)[1], "checked_at": datetime.now().isoformat(timespec="seconds")})
+            j.update(state="done", at=time.time(), value=out)
+        except Exception as exc:                                 # noqa: BLE001
+            traceback.print_exc()
+            j.update(state="failed", at=time.time(), error=str(exc)[:300])
+    threading.Thread(target=go, daemon=True, name="suppliers").start()
+    return {"pending": True, "step": "starting"}
 
 
 _tr_jobs, _tr_lock = {}, threading.Lock()
@@ -238,8 +325,11 @@ def _refresh_dashboard(key, company, week, location, mode):
         out = _dashboard_build(company, week, location, mode)
         with _dash_lock:
             _dash_cache[key] = (time.time(), out)
+        _trim_dash()
     except Exception as exc:                                     # noqa: BLE001
         print(f"[{datetime.now():%H:%M:%S}] background refresh failed: {exc}")
+        with _dash_lock:
+            _dash_failed[key] = (time.time(), exc)
     finally:
         with _dash_lock:
             _dash_building.discard(key)
@@ -303,7 +393,7 @@ def _dashboard_build(company, week, location, mode="week", remember=True):
         "company": company, "location": location or "", "scope": sorted(only) if only is not None else None,
         "current": [c_from.isoformat(), c_to.isoformat()],
         "prior": [p_from.isoformat(), p_to.isoformat()],
-        "like_for_like": like_for_like, "mode": mode, "period_label": label,
+        "like_for_like": like_for_like, "mode": analytics.split_mode(mode)[0], "compare": analytics.split_mode(mode)[1], "period_label": label,
         "currency": company_currency(company, settings),
         "currency_note": "Amounts are in the company's own posting currency, as Business Central "
                          "stores them; nothing is converted.",
@@ -1035,7 +1125,7 @@ def streams(company, week, location, mode="week", _fresh=False):
     critical_missing = [x for x in sources if x["status"] == "unavailable" and x.get("critical")]
     out = {
         "by_location": by_loc,
-        "period": [c_from.isoformat(), c_to.isoformat()], "label": label, "mode": mode,
+        "period": [c_from.isoformat(), c_to.isoformat()], "label": label, "mode": analytics.split_mode(mode)[0], "compare": analytics.split_mode(mode)[1],
         "company": company, "location": location or "", "scope": sorted(only) if only is not None else None,
         "summary": summary,
         "item_rows": item_rows[:600], "gl_rows": gl_rows[:600],
@@ -1164,7 +1254,7 @@ def compare(company, week, location, mode="week"):
             budget = {"available": False, "reason": str(exc)}
 
     out = {"current": {"from": c_from.isoformat(), "to": c_to.isoformat(), "total": current_total,
-                       "like_for_like": like_for_like, "mode": mode, "period_label": label,
+                       "like_for_like": like_for_like, "mode": analytics.split_mode(mode)[0], "compare": analytics.split_mode(mode)[1], "period_label": label,
                        "company": company, "location": location or ""},
            "rows": rows, "budget": budget, "generated_at": datetime.now().isoformat(timespec="seconds")}
     _compare_cache[key] = (time.time(), out)
@@ -1354,7 +1444,8 @@ ACCESS_ONE_LOCATION = {"/api/dashboard", "/api/streams", "/api/comparisons", "/a
                        "/api/savings/xlsx", "/api/stock", "/api/report"}
 # read without a location by a person limited to some locations: all of theirs together, built from their entries
 # only (the Location intelligence screens, Live operations, the Action center, Supplier performance)
-ACCESS_SCOPE_SET = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/report", "/api/suppliers/locations"}
+ACCESS_SCOPE_SET = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/report", "/api/suppliers/locations",
+                    "/api/suppliers/summary", "/api/items/history"}
 # answered cut to the locations in scope
 ACCESS_FILTERED = {"/api/today/locations", "/api/locations", "/api/recipients/locations"}
 
@@ -1830,8 +1921,38 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(404, {"error": "Font not installed"})
             elif url.path == "/api/dashboard":
                 d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), self._scope_set or q.get("location"),
-                              q.get("mode", "week"))
-                self._send(200, {k: v for k, v in d.items() if k != "_supplier_matrix"} if isinstance(d, dict) else d)
+                              mode_of(q))
+                if isinstance(d, dict) and d.get("pending"):
+                    self._send(202, d)
+                else:
+                    self._send(200, {k: v for k, v in d.items() if k != "_supplier_matrix"} if isinstance(d, dict) else d)
+            elif url.path == "/api/suppliers/summary" and not auth.can(user, "purchasing.s.suppliers.suppliers"):
+                self._send(403, {"error": "Your role does not include Supplier performance."})
+            elif url.path == "/api/suppliers/summary":
+                r = supplier_summary(q.get("company") or config.BC_COMPANY, q.get("week"),
+                                     self._scope_set or q.get("location") or "", mode_of(q))
+                self._send(500 if r.get("error") else 200, r)
+            elif url.path == "/api/items/history" and not auth.can(user, "purchasing.s.compare.items"):
+                self._send(403, {"error": "Your role does not include Item history."})
+            elif url.path == "/api/items/history":
+                company = q.get("company") or config.BC_COMPANY
+                # the period chosen above and its comparison period
+                a, b, pa, pb, _lfl, label = _period(q.get("week"), mode_of(q))
+                if (b - a).days > 731:
+                    self._send(400, {"error": "Choose a period of two years or less."})
+                    return
+                progress = itemhist.ensure(client, company, min(a, pa), max(b, pb), q.get("refresh") == "1")
+                if progress:
+                    self._send(200, {"pending": True, "progress": progress,
+                                     "note": "Reading the purchase invoice lines of these months from Business Central. "
+                                             "A month is read once; the next look at the same months is immediate."})
+                else:
+                    loc, only = _scope_of(self._scope_set or q.get("location") or "")
+                    r = itemhist.report(client, company, a, b, pa, pb, loc, {x.upper() for x in only} if only else None,
+                                        {k: (q.get(k) or "")[:120] for k in ("q", "vendor", "item", "category", "stream")},
+                                        company_currency(company), itemhist.last_errors(company))
+                    r["period_label"] = label
+                    self._send(200, r)
             elif url.path == "/api/suppliers/locations" and not (
                     auth.can(user, "purchasing.s.suppliers.suploc") or auth.can(user, "purchasing.s.suppliers.supco")):
                 self._send(403, {"error": "Your role does not include Supplier performance by location."})
@@ -1839,9 +1960,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Supplier performance → Location intelligence and Whole company: the company read of the period
                 # (every location), by location, supplier and item
                 d = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), self._scope_set or "",
-                              q.get("mode", "week"))
+                              mode_of(q))
                 m = d.get("_supplier_matrix") if isinstance(d, dict) else None
-                if m is None:
+                if isinstance(d, dict) and d.get("pending"):
+                    self._send(200, {"pending": True, "note": d.get("note")})
+                elif m is None:
                     self._send(200, {"available": False, "error": ((d or {}).get("operations") or {}).get("error")
                                      or "The supplier figures could not be read."})
                 else:
@@ -1994,15 +2117,15 @@ class Handler(BaseHTTPRequestHandler):
                                                q.get("month") or date.today().strftime("%Y-%m")))
             elif url.path == "/api/streams":
                 self._send(200, streams(q.get("company") or config.BC_COMPANY, q.get("week"),
-                                        self._scope_set or q.get("location"), q.get("mode", "week")))
+                                        self._scope_set or q.get("location"), mode_of(q)))
             elif url.path == "/api/comparisons":
                 self._send(200, compare(q.get("company") or config.BC_COMPANY, q.get("week"),
-                                        self._scope_set or q.get("location"), q.get("mode", "week")))
+                                        self._scope_set or q.get("location"), mode_of(q)))
             elif url.path == "/api/report":
                 kind = q.get("type", "weekly")
-                mode = q.get("mode", "week")
+                mode = mode_of(q)
                 full = dashboard(q.get("company") or config.BC_COMPANY, q.get("week"), self._scope_set or q.get("location"),
-                                 mode)
+                                 mode, wait=None)
                 if kind == "daily":
                     day = date.fromisoformat(q["day"]) if q.get("day") else date.today() - timedelta(days=1)
                     company = q.get("company") or config.BC_COMPANY

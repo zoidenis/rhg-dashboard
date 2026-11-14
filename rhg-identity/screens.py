@@ -105,6 +105,7 @@ PURCHASING = [
         ("savings", "Price savings", "location", ["purchasing.prices.view"]),
         ("prices", "Price changes", "location", ["purchasing.prices.view"]),
         ("locations", "Location prices", "location", ["purchasing.prices.view"]),
+        ("items", "Item history", "location", ["purchasing.prices.view"]),
         ("negotiations", "Negotiations", "company", ["purchasing.prices.view"])]),
     ("register", "Exceptions register", "Control", None, [], "location", []),
     ("compliance", "Invoices without PO", "Control", None, [], "company", ["purchasing.invoices.view"]),
