@@ -225,21 +225,26 @@ def periods(anchor, mode, today=None):
         c_from = date(a.year, q * 3 + 1, 1)
         running = c_from <= today <= date(a.year, q * 3 + 3, monthrange(a.year, q * 3 + 3)[1])
         c_to = today if running else date(a.year, q * 3 + 3, monthrange(a.year, q * 3 + 3)[1])
-        p_from = date(c_from.year - (1 if c_from.month <= 3 else 0), (c_from.month - 3) or 12, 1)
-        p_to = min(p_from + timedelta(days=(c_to - c_from).days),
-                   p_from.replace(day=monthrange(p_from.year, p_from.month)[1]))
+        p_from = date(c_from.year - (1 if c_from.month <= 3 else 0), ((c_from.month - 4) % 12) + 1, 1)
+        # the previous quarter ends on the last day of its third month, not of its first
+        p_end = date(p_from.year, p_from.month + 2, monthrange(p_from.year, p_from.month + 2)[1])
+        # to date: the same number of days; a finished quarter: the whole previous quarter
+        p_to = min(p_from + timedelta(days=(c_to - c_from).days), p_end) if running else p_end
         label = f"Q{q + 1} {a.year}" + (" to date" if running else "")
-        method = "Quarter to date against the same number of days of the previous quarter."
+        method = ("Quarter to date against the same number of days of the previous quarter." if running
+                  else "The whole quarter against the whole previous quarter.")
     else:
         c_from = a.replace(day=1)
         running = (c_from.year, c_from.month) == (today.year, today.month)
         month_end = c_from.replace(day=monthrange(c_from.year, c_from.month)[1])
         c_to = today if running else month_end
         p_from = (c_from - timedelta(days=1)).replace(day=1)
-        p_to = min(p_from + timedelta(days=(c_to - c_from).days),
-                   p_from.replace(day=monthrange(p_from.year, p_from.month)[1]))
+        p_end = p_from.replace(day=monthrange(p_from.year, p_from.month)[1])
+        # to date: the same number of days; a finished month: the whole previous month
+        p_to = min(p_from + timedelta(days=(c_to - c_from).days), p_end) if running else p_end
         label = f"{c_from:%B %Y}" + (" to date" if running else "")
-        method = "Month to date against the same number of days of the previous month."
+        method = ("Month to date against the same number of days of the previous month." if running
+                  else "The whole month against the whole previous month.")
     try:
         ly_from, ly_to = c_from.replace(year=c_from.year - 1), c_to.replace(year=c_to.year - 1)
     except ValueError:

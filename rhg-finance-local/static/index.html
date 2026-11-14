@@ -2696,7 +2696,7 @@ function statementRows(lines){
 }
 function renderPL(){
   const pl = data.pl;
-  const head = `<tr><th>Line</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Change</th>
+  const head = `<tr><th>Line</th><th class="num">Current</th>${priorTh()}<th class="num">Change</th>
     <th class="num">Last year</th><th class="num">Change</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">% of revenue</th></tr>`;
   $("plTable").innerHTML = head + statementRows(pl.statement);
   const hidden = new Set((pl.validation||[]).flatMap(x => x.suppressed || []));
@@ -2707,7 +2707,7 @@ function renderPL(){
   const curCell = l => l.label === "Cost of goods sold" && credit ? "Credit · review"
     : hidden.has(l.label) ? (l.label === "Gross profit" ? "Hidden" : "Review pending") : pending(l) ? "Review pending" : fmt(l.current);
   $("plSumTitle").textContent = `P&L summary · ${data.meta.currency}`;
-  $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th><th class="num">${data.meta.compare === "last_year" ? "Comparison" : "Prior"}</th><th class="num">Last year</th><th class="num">Budget</th><th class="num">Variance %${anyBudget?" vs budget":""}</th></tr>` +
+  $("plMini").innerHTML = `<tr><th>Line</th><th class="num">Current</th>${priorTh()}<th class="num">Last year</th><th class="num">Budget</th><th class="num">Variance %${anyBudget?" vs budget":""}</th></tr>` +
     (pl.summary || pl.statement).map(l=>`<tr class="${l.total || l.label==="EBIT"?"total":""}"><td class="name">${esc(l.label)}</td>
       <td class="num">${curCell(l)}</td><td class="num">${l.previous==null?"–":fmt(l.previous)}</td>
       <td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td><td class="num">${l.budget?fmt(l.budget):"–"}</td>
@@ -2720,7 +2720,7 @@ function renderPL(){
     + pl.note + (fallbackCount
     ? ` ${fmt(fallbackCount)} of these accounts have no Account Category in BC, so the account number classified them (${Object.entries(by).map(([k,v])=>`${k}: ${v}`).join(", ")}).`
     : "");
-  $("plAccounts").innerHTML = `<tr><th>Account</th><th>Name</th><th>Category</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Last year</th><th class="num">Budget</th></tr>` +
+  $("plAccounts").innerHTML = `<tr><th>Account</th><th>Name</th><th>Category</th><th class="num">Current</th>${priorTh()}<th class="num">Last year</th><th class="num">Budget</th></tr>` +
     pl.lines.slice(0,60).map(l=>`<tr><td><a href="#" class="acc" data-acc="${esc(l.account)}">${esc(l.account)}</a></td>
       <td class="name">${esc(l.name)}</td><td class="meta">${esc(l.category)}</td><td class="num">${fmt(l.current)}</td>
       <td class="num">${l.previous==null?"–":fmt(l.previous)}</td><td class="num">${l.last_year==null?"–":fmt(l.last_year)}</td>
@@ -2798,7 +2798,7 @@ function renderPLRatios(pl, hidden, credit){
                prime_cost_pct: prev("cogs") == null ? null : pp(prev("cogs") + (prev("labour") || 0)),
                occupancy_pct: pp(prev("occupancy")), ebitda_margin: pp(prev("ebitda")), net_margin: pp(prev("net_profit"))};
   const review = k => (credit && ["cogs_pct", "prime_cost_pct"].includes(k)) || (k === "ebitda_margin" && (hidden.has("EBITDA margin") || data.kpis.ebitda == null));
-  $("plRatios").innerHTML = `<tr><th>Ratio</th><th class="num">Current</th><th class="num">Comparison</th><th class="num">Change</th><th>Status</th></tr>` +
+  $("plRatios").innerHTML = `<tr><th>Ratio</th><th class="num">Current</th>${priorTh()}<th class="num">Change</th><th>Status</th></tr>` +
     PL_RATIOS.filter(k => L[k]).map(k => {
       const x = L[k], v = review(k) ? null : x.value, c = k === "revenue_growth" ? null : cmp[k];
       const d = v != null && c != null ? v - c : null;
@@ -2869,6 +2869,8 @@ $("lqLoad").onclick = () => loadCap(true);
 function renderBS(){ if (capOn()) loadCap(false); }
 function renderCap(){ renderBSLines(); renderLiquidity(); }
 const dmy = d => d ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}` : "–";
+// the P&L "previous" figures are always the period just before (meta.prior), whatever Compare says
+const priorTh = () => `<th class="num" title="${(data.meta.prior || []).map(dmy).join(" – ")}">Period before</th>`;
 function renderBSLines(){
   const c = capData; if (!c) return;
   const loc = dimValues().length ? " The location filter does not apply here: a balance sheet belongs to the whole legal entity." : "";
