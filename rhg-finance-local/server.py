@@ -2197,6 +2197,31 @@ def drop_codes(body, X, fields=("locations", "rows", "all_locations")):
     return out
 
 
+LI_PARTS = ("company_sales", "company_pl", "pl", "bc_sales", "purch_inv")
+
+
+def li_parts(user):
+    """The parts of Location intelligence (Executive dashboard) the person's role holds (Admin → Roles)."""
+    return {k: auth.can(user, "platform.s.executive.locations." + k) for k in LI_PARTS}
+
+
+def li_parts_cut(res, user):
+    """Location intelligence without what the role's parts leave out (Geri, 14 Nov 2026): the sales posted in BC
+    (bc_sales), purchasing and stock (purch_inv), the use at cost behind the food cost estimate (P&L by restaurant or
+    of the whole company). The restaurants and their Simphony figures are the tab itself."""
+    if not isinstance(res, dict) or not isinstance(res.get("locations"), list):
+        return res
+    P = li_parts(user)
+    drop = ([] if P["bc_sales"] else ["bc_posted"]) + ([] if P["purch_inv"] else ["purch", "inv"]) \
+        + ([] if P["pl"] or P["company_pl"] else ["use"])
+    out = dict(res, parts=P)
+    if drop:
+        out["locations"] = [dict(l, **{k: None for k in drop}) for l in res["locations"]]
+        if not P["purch_inv"]:
+            out["inventory"] = {"state": "n/a", "note": "Purchasing and stock are not part of your role here."}
+    return out
+
+
 _transit_cache, _transit_lock = {}, threading.Lock()
 
 
@@ -3034,6 +3059,7 @@ class Handler(BaseHTTPRequestHandler):
                 res = locintel.request(client, q.get("company") or config.BC_COMPANY,
                                        (c_from, c_to, p_from, p_to, ly_from, ly_to, running, label),
                                        _latest, in_parallel_jobs, rights, q.get("refresh") == "1")
+                res = li_parts_cut(res, user)            # what the parts of the role do not hold is not sent
                 if isinstance(res, dict) and res.get("locations") and auth.can(user, "finance.s.register"):
                     # the open items of the Exceptions register on each restaurant (BC location, department or
                     # Simphony reference), counted now, not held with the read

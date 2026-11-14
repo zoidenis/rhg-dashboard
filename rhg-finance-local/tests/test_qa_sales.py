@@ -120,5 +120,21 @@ class QA(unittest.TestCase):
         self.assertEqual((list(r["locations"]), r["totals"]), (["SALT"], {"x": 3}))
 
 
+    def test_location_intelligence_parts(self):
+        import server
+        res = {"locations": [{"ref": "SALT", "sim": {"cur": {}}, "bc_posted": {"total": 1}, "purch": {"amount": 2},
+                              "inv": {"stock": 3}, "use": 4}], "inventory": {"state": "done"}}
+        P = "platform.s.executive.locations."
+        analyst = {"permissions": ["platform.s.executive.locations", P + "company_sales", P + "bc_sales"]}
+        r = server.li_parts_cut(res, analyst)
+        L = r["locations"][0]
+        self.assertEqual((L["bc_posted"], L["purch"], L["inv"], L["use"]), ({"total": 1}, None, None, None))
+        self.assertEqual(r["parts"]["company_pl"], False)
+        self.assertEqual(r["inventory"]["state"], "n/a")
+        self.assertEqual(res["locations"][0]["purch"], {"amount": 2})                    # the held answer untouched
+        every = {"permissions": [P + k for k in server.LI_PARTS]}
+        self.assertEqual(server.li_parts_cut(res, every)["locations"][0]["use"], 4)
+
+
 if __name__ == "__main__":
     unittest.main()

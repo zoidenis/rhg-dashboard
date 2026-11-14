@@ -76,7 +76,7 @@ def catalogue():
             items = [(x["key"], x["tab"], x["label"], x["kind"]) for x in m["tabs"]] or \
                     [(m["key"], None, None, m["kind"])]
             for key, tab, tlabel, kind in items:
-                if key in NOT_REPORTS:
+                if key in NOT_REPORTS or (tab and "." in tab):        # a part of a screen, not a screen
                     continue
                 parts = [t["label"], m["label"]] + ([tlabel] if tlabel and tlabel != m["label"] else [])
                 out.append({"key": key, "app": t["app"], "tower": t["label"], "menu": m["label"],

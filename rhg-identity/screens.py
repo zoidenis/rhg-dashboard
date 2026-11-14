@@ -132,8 +132,19 @@ PLATFORM = [
         ("budget", "Budget", "company", ["finance.view", "finance.pl.view"]),
         ("balance", "Balance & capital", "company", ["finance.view", "finance.bs.view"]),
         ("purchasing", "Purchasing", "company", ["purchasing.view"]),
-        ("locations", "Location intelligence", "location", ["finance.view"])]),
+        ("locations", "Location intelligence", "location", ["finance.view"]),
+        # Location intelligence in parts (Geri, 14 Nov 2026): the tab itself is the restaurants (squares, Compare, each
+        # restaurant's operations from Simphony); each part below adds one layer. Not tabs of the page: the keys
+        # "locations.<part>" only give the permissions platform.s.executive.locations.<part>.
+        ("locations.company_sales", "Location intelligence · whole company: sales", "company", ["finance.view"]),
+        ("locations.company_pl", "Location intelligence · whole company: P&L", "company",
+         ["finance.view", "finance.pl.view"]),
+        ("locations.pl", "Location intelligence · P&L by restaurant", "location", ["finance.view", "finance.pl.view"]),
+        ("locations.bc_sales", "Location intelligence · sales posted in BC", "location", ["finance.view"]),
+        ("locations.purch_inv", "Location intelligence · purchasing and inventory", "location", ["finance.view"])]),
 ]
+# the parts of Location intelligence (Executive dashboard), as above
+LI_PARTS = ("company_sales", "company_pl", "pl", "bc_sales", "purch_inv")
 
 TOWERS = (("finance", "Finance & Inventory", FINANCE), ("purchasing", "Purchasing", PURCHASING),
           ("platform", "Platform", PLATFORM))

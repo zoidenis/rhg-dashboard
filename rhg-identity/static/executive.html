@@ -1102,7 +1102,10 @@ function viewLocations(){
   if (!can("finance.view")) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">Your role does not include the Finance tower.</p></div>`; return; }
   if (!window.LocIntel) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">Location intelligence could not be loaded; reload the page.</p></div>`; return; }
   $("periodLabel").textContent = `${mlabel(liMonth())} · every restaurant of ${F.company}`;
-  LocIntel.mount($("view"), {company: F.company, period: liMonth() + "-01", finance: liFinance(),
+  // the parts of Location intelligence the role holds (Admin → Roles): the restaurants always; each part adds a layer
+  const parts = {}; ["company_sales", "company_pl", "pl", "bc_sales", "purch_inv"].forEach(k => parts[k] = can("platform.s.executive.locations." + k));
+  LocIntel.mount($("view"), {company: F.company, period: liMonth() + "-01", parts,
+    finance: parts.pl || parts.company_pl ? liFinance() : null,
     onState: j => { if (F.tab === "locations") $("periodLabel").textContent = `${j.period.label} · whole days ${j.period.from} → ${j.period.to} · against the month before and the same dates last year`; }});
 }
 /* ------------------------------------------------------------ pop-ups (Pulse): a restaurant, a month, an account, a supplier

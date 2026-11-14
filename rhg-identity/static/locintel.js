@@ -39,8 +39,8 @@ const MARKUP = `<div class="card" style="margin-bottom:14px">
       <div class="li-sec"><h2>Restaurants<small id="liRestScope"></small></h2><span class="meta">click a restaurant for its KPIs · drag it onto Compare</span></div>
       <div id="liRest"></div>
       <div id="liOther"></div>
-      <div class="li-sec" style="margin-top:22px"><h2><span class="li-src">Simphony</span>Whole company<small id="liScope"></small></h2><span class="meta">click a square for every restaurant, the daily trend and alerts</span></div>
-      <div class="li-sqs" id="liSqs"></div>
+      <div id="liCoSales"><div class="li-sec" style="margin-top:22px"><h2><span class="li-src">Simphony</span>Whole company<small id="liScope"></small></h2><span class="meta">click a square for every restaurant, the daily trend and alerts</span></div>
+      <div class="li-sqs" id="liSqs"></div></div>
       <div class="li-sec"><h2><span class="li-src">Business Central</span>Finance &amp; stock<small id="liBcScope"></small></h2></div>
       <div class="kpis li-kpis" id="liKpis"></div>
       <div class="card" id="liMapCard"><div class="card-head" style="margin-bottom:10px"><h2 id="liMapTitle">On the map · Tirana and the airport</h2><span class="meta">ring colour = health · label = Simphony net sales</span></div>
@@ -53,6 +53,11 @@ const MARKUP = `<div class="card" style="margin-bottom:14px">
   `;
 const key = () => `${opts.company || ""}|${opts.period || ""}`;
 let liData = null, liTimer = null, liKey = "", host = null, opts = {}, liSort = "net", liTab = "rest", liCmp = [];
+// the parts of Location intelligence the role holds (Admin → Roles): the restaurants are the tab itself; the whole
+// company's sales, the whole company's P&L, the P&L by restaurant, the sales posted in BC, purchasing and stock each
+// add a layer. The server does not send what the parts leave out.
+const LI_ALL = {company_sales: true, company_pl: true, pl: true, bc_sales: true, purch_inv: true};
+const P = () => Object.assign({}, LI_ALL, (liData && liData.parts) || opts.parts || {});
 const LI_CC = ["var(--li-c1)", "var(--li-c2)", "var(--li-c3)", "var(--li-c4)"], LI_MAXCMP = 4;
 document.body.insertAdjacentHTML("beforeend", `<div class="li-bd" id="liBd"><div class="li-pop" id="liPop" role="dialog" aria-modal="true"></div></div>
   <div class="li-bd" id="liBd2"><div class="li-pop" id="liPop2" role="dialog" aria-modal="true"></div></div><div id="liTip"></div>`);
@@ -232,8 +237,9 @@ function liDerive(){
   LI.closed = mine.filter(l => l.status === "closed");
   LI.others = all.filter(l => l.company !== LI.company && l.registered && l.status !== "no sales");
   LI.unreg = all.filter(l => !l.registered);
-  const FN = opts.finance && opts.finance.company === LI.company ? opts.finance : null;
-  LI.fin = FN;
+  const FN0 = opts.finance && opts.finance.company === LI.company ? opts.finance : null;
+  const FN = P().pl ? FN0 : null;                 // by restaurant
+  LI.fin = FN; LI.finC = P().company_pl ? FN0 : null;   // the whole company
   for (const l of all) {
     l.pl = FN && l.company === LI.company && l.dept && FN.has(l.dept) ? FN.get(l.dept) : null;
     if (l.pl && !(l.pl.cur && (l.pl.cur.sales || l.pl.cur.ebitda))) l.pl = null;
@@ -241,7 +247,7 @@ function liDerive(){
     l.snet = c ? c.net : null;
     l.lyD = c && y && y.net ? (c.net / y.net - 1) * 100 : null;
     l.exvat = c ? c.net - c.tax : null;
-    l.fc = l.use != null && l.exvat > 0 ? l.use / l.exvat * 100 : null;
+    l.fc = P().pl && l.use != null && l.exvat > 0 ? l.use / l.exvat * 100 : null;     // a cost of the restaurant: with its P&L
     liHealth(l);
     const al = [...liPostAlerts(l), ...liSimAlerts(l)], inv = l.inv;
     if (inv) {
@@ -280,7 +286,11 @@ function liRender(){
   $("liScope").textContent = `${LI.company} · ${LI.scope.length} restaurant${LI.scope.length === 1 ? "" : "s"} open${LI.tot.length < LI.scope.length ? ` · totals in ${LI.ccy}` : ""} · ${LI.curLab}`;
   $("liRestScope").textContent = `${LI.company} · ${LI.scope.length} open · ${LI.curLab}`;
   liCmp = liCmp.filter(r => liData.locations.some(l => l.ref === r && l.sim));
-  liDrawRest(); liDrawSquares(); liDrawKpis(); liDrawMap(); liDrawCmp();
+  $("liCoSales").style.display = P().company_sales ? "" : "none";
+  const sorts = {fc: P().pl, ebitda: P().pl};
+  $("liSort").querySelectorAll("option").forEach(o => { if (o.value in sorts) o.hidden = !sorts[o.value]; });
+  if (liSort in sorts && !sorts[liSort]) { liSort = "net"; $("liSort").value = "net"; }
+  liDrawRest(); if (P().company_sales) liDrawSquares(); liDrawKpis(); liDrawMap(); liDrawCmp();
   $("liFoot").innerHTML = Object.values(j.definitions || {}).map(esc).join(" ");
   if (opts.onState) opts.onState(j);
 }
@@ -302,19 +312,20 @@ function liDrawSquares(){
 function liDrawKpis(){
   const s = LI.tot, th = LI.th;
   const posted = s.filter(l => l.bc_posted).reduce((a, l) => a + l.bc_posted.total, 0), simPosted = s.filter(l => l.bc_posted).reduce((a, l) => a + l.sim.cur.net, 0);
-  const useL = s.filter(l => l.fc != null), use = useL.reduce((a, l) => a + l.use, 0), exv = useL.reduce((a, l) => a + l.exvat, 0);
+  const useL = s.filter(l => l.use != null && l.exvat > 0), use = useL.reduce((a, l) => a + l.use, 0), exv = useL.reduce((a, l) => a + l.exvat, 0);
   const inv = s.filter(l => l.inv), stock = inv.reduce((a, l) => a + l.inv.stock, 0);
   const purch = s.filter(l => l.purch).reduce((a, l) => a + l.purch.amount, 0);
   const toAct = s.filter(l => l.h === "h-low").length, toWatch = s.filter(l => l.h === "h-mid").length, notPosted = s.filter(l => l.alerts.some(a => /posted|POS customer/.test(a[1]))).length;
   const kpi = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
   $("liBcScope").textContent = `${LI.company} · ${LI.curLab} · posted`;
-  $("liKpis").innerHTML =
-    kpi("Sales posted in BC", liM(posted), simPosted ? `with VAT · ${liPct((posted / simPosted - 1) * 100)} against Simphony (${liM(simPosted)})` : "no POS customer in the registry") +
-    kpi("Food cost (estimated)", exv ? (use / exv * 100).toFixed(1) + "%" : "–", exv ? `use at cost ${liM(use)} · target ${th.food_cost}%` : (liData.inventory || {}).note || "", exv && use / exv * 100 > th.food_cost ? "warn" : "down") +
+  const Q = P();
+  $("liKpis").innerHTML = (Q.company_sales && Q.bc_sales ?
+    kpi("Sales posted in BC", liM(posted), simPosted ? `with VAT · ${liPct((posted / simPosted - 1) * 100)} against Simphony (${liM(simPosted)})` : "no POS customer in the registry") : "") + (Q.company_pl ?
+    kpi("Food cost (estimated)", exv ? (use / exv * 100).toFixed(1) + "%" : "–", exv ? `use at cost ${liM(use)} · target ${th.food_cost}%` : (liData.inventory || {}).note || "", exv && use / exv * 100 > th.food_cost ? "warn" : "down") : "") + (Q.company_pl && Q.purch_inv ?
     kpi("Stock in restaurants", inv.length ? liM(stock) : "–", inv.length ? `at item cost · ${esc((liData.inventory || {}).as_of || "")}` : esc((liData.inventory || {}).note || "")) +
-    kpi("Bought direct", liM(purch), "posted purchase invoices with the restaurant's location, VAT incl.") +
+    kpi("Bought direct", liM(purch), "posted purchase invoices with the restaurant's location, VAT incl.") : "") +
     kpi("Restaurants to act on", `${toAct} of ${s.length}`, `${toWatch} to watch${notPosted ? ` · ${notPosted} with posting gaps` : ""}`, toAct ? "up" : "");
-  const F = LI.fin;
+  const F = LI.finC;
   if (F) {
     const T = F.total(), c = T.cur, y = T.ly;
     const d = (a, b) => b ? liPct((a / b - 1) * 100) : "–";
@@ -565,13 +576,13 @@ function liOpen(ref){
       <div class="li-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">${liSimTiles(l, p)}</div></div>` : "";
   let fin = "", pur = "", inv = "";
   if (mine) {
-    const bp = l.bc_posted;
-    fin = `<div class="li-panel li-span2"><div class="ttl"><h3>Finance</h3><span class="li-tag">BC · sales posted to ${l.customer ? "POS customer " + esc(l.customer) : "no POS customer set"} · VAT incl.</span></div>
+    const bp = l.bc_posted, Q = P();
+    if (Q.bc_sales || Q.pl || l.exceptions) fin = `<div class="li-panel li-span2"><div class="ttl"><h3>Finance</h3><span class="li-tag">${Q.bc_sales ? `BC · sales posted to ${l.customer ? "POS customer " + esc(l.customer) : "no POS customer set"} · VAT incl.` : "Simphony and Business Central"}</span></div>
       <div class="li-tiles" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-        ${liTile("Posted in BC", bp ? liM(bp.total) : "–", bp ? `${bp.days_posted} of ${LI.days} days` : "set the POS customer", bp ? "" : "pending")}
-        ${liTile("Simphony, same days", liM(l.snet), bp && l.snet ? `posted ${liPct((bp.total / l.snet - 1) * 100)} against it` : "net sales incl. VAT")}
+        ${Q.bc_sales ? liTile("Posted in BC", bp ? liM(bp.total) : "–", bp ? `${bp.days_posted} of ${LI.days} days` : "set the POS customer", bp ? "" : "pending") : ""}
+        ${Q.bc_sales ? liTile("Simphony, same days", liM(l.snet), bp && l.snet ? `posted ${liPct((bp.total / l.snet - 1) * 100)} against it` : "net sales incl. VAT") : ""}
         ${liTile("Sales ex VAT", liM(l.exvat), "Simphony net − tax")}
-        ${liTile("Food cost (estimated)", l.fc != null ? `<span class="${l.fc > LI.th.food_cost + 2 ? "warn" : ""}">${l.fc.toFixed(1)}%</span>` : "–", l.use != null ? `use at cost ${liM(l.use)} · target ${LI.th.food_cost}%` : "item ledger not read", l.fc == null ? "pending" : "")}
+        ${!Q.pl ? "" : liTile("Food cost (estimated)", l.fc != null ? `<span class="${l.fc > LI.th.food_cost + 2 ? "warn" : ""}">${l.fc.toFixed(1)}%</span>` : "–", l.use != null ? `use at cost ${liM(l.use)} · target ${LI.th.food_cost}%` : "item ledger not read", l.fc == null ? "pending" : "")}
         ${l.exceptions ? liTile("Open exceptions", `<a href="${opts.links.register}" class="${l.exceptions.critical ? "up" : ""}" style="color:inherit">${liN(l.exceptions.open)}</a>`, `${l.exceptions.critical} critical · ${l.exceptions.overdue} overdue · Exceptions register`) : ""}</div>
       ${l.daily ? `<div style="display:flex;gap:14px;font-size:11.5px;color:var(--sub);margin-bottom:2px;flex-wrap:wrap"><span><span class="li-lg li-c1"></span>Simphony, net sales a day</span>${bp ? `<span><span class="li-lg li-c2"></span>Posted in BC that day</span>` : ""}</div>
       ${liLine(l.daily.net, bp ? bp.daily : null, {label: "Daily sales", w: 760, h: 170, tip: i => `<b>${liDay(LI.dates[i])} ${liMon(LI.dates[i])}</b><br>Simphony ${liN(l.daily.net[i])}${bp ? `<br>BC ${liN(bp.daily[i])}` : ""}`})}` : ""}</div>`;
@@ -583,7 +594,7 @@ function liOpen(ref){
         <div class="meta" style="margin-bottom:6px">Largest suppliers</div>
         <div class="li-sup">${l.purch.suppliers.map(s => `<div>${esc(s[0])}<div class="b" style="width:${s[1] / mx * 100}%"></div></div><div class="num">${liM(s[1])}</div>`).join("") || `<div class="meta">None this period</div><div></div>`}</div></div>`; }
     const iv = l.inv, st = (liData.inventory || {});
-    inv = `<div class="li-panel"><div class="ttl"><h3>Inventory</h3><span class="li-tag">BC · ${iv ? "stock as of " + esc(st.as_of || "") : esc(st.note || "not read")}</span></div>` + (iv ? `
+    if (P().purch_inv) inv = `<div class="li-panel"><div class="ttl"><h3>Inventory</h3><span class="li-tag">BC · ${iv ? "stock as of " + esc(st.as_of || "") : esc(st.note || "not read")}</span></div>` + (iv ? `
         <div class="li-tiles">
           ${liTile("Stock value", liM(iv.stock), `food, beverage &amp; resale ${liM(iv.fb_stock)}`)}
           ${liTile("Days of cover", `<span class="${iv.doh != null && iv.doh > LI.th.cover_days ? "up" : ""}">${iv.doh ?? "–"}</span>`, `food, beverage &amp; resale · ${LI.th.cover_days} expected`)}
@@ -633,7 +644,7 @@ function liKpiAlerts(k, rows){
   return al;
 }
 function liKpi(kk, ref){
-  const k = LI_KB[kk]; if (!k || !LI.G0) return;
+  const k = LI_KB[kk]; if (!k || !LI.G0 || !P().company_sales) return;        // the company's figure is its own part
   const rows = liRows(k, LI.tot), others = liRows(k, [...LI.scope.filter(l => !LI.tot.includes(l)), ...LI.others.filter(l => l.sim && l.sim.cur.net > 0)]);
   const vals = rows.flatMap(r => [r.a, r.b, r.c]).filter(v => v != null && isFinite(v)), max = Math.max(...vals, 1e-9) * 1.04;
   const a = k.v(LI.G0), b = LI.G1 && k.v(LI.G1), c = k.noLy || !LI.G2 ? null : k.v(LI.G2), dS = liDelta(k, a, b), dL = liDelta(k, a, c);

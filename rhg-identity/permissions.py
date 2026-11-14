@@ -225,14 +225,18 @@ DEFAULT_ROLES = {
                                      "finance.s.inventory.loc", "finance.s.inventory.sku", "purchasing.s.overview.overview",
                                      "purchasing.s.reqs.reqs", "purchasing.s.reqs.po"]},
     "Sales analyst": {"department": "Sales", "system": False,
-                      "description": "Sales, location intelligence and the sales tabs of the executive dashboard.",
+                      "description": "Sales, location intelligence (every restaurant, the company's sales and the "
+                                     "sales posted in BC; no P&L, purchasing or stock) and the sales tabs of the "
+                                     "executive dashboard.",
                       "permissions": _s("finance.s.sales", "finance.s.overview.loc")
                                      + ["platform.s.executive.sales", "platform.s.executive.locations",
-                                        "finance.export"]},
+                                        "platform.s.executive.locations.company_sales",
+                                        "platform.s.executive.locations.bc_sales", "finance.export"]},
     # --- HR
     "HR manager": {"department": "HR", "system": False,
                    "description": "Labour cost of every restaurant (executive dashboard); payroll is not in pulse.",
-                   "permissions": ["platform.s.executive.labor", "platform.s.executive.locations"]},
+                   "permissions": ["platform.s.executive.labor", "platform.s.executive.locations",
+                                   "platform.s.executive.locations.pl"]},
     "Payroll specialist": {"department": "HR", "system": False,
                            "description": "Labour cost (executive dashboard).",
                            "permissions": ["platform.s.executive.labor"]},
@@ -306,6 +310,18 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                                               "finance.s.inventory.today", "finance.s.budget.today",
                                               "finance.s.assets.today"),
                  "purchasing.s.overview.today": ("purchasing.s.exceptions.today",),
+                 # Location intelligence of the Executive dashboard in parts (14 Nov 2026): each part once to the roles
+                 # whose other screens already show that kind of figure; the tab alone is the restaurants
+                 "platform.s.executive.locations.company_sales": ("platform.s.executive.overview",
+                                                                 "platform.s.executive.sales"),
+                 "platform.s.executive.locations.company_pl": ("platform.s.executive.overview",),
+                 "platform.s.executive.locations.pl": ("platform.s.executive.overview", "platform.s.executive.labor",
+                                                       "platform.s.executive.food"),
+                 "platform.s.executive.locations.bc_sales": ("platform.s.executive.overview", "platform.s.executive.sales",
+                                                             "finance.s.salesrec", "finance.s.kartela.ar"),
+                 "platform.s.executive.locations.purch_inv": ("platform.s.executive.overview",
+                                                              "platform.s.executive.purchasing",
+                                                              "finance.s.inventory.overview"),
                  "finance.s.pl.pl": ("finance.s.pl.charts",)}
 # Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
 REMOVED_SCREENS = ("finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
