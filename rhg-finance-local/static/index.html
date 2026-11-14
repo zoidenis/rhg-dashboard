@@ -2478,7 +2478,8 @@ function withDept(url){
   const p = new URLSearchParams((m[2] || "").slice(1));
   if (p.has("dimension")) return url;
   p.set("dimension", d.join(","));
-  return url.slice(0, m.index) + "/api/" + m[1] + "?" + p.toString();
+  // the address as it was, up to its path (no "/api/" written here: nginx rewrites it into /finance/api/ in this page)
+  return url.slice(0, m.index + m[0].length - (m[2] || "").length) + "?" + p.toString();
 }
 (function(){
   const f = window.fetch.bind(window);
