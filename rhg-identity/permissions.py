@@ -236,7 +236,10 @@ DEFAULT_ROLES = {
     "HR manager": {"department": "HR", "system": False,
                    "description": "Labour cost of every restaurant (executive dashboard); payroll is not in pulse.",
                    "permissions": ["platform.s.executive.labor", "platform.s.executive.locations",
-                                   "platform.s.executive.locations.pl"]},
+                                   "platform.s.executive.locations.pl", "finance.view", "finance.pl.view",
+                                   "finance.s.people.workforce", "finance.s.people.productivity",
+                                   "finance.s.people.scheduling", "finance.s.people.personnel",
+                                   "finance.s.people.quality"]},
     "Payroll specialist": {"department": "HR", "system": False,
                            "description": "Labour cost (executive dashboard).",
                            "permissions": ["platform.s.executive.labor"]},
@@ -298,6 +301,13 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "purchasing.s.compare.negotiations": "purchasing.s.compare.savings",
                  # Prices & contracts → Item history: whoever reads the price changes or the location prices
                  "purchasing.s.compare.items": ("purchasing.s.compare.prices", "purchasing.s.compare.locations"),
+                 # People & Productivity: whoever reads Sales or the P&L; the personnel cost: whoever reads the P&L or
+                 # the Executive dashboard's labour cost (HR)
+                 "finance.s.people.workforce": ("finance.s.sales.main", "finance.s.pl.pl", "platform.s.executive.labor"),
+                 "finance.s.people.productivity": ("finance.s.sales.main", "finance.s.pl.pl", "platform.s.executive.labor"),
+                 "finance.s.people.scheduling": ("finance.s.sales.main", "platform.s.executive.labor"),
+                 "finance.s.people.quality": ("finance.s.sales.main", "platform.s.executive.labor"),
+                 "finance.s.people.personnel": ("finance.s.pl.pl", "platform.s.executive.labor"),
                  "purchasing.negotiations.edit": "purchasing.actions.manage",
                  # Inventory → Item cards (was Item master control): with its stock by location it is also for the
                  # people of the warehouses, so whoever reads an inventory screen by location gets it once

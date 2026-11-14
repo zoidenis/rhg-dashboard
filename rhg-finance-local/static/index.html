@@ -37,7 +37,8 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 .fc-chart .vl{font-size:11px;font-weight:600;fill:var(--ink)}.fc-chart .lb{font-size:11.5px;fill:var(--ink)}
 .fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
-.fc-seg button.on{background:var(--accent);color:var(--card)}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.fc-seg button.on{background:var(--accent);color:var(--card)}
+@media (max-width:640px){#v-people .card-head{flex-direction:column;align-items:stretch}#v-people .card-head .sh-ctl{display:flex;flex-wrap:wrap;gap:6px}}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ic-keys{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink)}
 .ic-keys i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .ic-keys i.ln{width:16px;height:2px;border-radius:0;vertical-align:3px}.ic-keys i.dash{width:16px;height:0;border-top:2px dashed var(--sub);border-radius:0;vertical-align:3px;background:none}
@@ -636,6 +637,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <button class="on" data-view="overview">Executive overview</button>
     <button data-view="group">Group view</button>
     <button data-view="sales">Sales</button>
+    <button data-view="people">People &amp; Productivity</button>
 
     <div class="grp">Statements</div>
     <button data-view="pl" data-tab="Profit &amp; loss" data-group="Statements">Financial statements</button>
@@ -1707,6 +1709,27 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <details class="card" id="slHow" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
   </section>
 
+  <section class="view" id="v-people">
+    <div class="ov-tabs" id="ppTabs" role="tablist"><button data-t="workforce" class="on" role="tab" aria-selected="true">Workforce</button><button data-t="productivity" role="tab" aria-selected="false">Labour productivity</button><button data-t="scheduling" role="tab" aria-selected="false">Scheduling &amp; attendance</button><button data-t="personnel" role="tab" aria-selected="false">Personnel cost</button><button data-t="quality" role="tab" aria-selected="false">HR data quality</button></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2 id="ppH">Workforce</h2><p class="hint" id="ppHint"></p></div>
+        <div class="sh-ctl"><select id="ppLoc" aria-label="Restaurant" style="display:none"></select><button class="mini dark" id="ppRead" type="button">Read again</button><button class="mini exp" id="ppExp" type="button">Export ▾</button><button class="mini" id="ppSetBtn" type="button" style="display:none">Connection</button></div></div>
+      <p class="meta" id="ppStatus" style="margin:6px 0 0">Open a tab to read.</p>
+    </div>
+    <div class="card" id="ppSet" style="display:none;margin-bottom:14px">
+      <div class="card-head"><div><h2>Odoo: connection &amp; mapping</h2>
+        <p class="hint"><span>The tower reads Odoo's HR records through Odoo's external API with an Odoo user and an API key (Odoo → My Profile → Account Security → New API Key). The key is typed here, stays on the server and is never shown again.</span> <span>Only read: nothing is written to Odoo.</span></p></div></div>
+      <div class="formgrid"><label class="field">Odoo address<input id="odUrl" autocomplete="off" spellcheck="false" placeholder="https://rhg-group.odoo.com"></label><label class="field">Database<input id="odDb" autocomplete="off" spellcheck="false"></label>
+        <label class="field">Login (the Odoo user)<input id="odLogin" autocomplete="off" spellcheck="false"></label><label class="field">API key<input id="odKey" type="password" autocomplete="new-password" spellcheck="false"></label></div>
+      <label class="field" style="margin-top:8px">Odoo restaurants → restaurants <span class="meta">one per line: Odoo restaurant (top department) = reference of Settings → Location intelligence; "= -" leaves one out. The usual ones are already mapped.</span><textarea id="odMap" spellcheck="false" style="min-height:70px"></textarea></label>
+      <label class="field" style="margin-top:8px">Thresholds of sales per labour hour <span class="meta">one per line: reference = low, high (e.g. SALT = 3000, 9000; * for every restaurant). Without them no hour is called short or over staffed.</span><textarea id="odTh" spellcheck="false" style="min-height:50px"></textarea></label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="odSave" type="button">Save</button><button class="btn" id="odTest" type="button">Test the connection</button><span class="meta" id="odMsg"></span></div>
+      <div class="scroll" style="margin-top:12px"><table id="odUnits"></table></div></div>
+    <div id="ppKpis"></div>
+    <div id="ppBody"></div>
+    <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:15px;font-weight:600">How these figures are built</summary><div class="hint" id="ppDefs" style="margin-top:10px;line-height:1.55"></div></details></div>
+  </section>
+
   <section class="view" id="v-register">
     <div class="card">
       <div class="card-head"><div><h2>Exceptions register</h2>
@@ -2471,7 +2494,7 @@ const DEPT_API = new Set(["finance/locations", "cash/locations", "kartela/locati
   "today/locations", "assets/locations", "locations", "transit", "discharge", "discharge/xlsx", "movement", "movement/rows",
   "movement/xlsx", "typology", "typology/xlsx", "stockcount", "stockcount/xlsx", "shrinkage", "shrinkage/xlsx",
   "shrinkage/overview", "shrinkage/config", "sales/stockstop", "sales/stockstop/xlsx", "sevenrooms", "sevenrooms/xlsx",
-  "receipts", "billyrec", "billyrec/xlsx", "billyrec/rows", "executive"]);
+  "receipts", "billyrec", "billyrec/xlsx", "billyrec/rows", "executive", "people"]);
 function withDept(url){
   if (typeof url !== "string") return url;
   const m = url.match(/\/api\/([^?#]*)(\?[^#]*)?/);
@@ -2616,6 +2639,7 @@ function render(){
   if(!pmLoaded) loadPlMemo();
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
+  if($("v-people").classList.contains("on") && ppKeys[ppPart()] !== ppQs()) ppLoad(false);
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "loc" && typeof chData !== "undefined" && chData && chData._q !== chQuery()) loadCh();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "menu" && meKey !== meQs()) meLoad();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "chanprofit" && cpKey !== cpQs()) cpLoad();
@@ -4561,6 +4585,270 @@ function mcWhere(){
   $("mcLoss").innerHTML = L + rd.map(i => `<div class="mc-it"><b title="${esc(i.name)}">${esc(i.name)}</b><span class="r warn">${i.rtn > 0 ? fmt(i.rtn) + " ↩" : fmt(i.disc_pct, 0) + "%"}</span><span class="m">${fcSp(`${i.rtn > 0 ? `${fmt(i.rtn)} returned` : ""}${i.rtn > 0 && i.disc ? " · " : ""}${i.disc ? `discounts ${ilM(i.disc)} (${fmt(i.disc_pct, 0)}% of sales)` : ""}`)}</span></div>`).join("");
 }
 window.addEventListener("resize", () => { if ($("slMcView") && $("slMcView").style.display !== "none") { if (mcData) mcMatrix(); if (mcTrend) mcTrendDraw(); } });
+// ---------- People & Productivity (/api/people, people.py): Odoo HR against Simphony's sales and BC's personnel cost ----------
+// Only sums by restaurant reach the page: no name, wage or contract of a person.
+var ppTab = "workforce", ppData = {}, ppKeys = {}, ppTimer = null, ppMetric = "net", ppSel = "";
+const PP_TITLE = {workforce: "Workforce", productivity: "Labour productivity", scheduling: "Scheduling & attendance", personnel: "Personnel cost", quality: "HR data quality"};
+const PP_HINT = {
+  workforce: "Active employees by restaurant, section (front of house, back of house, management) and position; FTE where the contract's schedule gives its hours; headcount at each month end, hires and leavers from the contracts. From Odoo Employees and Contracts.",
+  productivity: "Simphony's net sales, checks and guests against Odoo's actual hours of the same restaurant and business days, for the period chosen above, and the week by week trend. Team figures of a restaurant, not the productivity of a person.",
+  scheduling: "When the restaurant is busy against the people on shift: the average of each weekday and hour of the period, Simphony's sales and checks against Odoo's planned and actual staff. Choose the restaurant and what the grid shows.",
+  personnel: "The personnel cost Business Central holds on the payroll accounts of each department, month by month, against its net revenue and the budget: labour cost %. Click a restaurant for its months and accounts.",
+  quality: "What to correct in Odoo so the figures above hold: employees without a manager, work location, position or running contract, schedules without hours a week, attendances with a forgotten check-out or waiting for review, and restaurants without a mapping."};
+function ppPart(){ return ppTab === "quality" ? "workforce" : ppTab; }
+function ppQs(){ const p = new URLSearchParams(params()); p.set("part", ppPart()); return p.toString(); }
+function ppShow(tab){
+  ppTab = tab;
+  document.querySelectorAll("#ppTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("ppH").textContent = PP_TITLE[tab]; $("ppHint").textContent = PP_HINT[tab];
+  $("ppLoc").style.display = tab === "scheduling" ? "" : "none";
+  if (currentView().id === "people") setHeader();
+  ppLoad(false);
+}
+document.querySelectorAll("#ppTabs button").forEach(b => b.onclick = () => ppShow(b.dataset.t));
+async function ppLoad(force){
+  const part = ppPart(), q = ppQs();
+  if (ppData[part] && ppKeys[part] === q && !force && !ppData[part].reading) { ppRender(); return; }
+  clearTimeout(ppTimer);
+  $("ppStatus").textContent = "Reading…";
+  try {
+    const r = await fetch("/api/people?" + q + (force ? "&refresh=1" : "")), j = await readJSON(r);
+    if (!r.ok || (j.error && j.available !== false)) throw new Error(j.error || r.status);
+    if (ppQs() !== q && ppPart() === part) return;
+    if (j.can_settings !== undefined) $("ppSetBtn").style.display = j.can_settings ? "" : "none";
+    if (j.configured === false) { ppData[part] = null; $("ppStatus").textContent = j.error; $("ppKpis").innerHTML = ""; $("ppBody").innerHTML = j.can_settings ? "" : `<div class="card"><p class="meta">${esc(j.error)} Ask whoever holds Settings.</p></div>`; if (j.can_settings) ppSetOpen(true); return; }
+    if (j.pending || j.reading) {
+      $("ppStatus").textContent = "Reading " + (j.stage || "") + "… the first read of a period takes a few minutes; then it is kept.";
+      ppTimer = setTimeout(() => { if (ppPart() === part && currentView().id === "people") ppLoad(false); }, 4000);
+      if (j.pending) return;
+    }
+    if (j.available === false) throw new Error(j.error || "Not read.");
+    ppData[part] = j; ppKeys[part] = q; ppRender();
+  } catch (e) { $("ppStatus").textContent = "Could not read: " + e.message; }
+}
+$("ppRead").onclick = () => ppLoad(true);
+const ppN = (v, d) => v == null ? "–" : fmt(v, d || 0);
+const ppPctS = v => v == null ? "–" : `<span class="${v > 0 ? "down" : v < 0 ? "up" : ""}">${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v), 1)}%</span>`;
+function ppRender(){
+  const d = ppData[ppPart()]; if (!d) return;
+  $("ppDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
+  ({workforce: ppWorkforce, productivity: ppProductivity, scheduling: ppScheduling, personnel: ppPersonnel, quality: ppQuality})[ppTab](d);
+}
+// A. Workforce
+function ppWorkforce(d){
+  const R = d.locations, all = R.concat(d.support, d.unmapped), sum = (L, k) => L.reduce((a, x) => a + (x[k] || 0), 0);
+  const last12 = (x, k) => x[k].slice(-13, -1).reduce((a, m) => a + m[1], 0);
+  $("ppStatus").textContent = `Odoo read ${d.read_at.slice(0, 16).replace("T", " ")} · ${fmt(d.totals.active)} active and ${fmt(d.totals.archived)} archived employees · contracts from ${d.history_from || "–"}`;
+  $("ppKpis").innerHTML = Pulse.tiles([
+    {l: "Active employees", v: fmt(sum(all, "employees")), s: `${fmt(sum(R, "employees"))} in ${R.length} restaurants · ${fmt(sum(d.support, "employees"))} in support units`},
+    {l: "FTE", v: fmt(sum(all, "fte"), 1), s: `${fmt(sum(all, "fte_unknown"))} people without hours a week in their schedule`, cls: sum(all, "fte_unknown") ? "warn" : ""},
+    {l: "Hires · 12 months", v: fmt(all.reduce((a, x) => a + last12(x, "hires"), 0)), s: "first contracts of the twelve closed months"},
+    {l: "Leavers · 12 months", v: fmt(all.reduce((a, x) => a + last12(x, "leavers"), 0)), s: "last contracts closed"},
+    {l: "Transfers", v: fmt(d.transfers_list.reduce((a, t) => a + t[2], 0)), s: "between restaurants, in the months shown", open: "ppk|transfers"},
+    {l: "Needs review", v: fmt(d.unmapped.length), s: "Odoo restaurants mapped to no restaurant of Settings", cls: d.unmapped.length ? "warn" : "", open: "ppk|review"}]);
+  const months = d.months.slice(-13), tot = months.map(k => all.reduce((a, x) => a + ((x.trend.find(t => t[0] === k) || [0, 0])[1]), 0));
+  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>By restaurant</h2><p class="hint">Active employees by section; click a restaurant for its positions and months.</p>`
+    + Pulse.bars(R.concat(d.support).map(x => ({key: x.name, segs: [[x.sections.FOH || 0, "var(--ch-0)", "front of house"], [x.sections.BOH || 0, "var(--ch-1)", "back of house"], [x.sections.MGMT || 0, "var(--ch-2)", "management"], [x.sections.Other || 0, "var(--ch-4)", "other"]],
+        text: `<b>${fmt(x.employees)}</b> <span class="meta">FTE ${fmt(x.fte, 1)}</span>`, open: "ppw|" + x.unit})),
+      [["var(--ch-0)", "front of house"], ["var(--ch-1)", "back of house"], ["var(--ch-2)", "management"], ["var(--ch-4)", "other"]]) + `</div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>Headcount at each month end</h2><p class="hint">Employees under contract on the last day of the month, every Odoo restaurant; the running month to today.</p>`
+    + Pulse.cols(months.map((k, i) => ({label: k.slice(2), segs: [[tot[i], "var(--ch-0)", "headcount"]], tip: `${k}: ${fmt(tot[i])} employees`})), null, {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="card"><h2>Every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Employees</th><th class="num">FOH</th><th class="num">BOH</th><th class="num">Mgmt</th><th class="num">FTE</th><th class="num">Hires 12m</th><th class="num">Leavers 12m</th><th class="num">Turnover 12m</th><th>Mapping</th></tr>`
+    + all.map(x => `<tr data-pulse="ppw|${esc(x.unit)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.unit)}${x.company ? " · " + esc(x.company) : ""}</div></td><td class="num"><b>${fmt(x.employees)}</b></td>
+      <td class="num">${fmt(x.sections.FOH || 0)}</td><td class="num">${fmt(x.sections.BOH || 0)}</td><td class="num">${fmt(x.sections.MGMT || 0)}</td><td class="num">${fmt(x.fte, 1)}${x.fte_unknown ? `<div class="meta">${x.fte_unknown} unknown</div>` : ""}</td>
+      <td class="num">${fmt(last12(x, "hires"))}</td><td class="num">${fmt(last12(x, "leavers"))}</td><td class="num">${x.turnover_12m == null ? "–" : fmt(x.turnover_12m, 1) + "%"}</td>
+      <td class="meta">${x.how === "mapped" ? esc(x.ref) : x.how === "needs review" ? '<span class="chip warn">Needs review</span>' : "support"}</td></tr>`).join("") + `</table></div></div>`;
+}
+Pulse.on("ppw", unit => {
+  const d = ppData.workforce, x = d && d.locations.concat(d.support, d.unmapped).find(r => r.unit === unit); if (!x) return;
+  const months = d.months.slice(-13);
+  Pulse.pop({title: esc(x.name), sub: esc(`${x.unit} · Odoo · ${fmt(x.employees)} active employees`), body: Pulse.tiles([
+      {l: "Employees", v: fmt(x.employees), s: `FOH ${x.sections.FOH || 0} · BOH ${x.sections.BOH || 0} · Mgmt ${x.sections.MGMT || 0}`},
+      {l: "FTE", v: fmt(x.fte, 1), s: x.fte_unknown ? `${x.fte_unknown} without hours a week` : ""},
+      {l: "Turnover · 12 months", v: x.turnover_12m == null ? "–" : fmt(x.turnover_12m, 1) + "%", s: "leavers / average headcount"},
+      {l: "Without a manager", v: fmt(x.no_manager), s: `${fmt(x.no_location)} without a work location`, cls: x.no_manager ? "warn" : ""}])
+    + Pulse.panel("Headcount, hires and leavers", Pulse.cols(months.map(k => { const h = (x.trend.find(t => t[0] === k) || [0, 0])[1], hi = (x.hires.find(t => t[0] === k) || [0, 0])[1], lv = (x.leavers.find(t => t[0] === k) || [0, 0])[1];
+        return {label: k.slice(2), segs: [[h, "var(--ch-0)", "headcount"]], tip: `${k}: ${h} employees · ${hi} hired · ${lv} left`}; }), null, {maxLabel: v => fmt(v)}))
+    + Pulse.panel("By position", Pulse.bars(Object.entries(x.jobs).sort((a, b) => b[1] - a[1]).map(([j, n]) => ({key: j, segs: [[n, "var(--ch-0)", "employees"]], text: fmt(n)}))))});
+});
+Pulse.on("ppk", kind => {
+  const d = ppData.workforce; if (!d) return;
+  if (kind === "transfers") Pulse.pop({title: "Transfers between restaurants", sub: "From the employees' contracts", body: Pulse.list([["Month"], ["From → to"], ["Employees", 1]], d.transfers_list.slice().reverse().map(t => ({cells: [esc(t[0]), esc(t[1]), fmt(t[2])]})), {max: 480, none: "No transfer in the months held."})});
+  if (kind === "review") Pulse.pop({title: "Odoo restaurants to review", sub: "Mapped to a reference that is not a restaurant of Settings → Location intelligence", body: Pulse.list([["Odoo restaurant"], ["Mapped to"], ["Employees", 1]], d.unmapped.map(x => ({cells: [esc(x.unit), esc(x.ref || "–"), fmt(x.employees)]})), {none: "None: every Odoo restaurant maps to a restaurant, or is a support unit."})});
+});
+// B. Labour productivity
+function ppProductivity(d){
+  const R = d.locations, C = (R[0] || {}).currency || "ALL";
+  const tn = R.reduce((a, x) => a + x.net, 0), th = R.reduce((a, x) => a + x.hours, 0);
+  const W = d.weekly, wn = W.reduce((a, w) => a + w[1], 0), wh = W.reduce((a, w) => a + w[4], 0), wc = W.reduce((a, w) => a + w[2], 0), wg = W.reduce((a, w) => a + w[3], 0);
+  $("ppStatus").textContent = `${d.period.from} to ${d.period.to}${d.prior ? ` against ${d.prior.from} to ${d.prior.to}` : ""} · read ${d.read_at.slice(11, 16)}${d.reading ? " · reading again…" : ""}${d.errors.length ? " · Simphony: " + d.errors.join("; ") : ""}`;
+  $("ppKpis").innerHTML = Pulse.tiles([
+    {l: `Sales per labour hour · ${C}`, v: wh ? fmt(wn / wh) : "–", s: "net sales / actual hours, the days both systems answered"},
+    {l: "Checks per labour hour", v: wh ? fmt(wc / wh, 2) : "–", s: `${fmt(wc)} checks`},
+    {l: "Guests per labour hour", v: wh ? fmt(wg / wh, 2) : "–", s: "covers keyed in Simphony"},
+    {l: "Actual hours", v: fmt(th), s: `${fmt(R.reduce((a, x) => a + x.overtime, 0))} overtime · Odoo attendances`},
+    {l: `Net sales · ${C}`, v: fmt(tn), s: `${R.length} restaurants with hours`},
+    {l: "Support units", v: fmt(d.support.reduce((a, x) => a + x.hours, 0)), s: "hours of the warehouse, central kitchen, head office: not in a restaurant"}]);
+  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Sales per labour hour by restaurant</h2><p class="hint">Net sales per actual hour, with the change against the comparison period; click a restaurant for its weeks and days.</p>`
+    + Pulse.bars(R.filter(x => x.splh != null).sort((a, b) => b.splh - a.splh).map(x => ({key: x.name, segs: [[x.splh, "var(--ch-0)", "sales per labour hour"]], text: `<b>${fmt(x.splh)}</b> <span class="meta">${x.change_splh == null ? "" : ppPctS(x.change_splh)}</span>`, open: "ppp|" + x.ref})), null, {none: "No restaurant with both sales and hours in this period."}) + `</div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>Week by week</h2><p class="hint">Sales per labour hour of every restaurant together, by week (Monday).</p>`
+    + Pulse.cols(W.map(w => ({label: w[0].slice(5), segs: [[w[5] || 0, "var(--ch-0)", "sales per labour hour"]], tip: `Week of ${w[0]}: ${fmt(w[5])} per hour · ${fmt(w[1])} net sales · ${fmt(w[4])} hours`})), null, {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="card"><h2>Every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Net sales</th><th class="num">Actual hours</th><th class="num">Sales / hour</th><th class="num">Checks / hour</th><th class="num">Guests / hour</th><th class="num">Comparison</th><th class="num">Change</th><th class="num">FOH / BOH / Mgmt hours</th><th class="num">Days with both</th></tr>`
+    + R.map(x => `<tr data-pulse="ppp|${esc(x.ref)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.units.join(", "))}</div></td><td class="num">${fmt(x.net)}</td><td class="num">${fmt(x.hours)}</td>
+      <td class="num"><b>${ppN(x.splh)}</b></td><td class="num">${ppN(x.cplh, 2)}</td><td class="num">${ppN(x.gplh, 2)}</td><td class="num">${ppN(x.prev_splh)}</td><td class="num">${x.change_splh == null ? "–" : ppPctS(x.change_splh)}</td>
+      <td class="num">${fmt(x.sections.FOH)} / ${fmt(x.sections.BOH)} / ${fmt(x.sections.MGMT)}</td><td class="num">${x.both_days} of ${x.days}</td></tr>`).join("") + `</table></div></div>`;
+}
+Pulse.on("ppp", ref => {
+  const d = ppData.productivity, x = d && d.locations.find(L => L.ref === ref); if (!x) return;
+  Pulse.pop({title: esc(x.name), sub: esc(`${d.period.from} to ${d.period.to} · Simphony ${x.ref} · Odoo ${x.units.join(", ")}`), body: Pulse.tiles([
+      {l: "Sales per labour hour", v: ppN(x.splh), s: x.prev_splh ? `comparison ${fmt(x.prev_splh)} · ${ppPctS(x.change_splh)}` : ""},
+      {l: "Checks per labour hour", v: ppN(x.cplh, 2)}, {l: "Guests per labour hour", v: ppN(x.gplh, 2)},
+      {l: "Actual hours", v: fmt(x.hours), s: `planned ${x.planned_days ? fmt(x.planned) : "– (no plan in Odoo)"}`},
+      {l: "Overtime hours", v: fmt(x.overtime)}, {l: "Days with both systems", v: `${x.both_days} of ${x.days}`, s: `${x.days_sales} with sales · ${x.days_hours} with hours`}])
+    + Pulse.panel("Week by week", Pulse.cols(x.weeks.map(w => ({label: w[0].slice(5), segs: [[w[6] || 0, "var(--ch-0)", "sales per labour hour"]], tip: `Week of ${w[0]}: ${fmt(w[6])} per hour · ${fmt(w[1])} sales · ${fmt(w[4])} hours`})), null, {maxLabel: v => fmt(v)}))
+    + Pulse.panel("Day by day", Pulse.list([["Business day"], ["Net sales", 1], ["Checks", 1], ["Guests", 1], ["Actual hours", 1], ["Planned hours", 1], ["Sales / hour", 1]],
+        x.daily.slice().reverse().map(r => ({cells: [esc(r[0]), r[6] ? fmt(r[1]) : '<span class="meta">not read</span>', fmt(r[2]), fmt(r[3]), r[4] ? fmt(r[4], 1) : '<span class="meta">none</span>', r[5] ? fmt(r[5], 1) : "–", r[6] && r[4] ? fmt(r[1] / r[4]) : "–"]})), {max: 380}))});
+});
+// C, E. Scheduling & attendance: the day × hour grid
+const PP_METRIC = {net: ["Net sales", 0, 0], checks: ["Checks", 1, 1], actual: ["Actual staff", 2, 1], planned: ["Planned staff", 3, 1], splh: ["Sales per labour hour", 4, 0]};
+function ppScheduling(d){
+  const R = d.locations;
+  const sel = $("ppLoc"), cur = ppSel || sel.value;
+  sel.innerHTML = R.map(x => `<option value="${esc(x.ref)}">${esc(x.name)}</option>`).join("");
+  sel.value = R.some(x => x.ref === cur) ? cur : (R[0] || {}).ref || "";
+  const x = R.find(L => L.ref === sel.value);
+  $("ppStatus").textContent = `${d.period.from} to ${d.period.to} · business day from ${String(d.day_start).padStart(2, "0")}:00 · read ${d.read_at.slice(11, 16)}`;
+  if (!x) { $("ppKpis").innerHTML = ""; $("ppBody").innerHTML = '<div class="card"><p class="meta">No restaurant with hours in this period.</p></div>'; return; }
+  const st = x.states || {}, rev = (st.pending || 0) + (st.escalated || 0) + (st.no_review || 0);
+  $("ppKpis").innerHTML = Pulse.tiles([
+    {l: "Actual hours", v: fmt(x.hours), s: "Odoo attendances"},
+    {l: "Planned hours", v: x.planned_days ? fmt(x.planned) : "–", s: x.planned_days ? `${x.planned_days} days planned in Odoo Planning` : "no plan in Odoo for this restaurant"},
+    {l: "Plan − actual", v: x.planned_days ? fmt(x.planned - x.hours) : "–", s: "hours", cls: x.planned_days && Math.abs(x.planned - x.hours) > x.planned * 0.1 ? "warn" : ""},
+    {l: "Forgotten check-outs", v: fmt(x.forgotten), s: "open for more than 16 hours: no hours counted", cls: x.forgotten ? "warn" : ""},
+    {l: "Waiting for review", v: fmt(rev), s: `pending ${st.pending || 0} · escalated ${st.escalated || 0} · not reviewed ${st.no_review || 0}`, cls: rev ? "warn" : ""},
+    {l: "Longer than 14 hours", v: fmt(x.long || 0), s: `attendances to check · ${fmt(x.rejected_hours, 1)} rejected hours left out`, cls: x.long ? "warn" : ""}]);
+  const M = PP_METRIC[ppMetric], idx = M[1];
+  const vals = x.grid.flat().map(c => c[idx]).filter(v => v != null && v > 0), max = Math.max(1e-9, ...vals);
+  const hours = Array.from({length: 24}, (_, i) => (i + d.day_start) % 24);
+  const seg = Object.entries(PP_METRIC).map(([k, m]) => `<button type="button" data-ppm="${k}" class="${k === ppMetric ? "on" : ""}">${esc(m[0])}</button>`).join("");
+  const cell = (c, wd, h) => { const v = c[idx]; const a = v == null || v <= 0 ? 0 : Math.max(0.08, v / max);
+    const sh = v >= 10000 ? fmt(v / 1000) + "k" : v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, M[2]);
+    return `<td title="${esc(`${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][wd]} ${String(h).padStart(2, "0")}:00 · sales ${fmt(c[0])} · checks ${fmt(c[1], 1)} · actual staff ${fmt(c[2], 1)} · planned ${fmt(c[3], 1)} · sales per labour hour ${c[4] == null ? "–" : fmt(c[4])}`)}" style="background:color-mix(in srgb, var(--accent) ${Math.round(a * 85)}%, transparent);color:${a > 0.55 ? "#fff" : "var(--ink)"};text-align:center;font-size:11px;padding:4px 2px;min-width:30px">${v == null || v <= 0 ? "" : sh}</td>`; };
+  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><div class="card-head"><div><h2>Day × hour</h2><p class="hint">The average of each weekday and hour of the period at ${esc(x.name)}. Hover a cell for all its figures.</p></div></div>
+      <div class="fc-seg" role="tablist" id="ppSeg">${seg}</div>
+      <div class="scroll" style="margin-top:10px"><table data-nosort style="border-collapse:separate;border-spacing:2px"><tr><th></th>${hours.map(h => `<th style="font-size:10.5px;text-align:center">${String(h).padStart(2, "0")}</th>`).join("")}</tr>
+      ${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((n, wd) => `<tr><th style="font-size:12px">${n}</th>${hours.map(h => cell(x.grid[wd][h], wd, h)).join("")}</tr>`).join("")}</table></div></div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>Signals</h2><p class="hint">${x.thresholds.splh_high || x.thresholds.splh_low ? `Hours whose sales per labour hour are above ${ppN(x.thresholds.splh_high)} or under ${ppN(x.thresholds.splh_low)} (Connection → Thresholds): hours to look at, not a cause.` : "No thresholds of sales per labour hour are set for this restaurant, so no hour is called short or over staffed. They are set under Connection → Thresholds."}</p>`
+    + (x.signals.length ? Pulse.list([["Weekday"], ["Hour"], ["Signal"], ["Sales per labour hour", 1]], x.signals.map(s => ({cells: [esc(s[0]), String(s[1]).padStart(2, "0") + ":00", esc(s[2]), fmt(s[3])]}))) : "") + `</div>`
+    + `<div class="card"><h2>Planned against actual, every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Planned hours</th><th class="num">Actual hours</th><th class="num">Difference</th><th class="num">Overtime</th><th class="num">Forgotten check-outs</th><th class="num">Longer than 14 h</th><th class="num">Waiting for review</th><th class="num">Rejected hours</th></tr>`
+    + R.map(L => { const s2 = L.states || {}; return `<tr><td class="name">${esc(L.name)}</td><td class="num">${L.planned_days ? fmt(L.planned) : '<span class="meta">no plan</span>'}</td><td class="num">${fmt(L.hours)}</td><td class="num">${L.planned_days ? fmt(L.hours - L.planned) : "–"}</td><td class="num">${fmt(L.overtime)}</td><td class="num">${fmt(L.forgotten)}</td><td class="num">${fmt(L.long || 0)}</td><td class="num">${fmt((s2.pending || 0) + (s2.escalated || 0) + (s2.no_review || 0))}</td><td class="num">${fmt(L.rejected_hours, 1)}</td></tr>`; }).join("") + `</table></div></div>`;
+  document.querySelectorAll("#ppSeg [data-ppm]").forEach(b => b.onclick = () => { ppMetric = b.dataset.ppm; ppScheduling(d); });
+}
+$("ppLoc").onchange = () => { ppSel = $("ppLoc").value; if (ppData.productivity) ppScheduling(ppData.productivity); };
+// D. Personnel cost (BC)
+function ppPersonnel(d){
+  const R = d.locations, C = d.currency || "ALL", cost = R.reduce((a, x) => a + x.cost, 0), sales = R.filter(x => x.group === "restaurant").reduce((a, x) => a + x.sales, 0);
+  const rc = R.filter(x => x.group === "restaurant").reduce((a, x) => a + x.cost, 0), bud = R.reduce((a, x) => a + (x.budget || 0), 0);
+  $("ppStatus").textContent = `${d.company} · ${d.year} · Business Central, posting months ${d.months[0] || "–"} to ${d.months[d.months.length - 1] || "–"}${d.pending ? " · still being read" : ""}${d.provisional.length ? " · provisional: " + d.provisional.join(", ") : ""}`;
+  if (d.pending && !R.length) { ppTimer = setTimeout(() => { if (ppTab === "personnel") ppLoad(true); }, 5000); }
+  $("ppKpis").innerHTML = Pulse.tiles([
+    {l: `Personnel cost · ${C}`, v: fmt(cost), s: "every department, the year to date"},
+    {l: "Restaurants", v: fmt(rc), s: `${fmt(cost - rc)} on head office, central kitchen, warehouse`},
+    {l: "Labour cost %", v: sales ? fmt(rc / sales * 100, 1) + "%" : "–", s: "restaurants' personnel cost / their net revenue"},
+    {l: `Budget · ${C}`, v: bud ? fmt(bud) : "–", s: d.budget ? `${d.budget_name}` : "no budget with personnel accounts"}]);
+  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Month by month</h2><p class="hint">Personnel cost of every department by posting month; a month whose payroll is not posted yet is low.</p>`
+    + Pulse.cols(d.months.map(k => { const v = R.reduce((a, x) => a + ((x.months.find(m => m[0] === k) || [0, 0])[1]), 0); return {label: k.slice(2), segs: [[v, "var(--ch-0)", "personnel cost"]], tip: `${k}: ${fmt(v)} ${C}`}; }), null, {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="card"><h2>By department</h2><div class="scroll"><table data-nosort><tr><th>Department</th><th class="num">Personnel cost</th><th class="num">Net revenue</th><th class="num">Labour cost %</th><th class="num">Budget</th><th class="num">vs budget</th></tr>`
+    + R.map(x => `<tr data-pulse="ppc|${esc(x.dept)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.dept)}${x.group === "support" ? " · support" : ""}</div></td><td class="num"><b>${fmt(x.cost)}</b></td><td class="num">${x.sales ? fmt(x.sales) : "–"}</td>
+      <td class="num">${x.pct == null ? "–" : fmt(x.pct, 1) + "%"}</td><td class="num">${x.budget ? fmt(x.budget) : "–"}</td><td class="num">${x.budget ? (x.cost > x.budget ? `<span class="up">+${fmt(x.cost - x.budget)}</span>` : `<span class="down">−${fmt(x.budget - x.cost)}</span>`) : "–"}</td></tr>`).join("") + `</table></div></div>`;
+}
+Pulse.on("ppc", dept => {
+  const d = ppData.personnel, x = d && d.locations.find(L => L.dept === dept); if (!x) return;
+  const C = d.currency || "ALL";
+  Pulse.pop({title: esc(x.name), sub: esc(`${x.dept} · ${d.year} · Business Central`), body: Pulse.tiles([
+      {l: `Personnel cost · ${C}`, v: fmt(x.cost)}, {l: "Net revenue", v: x.sales ? fmt(x.sales) : "–"}, {l: "Labour cost %", v: x.pct == null ? "–" : fmt(x.pct, 1) + "%"}, {l: "Budget", v: x.budget ? fmt(x.budget) : "–"}])
+    + Pulse.panel("Month by month", Pulse.list([["Month"], [`Personnel cost ${C}`, 1], ["Kitchen", 1], ["Service", 1], ["Management", 1], ["Other", 1], ["Net revenue", 1], ["Labour cost %", 1], ["Budget", 1]],
+        x.months.map(m => ({cells: [esc(m[0]) + (d.provisional.includes(m[0]) ? ' <span class="meta">provisional</span>' : ""), fmt(m[1]), fmt(m[5].labor_kitchen || 0), fmt(m[5].labor_service || 0), fmt(m[5].labor_management || 0), fmt(m[5].labor_other || 0), m[2] ? fmt(m[2]) : "–", m[3] == null ? "–" : fmt(m[3], 1) + "%", m[4] ? fmt(m[4]) : "–"]}))))
+    + Pulse.panel("By account", Pulse.list([["Account"], ["Name"], [`Amount ${C}`, 1]], x.accounts.map(a => ({cells: [esc(a[0]), esc(a[1]), fmt(a[2])]}))))});
+});
+// HR data quality
+function ppQuality(d){
+  const all = d.locations.concat(d.support, d.unmapped), sum = k => all.reduce((a, x) => a + (x[k] || 0), 0);
+  const pr = ppData.productivity, PL = pr ? pr.locations : [];
+  const longA = PL.reduce((a, x) => a + (x.long || 0), 0);
+  const forgot = PL.reduce((a, x) => a + x.forgotten, 0), rev = PL.reduce((a, x) => a + (x.states.pending || 0) + (x.states.escalated || 0) + (x.states.no_review || 0), 0);
+  $("ppStatus").textContent = `Odoo read ${d.read_at.slice(0, 16).replace("T", " ")}` + (pr ? ` · attendances ${pr.period.from} to ${pr.period.to}` : " · open Labour productivity for the attendances of the period");
+  $("ppKpis").innerHTML = Pulse.tiles([
+    {l: "Without a manager", v: fmt(sum("no_manager")), cls: sum("no_manager") ? "warn" : ""}, {l: "Without a work location", v: fmt(sum("no_location")), cls: sum("no_location") ? "warn" : ""},
+    {l: "Without a position", v: fmt(sum("no_job"))}, {l: "Without a running contract", v: fmt(sum("no_contract")), cls: sum("no_contract") ? "warn" : ""},
+    {l: "Schedule without hours a week", v: fmt(sum("fte_unknown")), s: "FTE not counted"},
+    {l: "Forgotten check-outs", v: pr ? fmt(forgot) : "–", s: pr ? `${fmt(longA)} longer than 14 hours · ${fmt(rev)} waiting for review` : "", cls: forgot || longA ? "warn" : ""}]);
+  $("ppBody").innerHTML = `<div class="card"><h2>By Odoo restaurant</h2><p class="hint">Counts only; the names are corrected in Odoo by HR.</p><div class="scroll"><table data-nosort><tr><th>Odoo restaurant</th><th class="num">Employees</th><th class="num">No manager</th><th class="num">No work location</th><th class="num">No position</th><th class="num">No running contract</th><th class="num">FTE unknown</th><th>Mapping</th></tr>`
+    + all.map(x => `<tr><td class="name">${esc(x.unit)}</td><td class="num">${fmt(x.employees)}</td><td class="num">${fmt(x.no_manager)}</td><td class="num">${fmt(x.no_location)}</td><td class="num">${fmt(x.no_job)}</td><td class="num">${fmt(x.no_contract)}</td><td class="num">${fmt(x.fte_unknown)}</td><td class="meta">${x.how === "mapped" ? esc(x.ref) : x.how === "needs review" ? '<span class="chip warn">Needs review</span>' : "support"}</td></tr>`).join("") + `</table></div></div>`;
+}
+// the connection (Settings permission)
+function ppSetOpen(show){ $("ppSet").style.display = show ? "" : "none"; if (show) odLoad(); }
+$("ppSetBtn").onclick = () => ppSetOpen($("ppSet").style.display === "none");
+async function odLoad(){
+  try {
+    const r = await fetch("/api/odoo/settings"), j = await readJSON(r);
+    if (!r.ok) throw new Error(j.error || r.status);
+    const c = j.connection;
+    $("odUrl").value = c.url || "https://rhg-group.odoo.com"; $("odDb").value = c.db || ""; $("odLogin").value = c.login || ""; $("odMap").value = c.map || ""; $("odTh").value = c.thresholds || "";
+    $("odKey").placeholder = c.has_key ? `saved ${c.key_saved_at.slice(0, 10)} · type to replace` : "not set";
+    $("odUnits").innerHTML = j.units.length ? `<tr><th>Odoo restaurant</th><th>Restaurant</th><th>Mapping</th></tr>` + j.units.map(u => `<tr><td>${esc(u.unit)}</td><td>${esc(u.ref || "–")}</td><td>${u.how === "mapped" ? "mapped" : u.how === "needs review" ? '<span class="chip warn">Needs review</span>' : esc(u.how)}</td></tr>`).join("")
+      : `<tr><td class="meta">${esc(j.error || (c.configured ? "" : "Save the connection to see Odoo's restaurants and their mapping."))}</td></tr>`;
+  } catch (e) { $("odMsg").textContent = "Could not read: " + e.message; }
+}
+async function odPost(path, body){
+  const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"}, body: JSON.stringify(body || {})});
+  const j = await readJSON(r); if (!r.ok) throw new Error(j.error || r.status); return j;
+}
+$("odSave").onclick = async () => {
+  $("odMsg").textContent = "Saving…";
+  try { await odPost("/api/odoo/settings", {url: $("odUrl").value, db: $("odDb").value, login: $("odLogin").value, key: $("odKey").value, map: $("odMap").value, thresholds: $("odTh").value});
+    $("odKey").value = ""; $("odMsg").textContent = "Saved."; ppData = {}; odLoad(); } catch (e) { $("odMsg").textContent = "Not saved: " + e.message; }
+};
+$("odTest").onclick = async () => {
+  $("odMsg").textContent = "Signing in to Odoo…";
+  try { const j = await odPost("/api/odoo/test", {});
+    $("odMsg").textContent = `Connected (Odoo ${j.version || ""}): ${fmt(j.attendances)} attendances, ${fmt(j.employees)} employees, ${fmt(j["planned shifts"])} planned shifts${(j.warnings || []).length ? " · " + j.warnings.join("; ") : ""}.`; odLoad();
+  } catch (e) { $("odMsg").textContent = "Not connected: " + e.message; }
+};
+$("ppExp").onclick = () => {
+  const d = ppData[ppPart()]; if (!d) { alert("Wait for the figures to finish reading."); return; }
+  const defs = Object.values(d.definitions || {});
+  if (ppTab === "workforce" || ppTab === "quality") {
+    const all = d.locations.concat(d.support, d.unmapped);
+    xlsxTable(`People ${PP_TITLE[ppTab]} ${d.read_at.slice(0, 10)}`, [
+      {title: "Restaurants", header: ["Odoo restaurant", "Restaurant", "Mapping", "Company", "Employees", "FOH", "BOH", "Management", "Other", "FTE", "FTE unknown", "No manager", "No work location", "No position", "No running contract", "Turnover 12m"],
+       formats: ["text", "text", "text", "text", "int", "int", "int", "int", "int", "num", "int", "int", "int", "int", "int", "pct"],
+       rows: all.map(x => [x.unit, x.name, x.how, x.company, x.employees, x.sections.FOH || 0, x.sections.BOH || 0, x.sections.MGMT || 0, x.sections.Other || 0, x.fte, x.fte_unknown, x.no_manager, x.no_location, x.no_job, x.no_contract, x.turnover_12m == null ? null : x.turnover_12m / 100])},
+      {title: "Headcount by month", header: ["Odoo restaurant"].concat(d.months), formats: ["text"].concat(d.months.map(() => "int")), rows: all.map(x => [x.unit].concat(x.trend.map(t => t[1])))},
+      {title: "Hires and leavers", header: ["Odoo restaurant", "Month", "Hires", "Leavers"], formats: ["text", "text", "int", "int"], rows: all.flatMap(x => x.hires.map((h, i) => [x.unit, h[0], h[1], x.leavers[i][1]]).filter(r => r[2] || r[3]))},
+      {title: "Transfers", header: ["Month", "From → to", "Employees"], formats: ["text", "text", "int"], rows: d.transfers_list}], [`Odoo, read ${d.read_at}`].concat(defs));
+  } else if (ppTab === "personnel") {
+    xlsxTable(`Personnel cost ${d.company} ${d.year}`, [
+      {title: "Departments", header: ["Department", "Restaurant", "Group", "Personnel cost", "Net revenue", "Labour cost %", "Budget"], formats: ["text", "text", "text", "num", "num", "pct", "num"],
+       rows: d.locations.map(x => [x.dept, x.name, x.group, x.cost, x.sales, x.pct == null ? null : x.pct / 100, x.budget])},
+      {title: "Months", header: ["Department", "Month", "Personnel cost", "Kitchen", "Service", "Management", "Other", "Net revenue", "Labour cost %", "Budget"], formats: ["text", "text", "num", "num", "num", "num", "num", "num", "pct", "num"],
+       rows: d.locations.flatMap(x => x.months.map(m => [x.dept, m[0], m[1], m[5].labor_kitchen || 0, m[5].labor_service || 0, m[5].labor_management || 0, m[5].labor_other || 0, m[2], m[3] == null ? null : m[3] / 100, m[4]]))},
+      {title: "Accounts", header: ["Department", "Account", "Name", "Amount"], formats: ["text", "text", "text", "num"], rows: d.locations.flatMap(x => x.accounts.map(a => [x.dept, a[0], a[1], a[2]]))}],
+      [`${d.company} · ${d.year} · Business Central`].concat(defs));
+  } else {
+    xlsxTable(`Labour productivity ${d.period.from} ${d.period.to}`, [
+      {title: "Restaurants", header: ["Restaurant", "Reference", "Odoo restaurants", "Net sales", "Checks", "Guests", "Actual hours", "Planned hours", "Overtime hours", "FOH hours", "BOH hours", "Management hours", "Sales / labour hour", "Checks / labour hour", "Guests / labour hour", "Comparison sales / hour", "Change", "Days with both", "Forgotten check-outs", "Rejected hours"],
+       formats: ["text", "text", "text", "num", "int", "int", "num", "num", "num", "num", "num", "num", "num", "qty", "qty", "num", "pct", "int", "int", "num"],
+       rows: d.locations.map(x => [x.name, x.ref, x.units.join(", "), x.net, x.checks, x.guests, x.hours, x.planned_days ? x.planned : null, x.overtime, x.sections.FOH, x.sections.BOH, x.sections.MGMT, x.splh, x.cplh, x.gplh, x.prev_splh, x.change_splh == null ? null : x.change_splh / 100, x.both_days, x.forgotten, x.rejected_hours])},
+      {title: "Days", header: ["Restaurant", "Business day", "Net sales", "Checks", "Guests", "Actual hours", "Planned hours", "Sales read"], formats: ["text", "text", "num", "int", "int", "num", "num", "text"],
+       rows: d.locations.flatMap(x => x.daily.map(r => [x.name, r[0], r[1], r[2], r[3], r[4], r[5], r[6] ? "yes" : "no"]))},
+      {title: "Weeks", header: ["Week from", "Net sales", "Checks", "Guests", "Actual hours", "Sales / labour hour", "Checks / labour hour"], formats: ["text", "num", "int", "int", "num", "num", "qty"], rows: d.weekly},
+      {title: "Day x hour", header: ["Restaurant", "Weekday", "Hour", "Net sales", "Checks", "Actual staff", "Planned staff", "Sales / labour hour"], formats: ["text", "text", "int", "num", "qty", "qty", "qty", "num"],
+       rows: d.locations.flatMap(x => x.grid.flatMap((row, wd) => row.map((c, h) => [x.name, ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][wd], h, c[0], c[1], c[2], c[3], c[4]]).filter(r => r[3] || r[5])))},
+      {title: "Support units", header: ["Odoo unit", "Actual hours", "Planned hours"], formats: ["text", "num", "num"], rows: d.support.map(s => [s.unit, s.hours, s.planned])}],
+      [`${d.period.from} to ${d.period.to}`].concat(defs));
+  }
+};
 // ---------- Sales → Location intelligence ----------
 // Every restaurant as a square, from the same Simphony read as the Sales tab (/api/sales).
 var slTab = "main", slSort = "net";
@@ -9501,6 +9789,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="assets" && faTab === "loc" && (!faData || faKey !== faQuery())) loadFa(false);
   if(b.dataset.view==="budget" && blTab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
+  if(b.dataset.view==="people") ppShow(ppTab);
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="bs" || b.dataset.view==="liquidity") loadCap(false);
   if(b.dataset.view==="gaps") loadDq(false);
@@ -9558,6 +9847,13 @@ function setHeader(){
   $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower);
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
+  if (v.id === "people"){
+    $("title").textContent = `People & Productivity · ${PP_TITLE[ppTab]} · ${$("company").value || data.meta.company || ""}`;
+    $("period").textContent = ppTab === "workforce" || ppTab === "quality" ? "Odoo HR records, read only · sums by restaurant, no personal data"
+      : ppTab === "personnel" ? "Business Central personnel accounts by department and month · read only"
+      : `${data.meta.period_label} · Simphony sales against Odoo hours · read only`;
+    return;
+  }
   if (v.id === "sales"){
     $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : typeof slTab !== "undefined" && slTab === "stockstop" ? "Sales · Blocked by stock" : typeof slTab !== "undefined" && slTab === "sevenrooms" ? "Sales · SevenRooms ↔ Simphony" : "Sales") + " · " + ($("company").value || "all restaurants") + (dimValues().length ? " · " + dimValues().join(" + ") : "");
     $("period").textContent = typeof slTab !== "undefined" && slTab === "stockstop"

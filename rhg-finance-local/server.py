@@ -53,6 +53,8 @@ import salestop_report
 import xlsxtable
 import emcpriv
 import sevenrooms
+import odoo
+import people
 import srsim
 import sevenrooms_report
 import requests
@@ -119,6 +121,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/emcpriv/settings": "settings", "/api/emcpriv/check": "settings",
                      "/api/emcaudit": "settings",
                      "/api/sevenrooms/settings": "settings", "/api/sevenrooms/test": "settings",
+                     "/api/odoo/settings": "settings", "/api/odoo/test": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
@@ -2133,7 +2136,9 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          # Control: Simphony ↔ BC and Takings POS ↔ BC, by restaurant
                          "/api/salesrec", "/api/receipts", "/api/billyrec", "/api/billyrec/xlsx", "/api/billyrec/rows",
                          # Budget & forecast → Location intelligence, by department
-                         "/api/executive"}
+                         "/api/executive",
+                         # People & Productivity: by restaurant (people.cut)
+                         "/api/people"}
 
 
 # the departments chosen above: the screens that read them themselves, the cuts of the location screens (the same as for a
@@ -2149,7 +2154,7 @@ LOCATION_CUTS = {
 SELF_CUT = {"/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
             "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview",
             "/api/shrinkage/config", "/api/shrinkage/count", "/api/shrinkage/waste", "/api/sevenrooms",
-            "/api/sevenrooms/xlsx", "/api/billyrec/rows", "/api/billyrec/xlsx"}
+            "/api/sevenrooms/xlsx", "/api/billyrec/rows", "/api/billyrec/xlsx", "/api/people"}
 
 
 def dept_codes(company, depts):
@@ -2430,6 +2435,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: salestop.cut(b, self._allowed)
         elif path in ("/api/sevenrooms", "/api/sevenrooms/xlsx"):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
+        elif path == "/api/people":
+            self._scope_filter = None                                   # cut by the handler (people.cut)
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
         elif path == "/api/transit":
@@ -3029,6 +3036,71 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 store.audit("export", "menu prices", user["username"], {}, {"rows": r["count"]}, "")
+            elif url.path == "/api/odoo/settings":
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role does not include Settings."})
+                    return
+                out = {"connection": odoo.info(), "units": []}
+                if out["connection"]["configured"]:
+                    try:
+                        reg, m = people.places()
+                        out["restaurants"] = [{"ref": r, "name": x.get("name") or r} for r, x in reg.items()]
+                        out["units"] = [dict(zip(("unit", "ref", "how"), (u,) + people.unit_ref(u, reg, m)))
+                                        for u in sorted(odoo.units().values())]
+                    except odoo.Error as exc:
+                        out["error"] = str(exc)[:300]
+                self._send(200, out)
+            elif url.path == "/api/people":
+                # People & Productivity (people.py): Odoo HR against Simphony's sales and BC's personnel cost
+                part = q.get("part") or "workforce"
+                need = {"workforce": "finance.s.people.workforce", "productivity": "finance.s.people.productivity",
+                        "scheduling": "finance.s.people.scheduling", "personnel": "finance.s.people.personnel",
+                        "quality": "finance.s.people.quality"}.get(part)
+                if not need:
+                    self._send(400, {"error": "Unknown part."})
+                    return
+                if not auth.can(user, need):
+                    self._send(403, {"error": "Your role does not include this screen of People & Productivity."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                refresh = q.get("refresh") == "1"
+                if part == "personnel":
+                    try:
+                        year = int((q.get("period") or str(date.today().year))[:4])
+                    except ValueError:
+                        year = date.today().year
+                    cube = executive.request(client, company, year, company_currency(company), refresh=False)
+                    A = {x.upper() for x in self._allowed} if self._allowed is not None else None
+                    r = people.personnel(cube, year, A)
+                    r.update(company=company, currency=company_currency(company), can_settings=auth.can(user, "settings"))
+                    self._send(200, r)
+                    return
+                if not odoo.info()["configured"]:
+                    self._send(200, {"available": False, "configured": False, "can_settings": auth.can(user, "settings"),
+                                     "error": "The Odoo connection is not set: People & Productivity → Connection."})
+                    return
+                if part in ("workforce", "quality"):
+                    r = people.held_request(("wf",), lambda st: people.workforce(), refresh)
+                else:
+                    try:
+                        per = periods(q.get("period"), q.get("mode", "month"))
+                    except ValueError:
+                        self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                        return
+                    c_from, c_to, p_from, p_to, ly_from, ly_to = per[:6]
+                    if q.get("compare") == "last_year":
+                        p_from, p_to = ly_from, ly_to
+                    if (c_to - c_from).days > 120:
+                        self._send(400, {"error": "Choose a period of four months or less: the hours are read day by day."})
+                        return
+                    r = people.held_request(("prod", c_from, c_to, p_from, p_to),
+                                            lambda st: people.productivity(c_from, c_to, p_from, p_to, _latest, st, refresh),
+                                            refresh)
+                if isinstance(r, dict) and r.get("locations") is not None:
+                    co = company.upper()
+                    r = dict(r, locations=[L for L in r["locations"] if (L.get("company") or "").upper() in (co, "")])
+                    r = people.cut(r, self._allowed)
+                self._send(200, dict(r, configured=True, can_settings=auth.can(user, "settings")) if isinstance(r, dict) else r)
             elif url.path == "/api/sales/channels":
                 # Sales → Location intelligence: channels (order types), revenue centres, day parts and delivery
                 # partners of every restaurant against the period before and last year (channels.py)
@@ -4201,6 +4273,19 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/odoo/settings", "/api/odoo/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                try:
+                    if url.path.endswith("/settings"):
+                        self._send(200, {"connection": odoo.save(body, actor)})
+                    else:
+                        r = odoo.test()
+                        store.audit("odoo test", "connection", actor, {}, {"uid": r.get("uid")}, "")
+                        self._send(200, r)
+                except (ValueError, odoo.Error) as exc:
+                    self._send(400, {"error": str(exc)[:300]})
             elif url.path in ("/api/sevenrooms/settings", "/api/sevenrooms/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

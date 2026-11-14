@@ -32,6 +32,13 @@ FINANCE = [
         ("stockstop", "Blocked by stock", "location", []),
         # SevenRooms reservations, covers and feedback against Simphony's checks
         ("sevenrooms", "SevenRooms ↔ Simphony", "location", [])]),
+    # People & Productivity: Odoo HR (workforce, attendances, planning) against Simphony's sales and BC's personnel cost
+    ("people", "People & Productivity", "Overview", "ppTabs", [
+        ("workforce", "Workforce", "location", []),
+        ("productivity", "Labour productivity", "location", []),
+        ("scheduling", "Scheduling & attendance", "location", []),
+        ("personnel", "Personnel cost", "location", ["finance.pl.view"]),
+        ("quality", "HR data quality", "location", [])]),
     ("pl", "Financial statements", "Statements", "stTabs", [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),
         ("bs", "Balance sheet", "company", ["finance.bs.view"]),
