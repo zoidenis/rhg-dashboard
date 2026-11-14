@@ -24,7 +24,7 @@ def _read(refresh=False):
     with _lock:
         if _held["data"] and not refresh and time.time() - _held["at"] < KEEP:
             return _held["data"]
-    locs = [l for l in simphony.locations() if l.get("active", True)]
+    locs = [l for l in simphony.locations() if locintel.in_use(l)]
     reg = {r["ref"]: r for r in locintel.registry()}
     rvc_names, errors = {}, []
     fallback = (store.get_settings().get("group") or {}).get("reporting_currency") or "ALL"

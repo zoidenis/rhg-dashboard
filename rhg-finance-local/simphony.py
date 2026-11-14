@@ -549,6 +549,8 @@ def day_figures(rvcs):
     return {"net": net, "discounts": disc, "gross": net + disc,
             "checks": int(_sum(rvcs, "chkCnt")), "guests": int(_sum(rvcs, "gstCnt")),
             "voids": abs(_sum(rvcs, "vdTtl")) + abs(_sum(rvcs, "mngrVdTtl")),
+            # voids apart (QA 14 Nov 2026): by the employee (vdTtl) and with a manager's authorization (mngrVdTtl)
+            "voids_emp": abs(_sum(rvcs, "vdTtl")), "voids_mgr": abs(_sum(rvcs, "mngrVdTtl")),
             "returns": abs(_sum(rvcs, "rtnTtl")), "service": _sum(rvcs, "svcTtl"),
             "tax": _sum(rvcs, "taxCollTtl"),
             "open_checks": int(_sum(rvcs, "chkOpnCnt")), "open_value": _sum(rvcs, "chkOpnTtl"),

@@ -203,7 +203,7 @@ def build(periods, latest_fn, client, refs=None, progress=None):
     settings = store.get_settings()
     reg = {r["ref"]: r for r in locintel.registry(settings)}
     fallback = (settings.get("group") or {}).get("reporting_currency") or "ALL"
-    locs = [l for l in simphony.locations() if l.get("active", True) and (refs is None or l["locRef"].upper() in refs)]
+    locs = [l for l in simphony.locations() if locintel.in_use(l) and (refs is None or l["locRef"].upper() in refs)]
     latest = {}
     for l in locs:
         try:

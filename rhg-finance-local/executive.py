@@ -315,7 +315,7 @@ def build(client, company, year, job_key, refresh=False, today=None):
 
 
 def _simphony_locations(active):
-    locs = [l for l in simphony.locations() if l.get("active", True)]
+    locs = [l for l in simphony.locations() if locintel.in_use(l)]
     mapping = simphony.loc_map()
     upper = {c.upper(): c for c in active}
     for l in locs:

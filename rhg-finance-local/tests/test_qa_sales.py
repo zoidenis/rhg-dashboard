@@ -95,5 +95,30 @@ class QA(unittest.TestCase):
             locintel.registry = old
 
 
+    def test_registry_inactive_and_franchise(self):
+        import importlib.util
+        import simphony
+        # a fresh copy of locintel: other tests replace locintel.registry
+        spec = importlib.util.spec_from_file_location("locintel_fresh", os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "locintel.py"))
+        locintel = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(locintel)
+        text = ("SALT | SALT Tirana | company=SALT | bc=SALT\n"
+                "OLD  | Old kiosk   | company=SALT | bc=OLDK | inactive\n"
+                "FR1  | OPA Durrës  | company=SALT | bc=OPADR | ownership=franchise")
+        st = {"locations": {"registry": text}}
+        rows = locintel.registry(st)
+        self.assertEqual([r["ref"] for r in rows], ["SALT", "FR1"])
+        self.assertEqual([r["ownership"] for r in rows], ["RHG", "Franchise"])
+        self.assertEqual(len(locintel.registry(st, inactive=True)), 3)
+        self.assertEqual(locintel.inactive_refs(st), {"OLD", "OLDK"})
+        f = simphony.day_figures([{"netSlsTtl": 100, "vdTtl": -30, "mngrVdTtl": -20}])
+        self.assertEqual((f["voids"], f["voids_emp"], f["voids_mgr"]), (50, 30, 20))
+        import server
+        body = {"locations": {"OLDK": {"x": 1}, "SALT": {"x": 2}}, "totals": {"x": 3}}
+        r = server.drop_codes(body, {"OLD", "OLDK"})
+        self.assertEqual((list(r["locations"]), r["totals"]), (["SALT"], {"x": 3}))
+
+
 if __name__ == "__main__":
     unittest.main()

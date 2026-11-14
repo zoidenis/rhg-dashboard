@@ -59,7 +59,31 @@ def norm_currency(code):
     return CURRENCY_ALIASES.get(c, c)
 
 
-def registry(settings=None):
+def registry(settings=None, inactive=False):
+    """The restaurants of Settings → Location intelligence. A line marked inactive (or closed) is a unit that no longer
+    trades: left out of every screen (QA 14 Nov 2026), unless inactive=True. ownership=franchise marks a franchise
+    (RHG otherwise)."""
+    rows = _registry(settings)
+    return rows if inactive else [r for r in rows if not r["inactive"]]
+
+
+def inactive_refs(settings=None):
+    """Every code of the inactive units (Simphony reference, BC location, department), upper case."""
+    return {(r.get(k) or "").strip().upper() for r in _registry(settings) if r["inactive"]
+            for k in ("ref", "bc", "dept")} - {""}
+
+
+def in_use(loc, settings=None, _cache={}):
+    """A Simphony location the screens read: active in Simphony and not an inactive unit of the registry."""
+    if not loc.get("active", True):
+        return False
+    now = time.time()
+    if _cache.get("at", 0) < now - 30:
+        _cache.update(at=now, refs=inactive_refs(settings))
+    return str(loc.get("locRef") or "").upper() not in _cache["refs"]
+
+
+def _registry(settings=None):
     text = ((settings or store.get_settings()).get("locations") or {}).get("registry") or DEFAULT_REGISTRY
     out, seen = [], set()
     for raw in text.splitlines():
@@ -72,7 +96,8 @@ def registry(settings=None):
             continue
         seen.add(ref)
         d = {"ref": ref, "name": ref, "brand": "", "company": "", "bc": "", "customer": "", "area": "",
-             "region": "", "currency": "", "dept": "", "x": None, "y": None, "seasonal": False}
+             "region": "", "currency": "", "dept": "", "x": None, "y": None, "seasonal": False, "inactive": False,
+             "ownership": "RHG"}
         for i, p in enumerate(parts[1:]):
             if "=" in p:
                 k, _, v = p.partition("=")
@@ -86,10 +111,14 @@ def registry(settings=None):
                         pass
                 elif k == "currency":
                     d["currency"] = norm_currency(v)
-                elif k in d and k not in ("ref", "x", "y", "seasonal"):
+                elif k == "ownership":
+                    d["ownership"] = "Franchise" if v.strip().lower().startswith("fran") else "RHG"
+                elif k in d and k not in ("ref", "x", "y", "seasonal", "inactive"):
                     d[k] = v[:80]
             elif p.lower() in ("seasonal", "season"):
                 d["seasonal"] = True
+            elif p.lower() in ("inactive", "closed"):
+                d["inactive"] = True
             elif i == 0 and p:
                 d["name"] = p[:80]
         d["brand"] = (d["brand"] or d["name"].split()[0]).upper()
@@ -142,7 +171,7 @@ def _empty():
 
 def _simphony(reg, c, p, ly, latest_fn, parallel_fn, progress):
     """{ref: {"cur", "prev", "ly", "daily"}} plus Simphony locations missing from the registry."""
-    locs = [l for l in simphony.locations() if l.get("active", True)]
+    locs = [l for l in simphony.locations() if in_use(l)]
     by_ref = {l["locRef"]: l for l in locs}
     latest = {r: (v if not e else None) for r, (v, e) in parallel_fn(
         {l["locRef"]: (lambda x=l["locRef"]: latest_fn(x)) for l in locs}).items()}

@@ -569,8 +569,8 @@ def _latest(loc_ref):
     return value
 
 
-SALES_KEYS = ("net", "discounts", "gross", "checks", "guests", "voids", "returns", "service", "tax",
-              "open_checks", "open_value", "error_corrects")
+SALES_KEYS = ("net", "discounts", "gross", "checks", "guests", "voids", "voids_emp", "voids_mgr", "returns", "service",
+              "tax", "open_checks", "open_value", "error_corrects")
 
 
 def sales_totals(rows):
@@ -670,7 +670,7 @@ def sales_screen(anchor, mode, compare="prior"):
         p_from, p_to = ly_from, ly_to
         method = "Same dates of the previous year."
     t0 = time.time()
-    locs = [l for l in simphony.locations() if l.get("active", True)]
+    locs = [l for l in simphony.locations() if locintel.in_use(l)]
     fallback = (store.get_settings().get("group") or {}).get("reporting_currency") or "ALL"
     reg = {r["ref"]: r for r in locintel.registry()}
     for l in locs:
@@ -714,8 +714,7 @@ def sales_screen(anchor, mode, compare="prior"):
     errors = sorted({str(err)[:200] for _, (_, err) in results.items() if err})
 
     rows, by_day = [], {}
-    keys = ("net", "discounts", "gross", "checks", "guests", "voids", "returns", "service", "tax",
-            "open_checks", "open_value", "error_corrects")
+    keys = SALES_KEYS
     for l in locs:
         cur = dict.fromkeys(keys, 0)
         prev = dict.fromkeys(keys, 0)
@@ -745,6 +744,7 @@ def sales_screen(anchor, mode, compare="prior"):
         rows.append({"locRef": l["locRef"], "name": l["name"], "currency": l["currency"],
                      "reg_name": rg.get("name") or "", "brand": rg.get("brand") or "", "seasonal": bool(rg.get("seasonal")),
                      "company": rg.get("company") or "", "in_registry": bool(rg),
+                     "ownership": (rg.get("ownership") or "RHG") if rg else "",
                      "daily": daily_cur, "daily_prev": daily_prev, "daily_cg": daily_cg,
                      "bc": mapping.get(l["locRef"], ""), "latest": latest.get(l["locRef"]),
                      "days_read": read, "days_missing": missing, "cur": cur, "prev": prev,
@@ -766,6 +766,9 @@ def sales_screen(anchor, mode, compare="prior"):
         "definitions": {
             "net": "Net sales as Simphony totals them (netSlsTtl): after item and subtotal discounts, "
                    "before service charges. VAT is included (the tax collected is inside it).",
+            "voids": "Voids apart: by the employee (vdTtl) and with a manager's authorization (mngrVdTtl).",
+            "ownership": "RHG and franchise restaurants are told apart by ownership=franchise in the registry "
+                         "(Settings → Location intelligence); each has its subtotal.",
             "service": "Service charge as Simphony totals it (svcTtl): charged on the checks on top of the net "
                        "sales, so it is not in them.",
             "checks": "Checks counted by Simphony for the business day (chkCnt). Guests are the covers "
@@ -2180,6 +2183,20 @@ def filter_codes(body, A, fields=("locations", "rows", "all_locations")):
     return dict(out, departments=sorted(A), dept_cut=True)
 
 
+def drop_codes(body, X, fields=("locations", "rows", "all_locations")):
+    """A copy of a location screen's answer without the places whose codes are in X (the inactive units)."""
+    if not isinstance(body, dict) or not X:
+        return body
+    out = dict(body)
+    for f in fields:
+        val = body.get(f)
+        if isinstance(val, dict):
+            out[f] = {k: v for k, v in val.items() if not (access._keys(k, v) & X)}
+        elif isinstance(val, list) and val and isinstance(val[0], dict):
+            out[f] = [r for r in val if not (access._keys(None, r) & X)]
+    return out
+
+
 _transit_cache, _transit_lock = {}, threading.Lock()
 
 
@@ -2404,7 +2421,17 @@ class Handler(BaseHTTPRequestHandler):
         refusal = self._access(path, q, user)
         if not refusal:
             self._dept_scope(path, q)
+            self._inactive_scope(path)
         return refusal
+
+    def _inactive_scope(self, path):
+        """The units marked inactive in the registry are left out of every location screen (QA 14 Nov 2026)."""
+        if path not in ACCESS_LOCATION_PATHS or path in DEPT_SELF:
+            return
+        X = locintel.inactive_refs()
+        if X:
+            prev = self._scope_filter
+            self._scope_filter = lambda b: drop_codes(prev(b) if prev else b, X)
 
     def _dept_scope(self, path, q):
         """The departments chosen above cut every location screen to their restaurants and locations, as the access
