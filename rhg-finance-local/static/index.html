@@ -768,7 +768,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
   <section class="view" id="v-pl">
     <div class="ov-tabs" id="stTabs" role="tablist"><button data-t="pl" class="on" role="tab" aria-selected="true">Profit &amp; loss</button><button data-t="bs" role="tab" aria-selected="false">Balance sheet</button><button data-t="liquidity" role="tab" aria-selected="false">Liquidity &amp; capital</button><button data-t="treasury" role="tab" aria-selected="false">Cash flow &amp; treasury</button></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plNote"></p></div>
-      <button class="mini" data-drill="pl">Open by account</button></div>
+      <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini" data-drill="pl">Open by account</button><button class="mini exp" id="plExp" type="button">Export ▾</button></div></div>
       <div class="scroll"><table id="plTable"></table></div></div>
     <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>From revenue to EBITDA</h2>
       <p class="hint"><span>The period chosen above, as the P&amp;L reads it: each bar adds or takes away from the revenue, the dark bars are the subtotals.</span></p></div></div>
@@ -786,7 +786,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 
   <section class="view" id="v-bs">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Balance sheet</h2><p class="hint" id="bsNote"></p></div>
-      <button class="mini dark" id="bsLoad">Read again</button></div>
+      <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini dark" id="bsLoad">Read again</button><button class="mini exp" id="bsExp" type="button">Export ▾</button></div></div>
       <div class="money" id="bsTotals"></div><p class="meta" id="bsCheck" style="margin:6px 0 0"></p></div>
     <div class="card"><div class="card-head"><div><h2>By line</h2><p class="hint" id="bsDates">Click a line for its accounts and its three dates, an account for its ledger entries</p></div>
       <button class="mini" data-drill="bs">Open all accounts</button></div>
@@ -796,7 +796,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 
   <section class="view" id="v-liquidity">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Liquidity and capital</h2><p class="hint" id="lqNote"></p></div>
-      <button class="mini dark" id="lqLoad">Read again</button></div>
+      <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini dark" id="lqLoad">Read again</button><button class="mini exp" id="lqExp" type="button">Export ▾</button></div></div>
       <div class="lq-grid" id="lqKpis"></div></div>
     <div class="grid">
       <div class="card"><h2>Equity bridge</h2><p class="hint" id="lqEqNote"></p>
@@ -1357,7 +1357,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
   <section class="view" id="v-treasury">
     <div class="money" id="trsKpis"></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Cash flow, indirect</h2><p class="hint" id="trsNote"></p></div>
-      <button class="mini dark" id="trsLoad">Read</button></div>
+      <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini dark" id="trsLoad">Read</button><button class="mini exp" id="trsExp" type="button">Export ▾</button></div></div>
       <div id="trsFlowBars"></div><details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="trsFlow"></table></div></details></div>
     <div class="grid">
       <div class="card"><div class="card-head"><div><h2>Due in the next seven days</h2><p class="hint" id="trsDueNote"></p></div>
@@ -2788,6 +2788,7 @@ window.addEventListener("resize", () => { if ($("v-pl").classList.contains("on")
 // The ratios of the KPI library, each with its status and formula; the comparison column is the same ratio on the
 // comparison period's lines (revenue growth is always against last year).
 const PL_RATIOS = ["revenue_growth", "cogs_pct", "labour_pct", "prime_cost_pct", "occupancy_pct", "ebitda_margin", "net_margin"];
+var plRatioRows = [];
 function renderPLRatios(pl, hidden, credit){
   const L = pl.library;
   if (!L) { $("plRatios").innerHTML = `<tr><td class="empty">${stChip("Content required")} This company has no KPI mapping: Settings → KPI mapping.</td></tr>`; return; }
@@ -2798,6 +2799,8 @@ function renderPLRatios(pl, hidden, credit){
                prime_cost_pct: prev("cogs") == null ? null : pp(prev("cogs") + (prev("labour") || 0)),
                occupancy_pct: pp(prev("occupancy")), ebitda_margin: pp(prev("ebitda")), net_margin: pp(prev("net_profit"))};
   const review = k => (credit && ["cogs_pct", "prime_cost_pct"].includes(k)) || (k === "ebitda_margin" && (hidden.has("EBITDA margin") || data.kpis.ebitda == null));
+  plRatioRows = PL_RATIOS.filter(k => L[k]).map(k => { const x = L[k], v = review(k) ? null : x.value, c = k === "revenue_growth" ? null : cmp[k];
+    return [x.label, review(k) ? "Review pending" : v == null ? null : v / 100, c == null ? null : c / 100, v != null && c != null ? (v - c) / 100 : null, x.status || "", x.formula || ""]; });
   $("plRatios").innerHTML = `<tr><th>Ratio</th><th class="num">Current</th>${priorTh()}<th class="num">Change</th><th>Status</th></tr>` +
     PL_RATIOS.filter(k => L[k]).map(k => {
       const x = L[k], v = review(k) ? null : x.value, c = k === "revenue_growth" ? null : cmp[k];
@@ -5799,6 +5802,73 @@ function renderTreasury(){
       : `<tr><td colspan="5" class="empty">No bank movement in this period.</td></tr>`);
   trsViz();
 }
+
+// ---------- Financial statements: Export ▾ of each tab (Excel, PDF, email), the figures it shows, unformatted
+const pctOf = v => v == null ? null : v / 100;
+$("plExp").onclick = () => {
+  if (!data || !data.pl) { alert("Wait for the P&L to finish reading."); return; }
+  const pl = data.pl, m = data.meta, C = m.currency || "", R = r => (r || []).join(" to ");
+  const sheets = [
+    {title: "Profit and loss", header: ["Line", `Current ${C}`, "Period before", "Change", "Last year", "Change vs last year", "Budget", "vs budget", "% of revenue"],
+     formats: ["text", "num", "num", "pct", "num", "pct", "num", "num", "pct"],
+     rows: (pl.statement || []).map(l => [l.label, l.current, l.previous, pctOf(l.vs_previous_pct), l.last_year, pctOf(l.vs_last_year_pct), l.budget || null, l.vs_budget, pctOf(l.of_revenue)])},
+    {title: "Ratios", header: ["Ratio", "Current", "Period before", "Change (points)", "Status", "Formula"], formats: ["text", "pct", "pct", "pct", "text", "text"], rows: plRatioRows},
+    {title: "Accounts", header: ["Account", "Name", "Category", `Current ${C}`, "Period before", "Last year", "Budget"], formats: ["text", "text", "text", "num", "num", "num", "num"],
+     rows: (pl.lines || []).map(l => [l.account, l.name, l.category, l.current, l.previous, l.last_year, l.budget || null])}];
+  xlsxTable(`Profit and loss ${m.company || ""} ${(m.current || [])[0] || ""} ${(m.current || [])[1] || ""}`, sheets,
+    [`${m.company || ""} · ${m.period_label || ""}${m.dimension ? " · departments " + m.dimension : ""} · currency ${C}`,
+     `Current: ${R(m.current)} · Period before: ${R(m.prior)} · Last year: ${R(m.last_year)}`,
+     "Period before is always the period just before the current one (the same number of days, or the whole previous month or quarter once it is finished).",
+     pl.note || ""].filter(Boolean));
+};
+$("bsExp").onclick = () => {
+  const c = capData; if (!c || !c.statement) { alert("Wait for the balance sheet to finish reading."); return; }
+  const D = c.dates, rows = [], acc = [];
+  c.statement.forEach(sec => {
+    sec.lines.forEach(l => { rows.push([sec.section, l.label, l.status || "", l.current, l.month_end, l.vs_month, l.year_end, l.vs_year]);
+      (l.accounts || []).forEach(a => acc.push([sec.section, l.label, a.account === "—" ? "" : a.account, a.name, a.value])); });
+    rows.push([sec.section, "Total " + sec.section.toLowerCase(), "", sec.current, sec.month_end, sec.month_end == null ? null : sec.current - sec.month_end, sec.year_end, sec.year_end == null ? null : sec.current - sec.year_end]);
+  });
+  const t = c.totals || {};
+  xlsxTable(`Balance sheet ${c.company || ""} ${D.current}`, [
+    {title: "Balance sheet", header: ["Section", "Line", "Status", D.current, D.month_end, "Change", D.year_end, "Change"], formats: ["text", "text", "text", "num", "num", "num", "num", "num"], rows},
+    {title: "Accounts", header: ["Section", "Line", "Account", "Name", D.current], formats: ["text", "text", "text", "text", "num"], rows: acc}],
+    [`${c.company || ""} at ${D.current}, against the end of the month before (${D.month_end}) and the end of last year (${D.year_end})`,
+     `Assets ${fmt(t.assets)} · Liabilities ${fmt(t.liabilities)} · Equity ${fmt(t.equity)} · Assets − liabilities − equity ${t.difference == null ? "–" : fmt(t.difference)}`,
+     "A balance sheet belongs to the whole legal entity: the location filter does not apply.", c.note || ""].filter(Boolean));
+};
+$("lqExp").onclick = () => {
+  const c = capData; if (!c || !c.statement) { alert("Wait for the figures to finish reading."); return; }
+  const D = c.dates, E = c.equity_bridge, M = c.maturity || {buckets: []}, LB = M.buckets.map(b => b.label);
+  const by = (list, first, key) => ({title: first === "Supplier" ? "By supplier" : first === "Currency" ? "By currency" : "Group companies",
+    header: [first, "Total"].concat(LB), formats: ["text", "num"].concat(LB.map(() => "num")),
+    rows: (list || []).map(v => [v[key], v.total].concat(LB.map(l => v[l] ?? null)))});
+  const sheets = [
+    {title: "Liquidity", header: ["Figure", "Status", D.current, D.month_end, D.year_end, "Unit", "Formula", "Note"], formats: ["text", "text", "qty", "qty", "qty", "text", "text", "text"],
+     rows: (c.liquidity || []).map(k => [k.label, k.status || "", k.value, k.month_end, k.year_end, k.unit === "ratio" ? "times" : "amount", k.formula || "", k.note || ""])},
+    {title: "Suppliers by due date", header: ["Due", "Amount"], formats: ["text", "num"], rows: M.buckets.map(b => [b.label, b.value])},
+    by(M.vendors, "Supplier", "vendor"), by(M.currencies, "Currency", "currency"), by(M.intercompany, "Group company", "vendor")];
+  if (E) sheets.splice(1, 0, {title: "Equity bridge", header: ["Movement", "Amount"], formats: ["text", "num"],
+    rows: [["Opening equity", E.opening], ["Profit or loss of the year", E.profit], ["Capital contributions", E.contributions], ["Distributions (dividends)", E.distributions], ["Other movements", E.other], ["Closing equity", E.closing]]});
+  xlsxTable(`Liquidity and capital ${c.company || ""} ${D.current}`, sheets,
+    [`${c.company || ""} at ${D.current}, against ${D.month_end} and ${D.year_end}`, `Open supplier entries ${fmt(M.total)}; overdue and due within 30 days ${fmt(M.next_30)}`,
+     "Group companies are included in the due dates and listed apart."].concat(E ? E.notes || [] : []));
+};
+$("trsExp").onclick = () => {
+  const t = data && data.treasury; if (!t || !t.loaded) { alert("Read the cash flow first."); return; }
+  const o = t.obligations, m = data.meta || {};
+  const sheets = [
+    {title: "Summary", header: ["Figure", "Amount"], formats: ["text", "num"],
+     rows: [["Cash and bank", o.cash], ["Due in 7 days", o.due_7], ["Expected in 7 days", o.expected_7], ["Net after 7 days", o.net_7], ["Net after 30 days", o.net_30], ["Operating cash flow", t.flow.operating]]
+       .concat(o.unapplied_ap ? [["Unapplied supplier payments", o.unapplied_ap]] : [])},
+    {title: "Cash flow, indirect", header: ["Line", "Amount", "How it is measured"], formats: ["text", "num", "text"], rows: t.flow.lines.map(l => [l.label, l.value, l.note || ""])},
+    {title: "Due in 7 days", header: ["Supplier", "Document", "Due", "Days late", "Amount"], formats: ["text", "text", "text", "int", "num"],
+     rows: (o.payments || []).map(p => [p.party, p.document, p.due, p.days > 0 ? p.days : null, p.amount])},
+    {title: "Bank activity", header: ["Bank account", "Currency", "In", "Out", "Net"], formats: ["text", "text", "num", "num", "num"],
+     rows: (t.activity.accounts || []).map(a => [a.name, a.currency || "", a.in, a.out, a.net])}];
+  xlsxTable(`Cash flow and treasury ${m.company || ""} ${(m.current || [])[0] || ""} ${(m.current || [])[1] || ""}`, sheets,
+    [`${m.company || ""} · ${m.period_label || ""} · ${(m.current || []).join(" to ")}`, t.flow.note || "", o.note || ""].filter(Boolean));
+};
 
 function renderAssets(){
   const a = data.assets; if(!a||!a.loaded) return;
