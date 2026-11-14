@@ -45,5 +45,30 @@ class QA(unittest.TestCase):
         self.assertEqual(c["totals"]["ALL"]["rvcs"][0]["place"], "Le District")
 
 
+    def test_company_and_departments(self):
+        import locintel
+        import server
+        reg = [{"ref": "R1", "company": "SALT", "dept": "OPA1", "bc": "OPA1"},
+               {"ref": "R2", "company": "SALT", "dept": "LIFT", "bc": "LIFT"},
+               {"ref": "R4", "company": "TBM", "dept": "LD", "bc": ""}]
+        old = locintel.registry
+        locintel.registry = lambda settings=None: reg
+        try:
+            self.assertIsNone(server.company_refs("", []))
+            self.assertEqual(server.company_refs("SALT"), {"R1", "R2"})
+            self.assertEqual(server.company_refs("SALT", ["lift"]), {"R2"})
+            self.assertEqual(server.company_refs("SALT", ["LD"]), set())
+            body = {"available": True, "currency": "ALL", "locations": [
+                {"locRef": "R1", "name": "OPA", "currency": "ALL", "in_registry": True, "daily": {"2026-11-01": 10},
+                 "cur": {"net": 10}, "prev": {"net": 5}},
+                {"locRef": "R2", "name": "LIFT", "currency": "ALL", "in_registry": True, "daily": {"2026-11-01": 30},
+                 "cur": {"net": 30}, "prev": {"net": 20}}]}
+            r = server.sales_of_company(body, "SALT", ["LIFT"])
+            self.assertEqual([x["name"] for x in r["locations"]], ["LIFT"])
+            self.assertEqual((r["totals"]["ALL"]["cur"]["net"], r["days"][0]["net"]["ALL"]), (30, 30))
+        finally:
+            locintel.registry = old
+
+
 if __name__ == "__main__":
     unittest.main()

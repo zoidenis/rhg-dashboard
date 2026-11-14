@@ -615,25 +615,47 @@ def sales_cut(body, user, company):
     return _sales_resum(out, out["locations"], body)
 
 
-def company_refs(company):
-    """The Simphony references (upper case) of the restaurants of a company in the registry; None = no company."""
+def depts_of(q):
+    """The departments chosen above (the hidden select "dimension"), upper case."""
+    return [x.strip().upper() for x in (q.get("dimension") or "").split(",") if x.strip()]
+
+
+def company_refs(company, depts=None):
+    """The Simphony references (upper case) of the restaurants of a company in the registry and, when departments are
+    chosen, of those departments only (the registry's dept, BC location or reference); None = neither chosen."""
     co = str(company or "").strip().upper()
-    if not co:
+    D = {str(d).strip().upper() for d in depts or [] if str(d).strip()}
+    if not co and not D:
         return None
-    return {(r.get("ref") or "").upper() for r in locintel.registry() if (r.get("company") or "").strip().upper() == co} - {""}
+    out = set()
+    for r in locintel.registry():
+        if co and (r.get("company") or "").strip().upper() != co:
+            continue
+        if D and not ({(r.get(k) or "").strip().upper() for k in ("dept", "bc", "ref")} & D):
+            continue
+        out.add((r.get("ref") or "").upper())
+    return out - {""}
 
 
-def sales_of_company(body, company):
-    """Sales of the company chosen above only (QA 14 Nov 2026: TBM showed the restaurants of RHG): the restaurants
-    the registry gives to that company; the totals and the days summed again. The Simphony locations that are not in
-    the registry are left out and named."""
-    refs = company_refs(company)
+def sales_refs(user, q):
+    """The Simphony locations of a Sales screen: the person's access, the company and the departments chosen above."""
+    refs, mine = simphony_refs_in_scope(user), company_refs(q.get("company"), depts_of(q))
+    if mine is None:
+        return refs
+    return mine if refs is None else refs & mine
+
+
+def sales_of_company(body, company, depts=None):
+    """Sales of the company chosen above only (QA 14 Nov 2026: TBM showed the restaurants of RHG), and of the
+    departments chosen, if any (a department showed every restaurant): the restaurants the registry gives them; the
+    totals and the days summed again. The Simphony locations that are not in the registry are left out and named."""
+    refs = company_refs(company, depts)
     if refs is None or not isinstance(body, dict) or not body.get("available") or not isinstance(body.get("locations"), list):
         return body
     rows = [r for r in body["locations"] if (r.get("locRef") or "").upper() in refs]
     other = [r["name"] for r in body["locations"] if not r.get("in_registry")]
     out = _sales_resum(body, rows, body)
-    out.update(company=company, not_in_registry=other)
+    out.update(company=company, departments=list(depts or []), not_in_registry=other)
     return out
 
 
@@ -2750,7 +2772,7 @@ class Handler(BaseHTTPRequestHandler):
                 xlsx = url.path.endswith("xlsx")
                 cfg = chanprof.load_config()
                 prefixes = chanprof.bc_prefixes(cfg)
-                refs = simphony_refs_in_scope(user)
+                refs = sales_refs(user, q)
                 key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None, prefixes)
                 ds = chanprof.request(per, _latest, client, key, refs, prefixes, q.get("refresh") == "1" and not xlsx)
                 if ds.get("pending") or ds.get("available") is False:
@@ -2787,7 +2809,7 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
                     return
-                refs = simphony_refs_in_scope(user)
+                refs = sales_refs(user, q)
                 key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
                 ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1" and url.path == "/api/sales/menu")
                 if ds.get("pending") or ds.get("available") is False:
@@ -2820,7 +2842,7 @@ class Handler(BaseHTTPRequestHandler):
                     weeks = max(4, min(int(q.get("weeks") or 13), 52))
                 except ValueError:
                     weeks = 13
-                refs = simphony_refs_in_scope(user)
+                refs = sales_refs(user, q)
                 per = menucost.trend_period(weeks)
                 key = ("foodcost", per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
                 ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1")
@@ -2846,10 +2868,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not simphony.info()["configured"]:
                     self._send(200, {"error": "The Simphony connection is not set."})
                     return
-                refs = simphony_refs_in_scope(user)
-                mine = company_refs(q.get("company"))                     # the company chosen above
-                if mine is not None:
-                    refs = mine if refs is None else refs & mine
+                refs = sales_refs(user, q)                                # access, company and departments
                 xlsx = url.path.endswith("xlsx")
                 try:
                     r = pricelist.request(refs, (q.get("location") or "")[:40], (q.get("level") or "")[:99],
@@ -2883,11 +2902,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
                     return
                 self._send(200, channels.cut(channels.request(per, _latest, (q.get("period") or "", q.get("mode", "month")),
-                                                              q.get("refresh") == "1"), company_refs(q.get("company"))))
+                                                              q.get("refresh") == "1"),
+                                                 company_refs(q.get("company"), depts_of(q))))
             elif url.path == "/api/sales":
                 self._send(200, sales_of_company(sales_request(q.get("period"), q.get("mode", "month"),
                                                                q.get("refresh") == "1", q.get("compare") or "prior"),
-                                                 q.get("company")))
+                                                 q.get("company"), depts_of(q)))
             elif url.path == "/api/locations/registry":
                 # the restaurants of the company as the registry names them (Settings → Location intelligence): one
                 # place's department, BC location and Simphony reference, so its pop-up finds it in every area

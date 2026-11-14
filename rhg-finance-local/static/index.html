@@ -2459,6 +2459,12 @@ function params(){
   p.set("compare",$("cmpMode").value);
   return p.toString();
 }
+// the Sales screens follow the company and the departments chosen above (QA 14 Nov 2026)
+function scopeQs(o){
+  const p = new URLSearchParams(params());
+  ["company", "dimension"].forEach(k => { if (p.get(k)) o.set(k, p.get(k)); });
+  return o;
+}
 function setPill(state,text){ $("pill").className="pill "+state; $("pillText").textContent=text; }
 
 // Access (Admin → Accounts → Access): the locations of the company in view this person is limited to, or null.
@@ -2570,6 +2576,7 @@ function render(){
   if(!pmLoaded) loadPlMemo();
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
+  if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "loc" && typeof chData !== "undefined" && chData && chData._q !== chQuery()) loadCh();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "menu" && meKey !== meQs()) meLoad();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "chanprofit" && cpKey !== cpQs()) cpLoad();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "menucost" && mcKey !== mcQs()) mcLoad();
@@ -3855,7 +3862,9 @@ function renderSales(){
     k("Discounts", fmt(t.cur.discounts), `${C} · ${t.cur.gross ? fmt(t.cur.discounts/t.cur.gross*100,1) : "–"}% of gross`),
     k("Service charge", fmt(t.cur.service), `${C} · on top of the net sales · ${fmt(t.prev.service)}, ${esc(base)}`),
   ].join("");
-  $("slLocNote").textContent = `${d.locations.length} restaurant(s) with sales` + (d.company ? ` of ${d.company} (Settings → Location intelligence → registry)` : "") + "." +
+  $("slLocNote").textContent = `${d.locations.length} restaurant(s) with sales` + (d.company ? ` of ${d.company} (Settings → Location intelligence → registry)` : "") +
+    ((d.departments || []).length ? `, departments ${d.departments.join(", ")}` : "") + "." +
+    (!d.locations.length && (d.departments || []).length ? " No restaurant of the registry has these departments (its dept, BC location or reference)." : "") +
     ((d.not_in_registry || []).length ? ` Not in the registry, so left out: ${d.not_in_registry.join(", ")}.` : "") +
     (others.length ? ` Restaurants reporting in ${others.join(", ")} are listed but kept out of the ${C} totals.` : "");
   $("slLoc").innerHTML = `<tr><th>Restaurant</th><th>BC</th><th class="num">Net sales</th><th class="num">${d.prior.label === "same dates last year" ? "Last year" : "Before"}</th><th class="num">Change</th>
@@ -3886,7 +3895,7 @@ function renderSales(){
 let cpData = null, cpKey = "", cpTimer = null, cpCfg = null, cpFields = [];
 const cpM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + ilM(Math.abs(v));
 function cpQs(){
-  const p = new URLSearchParams(params()), o = new URLSearchParams();
+  const p = new URLSearchParams(params()), o = scopeQs(new URLSearchParams());
   o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
   o.set("level", $("cpLevel").value); if ($("cpLevel").value !== "all") o.set("key", $("cpKey").value || "");
   o.set("view", $("cpView").value); if ($("cpView").value === "month") o.set("channel", $("cpCh").value || "");
@@ -4020,7 +4029,7 @@ const ME_ORDER = ["star", "plowhorse", "puzzle", "dog", "nocost"];
 const meLbl = k => (meData && meData.labels[k]) || (k === "noprice" ? "No price" : k);
 const meSt = k => `<span class="me-st me-c-${k}"><i></i>${esc(meLbl(k))}</span>`;
 function meQs(){
-  const p = new URLSearchParams(params()), o = new URLSearchParams();
+  const p = new URLSearchParams(params()), o = scopeQs(new URLSearchParams());
   o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
   o.set("level", $("meLevel").value); if ($("meLevel").value !== "all") o.set("key", $("meKey").value || "");
   o.set("section", $("meSec").value);
@@ -4201,14 +4210,14 @@ function meAcross(){
 var mcData = null, mcTrend = null, mcKey = "", mcTrKey = "", mcTimer = null, mcTrTimer = null;
 const MC_COL = {ok: "var(--fc-up)", near: "#c98500", over: "var(--fc-down)", none: "var(--fc-bud)"};
 function mcQs(){
-  const p = new URLSearchParams(params()), o = new URLSearchParams();
+  const p = new URLSearchParams(params()), o = scopeQs(new URLSearchParams());
   o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
   o.set("level", $("mcLevel").value); if ($("mcLevel").value !== "all") o.set("key", $("mcKey").value || "");
   o.set("section", "family");
   return o.toString();
 }
 function mcTrQs(){
-  const o = new URLSearchParams({level: $("mcLevel").value, weeks: $("mcWeeks").value});
+  const o = scopeQs(new URLSearchParams({level: $("mcLevel").value, weeks: $("mcWeeks").value}));
   if ($("mcLevel").value !== "all") o.set("key", $("mcKey").value || "");
   return o.toString();
 }
@@ -4496,7 +4505,7 @@ function slRender(){
 // before and the same dates last year, from one Simphony read per restaurant and day; delivery partners from the
 // tender media. The group table above the squares, a channel bar in each square, the full view in the popup.
 let chData = null, chPoll = null, chView = "channels";
-const chQuery = () => { const p = new URLSearchParams(params()); return new URLSearchParams({company: p.get("company") || "", period: p.get("period") || "", mode: p.get("mode") || "month"}).toString(); };
+const chQuery = () => { const p = new URLSearchParams(params()); return scopeQs(new URLSearchParams({period: p.get("period") || "", mode: p.get("mode") || "month"})).toString(); };
 async function loadCh(refresh){
   const q = chQuery() + (refresh ? "&refresh=1" : "");
   if (chPoll && chPoll.q === chQuery()) return;
@@ -4595,7 +4604,7 @@ function chPanels(l){
 
 // ---------- Sales → Menu prices (pricelist.py, /api/sales/prices) ----------
 let prxData = null, prxBusy = false, prxTimer = null;
-const prxQs = () => new URLSearchParams({company: $("company").value || "", location: $("prxLoc").value, level: $("prxLvl").value, group: $("prxGrp").value, q: $("prxQ").value.trim()}).toString();
+const prxQs = () => scopeQs(new URLSearchParams({location: $("prxLoc").value, level: $("prxLvl").value, group: $("prxGrp").value, q: $("prxQ").value.trim()})).toString();
 async function prxLoad(refresh){
   if (prxBusy) return; prxBusy = true;
   $("prxNote").textContent = refresh || !prxData ? "Reading the prices and menu items of every location from Simphony…" : "Filtering…";
@@ -4629,7 +4638,7 @@ function prxRender(){
 ["prxLoc", "prxLvl", "prxGrp"].forEach(id => $(id).onchange = () => prxLoad());
 $("prxQ").oninput = () => { clearTimeout(prxTimer); prxTimer = setTimeout(() => prxLoad(), 400); };
 $("prxRead").onclick = () => prxLoad(true);
-$("company").addEventListener("change", () => { if (prxData) { prxData = null; $("prxLoc").value = ""; if ($("slPrView") && $("slPrView").style.display !== "none") prxLoad(); } });
+["company", "dimension"].forEach(id => $(id).addEventListener("change", () => { if (prxData) { prxData = null; $("prxLoc").value = ""; if ($("slPrView") && $("slPrView").style.display !== "none") prxLoad(); } }));
 $("prxXlsx").onclick = () => { exportGo("/api/sales/prices/xlsx?" + prxQs()); };
 function slOpen(i){ $("slPop").dataset.i = i; slDraw(i); $("slBd").classList.add("show"); }
 function slDraw(i){
