@@ -3912,7 +3912,6 @@ function renderSales(){
     k("Discounts", fmt(t.cur.discounts), `${C} · ${t.cur.gross ? fmt(t.cur.discounts/t.cur.gross*100,1) : "–"}% of gross`),
     k("Service charge", fmt(t.cur.service), `${C} · on top of the net sales · ${fmt(t.prev.service)}, ${esc(base)}`),
     k("Voids", fmt(t.cur.voids), `${C} · ${fmt(t.cur.voids_emp ?? t.cur.voids)} by the employee, ${fmt(t.cur.voids_mgr)} manager voids`),
-    k("Checks still open", fmt(t.cur.open_checks), t.cur.open_checks ? `${C} ${fmt(t.cur.open_value)} not yet final` : "every check closed"),
   ].join("");
   $("slLocNote").textContent = `${d.locations.length} restaurant(s) with sales` + (d.company ? ` of ${d.company} (Settings → Location intelligence → registry)` : "") +
     ((d.departments || []).length ? `, departments ${d.departments.join(", ")}` : "") + "." +
@@ -6042,6 +6041,21 @@ function biGo(v){
 Pulse.on("biday", x => biDayPop(x));
 Pulse.on("bicell", v => { const i = v.lastIndexOf("|"); biCellPop(v.slice(0, i), v.slice(i + 1)); });
 Pulse.on("biseg", v => biGo(v));
+// the checks left open at the end of a business day (Simphony): a check left open is not fiscalized (QA 14 Nov 2026)
+Pulse.on("biopen", () => {
+  const d = biData; if (!d) return;
+  const rows = [];
+  Object.entries(d.open || {}).forEach(([ref, by]) => Object.entries(by).forEach(([day, v]) => rows.push({ref, day, n: v[0], v: v[1]})));
+  rows.sort((a, b) => b.day.localeCompare(a.day) || b.v - a.v);
+  const name = ref => (d.locations.find(L => L.ref === ref) || {}).name || ref, by = {};
+  rows.forEach(x => { by[x.ref] = (by[x.ref] || 0) + x.v; });
+  Pulse.pop({title: fcSp("Checks still open"), sub: esc(`${d.days[0]} to ${d.days[d.days.length - 1]} · Simphony, at the end of each business day`),
+    body: Pulse.tiles([{l: "Checks", v: fmt(d.kpis.open_checks || 0)}, {l: "Value", v: biM(d.kpis.open_value || 0), s: "on the open checks"}])
+      + `<p class="meta">${fcSp("A check still open when its business day closed has not been paid and closed, so it is not fiscalized either. Close it in Simphony (or void it with a reason), then it reaches Billy.")}</p>`
+      + (Object.keys(by).length > 1 ? Pulse.panel("By restaurant", Pulse.bars(Object.entries(by).sort((a, b) => b[1] - a[1]).map(([r, v]) => ({key: name(r), segs: [[v, "var(--ch-1)", "open"]], text: biM(v)})))) : "")
+      + Pulse.panel(`The days · ${fmt(rows.length)}`, Pulse.list([["Restaurant"], ["Day"], ["Open checks", 1], ["Value", 1]],
+        rows.map(x => ({cells: [`<b>${esc(name(x.ref))}</b>`, esc(x.day), fmt(x.n), biM(x.v)]})), {none: "None: every check was closed at the end of its day."}))});
+});
 function renderBilly(){
   const BI_GO = {"Not fiscalized": "biseg|checks|missing", "Fiscalized late": "biseg|checks|late", "Invoices without a check": "biseg|checks|inv", "No FIC in Billy": "biseg|checks|inv", "Sales book cases": "biseg|book|", "Orders": "biseg|orders|"};
   const d = biData, k = d.kpis, card = (l, val, sub, cls) => `<div class="card kpi"${BI_GO[l] ? ` data-pulse="${BI_GO[l]}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${fcSp(l)}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
@@ -6049,6 +6063,7 @@ function renderBilly(){
   $("biKpis").innerHTML =
     card("Checks fiscalized", pct == null ? "–" : fmt(pct, 1) + "%", fcSp(`${fmt(k.fiscalized)} of ${fmt(k.checks)} checks`), pct == null ? "" : pct >= 99.9 ? "down" : "warn") +
     card("Not fiscalized", fmt(k.missing), fcSp(`${biM(k.missing_value)} on the checks`), k.missing ? "up" : "down") +
+    (d.open ? `<div class="card kpi" data-pulse="biopen|" role="button" tabindex="0" style="cursor:pointer"><div class="l">${fcSp("Checks still open")}</div><div class="v ${k.open_checks ? "up" : "down"}">${fmt(k.open_checks || 0)}</div><div class="s">${k.open_checks ? fcSp(`${biM(k.open_value)} left open at the end of the day: not fiscalized`) : fcSp("every check closed at the end of its day")}</div></div>` : "") +
     card("Fiscalized late", fmt(k.late + k.late48), fcSp(`${fmt(k.late48)} after 48 hours · late after ${fmt(d.settings.late)} min`), k.late48 ? "up" : k.late ? "warn" : "") +
     card("Invoices without a check", fmt(k.no_check), fcSp(`${biM(k.no_check_value)} · ${fmt(k.other_till || 0)} on tills without Simphony`), k.no_check ? "warn" : "") +
     card("No FIC in Billy", fmt(k.no_fic), fcSp(`${biM(k.no_fic_value)} not fiscalized`), k.no_fic ? "up" : "down") +

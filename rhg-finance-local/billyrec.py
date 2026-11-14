@@ -718,6 +718,10 @@ def build(company, latest_fn, progress=None, today=None, frm=None, to=None):
     note = (f"{left} invoice{'' if left == 1 else 's'} still to be read in full for their orders; "
             f"the next read continues.") if left else ""
     r = acc.result(gen)
+    if sim_on:
+        say("Simphony · checks still open")
+        r["open"] = open_checks([x["ref"] for x in regs], days, latest, errors)
+        r["kpis"] = _kpis(r, None)
     nb, nf = billy.counts(nuis, "bridge", days[0], days[-1]), billy.counts(nuis, "fiscal", days[0], days[-1])
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"), complete=not errors,
              simphony=sim_on, orders_note=note,
@@ -726,6 +730,33 @@ def build(company, latest_fn, progress=None, today=None, frm=None, to=None):
              empty_days=[d.isoformat() for d in days if not nb.get(d.isoformat()) and not nf.get(d.isoformat())])
     _trim()
     return r
+
+
+def open_checks(refs, days, latest, errors=None):
+    """{ref: {day: [checks, value]}} still open at the end of each business day (operations daily totals:
+    chkOpnCnt, chkOpnTtl): a check left open is not fiscalized (QA 14 Nov 2026: the KPI belongs here, not on Sales).
+    The days are those Simphony keeps (simphony.daily_totals), read once."""
+    out = {}
+    jobs = [(r, d.isoformat()) for r in refs for d in days if not latest.get(r) or d.isoformat() <= latest[r]]
+
+    def one(job):
+        r, d = job
+        rv = (simphony.daily_totals(r, d, latest.get(r)) or {}).get("rvcs") or []
+        return (sum(int(x.get("chkOpnCnt") or 0) for x in rv), round(sum(float(x.get("chkOpnTtl") or 0) for x in rv), 2))
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futs = {pool.submit(one, j): j for j in jobs}
+        for f in as_completed(futs):
+            r, d = futs[f]
+            try:
+                n, v = f.result()
+            except Exception as exc:                                # noqa: BLE001
+                if errors is not None and len(errors) < 12:
+                    errors.append(f"Simphony {r} {d}, open checks: {str(exc)[:120]}")
+                continue
+            if n:
+                out.setdefault(r, {})[d] = [n, v]
+    simphony.flush_days()
+    return out
 
 
 def _trim():
@@ -1525,6 +1556,10 @@ def _kpis(r, keep):
             "no_fic": g("no_fic"), "no_fic_value": round(g("no_fic_value"), 2), "other_till": g("other_till"),
             "summary": g("summary"), "book_errors": g("book_errors"), "book_nodetail": g("book_nodetail"),
             "orders": g("orders"), "orders_value": round(g("orders_value"), 2), "orders_open": g("orders_open"),
+            "open_checks": sum(v[0] for ref, by in (r.get("open") or {}).items() if keep is None or ref in keep
+                               for v in by.values()),
+            "open_value": round(sum(v[1] for ref, by in (r.get("open") or {}).items() if keep is None or ref in keep
+                                    for v in by.values()), 2),
             "unmapped": sum(1 for x in tills if not x["ref"]) if keep is None else 0,
             "proposed": len(r.get("proposals") or {}) if keep is None else 0}
 
@@ -1568,6 +1603,7 @@ def public(r):
     t = _sum_agg(r, keep)
     k, chips = _ret_view(r, keep)
     out = {x: v for x, v in r.items() if x not in ("agg", "find")}
+    out["open"] = {ref: v for ref, v in (r.get("open") or {}).items() if keep is None or ref in keep}
     out.update(kpis=_kpis(r, keep), book_count=t.get("invoices") or 0, book_cases=t.get("book_errors") or 0,
                book_errors={e: n for e, n in (t.get("be") or {}).items() if n} if keep is not None else r["book_errors"],
                book_totals={x: round(v, 2) for x, v in (t.get("bt") or {}).items()},

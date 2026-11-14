@@ -44,5 +44,24 @@ class OpenCheck(unittest.TestCase):
         self.assertIsNone(c1["inv"])
 
 
+class OpenChecks(unittest.TestCase):
+    def test_open_checks_by_restaurant_and_day(self):
+        from datetime import date
+        import simphony
+        old = simphony.daily_totals, simphony.flush_days
+        simphony.daily_totals = lambda ref, d, latest=None: {"rvcs": [{"chkOpnCnt": 2 if ref == "SALT" else 0,
+                                                                         "chkOpnTtl": 3500.5 if ref == "SALT" else 0}]}
+        simphony.flush_days = lambda: None
+        try:
+            o = billyrec.open_checks(["SALT", "LIFT"], [date(2026, 11, 10), date(2026, 11, 11)],
+                                     {"SALT": "2026-11-10", "LIFT": "2026-11-11"})
+        finally:
+            simphony.daily_totals, simphony.flush_days = old
+        self.assertEqual(o, {"SALT": {"2026-11-10": [2, 3500.5]}})             # 11 Nov not closed at SALT yet
+        k = billyrec._kpis({"open": o, "agg": {}, "tills": []}, None)
+        self.assertEqual((k["open_checks"], k["open_value"]), (2, 3500.5))
+        self.assertEqual(billyrec._kpis({"open": o, "agg": {}, "tills": []}, {"LIFT"})["open_checks"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
