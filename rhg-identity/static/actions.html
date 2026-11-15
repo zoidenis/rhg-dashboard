@@ -360,12 +360,19 @@ async function loadMatrix(){
   try { M = await get("/api/actions/matrix"); U = M; } catch (e) { $("mxMsg").textContent = e.message; return; }
   const ed = M.can_manage;
   $("slaT").innerHTML = `<tr><th>Department</th>${M.severities.map(s => `<th class="num">${esc(SEV[s])}</th>`).join("")}</tr>` + M.departments.map(d => `<tr><td class="name"><b>${esc(d)}</b></td>${M.severities.map(s => `<td class="num"><input type="number" min="1" max="180" data-sla="${esc(d)}|${s}" value="${M.sla[d][s]}" ${ed ? "" : "disabled"}> d</td>`).join("")}</tr>`).join("");
-  const roles = M.roles, ro = (sel) => roles.map(r => `<option value="${esc(r.key)}"${r.key === sel ? " selected" : ""}>${esc(r.label)}</option>`).join("");
+  const roles = M.roles, adm = M.admin_roles || [];
+  const ro = (sel, many) => {
+    const on = (k) => many ? (sel || []).includes(k) : k === sel;
+    const known = new Set([...adm.map(a => "admin:" + a.name), ...roles.map(r => r.key)]);
+    const keep = (many ? (sel || []) : (sel ? [sel] : [])).filter(k => !known.has(k));       // kept as saved when its list could not be read
+    return keep.map(k => `<option value="${esc(k)}" data-no-i18n selected>${esc(k.replace(/^admin:/, ""))}</option>`).join("") + `<optgroup label="Roles of Administration">${adm.map(a => `<option value="admin:${esc(a.name)}" data-no-i18n${on("admin:" + a.name) ? " selected" : ""}>${esc(a.name)} (${a.people.length})</option>`).join("")}</optgroup>`
+      + `<optgroup label="Roles of Email recipients">${roles.map(r => `<option value="${esc(r.key)}"${on(r.key) ? " selected" : ""}>${esc(r.label)}</option>`).join("")}</optgroup>`;
+  };
   const E = M.escalation;
   $("escF").innerHTML = `<label class="meta">Head of department after <input type="number" id="e1" min="0" max="60" value="${E.level1_days}" ${ed ? "" : "disabled"} style="width:60px"> day(s) late</label>
     <label class="meta">Executives after <input type="number" id="e2" min="0" max="60" value="${E.level2_days}" ${ed ? "" : "disabled"} style="width:60px"> day(s) late</label>`
     + M.departments.map(d => `<label class="meta">${esc(d)}: <select data-head="${esc(d)}" ${ed ? "" : "disabled"}>${ro(E.heads[d])}</select></label>`).join("")
-    + `<label class="meta">Executives: <select id="eEx" multiple size="3" ${ed ? "" : "disabled"}>${roles.map(r => `<option value="${esc(r.key)}"${E.executives.includes(r.key) ? " selected" : ""}>${esc(r.label)}</option>`).join("")}</select></label>`;
+    + `<label class="meta">Executives: <select id="eEx" multiple size="6" ${ed ? "" : "disabled"}>${ro(E.executives, true)}</select></label>`;
   const G = (D && D.settings.digest) || {enabled: false, time: "08:30", reminder_days: 1};
   $("mailF").innerHTML = `<label class="meta"><input type="checkbox" id="gOn" ${G.enabled ? "checked" : ""} ${ed ? "" : "disabled"}> One daily email per owner (every tower and Unicorn together; it replaces the registers' own emails)</label>
     <label class="meta">at <input id="gT" value="${esc(G.time)}" ${ed ? "" : "disabled"} style="width:70px"></label><label class="meta">reminder <input type="number" id="gR" min="0" max="7" value="${G.reminder_days}" ${ed ? "" : "disabled"} style="width:56px"> day(s) before the deadline</label>

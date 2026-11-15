@@ -162,6 +162,16 @@ class AdminRoles(Base):
         x = next(i for i in ac.collect()["items"] if i["uid"] == "finance:n1")
         self.assertEqual((x["role_label"], x["department"]), ("Sales analyst", "Operations"))
 
+    def test_an_administration_role_as_head_of_department(self):
+        before = ac.settings()["escalation"]
+        self.addCleanup(lambda: ac.save_settings({"escalation": before}, "geri"))
+        self.assertEqual(ac.role_people("admin:Sales analyst", "SALT"), ["sara@rhg.al"])
+        self.assertEqual(ac.role_people("admin:Sales analyst", "OTHER"), [])          # her access is SALT only
+        ac.save_settings({"escalation": {"level1_days": 2, "level2_days": 5, "heads": {"Operations": "admin:Sales analyst"},
+                                         "executives": ["admin:Sales analyst", "ceo"]}}, "geri")
+        e = ac.settings()["escalation"]
+        self.assertEqual((e["heads"]["Operations"], e["executives"][0]), ("admin:Sales analyst", "admin:Sales analyst"))
+
 
 class Email(Base):
     def test_one_email_per_owner_with_escalation(self):

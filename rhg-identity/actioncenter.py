@@ -142,8 +142,8 @@ def save_settings(patch, actor):
                     raise ValueError("Escalation: days as numbers.") from exc
             if out["level2_days"] < out["level1_days"]:
                 raise ValueError("Escalation: the executives come after the head of department.")
-            out["heads"] = {k: str(v)[:40] for k, v in (e.get("heads") or {}).items() if k in DEPARTMENTS and v}
-            out["executives"] = [str(x)[:40] for x in (e.get("executives") or DEFAULTS["escalation"]["executives"])][:10]
+            out["heads"] = {k: str(v)[:90] for k, v in (e.get("heads") or {}).items() if k in DEPARTMENTS and v}
+            out["executives"] = [str(x)[:90] for x in (e.get("executives") or DEFAULTS["escalation"]["executives"])][:10]
             d["escalation"] = out
         if "digest" in patch:
             g = patch["digest"] or {}
@@ -278,8 +278,24 @@ def _emails(text):
     return [x.strip().lower() for x in re.split(r"[,;\s]+", text or "") if "@" in x]
 
 
+def _in_scope(scope, company, location=""):
+    """Does an account's access (Administration → Accounts) cover this company and location?"""
+    comps = (scope or {}).get("companies", "*")
+    if comps != "*" and str(company or "").upper() not in {str(c).upper() for c in comps}:
+        return False
+    locs = next((v for k, v in ((scope or {}).get("locations") or {}).items()
+                 if str(k).upper() == str(company or "").upper()), "*")
+    return locs == "*" or not location or str(location).upper() in {str(x).upper() for x in locs}
+
+
 def role_people(role, company, location=""):
-    """The emails in a role for a company (its location row first, else the company and the whole-group rows)."""
+    """The emails in a role for a company. "admin:<role>": the accounts of that role of Administration whose access
+    covers the company (and location); otherwise a role of Email recipients (its location row first, else the
+    company and the whole-group rows)."""
+    if str(role or "").startswith("admin:"):
+        name = role[6:]
+        return list(dict.fromkeys(p["email"] for r in admin_roles() if r["name"] == name
+                                  for p in r["people"] if _in_scope(p["scope"], company, location)))
     d = _directory()
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).upper() == str(company or "").upper()), {})
     if location:
