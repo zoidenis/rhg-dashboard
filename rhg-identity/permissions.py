@@ -46,6 +46,7 @@ PERMISSIONS = {
     "unicorn.use":           "Talk to Unicorn, the business analyst: the morning brief and the chat",
     "unicorn.decisions.approve": "Approve or refuse Unicorn's proposals, own and close the actions and findings",
     "unicorn.rules.manage":  "Change Unicorn's rules library: thresholds, policies, approved decisions",
+    "actioncenter.manage":   "Executive Action Center: change the SLA matrix, the responsibility matrix and the emails",
 
     # --- Scheduled reports (any screen of pulse sent by email, as each recipient sees it)
     "reports.manage":        "Schedule screens as email reports and choose who receives them",
@@ -76,6 +77,7 @@ ACTIONS = {
     "unicorn.use": "Unicorn, the business analyst: the morning brief and the chat",
     "unicorn.decisions.approve": "Unicorn: approve or refuse its proposals, own and close actions and findings",
     "unicorn.rules.manage": "Unicorn: change the rules library (thresholds, policies, approved decisions)",
+    "actioncenter.manage": "Executive Action Center: SLA and responsibility matrices, deadlines, the daily email",
     "reports.manage": "Scheduled reports: send screens by email, choose how often and to whom",
     "layout.personal": "Rearrange and hide sections for yourself",
     "layout.roles.manage": "Set the sections each role sees, and their order",
@@ -330,6 +332,16 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  # Unicorn 2.0: whoever talks to Unicorn (management) approves its proposals and keeps its rules
                  "unicorn.decisions.approve": "unicorn.use",
                  "unicorn.rules.manage": "unicorn.use",
+                 # Executive Action Center: management sees all of it and keeps its matrices; whoever works the
+                 # registers (actions of a tower) sees the departments; everyone with a tower sees their own items
+                 "platform.s.actions.executive": ("unicorn.use", "platform.s.control"),
+                 "platform.s.actions.unicorn": "unicorn.use",
+                 "platform.s.actions.matrix": ("unicorn.use", "finance.settings.manage", "purchasing.settings.manage"),
+                 "actioncenter.manage": "unicorn.use",
+                 "platform.s.actions.departments": ("unicorn.use", "finance.actions.manage", "purchasing.actions.manage"),
+                 # anyone who opens a screen of pulse may own an item: their own items, once
+                 "platform.s.actions.mine": tuple(k for k in screens.SCREENS if not k.startswith("platform.s.actions"))
+                                            + ("unicorn.use",),
                  # Inventory → Item cards (was Item master control): with its stock by location it is also for the
                  # people of the warehouses, so whoever reads an inventory screen by location gets it once
                  "finance.s.inventory.itemmaster": ("finance.s.inventory.movement", "finance.s.inventory.sku",

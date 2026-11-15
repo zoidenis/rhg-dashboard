@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>Executive Action Center · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* Executive Action Center: every control's items, owners, SLA deadlines and progress. Shell as the Control center. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0}
+header{display:flex;justify-content:space-between}
+.adminlink{margin-top:auto;padding-top:16px}
+.adminlink a{color:var(--rhg-blue);font-size:11px;text-decoration:none}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--down);display:inline-block}
+.pill.err .dot{background:var(--up)} .pill.load .dot{background:var(--warn)}
+.ac-tabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 0 16px;align-self:flex-start;width:max-content;max-width:100%}
+.ac-tabs button{all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;font-size:13.5px;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.ac-tabs button.on{background:var(--rhg-primary);color:#fff;font-weight:600}
+.ac-tabs .n{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--rhg-redbg);color:var(--rhg-red)}
+.ac-tabs button.on .n{background:rgba(255,255,255,.2);color:#fff}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:14px}
+.kp .card.kpi{cursor:default}.kp .card.kpi.clickable{cursor:pointer}
+.grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+.grid2>*,main .card,section{min-width:0}
+.grid2 .it{grid-template-columns:86px minmax(0,1fr)}.grid2 .it .o,.grid2 .it .d{grid-column:2;text-align:left}
+.card h2{font-size:17px}
+.scroll{overflow-x:auto}
+.scroll table{min-width:640px}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--rhg-bg);min-width:90px}
+.bar i{display:block;height:100%}
+.flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.flt select,.flt input{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 10px;font-size:13px}
+.chipsel{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.chipsel button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.chipsel button.on{background:var(--rhg-primary);border-color:var(--rhg-primary);color:#fff;font-weight:600}
+.list{display:flex;flex-direction:column;gap:8px}
+.it{display:grid;grid-template-columns:92px 1fr 210px 120px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.it:hover,.it:focus-visible{border-color:var(--rhg-primary);outline:none}
+.it.late{border-left:3px solid var(--rhg-red)}
+.it .t{font-weight:600;font-size:13.5px}
+.it .s{font-size:11.5px;color:var(--sub);margin-top:2px}
+.it .o{font-size:12.5px}
+.it .d{text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums}
+.sev{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:6px;padding:3px 7px;background:var(--rhg-bg);color:var(--sub)}
+.sev.critical{background:var(--rhg-redbg);color:var(--rhg-red)}.sev.high{background:var(--rhg-amberbg);color:var(--rhg-amber)}.sev.medium{background:var(--rhg-sky);color:var(--rhg-primary)}
+.st{display:inline-block;white-space:nowrap;font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;background:var(--rhg-bg);color:var(--sub);margin-top:4px}
+.st.Open{background:var(--rhg-sky);color:var(--rhg-primary)}.st.Inprogress,.st.Awaitingverification,.st.Awaitingapproval{background:var(--rhg-amberbg);color:var(--rhg-amber)}.st.Closed{background:var(--rhg-greenbg);color:var(--rhg-green)}
+.esc{display:inline-block;font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 6px;background:var(--rhg-redbg);color:var(--rhg-red);margin-left:4px}
+.noacc{color:var(--rhg-amber);font-size:11px}
+.bd{position:fixed;inset:0;background:rgba(8,30,40,.55);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto}
+.md{background:var(--card);color:var(--ink);border-radius:14px;width:100%;max-width:780px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.md .mh{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:16px 20px;background:#08303f;color:#fff;border-radius:14px 14px 0 0}
+.md .mh h2{font-family:var(--rhg-font-display);font-size:18px;margin:0;color:#fff}
+.md .mh .sub{font-size:12px;opacity:.75;margin-top:3px}
+.md .mb{padding:16px 20px;font-size:13.5px;line-height:1.5}
+.md h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:16px 0 6px}
+.md .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px}
+.md label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub)}
+.md input,.md select,.md textarea,.mx input,.mx select{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 9px;font-size:13px;color:var(--ink)}
+.msg{font-size:12.5px;color:var(--sub)}
+.mx td input[type=number]{width:64px;text-align:right}
+.hint2{font-size:12px;color:var(--sub);margin:0 0 12px}
+.mnav-btn,.mnav-bd{display:none}
+@media(max-width:1000px){.grid2{grid-template-columns:1fr}.it{grid-template-columns:86px 1fr}.it .o,.it .d{grid-column:2;text-align:left}}
+@media(max-width:760px){
+  aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;transform:translateX(-105%);transition:transform .2s ease}
+  body.mnav-open aside{transform:none;box-shadow:0 0 32px rgba(0,0,0,.35)}
+  body.mnav-open{overflow:hidden}
+  .mnav-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}
+  body.mnav-open .mnav-bd{display:block}
+  .mnav-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px}
+  .mnav-btn svg{width:18px;height:18px}
+  main{padding:16px}
+  .ac-tabs{width:100%}.ac-tabs button{padding:7px 10px;font-size:13px}
+  .it{grid-template-columns:1fr;gap:4px}.it .o,.it .d{grid-column:1}
+}
+@media (prefers-reduced-motion: reduce){aside{transition:none}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/actions" class="on" aria-current="page">Executive Action Center</a>
+    <a href="/executive">Executive dashboard</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
+</aside>
+<div class="mnav-bd no-report" id="mnavBd"></div>
+<main>
+  <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
+  <header>
+    <div>
+      <div class="eyebrow">RHG / Executive Action Center</div>
+      <h1 id="title">Executive Action Center</h1>
+      <div class="period" id="sub">Every control's items, their owners, SLA deadlines and progress</div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn dark" id="reload" type="button">Read again</button></div>
+      <div class="hdr-meta"><span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading the registers…</span></span>
+        <span class="sep">|</span><span id="whoami"></span><button class="linkbtn" id="logoutBtn">Sign out</button></div>
+    </div>
+  </header>
+
+  <div class="ac-tabs" id="acTabs" role="tablist">
+    <button type="button" data-t="executive" role="tab">Executive view</button>
+    <button type="button" data-t="departments" role="tab">Departments</button>
+    <button type="button" data-t="mine" role="tab">My items <span class="n" id="nMine" hidden></span></button>
+    <button type="button" data-t="unicorn" role="tab">Unicorn's tasks</button>
+    <button type="button" data-t="matrix" role="tab">SLA &amp; responsibility matrix</button>
+  </div>
+
+  <section id="vExecutive" hidden>
+    <div class="kp" id="exKpis"></div>
+    <div class="grid2">
+      <div class="card"><h2>Departments</h2><p class="hint">Open items by department: within the deadline and past it. Click a department for its items.</p><div class="scroll"><table id="exDept"></table></div></div>
+      <div class="card"><h2>Escalated: past the deadline</h2><p class="hint" id="exEscHint"></p><div class="list" id="exEsc"></div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px"><h2>Owners</h2><p class="hint">Who carries the open items, past their deadline first, and how they closed in the last 30 days. An owner without a pulse account receives the email but cannot update the items.</p><div class="scroll"><table id="exOwners"></table></div></div>
+    <div class="card"><h2>Where the items come from</h2><p class="hint" id="exSrcHint"></p><div class="scroll"><table id="exSrc"></table></div></div>
+  </section>
+
+  <section id="vDepartments" hidden>
+    <div class="chipsel" id="dChips"></div>
+    <div class="kp" id="dKpis"></div>
+    <div class="flt">
+      <select id="fStatus" aria-label="Status"><option value="active">Open</option><option value="overdue">Past the deadline</option><option value="soon">Due soon</option><option value="noowner">Without an owner</option><option value="closed">Closed in 30 days</option><option value="all">All</option></select>
+      <select id="fSev" aria-label="Severity"><option value="">Every severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+      <select id="fSrc" aria-label="Source"><option value="">Every source</option></select>
+      <select id="fCo" aria-label="Company"><option value="">Every company</option></select>
+      <input id="fQ" type="search" placeholder="Title, restaurant or owner" aria-label="Search">
+      <span class="msg" id="dMsg"></span>
+    </div>
+    <div class="list" id="dList"></div>
+  </section>
+
+  <section id="vMine" hidden>
+    <div class="kp" id="mKpis"></div>
+    <div class="list" id="mList"></div>
+  </section>
+
+  <section id="vUnicorn" hidden>
+    <p class="hint2">The tasks Unicorn carries out every day on its own; people approve what it proposes. Its findings and proposals are in Unicorn → Gjetjet and Vendimet & veprimet; the approved actions are owned and followed here with everyone else's.</p>
+    <div class="kp" id="uKpis"></div>
+    <div class="grid2">
+      <div class="card"><h2>Unicorn's duties</h2><div class="scroll"><table id="uDuties"></table></div></div>
+      <div class="card"><h2>Morning runs</h2><div class="scroll"><table id="uRuns"></table></div></div>
+    </div>
+  </section>
+
+  <section id="vMatrix" hidden>
+    <div class="card mx" style="margin-bottom:14px"><h2>SLA matrix</h2><p class="hint">Days from the day an item is found to its deadline, by the department that owns it and its severity. The registers of Finance and Purchasing date every new item with it; "Apply to open items" re-dates the open items nobody re-dated by hand.</p>
+      <div class="scroll"><table id="slaT"></table></div>
+      <h3 style="font-size:14px;margin:16px 0 6px">Escalation</h3>
+      <div class="flt" id="escF"></div>
+      <h3 style="font-size:14px;margin:16px 0 6px">Daily email</h3>
+      <div class="flt" id="mailF"></div>
+      <div class="flt"><button class="btn dark" type="button" id="mxSave">Save</button><button class="btn" type="button" id="mxApply">Apply the SLA to open items</button><button class="btn" type="button" id="mxTest">Send me a test email</button><span class="msg" id="mxMsg"></span></div>
+    </div>
+    <div class="card mx" style="margin-bottom:14px"><h2>Who owns what</h2><p class="hint">The role that owns each type of item in the registers (the controls' rules), its department, and how many items it holds now.</p><div class="scroll"><table id="rulesT"></table></div></div>
+    <div class="card mx"><h2>People in each role</h2><p class="hint">The responsibility matrix: for every company (and restaurant), the people in each role. The same directory as Settings → Email recipients by company. An owner is a pulse account when its email matches one.</p>
+      <div class="flt"><select id="pCo" aria-label="Company"></select><span class="msg" id="pMsg"></span></div>
+      <div class="scroll"><table id="peopleT"></table></div>
+      <div class="flt" id="pEdit" hidden style="margin-top:12px"><select id="peRole" aria-label="Role"></select><input id="peLoc" placeholder="Restaurant code (blank = the whole company)" style="min-width:240px"><select id="peAcc" multiple size="4" aria-label="Pulse accounts" style="min-width:260px"></select><button class="btn dark" type="button" id="peSave">Save the role</button></div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtN = (v, d = 0) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? fmtN(v / 1e6, 1) + " M" : Math.abs(v) >= 1e4 ? fmtN(v / 1e3) + " k" : fmtN(v);
+let me = null, CSRF = null, D = null, M = null, tab = "executive", dept = "", U = null;
+const can = p => (me && me.permissions || []).includes(p);
+async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+async function post(u, body){ const r = await fetch(u, {method: "POST", credentials: "same-origin",
+  headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+const SEV = {critical: "Critical", high: "High", medium: "Medium", low: "Low"};
+const DEP_COLOR = {Finance: "var(--ch-0, #0c475e)", Purchasing: "var(--ch-1, #b26a00)", Warehouse: "var(--ch-2, #6b4fbb)", Operations: "var(--ch-3, #12805c)", Executive: "var(--ch-4, #c0392b)"};
+function kpi(l, v, s, cls, open){ return `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-open="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s || ""}</div></div>`; }
+function ownerText(x){
+  if (x.status === "Awaiting approval") return `<span class="meta">approver</span> ${esc(x.role_label)}`;
+  if (x.owner_accounts.length) return x.owner_accounts.map(a => `<b>${esc(a.name)}</b>`).join(", ") + (x.owners_without_account.length ? ` <span class="noacc">+${x.owners_without_account.length} without account</span>` : "");
+  if (x.owners.length) return esc(x.owners.join(", ")) + ` <span class="noacc">no pulse account</span>`;
+  return `<span class="noacc">nobody in the role ${esc(x.role_label || "")}</span>`;
+}
+function itemRow(x){
+  const late = x.overdue ? `<b style="color:var(--rhg-red)">${x.days_overdue} d late</b>${x.escalation ? `<span class="esc">L${x.escalation}</span>` : ""}` : x.due_soon ? `<b style="color:var(--rhg-amber)">due ${esc(x.due)}</b>` : x.active ? `due ${esc(x.due || "–")}` : `<span class="meta">${esc(x.status)} ${esc(String(x.closed_at || "").slice(0, 10))}</span>`;
+  return `<button class="it${x.overdue ? " late" : ""}" type="button" data-u="${esc(x.uid)}">
+    <div><span class="sev ${esc(x.severity)}">${esc(SEV[x.severity] || x.severity)}</span><div class="st ${esc(x.status.replace(/ /g, ""))}">${esc(x.status)}</div></div>
+    <div><div class="t">${esc(x.title)}</div><div class="s">${esc(x.department)} · ${esc(x.source_label)} · ${esc(x.company)}${x.location ? " · " + esc(x.location) : ""}</div></div>
+    <div class="o">${ownerText(x)}</div><div class="d">${late}${x.value ? `<div class="meta">${fmtM(x.value)}</div>` : ""}</div></button>`;
+}
+function show(t){
+  if (D && !D.tabs.includes(t)) t = D.tabs[0];
+  tab = t;
+  document.querySelectorAll("#acTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
+  ["executive", "departments", "mine", "unicorn", "matrix"].forEach(k => $("v" + k[0].toUpperCase() + k.slice(1)).hidden = k !== t);
+  if (history.replaceState) history.replaceState(null, "", "#" + t + (t === "departments" && dept ? "/" + dept : ""));
+  paint();
+  if (t === "unicorn") loadUnicorn();
+  if (t === "matrix") loadMatrix();
+}
+document.querySelectorAll("#acTabs button").forEach(b => b.onclick = () => show(b.dataset.t));
+async function load(){
+  $("pill").className = "pill load"; $("pillText").textContent = "Reading the registers…";
+  try { D = await get("/api/actions"); }
+  catch (e) { $("pill").className = "pill err"; $("pillText").textContent = e.message; return; }
+  document.querySelectorAll("#acTabs button").forEach(b => b.hidden = !D.tabs.includes(b.dataset.t));
+  $("pill").className = D.errors.length ? "pill err" : "pill"; $("pillText").textContent = D.errors.length ? "Not read: " + D.errors.join("; ").slice(0, 140) : `${fmtN(D.items.length)} items · read ${new Date().toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
+  const mine = D.items.filter(x => x.active && x.owners.includes(D.me));
+  $("nMine").hidden = !mine.length; $("nMine").textContent = mine.length;
+  if (!$("fSrc").dataset.done) { $("fSrc").dataset.done = 1;
+    $("fSrc").insertAdjacentHTML("beforeend", Object.entries(D.sources).sort((a, b) => a[1].localeCompare(b[1])).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join(""));
+    $("fCo").insertAdjacentHTML("beforeend", [...new Set(D.items.map(x => x.company).filter(Boolean))].sort().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("")); }
+  paint();
+}
+$("reload").onclick = load;
+function paint(){
+  if (!D) return;
+  if (tab === "executive") paintExecutive();
+  if (tab === "departments") paintDepartments();
+  if (tab === "mine") paintMine();
+}
+function paintExecutive(){
+  const T = D.stats.total;
+  $("exKpis").innerHTML = kpi("Open items", fmtN(T.open), `${fmtN(T.critical)} critical · ${fmtN(T.no_owner)} without an owner`, "", "departments:active")
+    + kpi("Past the deadline", fmtN(T.overdue), `${fmtN(T.escalated)} escalated`, T.overdue ? "up" : "", "departments:overdue")
+    + kpi("Due soon", fmtN(T.due_soon), `within ${D.settings.digest.reminder_days} day(s)`, T.due_soon ? "warn" : "", "departments:soon")
+    + kpi("Closed in 30 days", fmtN(T.closed_30), `${fmtN(T.closed_7)} in the last 7 days`, "", "departments:closed")
+    + kpi("On time", T.on_time_pct == null ? "–" : T.on_time_pct + "%", `closed by the deadline · median ${T.median_days_to_close ?? "–"} days`, T.on_time_pct != null && T.on_time_pct < 80 ? "warn" : "")
+    + kpi("Waiting for approval", fmtN(T.awaiting_approval), "Unicorn's proposals", T.awaiting_approval ? "warn" : "", "departments:active:Executive");
+  const S = D.stats.departments, mx = Math.max(1, ...Object.values(S).map(x => x.open));
+  $("exDept").innerHTML = `<tr><th>Department</th><th></th><th class="num">Open</th><th class="num">Late</th><th class="num">Critical</th><th class="num">No owner</th><th class="num">On time</th><th class="num">Oldest</th></tr>`
+    + D.departments.map(k => { const x = S[k];
+      return `<tr data-dep="${esc(k)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(k)}</b></td>
+        <td style="width:30%"><div class="bar" title="${x.open - x.overdue} within the deadline, ${x.overdue} late"><i style="width:${(x.open - x.overdue) / mx * 100}%;background:${DEP_COLOR[k]}"></i><i style="width:${x.overdue / mx * 100}%;background:var(--rhg-red)"></i></div></td>
+        <td class="num">${fmtN(x.open)}</td><td class="num ${x.overdue ? "up" : ""}">${fmtN(x.overdue)}</td><td class="num">${fmtN(x.critical)}</td><td class="num ${x.no_owner ? "warn" : ""}">${fmtN(x.no_owner)}</td>
+        <td class="num">${x.on_time_pct == null ? "–" : x.on_time_pct + "%"}</td><td class="num">${x.oldest_days == null ? "–" : x.oldest_days + " d"}</td></tr>`; }).join("");
+  const E = D.items.filter(x => x.overdue).slice(0, 12);
+  $("exEscHint").textContent = `L1 = the head of the department after ${D.settings.escalation.level1_days} day(s) late; L2 = the executives after ${D.settings.escalation.level2_days}.`;
+  $("exEsc").innerHTML = E.length ? E.map(itemRow).join("") : `<p class="meta">Nothing past its deadline.</p>`;
+  $("exOwners").innerHTML = `<tr><th>Owner</th><th>Department</th><th class="num">Open</th><th class="num">Late</th><th class="num">Critical</th><th class="num">Closed 30 d</th><th class="num">On time</th></tr>`
+    + (D.stats.owners.slice(0, 40).map(o => `<tr><td class="name"><b>${esc(o.name || o.owner)}</b><div class="meta">${o.name ? esc(o.owner) : ""}${o.account || o.owner.startsWith("(role)") ? "" : ` <span class="noacc">no pulse account</span>`}</div></td>
+      <td class="meta">${esc(o.departments.join(", "))}</td><td class="num">${fmtN(o.open)}</td><td class="num ${o.overdue ? "up" : ""}">${fmtN(o.overdue)}</td><td class="num">${fmtN(o.critical)}</td><td class="num">${fmtN(o.closed_30)}</td><td class="num">${o.on_time_pct == null ? "–" : o.on_time_pct + "%"}</td></tr>`).join("") || `<tr><td colspan="7" class="meta">No owner yet.</td></tr>`);
+  const bySrc = {};
+  D.items.filter(x => x.active).forEach(x => { const s = bySrc[x.source] = bySrc[x.source] || {label: x.source_label, dept: x.department, open: 0, late: 0}; s.open++; s.late += x.overdue; });
+  $("exSrcHint").textContent = `Finance and Purchasing registers and Unicorn. ${D.errors.length ? "Not read: " + D.errors.join("; ") : ""}`;
+  $("exSrc").innerHTML = `<tr><th>Source</th><th>Department</th><th class="num">Open</th><th class="num">Late</th></tr>` + Object.entries(bySrc).sort((a, b) => b[1].open - a[1].open).map(([k, s]) =>
+    `<tr><td>${esc(s.label)}</td><td class="meta">${esc(s.dept)}</td><td class="num">${fmtN(s.open)}</td><td class="num ${s.late ? "up" : ""}">${fmtN(s.late)}</td></tr>`).join("")
+    + (D.runs.length ? `<tr><td colspan="4" class="meta">Latest control runs: ${D.runs.slice(0, 6).map(r => `${esc(r.tower)} · ${esc(r.source)} ${esc(r.company)} ${esc(String(r.at).slice(5, 16).replace("T", " "))}`).join(" · ")}</td></tr>` : "");
+}
+document.addEventListener("click", e => {
+  const o = e.target.closest("[data-open]"); if (o) { const [t, st, dp] = o.dataset.open.split(":"); if (st) $("fStatus").value = st; dept = dp || ""; show(t); return; }
+  const r = e.target.closest("[data-dep]"); if (r) { dept = r.dataset.dep; $("fStatus").value = "active"; show("departments"); return; }
+  const it = e.target.closest("[data-u]"); if (it) openItem(it.dataset.u);
+});
+function filtered(xs){
+  const st = $("fStatus").value, sv = $("fSev").value, src = $("fSrc").value, co = $("fCo").value, q = $("fQ").value.trim().toLowerCase();
+  return xs.filter(x => (!dept || x.department === dept)
+    && (st === "all" || (st === "active" && x.active) || (st === "overdue" && x.overdue) || (st === "soon" && x.due_soon) || (st === "noowner" && x.active && !x.owners.length && x.status !== "Awaiting approval") || (st === "closed" && x.status === "Closed"))
+    && (!sv || x.severity === sv) && (!src || x.source === src) && (!co || x.company === co)
+    && (!q || (x.title + " " + x.location + " " + x.owners.join(" ") + " " + x.owner_accounts.map(a => a.name).join(" ")).toLowerCase().includes(q)));
+}
+function paintDepartments(){
+  const S = D.stats.departments;
+  $("dChips").innerHTML = `<button type="button" data-d="" class="${dept ? "" : "on"}">All</button>` + D.departments.map(k => `<button type="button" data-d="${esc(k)}" class="${dept === k ? "on" : ""}">${esc(k)} <span class="meta">${S[k].open}${S[k].overdue ? " · " + S[k].overdue + " late" : ""}</span></button>`).join("");
+  const x = dept ? S[dept] : D.stats.total;
+  $("dKpis").innerHTML = kpi("Open", fmtN(x.open), `${fmtN(x.critical)} critical`) + kpi("Past the deadline", fmtN(x.overdue), `${fmtN(x.escalated)} escalated`, x.overdue ? "up" : "")
+    + kpi("Without an owner", fmtN(x.no_owner), "nobody in the role", x.no_owner ? "warn" : "") + kpi("On time, 30 days", x.on_time_pct == null ? "–" : x.on_time_pct + "%", `${fmtN(x.closed_30)} closed`);
+  const L = filtered(D.items);
+  $("dMsg").textContent = `${L.length} items`;
+  $("dList").innerHTML = L.length ? L.slice(0, 300).map(itemRow).join("") : `<div class="card"><p class="hint" style="margin:0">No item here.</p></div>`;
+}
+$("dChips").addEventListener("click", e => { const b = e.target.closest("[data-d]"); if (!b) return; dept = b.dataset.d; show("departments"); });
+["fStatus", "fSev", "fSrc", "fCo"].forEach(id => $(id).onchange = paintDepartments);
+$("fQ").oninput = paintDepartments;
+function paintMine(){
+  const L = D.items.filter(x => x.owners.includes(D.me));
+  const A = L.filter(x => x.active);
+  $("mKpis").innerHTML = kpi("My open items", fmtN(A.length), `${fmtN(A.filter(x => x.severity === "critical").length)} critical`) + kpi("Past the deadline", fmtN(A.filter(x => x.overdue).length), "update or close them", A.some(x => x.overdue) ? "up" : "")
+    + kpi("Due soon", fmtN(A.filter(x => x.due_soon).length), "") + kpi("Closed in 30 days", fmtN(L.filter(x => x.status === "Closed").length), "");
+  $("mList").innerHTML = !D.me ? `<div class="card"><p class="hint" style="margin:0">Your account has no email, so no item can be yours. Ask the administrator to add it.</p></div>`
+    : A.length ? A.map(itemRow).join("") : `<div class="card"><p class="hint" style="margin:0">Nothing open is yours. Items come to you through the responsibility matrix (your email in a role).</p></div>`;
+}
+function statusesOf(x){
+  if (x.origin === "unicorn" || x.manual) return ["Open", "In progress", "Closed", "Dismissed"];
+  return ["Open", "In progress", "Awaiting verification", "Dismissed"];
+}
+async function openItem(uid){
+  const x = D.items.find(i => i.uid === uid); if (!x) return;
+  const mayManage = D.can_manage || D.can_tower[x.origin];
+  const mayEdit = mayManage || x.owners.includes(D.me);
+  const accs = D.accounts || [];
+  const body = `<p style="margin:0 0 8px">${esc(x.detail)}</p>
+    <div class="row" style="align-items:center"><span class="sev ${esc(x.severity)}">${esc(SEV[x.severity])}</span><span class="st ${esc(x.status.replace(/ /g, ""))}">${esc(x.status)}</span><span class="meta">${esc(x.department)} · ${esc(x.source_label)} · found ${esc(x.first_seen)}${x.reopened ? ` · reopened ${x.reopened}×` : ""}</span></div>
+    <h4>Owner and deadline</h4><p style="margin:0">${ownerText(x)} <span class="meta">${x.role_label && x.status !== "Awaiting approval" ? "· role " + esc(x.role_label) : ""}</span></p>
+    <p style="margin:4px 0 0">Deadline <b>${esc(x.due || "–")}</b>${x.sla_due && x.sla_due !== x.due ? ` <span class="meta">(SLA ${esc(x.sla_due)})</span>` : ""}${x.overdue ? ` · <b style="color:var(--rhg-red)">${x.days_overdue} days late</b>${x.escalation ? ` · escalated L${x.escalation}` : ""}` : ""}</p>
+    ${x.kpi ? `<h4>KPI followed by Unicorn</h4><p style="margin:0">${esc(x.kpi.metric)}: baseline ${esc(x.kpi.baseline ?? "–")} → latest ${esc(x.kpi.latest ?? "–")} (effect ${esc(x.kpi.effect ?? "–")}) · target ${esc(x.kpi.target ?? "–")}</p>` : ""}
+    ${x.history.length ? `<h4>History</h4><ul style="margin:0;padding-left:18px">${x.history.slice().reverse().map(h => `<li><span class="meta">${esc(String(h.ts || h.at || "").slice(0, 16).replace("T", " "))} · ${esc(h.by || "")}</span> ${esc(h.to ? h.to + (h.note ? ": " : "") : "")}${esc(h.note || h.text || "")}</li>`).join("")}</ul>` : ""}
+    ${x.status === "Awaiting approval" ? `<h4>Approval</h4><p style="margin:0"><a href="/unicorn#decisions">Approve or refuse it in Unicorn → Vendimet & veprimet</a></p>`
+      : mayEdit ? `<h4>Update</h4><div class="row">
+        <label>Status<select id="iSt"><option value="">unchanged</option>${statusesOf(x).filter(s => s !== x.status).map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>
+        <label style="flex:1;min-width:220px">Comment<input id="iCm" placeholder="What was done, or why it is dismissed"></label></div>
+        ${mayManage ? `<div class="row"><label>Owner<select id="iOw"><option value="">unchanged</option>${accs.map(a => `<option value="${esc(a.email)}">${esc(a.name)} · ${esc(a.email)}</option>`).join("")}</select></label><label>Deadline<input id="iDu" type="date" value="${esc(x.due || "")}"></label></div>` : ""}
+        <div class="row"><button class="btn dark" type="button" id="iSave">Save</button>${x.link ? `<a class="btn" href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}<span class="msg" id="iMsg"></span></div>`
+      : `<p class="meta">Only its owner or a manager updates it.${x.link ? ` <a href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}</p>`}`;
+  modal(x.title, `${x.company}${x.location ? " · " + x.location : ""} · ${x.tower}`, body);
+  if ($("iSave")) $("iSave").onclick = async () => {
+    const patch = {uid, status: $("iSt").value, comment: $("iCm").value};
+    if ($("iOw") && $("iOw").value) patch.owner = $("iOw").value;
+    if ($("iDu") && $("iDu").value && $("iDu").value !== x.due) patch.due = $("iDu").value;
+    try { await post("/api/actions/item", patch); $("iMsg").textContent = "Saved in " + x.tower + "."; setTimeout(() => { closeModal(); load(); }, 500); }
+    catch (e) { $("iMsg").textContent = e.message; }
+  };
+}
+function modal(title, sub, body){
+  closeModal();
+  document.body.insertAdjacentHTML("beforeend", `<div class="bd" id="bd"><div class="md" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="mh"><div><h2>${esc(title)}</h2><div class="sub">${esc(sub)}</div></div><button class="btn" type="button" id="mClose">Close ✕</button></div><div class="mb">${body}</div></div></div>`);
+  $("mClose").onclick = closeModal; $("bd").onclick = e => { if (e.target.id === "bd") closeModal(); };
+}
+function closeModal(){ const b = $("bd"); if (b) b.remove(); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+async function loadUnicorn(){
+  let j; try { j = await get("/api/actions/unicorn"); } catch (e) { $("uKpis").innerHTML = `<p class="msg">${esc(e.message)}</p>`; return; }
+  const s = j.state, c = j.counts, lr = s.last_run || {};
+  $("uKpis").innerHTML = kpi("Morning brief", lr.state === "done" ? "Done" : lr.state ? lr.state : "–", `${esc(lr.day || "")} · every day at ${esc(s.time)}`, lr.state === "failed" ? "up" : "")
+    + kpi("New findings", fmtN(j.new_findings.length), "waiting for investigation") + kpi("Proposals waiting", fmtN(c.decisions_proposed), "for a person", c.decisions_proposed ? "warn" : "")
+    + kpi("Actions followed", fmtN(c.actions_open), `${fmtN(c.actions_overdue)} past the deadline`, c.actions_overdue ? "up" : "");
+  const duty = (n, what, st) => `<tr><td class="name"><b>${esc(n)}</b><div class="meta">${esc(what)}</div></td><td>${st}</td></tr>`;
+  $("uDuties").innerHTML = `<tr><th>Duty</th><th>Status</th></tr>`
+    + duty("Morning brief", `Every day at ${s.time}: the figures of yesterday from Finance and Purchasing, written for management`, s.running ? `<span class="st Inprogress">${esc(s.running.stage)}</span>` : lr.state ? `<span class="st ${lr.state === "done" ? "Closed" : "Open"}">${esc(lr.state)}</span> ${esc(lr.day || "")}` : "–")
+    + duty("Detection", "11 rules over the morning's figures; every breach becomes a finding", `${fmtN(c.findings_open)} open findings`)
+    + duty("Investigation", "The largest new findings, read across the towers with read-only tools, end in a proposal", j.investigating.length ? `<span class="st Inprogress">investigating ${j.investigating.map(i => "F" + i).join(", ")}</span>` : `${fmtN(j.new_findings.length)} new waiting`)
+    + duty("Proposals", "Decisions with their impact, waiting for a person to approve or refuse", `${fmtN(c.decisions_proposed)} waiting`)
+    + duty("Follow-up", "Measures the KPI of every approved action each morning against its baseline", `${fmtN(j.measured.length)} measured`)
+    + duty("Rules", "Proposes new versions of rules people keep overruling; a person approves", `${fmtN(c.rules_proposed_by_unicorn)} waiting`);
+  $("uRuns").innerHTML = `<tr><th>Day</th><th>State</th><th class="num">Tries</th><th>Note</th></tr>` + (j.runs.map(r => `<tr><td>${esc(r.day)}</td><td><span class="st ${r.state === "done" ? "Closed" : "Open"}">${esc(r.state)}</span></td><td class="num">${esc(r.tries)}</td><td class="meta">${esc((r.error || "").slice(0, 120))}</td></tr>`).join("") || `<tr><td colspan="4" class="meta">No run yet.</td></tr>`);
+}
+async function loadMatrix(){
+  try { M = await get("/api/actions/matrix"); U = M; } catch (e) { $("mxMsg").textContent = e.message; return; }
+  const ed = M.can_manage;
+  $("slaT").innerHTML = `<tr><th>Department</th>${M.severities.map(s => `<th class="num">${esc(SEV[s])}</th>`).join("")}</tr>` + M.departments.map(d => `<tr><td class="name"><b>${esc(d)}</b></td>${M.severities.map(s => `<td class="num"><input type="number" min="1" max="180" data-sla="${esc(d)}|${s}" value="${M.sla[d][s]}" ${ed ? "" : "disabled"}> d</td>`).join("")}</tr>`).join("");
+  const roles = M.roles, ro = (sel) => roles.map(r => `<option value="${esc(r.key)}"${r.key === sel ? " selected" : ""}>${esc(r.label)}</option>`).join("");
+  const E = M.escalation;
+  $("escF").innerHTML = `<label class="meta">Head of department after <input type="number" id="e1" min="0" max="60" value="${E.level1_days}" ${ed ? "" : "disabled"} style="width:60px"> day(s) late</label>
+    <label class="meta">Executives after <input type="number" id="e2" min="0" max="60" value="${E.level2_days}" ${ed ? "" : "disabled"} style="width:60px"> day(s) late</label>`
+    + M.departments.map(d => `<label class="meta">${esc(d)}: <select data-head="${esc(d)}" ${ed ? "" : "disabled"}>${ro(E.heads[d])}</select></label>`).join("")
+    + `<label class="meta">Executives: <select id="eEx" multiple size="3" ${ed ? "" : "disabled"}>${roles.map(r => `<option value="${esc(r.key)}"${E.executives.includes(r.key) ? " selected" : ""}>${esc(r.label)}</option>`).join("")}</select></label>`;
+  const G = (D && D.settings.digest) || {enabled: false, time: "08:30", reminder_days: 1};
+  $("mailF").innerHTML = `<label class="meta"><input type="checkbox" id="gOn" ${G.enabled ? "checked" : ""} ${ed ? "" : "disabled"}> One daily email per owner (every tower and Unicorn together; it replaces the registers' own emails)</label>
+    <label class="meta">at <input id="gT" value="${esc(G.time)}" ${ed ? "" : "disabled"} style="width:70px"></label><label class="meta">reminder <input type="number" id="gR" min="0" max="7" value="${G.reminder_days}" ${ed ? "" : "disabled"} style="width:56px"> day(s) before the deadline</label>
+    ${D && D.settings.last_digest ? `<span class="meta">last sent ${esc(D.settings.last_digest.at)}${D.settings.last_digest.test ? " (test)" : ""}: ${D.settings.last_digest.sent.length} emails</span>` : ""}`;
+  ["mxSave", "mxApply", "mxTest"].forEach(id => $(id).hidden = !ed);
+  $("rulesT").innerHTML = `<tr><th>Register</th><th>Type of item</th><th>Owner role</th><th>Department</th><th class="num">Items now</th></tr>` + (M.owner_rules.map(r => `<tr><td>${esc(r.tower)}</td><td>${esc(r.source)}</td><td>${esc((roles.find(x => x.key === r.role) || {}).label || r.role)}</td><td class="meta">${esc(r.department)}</td><td class="num">${fmtN(r.items)}</td></tr>`).join("") || `<tr><td colspan="5" class="meta">No item in the registers yet.</td></tr>`);
+  const cos = [...new Set(M.people.map(p => p.company))]; if (!cos.includes("*")) cos.unshift("*");
+  if (!$("pCo").options.length) $("pCo").innerHTML = cos.map(c => `<option value="${esc(c)}">${c === "*" ? "Whole group" : esc(c)}</option>`).join("");
+  paintPeople();
+  $("pEdit").hidden = !ed;
+  $("peRole").innerHTML = ro(""); $("peAcc").innerHTML = M.accounts.map(a => `<option value="${esc(a.email)}">${esc(a.name)} · ${esc(a.role)}</option>`).join("");
+}
+function paintPeople(){
+  const co = $("pCo").value, P = M.people.filter(p => p.company === co);
+  $("peopleT").innerHTML = `<tr><th>Role</th><th>Department</th><th>Restaurant</th><th>People</th></tr>` + M.roles.map(r => {
+    const rows = P.filter(p => p.role === r.key), locs = [...new Set(rows.map(p => p.location))];
+    if (!rows.length) return `<tr><td>${esc(r.label)}</td><td class="meta">${esc(r.department)}</td><td class="meta">–</td><td><span class="noacc">nobody</span></td></tr>`;
+    return locs.map(l => `<tr><td>${esc(r.label)}</td><td class="meta">${esc(r.department)}</td><td class="meta">${esc(l || "whole company")}</td><td>${rows.filter(p => p.location === l).map(p => p.account ? `<b>${esc(p.account)}</b> <span class="meta">${esc(p.email)}</span>` : `${esc(p.email)} <span class="noacc">no pulse account</span>`).join("<br>")}</td></tr>`).join("");
+  }).join("");
+}
+$("pCo").onchange = paintPeople;
+$("peSave").onclick = async () => {
+  const emails = [...$("peAcc").selectedOptions].map(o => o.value);
+  try { M = await post("/api/actions/matrix", {company: $("pCo").value, location: $("peLoc").value.trim(), role: $("peRole").value, emails}); U = M; M.sla = M.sla || {}; $("pMsg").textContent = "Saved in the directory."; loadMatrix(); }
+  catch (e) { $("pMsg").textContent = e.message; }
+};
+$("mxSave").onclick = async () => {
+  const sla = {}; document.querySelectorAll("[data-sla]").forEach(i => { const [d, s] = i.dataset.sla.split("|"); (sla[d] = sla[d] || {})[s] = +i.value; });
+  const heads = {}; document.querySelectorAll("[data-head]").forEach(s => heads[s.dataset.head] = s.value);
+  try { await post("/api/actions/settings", {sla, escalation: {level1_days: +$("e1").value, level2_days: +$("e2").value, heads, executives: [...$("eEx").selectedOptions].map(o => o.value)},
+    digest: {enabled: $("gOn").checked, time: $("gT").value, reminder_days: +$("gR").value}}); $("mxMsg").textContent = "Saved. The registers read the new SLA within 5 minutes."; load(); }
+  catch (e) { $("mxMsg").textContent = e.message; }
+};
+$("mxApply").onclick = async () => {
+  if (!confirm("Re-date every open item nobody re-dated by hand with the SLA matrix?")) return;
+  try { const j = await post("/api/actions/apply-sla", {}); $("mxMsg").textContent = "Re-dated: " + Object.entries(j.changed).map(([k, v]) => `${k} ${v}`).join(", "); load(); } catch (e) { $("mxMsg").textContent = e.message; }
+};
+$("mxTest").onclick = async () => {
+  try { const j = await post("/api/actions/email-test", {}); $("mxMsg").textContent = j.sent.map(s => `${s.owner}: ${s.status}${s.detail ? " · " + s.detail : ""}`).join("; "); } catch (e) { $("mxMsg").textContent = e.message; }
+};
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login?signedout=1";
+};
+(async () => {
+  let s;
+  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  const held = p => (me.permissions || []).some(x => x.startsWith(p));
+  const t = $("towers");
+  if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  if (!held("platform.s.executive.")) { const ex = t.querySelector('a[href="/executive"]'); if (ex) ex.remove(); }
+  [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]
+    .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
+  if (can("unicorn.use")) t.insertAdjacentHTML("beforeend", `<a href="/unicorn">Unicorn</a>`);
+  if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
+  await load();
+  if (!D) return;
+  const h = location.hash.slice(1).split("/");
+  if (h[1]) dept = decodeURIComponent(h[1]);
+  show(D.tabs.includes(h[0]) ? h[0] : D.tabs.includes("executive") ? "executive" : D.tabs[0]);
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+<script>
+(() => {
+  const btn = document.getElementById("mnavBtn"), body = document.body;
+  if (!btn) return;
+  const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
+  document.getElementById("mnavBd").addEventListener("click", () => set(false));
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("a")) set(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
+})();
+</script>
+</body>
+</html>

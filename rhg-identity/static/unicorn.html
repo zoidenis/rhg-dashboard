@@ -132,6 +132,7 @@ header{display:flex;justify-content:space-between}
   <div class="towers" aria-label="Control towers" id="towers">
     <span class="lbl">Control towers</span>
     <a href="/">Control center</a>
+    <a href="/actions">Executive Action Center</a>
     <a href="/executive">Executive dashboard</a>
     <a href="/unicorn" class="on" aria-current="page">Unicorn</a>
   </div>
@@ -460,7 +461,7 @@ function paintDecisions(){
       <td><span class="st ${esc(a.status.replace(" ", ""))}">${esc(a.status)}</span></td>
       <td class="num">${esc(valU(a.baseline, a.unit))}</td><td class="num">${esc(valU(a.latest, a.unit))}${a.latest_at ? `<div class="meta">${esc(a.latest_at)}</div>` : ""}</td>
       <td class="num">${a.effect == null ? "–" : (a.effect > 0 ? "+" : "") + esc(valU(a.effect, a.unit))}</td><td class="num">${esc(valU(a.target, a.unit))}</td>
-      <td>${["Open", "In progress"].includes(a.status) ? `<select data-k="st" aria-label="Status"><option value="">Status…</option><option>In progress</option><option>Done</option>${R.can_approve ? "<option>Cancelled</option>" : ""}</select> <input data-k="note" placeholder="Note" style="width:130px">` : `<span class="meta">${esc(a.closed_by || "")} ${esc((a.closed_at || "").slice(0, 10))}</span>`}</td></tr>`).join("")
+      <td>${["Open", "In progress"].includes(a.status) ? `<select data-k="st" aria-label="Status"><option value="">Status…</option><option value="In progress">In progress</option><option value="Done">Done</option>${R.can_approve ? '<option value="Cancelled">Cancelled</option>' : ""}</select> <input data-k="note" placeholder="Note" style="width:130px">` : `<span class="meta">${esc(a.closed_by || "")} ${esc((a.closed_at || "").slice(0, 10))}</span>`}</td></tr>`).join("")
       : `<tr><td colspan="9" class="meta">No action yet: an approved proposal becomes one.</td></tr>`);
 }
 $("dList").addEventListener("click", async e => {
@@ -530,6 +531,7 @@ $("logoutBtn").onclick = async () => {
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"],["finance.view","/finance/#sales","Sales"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => p.endsWith(".") ? (me.permissions || []).some(x => x.startsWith(p)) : can(p));
   $("towers").insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
+  if (!(me.permissions || []).some(x => x.startsWith("platform.s.actions."))) { const ac = document.querySelector('#towers a[href="/actions"]'); if (ac) ac.remove(); }
   if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
   if (!can("unicorn.use")) {
     $("feed").innerHTML = `<div class="empty-state">${AV}<b style="color:var(--ink)">Unicorn is for management.</b><p>Your role does not include “Talk to Unicorn”. Ask an administrator if you need it.</p></div>`;

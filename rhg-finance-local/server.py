@@ -2785,6 +2785,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"registry": [{k: r.get(k) or "" for k in ("ref", "name", "brand", "company", "bc", "dept")}
                                               for r in locintel.registry()]})
             return
+        if url.path == "/internal/register":
+            # the Executive Action Center (identity): this tower's exceptions register, active and recently closed
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, exreg.for_action_center())
+            return
         if url.path == "/internal/scope-options":
             # identity's Admin → Accounts → access: the companies and their locations to choose from
             if not self._service_call():
@@ -3963,6 +3970,23 @@ class Handler(BaseHTTPRequestHandler):
                     lambda co: dashboard(co, "", "month", ""), arap.digest, day, bool(body.get("refresh"))))
             except ValueError:
                 self._send(400, {"error": "Bad date."})
+            return
+        if url.path in ("/internal/register/update", "/internal/register/apply-sla"):
+            # the Executive Action Center changing an item for its user (who may: checked in identity), or giving
+            # the active items the due dates of its SLA matrix
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            actor = str(body.get("actor") or "Executive Action Center")[:120]
+            try:
+                if url.path.endswith("apply-sla"):
+                    exreg._policy["at"] = 0
+                    self._send(200, {"changed": exreg.apply_sla(actor)})
+                else:
+                    patch = {k: body["patch"][k] for k in ("status", "comment", "owner", "due") if k in (body.get("patch") or {})}
+                    self._send(200, {"item": exreg.update(str(body.get("id") or ""), patch, actor)})
+            except (KeyError, ValueError) as exc:
+                self._send(400, {"error": str(exc).strip("'\"")})
             return
         if url.path == "/internal/unicorn/tool":
             # Unicorn (identity) reading one figure it needs for an investigation or a question (unicorn_tools.py)

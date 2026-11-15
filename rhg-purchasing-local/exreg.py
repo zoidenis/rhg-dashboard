@@ -15,6 +15,10 @@ until the data shows it is gone.
   * Items tracked by hand (source "manual", what the Action center held): a person opens one from any screen
     (Track) or in the register (New item); no run closes it, its owner marks it Done or Dismissed. Tracking
     something already in the register hands that item over instead of opening a second one.
+  * The Executive Action Center (identity) is the one place over both registers: it sets the SLA matrix (days by
+    department and severity) that gives a new item its due date here, lists the items with their owners and
+    progress, and changes them through /internal/register (service token). When its combined daily email is on,
+    this register's own digest is not sent, so an owner gets one email for every tower.
 Kept in data/exceptions.db. Nothing is written to Business Central or Simphony.
 Same file in Finance and Purchasing: each tower's server names its controls, owners and mailer (configure).
 """
@@ -28,6 +32,9 @@ from datetime import date, datetime, timedelta
 
 import uuid
 
+import requests
+
+import auth
 import config
 import recipients
 import store
@@ -94,6 +101,43 @@ def _directory():
         return fn() or {}
     except Exception:                                              # noqa: BLE001
         return {}
+
+
+# ---------------------------------------------------------------- the Executive Action Center's policy (identity)
+# role of the owner → department of the Action Center; severity here → its severity
+DEPARTMENT_OF_ROLE = {"purchasing_coordinator": "Purchasing", "purchasing_manager": "Purchasing", "inputer": "Finance",
+                      "finance": "Finance", "accounting": "Finance", "cost_controller": "Finance",
+                      "stock_manager": "Warehouse", "operations": "Operations", "unit_manager": "Operations",
+                      "head_chef": "Operations", "executive_chef": "Operations", "coo": "Executive",
+                      "cfo": "Executive", "ceo": "Executive", "management": "Executive", "others": "Executive"}
+SEVERITY_AC = {"critical": "critical", "warning": "high", "info": "low"}
+_policy = {"at": 0.0, "value": None}
+
+
+def policy(max_age=300):
+    """{"sla": {department: {severity: days}}, "combined_digest": bool} from the Action Center; None when identity
+    cannot be reached (the register then keeps its own SLA and digest)."""
+    if time.time() - _policy["at"] < max_age:
+        return _policy["value"]
+    try:
+        r = requests.get(f"{auth.IDENTITY_URL}/internal/actioncenter/policy", timeout=5,
+                         headers={"X-Service-Token": auth.SERVICE_TOKEN})
+        value = r.json() if r.ok else None
+    except (requests.RequestException, ValueError):
+        value = _policy["value"]
+    _policy.update(at=time.time(), value=value)
+    return value
+
+
+def sla_days(severity, role):
+    """Days to the due date of an item of this severity owned by this role: the Action Center's SLA matrix, else
+    the register's own (critical 2, warning 5, info 10)."""
+    p = policy() or {}
+    dept = DEPARTMENT_OF_ROLE.get(role or "", "Finance")
+    try:
+        return int((p.get("sla") or {})[dept][SEVERITY_AC.get(severity, "high")])
+    except (KeyError, TypeError, ValueError):
+        return SLA.get(severity, SLA["warning"])
 
 
 def _db():
@@ -186,14 +230,14 @@ def sync(source, company, findings, locations=None, actor="control run", in_scop
                 db.execute(f"INSERT INTO ex ({COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,'Open',?,?,?,NULL,NULL,'',0,?,?)",
                            (eid, source, f.get("kind") or "", company, loc, str(f["subject"]), f.get("title") or "",
                             f.get("detail") or "", sev, float(f.get("value") or 0), role, owner, now, now,
-                            (today + timedelta(days=SLA[sev])).isoformat(), json.dumps(hist), extra))
+                            (today + timedelta(days=sla_days(sev, role))).isoformat(), json.dumps(hist), extra))
                 opened += 1
                 continue
             x = _row(old)
             hist = x["history"]
             status, due, rp = x["status"], x["due"], x["reopened"]
             if status == "Closed":
-                status, rp, due = "Open", rp + 1, (today + timedelta(days=SLA[sev])).isoformat()
+                status, rp, due = "Open", rp + 1, (today + timedelta(days=sla_days(sev, x["role"]))).isoformat()
                 hist.append({"ts": now, "by": actor, "to": "Open", "note": "Found again after it was closed"})
                 reopened += 1
             elif status == "Awaiting verification":
@@ -277,7 +321,7 @@ def update(eid, patch, actor):
             elif x["status"] in ("Closed", "Dismissed"):
                 sev = x["severity"] if x["severity"] in SLA else "warning"
                 sets.update(closed_at=None, closed_by=None, note="",
-                            due=(date.today() + timedelta(days=SLA[sev])).isoformat())
+                            due=(date.today() + timedelta(days=sla_days(sev, x["role"]))).isoformat())
             x["history"].append({"ts": now, "by": actor, "to": status, "note": comment})
         elif comment:
             x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": comment})
@@ -286,6 +330,8 @@ def update(eid, patch, actor):
                 sets["due"] = date.fromisoformat(str(patch["due"])[:10]).isoformat()
             except ValueError:
                 raise ValueError("The due date must be a date, e.g. 2026-11-20.") from None
+            if sets["due"] != x["due"]:
+                x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": f"Due: {sets['due']}"})
         if "owner" in patch and str(patch["owner"]).strip() != x["owner"]:
             good, bad = recipients.parse(str(patch["owner"]))
             if bad:
@@ -501,6 +547,38 @@ def query(status="active", owner="", source="", company="", location="", q="", a
             "runs": [{"source": s, "company": c, "at": a} for s, c, a in runs]}
 
 
+def for_action_center(days=45):
+    """What the Executive Action Center lists: the active items and those closed or dismissed in the last `days`,
+    with this tower's labels (/internal/register)."""
+    since = (date.today() - timedelta(days=days)).isoformat()
+    d = query("all", limit=100000)
+    items = [{k: x[k] for k in ("id", "source", "kind", "company", "location", "subject", "title", "detail", "severity",
+                                "value", "role", "owner", "owner_set", "status", "first_seen", "last_seen", "due",
+                                "closed_at", "closed_by", "note", "reopened", "overdue", "age")}
+             | {"history": x["history"][-6:]}
+             for x in d["items"] if x["status"] in ACTIVE or (x["closed_at"] or "") >= since]
+    return {"tower": TOWER["name"], "link": TOWER["link"], "sources": SOURCES, "roles": ROLE_LABEL,
+            "statuses": STATUSES, "items": items, "runs": d["runs"]}
+
+
+def apply_sla(actor="Executive Action Center"):
+    """Gives every active item that nobody re-dated by hand the due date of the SLA matrix (first seen + days)."""
+    n, now = 0, _now()
+    with _lock:
+        db = _db()
+        for r in db.execute(f"SELECT {COLS} FROM ex WHERE status IN (?,?,?)", ACTIVE).fetchall():
+            x = _row(r)
+            if any("Due:" in (h.get("note") or "") for h in x["history"]):
+                continue                                           # a person set this due date
+            due = (date.fromisoformat(x["first_seen"][:10]) + timedelta(days=sla_days(x["severity"], x["role"]))).isoformat()
+            if due != x["due"]:
+                x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": f"SLA due date {due}"})
+                db.execute("UPDATE ex SET due=?, history=? WHERE id=?", (due, json.dumps(x["history"][-60:]), x["id"]))
+                n += 1
+        db.commit()
+    return n
+
+
 # ---------------------------------------------------------------- findings of the controls
 def from_negative(r):
     """Findings of a negative stock report (negstock.analyse)."""
@@ -679,7 +757,7 @@ def loop():
                 _state["done"] = now.date()
                 if s["controls"]:
                     run_controls()
-                if s["enabled"]:
+                if s["enabled"] and not (policy() or {}).get("combined_digest"):
                     send_digests()
         except Exception:                                          # noqa: BLE001
             traceback.print_exc()

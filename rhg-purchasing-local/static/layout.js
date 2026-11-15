@@ -570,7 +570,7 @@ body.lay-edit main{padding-bottom:190px}
     // The other towers in the side menu.
     document.querySelectorAll("aside .towers a[href]").forEach(a => {
       const h = a.getAttribute("href");
-      const need = h === "/" ? "platform.s.control" : h.startsWith("/executive") ? "platform.s.executive."
+      const need = h === "/" ? "platform.s.control" : h.startsWith("/executive") ? "platform.s.executive." : h.startsWith("/actions") ? "platform.s.actions."
         : h.startsWith("/finance/#inventory") ? "finance.s.inventory." : h.startsWith("/finance/#sales") ? "finance.s.sales." : h.startsWith("/finance/#opsexec") ? "finance.s.opsexec."
         : h.startsWith("/finance") ? "finance.s."
         : h.startsWith("/purchasing") ? "purchasing.s." : null;

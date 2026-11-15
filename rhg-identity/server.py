@@ -23,6 +23,7 @@ import permissions
 import reports
 import screens
 import store
+import actioncenter
 import unicorn
 import unicorn_registers as ureg
 
@@ -210,6 +211,17 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(200, (STATIC / "executive.html").read_bytes(), "text/html; charset=utf-8")
                 return
+            if url.path in ("/actions", "/actions.html"):
+                u = self._user()
+                page = "actions.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
+            if url.path == "/internal/actioncenter/policy":
+                # the towers' exceptions registers: the SLA matrix and whether the combined email replaces theirs
+                if not self._service_ok():
+                    self._send(403, {"error": "Bad service token."}); return
+                self._send(200, actioncenter.policy())
+                return
             if url.path in ("/unicorn", "/unicorn.html"):
                 u = self._user()
                 page = "unicorn.html" if u and not u.get("must_change") else "login.html"
@@ -293,6 +305,45 @@ class Handler(BaseHTTPRequestHandler):
                     unicorn.mark_seen(user["username"], rows[-1]["id"])
                 self._send(200, {"state": unicorn.state(), "messages": rows, "unread": unread,
                                  "more": len(rows) >= 60})
+            elif url.path == "/api/actions":
+                # Executive Action Center: every item of the registers and of Unicorn, its owner, deadline, progress
+                tabs = [t for t in ("executive", "departments", "mine", "unicorn", "matrix") if auth.can(user, f"platform.s.actions.{t}")]
+                if not tabs:
+                    self._send(403, {"error": "Your role does not include the Executive Action Center."}); return
+                d = actioncenter.collect(user.get("scope"))
+                me = (user.get("email") or "").strip().lower()
+                items = d["items"]
+                if not ({"executive", "departments"} & set(tabs)):
+                    items = [x for x in items if me and me in x["owners"]]
+                self._send(200, {"items": actioncenter.sort_items(items), "stats": actioncenter.stats(items, d["today"]),
+                                 "sources": d["sources"], "errors": d["errors"], "runs": d["runs"], "tabs": tabs,
+                                 "settings": d["settings"], "departments": actioncenter.DEPARTMENTS,
+                                 "severities": actioncenter.SEVERITIES, "me": me, "today": d["today"],
+                                 "can_manage": auth.can(user, "actioncenter.manage"),
+                                 "accounts": ([{"email": e, "name": u["name"]} for e, u in sorted(actioncenter.users().items(), key=lambda kv: kv[1]["name"])]
+                                              if any(auth.can(user, p) for p in ("actioncenter.manage", "finance.actions.manage",
+                                                                                   "purchasing.actions.manage", "unicorn.decisions.approve")) else []),
+                                 "can_tower": {"finance": auth.can(user, "finance.actions.manage"),
+                                               "purchasing": auth.can(user, "purchasing.actions.manage"),
+                                               "unicorn": auth.can(user, "unicorn.decisions.approve")}})
+            elif url.path == "/api/actions/matrix":
+                if not (auth.can(user, "platform.s.actions.matrix") or auth.can(user, "actioncenter.manage")):
+                    self._send(403, {"error": "Your role does not include the responsibility matrix."}); return
+                m = actioncenter.matrix()
+                m.update(sla=actioncenter.settings()["sla"], escalation=actioncenter.settings()["escalation"],
+                         departments=actioncenter.DEPARTMENTS, severities=actioncenter.SEVERITIES,
+                         can_manage=auth.can(user, "actioncenter.manage"))
+                self._send(200, m)
+            elif url.path == "/api/actions/unicorn":
+                if not auth.can(user, "platform.s.actions.unicorn"):
+                    self._send(403, {"error": "Your role does not include Unicorn's tasks."}); return
+                st = unicorn.state()
+                self._send(200, {"state": st, "counts": ureg.counts(),
+                                 "new_findings": [f for f in ureg.findings("New", limit=50)],
+                                 "investigating": sorted(unicorn._investigating),
+                                 "proposals": ureg.decisions("Proposed")[:20],
+                                 "measured": [a for a in ureg.actions("open") if a["latest_at"]][:30],
+                                 "runs": [dict(r) for r in store.q("SELECT * FROM unicorn_runs ORDER BY day DESC LIMIT 14")]})
             elif url.path == "/api/unicorn/registers":
                 # Unicorn 2.0: findings, decisions, actions and the rules library (pulse's own registers)
                 if not auth.can(user, "unicorn.use"):
@@ -473,6 +524,35 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"messages": unicorn.ask(user, body.get("text"))})
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
+            elif url.path == "/api/actions/item":
+                if not any(auth.can(user, f"platform.s.actions.{t}") for t in ("executive", "departments", "mine")):
+                    self._send(403, {"error": "Your role does not include the Executive Action Center."}); return
+                try:
+                    x = actioncenter.update(str(body.get("uid") or ""), {k: body.get(k) for k in ("status", "comment", "owner", "due")},
+                                            user, auth.can)
+                    self._send(200, {"item": x})
+                except PermissionError as exc:
+                    self._send(403, {"error": str(exc)})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path in ("/api/actions/settings", "/api/actions/apply-sla", "/api/actions/matrix", "/api/actions/email-test"):
+                if not auth.can(user, "actioncenter.manage"):
+                    self._send(403, {"error": "Your role cannot change the Action Center's matrices or emails."}); return
+                try:
+                    if url.path.endswith("/settings"):
+                        self._send(200, {"settings": actioncenter.save_settings(body, user["username"])})
+                    elif url.path.endswith("/apply-sla"):
+                        self._send(200, {"changed": actioncenter.apply_sla(user.get("email") or user["username"])})
+                    elif url.path.endswith("/matrix"):
+                        emails = body.get("emails") if isinstance(body.get("emails"), list) else []
+                        self._send(200, actioncenter.save_people(str(body.get("company") or "*")[:80], str(body.get("location") or "")[:40],
+                                                                 str(body.get("role") or ""), emails, user["username"]))
+                    else:
+                        if not user.get("email"):
+                            raise ValueError("Your account has no email to send the test to.")
+                        self._send(200, {"sent": actioncenter.send_digests(user["username"], [user["email"]])})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path == "/api/unicorn/finding":
                 if not auth.can(user, "unicorn.use"):
                     self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
@@ -618,6 +698,7 @@ def main():
                 pass
     threading.Thread(target=sweeper, daemon=True).start()
     unicorn.start()
+    actioncenter.start()
     if not unicorn.enabled():
         print("Unicorn: no ANTHROPIC_API_KEY in .env - the business analyst stays off until one is set.")
 

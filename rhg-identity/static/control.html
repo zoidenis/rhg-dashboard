@@ -99,6 +99,7 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
   <div class="towers" aria-label="Control towers" id="towers">
     <span class="lbl">Control towers</span>
     <a href="/" class="on" aria-current="page">Control center</a>
+    <a href="/actions">Executive Action Center</a>
     <a href="/executive">Executive dashboard</a>
   </div>
   <div class="adminlink" id="adminLink"></div>
@@ -219,6 +220,7 @@ function shell(){
                  ["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Sales"],
                  ["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => holds(p));
   const ex = t.querySelector('a[href="/executive"]'); if (ex && !holds("platform.s.executive.")) ex.remove();
+  const ac = t.querySelector('a[href="/actions"]'); if (ac && !holds("platform.s.actions.")) ac.remove();
   t.insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
   if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs
     t.insertAdjacentHTML("beforeend", `<a href="/unicorn" id="uniLink">Unicorn</a>`);

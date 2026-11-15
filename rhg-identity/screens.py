@@ -157,6 +157,13 @@ PLATFORM = [
         ("locations.pl", "Location intelligence · P&L by restaurant", "location", ["finance.view", "finance.pl.view"]),
         ("locations.bc_sales", "Location intelligence · sales posted in BC", "location", ["finance.view"]),
         ("locations.purch_inv", "Location intelligence · purchasing and inventory", "location", ["finance.view"])]),
+    # Executive Action Center: every control's items with their owner, SLA deadline and progress (actioncenter.py)
+    ("actions", "Executive Action Center", "Platform", "acTabs", [
+        ("executive", "Executive view", "company", []),
+        ("departments", "Departments", "company", []),
+        ("mine", "My items", "location", []),
+        ("unicorn", "Unicorn's tasks", "company", []),
+        ("matrix", "SLA & responsibility matrix", "company", [])]),
 ]
 # the parts of Location intelligence (Executive dashboard), as above
 LI_PARTS = ("company_sales", "company_pl", "pl", "bc_sales", "purch_inv")

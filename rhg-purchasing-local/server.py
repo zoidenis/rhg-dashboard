@@ -1849,6 +1849,13 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(200, recipients.public())
             return
+        if url.path == "/internal/register":
+            # the Executive Action Center (identity): this tower's exceptions register, active and recently closed
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, exreg.for_action_center())
+            return
         if url.path == "/internal/compliance":
             # Finance → Control → Document control: the same reading as Invoices without PO, with the follow-up
             # each invoice has in this tower's register, so Finance shows one figure and tracks nothing twice
@@ -2345,6 +2352,22 @@ class Handler(BaseHTTPRequestHandler):
                                                       day, bool(body.get("refresh"))))
             except ValueError:
                 self._send(400, {"error": "Bad date."})
+            return
+        if url.path in ("/internal/register/update", "/internal/register/apply-sla"):
+            # the Executive Action Center changing an item for its user, or applying its SLA matrix
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            actor = str(body.get("actor") or "Executive Action Center")[:120]
+            try:
+                if url.path.endswith("apply-sla"):
+                    exreg._policy["at"] = 0
+                    self._send(200, {"changed": exreg.apply_sla(actor)})
+                else:
+                    patch = {k: body["patch"][k] for k in ("status", "comment", "owner", "due") if k in (body.get("patch") or {})}
+                    self._send(200, {"item": exreg.update(str(body.get("id") or ""), patch, actor)})
+            except (KeyError, ValueError) as exc:
+                self._send(400, {"error": str(exc).strip("'\"")})
             return
         if url.path == "/internal/unicorn/tool":         # Unicorn (identity) reading one figure for an investigation
             if not self._service_call():
