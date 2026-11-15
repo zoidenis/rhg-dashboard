@@ -301,8 +301,10 @@ def _directory():
 
 
 def _emails(text):
+    """The email addresses in a text: "a@rhg.al, b@rhg.al" or "Fabian Kuka <fkuka@rhg.al>" (an owner chosen from the
+    pulse accounts in Unicorn or here); the name and the brackets are not part of the address."""
     import re
-    return [x.strip().lower() for x in re.split(r"[,;\s]+", text or "") if "@" in x]
+    return list(dict.fromkeys(m.lower() for m in re.findall(r"[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", text or "")))
 
 
 def _in_scope(scope, company, location=""):

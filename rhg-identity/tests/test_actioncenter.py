@@ -168,6 +168,25 @@ class Assign(Base):
         self.assertEqual(self.sent, [])
 
 
+class OwnerText(Base):
+    def test_an_owner_chosen_with_name_and_email_is_that_account(self):
+        self.assertEqual(ac._emails("Fabian Kuka <FKuka@rhg.al>"), ["fkuka@rhg.al"])
+        self.assertEqual(ac._emails("a@rhg.al, b@rhg.al; a@rhg.al"), ["a@rhg.al", "b@rhg.al"])
+        self.assertEqual(ac._emails("Drejtori i LIFT"), [])
+
+    def test_a_unicorn_action_given_to_an_account_is_in_their_items(self):
+        f = ureg.upsert_finding({"rule": "pl.labor_vs_budget", "capability": "financial", "company": "SALT", "location": "OPA TEG",
+                                 "location_name": "OPA TEG", "period": "2026-09", "title": "Labour", "metric": "labor_pct",
+                                 "value": 22.0, "limit": 18.4, "unit": "%", "severity": "high"}, "2026-11-14")[0]
+        did, ids = ureg.delegate(f, "geri", "Ana Stock <Ana@rhg.al>", "2026-12-01")
+        self.addCleanup(lambda: (store.run("DELETE FROM unicorn_actions WHERE decision_id=?", (did,)),
+                                 store.run("DELETE FROM unicorn_decisions WHERE id=?", (did,)),
+                                 store.run("DELETE FROM unicorn_findings WHERE id=?", (f,))))
+        x = next(i for i in ac.collect()["items"] if i["uid"] == f"unicorn:A{ids[0]}")
+        self.assertEqual(x["owners"], ["ana@rhg.al"])
+        self.assertEqual([a["name"] for a in x["owner_accounts"]], ["Ana Stock"])
+
+
 class ExportItem(Base):
     def test_the_card_and_history_as_a_workbook(self):
         x = next(i for i in ac.collect()["items"] if i["uid"] == "finance:n1")
