@@ -45,6 +45,8 @@ header{display:flex;justify-content:space-between}
 .it{display:grid;grid-template-columns:92px 1fr 210px 120px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
 .it:hover,.it:focus-visible{border-color:var(--rhg-primary);outline:none}
 .it.late{border-left:3px solid var(--rhg-red)}
+.asg{margin-left:6px;padding:3px 10px;border-radius:999px;border:1px solid var(--rhg-primary);background:var(--card);color:var(--rhg-primary);font:inherit;font-size:12px;font-weight:600;cursor:pointer}.asg:hover,.asg:focus-visible{background:var(--rhg-primary);color:#fff;outline:none}
+.pick{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px}.md .pick label{display:flex;flex-direction:row;justify-content:flex-start;text-align:left;color:var(--ink,inherit);gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}.md .pick label[hidden]{display:none}.md .pick label input{width:auto;margin:0}.pick label:last-child{border-bottom:0}.pick label:hover{background:var(--bg2,#f5f4f2)}
 .it .t{font-weight:600;font-size:13.5px}
 .it .s{font-size:11.5px;color:var(--sub);margin-top:2px}
 .it .o{font-size:12.5px}
@@ -142,6 +144,7 @@ header{display:flex;justify-content:space-between}
       <select id="fSrc" aria-label="Source"><option value="">Every source</option></select>
       <select id="fCo" aria-label="Company"><option value="">Every company</option></select>
       <input id="fQ" type="search" placeholder="Title, restaurant or owner" aria-label="Search">
+      <button class="btn dark" type="button" id="dAssign" hidden></button>
       <span class="msg" id="dMsg"></span>
     </div>
     <div class="list" id="dList"></div>
@@ -203,12 +206,20 @@ function ownerText(x){
   if (x.owners.length) return esc(x.owners.join(", ")) + ` <span class="noacc">no pulse account</span>`;
   return `<span class="noacc">nobody in the role <span data-no-i18n>${esc(x.role_label || "")}</span></span>`;
 }
+function canAssign(x){ return x.active && !x.owners.length && x.status !== "Awaiting approval" && !!(D.can_manage || D.can_tower[x.origin]) && (D.accounts || []).length > 0; }
+function covers(sc, company, location){
+  const comps = (sc || {}).companies ?? "*";
+  if (comps !== "*" && !comps.map(c => String(c).toUpperCase()).includes(String(company || "").toUpperCase())) return false;
+  const L = Object.entries((sc || {}).locations || {}).find(([k]) => k.toUpperCase() === String(company || "").toUpperCase());
+  const locs = L ? L[1] : "*";
+  return locs === "*" || !location || locs.map(v => String(v).toUpperCase()).includes(String(location).toUpperCase());
+}
 function itemRow(x){
   const late = x.overdue ? `<b style="color:var(--rhg-red)">${x.days_overdue} d late</b>${x.escalation ? `<span class="esc">L${x.escalation}</span>` : ""}` : x.due_soon ? `<b style="color:var(--rhg-amber)">due ${esc(x.due)}</b>` : x.active ? `due ${esc(x.due || "–")}` : `<span class="meta">${esc(x.status)} ${esc(String(x.closed_at || "").slice(0, 10))}</span>`;
-  return `<button class="it${x.overdue ? " late" : ""}" type="button" data-u="${esc(x.uid)}">
+  return `<div class="it${x.overdue ? " late" : ""}" role="button" tabindex="0" data-u="${esc(x.uid)}">
     <div><span class="sev ${esc(x.severity)}">${esc(SEV[x.severity] || x.severity)}</span><div class="st ${esc(x.status.replace(/ /g, ""))}">${esc(x.status)}</div></div>
     <div><div class="t">${esc(x.title)}</div><div class="s">${esc(x.department)} · ${esc(x.source_label)} · ${esc(x.company)}${x.location ? " · " + esc(x.location) : ""}</div></div>
-    <div class="o">${ownerText(x)}</div><div class="d">${late}${x.value ? `<div class="meta">${fmtM(x.value)}</div>` : ""}</div></button>`;
+    <div class="o">${ownerText(x)}${canAssign(x) ? `<button class="asg" type="button" data-assign="${esc(x.uid)}">Assign</button>` : ""}</div><div class="d">${late}${x.value ? `<div class="meta">${fmtM(x.value)}</div>` : ""}</div></div>`;
 }
 function show(t){
   if (D && !D.tabs.includes(t)) t = D.tabs[0];
@@ -272,7 +283,11 @@ function paintExecutive(){
 document.addEventListener("click", e => {
   const o = e.target.closest("[data-open]"); if (o) { const [t, st, dp] = o.dataset.open.split(":"); if (st) $("fStatus").value = st; dept = dp || ""; show(t); return; }
   const r = e.target.closest("[data-dep]"); if (r) { dept = r.dataset.dep; $("fStatus").value = "active"; show("departments"); return; }
+  const a = e.target.closest("[data-assign]"); if (a) { e.stopPropagation(); openAssign([a.dataset.assign]); return; }
   const it = e.target.closest("[data-u]"); if (it) openItem(it.dataset.u);
+});
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("[data-u]")) { e.preventDefault(); openItem(e.target.dataset.u); }
 });
 function filtered(xs){
   const st = $("fStatus").value, sv = $("fSev").value, src = $("fSrc").value, co = $("fCo").value, q = $("fQ").value.trim().toLowerCase();
@@ -289,6 +304,10 @@ function paintDepartments(){
     + kpi("Without an owner", fmtN(x.no_owner), "nobody in the role", x.no_owner ? "warn" : "") + kpi("On time, 30 days", x.on_time_pct == null ? "–" : x.on_time_pct + "%", `${fmtN(x.closed_30)} closed`);
   const L = filtered(D.items);
   $("dMsg").textContent = `${L.length} items`;
+  const free = L.filter(canAssign);
+  $("dAssign").hidden = !free.length;
+  $("dAssign").textContent = `Assign the ${free.length} without an owner`;
+  $("dAssign").onclick = () => openAssign(free.slice(0, 300).map(x => x.uid));
   $("dList").innerHTML = L.length ? L.slice(0, 300).map(itemRow).join("") : `<div class="card"><p class="hint" style="margin:0">No item here.</p></div>`;
 }
 $("dChips").addEventListener("click", e => { const b = e.target.closest("[data-d]"); if (!b) return; dept = b.dataset.d; show("departments"); });
@@ -321,7 +340,7 @@ async function openItem(uid){
       : mayEdit ? `<h4>Update</h4><div class="row">
         <label>Status<select id="iSt"><option value="">unchanged</option>${statusesOf(x).filter(s => s !== x.status).map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>
         <label style="flex:1;min-width:220px">Comment<input id="iCm" placeholder="What was done, or why it is dismissed"></label></div>
-        ${mayManage ? `<div class="row"><label>Owner<select id="iOw"><option value="">unchanged</option>${accs.map(a => `<option value="${esc(a.email)}">${esc(a.name)} · ${esc(a.email)}</option>`).join("")}</select></label><label>Deadline<input id="iDu" type="date" value="${esc(x.due || "")}"></label></div>` : ""}
+        ${mayManage ? `<div class="row"><label>${x.owners.length ? "Hand over to" : "Assign to"}<select id="iOw"><option value="">unchanged</option>${accs.filter(a => covers(a.scope, x.company, x.location)).map(a => `<option value="${esc(a.email)}" data-no-i18n>${esc(a.name)} · ${esc(a.role || "")}</option>`).join("")}</select></label><label>Deadline<input id="iDu" type="date" value="${esc(x.due || "")}"></label></div>` : ""}
         <div class="row"><button class="btn dark" type="button" id="iSave">Save</button>${x.link ? `<a class="btn" href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}<span class="msg" id="iMsg"></span></div>`
       : `<p class="meta">Only its owner or a manager updates it.${x.link ? ` <a href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}</p>`}`;
   modal(x.title, `${x.company}${x.location ? " · " + x.location : ""} · ${x.tower}`, body);
@@ -331,6 +350,37 @@ async function openItem(uid){
     if ($("iDu") && $("iDu").value && $("iDu").value !== x.due) patch.due = $("iDu").value;
     try { await post("/api/actions/item", patch); $("iMsg").textContent = "Saved in " + x.tower + "."; setTimeout(() => { closeModal(); load(); }, 500); }
     catch (e) { $("iMsg").textContent = e.message; }
+  };
+}
+function openAssign(uids){
+  const xs = uids.map(u => D.items.find(i => i.uid === u)).filter(Boolean);
+  if (!xs.length) return;
+  const accs = (D.accounts || []).filter(a => xs.every(x => covers(a.scope, x.company, x.location)));
+  const one = xs.length === 1 ? xs[0] : null;
+  const comps = [...new Set(xs.map(x => x.company))];
+  const body = `<p class="hint" style="margin:0 0 10px">${one ? `${esc(one.department)} · ${esc(one.source_label)} · ${esc(one.company)}${one.location ? " · " + esc(one.location) : ""}`
+      : `${xs.length} items · ${esc(comps.join(", "))}`}</p>
+    <p class="hint" style="margin:0 0 10px">${one ? 'The account you choose owns it from now on: it shows in their "My items" and their daily email, and the matrix no longer moves it.'
+      : 'The account you choose owns them from now on: they show in their "My items" and their daily email, and the matrix no longer moves them.'}</p>
+    <input id="aQ" type="search" placeholder="Name or role" aria-label="Search accounts" style="width:100%;margin-bottom:8px">
+    <div class="pick" id="aList">${accs.length ? accs.map(a => `<label data-k="${esc((a.name + " " + (a.role || "") + " " + a.email).toLowerCase())}"><input type="radio" name="aWho" value="${esc(a.email)}"><b data-no-i18n>${esc(a.name)}</b> <span class="meta" data-no-i18n>${esc(a.role || "")} · ${esc(a.email)}</span></label>`).join("")
+      : `<p class="hint" style="margin:10px">No pulse account with an email has access to ${esc(comps.join(", "))}. Give someone that access in Administration → Accounts.</p>`}</div>
+    <div class="row" style="margin-top:10px"><label>Deadline<input id="aDu" type="date" value="${one ? esc(one.due || "") : ""}"></label>
+      <label style="flex:1;min-width:220px">Note<input id="aCm" placeholder="What you expect them to do"></label></div>
+    <label class="meta" style="display:block;margin-top:6px"><input type="checkbox" id="aMail"> <span>${one ? "Send them an email now with this item" : "Send them an email now with these items"}</span></label>
+    <div class="row" style="margin-top:10px"><button class="btn dark" type="button" id="aGo">Assign</button><span class="msg" id="aMsg"></span></div>`;
+  modal(one ? one.title : "Assign items", one ? `${one.company}${one.location ? " · " + one.location : ""} · ${one.tower}` : "Without an owner by the matrix", body);
+  $("aQ").oninput = () => { const q = $("aQ").value.trim().toLowerCase(); document.querySelectorAll("#aList label").forEach(l => l.hidden = !!q && !l.dataset.k.includes(q)); };
+  $("aGo").onclick = async () => {
+    const who = document.querySelector('input[name="aWho"]:checked');
+    if (!who) { $("aMsg").textContent = "Choose who owns it."; return; }
+    const due = $("aDu").value;
+    $("aGo").disabled = true; $("aMsg").textContent = "Assigning…";
+    try {
+      const j = await post("/api/actions/assign", {uids: xs.map(x => x.uid), owner: who.value, due: one && due === one.due ? "" : due, comment: $("aCm").value, notify: $("aMail").checked});
+      $("aMsg").textContent = `Assigned to ${j.owner}: ${j.assigned}` + (j.emailed ? " · email sent" : "") + (j.failed.length ? ` · not assigned: ${j.failed.map(f => f.title + " (" + f.error + ")").slice(0, 3).join("; ")}` : "");
+      if (!j.failed.length) setTimeout(() => { closeModal(); load(); }, 800); else { $("aGo").disabled = false; load(); }
+    } catch (e) { $("aMsg").textContent = e.message; $("aGo").disabled = false; }
   };
 }
 function modal(title, sub, body){
@@ -389,7 +439,7 @@ async function loadMatrix(){
   if (!$("pCo").options.length) $("pCo").innerHTML = cos.map(c => `<option value="${esc(c)}">${c === "*" ? "Whole group" : esc(c)}</option>`).join("");
   paintPeople();
   $("pEdit").hidden = !ed;
-  $("peRole").innerHTML = ro(""); $("peAcc").innerHTML = M.accounts.map(a => `<option value="${esc(a.email)}">${esc(a.name)} · ${esc(a.role)}</option>`).join("");
+  $("peRole").innerHTML = roles.map(r => `<option value="${esc(r.key)}">${esc(r.label)}</option>`).join(""); $("peAcc").innerHTML = M.accounts.map(a => `<option value="${esc(a.email)}">${esc(a.name)} · ${esc(a.role)}</option>`).join("");
 }
 function paintPeople(){
   const co = $("pCo").value, P = M.people.filter(p => p.company === co);

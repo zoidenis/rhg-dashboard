@@ -122,6 +122,52 @@ class Change(Base):
             ac.update("finance:n1", {"due": d(9)}, {"username": "ana", "email": "ana@rhg.al"}, can)
 
 
+class Assign(Base):
+    def setUp(self):
+        super().setUp()
+        if not store.one("SELECT 1 FROM users WHERE username='tbm1'"):
+            store.run("INSERT INTO users(username,name,email,role,salt,hash,active,must_change,scope) VALUES(?,?,?,?,?,?,1,0,?)",
+                      ("tbm1", "Tea TBM", "tea@rhg.al", "Accountant", "s", "h", '{"companies": ["TBM"], "locations": {}}'))
+        self.sent, self.mails = [], []
+        sent = self.sent
+
+        class R:
+            ok, status_code, content = True, 200, b"{}"
+
+            def json(self):
+                return {"item": {}}
+        import requests
+        old = requests.post
+        requests.post = lambda url, timeout=None, json=None, headers=None: (sent.append(json), R())[1]
+        self.addCleanup(lambda: setattr(requests, "post", old))
+        ac._send_mail = lambda to, cc, subject, body, text: self.mails.append((to, subject))
+
+    def test_delegates_what_has_no_owner(self):
+        can = lambda u, p: p == "actioncenter.manage"  # noqa: E731
+        boss = {"username": "geri", "name": "Geri", "email": "geri@rhg.al"}
+        j = ac.assign(["finance:a1"], "Tea@rhg.al", d(5), "", boss, can, notify=True)
+        self.assertEqual((j["assigned"], j["failed"], j["emailed"]), (1, [], True))
+        self.assertEqual(self.sent[0]["patch"], {"owner": "tea@rhg.al", "due": d(5), "comment": "Assigned to Tea TBM"})
+        self.assertEqual(self.mails[0][0], ["tea@rhg.al"])
+
+    def test_only_to_an_account_whose_access_covers_the_item(self):
+        can = lambda u, p: p == "actioncenter.manage"  # noqa: E731
+        boss = {"username": "geri", "name": "Geri", "email": "geri@rhg.al"}
+        j = ac.assign(["finance:n1", "finance:a1", "finance:zz"], "tea@rhg.al", "", "x", boss, can)
+        self.assertEqual(j["assigned"], 1)                                  # n1 is SALT, out of her access; zz unknown
+        self.assertEqual(len(j["failed"]), 2)
+        self.assertIn("does not cover SALT", j["failed"][0]["error"])
+        with self.assertRaises(ValueError):
+            ac.assign(["finance:a1"], "nobody@x.al", "", "", boss, can)
+        with self.assertRaises(ValueError):
+            ac.update("finance:n1", {"owner": "tea@rhg.al"}, boss, can)
+
+    def test_someone_without_rights_assigns_nothing(self):
+        j = ac.assign(["finance:a1"], "tea@rhg.al", "", "", {"username": "x", "email": "x@rhg.al"}, lambda u, p: False)
+        self.assertEqual(j["assigned"], 0)
+        self.assertEqual(self.sent, [])
+
+
 class Settings(Base):
     def test_sla_validation_and_policy(self):
         with self.assertRaises(ValueError):

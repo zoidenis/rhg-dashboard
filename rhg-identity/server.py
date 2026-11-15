@@ -320,7 +320,7 @@ class Handler(BaseHTTPRequestHandler):
                                  "settings": d["settings"], "departments": actioncenter.DEPARTMENTS,
                                  "severities": actioncenter.SEVERITIES, "me": me, "today": d["today"],
                                  "can_manage": auth.can(user, "actioncenter.manage"),
-                                 "accounts": ([{"email": e, "name": u["name"]} for e, u in sorted(actioncenter.users().items(), key=lambda kv: kv[1]["name"])]
+                                 "accounts": ([{"email": e, "name": u["name"], "role": u["role"], "scope": u["scope"]} for e, u in sorted(actioncenter.users().items(), key=lambda kv: kv[1]["name"])]
                                               if any(auth.can(user, p) for p in ("actioncenter.manage", "finance.actions.manage",
                                                                                    "purchasing.actions.manage", "unicorn.decisions.approve")) else []),
                                  "can_tower": {"finance": auth.can(user, "finance.actions.manage"),
@@ -531,6 +531,18 @@ class Handler(BaseHTTPRequestHandler):
                     x = actioncenter.update(str(body.get("uid") or ""), {k: body.get(k) for k in ("status", "comment", "owner", "due")},
                                             user, auth.can)
                     self._send(200, {"item": x})
+                except PermissionError as exc:
+                    self._send(403, {"error": str(exc)})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/actions/assign":
+                if not any(auth.can(user, f"platform.s.actions.{t}") for t in ("executive", "departments")):
+                    self._send(403, {"error": "Your role does not include the Executive Action Center."}); return
+                try:
+                    uids = body.get("uids") if isinstance(body.get("uids"), list) else []
+                    self._send(200, actioncenter.assign(uids, str(body.get("owner") or ""), str(body.get("due") or ""),
+                                                        str(body.get("comment") or ""), user, auth.can,
+                                                        notify=bool(body.get("notify"))))
                 except PermissionError as exc:
                     self._send(403, {"error": str(exc)})
                 except (ValueError, RuntimeError) as exc:

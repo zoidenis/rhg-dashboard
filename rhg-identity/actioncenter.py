@@ -246,11 +246,13 @@ def forget():
 
 
 def users():
-    """{email (lower): {username, name, role}} of the active pulse accounts."""
+    """{email (lower): {username, name, role, scope}} of the active pulse accounts (scope: what their access covers)."""
+    import auth
     out = {}
-    for r in store.q("SELECT username, name, email, role FROM users WHERE active=1"):
+    for r in store.q("SELECT * FROM users WHERE active=1"):
         if r["email"]:
-            out[r["email"].strip().lower()] = {"username": r["username"], "name": r["name"], "role": r["role"]}
+            out[r["email"].strip().lower()] = {"username": r["username"], "name": r["name"], "role": r["role"],
+                                               "scope": auth.effective_scope(r)}
     return out
 
 
@@ -506,6 +508,69 @@ def update(uid, patch, user, can):
     x = find(uid, user.get("scope"))
     if not x:
         raise ValueError("This item is not in the Action Center, or not in your access.")
+    _apply(x, patch, user, can)
+    if x["origin"] in TOWERS:
+        with _lock:
+            _cache.pop(x["origin"], None)
+    return find(uid, user.get("scope"))
+
+
+def _check_owner(x, owner, U):
+    """An item goes only to a pulse account whose access covers its company and restaurant (else they never see it)."""
+    o = (owner or "").strip().lower()
+    if o not in U:
+        raise ValueError("Assign it to a pulse account with an email (Administration → Accounts).")
+    if not _in_scope(U[o]["scope"], x["company"], x.get("location") or ""):
+        raise ValueError(f"The access of {U[o]['name']} does not cover {x['company']}"
+                         + (f" · {x['location']}" if x.get("location") else "") + ".")
+    return o
+
+
+def assign(uids, owner, due, comment, user, can, notify=False):
+    """Hands items over to one pulse account (delegation of what has no owner by the SLA matrix): the owner is set
+    by hand in the register, so the matrix no longer moves it. Returns {assigned, failed, emailed}."""
+    uids = [str(u) for u in dict.fromkeys(uids or []) if u][:300]
+    if not uids:
+        raise ValueError("Choose the items to assign.")
+    U = users()
+    o = (owner or "").strip().lower()
+    if o not in U:
+        raise ValueError("Assign it to a pulse account with an email (Administration → Accounts).")
+    if due:
+        try:
+            date.fromisoformat(str(due))
+        except ValueError as exc:
+            raise ValueError("The deadline as a date.") from exc
+    by_uid = {x["uid"]: x for x in collect(user.get("scope"))["items"]}
+    note = (comment or "").strip()[:500] or f"Assigned to {U[o]['name']}"
+    done, failed, touched = [], [], set()
+    for uid in uids:
+        x = by_uid.get(uid)
+        try:
+            if not x:
+                raise ValueError("Not in the Action Center, or not in your access.")
+            _apply(x, {"owner": o, "due": due or None, "comment": note}, user, can, U)
+            done.append(x)
+            touched.add(x["origin"])
+        except (ValueError, PermissionError, RuntimeError) as exc:
+            failed.append({"uid": uid, "title": (x or {}).get("title", uid), "error": str(exc)})
+    with _lock:
+        for t in touched:
+            _cache.pop(t, None)
+    emailed = False
+    if notify and done:
+        body, text = _digest_html(U[o]["name"], sort_items([dict(x, owners=[o]) for x in done]))
+        actor = user.get("name") or user["username"]
+        try:
+            _send_mail([o], [], f"[pulse] {actor} assigned you {len(done)} item(s)", body, text)
+            emailed = True
+        except Exception as exc:                                    # noqa: BLE001
+            failed.append({"uid": "", "title": "Email", "error": f"not sent: {str(exc)[:160]}"})
+    store.audit("action center assign", user["username"], o, {"items": len(done), "failed": len(failed)})
+    return {"assigned": len(done), "failed": failed, "emailed": emailed, "owner": U[o]["name"]}
+
+
+def _apply(x, patch, user, can, U=None):
     if not may_change(user, x, can):
         raise PermissionError("Only its owner, a role that manages the Action Center or the tower's actions changes it.")
     if x["status"] == "Awaiting approval":
@@ -513,6 +578,8 @@ def update(uid, patch, user, can):
     if patch.get("due") and not (can(user, "actioncenter.manage") or can(user, {"finance": "finance.actions.manage",
                                  "purchasing": "purchasing.actions.manage", "unicorn": "unicorn.decisions.approve"}[x["origin"]])):
         raise PermissionError("The deadline comes from the SLA; only a manager moves it.")
+    if patch.get("owner"):
+        patch = dict(patch, owner=_check_owner(x, patch["owner"], U if U is not None else users()))
     actor = f"{user.get('name') or user['username']} <{user.get('email') or user['username']}>"
     if x["origin"] in TOWERS:
         body = {"id": x["ref"], "actor": actor,
@@ -525,19 +592,16 @@ def update(uid, patch, user, can):
             raise RuntimeError(f"{x['tower']} could not be reached: {exc}") from exc
         if not r.ok:
             raise ValueError(j.get("error") or f"{x['tower']} answered {r.status_code}.")
-        with _lock:
-            _cache.pop(x["origin"], None)
     else:
         st = {"Closed": "Done", "Dismissed": "Cancelled"}.get(patch.get("status"), patch.get("status"))
         if st and st not in ureg.ACTION_STATUSES:
             raise ValueError("An action is Open, In progress, Done or Cancelled.")
-        U = users()
+        U = U if U is not None else users()
         owner = patch.get("owner")
         if owner and owner.lower() in U:
             owner = U[owner.lower()]["name"] + " <" + owner.lower() + ">"
         ureg.update_action(x["ref"], actor, st or None, patch.get("comment"), owner or None, patch.get("due") or None)
-    store.audit("action center", user["username"], uid, {k: patch.get(k) for k in ("status", "owner", "due") if patch.get(k)})
-    return find(uid, user.get("scope"))
+    store.audit("action center", user["username"], x["uid"], {k: patch.get(k) for k in ("status", "owner", "due") if patch.get(k)})
 
 
 def apply_sla(actor):
