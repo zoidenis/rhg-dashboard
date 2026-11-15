@@ -35,6 +35,15 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 .fc-chart{position:relative;margin-top:10px}.fc-chart svg{display:block;width:100%;height:auto;overflow:visible}
 .fc-chart .ax{font-size:11px;fill:var(--sub)}.fc-chart .gr{stroke:var(--line);stroke-width:1}
 .fc-chart .vl{font-size:11px;font-weight:600;fill:var(--ink)}.fc-chart .lb{font-size:11.5px;fill:var(--ink)}
+/* the state of a read: final, reading, with warnings */
+.readst{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-left:4px solid var(--sub);border-radius:10px;padding:10px 14px;margin-top:12px;background:var(--card);color:var(--ink);font-size:13px;line-height:1.5}
+.readst .ic{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;background:var(--sub)}
+.readst .h b{font-size:14px}
+.readst .s{color:var(--sub);font-size:12px}
+.readst .s.wn{color:var(--warn,#b26a00)}
+.readst.ok{border-left-color:var(--pulse-green,#12805c);background:var(--rhg-greenbg,#e6f4ee)}.readst.ok .ic{background:var(--pulse-green,#12805c)}
+.readst.run{border-left-color:var(--rhg-primary,#0c475e)}.readst.run .ic{background:var(--rhg-primary,#0c475e)}
+.readst.warn{border-left-color:var(--warn,#b26a00);background:var(--rhg-amberbg,#fdf1dc)}.readst.warn .ic{background:var(--warn,#b26a00)}
 .fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
 .fc-seg button.on{background:var(--accent);color:var(--card)}
@@ -1930,7 +1939,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <button class="mini" type="button" id="biRange">Read this range</button><button class="mini" type="button" id="biRangeOff" hidden>Back to the last days</button>
         <span class="meta" id="biRangeMsg"><span>Any days up to yesterday, 62 at most; the usual view is the last days of Settings.</span></span></div>
       <div class="kpis" id="biKpis" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
-      <p class="meta" id="biStatus"></p>
+      <div class="meta" id="biStatus"></div>
     </div>
     <div class="card" id="biSet" style="display:none">
       <div class="card-head"><div><h2>Billy: connection &amp; mapping</h2>
@@ -6945,16 +6954,31 @@ $("biRetExp").onclick = () => {
   Object.entries(biRetParams()).forEach(([k, v]) => { if (v) p.set(k, v); });
   exportGo("/api/billyrec/xlsx?" + p.toString());
 };
+// the state of the figures in words: final (read in full, at what time and date), still reading, or read with warnings
+function biWhen(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(iso || ""); return m ? {time: `${m[4]}:${m[5]}`, date: `${m[3]}/${m[2]}/${m[1]}`} : null; }
+function biDay(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || ""); }
 function biStatusLine(){
-  const d = biData;
-  $("biStatus").innerHTML = (d.reading ? `<b>${fcSp("Reading the new figures…")}</b> ${esc(d.stage || "")} · ${fcSp("shown: the last read")} · ` : "") + (d.read_error ? `<span class="warn">${esc("Last read failed: " + d.read_error)}</span> · ` : "")
-    + (d.range && d.range.custom ? `<b>${fcSp("Chosen range")}</b> · ${fcSp("not in the exceptions register")} · ` : "")
-    + esc(`${d.company} · NUIS ${d.nuis} · ${d.days[0]} to ${d.days[d.days.length - 1]} · checked ${(d.checked_at || "").replace("T", " ")}`)
-    + ((d.empty_days || []).length ? ` · <span class="warn">${fcSp(`Billy gave no invoice for ${d.empty_days.length} of the days`)}</span>` : "")
-    + (d.register ? esc(` · register: ${d.register.opened} opened, ${d.register.closed} closed`) : "")
-    + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only Billy is read")}</span>`)
-    + (d.orders_note ? ` · <span class="warn">${fcSp(d.orders_note)}</span>` : "")
-    + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
+  const d = biData, w = biWhen(d.checked_at), days = d.days || [];
+  const warns = [];
+  if ((d.empty_days || []).length) warns.push(fcSp(`Billy gave no invoice for ${d.empty_days.length} of the days`));
+  if (!d.simphony) warns.push(fcSp("Simphony is not connected: only Billy is read"));
+  if (d.orders_note) warns.push(fcSp(d.orders_note));
+  if ((d.errors || []).length) warns.push(esc(d.errors.slice(0, 3).join(" · ")));
+  if (d.read_error) warns.push(esc("Last read failed: " + d.read_error));
+  const state = d.reading ? "run" : (warns.length || !d.complete) ? "warn" : "ok";
+  const icon = state === "ok" ? "✓" : state === "run" ? "↻" : "!";
+  const head = d.reading
+    ? `<b>${fcSp("Reading the new figures…")}</b> <span>${esc(d.stage || "")}</span> · <span>${fcSp("shown: the last read")}</span>${w ? ` <span>${fcSp(`of ${w.time}, ${w.date}`)}</span>` : ""}`
+    : state === "ok"
+      ? `<b>${fcSp("Final figures")}</b> · <span>${fcSp(`read in full at ${w ? w.time : "–"} on ${w ? w.date : "–"}`)}</span>`
+      : `<b>${fcSp("Figures read with warnings")}</b> · <span>${fcSp(`read at ${w ? w.time : "–"} on ${w ? w.date : "–"}`)}</span>`;
+  const reg = d.range && d.range.custom ? fcSp("Chosen range: not put in the exceptions register")
+    : d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`) : "";
+  $("biStatus").innerHTML = `<div class="readst ${state}"><span class="ic" aria-hidden="true">${icon}</span><div>
+      <div class="h">${head}</div>
+      <div class="s"><span data-no-i18n>${esc(d.company)} · NUIS ${esc(d.nuis || "–")}</span> · <span>${fcSp(`Days ${biDay(days[0])} – ${biDay(days[days.length - 1])}`)}</span>${days.length ? ` <span>${fcSp(`(${days.length} days, Simphony and Billy)`)}</span>` : ""}${reg ? ` · <span>${reg}</span>` : ""}</div>
+      ${warns.length ? `<div class="s wn">${warns.join(" · ")}</div>` : ""}
+    </div></div>`;
 }
 
 function biChecks(more){
