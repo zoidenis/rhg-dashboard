@@ -835,6 +835,8 @@ def sales_request(anchor, mode, refresh=False, compare="prior"):
     def run():
         try:
             result = sales_screen(anchor, mode, compare)
+            if isinstance(result, dict):                         # when Simphony was read: the screen says it
+                result.setdefault("read_at", datetime.now().isoformat(timespec="seconds"))
             state = {"state": "done", "result": result}
         except simphony.SimphonyError as exc:
             state = {"state": "failed", "error": str(exc)}

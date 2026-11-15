@@ -15,7 +15,7 @@ import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import locintel
 import simphony
@@ -285,6 +285,8 @@ def request(periods, latest_fn, key, refresh=False):
     def run():
         try:
             result = build(periods, latest_fn, progress)
+            if isinstance(result, dict):                         # when Simphony was read: the screen says it
+                result.setdefault("read_at", datetime.now().isoformat(timespec="seconds"))
             state = {"state": "done", "result": result}
         except simphony.SimphonyError as exc:
             state = {"state": "failed", "error": str(exc)}

@@ -38,12 +38,14 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 /* the state of a read: final, reading, with warnings */
 .readst{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-left:4px solid var(--sub);border-radius:10px;padding:10px 14px;margin-top:12px;background:var(--card);color:var(--ink);font-size:13px;line-height:1.5}
 .readst .ic{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;background:var(--sub)}
+.readst .bd,.readst .h,.readst .s{display:block}.readst .bd{min-width:0}
 .readst .h b{font-size:14px}
 .readst .s{color:var(--sub);font-size:12px}
 .readst .s.wn{color:var(--warn,#b26a00)}
 .readst.ok{border-left-color:var(--pulse-green,#12805c);background:var(--rhg-greenbg,#e6f4ee)}.readst.ok .ic{background:var(--pulse-green,#12805c)}
 .readst.run{border-left-color:var(--rhg-primary,#0c475e)}.readst.run .ic{background:var(--rhg-primary,#0c475e)}
 .readst.warn{border-left-color:var(--warn,#b26a00);background:var(--rhg-amberbg,#fdf1dc)}.readst.warn .ic{background:var(--warn,#b26a00)}
+.readst.err{border-left-color:var(--rhg-red,#c0392b);background:var(--rhg-redbg,#fbe9e7)}.readst.err .ic{background:var(--rhg-red,#c0392b)}
 .fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
 .fc-seg button.on{background:var(--accent);color:var(--card)}
@@ -2834,6 +2836,26 @@ function renderPL(){
 // ---------- Financial statements → Profit & loss: from revenue to EBITDA (was its own P&L charts tab)
 const fcM = v => v == null || !isFinite(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
 const fcSp = t => `<span>${esc(t)}</span>`;
+// ---- the state of a read from another platform (Simphony, Billy, SevenRooms, Odoo, Crunchtime, BC), said the same way
+// on every screen: final (read in full, at what time and date), reading (the last read stays on screen), read with
+// warnings, or could not read. o: {src, at (iso), reading, stage, text (a reading message of its own), error,
+//   incomplete, warns: [html], lines: [html]}
+function rdWhen(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(iso || ""); return m ? {time: `${m[4]}:${m[5]}`, date: `${m[3]}/${m[2]}/${m[1]}`} : null; }
+function rdDay(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || ""); }
+function readBanner(el, o){
+  if (typeof el === "string") el = $(el);
+  if (!el) return;
+  const w = rdWhen(o.at), src = o.src || "the source", warns = (o.warns || []).filter(Boolean), lines = (o.lines || []).filter(Boolean);
+  const state = o.error ? "err" : o.reading ? "run" : (warns.length || o.incomplete) ? "warn" : "ok";
+  const icon = {ok: "✓", run: "↻", warn: "!", err: "✕"}[state];
+  const head = state === "err" ? `<b>${fcSp(`Could not read ${src}`)}</b> · <span>${esc(o.error)}</span>`
+    : state === "run" ? (o.text ? `<b>${fcSp(o.text)}</b>` : `<b>${fcSp(`Reading ${src}…`)}</b>${o.stage ? ` <span>${esc(o.stage)}</span>` : ""}`)
+        + (w ? ` · ${fcSp(`shown: the last read of ${w.time}, ${w.date}`)}` : "")
+    : state === "ok" ? `<b>${fcSp("Final figures")}</b> · ${fcSp(w ? `read in full from ${src} at ${w.time} on ${w.date}` : `read in full from ${src}`)}`
+    : `<b>${fcSp("Figures read with warnings")}</b> · ${fcSp(w ? `read from ${src} at ${w.time} on ${w.date}` : `read from ${src}`)}`;
+  el.innerHTML = `<span class="readst ${state}"><span class="ic" aria-hidden="true">${icon}</span><span class="bd"><span class="h">${head}</span>`
+    + (lines.length ? `<span class="s">${lines.join(" · ")}</span>` : "") + (warns.length ? `<span class="s wn">${warns.join(" · ")}</span>` : "") + `</span></span>`;
+}
 // the waterfall: net revenue, other income → revenue total, COGS → gross margin, labour, occupancy, other OPEX → EBITDA
 function fcWaterfall(){
   const pl = data.pl || {}, S = Object.fromEntries((pl.summary || pl.statement || []).map(l => [l.key, l.current]));
@@ -3513,7 +3535,7 @@ const heldNote = d => d && d.reading ? `Reading the new figures… ${d.stage || 
 function heldPoll(prev, j, render, el, again){
   const same = prev && prev.checked_at === j.checked_at;
   if (!same) render();
-  else { const e = $(el); e.textContent = heldNote(j) + (e.dataset.base || ""); }
+  else { const e = $(el); if (e._status) e._status(); else e.textContent = heldNote(j) + (e.dataset.base || ""); }
   return j.reading ? setTimeout(again, 5000) : null;
 }
 // ---------------------------------------------------------------- Takings POS ↔ BC (rcpt.py)
@@ -3521,17 +3543,26 @@ let tkData = null, tkTimer = null, tkSel = null;
 const TK_SHORT = {ok: "✓", late: "late", pending: "…", none: "·"};
 async function loadReceipts(refresh){
   clearTimeout(tkTimer);
-  $("tkStatus").textContent = "Reading…";
+  readBanner("tkStatus", {src: "Simphony and Business Central", reading: true});
   try{
     const p = new URLSearchParams({company: $("company").value || ""});
     const j = await readJSON(await fetch("/api/receipts?" + p.toString() + (refresh ? "&refresh=1" : "")));
-    if (j.pending) { $("tkStatus").textContent = `Reading Simphony and Business Central… ${j.stage || ""}`; tkTimer = setTimeout(() => loadReceipts(false), 4000); return; }
+    if (j.pending) { readBanner("tkStatus", {src: "Simphony and Business Central", reading: true, stage: j.stage || ""}); tkTimer = setTimeout(() => loadReceipts(false), 4000); return; }
     if (j.available === false || (j.error && !j.locations)) throw new Error(j.error || "not available");
     const prev = tkData; tkData = j; tkTimer = heldPoll(prev, j, renderReceipts, "tkStatus", () => loadReceipts(false));
   }catch(e){
     if (/HTTP 50[234]|restarting/i.test(e.message)) { $("tkStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; tkTimer = setTimeout(() => loadReceipts(false), 15000); return; }
-    $("tkStatus").textContent = "Could not read: " + e.message; }
+    readBanner("tkStatus", {src: "Simphony and Business Central", error: e.message}); }
 }
+function tkStatusLine(){
+  const d = tkData;
+  readBanner("tkStatus", {src: "Simphony and Business Central", at: d.checked_at, reading: d.reading, stage: d.stage, incomplete: !d.complete,
+    warns: [d.read_error ? esc("Last read failed: " + d.read_error) : "", (d.errors || []).length ? esc(d.errors.slice(0, 3).join(" · ")) : ""],
+    lines: [`<span data-no-i18n>${esc(d.company)}</span> · ` + fcSp(`Days ${rdDay(d.from)} – ${rdDay(d.to)}`),
+            d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`)
+              : d.complete ? "" : fcSp("Not put in the exceptions register: the read was incomplete")]});
+}
+$("tkStatus")._status = tkStatusLine;
 function renderReceipts(){
   const d = tkData, k = d.kpis;
   const card = (l, val, sub, cls, open) => `<div class="card kpi"${open ? ` data-pulse="${open}" role="button" tabindex="0" style="cursor:pointer"` : ""}><div class="l">${l}</div><div class="v ${cls || ""}">${val}</div><div class="s">${sub}</div></div>`;
@@ -3544,9 +3575,7 @@ function renderReceipts(){
     card("Refunds and chargebacks", sxM(k.refunds), k.unmapped ? `${fmt(k.unmapped)} tenders not mapped` : "out of card and online accounts", k.refunds || k.unmapped ? "warn" : "", "tkcase|refunds");
   $("tkNote").textContent = `${d.company} · ${d.from} to ${d.to} · ${d.locations.filter(L => L.tips && L.tips.tenders).length} restaurants with takings` + (d.simphony ? "" : " · Simphony is not connected") +
     (d.mapping.saved ? ` · tender mapping saved by ${d.mapping.saved_by} on ${String(d.mapping.saved_at).slice(0, 10)}` : " · tender mapping: the proposal, not saved yet");
-  $("tkStatus").dataset.base = `Checked ${(d.checked_at || "").replace("T", " ")}` + (d.register ? ` · register: ${d.register.found} found, ${d.register.opened} opened, ${d.register.closed} closed` : d.complete ? "" : " · not put in the register: the read was incomplete")
-    + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
-  $("tkStatus").textContent = heldNote(d) + $("tkStatus").dataset.base;
+  tkStatusLine();
   const days = d.days, wd = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
   const rows = [];
   d.locations.forEach((L, li) => L.channels.forEach((c, ci) => rows.push([L, c, li, ci])));
@@ -3976,10 +4005,10 @@ async function loadSales(refresh){
       if(!r.ok) throw new Error(j.error || "failed");
       if(!j.pending){ salesData = j; salesData._q = params(); renderSales(); break; }
       const s = Math.round((Date.now() - me.started)/1000);
-      $("slNote").textContent = `Reading the daily totals from Simphony… ${s}s. The first read of a period is one call per restaurant and day; later reads come from the local file.`;
+      readBanner("slNote", {src: "Simphony", reading: true, text: `Reading the daily totals from Simphony… ${s}s. The first read of a period is one call per restaurant and day; later reads come from the local file.`});
       await new Promise(res => setTimeout(res, 4000));
     }
-  }catch(e){ if (salesPoll === me) $("slNote").textContent = "Could not read the sales: " + e.message; }
+  }catch(e){ if (salesPoll === me) readBanner("slNote", {src: "Simphony", error: e.message}); }
   finally{ if (salesPoll === me){ salesPoll = null; $("slLoad").disabled = false; } }
 }
 $("slLoad").onclick = () => loadSales(true);
@@ -4103,8 +4132,8 @@ function renderSales(){
   const C = d.currency || "ALL", t = (d.totals||{})[C] || {cur:{}, prev:{}};
   const base = (d.prior && d.prior.label) || "the period before";
   const chip = v => v==null ? "" : `<span class="chip ${v>=0?"down":"up"}">${v>=0?"+":""}${fmt(v,1)}%</span>`;
-  $("slNote").textContent = `${d.period.label} · ${d.period.from} to ${d.period.to}, against ${d.prior.from} to ${d.prior.to}` +
-    `${d.errors.length ? ` · ${d.errors.length} read(s) failed` : ""}`;
+  readBanner("slNote", {src: "Simphony", at: d.read_at, warns: d.errors.length ? [fcSp(`${d.errors.length} read(s) failed`)] : [],
+    lines: [fcSp(`${d.period.label} · ${d.period.from} to ${d.period.to}, against ${d.prior.from} to ${d.prior.to}`)]});
   const KM = {"Net sales": "net", "Checks": "checks", "Guests": "guests", "Average check": "avg", "Per guest": "guest", "Discounts": "disc", "Service charge": "svc", "Voids": "voids"};
   const k = (l, v, s) => `<div class="card kpi"${KM[l] ? ` data-pulse="slk|${KM[l]}" role="button" tabindex="0" style="cursor:pointer" title="${esc(l)} by restaurant"` : ""}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   const others = Object.keys(d.totals||{}).filter(c => c !== C);
@@ -4165,18 +4194,18 @@ function cpQs(){
 async function cpLoad(refresh){
   clearTimeout(cpTimer);
   const q = cpQs(); cpKey = q;
-  $("cpStatus").textContent = "Reading the channels from Simphony and Business Central…";
+  readBanner("cpStatus", {src: "Simphony and Business Central", reading: true});
   try{
     const j = await readJSON(await fetch("/api/sales/channel-profit?" + q + (refresh ? "&refresh=1" : "")));
     if (cpKey !== q) return;
     if (j.error) throw new Error(j.error);
     if (j.pending) {
-      $("cpStatus").textContent = `Reading the order types and menu items from Simphony, day by day${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)}` : "…"} The first read of a long period takes a few minutes; closed days are kept.`;
+      readBanner("cpStatus", {src: "Simphony and Business Central", reading: true, text: `Reading the order types and menu items from Simphony, day by day${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)}` : "…"} The first read of a long period takes a few minutes; closed days are kept.`});
       cpTimer = setTimeout(() => cpLoad(false), 4000); return;
     }
     if (j.available === false) throw new Error(j.error || "not available");
     cpData = j; cpCfg = j.config; cpFields = j.fields; cpFill(); cpRender();
-  }catch(e){ $("cpStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){ readBanner("cpStatus", {src: "Simphony and Business Central", error: e.message}); }
 }
 function cpFill(){
   const d = cpData, lv = $("cpLevel").value, keep = $("cpKey").value || d.key;
@@ -4207,7 +4236,8 @@ function cpRender(){
     card("Contribution", cpM(T.contribution), `${pc(T.contribution_pct)} · ${cpM(T.contribution_per_order)} per order`, T.contribution < 0 ? "up" : "") +
     card("Result after full costs", cpM(T.result), pc(T.result_pct), T.result < 0 ? "up" : "") +
     card("Net sales per order", cpM(T.net_per_order), `commission ${pc(T.commission_share)} of net sales`);
-  $("cpStatus").textContent = `${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"} · ${C}${d.converted ? " (converted at the group rates of Settings)" : ""} · read ${d.read_at}`
+  readBanner("cpStatus", {src: "Simphony and Business Central", at: d.read_at, warns: (d.errors || []).length ? [fcSp(`${d.errors.length} read(s) failed`)] : [],
+    lines: [fcSp(`${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"} · ${C}${d.converted ? " (converted at the group rates of Settings)" : ""}`)]})
     + (Object.keys(d.bc_accounts).length ? ` · BC accounts: ${Object.entries(d.bc_accounts).map(([k, v]) => `${k} ${v.join(", ")}`).join("; ")}` : "")
     + (d.errors.length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
   $("cpWarn").style.display = d.warnings.length ? "" : "none";
@@ -4299,18 +4329,18 @@ function meQs(){
 async function meLoad(refresh){
   clearTimeout(meTimer);
   const q = meQs(); meKey = q;
-  $("meStatus").textContent = "Reading the menu items from Simphony…";
+  readBanner("meStatus", {src: "Simphony", reading: true});
   try{
     const j = await readJSON(await fetch("/api/sales/menu?" + q + (refresh ? "&refresh=1" : "")));
     if (meKey !== q) return;
     if (j.error) throw new Error(j.error);
     if (j.pending) {
-      $("meStatus").textContent = `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} The first read of a long period takes a few minutes; closed days are kept.`;
+      readBanner("meStatus", {src: "Simphony", reading: true, text: `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} The first read of a long period takes a few minutes; closed days are kept.`});
       meTimer = setTimeout(() => meLoad(false), 4000); return;
     }
     if (j.available === false) throw new Error(j.error || "not available");
     meData = j; meFillKeys(); meRender();
-  }catch(e){ $("meStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){ readBanner("meStatus", {src: "Simphony", error: e.message}); }
 }
 function meFillKeys(){
   const d = meData, lv = $("meLevel").value, keep = $("meKey").value || d.key;
@@ -4342,7 +4372,8 @@ function meRender(){
     card("Portion cost", k.cost_pct != null ? fmt(k.cost_pct, 1) + "%" : "–", `target ${fmt(S.target)}% · ${k.costed_share != null ? fmt(k.costed_share, 0) + "% of sales costed" : ""}`, k.cost_pct > S.target ? "up" : "") +
     card("Stars · Plowhorses", `${fmt(d.classes.star.items)} · ${fmt(d.classes.plowhorse.items)}`, `${ilM(d.classes.star.net + d.classes.plowhorse.net)} of sales`) +
     card("Puzzles · Dogs", `${fmt(d.classes.puzzle.items)} · ${fmt(d.classes.dog.items)}`, `${fmt(d.classes.nocost.items)} with no cost`, d.classes.dog.items ? "warn" : "");
-  $("meStatus").textContent = `${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"}`
+  readBanner("meStatus", {src: "Simphony", at: d.read_at, warns: (d.errors || []).length ? [fcSp(`${d.errors.length} read(s) failed`)] : [],
+    lines: [fcSp(`${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"}`)]})
     + ` · ${esc(C)}${d.converted ? " (converted at the group rates of Settings)" : ""}${d.missing_rates.length ? " · no rate for " + d.missing_rates.join(", ") + ", left out" : ""}`
     + ` · read ${d.read_at}${d.errors.length ? " · " + d.errors.slice(0, 3).join(" · ") : ""}`;
   const secs = [...new Set(d.items.map(i => i.section))];
@@ -4487,18 +4518,18 @@ async function mcLoad(refresh){
   const q = mcQs();
   if (!refresh && mcData && mcKey === q) { mcRender(); mcLoadTrend(false); return; }
   mcKey = q;
-  $("mcStatus").textContent = "Reading the menu items from Simphony…";
+  readBanner("mcStatus", {src: "Simphony", reading: true});
   try{
     const j = await readJSON(await fetch("/api/sales/menu?" + q + (refresh ? "&refresh=1" : "")));
     if (mcKey !== q) return;
     if (j.error) throw new Error(j.error);
     if (j.pending) {
-      $("mcStatus").textContent = `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} Closed days are kept.`;
+      readBanner("mcStatus", {src: "Simphony", reading: true, text: `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} Closed days are kept.`});
       mcTimer = setTimeout(() => mcLoad(false), 4000); return;
     }
     if (j.available === false) throw new Error(j.error || "not available");
     mcData = j; mcFillKeys(); mcRender();
-  }catch(e){ $("mcStatus").textContent = "Could not read: " + e.message; }
+  }catch(e){ readBanner("mcStatus", {src: "Simphony", error: e.message}); }
   mcLoadTrend(refresh);
 }
 async function mcLoadTrend(refresh){
@@ -4542,7 +4573,8 @@ function mcItems(){
 }
 function mcRender(){
   const d = mcData, T = d.settings.target;
-  $("mcStatus").innerHTML = esc(`${d.title} · ${d.period.from} – ${d.period.to} · ${d.currency}`) + (d.errors && d.errors.length ? ` · <span class="warn">${esc(d.errors.length + " reads failed")}</span>` : "");
+  readBanner("mcStatus", {src: "Simphony and Business Central", at: d.read_at, warns: d.errors && d.errors.length ? [fcSp(`${d.errors.length} read(s) failed`)] : [],
+    lines: [fcSp(`${d.title} · ${d.period.from} – ${d.period.to} · ${d.currency}`)]});
   $("mcKeys").innerHTML = [["ok", `food cost up to ${fmt(T, 0)}%`], ["near", `up to ${fmt(T + 5, 0)}%`], ["over", `above ${fmt(T + 5, 0)}%`], ["none", "no cost"]]
     .map(([k, l]) => `<span><i style="background:${MC_COL[k]}"></i>${fcSp(l)}</span>`).join("");
   mcKpis(); mcMatrix(); mcWhere();
@@ -4666,6 +4698,7 @@ window.addEventListener("resize", () => { if ($("slMcView") && $("slMcView").sty
 // ---------- People & Productivity (/api/people, people.py): Odoo HR against Simphony's sales and BC's personnel cost ----------
 // Only sums by restaurant reach the page: no name, wage or contract of a person.
 var ppTab = "workforce", ppData = {}, ppKeys = {}, ppTimer = null, ppMetric = "net", ppSel = "";
+const PP_SRC = {workforce: "Odoo", productivity: "Simphony and Odoo", scheduling: "Odoo", personnel: "Business Central", quality: "Odoo"};
 const PP_TITLE = {workforce: "Workforce", productivity: "Labour productivity", scheduling: "Scheduling & attendance", personnel: "Personnel cost", quality: "HR data quality"};
 const PP_HINT = {
   workforce: "Active employees by restaurant, section (front of house, back of house, management) and position; FTE where the contract's schedule gives its hours; headcount at each month end, hires and leavers from the contracts. From Odoo Employees and Contracts.",
@@ -4710,7 +4743,7 @@ async function ppLoad(force){
   const part = ppPart(), q = ppQs();
   if (ppData[part] && ppKeys[part] === q && !force && !ppData[part].reading) { ppRender(); return; }
   clearTimeout(ppTimer);
-  $("ppStatus").textContent = "Reading…";
+  readBanner("ppStatus", {src: PP_SRC[ppTab] || "Odoo", reading: true});
   try {
     const r = await fetch("/api/people?" + q + (force ? "&refresh=1" : "")), j = await readJSON(r);
     if (!r.ok || (j.error && j.available !== false)) throw new Error(j.error || r.status);
@@ -4718,13 +4751,13 @@ async function ppLoad(force){
     if (j.can_settings !== undefined) $("ppSetBtn").style.display = j.can_settings ? "" : "none";
     if (j.configured === false) { ppData[part] = null; $("ppStatus").textContent = j.error; $("ppKpis").innerHTML = ""; $("ppBody").innerHTML = j.can_settings ? "" : `<div class="card"><p class="meta">${esc(j.error)} Ask whoever holds Settings.</p></div>`; if (j.can_settings) ppSetOpen(true); return; }
     if (j.pending || j.reading) {
-      $("ppStatus").textContent = "Reading " + (j.stage || "") + "… the first read of a period takes a few minutes; then it is kept.";
+      readBanner("ppStatus", {src: PP_SRC[ppTab] || "Odoo", reading: true, stage: `${j.stage || ""} · the first read of a period takes a few minutes; then it is kept.`});
       ppTimer = setTimeout(() => { if (ppPart() === part && currentView().id === "people") ppLoad(false); }, 4000);
       if (j.pending) return;
     }
     if (j.available === false) throw new Error(j.error || "Not read.");
     ppData[part] = j; ppKeys[part] = q; ppRender();
-  } catch (e) { $("ppStatus").textContent = "Could not read: " + e.message; }
+  } catch (e) { readBanner("ppStatus", {src: PP_SRC[ppTab] || "Odoo", error: e.message}); }
 }
 $("ppRead").onclick = () => ppLoad(true);
 const ppN = (v, d) => v == null ? "–" : fmt(v, d || 0);
@@ -4738,7 +4771,7 @@ function ppRender(){
 function ppWorkforce(d){
   const R = d.locations, all = R.concat(d.support, d.unmapped), sum = (L, k) => L.reduce((a, x) => a + (x[k] || 0), 0);
   const last12 = (x, k) => x[k].slice(-13, -1).reduce((a, m) => a + m[1], 0);
-  $("ppStatus").textContent = `Odoo read ${d.read_at.slice(0, 16).replace("T", " ")} · ${fmt(d.totals.active)} active and ${fmt(d.totals.archived)} archived employees · contracts from ${d.history_from || "–"}`;
+  readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading, lines: [fcSp(`${fmt(d.totals.active)} active and ${fmt(d.totals.archived)} archived employees · contracts from ${d.history_from || "–"}`)]});
   $("ppKpis").innerHTML = Pulse.tiles([
     {l: "Active employees", v: fmt(sum(all, "employees")), s: `${fmt(sum(R, "employees"))} in ${R.length} restaurants · ${fmt(sum(d.support, "employees"))} in support units`},
     {l: "FTE", v: fmt(sum(all, "fte"), 1), s: `${fmt(sum(all, "fte_unknown"))} people without hours a week in their schedule`, cls: sum(all, "fte_unknown") ? "warn" : ""},
@@ -4781,7 +4814,8 @@ function ppProductivity(d){
   const R = d.locations, C = (R[0] || {}).currency || "ALL";
   const tn = R.reduce((a, x) => a + x.net, 0), th = R.reduce((a, x) => a + x.hours, 0);
   const W = d.weekly, wn = W.reduce((a, w) => a + w[1], 0), wh = W.reduce((a, w) => a + w[4], 0), wc = W.reduce((a, w) => a + w[2], 0), wg = W.reduce((a, w) => a + w[3], 0);
-  $("ppStatus").textContent = `${d.period.from} to ${d.period.to}${d.prior ? ` against ${d.prior.from} to ${d.prior.to}` : ""} · read ${d.read_at.slice(11, 16)}${d.reading ? " · reading again…" : ""}${d.errors.length ? " · Simphony: " + d.errors.join("; ") : ""}`;
+  readBanner("ppStatus", {src: "Simphony and Odoo", at: d.read_at, reading: d.reading, warns: d.errors.length ? [esc("Simphony: " + d.errors.join("; "))] : [],
+    lines: [fcSp(`Days ${rdDay(d.period.from)} – ${rdDay(d.period.to)}`) + (d.prior ? " " + fcSp(`against ${rdDay(d.prior.from)} – ${rdDay(d.prior.to)}`) : "")]});
   $("ppKpis").innerHTML = Pulse.tiles([
     {l: `Sales per labour hour · ${C}`, v: wh ? fmt(wn / wh) : "–", s: "net sales / actual hours, the days both systems answered"},
     {l: "Checks per labour hour", v: wh ? fmt(wc / wh, 2) : "–", s: `${fmt(wc)} checks`},
@@ -4817,7 +4851,8 @@ function ppScheduling(d){
   sel.innerHTML = R.map(x => `<option value="${esc(x.ref)}">${esc(x.name)}</option>`).join("");
   sel.value = R.some(x => x.ref === cur) ? cur : (R[0] || {}).ref || "";
   const x = R.find(L => L.ref === sel.value);
-  $("ppStatus").textContent = `${d.period.from} to ${d.period.to} · business day from ${String(d.day_start).padStart(2, "0")}:00 · read ${d.read_at.slice(11, 16)}`;
+  readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading,
+    lines: [fcSp(`Days ${rdDay(d.period.from)} – ${rdDay(d.period.to)}`), fcSp(`business day from ${String(d.day_start).padStart(2, "0")}:00`)]});
   if (!x) { $("ppKpis").innerHTML = ""; $("ppBody").innerHTML = '<div class="card"><p class="meta">No restaurant with hours in this period.</p></div>'; return; }
   const st = x.states || {}, rev = (st.pending || 0) + (st.escalated || 0) + (st.no_review || 0);
   $("ppKpis").innerHTML = Pulse.tiles([
@@ -4849,7 +4884,9 @@ $("ppLoc").onchange = () => { ppSel = $("ppLoc").value; if (ppData.productivity)
 function ppPersonnel(d){
   const R = d.locations, C = d.currency || "ALL", cost = R.reduce((a, x) => a + x.cost, 0), sales = R.filter(x => x.group === "restaurant").reduce((a, x) => a + x.sales, 0);
   const rc = R.filter(x => x.group === "restaurant").reduce((a, x) => a + x.cost, 0), bud = R.reduce((a, x) => a + (x.budget || 0), 0);
-  $("ppStatus").textContent = `${d.company} · ${d.year} · Business Central, posting months ${d.months[0] || "–"} to ${d.months[d.months.length - 1] || "–"}${d.pending ? " · still being read" : ""}${d.provisional.length ? " · provisional: " + d.provisional.join(", ") : ""}`;
+  readBanner("ppStatus", {src: "Business Central", at: d.read_at, reading: d.pending, stage: d.pending ? "still being read" : "",
+    warns: d.provisional.length ? [fcSp(`provisional: ${d.provisional.join(", ")}`)] : [],
+    lines: [`<span data-no-i18n>${esc(d.company)}</span> · ` + fcSp(`${d.year} · posting months ${d.months[0] || "–"} to ${d.months[d.months.length - 1] || "–"}`)]});
   if (d.pending && !R.length) { ppTimer = setTimeout(() => { if (ppTab === "personnel") ppLoad(true); }, 5000); }
   $("ppKpis").innerHTML = Pulse.tiles([
     {l: `Personnel cost · ${C}`, v: fmt(cost), s: "every department, the year to date"},
@@ -4877,7 +4914,8 @@ function ppQuality(d){
   const pr = ppData.productivity, PL = pr ? pr.locations : [];
   const longA = PL.reduce((a, x) => a + (x.long || 0), 0);
   const forgot = PL.reduce((a, x) => a + x.forgotten, 0), rev = PL.reduce((a, x) => a + (x.states.pending || 0) + (x.states.escalated || 0) + (x.states.no_review || 0), 0);
-  $("ppStatus").textContent = `Odoo read ${d.read_at.slice(0, 16).replace("T", " ")}` + (pr ? ` · attendances ${pr.period.from} to ${pr.period.to}` : " · open Labour productivity for the attendances of the period");
+  readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading,
+    lines: [pr ? fcSp(`attendances ${rdDay(pr.period.from)} – ${rdDay(pr.period.to)}`) : fcSp("open Labour productivity for the attendances of the period")]});
   $("ppKpis").innerHTML = Pulse.tiles([
     {l: "Without a manager", v: fmt(sum("no_manager")), cls: sum("no_manager") ? "warn" : ""}, {l: "Without a work location", v: fmt(sum("no_location")), cls: sum("no_location") ? "warn" : ""},
     {l: "Without a position", v: fmt(sum("no_job"))}, {l: "Without a running contract", v: fmt(sum("no_contract")), cls: sum("no_contract") ? "warn" : ""},
@@ -4971,26 +5009,27 @@ async function oxLoad(force){
   const q = oxQs(), k = q.replace(/&?part=[^&]*/, "");
   if (oxData && oxKey === k && !force && !oxData.reading) { oxRender(); return; }
   clearTimeout(oxTimer);
-  $("oxStatus").textContent = "Reading…";
+  readBanner("oxStatus", {src: "Crunchtime", reading: true});
   try {
     const r = await fetch("/api/opsexec?" + q + (force ? "&refresh=1" : "")), j = await readJSON(r);
     if (!r.ok || (j.error && j.available !== false)) throw new Error(j.error || r.status);
     if (j.can_settings !== undefined) $("oxSetBtn").style.display = j.can_settings ? "" : "none";
     if (j.configured === false) { oxData = null; $("oxStatus").textContent = j.error; $("oxKpis").innerHTML = ""; $("oxBody").innerHTML = j.can_settings ? "" : `<div class="card"><p class="meta">${esc(j.error)} Ask whoever holds Settings.</p></div>`; if (j.can_settings) oxSetOpen(true); return; }
     if (j.pending || j.reading) {
-      $("oxStatus").textContent = "Reading " + (j.stage || "") + "… the first read of a period takes a few minutes; then it is kept.";
+      readBanner("oxStatus", {src: "Crunchtime", reading: true, stage: `${j.stage || ""} · the first read of a period takes a few minutes; then it is kept.`});
       oxTimer = setTimeout(() => { if (currentView().id === "opsexec") oxLoad(false); }, 4000);
       if (j.pending) return;
     }
     if (j.available === false) throw new Error(j.error || "Not read.");
     oxData = j; oxKey = k; oxRender();
-  } catch (e) { $("oxStatus").textContent = "Could not read: " + e.message; }
+  } catch (e) { readBanner("oxStatus", {src: "Crunchtime", error: e.message}); }
 }
 $("oxRead").onclick = () => oxLoad(true);
 const oxPct = (v, good, warn) => v == null ? "–" : `<span class="${v >= good ? "down" : v >= warn ? "warn" : "up"}">${fmt(v, 1)}%</span>`;
 function oxRender(){
   const d = oxData; if (!d) return;
-  $("oxStatus").textContent = `${d.period.from} to ${d.period.to} · Crunchtime Ops Execution, read ${d.read_at.slice(11, 16)}${d.reading ? " · reading again…" : ""}${d.errors.length ? " · not read: " + d.errors.join("; ") : ""}`;
+  readBanner("oxStatus", {src: "Crunchtime", at: d.read_at, reading: d.reading, warns: d.errors.length ? [esc("Not read: " + d.errors.join("; "))] : [],
+    lines: [fcSp(`Days ${rdDay(d.period.from)} – ${rdDay(d.period.to)}`), fcSp("Crunchtime Ops Execution, read only")]});
   $("oxDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
   ({overview: oxOverview, checklists: oxChecklists, foodsafety: oxFood, waste: oxWaste, forms: oxForms})[oxTab](d);
 }
@@ -5239,7 +5278,8 @@ function slRender(){
   if (!d.available) { $("slGrid").innerHTML = `<p class="hint">${esc(d.error || "Sales unavailable.")}</p>`; $("slTotals").innerHTML = ""; return; }
   const lim = d.limits || {}, rows = d.locations || [], C = d.currency || "ALL", t = (d.totals || {})[C] || {cur: {}, prev: {}};
   if ((!chData || chData._q !== chQuery()) && !chPoll) loadCh(); else chRender();
-  $("slStatus").textContent = `${d.period.from} → ${d.period.to}${d.period.running ? " (to the last closed day)" : ""} · against ${d.prior.label} ${d.prior.from} → ${d.prior.to} · each restaurant in its own currency`;
+  readBanner("slStatus", {src: "Simphony", at: d.read_at, warns: (d.errors || []).length ? [esc(d.errors.slice(0, 3).join(" · "))] : [],
+    lines: [fcSp(`${d.period.from} → ${d.period.to}${d.period.running ? " (to the last closed day)" : ""} · against ${d.prior.label} ${d.prior.from} → ${d.prior.to} · each restaurant in its own currency`)]});
   const k = (l, v, s, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${s}</div></div>`;
   const alerts = rows.map(l => slSignals(l, lim).al), crit = alerts.filter(a => a.some(x => x[0] === "crit")).length;
   $("slTotals").innerHTML =
@@ -5290,10 +5330,10 @@ async function loadCh(refresh){
       const j = await readJSON(r);
       if (!r.ok) throw new Error(j.error || "failed");
       if (!j.pending){ chData = j; chData._q = chQuery(); chRender(); slRender(); break; }
-      $("chStatus").textContent = `Reading the order types from Simphony… ${j.total ? `${fmt(j.done)} of ${fmt(j.total)} reads` : ""} · ${Math.round((Date.now() - me.started) / 1000)}s. The first read of a period is a call per restaurant and day for three periods; closed days are kept and not read again.`;
+      readBanner("chStatus", {src: "Simphony", reading: true, text: `Reading the order types from Simphony… ${j.total ? `${fmt(j.done)} of ${fmt(j.total)} reads` : ""} · ${Math.round((Date.now() - me.started) / 1000)}s. The first read of a period is a call per restaurant and day for three periods; closed days are kept and not read again.`});
       await new Promise(res => setTimeout(res, 4000));
     }
-  }catch(e){ if (chPoll === me) $("chStatus").textContent = "Could not read the channels: " + e.message; }
+  }catch(e){ if (chPoll === me) readBanner("chStatus", {src: "Simphony", error: e.message}); }
   finally{ if (chPoll === me) chPoll = null; }
 }
 document.querySelectorAll("#chTabs button").forEach(b => b.onclick = () => {
@@ -5323,10 +5363,12 @@ function chTable(list, total, opts){
 function chRender(){
   if (!$("chTable")) return;
   const d = chData;
-  if (!d || d._q !== chQuery()) { $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; if (!chPoll) $("chStatus").textContent = "Reading…"; return; }
+  if (!d || d._q !== chQuery()) { $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; if (!chPoll) readBanner("chStatus", {src: "Simphony", reading: true}); return; }
   if (!d.available) { $("chStatus").textContent = d.error || "Channels unavailable."; $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; return; }
   const C = d.currency, t = (d.totals || {})[C];
-  $("chStatus").textContent = `${d.period.from} → ${d.period.to} · before ${d.prev.from} → ${d.prev.to} · last year ${d.ly.from} → ${d.ly.to} · ${C}, VAT included` + (Object.keys(d.totals).length > 1 ? ` · restaurants in ${Object.keys(d.totals).filter(x => x !== C).join(", ")} only in their squares` : "") + (d.errors.length ? ` · ${d.errors.length} read(s) failed` : "");
+  readBanner("chStatus", {src: "Simphony", at: d.read_at, warns: d.errors.length ? [fcSp(`${d.errors.length} read(s) failed`)] : [],
+    lines: [fcSp(`${d.period.from} → ${d.period.to} · before ${d.prev.from} → ${d.prev.to} · last year ${d.ly.from} → ${d.ly.to} · ${C}, VAT included`)
+      + (Object.keys(d.totals).length > 1 ? " · " + fcSp(`restaurants in ${Object.keys(d.totals).filter(x => x !== C).join(", ")} only in their squares`) : "")]});
   if (!t) { $("chKpis").innerHTML = ""; $("chTable").innerHTML = `<tr><td class="hint">No sales by order type in this period.</td></tr>`; return; }
   const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
   const D = t.delivery, T = t.total, share = T.cur ? D.cur / T.cur * 100 : null, shareLy = T.ly ? D.ly / T.ly * 100 : null;
@@ -6615,8 +6657,9 @@ var eaTimer = null;
 function eaShow(j){
   $("eaGet").hidden = !j.file;
   const parts = Object.entries(j.summary || {}).map(([k, v]) => `${k} ${v.error ? "error" : fmt(v.rows ?? v.locations)}`);
-  $("eaStatus").textContent = j.running ? `Reading… ${j.step}` : j.error ? `Failed: ${j.error}`
-    : j.file ? `Read ${new Date(j.file_at).toLocaleString("en-GB", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"})} · ${fmt(j.file_bytes / 1048576, 1)} MB` + (parts.length ? ` · ${parts.join(" · ")}` : "") : "Not read yet.";
+  if (!j.running && !j.error && !j.file) $("eaStatus").textContent = "Not read yet.";
+  else readBanner("eaStatus", {src: "Simphony (Configuration API)", at: j.file_at, reading: j.running, stage: j.step, error: j.error ? j.error : "",
+    lines: j.file ? [fcSp(`${fmt(j.file_bytes / 1048576, 1)} MB`) + (parts.length ? " · " + esc(parts.join(" · ")) : "")] : []});
   clearTimeout(eaTimer); if (j.running) eaTimer = setTimeout(eaPoll, 4000);
 }
 async function eaPoll(){ try { eaShow(await readJSON(await fetch("/api/emcaudit"))); } catch (e) { $("eaStatus").textContent = "Could not read the status: " + e.message; } }
@@ -6628,13 +6671,13 @@ $("eaRun").onclick = async () => {
 };
 async function loadEp(refresh){
   clearTimeout(epTimer);
-  $("epStatus").textContent = "Reading…";
+  readBanner("epStatus", {src: "Simphony (Configuration API)", reading: true});
   try {
     const j = await readJSON(await fetch("/api/emcpriv" + (refresh ? "?refresh=1" : "")));
     $("epSetBtn").hidden = !j.can_settings;
     $("eaCard").hidden = !j.can_settings; if (j.can_settings && !$("eaStatus").textContent) eaPoll();
     epConn(j.connection || {});
-    if (j.pending) { $("epStatus").textContent = `Reading the Simphony Configuration API: ${j.stage || "starting"}…`; epTimer = setTimeout(() => loadEp(false), 3000); return; }
+    if (j.pending) { readBanner("epStatus", {src: "Simphony (Configuration API)", reading: true, stage: j.stage || "starting"}); epTimer = setTimeout(() => loadEp(false), 3000); return; }
     if (j.available === false) {
       $("epCmp").hidden = true;
       $("epStatus").textContent = j.setup ? (j.can_settings ? "The Simphony Configuration API account is not set yet: fill in the connection below." : "The Simphony Configuration API account is not set yet: someone with the Settings permission enters it here.") : "Could not read: " + (j.error || "");
@@ -6643,7 +6686,7 @@ async function loadEp(refresh){
     }
     epData = j; epRender();
     if (j.reading) epTimer = setTimeout(() => loadEp(false), 4000);
-  } catch (e) { $("epStatus").textContent = "Could not read: " + e.message; }
+  } catch (e) { readBanner("epStatus", {src: "Simphony (Configuration API)", error: e.message}); }
 }
 function epConn(c){
   $("epCc").value = c.cc_server || ""; $("epAuth").value = c.auth_server || ""; $("epAuth").placeholder = c.auth_default ? "as Settings → Simphony: " + c.auth_default : "https://…";
@@ -6681,7 +6724,8 @@ function epWho(u, el){
 }
 function epRender(){
   const d = epData, c = d.counts;
-  $("epStatus").innerHTML = esc(`${fmt(c.emc_users)} EMC users and ${fmt(c.employees - c.emc_users)} other employees · ${fmt(c.roles)} roles · read at ${(d.read_at || "").replace("T", " ").slice(0, 16)}`) + (d.reading ? ` · ${fcSp("reading again…")}` : "");
+  readBanner("epStatus", {src: "Simphony (Configuration API)", at: d.read_at, reading: d.reading,
+    lines: [fcSp(`${fmt(c.emc_users)} EMC users and ${fmt(c.employees - c.emc_users)} other employees · ${fmt(c.roles)} roles`)]});
   $("epCmp").hidden = false;
   const E = d.employees;
   if (!E.some(e => String(e.num) === epA)) epA = E[0] ? String(E[0].num) : "";
@@ -6753,12 +6797,12 @@ const biYday = () => { const y = new Date(); y.setDate(y.getDate() - 1); return 
 const BL_PILL = {ok: "low", late: "medium", late48: "critical", missing: "critical", pending: "", zero: ""};
 async function loadBilly(refresh){
   clearTimeout(biTimer);
-  $("biStatus").textContent = "Reading…";
+  readBanner("biStatus", {src: "Simphony and Billy", reading: true});
   try{
     const p = biRngP(new URLSearchParams({company: $("company").value || ""}));
     const j = await readJSON(await fetch("/api/billyrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
     $("biSetBtn").style.display = j.can_settings ? "" : "none";
-    if (j.pending) { $("biStatus").innerHTML = `${fcSp("Reading Simphony and Billy…")} ${biRng ? esc(`${biRng.from} → ${biRng.to}`) + " · " : ""}${esc(j.stage || "")}`; biTimer = setTimeout(() => loadBilly(false), 4000); return; }
+    if (j.pending) { readBanner("biStatus", {src: "Simphony and Billy", reading: true, stage: `${biRng ? `${biRng.from} → ${biRng.to} · ` : ""}${j.stage || ""}`}); biTimer = setTimeout(() => loadBilly(false), 4000); return; }
     if (j.available === false || j.error) throw Object.assign(new Error(j.error || "not available"), {companies: j.companies || []});
     // the last read is shown at once; a new one may be running behind it
     const same = biData && biData.gen === j.gen && biData.checked_at === j.checked_at && biData.company === j.company;
@@ -6954,31 +6998,16 @@ $("biRetExp").onclick = () => {
   Object.entries(biRetParams()).forEach(([k, v]) => { if (v) p.set(k, v); });
   exportGo("/api/billyrec/xlsx?" + p.toString());
 };
-// the state of the figures in words: final (read in full, at what time and date), still reading, or read with warnings
-function biWhen(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(iso || ""); return m ? {time: `${m[4]}:${m[5]}`, date: `${m[3]}/${m[2]}/${m[1]}`} : null; }
-function biDay(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || ""); }
 function biStatusLine(){
-  const d = biData, w = biWhen(d.checked_at), days = d.days || [];
-  const warns = [];
-  if ((d.empty_days || []).length) warns.push(fcSp(`Billy gave no invoice for ${d.empty_days.length} of the days`));
-  if (!d.simphony) warns.push(fcSp("Simphony is not connected: only Billy is read"));
-  if (d.orders_note) warns.push(fcSp(d.orders_note));
-  if ((d.errors || []).length) warns.push(esc(d.errors.slice(0, 3).join(" · ")));
-  if (d.read_error) warns.push(esc("Last read failed: " + d.read_error));
-  const state = d.reading ? "run" : (warns.length || !d.complete) ? "warn" : "ok";
-  const icon = state === "ok" ? "✓" : state === "run" ? "↻" : "!";
-  const head = d.reading
-    ? `<b>${fcSp("Reading the new figures…")}</b> <span>${esc(d.stage || "")}</span> · <span>${fcSp("shown: the last read")}</span>${w ? ` <span>${fcSp(`of ${w.time}, ${w.date}`)}</span>` : ""}`
-    : state === "ok"
-      ? `<b>${fcSp("Final figures")}</b> · <span>${fcSp(`read in full at ${w ? w.time : "–"} on ${w ? w.date : "–"}`)}</span>`
-      : `<b>${fcSp("Figures read with warnings")}</b> · <span>${fcSp(`read at ${w ? w.time : "–"} on ${w ? w.date : "–"}`)}</span>`;
-  const reg = d.range && d.range.custom ? fcSp("Chosen range: not put in the exceptions register")
-    : d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`) : "";
-  $("biStatus").innerHTML = `<div class="readst ${state}"><span class="ic" aria-hidden="true">${icon}</span><div>
-      <div class="h">${head}</div>
-      <div class="s"><span data-no-i18n>${esc(d.company)} · NUIS ${esc(d.nuis || "–")}</span> · <span>${fcSp(`Days ${biDay(days[0])} – ${biDay(days[days.length - 1])}`)}</span>${days.length ? ` <span>${fcSp(`(${days.length} days, Simphony and Billy)`)}</span>` : ""}${reg ? ` · <span>${reg}</span>` : ""}</div>
-      ${warns.length ? `<div class="s wn">${warns.join(" · ")}</div>` : ""}
-    </div></div>`;
+  const d = biData, days = d.days || [];
+  readBanner("biStatus", {src: "Simphony and Billy", at: d.checked_at, reading: d.reading, stage: d.stage, incomplete: !d.complete,
+    warns: [(d.empty_days || []).length ? fcSp(`Billy gave no invoice for ${d.empty_days.length} of the days`) : "",
+            d.simphony ? "" : fcSp("Simphony is not connected: only Billy is read"), d.orders_note ? fcSp(d.orders_note) : "",
+            (d.errors || []).length ? esc(d.errors.slice(0, 3).join(" · ")) : "", d.read_error ? esc("Last read failed: " + d.read_error) : ""],
+    lines: [`<span data-no-i18n>${esc(d.company)} · NUIS ${esc(d.nuis || "–")}</span>`,
+            fcSp(`Days ${rdDay(days[0])} – ${rdDay(days[days.length - 1])}`) + (days.length ? " " + fcSp(`(${days.length} days, Simphony and Billy)`) : ""),
+            d.range && d.range.custom ? fcSp("Chosen range: not put in the exceptions register")
+              : d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`) : ""]});
 }
 
 function biChecks(more){
@@ -7151,18 +7180,18 @@ function sxQuery(refresh){
 }
 async function loadSalesrec(refresh){
   clearTimeout(sxTimer);
-  $("sxStatus").textContent = refresh ? "Reading Simphony and Business Central again…" : "Reading…";
+  readBanner("sxStatus", {src: "Simphony and Business Central", reading: true});
   if (refresh) $("sxRead2").innerHTML = `<span class="sx-busy">${fcSp("Reading again: Business Central anew, and Simphony's last seven days…")}</span>`;
   try{
     const j = await readJSON(await fetch("/api/salesrec?" + sxQuery(refresh)));
     if (j.error && j.available !== false) throw new Error(j.error);
-    if (j.pending) { $("sxStatus").textContent = `${j.note || "Reading…"} ${j.stage || ""}`; sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
+    if (j.pending) { readBanner("sxStatus", {src: "Simphony and Business Central", reading: true, stage: `${j.note || ""} ${j.stage || ""}`.trim()}); sxTimer = setTimeout(() => loadSalesrec(false), 4000); return; }
     if (j.available === false) throw new Error(j.error || "not available");
     sxData = j; renderSalesrec(); setHeader();
     if (j.reading) sxTimer = setTimeout(() => loadSalesrec(false), 5000);
   }catch(e){
     if (/HTTP 50[234]|restarting/i.test(e.message)) { $("sxStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; sxTimer = setTimeout(() => loadSalesrec(false), 15000); return; }
-    $("sxStatus").textContent = "Could not read: " + e.message; }
+    readBanner("sxStatus", {src: "Simphony and Business Central", error: e.message}); }
 }
 const sxWhen = t => t ? new Date(t).toLocaleString("en-GB", {day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "–";
 function sxSum(L, f){ return sxData.days.reduce((a, x) => a + (((L.cells[x] || {})[f]) || 0), 0); }
@@ -7190,8 +7219,11 @@ function renderSalesrec(){
     + (lat.length ? `<span>${fcSp("Simphony closed through")} <b>${esc(lat[0])}${lat[0] !== lat[lat.length - 1] ? " – " + esc(lat[lat.length - 1]) : ""}</b></span>` : "")
     + (d.reading ? `<span class="sx-busy">${fcSp("reading again")}: ${esc(d.stage || "…")}</span>` : "");
   $("sxNote").textContent = `${d.company} · ${d.locations.length} restaurants` + (d.simphony ? "" : " · Simphony is not connected: only the import and the posting are checked");
-  $("sxStatus").textContent = (d.register ? `Register: ${d.register.opened} opened, ${d.register.closed} closed` : d.custom ? "A range chosen here does not change the exceptions register." : d.complete ? "" : "Not put in the register: the read was incomplete.")
-    + ((d.errors || []).length ? " · " + d.errors.slice(0, 3).join(" · ") : "");
+  readBanner("sxStatus", {src: "Simphony and Business Central", at: d.checked_at, reading: d.reading, stage: d.stage, incomplete: !d.complete && !d.custom,
+    warns: [d.read_error ? esc("Last read failed: " + d.read_error) : "", (d.errors || []).length ? esc(d.errors.slice(0, 3).join(" · ")) : ""],
+    lines: [`<span data-no-i18n>${esc(d.company || "")}</span> · ` + fcSp(`Days ${rdDay(d.from)} – ${rdDay(d.to)}`),
+            d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`)
+              : d.custom ? fcSp("Chosen range: not put in the exceptions register") : d.complete ? "" : fcSp("Not put in the exceptions register: the read was incomplete")]});
   if (!sxRng) { if (document.activeElement !== $("sxFrom")) $("sxFrom").value = d.from; if (document.activeElement !== $("sxTo")) $("sxTo").value = d.to; }
   $("sxLast").hidden = !sxRng;
   sxSplitTable();
@@ -7372,7 +7404,7 @@ function sxFromTop(){
   if (!$("v-salesrec").classList.contains("on")) return;
   const r = sxFromTop(); if (!r) return;
   sxRng = {from: r.from, to: r.to}; $("sxFrom").value = r.from; $("sxTo").value = r.to; loadSalesrec(false);
-  if (r.note) setTimeout(() => { $("sxStatus").textContent = r.note + " " + $("sxStatus").textContent; }, 0);
+  if (r.note) setTimeout(() => { $("sxStatus").insertAdjacentHTML("afterbegin", `<span class="meta" style="display:block">${esc(r.note)}</span>`); }, 0);
 }));
 $("dimension").addEventListener("change", () => { if ($("v-salesrec").classList.contains("on")) loadSalesrec(false); });
 $("sxExp").onclick = () => {
@@ -7633,14 +7665,14 @@ const SV_LINK_PILL = {linked: "low", shared: "medium", not_found: "critical", no
 const SV_CAT_PILL = {seated: "low", no_show: "critical", cancel: "", no_entry: "", open: "medium", pending: ""};
 async function svLoad(refresh){
   clearTimeout(svTimer);
-  $("svStatus").textContent = "Reading…";
+  readBanner("svStatus", {src: "SevenRooms and Simphony", reading: true});
   try{
     const p = new URLSearchParams({company: $("company").value || ""});
     if (svRng) { p.set("from", svRng.from); p.set("to", svRng.to); }
     if (refresh) p.set("refresh", "1");
     const j = await readJSON(await fetch("/api/sevenrooms?" + p.toString()));
     $("svSetBtn").style.display = j.can_settings ? "" : "none";
-    if (j.pending) { $("svStatus").innerHTML = `${fcSp("Reading SevenRooms and Simphony…")} ${esc(j.stage || "")}`; svTimer = setTimeout(() => svLoad(false), 4000); return; }
+    if (j.pending) { readBanner("svStatus", {src: "SevenRooms and Simphony", reading: true, stage: j.stage || ""}); svTimer = setTimeout(() => svLoad(false), 4000); return; }
     if (j.not_connected) { svData = null; svEmpty(j); return; }
     if (j.available === false || !j.kpis) throw new Error(j.error || "not available");
     const same = svData && svData.checked_at === j.checked_at && svData.range.from === j.range.from && svData.range.to === j.range.to && svData.company === j.company;
@@ -7649,7 +7681,7 @@ async function svLoad(refresh){
     if (currentView().id === "sales") setHeader();
   }catch(e){
     if (/HTTP 50[234]|restarting/i.test(e.message)) { $("svStatus").textContent = "The tower is restarting; trying again in 15 seconds…"; svTimer = setTimeout(() => svLoad(false), 15000); return; }
-    $("svStatus").textContent = "Could not read: " + e.message;
+    readBanner("svStatus", {src: "SevenRooms and Simphony", error: e.message});
   }
 }
 function svEmpty(j){
@@ -7735,12 +7767,11 @@ const SV_CASES = [["no_check", "Seated, no check", "Link the check to the reserv
   ["shared", "One check on two reservations", "Two parties on one table, or a wrong link: keep the check on one."],
   ["open", "A closed day left booked", "Close the reservation in SevenRooms: seated, no-show or cancelled."]];
 function svStatusLine(){
-  const d = svData;
-  $("svStatus").innerHTML = (d.reading ? `<b>${fcSp("Reading the new figures…")}</b> ${esc(d.stage || "")} · ${fcSp("shown: the last read")} · ` : "") + (d.read_error ? `<span class="warn">${esc("Last read failed: " + d.read_error)}</span> · ` : "")
-    + esc(`${d.company} · ${d.range.from} to ${d.range.to} · checked ${(d.checked_at || "").replace("T", " ")}`)
-    + (d.simphony ? "" : ` · <span class="warn">${fcSp("Simphony is not connected: only SevenRooms is read")}</span>`)
-    + (d.venues.some(v => !v.ref) ? ` · <span class="warn">${fcSp(`${d.venues.filter(v => !v.ref).length} SevenRooms venues not placed at a restaurant`)}</span>` : "")
-    + ((d.errors || []).length ? ` · <span class="warn">${esc(d.errors.slice(0, 3).join(" · "))}</span>` : "");
+  const d = svData, un = d.venues.filter(v => !v.ref).length;
+  readBanner("svStatus", {src: "SevenRooms and Simphony", at: d.checked_at, reading: d.reading, stage: d.stage, incomplete: d.complete === false,
+    warns: [d.read_error ? esc("Last read failed: " + d.read_error) : "", d.simphony ? "" : fcSp("Simphony is not connected: only SevenRooms is read"),
+            un ? fcSp(`${un} SevenRooms venues not placed at a restaurant`) : "", (d.errors || []).length ? esc(d.errors.slice(0, 3).join(" · ")) : ""],
+    lines: [`<span data-no-i18n>${esc(d.company)}</span>`, fcSp(`Days ${rdDay(d.range.from)} – ${rdDay(d.range.to)}`)]});
 }
 function svLocs(){
   const d = svData;
