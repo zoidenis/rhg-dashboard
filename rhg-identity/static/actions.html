@@ -44,6 +44,11 @@ mark.hl{background:var(--rhg-amberbg,#fdf1dc);color:inherit;border-radius:3px;pa
 @media(max-width:760px){.ac-find{max-width:none;flex-basis:100%}.ac-find kbd{display:none}}
 .kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:14px}
 .kp .card.kpi{cursor:default}.kp .card.kpi.clickable{cursor:pointer}
+.kp .card.kpi.clickable:hover,.kp .card.kpi.clickable:focus-visible{border-color:var(--rhg-primary);outline:none}
+tr.go{cursor:pointer}tr.go:hover td,tr.go:focus-visible td{background:var(--bg)}tr.go:focus-visible{outline:2px solid var(--rhg-primary);outline-offset:-2px}
+tr.go .arr{color:var(--rhg-primary);opacity:0;transition:opacity .12s}tr.go:hover .arr,tr.go:focus-visible .arr{opacity:1}
+#uDuties,#uRuns{min-width:0}
+.ac-find button[hidden],.ac-find kbd[hidden]{display:none}
 .grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
 .grid2>*,main .card,section{min-width:0}
 .grid2 .it{grid-template-columns:86px minmax(0,1fr)}.grid2 .it .o,.grid2 .it .d{grid-column:2;text-align:left}
@@ -228,7 +233,8 @@ async function post(u, body){ const r = await fetch(u, {method: "POST", credenti
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
 const SEV = {critical: "Critical", high: "High", medium: "Medium", low: "Low"};
 const DEP_COLOR = {Finance: "var(--ch-0, #0c475e)", Purchasing: "var(--ch-1, #b26a00)", Warehouse: "var(--ch-2, #6b4fbb)", Sales: "var(--ch-5, #a0522d)", Operations: "var(--ch-3, #12805c)", Executive: "var(--ch-4, #c0392b)"};
-function kpi(l, v, s, cls, open){ return `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-open="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s || ""}</div></div>`; }
+// open: "tab:status:department" here (src: a source of the list, e.g. unicorn:proposal); a path ("/unicorn#…") goes there
+function kpi(l, v, s, cls, open, src){ const go = open && open.startsWith("/"); return `<div class="card kpi${open ? " clickable" : ""}"${open ? ` ${go ? "data-go" : "data-open"}="${esc(open)}"${src ? ` data-src="${esc(src)}"` : ""} role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s || ""}</div></div>`; }
 function ownerText(x){
   if (x.status === "Awaiting approval") return `<span class="meta">approver</span> ${esc(x.role_label)}`;
   if (x.owner_accounts.length) return x.owner_accounts.map(a => `<b>${esc(a.name)}</b>`).join(", ") + (x.owners_without_account.length ? ` <span class="noacc">+${x.owners_without_account.length} without account</span>` : "");
@@ -372,13 +378,16 @@ function paintExecutive(){
     + (D.runs.length ? `<tr><td colspan="4" class="meta">Latest control runs: ${D.runs.slice(0, 6).map(r => `${esc(r.tower)} · ${esc(r.source)} ${esc(r.company)} ${esc(String(r.at).slice(5, 16).replace("T", " "))}`).join(" · ")}</td></tr>` : "");
 }
 document.addEventListener("click", e => {
-  const o = e.target.closest("[data-open]"); if (o) { const [t, st, dp] = o.dataset.open.split(":"); if (st) $("fStatus").value = st; dept = dp || ""; show(t); return; }
+  const g = e.target.closest("[data-go]"); if (g) { location.href = g.dataset.go; return; }
+  const o = e.target.closest("[data-open]"); if (o) { const [t, st, dp] = o.dataset.open.split(":"); if (st) $("fStatus").value = st; dept = dp || "";
+    $("fSrc").value = o.dataset.src || ""; show(t); scrollTo({top: 0}); return; }
   const r = e.target.closest("[data-dep]"); if (r) { dept = r.dataset.dep; $("fStatus").value = "active"; show("departments"); return; }
   const a = e.target.closest("[data-assign]"); if (a) { e.stopPropagation(); openAssign([a.dataset.assign]); return; }
   const it = e.target.closest("[data-u]"); if (it) openItem(it.dataset.u);
 });
 document.addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("[data-u]")) { e.preventDefault(); openItem(e.target.dataset.u); }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("[data-open],[data-go]")) { e.preventDefault(); e.target.click(); }
 });
 function filtered(xs){
   const st = $("fStatus").value, sv = $("fSev").value, src = $("fSrc").value, co = $("fCo").value, q = $("fQ").value.trim().toLowerCase();
@@ -531,10 +540,15 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
 async function loadUnicorn(){
   let j; try { j = await get("/api/actions/unicorn"); } catch (e) { $("uKpis").innerHTML = `<p class="msg">${esc(e.message)}</p>`; return; }
   const s = j.state, c = j.counts, lr = s.last_run || {};
-  $("uKpis").innerHTML = kpi("Morning brief", lr.state === "done" ? "Done" : lr.state ? lr.state : "–", `${esc(lr.day || "")} · every day at ${esc(s.time)}`, lr.state === "failed" ? "up" : "")
-    + kpi("New findings", fmtN(j.new_findings.length), "waiting for investigation") + kpi("Proposals waiting", fmtN(c.decisions_proposed), "for a person", c.decisions_proposed ? "warn" : "")
-    + kpi("Actions followed", fmtN(c.actions_open), `${fmtN(c.actions_overdue)} past the deadline`, c.actions_overdue ? "up" : "");
-  const duty = (n, what, st) => `<tr><td class="name"><b>${esc(n)}</b><div class="meta">${esc(what)}</div></td><td>${st}</td></tr>`;
+  $("uKpis").innerHTML = kpi("Morning brief", lr.state === "done" ? "Done" : lr.state ? lr.state : "–", `${esc(lr.day || "")} · every day at ${esc(s.time)}`, lr.state === "failed" ? "up" : "", lr.day ? "/unicorn#brief/" + lr.day : "/unicorn")
+    + kpi("New findings", fmtN(j.new_findings.length), "waiting for investigation", "", "/unicorn#findings/New")
+    + kpi("Proposals waiting", fmtN(c.decisions_proposed), "for a person: approve them here", c.decisions_proposed ? "warn" : "", "departments:active", "unicorn:proposal")
+    + kpi("Actions followed", fmtN(c.actions_open), `${fmtN(c.actions_overdue)} past the deadline`, c.actions_overdue ? "up" : "", c.actions_overdue ? "departments:overdue" : "departments:active", "unicorn:action");
+  // every duty opens where its work is: Unicorn's own screens, or the list here cut to Unicorn's items
+  const DUTY_GO = {"Morning brief": [lr.day ? "/unicorn#brief/" + lr.day : "/unicorn"], "Detection": ["/unicorn#findings"], "Investigation": ["/unicorn#findings/New"],
+    "Proposals": ["departments:active", "unicorn:proposal"], "Follow-up": ["departments:active", "unicorn:action"], "Rules": ["/unicorn#rules"]};
+  const duty = (n, what, st) => { const [to, src] = DUTY_GO[n] || [];
+    return `<tr class="go" ${to.startsWith("/") ? `data-go="${esc(to)}"` : `data-open="${esc(to)}" data-src="${esc(src)}"`} tabindex="0" title="Open"><td class="name"><b>${esc(n)}</b> <span class="arr">→</span><div class="meta">${esc(what)}</div></td><td>${st}</td></tr>`; };
   $("uDuties").innerHTML = `<tr><th>Duty</th><th>Status</th></tr>`
     + duty("Morning brief", `Every day at ${s.time}: the figures of yesterday from Finance and Purchasing, written for management`, s.running ? `<span class="st Inprogress">${esc(s.running.stage)}</span>` : lr.state ? `<span class="st ${lr.state === "done" ? "Closed" : "Open"}">${esc(lr.state)}</span> ${esc(lr.day || "")}` : "–")
     + duty("Detection", "11 rules over the morning's figures; every breach becomes a finding", `${fmtN(c.findings_open)} open findings`)
@@ -542,7 +556,7 @@ async function loadUnicorn(){
     + duty("Proposals", "Decisions with their impact, waiting for a person to approve or refuse", `${fmtN(c.decisions_proposed)} waiting`)
     + duty("Follow-up", "Measures the KPI of every approved action each morning against its baseline", `${fmtN(j.measured.length)} measured`)
     + duty("Rules", "Proposes new versions of rules people keep overruling; a person approves", `${fmtN(c.rules_proposed_by_unicorn)} waiting`);
-  $("uRuns").innerHTML = `<tr><th>Day</th><th>State</th><th class="num">Tries</th><th>Note</th></tr>` + (j.runs.map(r => `<tr><td>${esc(r.day)}</td><td><span class="st ${r.state === "done" ? "Closed" : "Open"}">${esc(r.state)}</span></td><td class="num">${esc(r.tries)}</td><td class="meta">${esc((r.error || "").slice(0, 120))}</td></tr>`).join("") || `<tr><td colspan="4" class="meta">No run yet.</td></tr>`);
+  $("uRuns").innerHTML = `<tr><th>Day</th><th>State</th><th class="num">Tries</th><th>Note</th></tr>` + (j.runs.map(r => `<tr class="go" data-go="/unicorn#brief/${esc(r.day)}" tabindex="0" title="Open the brief of this day"><td>${esc(r.day)} <span class="arr">→</span></td><td><span class="st ${r.state === "done" ? "Closed" : "Open"}">${esc(r.state)}</span></td><td class="num">${esc(r.tries)}</td><td class="meta">${esc((r.error || "").slice(0, 120))}</td></tr>`).join("") || `<tr><td colspan="4" class="meta">No run yet.</td></tr>`);
 }
 async function loadMatrix(){
   try { M = await get("/api/actions/matrix"); U = M; } catch (e) { $("mxMsg").textContent = e.message; return; }

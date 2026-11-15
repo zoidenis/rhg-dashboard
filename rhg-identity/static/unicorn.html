@@ -311,7 +311,7 @@ function dayName(iso){ const d = new Date(iso + "T12:00:00"); return isNaN(d) ? 
 function bubble(m){
   if (m.author === "user") return `<div class="msg me" data-id="${m.id}"><div class="bubble"><div class="who"><b>${esc(me.name || me.username)}</b><span>${esc(when(m.at))}</span></div>${esc(m.text).replace(/\n/g, "<br>")}</div></div>`;
   const brief = m.kind === "brief";
-  return `<div class="msg ${brief ? "is-brief" : m.kind === "note" ? "note" : ""}" data-id="${m.id}">${AV}<div class="bubble">
+  return `<div class="msg ${brief ? "is-brief" : m.kind === "note" ? "note" : ""}" data-id="${m.id}"${brief ? ` data-day="${esc(m.day)}"` : ""}>${AV}<div class="bubble">
     <div class="who"><b>Unicorn</b>${brief ? `<span class="btag">Morning brief · ${esc(dayName(m.day))}</span>` : ""}<span>${esc(when(m.at))}</span></div>${md(m.text)}</div></div>`;
 }
 function emptyState(){
@@ -723,8 +723,18 @@ $("logoutBtn").onclick = async () => {
   }
   try { await load(); } catch (e) { $("pill").className = "pill err"; $("pillText").textContent = e.message; }
   $("uTabs").hidden = false;
-  const h = location.hash.slice(1);
-  if (["findings", "decisions", "rules"].includes(h)) uShow(h); else { $("q").focus(); loadRegisters(); }
+  // links from the Executive Action Center: #findings/New (a status), #findings/F12 (one finding), #brief/2026-11-14 (that day's brief)
+  const [h, arg] = decodeURIComponent(location.hash.slice(1)).split("/");
+  if (h === "findings" && arg && /^(New|Proposed|Closed|Dismissed|open|all)$/.test(arg)) $("fStatus").value = arg;
+  if (["findings", "decisions", "rules"].includes(h)) {
+    uShow(h);
+    if (h === "findings" && /^F\d+$/.test(arg || "")) { await loadRegisters(); openFinding(+arg.slice(1)); }
+  } else {
+    loadRegisters();
+    const b = h === "brief" && arg ? document.querySelector(`.msg.is-brief[data-day="${arg}"]`) : null;
+    if (b) { b.scrollIntoView({block: "start"}); scrollBy(0, -140); b.querySelector(".bubble").style.boxShadow = "0 0 0 3px var(--rhg-primary)"; }
+    else $("q").focus();
+  }
 })();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>

@@ -395,6 +395,7 @@ def collect(scope=None):
                  "link": d.get("link") or "", "manual": r.get("source") == "manual"}
             items.append(_finish(x, today, s, U))
     # Unicorn: the actions of approved decisions, the proposals waiting for a person
+    sources.update({"unicorn:action": "Unicorn · approved decision", "unicorn:proposal": "Unicorn · proposal waiting for approval"})
     try:
         F = {f["id"]: f for f in ureg.findings(None, limit=2000)}
         D = {d["id"]: d for d in ureg.decisions(limit=1000)}
