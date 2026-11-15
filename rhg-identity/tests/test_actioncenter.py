@@ -168,6 +168,38 @@ class Assign(Base):
         self.assertEqual(self.sent, [])
 
 
+class ExportItem(Base):
+    def test_the_card_and_history_as_a_workbook(self):
+        x = next(i for i in ac.collect()["items"] if i["uid"] == "finance:n1")
+        t = ac.item_table(x, {"username": "geri", "name": "Geri"})
+        rows = dict(t["sheets"][0]["rows"])
+        self.assertEqual((rows["Item"], rows["Company"], rows["Severity"], rows["Value"]), ("Pule below zero", "SALT", "Critical", "5,000"))
+        self.assertEqual(t["sheets"][1]["header"], ["When", "By", "Status", "Note"])
+        self.assertIn("Exported by Geri", t["notes"][1])
+
+    def test_sent_through_purchasing_with_the_file(self):
+        sent = {}
+
+        class R:
+            ok, status_code, content = True, 200, b"{}"
+
+            def json(self):
+                return {"sent": {"to": ["boss@rhg.al"], "cc": ["geri@rhg.al"], "file": "x.pdf"}}
+        import requests
+        old = requests.post
+        requests.post = lambda url, timeout=None, json=None, headers=None: (sent.update(url=url, body=json), R())[1]
+        try:
+            out = ac.send_item("finance:n1", ["boss@rhg.al"], "pdf", "Shiko", True, {"username": "geri", "name": "Geri", "email": "geri@rhg.al", "scope": None})
+        finally:
+            requests.post = old
+        self.assertTrue(sent["url"].endswith("/internal/export/email"))
+        self.assertEqual((sent["body"]["to"], sent["body"]["cc"], sent["body"]["format"]), ("boss@rhg.al", "geri@rhg.al", "pdf"))
+        self.assertIn("Shiko", sent["body"]["html"])
+        self.assertEqual(out["file"], "x.pdf")
+        with self.assertRaises(ValueError):
+            ac.send_item("finance:none", "a@b.al", "pdf", "", False, {"username": "geri", "scope": None})
+
+
 class Settings(Base):
     def test_sla_validation_and_policy(self):
         with self.assertRaises(ValueError):

@@ -336,14 +336,61 @@ async function openItem(uid){
     <p style="margin:4px 0 0">Deadline <b>${esc(x.due || "–")}</b>${x.sla_due && x.sla_due !== x.due ? ` <span class="meta">(SLA ${esc(x.sla_due)})</span>` : ""}${x.overdue ? ` · <b style="color:var(--rhg-red)">${x.days_overdue} days late</b>${x.escalation ? ` · escalated L${x.escalation}` : ""}` : ""}</p>
     ${x.kpi ? `<h4>KPI followed by Unicorn</h4><p style="margin:0">${esc(x.kpi.metric)}: baseline ${esc(x.kpi.baseline ?? "–")} → latest ${esc(x.kpi.latest ?? "–")} (effect ${esc(x.kpi.effect ?? "–")}) · target ${esc(x.kpi.target ?? "–")}</p>` : ""}
     ${x.history.length ? `<h4>History</h4><ul style="margin:0;padding-left:18px">${x.history.slice().reverse().map(h => `<li><span class="meta">${esc(String(h.ts || h.at || "").slice(0, 16).replace("T", " "))} · ${esc(h.by || "")}</span> ${esc(h.to ? h.to + (h.note ? ": " : "") : "")}${esc(h.note || h.text || "")}</li>`).join("")}</ul>` : ""}
-    ${x.status === "Awaiting approval" ? `<h4>Approval</h4><p style="margin:0"><a href="/unicorn#decisions">Approve or refuse it in Unicorn → Vendimet & veprimet</a></p>`
+    ${x.status === "Awaiting approval" ? (D.can_tower.unicorn && accs.length ? `<h4>Approval</h4>
+        <p class="hint" style="margin:0 0 6px">Approving gives it an owner and a deadline: it becomes an action here, followed by Unicorn every morning. Refusing needs a reason, which Unicorn reads before it proposes anything similar.</p>
+        <div class="row"><label>Owner<select id="pOw"><option value="">Choose the owner…</option>${accs.filter(a => covers(a.scope, x.company, x.location)).map(a => `<option value="${esc(a.name)} &lt;${esc(a.email)}&gt;" data-no-i18n>${esc(a.name)} · ${esc(a.role || "")}</option>`).join("")}</select></label>
+          <label>Deadline<input id="pDu" type="date" value="${esc(x.due || "")}"></label><label>Target<input id="pTg" inputmode="decimal" style="width:110px"></label></div>
+        <div class="row"><label style="flex:1;min-width:220px">Note or reason<input id="pNt" placeholder="Needed to refuse"></label></div>
+        <div class="row"><button class="btn dark" type="button" id="pOk">Approve</button><button class="btn" type="button" id="pNo">Refuse</button><a class="btn" href="/unicorn#decisions">Open in Unicorn</a><span class="msg" id="pMsg"></span></div>`
+      : `<h4>Approval</h4><p style="margin:0"><a href="/unicorn#decisions">Approve or refuse it in Unicorn → Vendimet & veprimet</a></p>`)
       : mayEdit ? `<h4>Update</h4><div class="row">
         <label>Status<select id="iSt"><option value="">unchanged</option>${statusesOf(x).filter(s => s !== x.status).map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>
         <label style="flex:1;min-width:220px">Comment<input id="iCm" placeholder="What was done, or why it is dismissed"></label></div>
         ${mayManage ? `<div class="row"><label>${x.owners.length ? "Hand over to" : "Assign to"}<select id="iOw"><option value="">unchanged</option>${accs.filter(a => covers(a.scope, x.company, x.location)).map(a => `<option value="${esc(a.email)}" data-no-i18n>${esc(a.name)} · ${esc(a.role || "")}</option>`).join("")}</select></label><label>Deadline<input id="iDu" type="date" value="${esc(x.due || "")}"></label></div>` : ""}
         <div class="row"><button class="btn dark" type="button" id="iSave">Save</button>${x.link ? `<a class="btn" href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}<span class="msg" id="iMsg"></span></div>`
-      : `<p class="meta">Only its owner or a manager updates it.${x.link ? ` <a href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}</p>`}`;
+      : `<p class="meta">Only its owner or a manager updates it.${x.link ? ` <a href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}</p>`}
+    <h4>Export or send</h4>
+    <div class="row"><button class="btn" type="button" id="xX">Excel</button><button class="btn" type="button" id="xP">PDF</button><button class="btn" type="button" id="xM">Send by email…</button><span class="msg" id="xMsg"></span></div>
+    <div id="xBox" hidden style="margin-top:8px">
+      <div class="row"><label style="flex:1;min-width:240px">To<input id="xTo" list="xAcc" placeholder="name@rhg.al, another@rhg.al"></label>
+        <label>File<select id="xF"><option value="pdf">PDF</option><option value="xlsx">Excel</option></select></label></div>
+      <datalist id="xAcc">${accs.map(a => `<option value="${esc(a.email)}">${esc(a.name)}</option>`).join("")}</datalist>
+      <div class="row"><label style="flex:1;min-width:240px">Note<input id="xNt" placeholder="What you expect, by when"></label></div>
+      <label class="meta" style="display:flex;flex-direction:row;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="xMe" checked> <span>Send me a copy</span></label>
+      <div class="row"><button class="btn dark" type="button" id="xGo">Send</button></div>
+    </div>`;
   modal(x.title, `${x.company}${x.location ? " · " + x.location : ""} · ${x.tower}`, body);
+  if ($("pOk")) {
+    $("pOk").onclick = async () => {
+      if (!$("pOw").value) { $("pMsg").textContent = "Choose the owner."; return; }
+      try { await post("/api/unicorn/decision", {id: x.ref, action: "approve", owner: $("pOw").value, due: $("pDu").value, target: $("pTg").value, note: $("pNt").value});
+        $("pMsg").textContent = "Approved: it is an action now."; setTimeout(() => { closeModal(); load(); }, 700); }
+      catch (e) { $("pMsg").textContent = e.message; }
+    };
+    $("pNo").onclick = async () => {
+      try { await post("/api/unicorn/decision", {id: x.ref, action: "refuse", reason: $("pNt").value}); $("pMsg").textContent = "Refused."; setTimeout(() => { closeModal(); load(); }, 700); }
+      catch (e) { $("pMsg").textContent = e.message; }
+    };
+  }
+  const download = async fmt => {
+    $("xMsg").textContent = "Preparing the file…";
+    try {
+      const r = await fetch("/api/actions/export", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: JSON.stringify({uid, format: fmt})});
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || ("HTTP " + r.status)); }
+      const m = /filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") || ""), blob = await r.blob();
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = m ? m[1] : "action." + fmt; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); $("xMsg").textContent = "";
+    } catch (e) { $("xMsg").textContent = e.message; }
+  };
+  $("xX").onclick = () => download("xlsx"); $("xP").onclick = () => download("pdf");
+  $("xM").onclick = () => { $("xBox").hidden = !$("xBox").hidden; if (!$("xBox").hidden) $("xTo").focus(); };
+  $("xGo").onclick = async () => {
+    $("xGo").disabled = true; $("xMsg").textContent = "Sending…";
+    try { const j = await post("/api/actions/send", {uid, to: $("xTo").value, format: $("xF").value, note: $("xNt").value, copy_me: $("xMe").checked});
+      $("xMsg").textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc && j.sent.cc.length ? " (copy to you)" : ""}.`; $("xBox").hidden = true; }
+    catch (e) { $("xMsg").textContent = e.message; }
+    $("xGo").disabled = false;
+  };
   if ($("iSave")) $("iSave").onclick = async () => {
     const patch = {uid, status: $("iSt").value, comment: $("iCm").value};
     if ($("iOw") && $("iOw").value) patch.owner = $("iOw").value;

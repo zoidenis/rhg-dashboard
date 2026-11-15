@@ -2340,6 +2340,45 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/internal/mail":
             self._internal_mail(body)
             return
+        if url.path in ("/internal/export/table", "/internal/export/email"):
+            # identity (the Executive Action Center) exporting one item: the workbook built here as every export is
+            # (xlsxtable.py, a PDF of it with xlsxpdf.py), handed back or sent by email with the file attached
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            t = body.get("table") or {}
+            actor = str(body.get("actor") or "Executive Action Center")[:120]
+            try:
+                fname, ctype = xlsxtable.filename(t.get("name")), xlsxpdf.XLSX
+                data = xlsxtable.render(t.get("sheets"), t.get("notes") or [])
+                if body.get("format") == "pdf":
+                    data = xlsxpdf.render(data, str(t.get("name") or "")[:150])
+                    fname, ctype = xlsxpdf.pdf_name(fname), "application/pdf"
+                if url.path.endswith("/table"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                to, _fmt = exportmail.check(body)
+                cc = [c for c in exportmail.emails(body.get("cc"))[0] if c not in to][:exportmail.MAX_TO]
+                if len(data) > exportmail.MAX_BYTES:
+                    raise ValueError("The file is too large to send by email; download it instead.")
+                notify.send_mail(to, cc, str(body.get("subject") or fname)[:200], str(body.get("html") or ""),
+                                 str(body.get("text") or ""), [(fname, "application", ctype.split("/", 1)[1], data)],
+                                 reply_to=str(body.get("reply_to") or "") or None)
+                store.audit("email", f"export · {fname}", actor, {}, {"to": to, "cc": cc, "format": body.get("format") or "xlsx",
+                                                                    "source": "Executive Action Center"}, "")
+                self._send(200, {"sent": {"to": to, "cc": cc, "file": fname}})
+            except ValueError as exc:
+                self._send(400, {"error": str(exc)})
+            except Exception as exc:                               # noqa: BLE001
+                traceback.print_exc()
+                self._send(502, {"error": f"Could not send: {str(exc)[:240]}"})
+            return
         if url.path == "/internal/unicorn/facts":       # Unicorn (identity) asking for its morning figures
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})

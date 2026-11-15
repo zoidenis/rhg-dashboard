@@ -528,6 +528,21 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"messages": unicorn.ask(user, body.get("text"))})
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
+            elif url.path in ("/api/actions/export", "/api/actions/send"):
+                # one item out of the Action Center: an Excel or a PDF to download, or sent by email with it attached
+                if not any(auth.can(user, f"platform.s.actions.{t}") for t in ("executive", "departments", "mine")):
+                    self._send(403, {"error": "Your role does not include the Executive Action Center."}); return
+                fmt = "pdf" if body.get("format") == "pdf" else "xlsx"
+                try:
+                    if url.path.endswith("/export"):
+                        fname, ctype, data = actioncenter.export_item(str(body.get("uid") or ""), fmt, user)
+                        self._send(200, data, ctype or "application/octet-stream",
+                                   [("Content-Disposition", f'attachment; filename="{fname}"')])
+                    else:
+                        self._send(200, {"sent": actioncenter.send_item(str(body.get("uid") or ""), body.get("to"), fmt,
+                                                                       body.get("note"), bool(body.get("copy_me")), user)})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path == "/api/actions/item":
                 if not any(auth.can(user, f"platform.s.actions.{t}") for t in ("executive", "departments", "mine")):
                     self._send(403, {"error": "Your role does not include the Executive Action Center."}); return

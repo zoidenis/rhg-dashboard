@@ -643,6 +643,105 @@ def notify_action(aid, user):
         return f"not sent: {str(exc)[:160]}"
 
 
+# ---------------------------------------------------------------- one item out: Excel, PDF or email
+def _cell(v):
+    """A value of the item's card as text (left-aligned like the others): numbers with thousands."""
+    if v is None:
+        return ""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return f"{v:,.0f}" if float(v).is_integer() or abs(v) >= 100 else f"{v:,.2f}"
+    return str(v)
+
+
+def item_table(x, user):
+    """One item as a workbook (Purchasing builds the file, as every export of pulse): its card and its history."""
+    sev = {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low"}.get(x["severity"], x["severity"])
+    owners = ", ".join(a["name"] for a in x.get("owner_accounts") or []) or ", ".join(x["owners"]) or "nobody yet"
+    rows = [["Item", x["title"]], ["What", x.get("detail") or ""], ["From", f"{x['tower']} · {x['source_label']}"],
+            ["Company", x["company"]], ["Restaurant / location", x.get("location") or ""], ["Department", x["department"]],
+            ["Severity", sev], ["Status", x["status"]], ["Owner", owners], ["Role", x.get("role_label") or ""],
+            ["Deadline", x.get("due") or ""], ["SLA deadline", x.get("sla_due") or ""],
+            ["Days late", x.get("days_overdue") or 0 if x.get("overdue") else 0], ["Escalation", f"L{x['escalation']}" if x.get("escalation") else ""],
+            ["Value", x.get("value") if x.get("value") is not None else ""], ["Found", x.get("first_seen") or ""],
+            ["Closed", str(x.get("closed_at") or "")[:16]], ["Latest note", x.get("note") or ""]]
+    k = x.get("kpi") or {}
+    if k.get("metric"):
+        rows += [["KPI", k["metric"]], ["Baseline", k.get("baseline")], ["Latest", k.get("latest")], ["Effect", k.get("effect")],
+                 ["Target", k.get("target")]]
+    hist = [[str(h.get("ts") or h.get("at") or "")[:16].replace("T", " "), h.get("by") or "", h.get("to") or "",
+             h.get("note") or h.get("text") or ""] for h in x.get("history") or []]
+    who = user.get("name") or user.get("username") or ""
+    return {"name": f"Action {x['company']} {x.get('location') or ''} {x['title']}"[:110].strip(),
+            "sheets": [{"title": "Item", "header": ["Field", "Value"], "rows": [[a, _cell(b)] for a, b in rows],
+                        "formats": ["text", "text"], "widths": [24, 90]},
+                       {"title": "History", "header": ["When", "By", "Status", "Note"], "rows": hist or [["", "", "", "No history yet"]],
+                        "formats": ["text", "text", "text", "text"], "widths": [18, 30, 18, 80]}],
+            "notes": [f"Executive Action Center · {x['title']}", f"Exported by {who} on {date.today().isoformat()}.",
+                      "Read from pulse's registers (Finance, Purchasing, Unicorn); nothing was changed in any system."]}
+
+
+def _visible(uid, user):
+    x = find(uid, user.get("scope"))
+    if not x:
+        raise ValueError("This item is not in the Action Center, or not in your access.")
+    return x
+
+
+def export_item(uid, fmt, user):
+    """(file name, content type, bytes) of one item as Excel or PDF."""
+    x = _visible(uid, user)
+    try:
+        r = requests.post(PURCHASING_URL + "/internal/export/table", timeout=60, headers={"X-Service-Token": config.SERVICE_TOKEN},
+                          json={"table": item_table(x, user), "format": "pdf" if fmt == "pdf" else "xlsx",
+                                "actor": user.get("username") or ""})
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Purchasing could not be reached to build the file: {exc}") from exc
+    if not r.ok:
+        raise ValueError((r.json() if r.content else {}).get("error") or f"Purchasing answered {r.status_code}.")
+    import re as _re
+    m = _re.search(r'filename="([^"]+)"', r.headers.get("Content-Disposition", ""))
+    store.audit("action center export", user["username"], uid, {"format": fmt})
+    return (m.group(1) if m else "action." + ("pdf" if fmt == "pdf" else "xlsx")), r.headers.get("Content-Type"), r.content
+
+
+def send_item(uid, to, fmt, note, copy_me, user):
+    """One item by email, the file attached (Excel or PDF), with a note of the sender: {to, cc, file}."""
+    x = _visible(uid, user)
+    me = (user.get("email") or "").strip().lower()
+    who = user.get("name") or user.get("username") or ""
+    e = html.escape
+    note = str(note or "").strip()[:2000]
+    navy, ink, muted = "#08303f", "#0e2733", "#5c7482"
+    rows = [("Company", x["company"] + (" · " + x["location"] if x.get("location") else "")), ("From", f"{x['tower']} · {x['source_label']}"),
+            ("Status", x["status"]), ("Owner", ", ".join(a["name"] for a in x.get("owner_accounts") or []) or ", ".join(x["owners"]) or "nobody yet"),
+            ("Deadline", (x.get("due") or "–") + (f" · {x['days_overdue']} days late" if x.get("overdue") else ""))]
+    body = f"""<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#ecebeb;font-family:Figtree,Segoe UI,Arial,sans-serif;color:{ink}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ecebeb"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px">
+<tr><td style="background:{navy};color:#fff;padding:16px 22px;border-radius:12px 12px 0 0"><div style="font-size:12px;opacity:.75">pulse · Executive Action Center</div>
+<div style="font-size:18px;font-weight:700;margin-top:4px">{e(x['title'])}</div></td></tr>
+<tr><td style="background:#fff;padding:18px 22px;border-radius:0 0 12px 12px">
+<p style="margin:0 0 10px;font-size:14px">{e(who)} sent you this item{(' from ' + e(me)) if me else ''}; the {('PDF' if fmt == 'pdf' else 'Excel file')} is attached.</p>
+{f"<div style='white-space:pre-wrap;background:#f6f8f9;border-left:3px solid #0c475e;padding:10px 14px;margin:0 0 14px;font-size:14px'>{e(note)}</div>" if note else ""}
+<p style="margin:0 0 10px;font-size:13px;color:{ink}">{e(x.get('detail') or '')}</p>
+<table role="presentation" cellspacing="0" cellpadding="0" style="font-size:13px">{''.join(f"<tr><td style='padding:3px 14px 3px 0;color:{muted}'>{e(a)}</td><td style='padding:3px 0'>{e(str(b))}</td></tr>" for a, b in rows)}</table>
+<p style="margin:16px 0 0;font-size:12px;color:{muted}">Open it in pulse: Executive Action Center. Nothing was changed in any system by this email.</p>
+</td></tr></table></td></tr></table></body></html>"""
+    text = f"{who} sent you this item: {x['title']}\n{x.get('detail') or ''}\n" + "\n".join(f"{a}: {b}" for a, b in rows) + (f"\n\n{note}" if note else "")
+    try:
+        r = requests.post(PURCHASING_URL + "/internal/export/email", timeout=90, headers={"X-Service-Token": config.SERVICE_TOKEN},
+                          json={"table": item_table(x, user), "format": "pdf" if fmt == "pdf" else "xlsx", "to": ", ".join(map(str, to)) if isinstance(to, list) else str(to or ""),
+                                "cc": me if copy_me and me else "", "subject": f"[pulse] {x['title']}"[:180],
+                                "html": body, "text": text, "reply_to": me, "actor": user.get("username") or ""})
+        j = r.json() if r.content else {}
+    except (requests.RequestException, ValueError) as exc:
+        raise RuntimeError(f"Purchasing could not be reached to send it: {exc}") from exc
+    if not r.ok:
+        raise ValueError(j.get("error") or f"Purchasing answered {r.status_code}.")
+    store.audit("action center email", user["username"], uid, j.get("sent") or {})
+    return j.get("sent") or {}
+
+
 def apply_sla(actor):
     out = {}
     for key, (name, base) in TOWERS.items():
