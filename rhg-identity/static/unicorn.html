@@ -529,7 +529,7 @@ $("logoutBtn").onclick = async () => {
   if (!s.user || s.user.must_change) { location.href = "/login"; return; }
   me = s.user; CSRF = s.user.csrf;
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
-  const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"],["finance.view","/finance/#sales","Sales"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => p.endsWith(".") ? (me.permissions || []).some(x => x.startsWith(p)) : can(p));
+  const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"],["finance.view","/finance/#sales","Sales"],["finance.s.people.","/finance/#people","People &amp; Productivity"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => p.endsWith(".") ? (me.permissions || []).some(x => x.startsWith(p)) : can(p));
   $("towers").insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
   if (!(me.permissions || []).some(x => x.startsWith("platform.s.actions."))) { const ac = document.querySelector('#towers a[href="/actions"]'); if (ac) ac.remove(); }
   if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;

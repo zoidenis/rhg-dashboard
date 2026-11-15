@@ -171,6 +171,8 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
       <span class="rhg-pill info">BC and Simphony</span><a class="btn dark" href="/executive">Open dashboard →</a></div>
     <div class="card" id="cInv"><h3>Inventory control</h3><p>Stock, movement and ledger reconciliation</p>
       <span class="rhg-pill info" id="cInvChip">–</span><a class="btn dark" href="/finance/#inventory">Open tower →</a></div>
+    <div class="card" id="cPpl"><h3>People &amp; Productivity</h3><p>Workforce, labour productivity, scheduling and personnel cost by restaurant</p>
+      <span class="rhg-pill info">Odoo HR · Simphony · BC</span><a class="btn dark" href="/finance/#people">Open tower →</a></div>
     <div class="card" id="cOps"><h3>Operations &amp; Food Safety</h3><p>Checklists, temperatures, sensors, waste and yield by restaurant</p>
       <span class="rhg-pill info">Crunchtime Ops Execution</span><a class="btn dark" href="/finance/#opsexec">Open tower →</a></div>
   </div>
@@ -218,7 +220,7 @@ function shell(){
   const t = $("towers");
   const links = [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],
                  ["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Sales"],
-                 ["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => holds(p));
+                 ["finance.s.people.","/finance/#people","People &amp; Productivity"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => holds(p));
   const ex = t.querySelector('a[href="/executive"]'); if (ex && !holds("platform.s.executive.")) ex.remove();
   const ac = t.querySelector('a[href="/actions"]'); if (ac && !holds("platform.s.actions.")) ac.remove();
   t.insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
@@ -235,6 +237,7 @@ function shell(){
   if (!can("finance.view")) $("cFin").classList.add("off");
   if (!can("finance.inventory.view")) $("cInv").classList.add("off");
   if (!holds("finance.s.opsexec.")) $("cOps").classList.add("off");
+  if (!holds("finance.s.people.")) $("cPpl").classList.add("off");
 }
 
 const RANK = {critical:0, warning:1, info:2};

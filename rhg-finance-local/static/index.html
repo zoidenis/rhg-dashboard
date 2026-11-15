@@ -43,6 +43,12 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 body.tw-ops #nav{display:none}
 body.tw-ops #oxNav{display:flex;flex-direction:column;gap:var(--rhg-space-8,8px)}
 #nav button[data-view="opsexec"]{display:none!important}
+/* People & Productivity: a tower of its own as well (its side menu; no department filter) */
+#ppNav{display:none}
+body.tw-ppl #nav{display:none}
+body.tw-ppl #ppNav{display:flex;flex-direction:column;gap:var(--rhg-space-8,8px)}
+#nav button[data-view="people"]{display:none!important}
+body.tw-ppl #dimPick,body.tw-ppl #foot,body.tw-ppl #sourceBanner{display:none!important}
 body.tw-ops #dimPick,body.tw-ops #cmpLabel,body.tw-ops #foot,body.tw-ops #sourceBanner{display:none!important}
 @media (max-width:640px){#v-people .card-head,#v-opsexec .card-head{flex-direction:column;align-items:stretch}#v-people .card-head .sh-ctl,#v-opsexec .card-head .sh-ctl{display:flex;flex-wrap:wrap;gap:6px}}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ic-keys{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink)}
@@ -638,6 +644,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <a href="/finance/" class="on" id="towerFinance" aria-current="page">Finance</a>
     <a href="/finance/#inventory" id="towerInventory">Inventory</a>
     <a href="/finance/#sales" id="towerSales">Sales</a>
+    <a href="/finance/#people" id="towerPeople">People &amp; Productivity</a>
     <a href="/finance/#opsexec" id="towerOps">Operations &amp; Food Safety</a>
   </div>
   <nav id="nav">
@@ -689,6 +696,14 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <button data-view="gaps">Data quality &amp; reconciliation</button>
     <button data-view="settings">Settings</button>
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
+  </nav>
+  <nav id="ppNav" aria-label="People &amp; Productivity">
+    <div class="grp">People &amp; Productivity</div>
+    <button type="button" data-t="workforce">Workforce</button>
+    <button type="button" data-t="productivity">Labour productivity</button>
+    <button type="button" data-t="scheduling">Scheduling &amp; attendance</button>
+    <button type="button" data-t="personnel">Personnel cost</button>
+    <button type="button" data-t="quality">HR data quality</button>
   </nav>
   <nav id="oxNav" aria-label="Operations &amp; Food Safety">
     <div class="grp">Operations &amp; Food Safety</div>
@@ -4639,12 +4654,34 @@ function ppQs(){ const p = new URLSearchParams(params()); p.set("part", ppPart()
 function ppShow(tab){
   ppTab = tab;
   document.querySelectorAll("#ppTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("ppH").textContent = PP_TITLE[tab]; $("ppHint").textContent = PP_HINT[tab];
+  $("ppH").textContent = PP_TITLE[tab]; $("ppHint").textContent = PP_HINT[tab]; ppNavSync();
   $("ppLoc").style.display = tab === "scheduling" ? "" : "none";
   if (currentView().id === "people") setHeader();
   ppLoad(false);
 }
 document.querySelectorAll("#ppTabs button").forEach(b => b.onclick = () => ppShow(b.dataset.t));
+// the tower of its own: its side menu (mirrors the tab bar, screens the role does not hold included), its header
+function ppTower(on){                // may run before this script part: everything it needs is read here
+  const eb = document.getElementById("eyebrow"), sf = document.getElementById("sideFoot");
+  if (!eb.dataset.fin) { eb.dataset.fin = eb.textContent; sf.dataset.fin = sf.textContent; }
+  const was = document.body.classList.contains("tw-ppl");
+  document.body.classList.toggle("tw-ppl", on);
+  if (on) {
+    eb.textContent = "RHG People & Productivity / Odoo HR, Simphony and Business Central, read-only";
+    sf.textContent = "Reads Odoo's HR records, Simphony's sales and Business Central's personnel cost, read only. Sums by restaurant, no personal data. Nothing is written to Odoo.";
+  } else if (was) { eb.textContent = eb.dataset.fin; sf.textContent = sf.dataset.fin; }
+  document.querySelectorAll("#ppNav button").forEach(b => {
+    const t = document.querySelector(`#ppTabs button[data-t="${b.dataset.t}"]`);
+    b.classList.toggle("on", b.dataset.t === (typeof ppTab === "undefined" ? "workforce" : ppTab));
+    b.classList.toggle("scr-off", !!t && t.classList.contains("scr-off"));
+  });
+}
+function ppNavSync(){ ppTower(document.body.classList.contains("tw-ppl")); }
+document.querySelectorAll("#ppNav button").forEach(b => b.onclick = () => {
+  ppTab = b.dataset.t;
+  if (currentView().id !== "people") navTo("people"); else ppShow(b.dataset.t);
+});
+new MutationObserver(ppNavSync).observe($("ppTabs"), {subtree: true, attributes: true, attributeFilter: ["class"]});
 async function ppLoad(force){
   const part = ppPart(), q = ppQs();
   if (ppData[part] && ppKeys[part] === q && !force && !ppData[part].reading) { ppRender(); return; }
@@ -4937,9 +4974,12 @@ function oxRender(){
 function oxTower(on){                // may run before this script part: everything it needs is read here
   const eb = document.getElementById("eyebrow"), sf = document.getElementById("sideFoot");
   if (!eb.dataset.fin) { eb.dataset.fin = eb.textContent; sf.dataset.fin = sf.textContent; }
+  const was = document.body.classList.contains("tw-ops");
   document.body.classList.toggle("tw-ops", on);
-  eb.textContent = on ? "RHG Operations & Food Safety / Crunchtime Ops Execution, read-only" : eb.dataset.fin;
-  sf.textContent = on ? "Reads Crunchtime Ops Execution, read only: checklists, food safety logs, waste and yield, sensors. Nothing is written to Crunchtime." : sf.dataset.fin;
+  if (on) {
+    eb.textContent = "RHG Operations & Food Safety / Crunchtime Ops Execution, read-only";
+    sf.textContent = "Reads Crunchtime Ops Execution, read only: checklists, food safety logs, waste and yield, sensors. Nothing is written to Crunchtime.";
+  } else if (was) { eb.textContent = eb.dataset.fin; sf.textContent = sf.dataset.fin; }
   document.querySelectorAll("#oxNav button").forEach(b => {
     const t = document.querySelector(`#oxTabs button[data-t="${b.dataset.t}"]`);
     b.classList.toggle("on", b.dataset.t === (typeof oxTab === "undefined" ? "overview" : oxTab));
@@ -10091,10 +10131,10 @@ function setHeader(){
   dimNaSync();
   const v = currentView();
   const inv = v.id === "inventory", invTower = inv || INV_TABS.has(v.id);
-  const salesTower = v.id === "sales", opsTower = v.id === "opsexec", finTower = !invTower && !salesTower && !opsTower;
-  $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower); $("towerOps").classList.toggle("on", opsTower);
-  $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower); $("towerOps").toggleAttribute("aria-current", opsTower);
-  oxTower(opsTower);
+  const salesTower = v.id === "sales", opsTower = v.id === "opsexec", pplTower = v.id === "people", finTower = !invTower && !salesTower && !opsTower && !pplTower;
+  $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower); $("towerOps").classList.toggle("on", opsTower); $("towerPeople").classList.toggle("on", pplTower);
+  $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower); $("towerOps").toggleAttribute("aria-current", opsTower); $("towerPeople").toggleAttribute("aria-current", pplTower);
+  if (pplTower) { oxTower(false); ppTower(true); } else { ppTower(false); oxTower(opsTower); }
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "opsexec"){
@@ -12542,7 +12582,7 @@ locRegLoad();
   const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
   btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
   document.getElementById("mnavBd").addEventListener("click", () => set(false));
-  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("#nav button, #oxNav button, .towers a, a")) set(false); });
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("#nav button, #oxNav button, #ppNav button, .towers a, a")) set(false); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
   window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
 })();

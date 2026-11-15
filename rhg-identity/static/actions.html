@@ -495,7 +495,7 @@ $("logoutBtn").onclick = async () => {
   const t = $("towers");
   if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
   if (!held("platform.s.executive.")) { const ex = t.querySelector('a[href="/executive"]'); if (ex) ex.remove(); }
-  [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]
+  [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.people.", "/finance/#people", "People &amp; Productivity"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]
     .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (can("unicorn.use")) t.insertAdjacentHTML("beforeend", `<a href="/unicorn">Unicorn</a>`);
   if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;

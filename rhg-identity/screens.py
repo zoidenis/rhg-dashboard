@@ -33,7 +33,7 @@ FINANCE = [
         # SevenRooms reservations, covers and feedback against Simphony's checks
         ("sevenrooms", "SevenRooms ↔ Simphony", "location", [])]),
     # People & Productivity: Odoo HR (workforce, attendances, planning) against Simphony's sales and BC's personnel cost
-    ("people", "People & Productivity", "Overview", "ppTabs", [
+    ("people", "People & Productivity", "People & Productivity", "ppTabs", [
         ("workforce", "Workforce", "location", []),
         ("productivity", "Labour productivity", "location", []),
         ("scheduling", "Scheduling & attendance", "location", []),
