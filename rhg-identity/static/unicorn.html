@@ -153,6 +153,9 @@ header{display:flex;justify-content:space-between}
 .ft tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--rhg-amber,#b26a00)}
 .pchip{display:inline-block;background:var(--rhg-sky,#e6f2f7);color:var(--rhg-primary);border-radius:6px;padding:1px 7px;font-weight:600;font-size:11.5px;white-space:nowrap}
 @media(max-width:760px){.per{grid-template-columns:1fr}.per .when{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:8px}.mz{grid-template-columns:1fr 1fr}}
+.dlg{border:1px solid var(--line);border-left:4px solid var(--rhg-primary);border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--bg)}
+.dlg label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub)}
+.dlg label.meta{flex-direction:row}
 .rv{display:flex;flex-wrap:wrap;gap:4px}.rv span{background:var(--bg);border-radius:6px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}.rv span b{font-weight:600;color:var(--sub);margin-right:4px}
 .latest{position:absolute;right:0;top:-34px;z-index:30;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(22,24,29,.12)}
 .latest:hover{border-color:var(--rhg-primary)}
@@ -517,6 +520,7 @@ async function openFinding(id){
   const f = j.finding, ev = f.evidence || {}, d = j.decision;
   const evRows = Object.entries(ev).filter(([k]) => !["rule", "rule_status", "rule_version", "rule_value", "impact_formula"].includes(k));
   const P = periodOf(f), pl = !!(ev.actual && ev.budget), bud = pl && ev.budget[f.metric] != null ? ev.budget[f.metric] : null;
+  const canDelegate = R.can_approve && !["Dismissed", "Closed"].includes(f.status) && !(d && d.status === "Proposed");
   const body = `<div class="per">
       <div><div class="k">${esc(P.kind)}</div><div class="v">${esc(P.value)}</div><div class="s">${esc(P.what)}</div>${P.vs ? `<div class="c"><span>Compared with</span> <b>${esc(P.vs)}</b></div>` : ""}</div>
       <div class="when"><div><span>Found on</span> <b>${esc(shortDay(f.first_seen))}</b></div><div><span>Last seen on</span> <b>${esc(shortDay(f.last_seen))}</b>${f.seen_count > 1 ? ` <span>· seen ${f.seen_count} times</span>` : ""}</div><div>${esc(f.capability_label)}</div></div>
@@ -538,10 +542,24 @@ async function openFinding(id){
     ${f.note ? `<h4>Note</h4><p style="margin:0">${esc(f.note)}</p>` : ""}
     <h4>What to do</h4><div class="row">
       ${f.status === "New" && R.enabled ? `<button class="btn dark" type="button" id="fInv">Investigate now</button>` : ""}
+      ${canDelegate ? `<button class="btn dark" type="button" id="fDel">Delegate</button>` : ""}
       ${f.status === "Proposed" ? `<button class="btn dark" type="button" id="fGoDec">Open the proposal</button>` : ""}
       ${["Dismissed", "Closed"].includes(f.status) ? `<button class="btn" type="button" id="fReopen">Reopen</button>` : ""}
       ${R.can_approve && !["Dismissed", "Closed"].includes(f.status) ? `<input id="fNote" placeholder="Reason (needed to dismiss)" style="flex:1;min-width:200px"><button class="btn" type="button" id="fDismiss">Dismiss</button><button class="btn" type="button" id="fCloseF">Close</button>` : ""}
-    </div><p class="u-msg" id="fAct"></p>`;
+    </div>
+    ${canDelegate ? `<div class="dlg" id="fDelBox" hidden>
+      <p class="hint" style="margin:0 0 8px">Hand the finding to an owner now, without waiting for Unicorn's investigation. It becomes a decision of yours and an action: it reaches the owner in the Executive Action Center ("My items", daily email), and Unicorn measures ${esc(METRIC[f.metric] || f.metric || "the measure")} every morning against ${esc(valU(f.value, f.unit))} as the baseline.</p>
+      <div class="row">
+        <label>Owner<select id="dOwner" style="min-width:220px;max-width:320px">${ownerOptions(f)}</select></label>
+        <label>Deadline<input id="dDue" type="date" value="${plusDays(["critical", "high"].includes(f.severity) ? 7 : 14)}"></label>
+        <label>Target (${esc(f.unit || "value")})<input id="dTarget" inputmode="decimal" style="width:110px" value="${bud != null ? esc(bud) : f.limit != null ? esc(f.limit) : ""}"></label>
+      </div>
+      <div class="row"><label style="flex:1;min-width:240px">What to do<input id="dTask" value="${esc(defaultTask(f))}"></label></div>
+      <div class="row"><label style="flex:1;min-width:240px">Note for the owner<input id="dNote" placeholder="Context, what you expect, by when"></label></div>
+      <label class="meta" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="dMail"> <span>Send them an email now</span></label>
+      <div class="row"><button class="btn dark" type="button" id="dGo">Delegate</button><button class="btn" type="button" id="dCancel">Cancel</button><span class="u-msg" id="dMsg"></span></div>
+    </div>` : ""}
+    <p class="u-msg" id="fAct"></p>`;
   modal(`F${f.id} · ${f.title}`, `${f.location_name || f.location || ""}${f.company && f.company !== f.location_name ? " · " + f.company : ""} · ${P.chip} · ${P.chipKind}`, body);
   const act = async (action, note) => {
     try { await post("/api/unicorn/finding", {id: f.id, action, note}); $("fAct").textContent = action === "investigate" ? "Unicorn is investigating; the proposal appears under Decisions & actions in a few minutes." : "Saved."; loadRegisters(); if (action !== "investigate") setTimeout(closeModal, 600); }
@@ -552,6 +570,20 @@ async function openFinding(id){
   if ($("fDismiss")) $("fDismiss").onclick = () => act("dismiss", $("fNote").value);
   if ($("fCloseF")) $("fCloseF").onclick = () => act("close", $("fNote").value);
   if ($("fGoDec")) $("fGoDec").onclick = () => { closeModal(); uShow("decisions"); };
+  if ($("fDel")) {
+    $("fDel").onclick = () => { $("fDelBox").hidden = false; $("fDel").hidden = true; $("dOwner").focus(); $("fDelBox").scrollIntoView({block: "nearest", behavior: "smooth"}); };
+    $("dCancel").onclick = () => { $("fDelBox").hidden = true; $("fDel").hidden = false; };
+    $("dGo").onclick = async () => {
+      if (!$("dOwner").value) { $("dMsg").textContent = "Choose the owner."; return; }
+      $("dGo").disabled = true; $("dMsg").textContent = "Delegating…";
+      try {
+        const j = await post("/api/unicorn/finding", {id: f.id, action: "delegate", owner: $("dOwner").value, due: $("dDue").value,
+          target: $("dTarget").value, task: $("dTask").value, note: $("dNote").value, notify: $("dMail").checked});
+        $("dMsg").textContent = `Delegated to ${ownerName($("dOwner").value)}: action A${j.actions[0]}` + (j.emailed === true ? " · email sent" : j.emailed ? " · email " + j.emailed : "");
+        loadRegisters(); setTimeout(closeModal, 1400);
+      } catch (e) { $("dMsg").textContent = e.message; $("dGo").disabled = false; }
+    };
+  }
 }
 ["fStatus", "fCap"].forEach(id => $(id).onchange = loadRegisters);
 let fqT = null; $("fQ").oninput = () => { clearTimeout(fqT); fqT = setTimeout(loadRegisters, 300); };
@@ -560,6 +592,15 @@ function ruleValue(v){
   if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(x => x == null || typeof x !== "object"))
     return `<div class="rv" data-no-i18n>${Object.entries(v).map(([k, x]) => `<span><b>${esc(k)}</b>${esc(typeof x === "number" ? fmtN(x, Number.isInteger(x) ? 0 : 2) : x)}</span>`).join("") || "–"}</div>`;
   return `<code style="white-space:normal;word-break:break-all">${esc(JSON.stringify(v))}</code>`;
+}
+// the task a delegated finding starts from: back to the limit or budget of its measure (editable)
+function defaultTask(f){
+  const ev = f.evidence || {}, bud = ev.budget && ev.budget[f.metric] != null ? ev.budget[f.metric] : null;
+  const where = f.location_name || f.location || f.company || "";
+  const sq = window.PulseI18n && PulseI18n.lang() === "sq", T = x => sq ? PulseI18n.t(x) : x;
+  const lim = bud != null ? valU(bud, f.unit) : f.limit != null ? valU(f.limit, f.unit) : "";
+  if (sq) return `${T(METRIC[f.metric] || f.title)}${where ? " te " + where : ""}: gjej shkakun dhe ktheje ${bud != null ? "në buxhet" : "brenda kufirit"}${lim ? " (" + lim + ")" : ""}`;
+  return `${METRIC[f.metric] || f.title}${where ? " at " + where : ""}: find the cause and bring it back to ${bud != null ? "the budget" : "the limit"}${lim ? " (" + lim + ")" : ""}`;
 }
 function ownerName(o){ return String(o || "").replace(/\s*<[^>]+>\s*$/, ""); }
 function covers(sc, company){

@@ -436,6 +436,34 @@ def approve(did, actor, owner, due, target=None, note="", actions=None):
     return ids
 
 
+def delegate(fid, actor, owner, due, task="", target=None, note=""):
+    """A person hands a finding straight to an owner, without waiting for Unicorn's investigation: a decision taken
+    by that person (approved at once) and its action, followed like any other (baseline = the finding's value).
+    Returns (decision id, [action ids])."""
+    f = store.one("SELECT * FROM unicorn_findings WHERE id=?", (int(fid),))
+    if not f:
+        raise ValueError("No such finding.")
+    if f["status"] in ("Closed", "Dismissed"):
+        raise ValueError("Reopen the finding first: it is " + f["status"].lower() + ".")
+    if f["decision_id"]:
+        d = store.one("SELECT status FROM unicorn_decisions WHERE id=?", (f["decision_id"],))
+        if d and d["status"] == "Proposed":
+            raise ValueError(f"Unicorn's proposal D{f['decision_id']} is waiting: approve it with its owner, or refuse it first.")
+    if not str(owner or "").strip():
+        raise ValueError("Choose the owner.")
+    _date(due, "Deadline")
+    ev = _j(f["evidence"], {})
+    did = propose(f["id"], {"decision": str(task or "").strip() or f"Take action on: {f['title']}",
+                            "summary": str(note or "").strip() or "Delegated by a person from the finding.",
+                            "confidence": "high", "impact_amount": f["impact"],
+                            "impact_formula": ev.get("impact_formula") or "", "kpi": f["metric"] or "",
+                            "target": "" if target in (None, "") else str(target)},
+                  actor=actor, meta={"delegated": True})
+    ids = approve(did, actor, owner, due, target, note)
+    store.audit("unicorn finding delegated", actor, str(f["id"]), {"owner": str(owner)[:120], "due": due, "decision": did})
+    return did, ids
+
+
 def refuse(did, actor, reason):
     d = store.one("SELECT * FROM unicorn_decisions WHERE id=?", (int(did),))
     if not d:

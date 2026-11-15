@@ -584,6 +584,16 @@ class Handler(BaseHTTPRequestHandler):
                     act, fid = body.get("action"), int(body.get("id") or 0)
                     if act == "investigate":
                         self._send(200, unicorn.investigate_now(fid, user["username"])); return
+                    if act == "delegate":
+                        # a person hands the finding to an owner at once: a decision of theirs and its action
+                        if not auth.can(user, "unicorn.decisions.approve"):
+                            self._send(403, {"error": "Your role cannot delegate findings."}); return
+                        did, ids = ureg.delegate(fid, user["username"], str(body.get("owner") or ""), body.get("due"),
+                                                 str(body.get("task") or ""), body.get("target"), str(body.get("note") or ""))
+                        mailed = None
+                        if body.get("notify"):
+                            mailed = actioncenter.notify_action(ids[0], user)
+                        self._send(200, {"decision": ureg.decision(did), "actions": ids, "emailed": mailed}); return
                     if act not in ("dismiss", "reopen", "close"):
                         raise ValueError("Action: investigate, dismiss, reopen or close.")
                     if act != "reopen" and not auth.can(user, "unicorn.decisions.approve"):

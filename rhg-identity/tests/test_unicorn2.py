@@ -128,6 +128,27 @@ class Lifecycle(unittest.TestCase):
             reg.set_finding(f["id"], "Dismissed", "cfo", "")
 
 
+class Delegate(unittest.TestCase):
+    def test_a_person_hands_a_finding_to_an_owner(self):
+        detect.run(FACTS)
+        f = next(x for x in reg.findings("open") if x["rule"] == "pl.ebitda_vs_budget")
+        with self.assertRaises(ValueError):
+            reg.delegate(f["id"], "cfo", "", "2026-12-01")                    # no owner
+        did, ids = reg.delegate(f["id"], "cfo", "Ana Marku <ana@rhg.al>", "2026-12-01", "Gjej shkakun", 2500000, "brenda dhjetorit")
+        d = reg.decision(did)
+        self.assertEqual((d["status"], d["owner"], d["proposed_by"], d["meta"]["delegated"]),
+                         ("Approved", "Ana Marku <ana@rhg.al>", "cfo", True))
+        a = next(x for x in reg.actions() if x["id"] == ids[0])
+        self.assertEqual((a["title"], a["baseline"], a["target"], a["metric"]), ("Gjej shkakun", -50.0, 2500000.0, "ebitda_vs_budget_pct"))
+
+    def test_not_while_unicorns_proposal_waits(self):
+        detect.run(FACTS)
+        f = next(x for x in reg.findings("open") if x["rule"] == "purchasing.price_mover")
+        reg.propose(f["id"], {"decision": "Rinegocio", "confidence": "medium"})
+        with self.assertRaises(ValueError):
+            reg.delegate(f["id"], "cfo", "Ana <ana@rhg.al>", "2026-12-01")
+
+
 class Rules(unittest.TestCase):
     def test_versions_proposals_wait(self):
         r = reg.save_rule({"key": "policy.po_required", "kind": "policy", "title": "PO mbi 50k", "value": {"min": 50000}},

@@ -629,6 +629,20 @@ def _apply(x, patch, user, can, U=None):
     store.audit("action center", user["username"], x["uid"], {k: patch.get(k) for k in ("status", "owner", "due") if patch.get(k)})
 
 
+def notify_action(aid, user):
+    """An email to the owner of a Unicorn action now (a finding delegated to them): True, or the reason it was not sent."""
+    x = next((i for i in collect()["items"] if i["uid"] == f"unicorn:A{aid}"), None)
+    if not x or not x["owners"]:
+        return "the owner has no pulse account with an email"
+    U = users()
+    body, text = _digest_html((U.get(x["owners"][0]) or {}).get("name") or x["owners"][0], [x])
+    try:
+        _send_mail(x["owners"], [], f"[pulse] {user.get('name') or user['username']} delegated to you: {x['title']}"[:180], body, text)
+        return True
+    except Exception as exc:                                        # noqa: BLE001
+        return f"not sent: {str(exc)[:160]}"
+
+
 def apply_sla(actor):
     out = {}
     for key, (name, base) in TOWERS.items():
