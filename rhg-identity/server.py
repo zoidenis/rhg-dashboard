@@ -592,6 +592,26 @@ class Handler(BaseHTTPRequestHandler):
                         self._send(200, {"sent": actioncenter.send_digests(user["username"], [user["email"]])})
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
+            elif url.path in ("/api/unicorn/finding/export", "/api/unicorn/finding/send"):
+                # a finding out of Unicorn: Excel or PDF to download, or sent by email with it attached (Purchasing builds and sends)
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                fmt = "pdf" if body.get("format") == "pdf" else "xlsx"
+                try:
+                    f, table = ureg.finding_table(int(body.get("id") or 0), user)
+                    if url.path.endswith("/export"):
+                        fname, ctype, data = actioncenter.build_file(table, fmt, user, "unicorn finding")
+                        self._send(200, data, ctype or "application/octet-stream", [("Content-Disposition", f'attachment; filename="{fname}"')])
+                    else:
+                        kind, when, _of, vs = ureg.period_of(f)
+                        rows = [("Place", f"{f['location_name'] or f['location']} · {f['company']}"), ("Period", f"{when} ({kind.lower()})"),
+                                ("Compared with", vs), ("Measured", f"{ureg._v(f['value'], f['unit'])} against the limit {ureg._v(f['limit'], f['unit'])}"),
+                                ("Estimated impact", f"{ureg._v(f['impact'])} {f['currency']}".strip()), ("Status", f["status"])]
+                        self._send(200, {"sent": actioncenter.send_file(table, fmt, body.get("to"), body.get("note"), bool(body.get("copy_me")), user,
+                                                                        source="Unicorn", title=f"F{f['id']} · {f['title']}", detail=f["detail"],
+                                                                        rows=rows, where=f"Unicorn → Findings → F{f['id']}", what="unicorn finding")})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
             elif url.path == "/api/unicorn/finding":
                 if not auth.can(user, "unicorn.use"):
                     self._send(403, {"error": "Your role cannot talk to Unicorn."}); return

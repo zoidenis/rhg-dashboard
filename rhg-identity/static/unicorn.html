@@ -559,7 +559,17 @@ async function openFinding(id){
       <label class="meta" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="dMail"> <span>Send them an email now</span></label>
       <div class="row"><button class="btn dark" type="button" id="dGo">Delegate</button><button class="btn" type="button" id="dCancel">Cancel</button><span class="u-msg" id="dMsg"></span></div>
     </div>` : ""}
-    <p class="u-msg" id="fAct"></p>`;
+    <p class="u-msg" id="fAct"></p>
+    <h4>Export or send</h4>
+    <div class="row"><button class="btn" type="button" id="xP">PDF</button><button class="btn" type="button" id="xX">Excel</button><button class="btn" type="button" id="xM">Send by email…</button><span class="u-msg" id="xMsg"></span></div>
+    <div class="dlg" id="xBox" hidden>
+      <div class="row"><label style="flex:1;min-width:240px">To<input id="xTo" list="xAcc" placeholder="name@rhg.al, another@rhg.al"></label>
+        <label>File<select id="xF"><option value="pdf">PDF</option><option value="xlsx">Excel</option></select></label></div>
+      <datalist id="xAcc">${(R.accounts || []).map(a => `<option value="${esc(a.email)}">${esc(a.name)}</option>`).join("")}</datalist>
+      <div class="row"><label style="flex:1;min-width:240px">Note<input id="xNt" placeholder="What you expect, by when"></label></div>
+      <label class="meta" style="display:flex;flex-direction:row;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="xMe" checked> <span>Send me a copy</span></label>
+      <div class="row"><button class="btn dark" type="button" id="xGo">Send</button></div>
+    </div>`;
   modal(`F${f.id} · ${f.title}`, `${f.location_name || f.location || ""}${f.company && f.company !== f.location_name ? " · " + f.company : ""} · ${P.chip} · ${P.chipKind}`, body);
   const act = async (action, note) => {
     try { await post("/api/unicorn/finding", {id: f.id, action, note}); $("fAct").textContent = action === "investigate" ? "Unicorn is investigating; the proposal appears under Decisions & actions in a few minutes." : "Saved."; loadRegisters(); if (action !== "investigate") setTimeout(closeModal, 600); }
@@ -570,6 +580,26 @@ async function openFinding(id){
   if ($("fDismiss")) $("fDismiss").onclick = () => act("dismiss", $("fNote").value);
   if ($("fCloseF")) $("fCloseF").onclick = () => act("close", $("fNote").value);
   if ($("fGoDec")) $("fGoDec").onclick = () => { closeModal(); uShow("decisions"); };
+  // the finding as a PDF or an Excel file, or by email with it attached (Purchasing builds and sends, as every export)
+  const download = async fmt => {
+    $("xMsg").textContent = "Preparing the file…";
+    try {
+      const r = await fetch("/api/unicorn/finding/export", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: JSON.stringify({id: f.id, format: fmt})});
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || ("HTTP " + r.status)); }
+      const m = /filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") || ""), blob = await r.blob();
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = m ? m[1] : `F${f.id}.${fmt}`; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); $("xMsg").textContent = "";
+    } catch (e) { $("xMsg").textContent = e.message; }
+  };
+  $("xP").onclick = () => download("pdf"); $("xX").onclick = () => download("xlsx");
+  $("xM").onclick = () => { $("xBox").hidden = !$("xBox").hidden; if (!$("xBox").hidden) { $("xTo").focus(); $("xBox").scrollIntoView({block: "nearest", behavior: "smooth"}); } };
+  $("xGo").onclick = async () => {
+    $("xGo").disabled = true; $("xMsg").textContent = "Sending…";
+    try { const j = await post("/api/unicorn/finding/send", {id: f.id, to: $("xTo").value, format: $("xF").value, note: $("xNt").value, copy_me: $("xMe").checked});
+      $("xMsg").textContent = `Sent to ${j.sent.to.join(", ")}${j.sent.cc && j.sent.cc.length ? " (copy to you)" : ""}.`; $("xBox").hidden = true; }
+    catch (e) { $("xMsg").textContent = e.message; }
+    $("xGo").disabled = false;
+  };
   if ($("fDel")) {
     $("fDel").onclick = () => { $("fDelBox").hidden = false; $("fDel").hidden = true; $("dOwner").focus(); $("fDelBox").scrollIntoView({block: "nearest", behavior: "smooth"}); };
     $("dCancel").onclick = () => { $("fDelBox").hidden = true; $("fDel").hidden = false; };

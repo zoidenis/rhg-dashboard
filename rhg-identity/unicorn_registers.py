@@ -565,3 +565,119 @@ def counts():
     return {"findings_open": sum(f.get(s, 0) for s in ("New", "Investigating", "Proposed")), "findings": f,
             "decisions_proposed": d.get("Proposed", 0), "decisions": d, "actions_open": opn["n"] if opn else 0,
             "actions_overdue": over["n"] if over else 0, "rules_proposed_by_unicorn": rp["n"] if rp else 0}
+
+
+# ---------------------------------------------------------------- a finding as a file (Excel / PDF, by email)
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December")
+METRIC_LABEL = {"labor_pct": "Labour cost %", "food_pct": "Food cost %", "ebitda_vs_budget_pct": "EBITDA against budget",
+                "vs_last_year_pct": "Sales against last year", "mtd_vs_budget_pct": "Sales against budget",
+                "discounts_pct_of_gross": "Discounts % of gross sales", "voids_pct_of_gross": "Voids % of gross sales",
+                "payables_beyond_critical": "Payables beyond the critical age",
+                "receivables_beyond_critical": "Receivables beyond the critical age",
+                "price_change_pct": "Average cost change", "invoices_without_po_pct": "Invoices without a purchase order"}
+PL_LINES = (("sales", "Sales"), ("food", "Food cost"), ("food_pct", "Food cost %"), ("labor", "Labour cost"),
+            ("labor_pct", "Labour cost %"), ("opex", "Operating expenses"), ("ebitda", "EBITDA"), ("ebitda_pct", "EBITDA %"))
+
+
+def _month(p):
+    m = re.match(r"^(\d{4})-(\d{2})", str(p or ""))
+    return f"{MONTHS[int(m.group(2)) - 1]} {m.group(1)}" if m else str(p or "")
+
+
+def _day(p):
+    try:
+        d = date.fromisoformat(str(p or "")[:10])
+    except ValueError:
+        return str(p or "")
+    return f"{d.strftime('%A')} {d.day} {MONTHS[d.month - 1]} {d.year}"
+
+
+def period_of(f):
+    """(kind, period in words, of what, compared with): the same words the finding's card shows."""
+    ev, r = f.get("evidence") or {}, f.get("rule") or ""
+    if r.startswith("pl."):
+        return "Closed month", _month(f["period"]), "Profit & loss of the department, Business Central", f"Budget of {_month(f['period'])}"
+    if r == "sales.drop_vs_last_year":
+        return "One day", _day(f["period"]), "Net sales of the restaurant, Simphony", f"Same weekday last year: {_day(ev.get('last_year_day'))}"
+    if r in ("sales.discounts_pct", "sales.voids_pct"):
+        return "One day", _day(f["period"]), "Gross sales of the restaurant, Simphony", "The limit of the rule"
+    if r == "sales.mtd_vs_budget":
+        return "Month to date", f"1 – {_day(ev.get('day') or f['last_seen'])}", f"Net sales of {_month(f['period'])} so far, Simphony", "Budget of the same days"
+    if r.startswith("apar."):
+        return ("Open balance on the day", _day(f["last_seen"]),
+                f"{'Receivables' if ev.get('side') == 'receivables' else 'Payables'} older than {ev.get('critical_days', '–')} days, Kartela",
+                "Every open document on that day")
+    if r == "purchasing.price_mover":
+        return "Purchases of the month", _month(f["period"]), f"Average purchase cost so far, up to {_day(f['last_seen'])}, Business Central", "The previous average cost"
+    if r == "purchasing.invoices_without_po":
+        return "One day", _day(f["period"]), "Purchase invoices posted that day, Business Central", "The limit of the rule"
+    return "Period", str(f.get("period") or ""), "", ""
+
+
+def _v(v, unit=""):
+    if v is None or v == "":
+        return ""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if unit == "%":
+            return f"{v:,.1f}%"
+        return f"{v:,.0f}" if float(v).is_integer() or abs(v) >= 100 else f"{v:,.2f}"
+    return str(v)
+
+
+def finding_table(fid, user):
+    """One finding as a workbook: its card (period, measure, limit, impact), the figures read and what was decided."""
+    f = finding(fid)
+    if not f:
+        raise ValueError("No such finding.")
+    ev = f["evidence"] or {}
+    kind, when, of, vs = period_of(f)
+    bud = (ev.get("budget") or {}).get(f["metric"]) if ev.get("budget") else None
+    card = [["Finding", f"F{f['id']} · {f['title']}"], ["Restaurant / place", f["location_name"] or f["location"]], ["Company", f["company"]],
+            ["Period", f"{when} ({kind.lower()})"], ["Figures of", of], ["Compared with", vs],
+            ["Measure", METRIC_LABEL.get(f["metric"], f["metric"])], ["Measured", _v(f["value"], f["unit"])]]
+    if bud is not None:
+        card.append(["Budget", _v(bud, f["unit"])])
+    card += [["Limit of the rule", _v(f["limit"], f["unit"])],
+             ["Rule", f"{ev.get('rule') or f['rule']} · version {ev.get('rule_version', '')} · "
+                      f"{'approved by RHG' if ev.get('rule_status') == 'Approved' else 'proposed, not yet approved'}"],
+             ["Estimated impact", f"{_v(f['impact'])} {f['currency']}".strip()], ["How the impact is estimated", ev.get("impact_formula") or ""],
+             ["Severity", f["severity"].capitalize()], ["Status", f["status"]], ["Found on", f["first_seen"]], ["Last seen on", f["last_seen"]],
+             ["Seen", f"{f['seen_count']} time(s)"], ["Capability", f["capability_label"]], ["What", f["detail"]]]
+    if f["note"]:
+        card.append(["Note", f["note"]])
+    sheets = [{"title": "Finding", "header": ["Field", "Value"], "rows": [[a, "" if b is None else str(b)] for a, b in card],
+               "formats": ["text", "text"], "widths": [26, 90]}]
+    if ev.get("actual") and ev.get("budget"):
+        rows = []
+        for k, label in PL_LINES:
+            a, b = ev["actual"].get(k), ev["budget"].get(k)
+            if a is None and b is None:
+                continue
+            pct = k.endswith("_pct")
+            d = a - b if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None
+            show = (lambda v: "" if v is None else f"{v:,.1f}%") if pct else (lambda v: "" if v is None else f"{v:,.0f}")
+            diff = "" if d is None else (f"{d:+,.1f} pts" if pct else f"{d:+,.0f}")
+            rows.append([label + ("  (measured)" if k == f["metric"] else ""), show(a), show(b), diff])
+        sheets.append({"title": "Figures read", "header": [_month(ev.get("month") or f["period"]), "Actual", "Budget", "Difference"],
+                       "rows": rows, "formats": ["text", "text", "text", "text"], "widths": [34, 18, 18, 18]})
+    else:
+        skip = {"rule", "rule_status", "rule_value", "rule_version", "impact_formula", "side"}
+        rows = [[k.replace("_", " "), json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else _v(v)]
+                for k, v in ev.items() if k not in skip]
+        if rows:
+            sheets.append({"title": "Figures read", "header": ["Figure", "Value"], "rows": rows, "formats": ["text", "text"], "widths": [30, 80]})
+    d = decision(f["decision_id"]) if f["decision_id"] else None
+    acts = [a for a in actions() if d and a["decision_id"] == d["id"]]
+    if d:
+        rows = [["Decision", d["title"]], ["Status", d["status"]], ["Why", d["rationale"]], ["Owner", d["owner"]], ["Deadline", d["due"]],
+                ["Proposed by", d["proposed_by"]], ["Decided by", d["decided_by"]]]
+        rows += [[f"Action A{a['id']}", f"{a['title']} · {a['owner']} · due {a['due']} · {a['status']} · baseline {_v(a['baseline'], a['unit'])}"
+                  f" · latest {_v(a['latest'], a['unit']) or '–'} · target {_v(a['target'], a['unit']) or '–'}"] for a in acts]
+        sheets.append({"title": "Decision and actions", "header": ["Field", "Value"], "rows": [[a, "" if b is None else str(b)] for a, b in rows],
+                       "formats": ["text", "text"], "widths": [22, 100]})
+    who = user.get("name") or user.get("username") or ""
+    name = f"Finding F{f['id']} {f['location_name'] or f['company']} {when}"
+    return f, {"name": name[:110], "sheets": sheets,
+               "notes": [f"Unicorn · finding F{f['id']}: {f['title']}", f"Period: {when} ({kind.lower()}); {of}; compared with {vs}.",
+                         f"Exported by {who} on {date.today().isoformat()}. Read only: nothing was changed in any system."]}

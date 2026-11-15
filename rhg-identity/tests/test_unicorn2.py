@@ -149,6 +149,23 @@ class Delegate(unittest.TestCase):
             reg.delegate(f["id"], "cfo", "Ana <ana@rhg.al>", "2026-12-01")
 
 
+class FindingFile(unittest.TestCase):
+    def test_the_card_the_figures_and_the_period_in_words(self):
+        detect.run(FACTS)
+        fd = next(x for x in reg.findings() if x["rule"] == "pl.food_vs_budget")
+        f, t = reg.finding_table(fd["id"], {"username": "geri", "name": "Geri"})
+        card = dict(t["sheets"][0]["rows"])
+        self.assertEqual(card["Period"], "October 2026 (closed month)")
+        self.assertEqual((card["Compared with"], card["Measured"], card["Budget"]), ("Budget of October 2026", "34.0%", "30.0%"))
+        fig = t["sheets"][1]
+        self.assertEqual(fig["header"][0], "October 2026")
+        line = next(r for r in fig["rows"] if r[0].startswith("Food cost %"))
+        self.assertTrue(line[0].endswith("(measured)"))
+        self.assertEqual(line[1:], ["34.0%", "30.0%", "+4.0 pts"])
+        self.assertEqual(reg.period_of(dict(fd, rule="sales.drop_vs_last_year", period="2026-11-14",
+                                          evidence={"last_year_day": "2025-11-15"}))[1], "Saturday 14 November 2026")
+
+
 class Rules(unittest.TestCase):
     def test_versions_proposals_wait(self):
         r = reg.save_rule({"key": "policy.po_required", "kind": "policy", "title": "PO mbi 50k", "value": {"min": 50000}},
