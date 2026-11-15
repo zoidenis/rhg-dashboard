@@ -38,6 +38,12 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 .fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
 .fc-seg button.on{background:var(--accent);color:var(--card)}
+/* Operations & Food Safety: a tower of its own (its side menu, not Finance's; no department or comparison) */
+#oxNav{display:none}
+body.tw-ops #nav{display:none}
+body.tw-ops #oxNav{display:flex;flex-direction:column;gap:var(--rhg-space-8,8px)}
+#nav button[data-view="opsexec"]{display:none!important}
+body.tw-ops #dimPick,body.tw-ops #cmpLabel,body.tw-ops #foot,body.tw-ops #sourceBanner{display:none!important}
 @media (max-width:640px){#v-people .card-head,#v-opsexec .card-head{flex-direction:column;align-items:stretch}#v-people .card-head .sh-ctl,#v-opsexec .card-head .sh-ctl{display:flex;flex-wrap:wrap;gap:6px}}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ic-keys{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink)}
 .ic-keys i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
@@ -631,6 +637,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <a href="/finance/" class="on" id="towerFinance" aria-current="page">Finance</a>
     <a href="/finance/#inventory" id="towerInventory">Inventory</a>
     <a href="/finance/#sales" id="towerSales">Sales</a>
+    <a href="/finance/#opsexec" id="towerOps">Operations &amp; Food Safety</a>
   </div>
   <nav id="nav">
     <div class="grp">Overview</div>
@@ -682,7 +689,15 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <button data-view="settings">Settings</button>
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
   </nav>
-  <div class="side-foot">Reads Business Central directly, on this PC. BC stays read-only; actions and thresholds live here.</div>
+  <nav id="oxNav" aria-label="Operations &amp; Food Safety">
+    <div class="grp">Operations &amp; Food Safety</div>
+    <button type="button" data-t="overview">Overview</button>
+    <button type="button" data-t="checklists">Checklists &amp; tasks</button>
+    <button type="button" data-t="foodsafety">Food safety</button>
+    <button type="button" data-t="waste">Waste &amp; yield</button>
+    <button type="button" data-t="forms">Forms &amp; coverage</button>
+  </nav>
+  <div class="side-foot" id="sideFoot">Reads Business Central directly, on this PC. BC stays read-only; actions and thresholds live here.</div>
   <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
 </aside>
 <div class="mnav-bd no-report" id="mnavBd"></div>
@@ -690,7 +705,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 <main>
   <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
   <header>
-    <div><div class="eyebrow">RHG Finance / Business Central, read-only</div>
+    <div><div class="eyebrow" id="eyebrow">RHG Finance / Business Central, read-only</div>
       <h1 id="title">Executive overview</h1><div class="period" id="period">Loading your data…</div></div>
     <div class="hdr-side">
       <div class="hdr-btns">
@@ -4884,7 +4899,7 @@ function oxQs(){ const p = new URLSearchParams(params()); p.set("part", oxTab); 
 function oxShow(tab){
   oxTab = tab;
   document.querySelectorAll("#oxTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("oxH").textContent = OX_TITLE[tab]; $("oxHint").textContent = OX_HINT[tab];
+  $("oxH").textContent = OX_TITLE[tab]; $("oxHint").textContent = OX_HINT[tab]; oxNavSync();
   if (currentView().id === "opsexec") setHeader();
   oxLoad(false);
 }
@@ -4916,6 +4931,25 @@ function oxRender(){
   $("oxDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
   ({overview: oxOverview, checklists: oxChecklists, foodsafety: oxFood, waste: oxWaste, forms: oxForms})[oxTab](d);
 }
+// the tower of its own: its side menu (mirrors the tab bar, screens the role does not hold included), its header
+function oxTower(on){                // may run before this script part: everything it needs is read here
+  const eb = document.getElementById("eyebrow"), sf = document.getElementById("sideFoot");
+  if (!eb.dataset.fin) { eb.dataset.fin = eb.textContent; sf.dataset.fin = sf.textContent; }
+  document.body.classList.toggle("tw-ops", on);
+  eb.textContent = on ? "RHG Operations & Food Safety / Crunchtime Ops Execution, read-only" : eb.dataset.fin;
+  sf.textContent = on ? "Reads Crunchtime Ops Execution, read only: checklists, food safety logs, waste and yield, sensors. Nothing is written to Crunchtime." : sf.dataset.fin;
+  document.querySelectorAll("#oxNav button").forEach(b => {
+    const t = document.querySelector(`#oxTabs button[data-t="${b.dataset.t}"]`);
+    b.classList.toggle("on", b.dataset.t === (typeof oxTab === "undefined" ? "overview" : oxTab));
+    b.classList.toggle("scr-off", !!t && t.classList.contains("scr-off"));
+  });
+}
+function oxNavSync(){ oxTower(document.body.classList.contains("tw-ops")); }
+document.querySelectorAll("#oxNav button").forEach(b => b.onclick = () => {
+  oxTab = b.dataset.t;
+  if (currentView().id !== "opsexec") navTo("opsexec"); else oxShow(b.dataset.t);
+});
+new MutationObserver(oxNavSync).observe($("oxTabs"), {subtree: true, attributes: true, attributeFilter: ["class"]});
 function oxSum(R, f){ return R.reduce((a, x) => a + (f(x) || 0), 0); }
 // executives
 function oxOverview(d){
@@ -10055,9 +10089,10 @@ function setHeader(){
   dimNaSync();
   const v = currentView();
   const inv = v.id === "inventory", invTower = inv || INV_TABS.has(v.id);
-  const salesTower = v.id === "sales", finTower = !invTower && !salesTower;
-  $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower);
-  $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower);
+  const salesTower = v.id === "sales", opsTower = v.id === "opsexec", finTower = !invTower && !salesTower && !opsTower;
+  $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower); $("towerOps").classList.toggle("on", opsTower);
+  $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower); $("towerOps").toggleAttribute("aria-current", opsTower);
+  oxTower(opsTower);
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "opsexec"){
@@ -10145,7 +10180,7 @@ $("exportBtn").onclick = () => {
 };
 $("pdfBtn").onclick = () => { document.body.classList.add("printing"); window.print(); };
 window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
-$("refreshBtn").onclick=()=>load();
+$("refreshBtn").onclick=()=>{ if (currentView().id === "opsexec") oxLoad(true); else load(); };
 ["company","dimension"].forEach(id=>$(id).onchange=()=>load());
 // the departments changed: every location screen is read again for them (the open one now, the others when opened)
 $("dimension").addEventListener("change", () => {
@@ -12481,7 +12516,7 @@ locRegLoad();
   const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
   btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
   document.getElementById("mnavBd").addEventListener("click", () => set(false));
-  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("#nav button, .towers a, a")) set(false); });
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("#nav button, #oxNav button, .towers a, a")) set(false); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
   window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
 })();

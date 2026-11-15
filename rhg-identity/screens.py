@@ -40,7 +40,7 @@ FINANCE = [
         ("personnel", "Personnel cost", "location", ["finance.pl.view"]),
         ("quality", "HR data quality", "location", [])]),
     # Operations & Food Safety: Crunchtime Ops Execution (checklists, food safety logs, waste and yield, sensors)
-    ("opsexec", "Operations & Food Safety", "Overview", "oxTabs", [
+    ("opsexec", "Operations & Food Safety", "Operations & Food Safety", "oxTabs", [
         ("overview", "Overview", "location", []),
         ("checklists", "Checklists & tasks", "location", []),
         ("foodsafety", "Food safety", "location", []),
