@@ -1422,7 +1422,8 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     </div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Every asset</h2><p class="hint" id="frListNote"></p></div></div>
       <div class="filters" style="margin:0 0 10px">
-        <label>Search<input id="frQ" placeholder="asset, description"></label>
+        <label>Asset ID<input id="frId" placeholder="one or more: 201906310, K31" spellcheck="false" autocomplete="off" title="One or more asset IDs (No. of the FA card), separated by commas, spaces or new lines; a part of the ID is enough. A disposed asset is found too."></label>
+        <label>Search<input id="frQ" placeholder="description or asset ID"></label>
         <label>Class<select id="frClassF"><option value="">All</option></select></label>
         <label>Location<select id="frLocF"><option value="">All</option></select></label>
         <label>Status<select id="frStF"><option value="">In use and fully depreciated</option><option value="in use">In use</option><option value="fully">Fully depreciated</option><option value="disposed">Disposed this year</option><option value="all">All</option></select></label>
@@ -11690,23 +11691,38 @@ async function loadFr(refresh){
     if (j.refreshing) frTimer = setTimeout(() => loadFr(false), 15000);
   } catch (e) { $("frStatus").textContent = "Could not read: " + e.message; }
 }
+// the IDs typed or pasted (comma, semicolon, space, tab or new line between them), upper case
+const frIds = () => $("frId").value.toUpperCase().split(/[\s,;]+/).filter(Boolean);
+const frNorm = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
+const frIdHit = (asset, ids) => { const a = String(asset || "").toUpperCase(); return ids.some(i => a === i || a.includes(i)); };
 function frFiltered(){
-  const q = $("frQ").value.trim().toLowerCase(), cl = $("frClassF").value, lo = $("frLocF").value, st = $("frStF").value, so = $("frSort").value;
-  let R = frData.rows.map(frRow).filter(x => (st === "all" || (st ? x.status === st : x.status !== "disposed"))
-    && (!cl || (x.class || "—") === cl) && (!lo || x.location === lo) && (!q || (x.asset + " " + x.description).toLowerCase().includes(q)));
-  const key = {nbv: x => -x.nbv, cost: x => -x.cost, dep_ytd: x => -x.dep_ytd, acquired: x => (x.acquired ? -Number(x.acquired.replace("-", "")) : 0), dep_pct: x => -(x.dep_pct || 0)}[so];
+  const q = frNorm($("frQ").value), ids = frIds(), cl = $("frClassF").value, lo = $("frLocF").value, st = $("frStF").value, so = $("frSort").value;
+  let R = frData.rows.map(frRow).filter(x => (st === "all" || (st ? x.status === st : (ids.length || x.status !== "disposed")))
+    && (!cl || (x.class || "—") === cl) && (!lo || x.location === lo) && (!ids.length || frIdHit(x.asset, ids))
+    && (!q || frNorm(x.asset + " " + x.description).includes(q)));
+  if (ids.length) {             // an exact ID first, then the IDs that only contain what was typed
+    const ex = new Set(ids);
+    return R.sort((a, b) => (ex.has(String(b.asset).toUpperCase()) - ex.has(String(a.asset).toUpperCase())) || frSortKey(so)(a) - frSortKey(so)(b));
+  }
+  const key = frSortKey(so);
   return R.sort((a, b) => key(a) - key(b));
 }
+const frSortKey = so => ({nbv: x => -x.nbv, cost: x => -x.cost, dep_ytd: x => -x.dep_ytd, acquired: x => (x.acquired ? -Number(x.acquired.replace("-", "")) : 0), dep_pct: x => -(x.dep_pct || 0)})[so] || (x => -x.nbv);
 const frStatusTag = x => x.status === "disposed" ? `<span class="meta">disposed</span>` : x.status === "fully" ? `<span class="meta">fully depreciated</span>` : "in use";
 function frTable(){
   const R = frFiltered(), shown = R.slice(0, frShow), C = frData.currency || "";
   $("frListNote").textContent = `${fmt(R.length)} assets · cost ${flM(R.reduce((a, x) => a + x.cost, 0))} · net book value ${flM(R.reduce((a, x) => a + x.nbv, 0))} ${C} · depreciation this year ${flM(R.reduce((a, x) => a + x.dep_ytd, 0))}`;
-  $("frTable").innerHTML = `<tr><th>Asset</th><th>Class</th><th>Location</th><th>Acquired</th><th class="num">Cost</th><th class="num">Accumulated depreciation</th><th class="num">Net book value</th><th class="num">% depreciated</th><th class="num">Depreciation this year</th><th class="num">Last month</th><th>Last depreciated</th><th>Status</th></tr>`
-    + (shown.map(x => `<tr data-pulse="faasset|${esc(x.asset)}" tabindex="0" style="cursor:pointer"><td><b>${esc(x.description || x.asset)}</b><div class="meta">${esc(x.asset)}</div></td><td class="meta">${esc(x.class || "–")}</td>
+  $("frTable").innerHTML = `<tr><th>Asset ID</th><th>Description</th><th>Class</th><th>Location</th><th>Acquired</th><th class="num">Cost</th><th class="num">Accumulated depreciation</th><th class="num">Net book value</th><th class="num">% depreciated</th><th class="num">Depreciation this year</th><th class="num">Last month</th><th>Last depreciated</th><th>Status</th></tr>`
+    + (shown.map(x => `<tr data-pulse="faasset|${esc(x.asset)}" tabindex="0" style="cursor:pointer"><td style="white-space:nowrap"><b>${esc(x.asset)}</b></td><td>${esc(x.description || "–")}</td><td class="meta">${esc(x.class || "–")}</td>
       <td class="meta">${esc(frLocName(x.location, x.location_name))}</td><td class="meta">${esc(x.acquired || "–")}</td><td class="num">${fmt(x.cost)}</td><td class="num">${fmt(x.acc_dep)}</td>
       <td class="num"><b class="${x.nbv < -1 ? "up" : ""}">${fmt(x.nbv)}</b></td><td class="num">${x.dep_pct == null ? "–" : fmt(x.dep_pct, 0) + "%"}</td><td class="num">${fmt(x.dep_ytd)}</td>
       <td class="num">${x.dep_month ? fmt(x.dep_month) : "–"}</td><td class="meta">${esc(x.last_dep || "never")}</td><td>${frStatusTag(x)}</td></tr>`).join("")
-      || `<tr><td colspan="12" class="meta">No asset matches.</td></tr>`);
+      || `<tr><td colspan="13" class="meta">${frIds().length > 1 ? "No asset with these IDs in the register of the period (with the class, location and status chosen)." : frIds().length ? "No asset with this ID in the register of the period (with the class, location and status chosen)." : "No asset matches."}</td></tr>`);
+  const ids = frIds();
+  if (ids.length) {             // the IDs typed that match nothing are named
+    const miss = ids.filter(i => !R.some(x => frIdHit(x.asset, [i])));
+    if (miss.length) $("frListNote").textContent += ` · not found: ${miss.slice(0, 12).join(", ")}${miss.length > 12 ? " …" : ""}`;
+  }
   $("frMore").textContent = R.length > shown.length ? `The first ${fmt(shown.length)} of ${fmt(R.length)}; Export gives every one.` : "";
   $("frMoreBtn").style.display = R.length > shown.length ? "" : "none";
 }
@@ -11752,7 +11768,7 @@ function renderFr(){
   frTable();
 }
 $("frRead").onclick = () => loadFr(true);
-["frQ"].forEach(id => $(id).oninput = () => { frShow = 200; frTable(); });
+["frQ", "frId"].forEach(id => $(id).oninput = () => { frShow = 200; frTable(); });
 ["frClassF", "frLocF", "frStF", "frSort"].forEach(id => $(id).onchange = () => { frShow = 200; frTable(); });
 $("frMoreBtn").onclick = () => { frShow += 200; frTable(); };
 $("frExp").onclick = () => {
@@ -11765,7 +11781,7 @@ $("frExp").onclick = () => {
     {title: "By class", header: ["Class", "Assets", "Cost", "Accumulated depreciation", "Net book value", "Depreciation this year"], formats: ["text", "num", "num", "num", "num", "num"], rows: d.classes},
     {title: "By location", header: ["Location", "Name", "Assets", "Cost", "Accumulated depreciation", "Net book value", "Depreciation this year"], formats: ["text", "text", "num", "num", "num", "num", "num"], rows: d.locations},
     {title: "By month", header: ["Month", "Additions", "Depreciation", "Net book value at its end"], formats: ["text", "num", "num", "num"], rows: d.months.map((m, i) => [m, d.m_add[i], d.m_dep[i], d.m_nbv[i]])}],
-    [`${d.company} · depreciation book ${d.book} · at the end of ${P.months[1]}`, `Filters of the list: ${[$("frQ").value, $("frClassF").value, $("frLocF").value, $("frStF").value].filter(Boolean).join(", ") || "none"}`]
+    [`${d.company} · depreciation book ${d.book} · at the end of ${P.months[1]}`, `Filters of the list: ${[$("frId").value.trim() && `asset ID: ${frIds().join(", ")}`, $("frQ").value, $("frClassF").value, $("frLocF").value, $("frStF").value].filter(Boolean).join(", ") || "none"}`]
     .concat(Object.values(d.definitions || {})));
 };
 // pop-ups: a list of assets (a check, a class, the added, the disposed), one asset, one month
@@ -11777,14 +11793,23 @@ function frListPop(kind){
     fully: "Fully depreciated, still on the books", added: "Added this year", disposed: "Disposed this year", noloc: "Assets with no FA location"};
   const R = all.filter(x => cls != null ? (x.class || "—") === cls && x.status !== "disposed" : kind === "all" ? x.status !== "disposed" : kind === "added" ? x.add_ytd > 0
     : kind === "disposed" ? x.status === "disposed" : kind === "noloc" ? !x.location && x.status !== "disposed" : by.has(x.asset)).sort((a, b) => b.nbv - a.nbv || b.cost - a.cost);
-  const sum = k => R.reduce((a, x) => a + (x[k] || 0), 0);
-  Pulse.pop({title: esc(cls != null ? cls : T[kind] || kind), sub: esc(`${cls != null ? "FA class · " : ""}Fixed assets · ${d.company} · ${flMon(d.period.months[1])}`), body:
-    Pulse.tiles([{l: "Assets", v: fmt(R.length)}, {l: "Cost", v: flM(sum("cost"))}, {l: "Accumulated depreciation", v: flM(sum("acc_dep"))}, {l: "Net book value", v: flM(sum("nbv"))},
+  const draw = (el, q) => {
+    const ids = q.toUpperCase().split(/[\s,;]+/).filter(Boolean), t = frNorm(q);
+    const F = !q.trim() ? R : R.filter(x => frIdHit(x.asset, ids) || frNorm(x.asset + " " + x.description).includes(t));
+    const sum = k => F.reduce((a, x) => a + (x[k] || 0), 0);
+    el.innerHTML = Pulse.tiles([{l: "Assets", v: fmt(F.length)}, {l: "Cost", v: flM(sum("cost"))}, {l: "Accumulated depreciation", v: flM(sum("acc_dep"))}, {l: "Net book value", v: flM(sum("nbv"))},
       {l: "Depreciation this year", v: flM(sum("dep_ytd"))}])
-    + Pulse.list([["Asset"], ["Class"], ["Location"], ["Acquired"], ["Cost", 1], ["Net book value", 1], ["% depreciated", 1], ["This year", 1], ["Last depreciated"]],
-      R.map(x => ({cells: [`<b>${esc(x.description || x.asset)}</b><div class="meta">${esc(x.asset)}</div>`, `<span class="meta">${esc(x.class || "–")}</span>`, esc(frLocName(x.location, x.location_name)),
+    + Pulse.list([["Asset ID"], ["Description"], ["Class"], ["Location"], ["Acquired"], ["Cost", 1], ["Net book value", 1], ["% depreciated", 1], ["This year", 1], ["Last depreciated"]],
+      F.map(x => ({cells: [`<b style="white-space:nowrap">${esc(x.asset)}</b>`, esc(x.description || "–"), `<span class="meta">${esc(x.class || "–")}</span>`, esc(frLocName(x.location, x.location_name)),
         esc(x.acquired || "–"), fmt(x.cost), `<b>${fmt(x.nbv)}</b>`, x.dep_pct == null ? "–" : fmt(x.dep_pct, 0) + "%", fmt(x.dep_ytd), esc(x.last_dep || "never")], open: `faasset|${x.asset}`})),
-      {max: 480, limit: 400, none: "No asset."})});
+      {max: 480, limit: 400, none: q.trim() ? "No asset with this ID or description here." : "No asset."});
+  };
+  Pulse.pop({title: esc(cls != null ? cls : T[kind] || kind), sub: esc(`${cls != null ? "FA class · " : ""}Fixed assets · ${d.company} · ${flMon(d.period.months[1])}`), body: el => {
+    el.innerHTML = `<div class="filters" style="margin:0 0 10px"><label>Asset ID or description<input class="fr-pq" placeholder="e.g. 201906310 or frigorifer" spellcheck="false" autocomplete="off"></label></div><div class="fr-pl"></div>`;
+    const inp = el.querySelector(".fr-pq"), box = el.querySelector(".fr-pl");
+    inp.oninput = () => draw(box, inp.value);
+    draw(box, "");
+  }});
 }
 Pulse.on("frlist", k => frListPop(k));
 Pulse.on("frclass", c => frListPop("class:" + c));
