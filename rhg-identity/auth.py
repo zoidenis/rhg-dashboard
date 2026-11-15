@@ -132,7 +132,7 @@ def public(row):
     scope = effective_scope(row)
     if scope != ALL_SCOPE:
         # Unicorn reads the whole group: not for an account limited to some companies or locations.
-        perms = [p for p in perms if p != "unicorn.use"]
+        perms = [p for p in perms if not p.startswith("unicorn.")]
     return {"username": row["username"], "name": row["name"], "email": row["email"],
             "role": row["role"], "active": bool(row["active"]),
             "must_change": bool(row["must_change"]), "last_login": row["last_login"],

@@ -39,6 +39,7 @@ import menucost
 import chanprof
 import today as todayloc
 import unicorn_facts
+import unicorn_tools
 import faloc
 import faregister
 import transit
@@ -3962,6 +3963,16 @@ class Handler(BaseHTTPRequestHandler):
                     lambda co: dashboard(co, "", "month", ""), arap.digest, day, bool(body.get("refresh"))))
             except ValueError:
                 self._send(400, {"error": "Bad date."})
+            return
+        if url.path == "/internal/unicorn/tool":
+            # Unicorn (identity) reading one figure it needs for an investigation or a question (unicorn_tools.py)
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            self._send(200, unicorn_tools.call(
+                {"client": client, "latest_fn": _latest, "parallel_fn": in_parallel_jobs,
+                 "currency_of": company_currency, "digest_fn": arap.digest},
+                str(body.get("name") or ""), body.get("args") or {}))
             return
         user = self._user()
         if url.path == "/api/login":

@@ -23,6 +23,9 @@ from datetime import date, datetime, timedelta
 
 import config
 import store
+import unicorn_agent as agent
+import unicorn_detect as detect
+import unicorn_registers as reg
 
 MODEL = config.get("UNICORN_MODEL", "claude-sonnet-5-5")
 API_KEY = config.get("ANTHROPIC_API_KEY", "")
@@ -69,6 +72,7 @@ def init():
     with store._lock:
         store.connect().executescript(SCHEMA)
         store.connect().commit()
+    reg.init()
 
 
 def enabled():
@@ -110,12 +114,21 @@ What you can see today:
     invoiced, the tower's own brief (developments, risks, actions), the largest price movers, exceptions without an
     owner, invoices posted the day before without a purchase order.
 - Facts listed under "errors", or missing, are UNAVAILABLE. Say exactly what is missing; never fill it with zero.
-- You cannot query Business Central, Simphony or any other system yourself in this version, and SevenRooms and
-  Microsoft 365 are not connected. When a question needs data that is not in the FACTS, say so and point to the
-  pulse screen where it can be seen (Finance → Sales, Kartela, Inventory, Budget & forecast, Location
-  intelligence; Purchasing → Buying, Prices & contracts, Exceptions, Invoices without PO).
-- You only read and advise. You cannot create actions, send messages or change anything; recommend, and say who
-  should act.
+- Read-only TOOLS (when given in this conversation): list_restaurants, kpi_definitions, sales, sales_by_day,
+  pl_month, payables_receivables, food_safety (Crunchtime), purchases_overview, supplier_summary, item_prices,
+  invoices_without_po, and pulse's registers (open_findings, rules_in_force, decision_history). Use them to answer
+  with fresh figures and to investigate across systems (sales ↔ P&L ↔ purchases ↔ food safety): read before you
+  conclude, read narrowly (one company, one restaurant, the days that matter), and name the tool and period of
+  every figure. A tool answer with "available": false or "error" is UNAVAILABLE, never zero. SevenRooms, Odoo
+  and Microsoft 365 have no tool yet: point to the pulse screen (Sales → SevenRooms, People & Productivity).
+- pulse keeps a Findings register, a Decisions register, an Action tracker and a Rules library. Detectors without
+  AI raise findings every morning from the rules in force. You may record a finding (raise_finding) or propose a
+  decision (submit_proposal) or a new version of a rule (propose_rule_change); a person approves, refuses, owns
+  and closes. You read, investigate and propose; you never send a message, change a rule, approve a decision or
+  write to Business Central, Simphony, Odoo, Crunchtime or any other source.
+- Rules marked Approved are RHG's; rules marked Proposed are pulse's defaults awaiting approval: say so when a
+  finding rests on one. A finding explained by an approved decision or rule is not a new problem: say "within the
+  approved decision".
 - The people you talk to are RHG's management (CEO, CFO, COO and administrators) with access to the whole group.
 - History of exceptions: the previous morning brief is given to you; use it for "changes since the previous
   briefing".
@@ -318,6 +331,8 @@ def run(day, actor="scheduler"):
         store.run("""INSERT INTO unicorn_facts(day, facts, at) VALUES(?,?,?)
                      ON CONFLICT(day) DO UPDATE SET facts=excluded.facts, at=excluded.at""",
                   (day.isoformat(), _compact(facts), store.now()))
+        _running["stage"] = "Detecting findings"
+        found = _detect(facts)
         _running["stage"] = "Writing the brief"
         prev = store.one("""SELECT day, text FROM unicorn_messages WHERE username='*' AND kind='brief' AND day < ?
                             ORDER BY id DESC LIMIT 1""", (day.isoformat(),))
@@ -325,7 +340,7 @@ def run(day, actor="scheduler"):
             {"role": "user", "content": FACTS_TURN.format(day=day.isoformat(), weekday=day.strftime("%A"),
                                                           facts=_compact(facts))},
             {"role": "assistant", "content": f"I have read the facts of {day.isoformat()}."},
-            {"role": "user", "content": BRIEF_ASK.format(
+            {"role": "user", "content": _registers_turn(found).strip() + "\n\n" + BRIEF_ASK.format(
                 day=day.isoformat(), weekday=day.strftime("%A"), language=LANGUAGE,
                 prev_day=prev["day"] if prev else "none",
                 previous=prev["text"] if prev else "(this is the first briefing)")}],
@@ -335,6 +350,13 @@ def run(day, actor="scheduler"):
         store.run("UPDATE unicorn_runs SET state='done', at=?, message_id=? WHERE day=?",
                   (store.now(), mid, day.isoformat()))
         store.audit("unicorn brief", actor, day.isoformat(), {"message": mid, "usage": usage})
+        _running["stage"] = "Investigating the largest new findings"
+        try:
+            done = investigate_new(actor)
+            if done:
+                _post("*", "unicorn", "note", _investigation_note(done), day.isoformat(), {"investigated": done})
+        except Exception:                                           # noqa: BLE001
+            traceback.print_exc()
         return mid
     except Exception as exc:                                        # noqa: BLE001
         traceback.print_exc()
@@ -362,9 +384,16 @@ def _safe(fn, *a):
         pass
 
 
+def _safe_counts():
+    try:
+        return reg.counts()
+    except Exception:                                               # noqa: BLE001
+        return {}
+
+
 def state():
     last = store.one("SELECT * FROM unicorn_runs ORDER BY day DESC LIMIT 1")
-    return {"enabled": enabled(), "model": MODEL, "time": RUN_AT,
+    return {"enabled": enabled(), "model": MODEL, "time": RUN_AT, "registers": _safe_counts(),
             "running": {"day": _running["day"], "stage": _running["stage"],
                         "seconds": int(time.time() - _running["started"]) if _running["started"] else 0}
             if _running["day"] else None,
@@ -415,6 +444,150 @@ def start():
     threading.Thread(target=loop, daemon=True, name="unicorn").start()
 
 
+
+# ---------------------------------------------------------------- detection, investigation, follow-up (Unicorn 2.0)
+_inv_lock = threading.Lock()
+_investigating = set()
+SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def _detect(facts):
+    """The detectors over the morning's facts and the measurement of open actions. Never stops the brief."""
+    try:
+        seen, new = detect.run(facts)
+        measured = detect.follow_up(facts)
+        return {"seen": seen, "new": new, "measured": measured}
+    except Exception:                                               # noqa: BLE001
+        traceback.print_exc()
+        return {"seen": [], "new": [], "measured": 0, "error": "the detectors failed"}
+
+
+def _registers_turn(found):
+    """What the registers hold this morning, for the brief: new findings, proposals waiting, overdue actions."""
+    new = [reg.finding(i) for i in (found or {}).get("new") or []]
+    new = sorted([f for f in new if f], key=lambda f: (SEV_RANK.get(f["severity"], 9), -(f["impact"] or 0)))[:12]
+    waiting = reg.decisions("Proposed")[:8]
+    overdue = [a for a in reg.actions("open") if a["overdue"]][:8]
+    if not (new or waiting or overdue):
+        return "\n\n<registers>No new finding, no proposal waiting and no overdue action this morning.</registers>"
+    slim = lambda f: {k: f[k] for k in ("id", "title", "location_name", "company", "period", "value", "limit", "unit",  # noqa: E731
+                                        "impact", "currency", "severity", "seen_count")}
+    reg_json = json.dumps({"new_findings": [slim(f) for f in new],
+                           "proposals_waiting_for_approval": [{k: d[k] for k in ("id", "title", "impact", "currency", "proposed_at")} for d in waiting],
+                           "overdue_actions": [{k: a[k] for k in ("id", "title", "owner", "due", "baseline", "latest", "effect", "unit")} for a in overdue]},
+                          ensure_ascii=False, default=str)
+    return ("\n\n<registers>\n" + reg_json + "\n</registers>\nIn section 7 cite the findings by their number "
+            "(e.g. [F12]) and mention the proposals waiting and the overdue actions with their owners.")
+
+
+INVESTIGATE_ASK = """<finding id="{id}">
+{finding}
+</finding>
+<history_of_similar_findings>
+{history}
+</history_of_similar_findings>
+
+Investigate finding F{id} for RHG management, as the CFO, COO and controller would. Today is {today}.
+1. Check it is real: read the figures again with the tools (the same restaurant or company and period, and the
+   comparison that explains it). If the data is missing or wrong, say so and propose no business decision.
+2. Look for the cause across systems: sales (checks, guests, average check, discounts, voids, the days), the P&L
+   by department, purchases and item prices of what drives the cost, food safety (spoil, yield, refused products),
+   payables and receivables. Read narrowly; stop when the cause is clear or the reads run out.
+3. Check rules_in_force and the history above: an approved rule or decision that explains it means no new
+   decision (say so in no_action_reason); a reason people gave before for refusing a similar proposal must be
+   weighed.
+4. Finish with submit_proposal: facts (each with its tool and period) apart from the hypothesis, one decision with
+   an action verb, the impact in money with its formula, the approver role, the days to carry it out, the KPI and
+   its target. Write in {language}."""
+
+
+def investigate(fid, actor="unicorn"):
+    """One finding: Claude reads with the tools and ends with a proposal (or why none is needed)."""
+    f = reg.finding(fid)
+    if not f:
+        raise ValueError("No such finding.")
+    if f["status"] not in ("New", "Investigating"):
+        raise ValueError("Only a new finding is investigated (this one is " + f["status"] + ").")
+    with _inv_lock:
+        if fid in _investigating:
+            raise RuntimeError("Unicorn is already investigating this finding.")
+        _investigating.add(fid)
+    try:
+        reg.set_finding(fid, "Investigating", actor)
+        maxc, _st, _v = reg.rule_value("agent.max_tool_calls", {"n": 12})
+        ctx = {"context": f"finding:{fid}", "actor": actor}
+        hist = reg.similar_history(f)
+        ask_text = INVESTIGATE_ASK.format(id=fid, finding=json.dumps(f, ensure_ascii=False, default=str),
+                                          history=json.dumps(hist, ensure_ascii=False, default=str) if hist else "none",
+                                          today=date.today().isoformat(), language=LANGUAGE)
+        text, prop, usage, calls = agent.loop(system_prompt(), [{"role": "user", "content": ask_text}],
+                                              agent.investigation_specs(), ctx, MODEL, CHAT_TOKENS, EFFORT,
+                                              int(maxc.get("n") or 12), finish="submit_proposal")
+        meta = {"model": MODEL, "usage": usage, "tool_calls": calls}
+        if not prop:
+            reg.set_finding(fid, "New", "unicorn", "Investigation ended without a proposal: " + (text or "")[:500])
+            return {"finding": fid, "proposal": None}
+        if prop.get("no_action_reason") and not prop.get("decision"):
+            reg.set_finding(fid, "Closed", "unicorn", "No decision needed: " + prop["no_action_reason"][:1500])
+            return {"finding": fid, "proposal": None, "no_action": prop["no_action_reason"]}
+        if not prop.get("decision"):
+            prop["decision"] = prop.get("no_action_reason") or "Review the finding"
+        did = reg.propose(fid, prop, "unicorn", meta)
+        return {"finding": fid, "proposal": did, "impact": prop.get("impact_amount"), "title": prop.get("decision")}
+    except Exception as exc:                                        # noqa: BLE001
+        traceback.print_exc()
+        try:
+            reg.set_finding(fid, "New", "unicorn", f"Investigation failed: {str(exc)[:300]}")
+        except Exception:                                           # noqa: BLE001
+            pass
+        raise
+    finally:
+        with _inv_lock:
+            _investigating.discard(fid)
+
+
+def investigate_new(actor="scheduler"):
+    """The n new findings with the largest impact (rule agent.investigate_per_day), investigated one by one."""
+    if not enabled():
+        return []
+    n, _st, _v = reg.rule_value("agent.investigate_per_day", {"n": 3})
+    todo = [f for f in reg.findings("New", limit=200) if not f["rule"].startswith("chat.")]
+    todo.sort(key=lambda f: (SEV_RANK.get(f["severity"], 9), -(f["impact"] or 0)))
+    done = []
+    for f in todo[:max(0, int(n.get("n") or 0))]:
+        try:
+            done.append(investigate(f["id"], actor))
+        except Exception as exc:                                    # noqa: BLE001
+            done.append({"finding": f["id"], "error": str(exc)[:200]})
+    return done
+
+
+def investigate_now(fid, actor):
+    if not enabled():
+        raise RuntimeError("Unicorn has no Anthropic API key yet (ANTHROPIC_API_KEY in identity's .env).")
+    f = reg.finding(fid)
+    if not f or f["status"] not in ("New",):
+        raise ValueError("Only a new finding can be investigated.")
+    threading.Thread(target=lambda: _safe(investigate, int(fid), actor), daemon=True, name="unicorn-investigate").start()
+    return {"started": True}
+
+
+def _investigation_note(done):
+    props = [d for d in done if d.get("proposal")]
+    lines = [f"Hetova {len(done)} gjetjet e reja me ndikimin më të madh; {len(props)} propozime presin miratim "
+             "te Unicorn → Decisions & actions."]
+    for d in done:
+        f = reg.finding(d["finding"])
+        name = f"F{d['finding']} · {f['title']} · {f['location_name']}" if f else f"F{d['finding']}"
+        if d.get("proposal"):
+            imp = f" · ndikimi i pritur {d['impact']:,.0f}" if isinstance(d.get("impact"), (int, float)) else ""
+            lines.append(f"- **{name}**: {d.get('title') or ''}{imp}")
+        elif d.get("no_action"):
+            lines.append(f"- {name}: pa vendim të ri ({d['no_action'][:160]})")
+        else:
+            lines.append(f"- {name}: hetimi nuk përfundoi ({d.get('error') or 'pa propozim'})")
+    return "\n".join(lines)
+
 # ---------------------------------------------------------------- the chat
 def ask(user, text):
     """A question from a person: stored, answered from the latest facts and their conversation."""
@@ -441,8 +614,9 @@ def ask(user, text):
             msgs.append({"role": "user", "content": f"FACTS of {day} (JSON, gathered this morning):\n{_compact(facts)}"})
             msgs.append({"role": "assistant", "content": brief["text"] if brief else "I have read the facts."})
         else:
-            msgs.append({"role": "user", "content": "No facts have been gathered yet (the first morning brief has "
-                                                    "not run). Answer without figures and say so."})
+            msgs.append({"role": "user", "content": "No morning facts have been gathered yet (the first brief has not "
+                                                    "run). Read the figures you need with the tools; without a tool "
+                                                    "for it, say the figure is unavailable."})
             msgs.append({"role": "assistant", "content": "Understood."})
         for h in reversed(history):
             role = "assistant" if h["author"] == "unicorn" else "user"
@@ -457,7 +631,14 @@ def ask(user, text):
         else:
             msgs.append({"role": "user", "content": q})
         try:
-            answer, usage = claude(msgs, max_tokens=CHAT_TOKENS)
+            perms = user.get("permissions") or []
+            maxc, _st, _v = reg.rule_value("agent.max_tool_calls", {"n": 12})
+            answer, _x, usage, calls = agent.loop(system_prompt(), msgs, agent.chat_specs(perms),
+                                                  {"context": f"chat:{qid}", "actor": who}, MODEL, CHAT_TOKENS, EFFORT,
+                                                  int(maxc.get("n") or 12))
+            if not answer:
+                raise EmptyAnswer("Unicorn gave an empty answer.")
+            usage["tool_calls"] = calls
         except Exception as exc:                                    # noqa: BLE001
             nid = _post(who, "unicorn", "note", f"I could not answer just now: {exc}")
             return [_row(store.one("SELECT * FROM unicorn_messages WHERE id=?", (i,))) for i in (qid, nid)]

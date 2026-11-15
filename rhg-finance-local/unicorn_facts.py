@@ -85,7 +85,7 @@ def sales(day, client, latest_fn, parallel_fn, currency_of, errors, progress):
             b2 = brand_report._budget_days(cube_of, dept, m1, day)
             b_day = round(b1["sales"]) if b1 and b1.get("sales") else None
             b_mtd = round(b2["sales"]) if b2 and b2.get("sales") else None
-        L = {"name": r.get("name") or r["ref"], "brand": r.get("brand") or "", "company": r.get("company") or "",
+        L = {"ref": r["ref"], "name": r.get("name") or r["ref"], "brand": r.get("brand") or "", "company": r.get("company") or "",
              "currency": cur, "seasonal": bool(r.get("seasonal")),
              "yesterday": round(s_y) if s_y is not None else None,
              "same_weekday_last_week": round(s_lw) if s_lw is not None else None,
@@ -152,7 +152,7 @@ def pl(company, day, client, currency_of):
             "last_year": _pl_short(P["ly"]), "year_to_date": _pl_short(P["ytd"]),
             "year_to_date_budget": _pl_short(P["ytd_bud"]), "year_to_date_last_year": _pl_short(P["ytd_ly"]),
             "full_year_budget": _pl_short(P.get("fy_bud")), "forecast": _pl_short(P.get("forecast")),
-            "departments": [{"name": d["name"], "brand": d["brand"], "actual": _pl_short(d["cur"]),
+            "departments": [{"code": d["code"], "name": d["name"], "brand": d["brand"], "actual": _pl_short(d["cur"]),
                              "budget": _pl_short(d["bud"]), "last_year": _pl_short(d["ly"])}
                             for d in R["depts"] if d["group"] == "restaurant"][:20],
             "largest_variances": R["variances"], "memo": R["memo"],

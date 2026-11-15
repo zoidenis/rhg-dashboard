@@ -44,6 +44,7 @@ import pricechg
 import purchasers
 import weekly_report
 import unicorn_facts
+import unicorn_tools
 import contracts
 import comparisons
 import config
@@ -2344,6 +2345,15 @@ class Handler(BaseHTTPRequestHandler):
                                                       day, bool(body.get("refresh"))))
             except ValueError:
                 self._send(400, {"error": "Bad date."})
+            return
+        if url.path == "/internal/unicorn/tool":         # Unicorn (identity) reading one figure for an investigation
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            self._send(200, unicorn_tools.call(
+                {"client": client, "dashboard": dashboard, "supplier_summary": supplier_summary, "period": _period,
+                 "nopo": nopo_window, "currency_of": company_currency, "default_company": config.BC_COMPANY},
+                str(body.get("name") or ""), body.get("args") or {}))
             return
         if url.path == "/internal/compliance/track":     # Finance tracking an invoice without a PO, for its user
             # the item goes into this tower's register, where the daily notice reads it: one follow-up per invoice

@@ -44,6 +44,8 @@ PERMISSIONS = {
 
     # --- Unicorn, the business analyst (morning brief and chat; for management)
     "unicorn.use":           "Talk to Unicorn, the business analyst: the morning brief and the chat",
+    "unicorn.decisions.approve": "Approve or refuse Unicorn's proposals, own and close the actions and findings",
+    "unicorn.rules.manage":  "Change Unicorn's rules library: thresholds, policies, approved decisions",
 
     # --- Scheduled reports (any screen of pulse sent by email, as each recipient sees it)
     "reports.manage":        "Schedule screens as email reports and choose who receives them",
@@ -72,6 +74,8 @@ ACTIONS = {
     "purchasing.settings.manage": "Purchasing: change thresholds and email settings",
     "purchasing.negotiations.edit": "Purchasing: enter proposed prices and negotiation scenarios (Negotiations)",
     "unicorn.use": "Unicorn, the business analyst: the morning brief and the chat",
+    "unicorn.decisions.approve": "Unicorn: approve or refuse its proposals, own and close actions and findings",
+    "unicorn.rules.manage": "Unicorn: change the rules library (thresholds, policies, approved decisions)",
     "reports.manage": "Scheduled reports: send screens by email, choose how often and to whom",
     "layout.personal": "Rearrange and hide sections for yourself",
     "layout.roles.manage": "Set the sections each role sees, and their order",
@@ -133,19 +137,21 @@ DEFAULT_ROLES = {
     "CEO": {"department": "Management", "system": False,
             "description": "Every screen of both towers and the executive dashboard; Unicorn; read only.",
             "permissions": _FIN_ALL + _PUR_ALL + _s("platform.s") + ["finance.export", "purchasing.export",
-                                                                     "unicorn.use", "layout.personal"]},
+                                                                     "unicorn.use", "unicorn.decisions.approve",
+                                                                     "unicorn.rules.manage", "layout.personal"]},
     "COO": {"department": "Management", "system": False,
             "description": "Operations: sales, inventory, purchasing, the executive dashboard; Unicorn.",
             "permissions": _s("finance.s.overview", "finance.s.sales", "finance.s.inventory", "finance.s.budget")
                            + _PUR_ALL + _s("platform.s") + ["finance.export", "purchasing.export", "unicorn.use",
-                                                             "layout.personal"]},
+                                                             "unicorn.decisions.approve", "layout.personal"]},
     # --- finance
     "CFO": {"department": "Finance", "system": False,
             "description": "Finance in full with closing and thresholds, Purchasing to read, the executive "
                            "dashboard; Unicorn.",
             "permissions": _FIN_ALL + _PUR_ALL + _s("platform.s") + _FIN_ACT + ["purchasing.export",
                                                                                 "admin.audit.view", "unicorn.use",
-                                                                                "layout.personal"]},
+                                                                                "unicorn.decisions.approve",
+                                                                                "unicorn.rules.manage", "layout.personal"]},
     "Finance director": {"department": "Finance", "system": False,
                          "description": "Finance in full, including closing and thresholds.",
                          "permissions": _FIN_ALL + _EXEC + _FIN_ACT + ["layout.personal"]},
@@ -321,6 +327,9 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.opsexec.waste": ("finance.s.sales.main", "finance.s.inventory.shrinkage"),
                  "finance.s.opsexec.forms": ("finance.s.sales.main",),
                  "purchasing.negotiations.edit": "purchasing.actions.manage",
+                 # Unicorn 2.0: whoever talks to Unicorn (management) approves its proposals and keeps its rules
+                 "unicorn.decisions.approve": "unicorn.use",
+                 "unicorn.rules.manage": "unicorn.use",
                  # Inventory → Item cards (was Item master control): with its stock by location it is also for the
                  # people of the warehouses, so whoever reads an inventory screen by location gets it once
                  "finance.s.inventory.itemmaster": ("finance.s.inventory.movement", "finance.s.inventory.sku",

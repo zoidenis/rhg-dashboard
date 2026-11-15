@@ -24,6 +24,7 @@ import reports
 import screens
 import store
 import unicorn
+import unicorn_registers as ureg
 
 STATIC = config.BASE_DIR / "static"
 STATIC_FILES = {
@@ -292,6 +293,35 @@ class Handler(BaseHTTPRequestHandler):
                     unicorn.mark_seen(user["username"], rows[-1]["id"])
                 self._send(200, {"state": unicorn.state(), "messages": rows, "unread": unread,
                                  "more": len(rows) >= 60})
+            elif url.path == "/api/unicorn/registers":
+                # Unicorn 2.0: findings, decisions, actions and the rules library (pulse's own registers)
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                qs = parse_qs(url.query)
+                fst = (qs.get("status") or ["open"])[0]
+                self._send(200, {"counts": ureg.counts(),
+                                 "findings": ureg.findings(None if fst == "all" else fst, (qs.get("capability") or [None])[0] or None,
+                                                           ((qs.get("q") or [""])[0] or "").strip()[:80] or None),
+                                 "decisions": ureg.decisions(), "actions": ureg.actions(),
+                                 "rules": ureg.rules(), "capabilities": ureg.CAPABILITIES,
+                                 "can_approve": auth.can(user, "unicorn.decisions.approve"),
+                                 "can_rules": auth.can(user, "unicorn.rules.manage"),
+                                 "investigating": sorted(unicorn._investigating), "enabled": unicorn.enabled()})
+            elif url.path == "/api/unicorn/finding":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                fid = (parse_qs(url.query).get("id") or ["0"])[0]
+                f = ureg.finding(int(fid)) if fid.isdigit() else None
+                if not f:
+                    self._send(404, {"error": "No such finding."}); return
+                d = ureg.decision(f["decision_id"]) if f["decision_id"] else None
+                self._send(200, {"finding": f, "decision": d, "trail": ureg.tool_calls(f"finding:{f['id']}"),
+                                 "history": ureg.similar_history(f),
+                                 "actions": [a for a in ureg.actions() if d and a["decision_id"] == d["id"]]})
+            elif url.path == "/api/unicorn/rules":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                self._send(200, {"versions": ureg.rules(with_history=True)})
             elif url.path == "/api/layout":
                 # The towers' layout (order and hidden sections) for the signed-in person.
                 qs = parse_qs(url.query)
@@ -442,6 +472,66 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     self._send(200, {"messages": unicorn.ask(user, body.get("text"))})
                 except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/unicorn/finding":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                try:
+                    act, fid = body.get("action"), int(body.get("id") or 0)
+                    if act == "investigate":
+                        self._send(200, unicorn.investigate_now(fid, user["username"])); return
+                    if act not in ("dismiss", "reopen", "close"):
+                        raise ValueError("Action: investigate, dismiss, reopen or close.")
+                    if act != "reopen" and not auth.can(user, "unicorn.decisions.approve"):
+                        self._send(403, {"error": "Your role cannot close or dismiss findings."}); return
+                    ureg.set_finding(fid, {"dismiss": "Dismissed", "reopen": "New", "close": "Closed"}[act],
+                                     user["username"], str(body.get("note") or ""))
+                    self._send(200, {"finding": ureg.finding(fid)})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/unicorn/decision":
+                if not auth.can(user, "unicorn.decisions.approve"):
+                    self._send(403, {"error": "Your role cannot approve or refuse Unicorn's proposals."}); return
+                try:
+                    did = int(body.get("id") or 0)
+                    if body.get("action") == "approve":
+                        ids = ureg.approve(did, user["username"], body.get("owner"), body.get("due"), body.get("target"),
+                                           str(body.get("note") or ""), body.get("actions") or None)
+                        self._send(200, {"decision": ureg.decision(did), "actions": ids})
+                    elif body.get("action") == "refuse":
+                        ureg.refuse(did, user["username"], str(body.get("reason") or ""))
+                        self._send(200, {"decision": ureg.decision(did)})
+                    else:
+                        raise ValueError("Action: approve or refuse.")
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/unicorn/action":
+                if not auth.can(user, "unicorn.use"):
+                    self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
+                try:
+                    if (body.get("owner") or body.get("due") or body.get("status") in ("Cancelled",)) and \
+                            not auth.can(user, "unicorn.decisions.approve"):
+                        self._send(403, {"error": "Only who approves decisions changes the owner, the deadline or cancels."}); return
+                    ureg.update_action(int(body.get("id") or 0), user["username"], body.get("status") or None,
+                                       body.get("note"), body.get("owner") or None, body.get("due") or None)
+                    self._send(200, {"actions": ureg.actions()})
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/unicorn/rule":
+                if not auth.can(user, "unicorn.rules.manage"):
+                    self._send(403, {"error": "Your role cannot change Unicorn's rules."}); return
+                try:
+                    act = body.get("action")
+                    if act == "save":
+                        self._send(200, ureg.save_rule(body, user["username"], approve=True))
+                    elif act in ("approve", "set_aside"):
+                        ureg.decide_rule(int(body.get("id") or 0), act == "approve", user["username"], str(body.get("reason") or ""))
+                        self._send(200, {"ok": True})
+                    elif act == "retire":
+                        self._send(200, {"retired": ureg.retire_rule(str(body.get("key") or ""), user["username"], str(body.get("reason") or ""))})
+                    else:
+                        raise ValueError("Action: save, approve, set_aside or retire.")
+                except ValueError as exc:
                     self._send(400, {"error": str(exc)})
             elif url.path == "/api/unicorn/brief":
                 if not auth.can(user, "unicorn.use"):

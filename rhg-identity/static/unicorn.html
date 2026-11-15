@@ -80,6 +80,48 @@ header{display:flex;justify-content:space-between}
 }
 @media (prefers-reduced-motion: reduce){aside{transition:none}}
 @media(max-width:760px){.bubble{max-width:calc(100% - 40px)}.chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.chips button{flex:none}}
+/* Unicorn 2.0: the registers (findings, decisions & actions, rules) */
+.u-tabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 0 16px;align-self:flex-start;max-width:100%}
+.u-tabs button{all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;font-size:13.5px;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.u-tabs button.on{background:var(--rhg-primary);color:#fff;font-weight:600}
+.u-tabs .n{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--rhg-sky);color:var(--rhg-primary)}
+.u-tabs button.on .n{background:rgba(255,255,255,.2);color:#fff}
+.u-view{width:100%;max-width:1180px}
+.u-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.u-flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.u-flt select,.u-flt input{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 10px;font-size:13px}
+.u-list{display:flex;flex-direction:column;gap:8px}
+.u-row{display:grid;grid-template-columns:86px 1fr auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.u-row:hover,.u-row:focus-visible{border-color:var(--rhg-primary);outline:none}
+.u-row .t{font-weight:600;font-size:14px}
+.u-row .s{font-size:12px;color:var(--sub);margin-top:2px}
+.u-row .r{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+.u-row .r b{display:block;font-size:14px}
+.sev{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:6px;padding:3px 7px;background:var(--rhg-bg);color:var(--sub)}
+.sev.critical{background:var(--rhg-redbg);color:var(--rhg-red)}.sev.high{background:var(--rhg-amberbg);color:var(--rhg-amber)}.sev.medium{background:var(--rhg-sky);color:var(--rhg-primary)}
+.st{display:inline-block;white-space:nowrap;font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;background:var(--rhg-bg);color:var(--sub);margin-top:4px}
+.st.New{background:var(--rhg-sky);color:var(--rhg-primary)}.st.Proposed,.st.Investigating{background:var(--rhg-amberbg);color:var(--rhg-amber)}.st.Approved,.st.Done,.st.Closed{background:var(--rhg-greenbg);color:var(--rhg-green)}.st.Refused,.st.Dismissed{background:var(--rhg-bg);color:var(--sub)}
+.dec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+.dec h3{font-family:var(--rhg-font-display);font-size:16px;margin:4px 0 6px}
+.dec .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;margin:10px 0}
+.dec .lbl{font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.dec ul{margin:4px 0;padding-left:18px;font-size:13px}
+.dec .form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border-top:1px solid var(--line);padding-top:12px;margin-top:10px}
+.dec .form label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub)}
+.dec .form input,.dec .form textarea,.u-modal input,.u-modal textarea,.u-modal select{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 9px;font-size:13px;color:var(--ink)}
+.u-scroll{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.u-scroll table{min-width:760px}
+.u-bd{position:fixed;inset:0;background:rgba(8,30,40,.55);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto}
+.u-modal{background:var(--card);color:var(--ink);border-radius:14px;width:100%;max-width:820px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.u-modal .mh{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:16px 20px;background:var(--pulse-graphite,#08303f);color:#fff;border-radius:14px 14px 0 0}
+.u-modal .mh h2{font-family:var(--rhg-font-display);font-size:18px;margin:0;color:#fff}
+.u-modal .mh .sub{font-size:12px;opacity:.75;margin-top:3px}
+.u-modal .mb{padding:16px 20px;font-size:13.5px;line-height:1.5}
+.u-modal .mb h4{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:16px 0 6px}
+.u-modal .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.u-modal pre{white-space:pre-wrap;font-size:12px;background:var(--bg);border-radius:8px;padding:8px 10px;margin:0}
+.u-msg{font-size:12.5px;color:var(--sub)}
+@media(max-width:760px){.u-row{grid-template-columns:1fr;gap:6px}.u-row .r{text-align:left}.dec .grid2{grid-template-columns:1fr}.u-tabs{width:100%}.u-tabs button{padding:7px 10px;font-size:13px}}
 </style>
 <link rel="stylesheet" href="/brand.css">
 </head>
@@ -117,7 +159,36 @@ header{display:flex;justify-content:space-between}
     </div>
   </header>
 
-  <div class="uni">
+  <div class="u-tabs" id="uTabs" role="tablist" hidden>
+    <button type="button" data-t="chat" class="on" role="tab" aria-selected="true">Chat</button>
+    <button type="button" data-t="findings" role="tab" aria-selected="false">Findings <span class="n" id="nF">0</span></button>
+    <button type="button" data-t="decisions" role="tab" aria-selected="false">Decisions &amp; actions <span class="n" id="nD">0</span></button>
+    <button type="button" data-t="rules" role="tab" aria-selected="false">Rules</button>
+  </div>
+  <section class="u-view" id="vFindings" hidden>
+    <div class="u-kpis" id="fKpis"></div>
+    <div class="u-flt"><select id="fStatus" aria-label="Status"><option value="open">Open</option><option value="New">New</option><option value="Proposed">Proposed</option><option value="Closed">Closed</option><option value="Dismissed">Dismissed</option><option value="all">All</option></select>
+      <select id="fCap" aria-label="Capability"><option value="">Every capability</option></select>
+      <input id="fQ" type="search" placeholder="Restaurant, company or title" aria-label="Search findings">
+      <span class="u-msg" id="fMsg"></span></div>
+    <div class="u-list" id="fList"></div>
+  </section>
+  <section class="u-view" id="vDecisions" hidden>
+    <h2 style="font-size:18px;margin:0 0 4px">Proposals waiting for approval</h2>
+    <p class="hint" style="margin:0 0 12px">Unicorn's proposals from its investigations. Approving names the owner, the deadline and the target; the decision becomes an action Unicorn measures every morning. Refusing needs a reason, which Unicorn reads before it proposes anything similar.</p>
+    <div id="dList"></div>
+    <h2 style="font-size:18px;margin:22px 0 4px">Action tracker</h2>
+    <p class="hint" style="margin:0 0 12px">Approved decisions being carried out: the KPI when approved (baseline), the latest value Unicorn read and the effect. Overdue first.</p>
+    <div class="u-scroll"><table id="aTable"></table></div>
+  </section>
+  <section class="u-view" id="vRules" hidden>
+    <h2 style="font-size:18px;margin:0 0 4px">Rules library</h2>
+    <p class="hint" style="margin:0 0 12px">The thresholds, policies, approved decisions and business knowledge Unicorn reads before every finding and proposal. Approved = RHG's rule; Proposed = pulse's default or Unicorn's proposal, waiting for approval. Unicorn never changes a rule; each change is a new version.</p>
+    <div class="u-flt"><button class="btn dark" id="rNew" type="button" hidden>New rule</button><span class="u-msg" id="rMsg"></span></div>
+    <div class="u-scroll"><table id="rTable"></table></div>
+  </section>
+
+  <div class="uni" id="vChat">
     <div class="card notice" id="notice" hidden></div>
     <div class="feed" id="feed" aria-live="polite"></div>
     <div class="composer">
@@ -131,7 +202,7 @@ header{display:flex;justify-content:space-between}
         <textarea id="q" rows="1" placeholder="Pyesni Unicorn për shitjet, P&amp;L, cash, detyrimet ose blerjet…" aria-label="Your question to Unicorn"></textarea>
         <button class="btn dark" id="send">Send</button>
       </div>
-      <p class="hint2" id="hint2">Unicorn answers from the figures of its latest morning brief (Simphony and Business Central). Enter sends, Shift+Enter starts a new line.</p>
+      <p class="hint2" id="hint2">Unicorn answers from its morning brief and reads fresh figures from Finance, Purchasing and Crunchtime when it needs them (read only). Enter sends, Shift+Enter starts a new line.</p>
     </div>
   </div>
 </main>
@@ -281,6 +352,171 @@ $("briefBtn").onclick = async () => {
   try { await post("/api/unicorn/brief", {}); const j = await get("/api/unicorn"); paintState(j.state); watch(j.state); }
   catch (e) { $("pill").className = "pill err"; $("pillText").textContent = e.message; $("briefBtn").disabled = false; }
 };
+// ---------------------------------------------------------------- Unicorn 2.0: findings, decisions & actions, rules
+let R = null, uTab = "chat";
+const fmtN = (v, d = 0) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? fmtN(v / 1e6, 1) + " M" : Math.abs(v) >= 1e4 ? fmtN(v / 1e3) + " k" : fmtN(v);
+const valU = (v, u) => v == null ? "–" : u === "%" ? fmtN(v, 1) + "%" : fmtM(v) + (u && u !== "amount" ? " " + u : "");
+const SEV_SQ = {critical: "Critical", high: "High", medium: "Medium", low: "Low"};
+function uShow(t){
+  uTab = t;
+  document.querySelectorAll("#uTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
+  $("vChat").hidden = t !== "chat"; $("vFindings").hidden = t !== "findings"; $("vDecisions").hidden = t !== "decisions"; $("vRules").hidden = t !== "rules";
+  document.querySelector(".uni").style.display = t === "chat" ? "" : "none";
+  if (history.replaceState) history.replaceState(null, "", t === "chat" ? location.pathname : "#" + t);
+  if (t !== "chat") loadRegisters();
+}
+document.querySelectorAll("#uTabs button").forEach(b => b.onclick = () => uShow(b.dataset.t));
+async function loadRegisters(){
+  const qs = new URLSearchParams({status: $("fStatus").value, capability: $("fCap").value, q: $("fQ").value.trim()});
+  try { R = await get("/api/unicorn/registers?" + qs); } catch (e) { $("fMsg").textContent = e.message; return; }
+  const c = R.counts;
+  $("nF").textContent = c.findings_open; $("nD").textContent = c.decisions_proposed + c.actions_overdue;
+  if ($("fCap").options.length <= 1) $("fCap").insertAdjacentHTML("beforeend", Object.entries(R.capabilities).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(""));
+  $("rNew").hidden = !R.can_rules;
+  paintFindings(); paintDecisions(); paintRules();
+}
+function kpi(l, v, s, cls){ return `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s || ""}</div></div>`; }
+function paintFindings(){
+  const c = R.counts, F = R.findings;
+  const crit = F.filter(f => f.severity === "critical" && ["New", "Investigating", "Proposed"].includes(f.status)).length;
+  $("fKpis").innerHTML = kpi("Open findings", fmtN(c.findings_open), `${fmtN(c.findings.New || 0)} new · ${fmtN(c.findings.Proposed || 0)} with a proposal`)
+    + kpi("Critical", fmtN(crit), "open, the most serious", crit ? "up" : "")
+    + kpi("Proposals waiting", fmtN(c.decisions_proposed), "for a person to approve or refuse", c.decisions_proposed ? "warn" : "")
+    + kpi("Actions open", fmtN(c.actions_open), `${fmtN(c.actions_overdue)} past their deadline`, c.actions_overdue ? "up" : "");
+  $("fMsg").textContent = `${F.length} shown${R.investigating.length ? " · investigating " + R.investigating.map(i => "F" + i).join(", ") : ""}`;
+  $("fList").innerHTML = F.length ? F.map(f => `<button class="u-row" type="button" data-f="${f.id}">
+      <div><span class="sev ${esc(f.severity)}">${esc(SEV_SQ[f.severity] || f.severity)}</span><div class="st ${esc(f.status)}">${esc(f.status)}</div></div>
+      <div><div class="t">F${f.id} · ${esc(f.title)}</div><div class="s">${esc(f.location_name || f.location || "")}${f.company && f.company !== f.location_name ? " · " + esc(f.company) : ""} · ${esc(f.period)} · ${esc(f.capability_label)}${f.seen_count > 1 ? ` · seen ${f.seen_count} times` : ""}</div></div>
+      <div class="r">${f.value != null ? `<span class="meta">value</span> ${esc(valU(f.value, f.unit))}${f.limit != null ? ` <span class="meta">limit ${esc(valU(f.limit, f.unit))}</span>` : ""}` : ""}<b>${f.impact != null ? fmtM(f.impact) + " " + esc(f.currency) : ""}</b><span class="meta">${f.impact != null ? "estimated impact" : ""}</span></div></button>`).join("")
+    : `<div class="card"><p class="hint" style="margin:0">No finding here. Detectors run every morning with the brief, on the rules of the Rules tab.</p></div>`;
+}
+function modal(title, sub, body){
+  closeModal();
+  document.body.insertAdjacentHTML("beforeend", `<div class="u-bd" id="uBd"><div class="u-modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="mh"><div><h2>${esc(title)}</h2><div class="sub">${esc(sub || "")}</div></div><button class="btn" type="button" id="uClose">Close ✕</button></div><div class="mb" id="uBody">${body}</div></div></div>`);
+  $("uClose").onclick = closeModal; $("uBd").onclick = e => { if (e.target.id === "uBd") closeModal(); };
+}
+function closeModal(){ const b = $("uBd"); if (b) b.remove(); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+$("fList").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b) openFinding(+b.dataset.f); });
+async function openFinding(id){
+  let j; try { j = await get("/api/unicorn/finding?id=" + id); } catch (e) { alert(e.message); return; }
+  const f = j.finding, ev = f.evidence || {}, d = j.decision;
+  const evRows = Object.entries(ev).filter(([k]) => !["rule", "rule_status", "rule_version", "rule_value", "impact_formula"].includes(k));
+  const body = `<p style="margin:0 0 8px">${esc(f.detail)}</p>
+    <div class="row"><span class="sev ${esc(f.severity)}">${esc(SEV_SQ[f.severity] || f.severity)}</span><span class="st ${esc(f.status)}">${esc(f.status)}</span>
+      <span class="meta">${esc(f.capability_label)} · first seen ${esc(f.first_seen)} · last seen ${esc(f.last_seen)}</span></div>
+    <h4>Measure</h4><p style="margin:0">${esc(f.metric)}: <b>${esc(valU(f.value, f.unit))}</b>${f.limit != null ? ` against the limit ${esc(valU(f.limit, f.unit))}` : ""}. Estimated impact <b>${f.impact != null ? fmtN(f.impact) + " " + esc(f.currency) : "–"}</b>${ev.impact_formula ? ` <span class="meta">(${esc(ev.impact_formula)})</span>` : ""}.</p>
+    <p class="meta" style="margin:4px 0 0">Rule ${esc(ev.rule || f.rule)} · version ${esc(ev.rule_version ?? "")} · ${ev.rule_status === "Approved" ? "approved by RHG" : "<b>proposed threshold, not yet approved</b>"}</p>
+    ${evRows.length ? `<h4>Figures read</h4><pre>${esc(evRows.map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n"))}</pre>` : ""}
+    ${d ? `<h4>Unicorn's proposal · <span class="st ${esc(d.status)}">${esc(d.status)}</span></h4><p style="margin:0"><b>${esc(d.title)}</b></p><p style="margin:4px 0">${esc(d.rationale)}</p>` : ""}
+    ${j.actions.length ? `<h4>Actions</h4><ul>${j.actions.map(a => `<li>${esc(a.title)} · ${esc(a.owner)} · ${esc(a.due)} · ${esc(a.status)}${a.latest != null ? ` · latest ${esc(valU(a.latest, a.unit))}` : ""}</li>`).join("")}</ul>` : ""}
+    ${j.trail.length ? `<h4>What Unicorn read (${j.trail.length})</h4><ul>${j.trail.map(t => `<li><b>${esc(t.tool)}</b> ${esc(JSON.stringify(t.args))} <span class="meta">${t.ok ? "" : "not read · "}${esc(t.summary)}</span></li>`).join("")}</ul>` : ""}
+    ${j.history.length ? `<h4>Decided before on the same rule and place</h4><ul>${j.history.map(h => `<li>${esc(h.title || ("F" + h.finding))} · ${esc(h.status)}${h.reason ? " · " + esc(h.reason) : ""}</li>`).join("")}</ul>` : ""}
+    ${f.note ? `<h4>Note</h4><p style="margin:0">${esc(f.note)}</p>` : ""}
+    <h4>What to do</h4><div class="row">
+      ${f.status === "New" && R.enabled ? `<button class="btn dark" type="button" id="fInv">Investigate now</button>` : ""}
+      ${f.status === "Proposed" ? `<button class="btn dark" type="button" id="fGoDec">Open the proposal</button>` : ""}
+      ${["Dismissed", "Closed"].includes(f.status) ? `<button class="btn" type="button" id="fReopen">Reopen</button>` : ""}
+      ${R.can_approve && !["Dismissed", "Closed"].includes(f.status) ? `<input id="fNote" placeholder="Reason (needed to dismiss)" style="flex:1;min-width:200px"><button class="btn" type="button" id="fDismiss">Dismiss</button><button class="btn" type="button" id="fCloseF">Close</button>` : ""}
+    </div><p class="u-msg" id="fAct"></p>`;
+  modal(`F${f.id} · ${f.title}`, `${f.location_name || f.location || ""}${f.company && f.company !== f.location_name ? " · " + f.company : ""} · ${f.period}`, body);
+  const act = async (action, note) => {
+    try { await post("/api/unicorn/finding", {id: f.id, action, note}); $("fAct").textContent = action === "investigate" ? "Unicorn is investigating; the proposal appears under Decisions & actions in a few minutes." : "Saved."; loadRegisters(); if (action !== "investigate") setTimeout(closeModal, 600); }
+    catch (e) { $("fAct").textContent = e.message; }
+  };
+  if ($("fInv")) $("fInv").onclick = () => act("investigate");
+  if ($("fReopen")) $("fReopen").onclick = () => act("reopen");
+  if ($("fDismiss")) $("fDismiss").onclick = () => act("dismiss", $("fNote").value);
+  if ($("fCloseF")) $("fCloseF").onclick = () => act("close", $("fNote").value);
+  if ($("fGoDec")) $("fGoDec").onclick = () => { closeModal(); uShow("decisions"); };
+}
+["fStatus", "fCap"].forEach(id => $(id).onchange = loadRegisters);
+let fqT = null; $("fQ").oninput = () => { clearTimeout(fqT); fqT = setTimeout(loadRegisters, 300); };
+function plusDays(n){ const d = new Date(); d.setDate(d.getDate() + (n || 14)); return d.toISOString().slice(0, 10); }
+function paintDecisions(){
+  const P = R.decisions.filter(d => d.status === "Proposed"), F = Object.fromEntries(R.findings.map(f => [f.id, f]));
+  $("dList").innerHTML = P.length ? P.map(d => { const f = F[d.finding_id];
+    return `<div class="dec" data-d="${d.id}"><div class="row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="st Proposed">Proposed</span><span class="meta">D${d.id}${d.finding_id ? ` · from <a href="#" data-of="${d.finding_id}">F${d.finding_id}</a>` : ""}${f ? " · " + esc(f.location_name || "") + " · " + esc(f.period) : ""} · ${esc(d.proposed_at)} · confidence ${esc(d.confidence)}</span></div>
+      <h3>${esc(d.title)}</h3><p style="margin:0;font-size:13.5px">${esc(d.rationale)}</p>
+      <div class="grid2">
+        <div><div class="lbl">Expected impact</div><b>${d.impact != null ? fmtN(d.impact) + " " + esc(d.currency) : "not measured"}</b><div class="meta">${esc(d.impact_formula)}</div></div>
+        <div><div class="lbl">KPI and target</div>${esc(d.kpi || "–")}${d.target ? " → " + esc(d.target) : ""}<div class="meta">approver: ${esc(d.approver_role || "–")} · ${esc(d.due_days || "")} days</div></div>
+        <div><div class="lbl">Facts</div><ul>${(d.evidence || []).map(e => `<li>${esc(e.fact)} <span class="meta">${esc(e.source)}</span></li>`).join("") || "<li>–</li>"}</ul></div>
+        <div><div class="lbl">Hypothesis</div>${esc(d.hypothesis || "–")}${(d.alternatives || []).length ? `<div class="lbl" style="margin-top:8px">Alternatives</div><ul>${d.alternatives.map(a => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}${d.risks ? `<div class="lbl" style="margin-top:8px">Risks</div>${esc(d.risks)}` : ""}</div>
+      </div>
+      ${R.can_approve ? `<div class="form">
+        <label>Owner<input data-k="owner" placeholder="Name or role" style="min-width:180px"></label>
+        <label>Deadline<input data-k="due" type="date" value="${plusDays(d.due_days)}"></label>
+        <label>Target (${esc(f ? f.unit || "value" : "value")})<input data-k="target" inputmode="decimal" style="width:110px"></label>
+        <label style="flex:1;min-width:200px">Note or reason<input data-k="note" placeholder="Needed to refuse"></label>
+        <button class="btn dark" type="button" data-act="approve">Approve</button><button class="btn" type="button" data-act="refuse">Refuse</button>
+        <span class="u-msg" data-k="msg"></span></div>` : `<p class="meta">Approving needs “Approve or refuse Unicorn's proposals”.</p>`}</div>`; }).join("")
+    : `<div class="card"><p class="hint" style="margin:0">No proposal waiting. Unicorn investigates the largest new findings every morning; any new finding can be investigated from its card.</p></div>`;
+  const A = R.actions;
+  $("aTable").innerHTML = `<tr><th>Action</th><th>Owner</th><th>Deadline</th><th>Status</th><th class="num">Baseline</th><th class="num">Latest</th><th class="num">Effect</th><th class="num">Target</th><th>Update</th></tr>`
+    + (A.length ? A.map(a => `<tr data-a="${a.id}"><td class="name"><b>${esc(a.title)}</b><div class="meta">A${a.id} · D${a.decision_id}${a.location ? " · " + esc(a.location) : ""}${a.notes.length ? " · " + esc(a.notes.at(-1).text) : ""}</div></td>
+      <td>${esc(a.owner)}</td><td class="${a.overdue ? "" : "meta"}">${a.overdue ? `<span class="chip up">${esc(a.due)} · overdue</span>` : esc(a.due)}</td>
+      <td><span class="st ${esc(a.status.replace(" ", ""))}">${esc(a.status)}</span></td>
+      <td class="num">${esc(valU(a.baseline, a.unit))}</td><td class="num">${esc(valU(a.latest, a.unit))}${a.latest_at ? `<div class="meta">${esc(a.latest_at)}</div>` : ""}</td>
+      <td class="num">${a.effect == null ? "–" : (a.effect > 0 ? "+" : "") + esc(valU(a.effect, a.unit))}</td><td class="num">${esc(valU(a.target, a.unit))}</td>
+      <td>${["Open", "In progress"].includes(a.status) ? `<select data-k="st" aria-label="Status"><option value="">Status…</option><option>In progress</option><option>Done</option>${R.can_approve ? "<option>Cancelled</option>" : ""}</select> <input data-k="note" placeholder="Note" style="width:130px">` : `<span class="meta">${esc(a.closed_by || "")} ${esc((a.closed_at || "").slice(0, 10))}</span>`}</td></tr>`).join("")
+      : `<tr><td colspan="9" class="meta">No action yet: an approved proposal becomes one.</td></tr>`);
+}
+$("dList").addEventListener("click", async e => {
+  const of = e.target.closest("[data-of]"); if (of) { e.preventDefault(); openFinding(+of.dataset.of); return; }
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const box = b.closest(".dec"), v = k => box.querySelector(`[data-k="${k}"]`).value, msg = box.querySelector('[data-k="msg"]');
+  try {
+    if (b.dataset.act === "approve") await post("/api/unicorn/decision", {id: +box.dataset.d, action: "approve", owner: v("owner"), due: v("due"), target: v("target"), note: v("note")});
+    else await post("/api/unicorn/decision", {id: +box.dataset.d, action: "refuse", reason: v("note")});
+    loadRegisters();
+  } catch (err) { msg.textContent = err.message; }
+});
+$("aTable").addEventListener("change", async e => {
+  const s = e.target.closest('[data-k="st"]'); if (!s || !s.value) return;
+  const tr = s.closest("tr");
+  try { await post("/api/unicorn/action", {id: +tr.dataset.a, status: s.value, note: tr.querySelector('[data-k="note"]').value}); loadRegisters(); }
+  catch (err) { alert(err.message); }
+});
+const KIND_SQ = {threshold: "Threshold", policy: "Policy", decision: "Approved decision", knowledge: "Business knowledge"};
+function paintRules(){
+  $("rTable").innerHTML = `<tr><th>Rule</th><th>Kind</th><th>Value</th><th>Status</th><th>Version</th>${R.can_rules ? "<th></th>" : ""}</tr>`
+    + R.rules.map(r => `<tr data-r="${esc(r.key)}"><td class="name"><b>${esc(r.title)}</b><div class="meta">${esc(r.key)}${r.applies && r.applies !== "all" ? " · " + esc(r.applies) : ""}</div><div class="meta">${esc(r.text)}</div>
+        ${r.pending ? `<div class="meta" style="margin-top:4px"><span class="st Proposed">Waiting</span> v${r.pending.version} by ${esc(r.pending.created_by)}: ${esc(JSON.stringify(r.pending.value))} · ${esc(r.pending.reason)}</div>` : ""}</td>
+      <td class="meta">${esc(KIND_SQ[r.kind] || r.kind)}</td><td><code>${esc(JSON.stringify(r.value))}</code></td>
+      <td><span class="st ${r.status === "Approved" ? "Approved" : "Proposed"}">${esc(r.status)}</span><div class="meta">${r.status === "Approved" ? esc(r.approved_by || "") + " " + esc((r.approved_at || "").slice(0, 10)) : esc(r.created_by || "")}</div></td>
+      <td class="meta">v${r.version}${r.versions > 1 ? ` of ${r.versions}` : ""}</td>
+      ${R.can_rules ? `<td style="white-space:nowrap">${r.status === "Proposed" ? `<button class="btn" type="button" data-ra="approve" data-id="${r.id}">Approve</button> ` : ""}${r.pending ? `<button class="btn" type="button" data-ra="approve" data-id="${r.pending.id}">Approve v${r.pending.version}</button> <button class="btn" type="button" data-ra="set_aside" data-id="${r.pending.id}">Set aside</button> ` : ""}<button class="btn" type="button" data-ra="edit">Edit</button></td>` : ""}</tr>`).join("");
+}
+function ruleForm(r){
+  r = r || {key: "", kind: "policy", title: "", text: "", value: {}, applies: "all"};
+  modal(r.key ? "Change a rule" : "New rule", r.key ? `${r.key} · the change is saved as version ${(r.versions || 1) + 1}, in force at once` : "a threshold, a policy, an approved decision or business knowledge", `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <label>Key<input id="rk" value="${esc(r.key)}" ${r.key ? "readonly" : ""} placeholder="e.g. policy.po_required"></label>
+      <label>Kind<select id="rkind">${Object.entries(KIND_SQ).map(([k, v]) => `<option value="${k}"${k === r.kind ? " selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label style="grid-column:1/-1">Title<input id="rt" value="${esc(r.title)}"></label>
+      <label style="grid-column:1/-1">Text: what the rule says, in words Unicorn reads<textarea id="rx" rows="3">${esc(r.text)}</textarea></label>
+      <label>Value (JSON)<input id="rv" value='${esc(JSON.stringify(r.value || {}))}'></label>
+      <label>Applies to<input id="ra" value="${esc(r.applies || "all")}" placeholder="all, a company or a restaurant"></label>
+      <label style="grid-column:1/-1">Reason for the change<input id="rr"></label></div>
+    <div class="row"><button class="btn dark" type="button" id="rSave">Save and put in force</button>${r.key ? `<button class="btn" type="button" id="rRetire">Retire the rule</button>` : ""}<span class="u-msg" id="rFormMsg"></span></div>`);
+  $("rSave").onclick = async () => {
+    try { await post("/api/unicorn/rule", {action: "save", key: $("rk").value.trim(), kind: $("rkind").value, title: $("rt").value, text: $("rx").value, value: $("rv").value, applies: $("ra").value, reason: $("rr").value}); closeModal(); loadRegisters(); }
+    catch (e) { $("rFormMsg").textContent = e.message; }
+  };
+  if ($("rRetire")) $("rRetire").onclick = async () => {
+    if (!$("rr").value.trim()) { $("rFormMsg").textContent = "Write the reason first."; return; }
+    try { await post("/api/unicorn/rule", {action: "retire", key: r.key, reason: $("rr").value}); closeModal(); loadRegisters(); } catch (e) { $("rFormMsg").textContent = e.message; }
+  };
+}
+$("rNew").onclick = () => ruleForm(null);
+$("rTable").addEventListener("click", async e => {
+  const b = e.target.closest("[data-ra]"); if (!b) return;
+  const key = b.closest("tr").dataset.r, r = R.rules.find(x => x.key === key);
+  if (b.dataset.ra === "edit") { ruleForm(r); return; }
+  try { await post("/api/unicorn/rule", {action: b.dataset.ra, id: +b.dataset.id}); loadRegisters(); } catch (err) { $("rMsg").textContent = err.message; }
+});
 $("logoutBtn").onclick = async () => {
   try { await fetch("/api/logout", {method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":CSRF || ""}, body:"{}"}); } catch (e) {}
   location.href = "/login?signedout=1";
@@ -301,7 +537,9 @@ $("logoutBtn").onclick = async () => {
     return;
   }
   try { await load(); } catch (e) { $("pill").className = "pill err"; $("pillText").textContent = e.message; }
-  $("q").focus();
+  $("uTabs").hidden = false;
+  const h = location.hash.slice(1);
+  if (["findings", "decisions", "rules"].includes(h)) uShow(h); else { $("q").focus(); loadRegisters(); }
 })();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
