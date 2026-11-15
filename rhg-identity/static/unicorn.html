@@ -108,7 +108,7 @@ header{display:flex;justify-content:space-between}
 .dec ul{margin:4px 0;padding-left:18px;font-size:13px}
 .dec .form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border-top:1px solid var(--line);padding-top:12px;margin-top:10px}
 .dec .form label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub)}
-.dec .form input,.dec .form textarea,.u-modal input,.u-modal textarea,.u-modal select{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 9px;font-size:13px;color:var(--ink)}
+.dec .form input,.dec .form textarea,.dec .form select,.u-modal input,.u-modal textarea,.u-modal select{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 9px;font-size:13px;color:var(--ink)}
 .u-scroll{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
 .u-scroll table{min-width:760px}
 .u-bd{position:fixed;inset:0;background:rgba(8,30,40,.55);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto}
@@ -411,7 +411,7 @@ async function openFinding(id){
     <p class="meta" style="margin:4px 0 0">Rule ${esc(ev.rule || f.rule)} · version ${esc(ev.rule_version ?? "")} · ${ev.rule_status === "Approved" ? "approved by RHG" : "<b>proposed threshold, not yet approved</b>"}</p>
     ${evRows.length ? `<h4>Figures read</h4><pre>${esc(evRows.map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n"))}</pre>` : ""}
     ${d ? `<h4>Unicorn's proposal · <span class="st ${esc(d.status)}">${esc(d.status)}</span></h4><p style="margin:0"><b>${esc(d.title)}</b></p><p style="margin:4px 0">${esc(d.rationale)}</p>` : ""}
-    ${j.actions.length ? `<h4>Actions</h4><ul>${j.actions.map(a => `<li>${esc(a.title)} · ${esc(a.owner)} · ${esc(a.due)} · ${esc(a.status)}${a.latest != null ? ` · latest ${esc(valU(a.latest, a.unit))}` : ""}</li>`).join("")}</ul>` : ""}
+    ${j.actions.length ? `<h4>Actions</h4><ul>${j.actions.map(a => `<li>${esc(a.title)} · ${esc(ownerName(a.owner))} · ${esc(a.due)} · ${esc(a.status)}${a.latest != null ? ` · latest ${esc(valU(a.latest, a.unit))}` : ""}</li>`).join("")}</ul>` : ""}
     ${j.trail.length ? `<h4>What Unicorn read (${j.trail.length})</h4><ul>${j.trail.map(t => `<li><b>${esc(t.tool)}</b> ${esc(JSON.stringify(t.args))} <span class="meta">${t.ok ? "" : "not read · "}${esc(t.summary)}</span></li>`).join("")}</ul>` : ""}
     ${j.history.length ? `<h4>Decided before on the same rule and place</h4><ul>${j.history.map(h => `<li>${esc(h.title || ("F" + h.finding))} · ${esc(h.status)}${h.reason ? " · " + esc(h.reason) : ""}</li>`).join("")}</ul>` : ""}
     ${f.note ? `<h4>Note</h4><p style="margin:0">${esc(f.note)}</p>` : ""}
@@ -434,6 +434,20 @@ async function openFinding(id){
 }
 ["fStatus", "fCap"].forEach(id => $(id).onchange = loadRegisters);
 let fqT = null; $("fQ").oninput = () => { clearTimeout(fqT); fqT = setTimeout(loadRegisters, 300); };
+function ownerName(o){ return String(o || "").replace(/\s*<[^>]+>\s*$/, ""); }
+function covers(sc, company){
+  const comps = (sc || {}).companies ?? "*";
+  return !company || comps === "*" || comps.map(c => String(c).toUpperCase()).includes(String(company).toUpperCase());
+}
+// the owner of an approved decision: a pulse account (its items reach them in the Action Center and the daily email);
+// accounts whose access does not cover the finding's company come last, marked
+function ownerOptions(f){
+  const co = f ? f.company : "", A = R.accounts || [];
+  const opt = a => `<option value="${esc(a.name)} &lt;${esc(a.email)}&gt;" data-no-i18n>${esc(a.name)} · ${esc(a.role || "")}</option>`;
+  const inn = A.filter(a => covers(a.scope, co)), out = A.filter(a => !covers(a.scope, co));
+  return `<option value="">Choose the owner…</option>` + inn.map(opt).join("")
+    + (out.length ? `<optgroup label="No access to ${esc(co)}: they will not see the action">${out.map(opt).join("")}</optgroup>` : "");
+}
 function plusDays(n){ const d = new Date(); d.setDate(d.getDate() + (n || 14)); return d.toISOString().slice(0, 10); }
 function paintDecisions(){
   const P = R.decisions.filter(d => d.status === "Proposed"), F = Object.fromEntries(R.findings.map(f => [f.id, f]));
@@ -447,7 +461,7 @@ function paintDecisions(){
         <div><div class="lbl">Hypothesis</div>${esc(d.hypothesis || "–")}${(d.alternatives || []).length ? `<div class="lbl" style="margin-top:8px">Alternatives</div><ul>${d.alternatives.map(a => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}${d.risks ? `<div class="lbl" style="margin-top:8px">Risks</div>${esc(d.risks)}` : ""}</div>
       </div>
       ${R.can_approve ? `<div class="form">
-        <label>Owner<input data-k="owner" placeholder="Name or role" style="min-width:180px"></label>
+        <label>Owner<select data-k="owner" style="min-width:220px;max-width:320px">${ownerOptions(f)}</select></label>
         <label>Deadline<input data-k="due" type="date" value="${plusDays(d.due_days)}"></label>
         <label>Target (${esc(f ? f.unit || "value" : "value")})<input data-k="target" inputmode="decimal" style="width:110px"></label>
         <label style="flex:1;min-width:200px">Note or reason<input data-k="note" placeholder="Needed to refuse"></label>
@@ -457,7 +471,7 @@ function paintDecisions(){
   const A = R.actions;
   $("aTable").innerHTML = `<tr><th>Action</th><th>Owner</th><th>Deadline</th><th>Status</th><th class="num">Baseline</th><th class="num">Latest</th><th class="num">Effect</th><th class="num">Target</th><th>Update</th></tr>`
     + (A.length ? A.map(a => `<tr data-a="${a.id}"><td class="name"><b>${esc(a.title)}</b><div class="meta">A${a.id} · D${a.decision_id}${a.location ? " · " + esc(a.location) : ""}${a.notes.length ? " · " + esc(a.notes.at(-1).text) : ""}</div></td>
-      <td>${esc(a.owner)}</td><td class="${a.overdue ? "" : "meta"}">${a.overdue ? `<span class="chip up">${esc(a.due)} · overdue</span>` : esc(a.due)}</td>
+      <td title="${esc(a.owner)}">${esc(ownerName(a.owner))}</td><td class="${a.overdue ? "" : "meta"}">${a.overdue ? `<span class="chip up">${esc(a.due)} · overdue</span>` : esc(a.due)}</td>
       <td><span class="st ${esc(a.status.replace(" ", ""))}">${esc(a.status)}</span></td>
       <td class="num">${esc(valU(a.baseline, a.unit))}</td><td class="num">${esc(valU(a.latest, a.unit))}${a.latest_at ? `<div class="meta">${esc(a.latest_at)}</div>` : ""}</td>
       <td class="num">${a.effect == null ? "–" : (a.effect > 0 ? "+" : "") + esc(valU(a.effect, a.unit))}</td><td class="num">${esc(valU(a.target, a.unit))}</td>
@@ -469,6 +483,7 @@ $("dList").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const box = b.closest(".dec"), v = k => box.querySelector(`[data-k="${k}"]`).value, msg = box.querySelector('[data-k="msg"]');
   try {
+    if (b.dataset.act === "approve" && !v("owner")) { msg.textContent = "Choose the owner."; return; }
     if (b.dataset.act === "approve") await post("/api/unicorn/decision", {id: +box.dataset.d, action: "approve", owner: v("owner"), due: v("due"), target: v("target"), note: v("note")});
     else await post("/api/unicorn/decision", {id: +box.dataset.d, action: "refuse", reason: v("note")});
     loadRegisters();

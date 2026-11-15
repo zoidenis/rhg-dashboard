@@ -356,6 +356,10 @@ class Handler(BaseHTTPRequestHandler):
                                  "decisions": ureg.decisions(), "actions": ureg.actions(),
                                  "rules": ureg.rules(), "capabilities": ureg.CAPABILITIES,
                                  "can_approve": auth.can(user, "unicorn.decisions.approve"),
+                                 # the pulse accounts an approved decision can be given to (Administration → Accounts)
+                                 "accounts": ([{"email": e, "name": u["name"], "role": u["role"], "scope": u["scope"]}
+                                               for e, u in sorted(actioncenter.users().items(), key=lambda kv: kv[1]["name"].lower())]
+                                              if auth.can(user, "unicorn.decisions.approve") else []),
                                  "can_rules": auth.can(user, "unicorn.rules.manage"),
                                  "investigating": sorted(unicorn._investigating), "enabled": unicorn.enabled()})
             elif url.path == "/api/unicorn/finding":
