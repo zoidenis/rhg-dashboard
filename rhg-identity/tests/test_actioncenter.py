@@ -192,7 +192,7 @@ class AdminRoles(Base):
 
     def test_roles_of_administration_in_the_matrix(self):
         A = {r["name"]: r for r in ac.admin_roles()}
-        self.assertEqual((A["Sales analyst"]["ac_department"], A["Sales analyst"]["people"][0]["email"]), ("Operations", "sara@rhg.al"))
+        self.assertEqual((A["Sales analyst"]["ac_department"], A["Sales analyst"]["people"][0]["email"]), ("Sales", "sara@rhg.al"))
         rules = ac.save_owner_rule("Finance", "negative_stock", "stock", "admin:Sales analyst", "geri")
         self.assertEqual(rules["Finance|negative_stock|stock"], "admin:Sales analyst")
         p = ac.policy()
@@ -206,17 +206,38 @@ class AdminRoles(Base):
         reg = dict(REG["finance"], items=[dict(REG["finance"]["items"][0], role="admin:Sales analyst", owner="sara@rhg.al")])
         ac._tower = lambda key, max_age=60: reg if key == "finance" else REG[key]
         x = next(i for i in ac.collect()["items"] if i["uid"] == "finance:n1")
-        self.assertEqual((x["role_label"], x["department"]), ("Sales analyst", "Operations"))
+        self.assertEqual((x["role_label"], x["department"]), ("Sales analyst", "Sales"))
+
+    def test_sales_is_a_department_of_the_sla_matrix(self):
+        s = ac.settings()
+        self.assertIn("Sales", ac.DEPARTMENTS)
+        self.assertEqual(s["sla"]["Sales"], {"critical": 2, "high": 5, "medium": 7, "low": 10})
+        self.assertEqual(ac.policy()["admin_departments"]["Sales analyst"], "Sales")
+        ac.save_settings({"sla": {"Sales": {"critical": 1, "high": 3, "medium": 5, "low": 8}}}, "geri")
+        self.addCleanup(lambda: ac.save_settings({"sla": {"Sales": ac.DEFAULT_SLA["Sales"]}}, "geri"))
+        self.assertEqual(ac.policy()["sla"]["Sales"]["high"], 3)
+
+    def test_the_department_of_a_role_can_be_changed(self):
+        A = {r["name"]: r for r in ac.admin_roles()}
+        self.assertEqual(A["Sales analyst"]["default_department"], "Sales")
+        got = ac.save_role_department("Sales analyst", "Operations", "geri")
+        self.addCleanup(lambda: ac.save_role_department("Sales analyst", "", "geri"))
+        self.assertEqual(got["Sales analyst"], "Operations")
+        self.assertEqual(ac.policy()["admin_departments"]["Sales analyst"], "Operations")
+        with self.assertRaises(ValueError):
+            ac.save_role_department("Sales analyst", "Marketing", "geri")
+        with self.assertRaises(ValueError):
+            ac.save_role_department("No role", "Sales", "geri")
 
     def test_an_administration_role_as_head_of_department(self):
         before = ac.settings()["escalation"]
         self.addCleanup(lambda: ac.save_settings({"escalation": before}, "geri"))
         self.assertEqual(ac.role_people("admin:Sales analyst", "SALT"), ["sara@rhg.al"])
         self.assertEqual(ac.role_people("admin:Sales analyst", "OTHER"), [])          # her access is SALT only
-        ac.save_settings({"escalation": {"level1_days": 2, "level2_days": 5, "heads": {"Operations": "admin:Sales analyst"},
+        ac.save_settings({"escalation": {"level1_days": 2, "level2_days": 5, "heads": {"Sales": "admin:Sales analyst"},
                                          "executives": ["admin:Sales analyst", "ceo"]}}, "geri")
         e = ac.settings()["escalation"]
-        self.assertEqual((e["heads"]["Operations"], e["executives"][0]), ("admin:Sales analyst", "admin:Sales analyst"))
+        self.assertEqual((e["heads"]["Sales"], e["executives"][0]), ("admin:Sales analyst", "admin:Sales analyst"))
 
 
 class Email(Base):

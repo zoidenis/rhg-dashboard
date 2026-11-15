@@ -174,7 +174,7 @@ header{display:flex;justify-content:space-between}
       <div class="flt"><button class="btn dark" type="button" id="mxSave">Save</button><button class="btn" type="button" id="mxApply">Apply the matrices to open items</button><button class="btn" type="button" id="mxTest">Send me a test email</button><span class="msg" id="mxMsg"></span></div>
     </div>
     <div class="card mx" style="margin-bottom:14px"><h2>Who owns what</h2><p class="hint">The role that owns each type of item in the registers. Choose a role of Administration (its accounts own the items of the companies and restaurants their access covers) or a role of Email recipients; leave it on the register's rule otherwise. New items take it within 5 minutes; "Apply the matrices to open items" hands the open ones over (not those handed over by hand).</p><div class="scroll"><table id="rulesT"></table></div><span class="msg" id="rMsg"></span></div>
-    <div class="card mx" style="margin-bottom:14px"><h2>Roles of Administration</h2><p class="hint">The roles created in Administration → Roles & permissions and their accounts (Administration → Accounts), with the access of each. A role chosen above gives its items to these people; to add someone, give them the role in Administration.</p><div class="scroll"><table id="adminT"></table></div></div>
+    <div class="card mx" style="margin-bottom:14px"><h2>Roles of Administration</h2><p class="hint">The roles created in Administration → Roles & permissions and their accounts (Administration → Accounts), with the access of each. A role chosen above gives its items to these people; to add someone, give them the role in Administration.</p><p class="hint">The department of each role decides the row of the SLA matrix its items follow and the head of department they escalate to. It starts from the role's department in Administration; change it here when it differs.</p><div class="scroll"><table id="adminT"></table></div><span class="msg" id="adMsg"></span></div>
     <div class="card mx"><h2>Roles of Email recipients</h2><p class="hint">For every company (and restaurant), the people in each role of Email recipients. The same directory as Settings → Email recipients by company; it also routes the reports. An owner is a pulse account when its email matches one.</p>
       <div class="flt"><select id="pCo" aria-label="Company"></select><span class="msg" id="pMsg"></span></div>
       <div class="scroll"><table id="peopleT"></table></div>
@@ -198,7 +198,7 @@ async function post(u, body){ const r = await fetch(u, {method: "POST", credenti
   headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: JSON.stringify(body || {})});
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
 const SEV = {critical: "Critical", high: "High", medium: "Medium", low: "Low"};
-const DEP_COLOR = {Finance: "var(--ch-0, #0c475e)", Purchasing: "var(--ch-1, #b26a00)", Warehouse: "var(--ch-2, #6b4fbb)", Operations: "var(--ch-3, #12805c)", Executive: "var(--ch-4, #c0392b)"};
+const DEP_COLOR = {Finance: "var(--ch-0, #0c475e)", Purchasing: "var(--ch-1, #b26a00)", Warehouse: "var(--ch-2, #6b4fbb)", Sales: "var(--ch-5, #a0522d)", Operations: "var(--ch-3, #12805c)", Executive: "var(--ch-4, #c0392b)"};
 function kpi(l, v, s, cls, open){ return `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-open="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s || ""}</div></div>`; }
 function ownerText(x){
   if (x.status === "Awaiting approval") return `<span class="meta">approver</span> ${esc(x.role_label)}`;
@@ -433,7 +433,7 @@ async function loadMatrix(){
     + `<optgroup label="Roles of Email recipients">${roles.map(x => `<option value="dir:${esc(x.key)}"${r.owner === "dir:" + x.key ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</optgroup>`;
   $("rulesT").innerHTML = `<tr><th>Register</th><th>Type of item</th><th>Owner</th><th>Department</th><th class="num">Open now</th></tr>` + (M.owner_rules.map((r, i) => `<tr><td>${esc(r.tower)}</td><td>${esc(r.source_label)}${r.kind && r.kind !== "*" ? ` <span class="meta">· ${esc(r.kind)}</span>` : ""}</td>
       <td>${ed ? `<select data-rule="${i}" aria-label="Owner">${ownerOpts(r)}</select>` : `<span data-no-i18n>${esc(r.owner_label)}</span>`}</td><td class="meta">${esc(r.department)}</td><td class="num">${fmtN(r.items)}</td></tr>`).join("") || `<tr><td colspan="5" class="meta">The registers could not be read.</td></tr>`);
-  $("adminT").innerHTML = `<tr><th>Role</th><th>Department</th><th>Accounts and their access</th></tr>` + M.admin_roles.map(a => `<tr><td class="name"><b data-no-i18n>${esc(a.name)}</b></td><td class="meta" title="${esc(a.department)}"><span>${esc(a.ac_department)}</span></td>
+  $("adminT").innerHTML = `<tr><th>Role</th><th>Department</th><th>Accounts and their access</th></tr>` + M.admin_roles.map(a => `<tr><td class="name"><b data-no-i18n>${esc(a.name)}</b></td><td class="meta">${ed ? `<select data-rdep="${esc(a.name)}" aria-label="Department">${M.departments.map(dp => `<option value="${esc(dp)}"${dp === a.ac_department ? " selected" : ""}>${esc(dp)}</option>`).join("")}</select>` : `<span>${esc(a.ac_department)}</span>`}</td>
       <td>${a.people.length ? a.people.map(p => `<b>${esc(p.name)}</b> <span class="meta"><span data-no-i18n>${esc(p.email)}</span> · ${p.access === "every company" ? "<span>every company</span>" : `<span data-no-i18n>${esc(p.access)}</span>`}</span>`).join("<br>") : `<span class="noacc">no account with an email</span>`}</td></tr>`).join("");
   const cos = [...new Set(M.people.map(p => p.company))]; if (!cos.includes("*")) cos.unshift("*");
   if (!$("pCo").options.length) $("pCo").innerHTML = cos.map(c => `<option value="${esc(c)}">${c === "*" ? "Whole group" : esc(c)}</option>`).join("");
@@ -462,6 +462,12 @@ $("mxSave").onclick = async () => {
     digest: {enabled: $("gOn").checked, time: $("gT").value, reminder_days: +$("gR").value}}); $("mxMsg").textContent = "Saved. The registers read the new SLA within 5 minutes."; load(); }
   catch (e) { $("mxMsg").textContent = e.message; }
 };
+$("adminT").addEventListener("change", async e => {
+  const sel = e.target.closest("[data-rdep]"); if (!sel) return;
+  const a = M.admin_roles.find(r => r.name === sel.dataset.rdep);
+  try { await post("/api/actions/role-department", {role: a.name, department: sel.value === a.default_department ? "" : sel.value}); $("adMsg").textContent = "Saved. Apply the matrices to re-date the open items with the SLA of the new department."; loadMatrix(); }
+  catch (err) { $("adMsg").textContent = err.message; }
+});
 $("rulesT").addEventListener("change", async e => {
   const sel = e.target.closest("[data-rule]"); if (!sel) return;
   const r = M.owner_rules[+sel.dataset.rule];

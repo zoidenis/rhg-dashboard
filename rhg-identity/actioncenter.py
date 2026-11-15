@@ -1,5 +1,5 @@
 """Executive Action Center: the one place where every automated control of pulse ends, with its owner, its
-deadline and its progress, for the CEO, the CFO and the heads of Finance, Purchasing, Warehouse and Operations.
+deadline and its progress, for the CEO, the CFO and the heads of Finance, Purchasing, Warehouse, Sales and Operations.
 
 It sits over what already exists and does not replace it:
   * the Exceptions registers of Finance and Purchasing (the controls of the towers: negative stock, received vs
@@ -43,7 +43,7 @@ PURCHASING_URL = config.get("PURCHASING_URL", "http://purchasing:8765").rstrip("
 PUBLIC_URL = (config.get("PUBLIC_URL", "https://dashboard.rhg.al") or "").rstrip("/")
 TOWERS = {"finance": ("Finance", FINANCE_URL), "purchasing": ("Purchasing", PURCHASING_URL)}
 
-DEPARTMENTS = ["Finance", "Purchasing", "Warehouse", "Operations", "Executive"]
+DEPARTMENTS = ["Finance", "Purchasing", "Warehouse", "Sales", "Operations", "Executive"]
 SEVERITIES = ["critical", "high", "medium", "low"]
 DEFAULT_SLA = {d: {"critical": 2, "high": 5, "medium": 7, "low": 10} for d in DEPARTMENTS}
 DEPARTMENT_OF_ROLE = {"purchasing_coordinator": "Purchasing", "purchasing_manager": "Purchasing", "inputer": "Finance",
@@ -55,7 +55,7 @@ DEPARTMENT_OF_CAPABILITY = {"financial": "Finance", "purchasing": "Purchasing", 
                             "restaurant": "Operations", "operations": "Operations", "people": "Operations",
                             "executive": "Executive", "data": "Finance"}
 # the department of a role of Administration (Admin → Roles: its department) in the Action Center
-DEPARTMENT_OF_ADMIN = {"finance": "Finance", "purchasing": "Purchasing", "sales": "Operations", "operations": "Operations",
+DEPARTMENT_OF_ADMIN = {"finance": "Finance", "purchasing": "Purchasing", "sales": "Sales", "operations": "Operations",
                        "hr": "Operations", "warehouse": "Warehouse", "inventory": "Warehouse", "management": "Executive"}
 SEVERITY_OF_REGISTER = {"critical": "critical", "warning": "high", "info": "low"}
 ACTIVE = ("Open", "In progress", "Awaiting verification", "Awaiting approval")
@@ -63,9 +63,11 @@ DEFAULTS = {
     "sla": DEFAULT_SLA,
     "escalation": {"level1_days": 1, "level2_days": 3,
                    "heads": {"Finance": "cfo", "Purchasing": "purchasing_manager", "Warehouse": "coo",
-                             "Operations": "coo", "Executive": "ceo"},
+                             "Sales": "coo", "Operations": "coo", "Executive": "ceo"},
                    "executives": ["ceo", "cfo"]},
     "digest": {"enabled": False, "time": "08:30", "reminder_days": 1},
+    # the department of a role of Administration in the Action Center when it differs from its department there
+    "role_departments": {"Food safety manager": "Operations"},
 }
 _lock = threading.RLock()
 _cache = {}
@@ -109,6 +111,8 @@ def settings():
         s["digest"]["reminder_days"] = g["reminder_days"]
     s["owner_rules"] = {k: v for k, v in (d.get("owner_rules") or {}).items()
                         if isinstance(v, str) and (v.startswith("admin:") or v.startswith("dir:"))}
+    if isinstance(d.get("role_departments"), dict):
+        s["role_departments"] = {k: v for k, v in d["role_departments"].items() if v in DEPARTMENTS}
     s["updated_at"], s["updated_by"] = d.get("updated_at"), d.get("updated_by")
     s["last_digest"] = d.get("last_digest")
     return s
@@ -169,10 +173,11 @@ def admin_roles():
         if r["email"]:
             people.setdefault(r["role"], []).append({"email": r["email"].strip().lower(), "name": r["name"],
                                                      "username": r["username"], "scope": auth.effective_scope(r)})
-    out = []
+    out, chosen = [], settings()["role_departments"]
     for r in store.q("SELECT name, department FROM roles ORDER BY name"):
+        own = DEPARTMENT_OF_ADMIN.get((r["department"] or "").strip().lower(), "Executive")
         out.append({"name": r["name"], "department": r["department"] or "Other",
-                    "ac_department": DEPARTMENT_OF_ADMIN.get((r["department"] or "").strip().lower(), "Executive"),
+                    "ac_department": chosen.get(r["name"]) or own, "default_department": own,
                     "people": sorted(people.get(r["name"], []), key=lambda p: p["name"])})
     return out
 
@@ -208,6 +213,26 @@ def save_owner_rule(tower, source, kind, target, actor):
         _write(d)
     store.audit("action center owner rule", actor, key, {"owner": target or "the register's rule"})
     return settings()["owner_rules"]
+
+
+def save_role_department(role, dept, actor):
+    """The department of the Action Center a role of Administration belongs to (its SLA row and head of department);
+    "" goes back to the department it has in Administration."""
+    if role not in {r["name"] for r in admin_roles()}:
+        raise ValueError("That role is not in Administration.")
+    if dept and dept not in DEPARTMENTS:
+        raise ValueError("Unknown department.")
+    with _lock:
+        d = _read()
+        cur = dict(settings()["role_departments"])
+        if dept:
+            cur[role] = dept
+        else:
+            cur.pop(role, None)
+        d["role_departments"], d["updated_at"], d["updated_by"] = cur, store.now(), actor
+        _write(d)
+    store.audit("action center role department", actor, role, {"department": dept or "as in Administration"})
+    return {r["name"]: r["ac_department"] for r in admin_roles()}
 
 
 def role_label(role, labels):
@@ -376,7 +401,7 @@ def collect(scope=None):
         for a in ureg.actions(limit=1000):
             d = D.get(a["decision_id"]) or {}
             f = F.get(d.get("finding_id")) or {}
-            dept = DEPARTMENT_OF_CAPABILITY.get(f.get("capability"), "Executive")
+            dept = "Sales" if str(f.get("rule") or "").startswith("sales.") else DEPARTMENT_OF_CAPABILITY.get(f.get("capability"), "Executive")
             sev = f.get("severity") if f.get("severity") in SEVERITIES else "medium"
             st = {"Done": "Closed", "Cancelled": "Dismissed"}.get(a["status"], a["status"])
             own = _emails(a["owner"]) or [e for e, u in U.items() if a["owner"] and a["owner"].strip().lower() in
@@ -662,7 +687,7 @@ def matrix():
                                 "owner": cur, "owner_label": label, "set": bool(cur),
                                 "department": department_of(cur or rr["role"], "Finance", admin_dept), "items": n})
     return {"roles": roles, "people": sorted(people, key=lambda p: (p["company"] != "*", p["company"], p["location"], p["role"])),
-            "admin_roles": [{k: r[k] for k in ("name", "department", "ac_department")}
+            "admin_roles": [{k: r[k] for k in ("name", "department", "ac_department", "default_department")}
                             | {"people": [{"name": p["name"], "email": p["email"], "access": _scope_text(p["scope"])} for p in r["people"]]}
                             for r in A],
             "owner_rules": owner_rules,
