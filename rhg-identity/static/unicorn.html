@@ -121,6 +121,32 @@ header{display:flex;justify-content:space-between}
 .u-modal .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .u-modal pre{white-space:pre-wrap;font-size:12px;background:var(--bg);border-radius:8px;padding:8px 10px;margin:0}
 .u-msg{font-size:12.5px;color:var(--sub)}
+/* the top stays in view (title, tabs): it slims down once the page scrolls */
+.u-top{position:sticky;top:0;z-index:40;background:var(--bg);margin:-24px -24px 0;padding:24px 24px 0;transition:box-shadow .15s}
+.u-top .u-tabs{width:max-content;max-width:100%}
+.u-top.slim{padding-top:10px;box-shadow:0 1px 0 var(--line),0 8px 16px rgba(22,24,29,.06)}
+.u-top.slim header{margin-bottom:8px;align-items:center}
+.u-top.slim .eyebrow,.u-top.slim #sub,.u-top.slim .hdr-meta{display:none}
+.u-top.slim h1{font-size:20px}
+.u-top.slim .hdr-btns .btn{padding-top:6px;padding-bottom:6px}
+.u-top.slim .u-tabs{margin-bottom:10px}
+.rv{display:flex;flex-wrap:wrap;gap:4px}.rv span{background:var(--bg);border-radius:6px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}.rv span b{font-weight:600;color:var(--sub);margin-right:4px}
+.latest{position:absolute;right:0;top:-34px;z-index:30;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(22,24,29,.12)}
+.latest:hover{border-color:var(--rhg-primary)}
+@media(max-width:760px){
+  .u-top{margin:-16px -16px 0;padding:16px 16px 0}
+  .u-top .u-tabs{width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .u-top .u-tabs::-webkit-scrollbar{display:none}
+  .u-top .u-tabs button{flex:none}
+  .u-top.slim{display:flex;align-items:flex-start;gap:8px;padding-top:8px}
+  .u-top.slim header{display:none}
+  .u-top.slim .mnav-btn{margin:0;flex:none;padding:8px 10px}
+  .u-top.slim .mnav-btn span{display:none}
+  .u-top.slim .u-tabs{flex:1;min-width:0;margin-bottom:8px}
+  #send{min-width:0;padding-left:14px;padding-right:14px}
+  .hint2{font-size:11px}
+  .u-scroll code{white-space:normal;word-break:break-all}
+}
 @media(max-width:760px){.u-row{grid-template-columns:1fr;gap:6px}.u-row .r{text-align:left}.dec .grid2{grid-template-columns:1fr}.u-tabs{width:100%}.u-tabs button{padding:7px 10px;font-size:13px}}
 </style>
 <link rel="stylesheet" href="/brand.css">
@@ -142,6 +168,7 @@ header{display:flex;justify-content:space-between}
 <div class="mnav-bd no-report" id="mnavBd"></div>
 
 <main>
+  <div class="u-top" id="uTop">
   <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
   <header>
     <div>
@@ -165,6 +192,7 @@ header{display:flex;justify-content:space-between}
     <button type="button" data-t="findings" role="tab" aria-selected="false">Findings <span class="n" id="nF">0</span></button>
     <button type="button" data-t="decisions" role="tab" aria-selected="false">Decisions &amp; actions <span class="n" id="nD">0</span></button>
     <button type="button" data-t="rules" role="tab" aria-selected="false">Rules</button>
+  </div>
   </div>
   <section class="u-view" id="vFindings" hidden>
     <div class="u-kpis" id="fKpis"></div>
@@ -193,6 +221,7 @@ header{display:flex;justify-content:space-between}
     <div class="card notice" id="notice" hidden></div>
     <div class="feed" id="feed" aria-live="polite"></div>
     <div class="composer">
+      <button class="latest" id="latest" type="button" hidden>↓ Latest</button>
       <div class="chips" id="chips">
         <button type="button">Pse ndryshuan shitjet dje?</button>
         <button type="button">Cilët restorante janë nën buxhet këtë muaj?</button>
@@ -366,8 +395,26 @@ function uShow(t){
   document.querySelector(".uni").style.display = t === "chat" ? "" : "none";
   if (history.replaceState) history.replaceState(null, "", t === "chat" ? location.pathname : "#" + t);
   if (t !== "chat") loadRegisters();
+  $("latest").hidden = t !== "chat" || atBottom();
 }
-document.querySelectorAll("#uTabs button").forEach(b => b.onclick = () => uShow(b.dataset.t));
+document.querySelectorAll("#uTabs button").forEach(b => b.onclick = () => {
+  if (b.dataset.t === uTab) return;
+  uShow(b.dataset.t);
+  if (b.dataset.t === "chat") scrollTo({top: document.body.scrollHeight}); else scrollTo({top: 0});
+  b.scrollIntoView({block: "nearest", inline: "nearest"});
+});
+// the top slims down once the page scrolls (with a margin, so it does not flicker at the edge); the chat offers a
+// way back to the latest message when one reads further up
+function onScroll(){
+  const top = $("uTop"), y = scrollY;
+  const was = top.classList.contains("slim");
+  if (y > 70) top.classList.add("slim"); else if (y < 12) top.classList.remove("slim");
+  if (was !== top.classList.contains("slim")) { const on = document.querySelector("#uTabs button.on"); if (on) on.scrollIntoView({block: "nearest", inline: "nearest"}); }
+  $("latest").hidden = uTab !== "chat" || atBottom();
+}
+addEventListener("scroll", onScroll, {passive: true});
+addEventListener("resize", onScroll);
+$("latest").onclick = scrollEnd;
 async function loadRegisters(){
   const qs = new URLSearchParams({status: $("fStatus").value, capability: $("fCap").value, q: $("fQ").value.trim()});
   try { R = await get("/api/unicorn/registers?" + qs); } catch (e) { $("fMsg").textContent = e.message; return; }
@@ -389,7 +436,7 @@ function paintFindings(){
   $("fList").innerHTML = F.length ? F.map(f => `<button class="u-row" type="button" data-f="${f.id}">
       <div><span class="sev ${esc(f.severity)}">${esc(SEV_SQ[f.severity] || f.severity)}</span><div class="st ${esc(f.status)}">${esc(f.status)}</div></div>
       <div><div class="t">F${f.id} · ${esc(f.title)}</div><div class="s">${esc(f.location_name || f.location || "")}${f.company && f.company !== f.location_name ? " · " + esc(f.company) : ""} · ${esc(f.period)} · ${esc(f.capability_label)}${f.seen_count > 1 ? ` · seen ${f.seen_count} times` : ""}</div></div>
-      <div class="r">${f.value != null ? `<span class="meta">value</span> ${esc(valU(f.value, f.unit))}${f.limit != null ? ` <span class="meta">limit ${esc(valU(f.limit, f.unit))}</span>` : ""}` : ""}<b>${f.impact != null ? fmtM(f.impact) + " " + esc(f.currency) : ""}</b><span class="meta">${f.impact != null ? "estimated impact" : ""}</span></div></button>`).join("")
+      <div class="r">${f.value != null ? `<span class="meta">value</span> ${esc(valU(f.value, f.unit))}${f.limit != null ? ` <span class="meta"><span>limit</span> ${esc(valU(f.limit, f.unit))}</span>` : ""}` : ""}<b>${f.impact != null ? fmtM(f.impact) + " " + esc(f.currency) : ""}</b><span class="meta">${f.impact != null ? "estimated impact" : ""}</span></div></button>`).join("")
     : `<div class="card"><p class="hint" style="margin:0">No finding here. Detectors run every morning with the brief, on the rules of the Rules tab.</p></div>`;
 }
 function modal(title, sub, body){
@@ -434,6 +481,12 @@ async function openFinding(id){
 }
 ["fStatus", "fCap"].forEach(id => $(id).onchange = loadRegisters);
 let fqT = null; $("fQ").oninput = () => { clearTimeout(fqT); fqT = setTimeout(loadRegisters, 300); };
+// a rule's value as its parts ("max 8", "pct -15"), not as JSON; anything nested stays as it is
+function ruleValue(v){
+  if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(x => x == null || typeof x !== "object"))
+    return `<div class="rv" data-no-i18n>${Object.entries(v).map(([k, x]) => `<span><b>${esc(k)}</b>${esc(typeof x === "number" ? fmtN(x, Number.isInteger(x) ? 0 : 2) : x)}</span>`).join("") || "–"}</div>`;
+  return `<code style="white-space:normal;word-break:break-all">${esc(JSON.stringify(v))}</code>`;
+}
 function ownerName(o){ return String(o || "").replace(/\s*<[^>]+>\s*$/, ""); }
 function covers(sc, company){
   const comps = (sc || {}).companies ?? "*";
@@ -471,7 +524,7 @@ function paintDecisions(){
   const A = R.actions;
   $("aTable").innerHTML = `<tr><th>Action</th><th>Owner</th><th>Deadline</th><th>Status</th><th class="num">Baseline</th><th class="num">Latest</th><th class="num">Effect</th><th class="num">Target</th><th>Update</th></tr>`
     + (A.length ? A.map(a => `<tr data-a="${a.id}"><td class="name"><b>${esc(a.title)}</b><div class="meta">A${a.id} · D${a.decision_id}${a.location ? " · " + esc(a.location) : ""}${a.notes.length ? " · " + esc(a.notes.at(-1).text) : ""}</div></td>
-      <td title="${esc(a.owner)}">${esc(ownerName(a.owner))}</td><td class="${a.overdue ? "" : "meta"}">${a.overdue ? `<span class="chip up">${esc(a.due)} · overdue</span>` : esc(a.due)}</td>
+      <td title="${esc(a.owner)}">${esc(ownerName(a.owner))}</td><td class="${a.overdue ? "" : "meta"}">${a.overdue ? `<span class="chip up">${esc(a.due)} · <span>overdue</span></span>` : esc(a.due)}</td>
       <td><span class="st ${esc(a.status.replace(" ", ""))}">${esc(a.status)}</span></td>
       <td class="num">${esc(valU(a.baseline, a.unit))}</td><td class="num">${esc(valU(a.latest, a.unit))}${a.latest_at ? `<div class="meta">${esc(a.latest_at)}</div>` : ""}</td>
       <td class="num">${a.effect == null ? "–" : (a.effect > 0 ? "+" : "") + esc(valU(a.effect, a.unit))}</td><td class="num">${esc(valU(a.target, a.unit))}</td>
@@ -500,7 +553,7 @@ function paintRules(){
   $("rTable").innerHTML = `<tr><th>Rule</th><th>Kind</th><th>Value</th><th>Status</th><th>Version</th>${R.can_rules ? "<th></th>" : ""}</tr>`
     + R.rules.map(r => `<tr data-r="${esc(r.key)}"><td class="name"><b>${esc(r.title)}</b><div class="meta">${esc(r.key)}${r.applies && r.applies !== "all" ? " · " + esc(r.applies) : ""}</div><div class="meta">${esc(r.text)}</div>
         ${r.pending ? `<div class="meta" style="margin-top:4px"><span class="st Proposed">Waiting</span> v${r.pending.version} by ${esc(r.pending.created_by)}: ${esc(JSON.stringify(r.pending.value))} · ${esc(r.pending.reason)}</div>` : ""}</td>
-      <td class="meta">${esc(KIND_SQ[r.kind] || r.kind)}</td><td><code>${esc(JSON.stringify(r.value))}</code></td>
+      <td class="meta">${esc(KIND_SQ[r.kind] || r.kind)}</td><td>${ruleValue(r.value)}</td>
       <td><span class="st ${r.status === "Approved" ? "Approved" : "Proposed"}">${esc(r.status)}</span><div class="meta">${r.status === "Approved" ? esc(r.approved_by || "") + " " + esc((r.approved_at || "").slice(0, 10)) : esc(r.created_by || "")}</div></td>
       <td class="meta">v${r.version}${r.versions > 1 ? ` of ${r.versions}` : ""}</td>
       ${R.can_rules ? `<td style="white-space:nowrap">${r.status === "Proposed" ? `<button class="btn" type="button" data-ra="approve" data-id="${r.id}">Approve</button> ` : ""}${r.pending ? `<button class="btn" type="button" data-ra="approve" data-id="${r.pending.id}">Approve v${r.pending.version}</button> <button class="btn" type="button" data-ra="set_aside" data-id="${r.pending.id}">Set aside</button> ` : ""}<button class="btn" type="button" data-ra="edit">Edit</button></td>` : ""}</tr>`).join("");
