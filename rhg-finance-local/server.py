@@ -55,6 +55,8 @@ import emcpriv
 import sevenrooms
 import odoo
 import people
+import crunchtime
+import opsexec
 import srsim
 import sevenrooms_report
 import requests
@@ -122,6 +124,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/emcaudit": "settings",
                      "/api/sevenrooms/settings": "settings", "/api/sevenrooms/test": "settings",
                      "/api/odoo/settings": "settings", "/api/odoo/test": "settings",
+                     "/api/crunchtime/settings": "settings", "/api/crunchtime/test": "settings",
                      "/api/register/settings": "settings", "/api/register/run": "settings",
                      "/api/register/test": "settings", "/api/salesrec/settings": "settings",
                      "/api/kpi/mapping": "settings", "/api/dq/freeze": "settings", "/api/allocation": "settings",
@@ -2138,7 +2141,9 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          # Budget & forecast → Location intelligence, by department
                          "/api/executive",
                          # People & Productivity: by restaurant (people.cut)
-                         "/api/people"}
+                         "/api/people",
+                         # Operations & Food Safety: by restaurant (opsexec.cut)
+                         "/api/opsexec"}
 
 
 # the departments chosen above: the screens that read them themselves, the cuts of the location screens (the same as for a
@@ -2154,7 +2159,7 @@ LOCATION_CUTS = {
 SELF_CUT = {"/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
             "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview",
             "/api/shrinkage/config", "/api/shrinkage/count", "/api/shrinkage/waste", "/api/sevenrooms",
-            "/api/sevenrooms/xlsx", "/api/billyrec/rows", "/api/billyrec/xlsx", "/api/people"}
+            "/api/sevenrooms/xlsx", "/api/billyrec/rows", "/api/billyrec/xlsx", "/api/people", "/api/opsexec"}
 
 
 def dept_codes(company, depts):
@@ -2435,8 +2440,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = lambda b: salestop.cut(b, self._allowed)
         elif path in ("/api/sevenrooms", "/api/sevenrooms/xlsx"):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
-        elif path == "/api/people":
-            self._scope_filter = None                                   # cut by the handler (people.cut)
+        elif path in ("/api/people", "/api/opsexec"):
+            self._scope_filter = None                                   # cut by the handler
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
         elif path == "/api/transit":
@@ -3036,6 +3041,48 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 store.audit("export", "menu prices", user["username"], {}, {"rows": r["count"]}, "")
+            elif url.path == "/api/crunchtime/settings":
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role does not include Settings."})
+                    return
+                out = {"connection": crunchtime.info(), "locations": []}
+                if out["connection"]["configured"]:
+                    try:
+                        reg, m = opsexec.places()
+                        out["locations"] = [dict(zip(("location", "ref", "how"), (x["name"],) + opsexec.place_of(x["name"], reg, m)))
+                                            for x in crunchtime.locations()]
+                    except crunchtime.Error as exc:
+                        out["error"] = str(exc)[:300]
+                self._send(200, out)
+            elif url.path == "/api/opsexec":
+                # Operations & Food Safety (opsexec.py): Crunchtime Ops Execution by restaurant
+                part = q.get("part") or "overview"
+                need = {p: f"finance.s.opsexec.{p}" for p in ("overview", "checklists", "foodsafety", "waste", "forms")}.get(part)
+                if not need:
+                    self._send(400, {"error": "Unknown part."})
+                    return
+                if not auth.can(user, need):
+                    self._send(403, {"error": "Your role does not include this screen of Operations & Food Safety."})
+                    return
+                if not crunchtime.info()["configured"]:
+                    self._send(200, {"available": False, "configured": False, "can_settings": auth.can(user, "settings"),
+                                     "error": "The Crunchtime connection is not set: Operations & Food Safety → Connection."})
+                    return
+                try:
+                    per = periods(q.get("period"), q.get("mode", "month"))
+                except ValueError:
+                    self._send(400, {"error": "The period must be a date, e.g. 2026-10-01."})
+                    return
+                a, b = per[0], per[1]
+                if (b - a).days > 120:
+                    self._send(400, {"error": "Choose a period of four months or less."})
+                    return
+                r = opsexec.held_request(("ox", a, b), lambda st: opsexec.build(a, b, st), q.get("refresh") == "1")
+                if isinstance(r, dict) and r.get("locations") is not None:
+                    co = (q.get("company") or config.BC_COMPANY).upper()
+                    r = dict(r, locations=[L for L in r["locations"] if (L.get("company") or "").upper() in (co, "")])
+                    r = opsexec.cut(r, self._allowed)
+                self._send(200, dict(r, configured=True, can_settings=auth.can(user, "settings")) if isinstance(r, dict) else r)
             elif url.path == "/api/odoo/settings":
                 if not auth.can(user, "settings"):
                     self._send(403, {"error": "Your role does not include Settings."})
@@ -4273,6 +4320,19 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 company = body.get("company") or negrep.companies()[0]
                 self._send(202, negrep.start_job(company, actor, only or None))
+            elif url.path in ("/api/crunchtime/settings", "/api/crunchtime/test"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                try:
+                    if url.path.endswith("/settings"):
+                        self._send(200, {"connection": crunchtime.save(body, actor)})
+                    else:
+                        r = crunchtime.test()
+                        store.audit("crunchtime test", "connection", actor, {}, {"forms": r.get("forms")}, "")
+                        self._send(200, r)
+                except (ValueError, crunchtime.Error) as exc:
+                    self._send(400, {"error": str(exc)[:300]})
             elif url.path in ("/api/odoo/settings", "/api/odoo/test"):
                 if self.headers.get("X-Requested-With") != "RHG-Finance":
                     self._send(403, {"error": "This request must come from the Finance tower."})

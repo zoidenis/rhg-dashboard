@@ -39,6 +39,13 @@ FINANCE = [
         ("scheduling", "Scheduling & attendance", "location", []),
         ("personnel", "Personnel cost", "location", ["finance.pl.view"]),
         ("quality", "HR data quality", "location", [])]),
+    # Operations & Food Safety: Crunchtime Ops Execution (checklists, food safety logs, waste and yield, sensors)
+    ("opsexec", "Operations & Food Safety", "Overview", "oxTabs", [
+        ("overview", "Overview", "location", []),
+        ("checklists", "Checklists & tasks", "location", []),
+        ("foodsafety", "Food safety", "location", []),
+        ("waste", "Waste & yield", "location", []),
+        ("forms", "Forms & coverage", "location", [])]),
     ("pl", "Financial statements", "Statements", "stTabs", [
         ("pl", "Profit & loss", "company", ["finance.pl.view"]),
         ("bs", "Balance sheet", "company", ["finance.bs.view"]),

@@ -233,6 +233,12 @@ DEFAULT_ROLES = {
                                         "platform.s.executive.locations.company_sales",
                                         "platform.s.executive.locations.bc_sales", "finance.export"]},
     # --- HR
+    "Food safety manager": {"department": "Sales", "system": False,
+                            "description": "Food safety, waste and yield, checklists and forms of every restaurant "
+                                           "(Crunchtime Ops Execution in Operations & Food Safety).",
+                            "permissions": ["finance.view", "finance.s.opsexec.overview", "finance.s.opsexec.checklists",
+                                            "finance.s.opsexec.foodsafety", "finance.s.opsexec.waste",
+                                            "finance.s.opsexec.forms", "finance.export"]},
     "HR manager": {"department": "HR", "system": False,
                    "description": "Labour cost of every restaurant (executive dashboard); payroll is not in pulse.",
                    "permissions": ["platform.s.executive.labor", "platform.s.executive.locations",
@@ -308,6 +314,12 @@ ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sal
                  "finance.s.people.scheduling": ("finance.s.sales.main", "platform.s.executive.labor"),
                  "finance.s.people.quality": ("finance.s.sales.main", "platform.s.executive.labor"),
                  "finance.s.people.personnel": ("finance.s.pl.pl", "platform.s.executive.labor"),
+                 # Operations & Food Safety: whoever reads Sales; food safety and waste also whoever reads shrinkage
+                 "finance.s.opsexec.overview": ("finance.s.sales.main", "finance.s.pl.pl"),
+                 "finance.s.opsexec.checklists": ("finance.s.sales.main",),
+                 "finance.s.opsexec.foodsafety": ("finance.s.sales.main", "finance.s.inventory.shrinkage"),
+                 "finance.s.opsexec.waste": ("finance.s.sales.main", "finance.s.inventory.shrinkage"),
+                 "finance.s.opsexec.forms": ("finance.s.sales.main",),
                  "purchasing.negotiations.edit": "purchasing.actions.manage",
                  # Inventory → Item cards (was Item master control): with its stock by location it is also for the
                  # people of the warehouses, so whoever reads an inventory screen by location gets it once

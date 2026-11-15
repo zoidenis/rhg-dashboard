@@ -38,7 +38,7 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 .fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
 .fc-seg button.on{background:var(--accent);color:var(--card)}
-@media (max-width:640px){#v-people .card-head{flex-direction:column;align-items:stretch}#v-people .card-head .sh-ctl{display:flex;flex-wrap:wrap;gap:6px}}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media (max-width:640px){#v-people .card-head,#v-opsexec .card-head{flex-direction:column;align-items:stretch}#v-people .card-head .sh-ctl,#v-opsexec .card-head .sh-ctl{display:flex;flex-wrap:wrap;gap:6px}}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ic-keys{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink)}
 .ic-keys i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .ic-keys i.ln{width:16px;height:2px;border-radius:0;vertical-align:3px}.ic-keys i.dash{width:16px;height:0;border-top:2px dashed var(--sub);border-radius:0;vertical-align:3px;background:none}
@@ -638,6 +638,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <button data-view="group">Group view</button>
     <button data-view="sales">Sales</button>
     <button data-view="people">People &amp; Productivity</button>
+    <button data-view="opsexec">Operations &amp; Food Safety</button>
 
     <div class="grp">Statements</div>
     <button data-view="pl" data-tab="Profit &amp; loss" data-group="Statements">Financial statements</button>
@@ -1709,6 +1710,26 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
     <details class="card" id="slHow" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="slDefs" style="margin-top:8px"></div></details>
   </section>
 
+  <section class="view" id="v-opsexec">
+    <div class="ov-tabs" id="oxTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="checklists" role="tab" aria-selected="false">Checklists &amp; tasks</button><button data-t="foodsafety" role="tab" aria-selected="false">Food safety</button><button data-t="waste" role="tab" aria-selected="false">Waste &amp; yield</button><button data-t="forms" role="tab" aria-selected="false">Forms &amp; coverage</button></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2 id="oxH">Overview</h2><p class="hint" id="oxHint"></p></div>
+        <div class="sh-ctl"><button class="mini dark" id="oxRead" type="button">Read again</button><button class="mini exp" id="oxExp" type="button">Export ▾</button><button class="mini" id="oxSetBtn" type="button" style="display:none">Connection</button></div></div>
+      <p class="meta" id="oxStatus" style="margin:6px 0 0">Open a tab to read.</p>
+    </div>
+    <div class="card" id="oxSet" style="display:none;margin-bottom:14px">
+      <div class="card-head"><div><h2>Crunchtime Ops Execution: connection &amp; mapping</h2>
+        <p class="hint"><span>The tower reads Ops Execution with an API token (Ops Execution → Settings of the user; if there is none, Crunchtime support issues it). The token is typed here, stays on the server and is never shown again.</span> <span>Only read: nothing is written to Crunchtime.</span></p></div></div>
+      <div class="formgrid"><label class="field">API token<input id="ctTok" type="password" autocomplete="new-password" spellcheck="false"></label></div>
+      <label class="field" style="margin-top:8px">Crunchtime locations → restaurants <span class="meta">one per line: Crunchtime location = reference of Settings → Location intelligence; "= -" leaves one out. The usual ones are already mapped.</span><textarea id="ctMap" spellcheck="false" style="min-height:60px"></textarea></label>
+      <label class="field" style="margin-top:8px">Temperature limits (°C) <span class="meta">cooler_max = 5, freezer_max = -10 (RHG's form), hot_min = 63; one per line to change one</span><textarea id="ctLim" spellcheck="false" style="min-height:44px"></textarea></label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px"><button class="btn dark" id="ctSave" type="button">Save</button><button class="btn" id="ctTest" type="button">Test the connection</button><span class="meta" id="ctMsg"></span></div>
+      <div class="scroll" style="margin-top:12px"><table id="ctLocs"></table></div></div>
+    <div id="oxKpis"></div>
+    <div id="oxBody"></div>
+    <div class="card" style="margin-top:14px"><details><summary style="cursor:pointer;font-size:15px;font-weight:600">How these figures are built</summary><div class="hint" id="oxDefs" style="margin-top:10px;line-height:1.55"></div></details></div>
+  </section>
+
   <section class="view" id="v-people">
     <div class="ov-tabs" id="ppTabs" role="tablist"><button data-t="workforce" class="on" role="tab" aria-selected="true">Workforce</button><button data-t="productivity" role="tab" aria-selected="false">Labour productivity</button><button data-t="scheduling" role="tab" aria-selected="false">Scheduling &amp; attendance</button><button data-t="personnel" role="tab" aria-selected="false">Personnel cost</button><button data-t="quality" role="tab" aria-selected="false">HR data quality</button></div>
     <div class="card" style="margin-bottom:14px">
@@ -2494,7 +2515,7 @@ const DEPT_API = new Set(["finance/locations", "cash/locations", "kartela/locati
   "today/locations", "assets/locations", "locations", "transit", "discharge", "discharge/xlsx", "movement", "movement/rows",
   "movement/xlsx", "typology", "typology/xlsx", "stockcount", "stockcount/xlsx", "shrinkage", "shrinkage/xlsx",
   "shrinkage/overview", "shrinkage/config", "sales/stockstop", "sales/stockstop/xlsx", "sevenrooms", "sevenrooms/xlsx",
-  "receipts", "billyrec", "billyrec/xlsx", "billyrec/rows", "executive", "people"]);
+  "receipts", "billyrec", "billyrec/xlsx", "billyrec/rows", "executive", "people", "opsexec"]);
 function withDept(url){
   if (typeof url !== "string") return url;
   const m = url.match(/\/api\/([^?#]*)(\?[^#]*)?/);
@@ -2640,6 +2661,7 @@ function render(){
   if(!window.rcDone && window.rcLoad){ window.rcDone = true; rcLoad(); }
   if($("v-sales").classList.contains("on") && (!salesData || salesData._q !== params())) loadSales();
   if($("v-people").classList.contains("on") && ppKeys[ppPart()] !== ppQs()) ppLoad(false);
+  if($("v-opsexec").classList.contains("on") && oxKey !== oxQs().replace(/&?part=[^&]*/, "")) oxLoad(false);
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "loc" && typeof chData !== "undefined" && chData && chData._q !== chQuery()) loadCh();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "menu" && meKey !== meQs()) meLoad();
   if($("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "chanprofit" && cpKey !== cpQs()) cpLoad();
@@ -4848,6 +4870,196 @@ $("ppExp").onclick = () => {
       {title: "Support units", header: ["Odoo unit", "Actual hours", "Planned hours"], formats: ["text", "num", "num"], rows: d.support.map(s => [s.unit, s.hours, s.planned])}],
       [`${d.period.from} to ${d.period.to}`].concat(defs));
   }
+};
+// ---------- Operations & Food Safety (/api/opsexec, opsexec.py): Crunchtime Ops Execution by restaurant ----------
+var oxTab = "overview", oxData = null, oxKey = "", oxTimer = null;
+const OX_TITLE = {overview: "Overview", checklists: "Checklists & tasks", foodsafety: "Food safety", waste: "Waste & yield", forms: "Forms & coverage"};
+const OX_HINT = {
+  overview: "Every restaurant on one line for the period chosen above: checklists done, temperatures in range, sensors, frying oil, products refused at receiving, waste and yield. For the executives; click a restaurant for its detail.",
+  checklists: "The checklists and procedures due in the period (opening, closing, cleaning, kitchen, service): done, done late, still open past their time, by restaurant and by checklist. For the operational managers.",
+  foodsafety: "Temperature logs against RHG's limits, the walk-in sensors now, frying oil checks, products checked on arrival by supplier, and the other food safety forms. For the food safety manager.",
+  waste: "What was written off as spoiled, by product and reason, and the yield of the products processed (net after handling against gross), by product and supplier.",
+  forms: "Every form of Ops Execution by kind, whether it was used in the last 30 days, and how Crunchtime's locations map to the restaurants."};
+function oxQs(){ const p = new URLSearchParams(params()); p.set("part", oxTab); return p.toString(); }
+function oxShow(tab){
+  oxTab = tab;
+  document.querySelectorAll("#oxTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
+  $("oxH").textContent = OX_TITLE[tab]; $("oxHint").textContent = OX_HINT[tab];
+  if (currentView().id === "opsexec") setHeader();
+  oxLoad(false);
+}
+document.querySelectorAll("#oxTabs button").forEach(b => b.onclick = () => oxShow(b.dataset.t));
+async function oxLoad(force){
+  const q = oxQs(), k = q.replace(/&?part=[^&]*/, "");
+  if (oxData && oxKey === k && !force && !oxData.reading) { oxRender(); return; }
+  clearTimeout(oxTimer);
+  $("oxStatus").textContent = "Reading…";
+  try {
+    const r = await fetch("/api/opsexec?" + q + (force ? "&refresh=1" : "")), j = await readJSON(r);
+    if (!r.ok || (j.error && j.available !== false)) throw new Error(j.error || r.status);
+    if (j.can_settings !== undefined) $("oxSetBtn").style.display = j.can_settings ? "" : "none";
+    if (j.configured === false) { oxData = null; $("oxStatus").textContent = j.error; $("oxKpis").innerHTML = ""; $("oxBody").innerHTML = j.can_settings ? "" : `<div class="card"><p class="meta">${esc(j.error)} Ask whoever holds Settings.</p></div>`; if (j.can_settings) oxSetOpen(true); return; }
+    if (j.pending || j.reading) {
+      $("oxStatus").textContent = "Reading " + (j.stage || "") + "… the first read of a period takes a few minutes; then it is kept.";
+      oxTimer = setTimeout(() => { if (currentView().id === "opsexec") oxLoad(false); }, 4000);
+      if (j.pending) return;
+    }
+    if (j.available === false) throw new Error(j.error || "Not read.");
+    oxData = j; oxKey = k; oxRender();
+  } catch (e) { $("oxStatus").textContent = "Could not read: " + e.message; }
+}
+$("oxRead").onclick = () => oxLoad(true);
+const oxPct = (v, good, warn) => v == null ? "–" : `<span class="${v >= good ? "down" : v >= warn ? "warn" : "up"}">${fmt(v, 1)}%</span>`;
+function oxRender(){
+  const d = oxData; if (!d) return;
+  $("oxStatus").textContent = `${d.period.from} to ${d.period.to} · Crunchtime Ops Execution, read ${d.read_at.slice(11, 16)}${d.reading ? " · reading again…" : ""}${d.errors.length ? " · not read: " + d.errors.join("; ") : ""}`;
+  $("oxDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
+  ({overview: oxOverview, checklists: oxChecklists, foodsafety: oxFood, waste: oxWaste, forms: oxForms})[oxTab](d);
+}
+function oxSum(R, f){ return R.reduce((a, x) => a + (f(x) || 0), 0); }
+// executives
+function oxOverview(d){
+  const R = d.locations, due = oxSum(R, x => x.tasks.due), done = oxSum(R, x => x.tasks.done), tn = oxSum(R, x => x.temp_n), to = oxSum(R, x => x.temp_out);
+  const S = d.sensors, so = S.filter(s => s.out).length, soff = S.filter(s => !s.online || s.stale).length;
+  $("oxKpis").innerHTML = Pulse.tiles([
+    {l: "Checklists done", v: due ? fmt(done / due * 100, 1) + "%" : "–", s: `${fmt(done)} of ${fmt(due)} due · ${fmt(oxSum(R, x => x.tasks.overdue))} overdue`, cls: due && done / due < 0.85 ? "warn" : "", open: "oxk|tasks"},
+    {l: "Temperatures in range", v: tn ? fmt((1 - to / tn) * 100, 1) + "%" : "–", s: `${fmt(to)} of ${fmt(tn)} readings out of range`, cls: to ? "warn" : "", open: "oxk|temp"},
+    {l: "Sensors out of range now", v: fmt(so), s: `${fmt(S.length)} sensors · ${fmt(soff)} offline or silent`, cls: so ? "up" : "", open: "oxk|sensors"},
+    {l: "Frying oil to change", v: fmt(oxSum(R, x => x.oil_over)), s: `of ${fmt(oxSum(R, x => x.oil_n))} measurements`},
+    {l: "Refused at receiving", v: fmt(oxSum(R, x => x.trace_unfit)), s: `of ${fmt(oxSum(R, x => x.trace_n))} products checked`, cls: oxSum(R, x => x.trace_unfit) ? "warn" : ""},
+    {l: "Spoiled product entries", v: fmt(oxSum(R, x => x.spoil.length)), s: "written off in the spoil forms"}]);
+  $("oxBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Checklists done by restaurant</h2><p class="hint">Share of the tasks due in the period that were done; click a restaurant for its detail.</p>`
+    + Pulse.bars(R.filter(x => x.completion != null).sort((a, b) => a.completion - b.completion).map(x => ({key: x.name, segs: [[x.completion, x.completion >= 90 ? "var(--ch-3)" : x.completion >= 75 ? "var(--ch-1)" : "var(--up)", "done"]], text: `<b>${fmt(x.completion, 1)}%</b> <span class="meta">${fmt(x.tasks.done)} of ${fmt(x.tasks.due)}</span>`, open: "oxl|" + x.location})), null, {none: "No task due in this period."}) + `</div>`
+    + `<div class="card"><h2>Scorecard</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Checklists done</th><th class="num">Overdue</th><th class="num">Temperatures in range</th><th class="num">Sensors out</th><th class="num">Oil to change</th><th class="num">Refused at receiving</th><th class="num">Spoil entries</th><th class="num">Yield</th></tr>`
+    + R.concat(d.support).map(x => `<tr data-pulse="oxl|${esc(x.location)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.location)}${x.how === "needs review" ? ' · <span class="chip warn">Needs review</span>' : x.how === "support" ? " · support" : ""}</div></td>
+      <td class="num">${oxPct(x.completion, 90, 75)}</td><td class="num ${x.tasks.overdue ? "up" : ""}">${fmt(x.tasks.overdue)}</td><td class="num">${oxPct(x.temp_pct_in, 98, 95)}<div class="meta">${fmt(x.temp_n)} readings</div></td>
+      <td class="num ${x.sensors_out ? "up" : ""}">${x.sensors.length ? fmt(x.sensors_out) + " / " + fmt(x.sensors.length) : "–"}</td><td class="num">${x.oil_n ? fmt(x.oil_over) : "–"}</td><td class="num">${x.trace_n ? fmt(x.trace_unfit) + " / " + fmt(x.trace_n) : "–"}</td>
+      <td class="num">${fmt(x.spoil.length)}</td><td class="num">${x.yield_pct == null ? "–" : fmt(x.yield_pct, 1) + "%"}</td></tr>`).join("") + `</table></div></div>`;
+}
+Pulse.on("oxl", name => {
+  const d = oxData, x = d && d.locations.concat(d.support).find(L => L.location === name); if (!x) return;
+  const tb = x.temp_by || {};
+  Pulse.pop({title: esc(x.name), sub: esc(`${x.location} · ${d.period.from} to ${d.period.to} · Crunchtime`), body: Pulse.tiles([
+      {l: "Checklists done", v: x.completion == null ? "–" : fmt(x.completion, 1) + "%", s: `${fmt(x.tasks.done)} of ${fmt(x.tasks.due)} · ${fmt(x.tasks.late)} late · ${fmt(x.tasks.overdue)} overdue`},
+      {l: "Temperatures in range", v: x.temp_pct_in == null ? "–" : fmt(x.temp_pct_in, 1) + "%", s: `${fmt(x.temp_out)} of ${fmt(x.temp_n)} out`},
+      {l: "Sensors out now", v: x.sensors.length ? fmt(x.sensors_out) : "–", s: x.sensors.length ? `${x.sensors.length} sensors` : "no sensor"},
+      {l: "Refused at receiving", v: fmt(x.trace_unfit), s: `of ${fmt(x.trace_n)} checked`}, {l: "Yield", v: x.yield_pct == null ? "–" : fmt(x.yield_pct, 1) + "%", s: `${x.firo.length} products processed`}])
+    + Pulse.panel("Checklists done day by day", Pulse.cols(x.task_days.map(t => ({label: t[0].slice(5), segs: [[t[2], "var(--ch-3)", "done"], [t[1] - t[2], "var(--up)", "not done"]], tip: `${t[0]}: ${t[2]} of ${t[1]} done`})), [["var(--ch-3)", "done"], ["var(--up)", "not done"]], {maxLabel: v => fmt(v)}))
+    + Pulse.panel("Checklists, the least done first", Pulse.list([["Checklist"], ["Due", 1], ["Done", 1], ["Late", 1], ["Overdue", 1]], x.checklists.map(c => ({cells: [esc(c[0]), fmt(c[1]), `${fmt(c[2])} <span class="meta">${c[1] ? fmt(c[2] / c[1] * 100, 0) + "%" : ""}</span>`, fmt(c[3]), c[4] ? `<span class="up">${fmt(c[4])}</span>` : "0"]})), {max: 320}))
+    + Pulse.panel("Temperatures by equipment", Pulse.list([["Equipment"], ["Readings", 1], ["Out of range", 1], ["Lowest °C", 1], ["Highest °C", 1]], Object.entries(tb).map(([k, v]) => ({cells: [esc(k), fmt(v[0]), v[1] ? `<span class="up">${fmt(v[1])}</span>` : "0", v[2] == null ? "–" : fmt(v[2], 1), v[3] == null ? "–" : fmt(v[3], 1)]}))))
+    + (x.sensors.length ? Pulse.panel("Sensors now", Pulse.list([["Sensor"], ["Placement"], ["°C", 1], ["Status"]], x.sensors.map(s => ({cells: [esc(s.name), esc(s.placement), s.c == null ? "–" : fmt(s.c, 1), s.out ? '<span class="chip up">out of range</span>' : !s.online || s.stale ? '<span class="chip warn">offline</span>' : "ok"]})))) : "")});
+});
+Pulse.on("oxk", kind => {
+  const d = oxData; if (!d) return;
+  if (kind === "sensors") return Pulse.pop({title: "Sensors now", sub: esc(`limits: cooler ${d.limits.cooler_max} °C, freezer ${d.limits.freezer_max} °C`), body: oxSensorList(d.sensors)});
+  if (kind === "temp") return Pulse.pop({title: "Temperature readings out of range", sub: esc(`${d.period.from} to ${d.period.to}`), body: Pulse.list([["Restaurant"], ["Readings", 1], ["Out of range", 1], ["In range", 1]], d.locations.filter(x => x.temp_n).sort((a, b) => b.temp_out - a.temp_out).map(x => ({cells: [esc(x.name), fmt(x.temp_n), fmt(x.temp_out), x.temp_pct_in == null ? "–" : fmt(x.temp_pct_in, 1) + "%"], open: "oxl|" + x.location})))});
+  if (kind === "tasks") return Pulse.pop({title: "Overdue checklists", sub: esc(`${d.period.from} to ${d.period.to}`), body: Pulse.list([["Restaurant"], ["Checklist"], ["Overdue", 1], ["Due", 1]], d.locations.flatMap(x => x.checklists.filter(c => c[4]).map(c => ({n: c[4], cells: [esc(x.name), esc(c[0]), fmt(c[4]), fmt(c[1])], open: "oxl|" + x.location}))).sort((a, b) => b.n - a.n), {max: 480, none: "Nothing overdue."})});
+});
+function oxSensorList(S){
+  return Pulse.list([["Restaurant"], ["Sensor"], ["Placement"], ["°C", 1], ["Last reading"], ["Battery", 1], ["Status"]], S.slice().sort((a, b) => (b.out - a.out) || ((!b.online || b.stale) - (!a.online || a.stale)) || (a.restaurant || a.location).localeCompare(b.restaurant || b.location)).map(s => ({cells: [esc(s.restaurant || s.location), esc(s.name), esc(s.placement), s.c == null ? "–" : `<b class="${s.out ? "up" : ""}">${fmt(s.c, 1)}</b>`, esc(s.last.replace("T", " ")), s.battery == null ? "–" : fmt(s.battery) + "%", s.out ? '<span class="chip up">out of range</span>' : !s.online || s.stale ? '<span class="chip warn">offline / silent</span>' : "ok"]})));
+}
+// operational managers
+function oxChecklists(d){
+  const R = d.locations.concat(d.support).filter(x => x.tasks.due), due = oxSum(R, x => x.tasks.due), done = oxSum(R, x => x.tasks.done);
+  $("oxKpis").innerHTML = Pulse.tiles([
+    {l: "Tasks due", v: fmt(due), s: "checklists and procedures of the period"}, {l: "Done", v: due ? fmt(done / due * 100, 1) + "%" : "–", s: `${fmt(done)} tasks`},
+    {l: "Done late", v: fmt(oxSum(R, x => x.tasks.late)), s: "after their due time"}, {l: "Overdue", v: fmt(oxSum(R, x => x.tasks.overdue)), s: "still open past their time", cls: oxSum(R, x => x.tasks.overdue) ? "up" : "", open: "oxk|tasks"}]);
+  const all = {};
+  R.forEach(x => x.checklists.forEach(c => { const a = all[c[0]] = all[c[0]] || [0, 0, 0, 0]; for (let i = 0; i < 4; i++) a[i] += c[i + 1]; }));
+  const worst = Object.entries(all).filter(([, v]) => v[0] >= 3).sort((a, b) => a[1][1] / a[1][0] - b[1][1] / b[1][0]).slice(0, 15);
+  $("oxBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>By restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Due</th><th class="num">Done</th><th class="num">Done %</th><th class="num">Late</th><th class="num">Overdue</th></tr>`
+    + R.sort((a, b) => (a.completion ?? 0) - (b.completion ?? 0)).map(x => `<tr data-pulse="oxl|${esc(x.location)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b></td><td class="num">${fmt(x.tasks.due)}</td><td class="num">${fmt(x.tasks.done)}</td><td class="num">${oxPct(x.completion, 90, 75)}</td><td class="num">${fmt(x.tasks.late)}</td><td class="num ${x.tasks.overdue ? "up" : ""}">${fmt(x.tasks.overdue)}</td></tr>`).join("") + `</table></div></div>`
+    + `<div class="card"><h2>The checklists least done</h2><p class="hint">Every restaurant together, checklists due at least three times.</p>`
+    + Pulse.bars(worst.map(([k, v]) => ({key: k, segs: [[v[1] / v[0] * 100, v[1] / v[0] >= 0.9 ? "var(--ch-3)" : v[1] / v[0] >= 0.75 ? "var(--ch-1)" : "var(--up)", "done"]], text: `<b>${fmt(v[1] / v[0] * 100, 0)}%</b> <span class="meta">${fmt(v[1])} of ${fmt(v[0])}${v[3] ? ` · ${fmt(v[3])} overdue` : ""}</span>`})), null, {none: "No checklist due."}) + `</div>`;
+}
+// food safety manager
+function oxFood(d){
+  const R = d.locations.concat(d.support), tn = oxSum(R, x => x.temp_n), to = oxSum(R, x => x.temp_out), S = d.sensors;
+  const days = {}; R.forEach(x => x.temp_days.forEach(t => { const a = days[t[0]] = days[t[0]] || [0, 0]; a[0] += t[1]; a[1] += t[2]; }));
+  $("oxKpis").innerHTML = Pulse.tiles([
+    {l: "Temperature readings", v: fmt(tn), s: `${fmt(to)} out of range (${tn ? fmt(to / tn * 100, 1) : "–"}%)`, cls: to ? "warn" : "", open: "oxk|temp"},
+    {l: "Sensors out of range now", v: fmt(S.filter(s => s.out).length), s: `${fmt(S.filter(s => !s.online || s.stale).length)} offline or silent`, cls: S.some(s => s.out) ? "up" : "", open: "oxk|sensors"},
+    {l: "Frying oil to change", v: fmt(oxSum(R, x => x.oil_over)), s: `of ${fmt(oxSum(R, x => x.oil_n))} measurements`},
+    {l: "Products checked on arrival", v: fmt(oxSum(R, x => x.trace_n)), s: `${fmt(oxSum(R, x => x.trace_unfit))} not fit to use`, cls: oxSum(R, x => x.trace_unfit) ? "warn" : ""}]);
+  const otherSafety = {}; R.forEach(x => Object.entries(x.safety).forEach(([k, v]) => otherSafety[k] = (otherSafety[k] || 0) + v));
+  $("oxBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Sensors now</h2><p class="hint">The walk-in coolers and freezers with a sensor, judged with the limits of the Connection card (cooler ${fmt(d.limits.cooler_max)} °C, freezer ${fmt(d.limits.freezer_max)} °C). Live value only: the history is not in Crunchtime's API.</p>${oxSensorList(S)}</div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>Temperature readings out of range, day by day</h2>`
+    + Pulse.cols(Object.entries(days).sort().map(([k, v]) => ({label: k.slice(5), segs: [[v[1], "var(--up)", "out of range"], [v[0] - v[1], "var(--ch-3)", "in range"]], tip: `${k}: ${v[1]} of ${v[0]} out of range`})), [["var(--up)", "out of range"], ["var(--ch-3)", "in range"]], {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="grid"><div class="card"><h2>By restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Readings</th><th class="num">Out</th><th class="num">Oil to change</th><th class="num">Refused</th></tr>`
+    + R.filter(x => x.temp_n || x.oil_n || x.trace_n).map(x => `<tr data-pulse="oxl|${esc(x.location)}" tabindex="0" style="cursor:pointer"><td class="name">${esc(x.name)}</td><td class="num">${fmt(x.temp_n)}</td><td class="num ${x.temp_out ? "up" : ""}">${fmt(x.temp_out)}</td><td class="num">${fmt(x.oil_over)} / ${fmt(x.oil_n)}</td><td class="num ${x.trace_unfit ? "up" : ""}">${fmt(x.trace_unfit)} / ${fmt(x.trace_n)}</td></tr>`).join("") + `</table></div></div>`
+    + `<div class="card"><h2>Products checked on arrival, by supplier</h2><p class="hint">From the traceability forms: products checked, not fit to use, the average and highest temperature.</p>`
+    + Pulse.list([["Supplier"], ["Checked", 1], ["Not fit", 1], ["Average °C", 1], ["Highest °C", 1]], d.suppliers.map(s => ({cells: [esc(s[0]), fmt(s[1]), s[2] ? `<span class="up">${fmt(s[2])}</span>` : "0", s[3] == null ? "–" : fmt(s[3], 1), s[4] == null ? "–" : fmt(s[4], 1)]})), {max: 360, none: "No product checked in this period."}) + `</div></div>`
+    + `<div class="card" style="margin-top:14px"><h2>Other food safety forms</h2>` + Pulse.list([["Form"], ["Submissions", 1]], Object.entries(otherSafety).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({cells: [esc(k), fmt(v)]})), {none: "None submitted in this period."}) + `</div>`;
+}
+// waste & yield
+function oxWaste(d){
+  const R = d.locations.concat(d.support), sp = R.flatMap(x => x.spoil.map(s => [x.name].concat(s))), fi = R.flatMap(x => x.firo.map(f => [x.name].concat(f)));
+  const byProd = {}; sp.forEach(s => { const k = s[2] + " · " + (s[4] || "?"); const a = byProd[k] = byProd[k] || [0, 0]; a[0] += s[3]; a[1]++; });
+  const byWhy = {}, whyName = {}; sp.forEach(s => { const w = (s[5] || "Not written").slice(0, 60), k = w.toLowerCase(); whyName[k] = whyName[k] || w; byWhy[k] = (byWhy[k] || 0) + 1; });
+  const fp = {}; fi.forEach(f => { const k = f[2] + " | " + (f[3] || "Not written"); const a = fp[k] = fp[k] || [0, 0, 0]; a[0] += f[5]; a[1] += f[6]; a[2]++; });
+  const g = fi.reduce((a, f) => a + f[5], 0), n = fi.reduce((a, f) => a + f[6], 0);
+  $("oxKpis").innerHTML = Pulse.tiles([
+    {l: "Spoiled product entries", v: fmt(sp.length), s: `${Object.keys(byProd).length} products`},
+    {l: "Yield", v: g ? fmt(n / g * 100, 1) + "%" : "–", s: `${fmt(n, 1)} kg net of ${fmt(g, 1)} kg gross · ${fi.length} products processed`},
+    {l: "Staff consumption forms", v: fmt(oxSum(R, x => x.staff_subs)), s: "submitted in the period"},
+    {l: "Receiving reports", v: fmt(oxSum(R, x => x.receiving_subs)), s: `${fmt(oxSum(R, x => (x.receiving || {}).missing))} invoices reported missing`}]);
+  $("oxBody").innerHTML = `<div class="grid"><div class="card"><h2>Spoiled, by product</h2><p class="hint">Quantity in the unit entered (kg or pieces), every restaurant.</p>`
+    + Pulse.bars(Object.entries(byProd).sort((a, b) => b[1][1] - a[1][1]).slice(0, 20).map(([k, v]) => ({key: k, segs: [[v[1], "var(--ch-1)", "entries"]], text: `<b>${fmt(v[0], 1)}</b> <span class="meta">${v[1]} entries</span>`})), null, {none: "Nothing written off in this period."}) + `</div>`
+    + `<div class="card"><h2>Spoiled, by reason</h2>` + Pulse.bars(Object.entries(byWhy).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => ({key: whyName[k], segs: [[v, "var(--ch-2)", "entries"]], text: fmt(v)}))) + `</div></div>`
+    + `<div class="card" style="margin-top:14px"><h2>Yield by product and supplier</h2><p class="hint">Net weight after handling against the gross weight received (firo forms).</p>`
+    + Pulse.list([["Product"], ["Supplier"], ["Processed", 1], ["Gross kg", 1], ["Net kg", 1], ["Yield", 1]], Object.entries(fp).sort((a, b) => b[1][0] - a[1][0]).map(([k, v]) => { const [p, s] = k.split(" | "); return {cells: [esc(p), esc(s), fmt(v[2]), fmt(v[0], 1), fmt(v[1], 1), fmt(v[1] / v[0] * 100, 1) + "%"]}; }), {max: 400, none: "No product processed in this period."}) + `</div>`
+    + `<div class="card" style="margin-top:14px"><h2>Every spoil entry</h2>` + Pulse.list([["Restaurant"], ["Day"], ["Product"], ["Quantity", 1], ["Unit"], ["Reason"]], sp.map(s => ({cells: [esc(s[0]), esc(s[1]), esc(s[2]), fmt(s[3], 2), esc(s[4]), esc(s[5])]})), {max: 420, none: "None."}) + `</div>`;
+}
+// coverage
+function oxForms(d){
+  const K = d.kinds, L = d.kind_label, F = d.forms.filter(f => !f.deleted), now30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  $("oxKpis").innerHTML = Pulse.tiles([
+    {l: "Forms", v: fmt(F.length), s: `${fmt(F.filter(f => f.last && f.last >= now30).length)} used in the last 30 days`},
+    {l: "Not used for 30 days", v: fmt(F.filter(f => !f.last || f.last < now30).length), s: "candidates to archive in Crunchtime"},
+    {l: "Locations", v: fmt(d.locations.length + d.support.length), s: `${fmt(d.locations.filter(x => x.how === "needs review").length)} need review`},
+    {l: "Sensors", v: fmt(d.sensors.length), s: "Monnit, walk-in coolers and freezers"}]);
+  $("oxBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Forms by kind</h2>` + Pulse.list([["Kind"], ["Forms", 1], ["Used in 30 days", 1], ["Submissions, all time", 1]], Object.entries(K).map(([k, v]) => ({cells: [esc(L[k] || k), fmt(v[0]), fmt(v[1]), fmt(v[2])]}))) + `</div>`
+    + `<div class="card"><h2>Every form</h2><div class="scroll" style="max-height:560px"><table data-nosort><tr><th>Form</th><th>Kind</th><th>Category</th><th class="num">Submissions</th><th>Last submitted</th></tr>`
+    + F.map(f => `<tr><td class="name">${esc(f.title)}</td><td class="meta">${esc(L[f.kind] || f.kind)}</td><td class="meta">${esc(f.category)}</td><td class="num">${fmt(f.subs)}</td><td class="${!f.last || f.last < now30 ? "meta" : ""}">${esc(f.last || "never")}</td></tr>`).join("") + `</table></div></div>`;
+}
+// connection
+function oxSetOpen(show){ $("oxSet").style.display = show ? "" : "none"; if (show) ctLoad(); }
+$("oxSetBtn").onclick = () => oxSetOpen($("oxSet").style.display === "none");
+async function ctLoad(){
+  try {
+    const r = await fetch("/api/crunchtime/settings"), j = await readJSON(r);
+    if (!r.ok) throw new Error(j.error || r.status);
+    const c = j.connection;
+    $("ctMap").value = c.map || ""; $("ctLim").value = c.thresholds || "";
+    $("ctMap").placeholder = Object.entries(c.default_map || {}).map(([k, v]) => `${k} = ${v}`).join("\n");
+    $("ctTok").placeholder = c.has_token ? `saved ${c.token_saved_at.slice(0, 10)} · type to replace` : "not set";
+    $("ctLocs").innerHTML = j.locations.length ? `<tr><th>Crunchtime location</th><th>Restaurant</th><th>Mapping</th></tr>` + j.locations.map(u => `<tr><td>${esc(u.location)}</td><td>${esc(u.ref || "–")}</td><td>${u.how === "mapped" ? "mapped" : u.how === "needs review" ? '<span class="chip warn">Needs review</span>' : esc(u.how)}</td></tr>`).join("")
+      : `<tr><td class="meta">${esc(j.error || (c.configured ? "" : "Save the token to see Crunchtime's locations and their mapping."))}</td></tr>`;
+  } catch (e) { $("ctMsg").textContent = "Could not read: " + e.message; }
+}
+$("ctSave").onclick = async () => {
+  $("ctMsg").textContent = "Saving…";
+  try { await odPost("/api/crunchtime/settings", {token: $("ctTok").value, map: $("ctMap").value, thresholds: $("ctLim").value});
+    $("ctTok").value = ""; $("ctMsg").textContent = "Saved."; oxData = null; ctLoad(); } catch (e) { $("ctMsg").textContent = "Not saved: " + e.message; }
+};
+$("ctTest").onclick = async () => {
+  $("ctMsg").textContent = "Reading Crunchtime…";
+  try { const j = await odPost("/api/crunchtime/test", {}); $("ctMsg").textContent = `Connected: ${fmt(j.forms)} forms, ${j.locations.length} locations, ${fmt(j.sensors)} sensors.`; ctLoad(); }
+  catch (e) { $("ctMsg").textContent = "Not connected: " + e.message; }
+};
+$("oxExp").onclick = () => {
+  const d = oxData; if (!d) { alert("Wait for the figures to finish reading."); return; }
+  const R = d.locations.concat(d.support);
+  xlsxTable(`Operations and food safety ${d.period.from} ${d.period.to}`, [
+    {title: "Scorecard", header: ["Restaurant", "Crunchtime location", "Mapping", "Tasks due", "Done", "Done %", "Late", "Overdue", "Temperature readings", "Out of range", "In range %", "Sensors", "Sensors out", "Oil measurements", "Oil to change", "Products checked", "Not fit", "Spoil entries", "Yield %"],
+     formats: ["text", "text", "text", "int", "int", "pct", "int", "int", "int", "int", "pct", "int", "int", "int", "int", "int", "int", "int", "pct"],
+     rows: R.map(x => [x.name, x.location, x.how, x.tasks.due, x.tasks.done, x.completion == null ? null : x.completion / 100, x.tasks.late, x.tasks.overdue, x.temp_n, x.temp_out, x.temp_pct_in == null ? null : x.temp_pct_in / 100, x.sensors.length, x.sensors_out, x.oil_n, x.oil_over, x.trace_n, x.trace_unfit, x.spoil.length, x.yield_pct == null ? null : x.yield_pct / 100])},
+    {title: "Checklists", header: ["Restaurant", "Checklist", "Due", "Done", "Late", "Overdue"], formats: ["text", "text", "int", "int", "int", "int"], rows: R.flatMap(x => x.checklists.map(c => [x.name].concat(c)))},
+    {title: "Sensors", header: ["Restaurant", "Sensor", "Placement", "Type", "°C", "Out of range", "Online", "Last reading", "Battery"], formats: ["text", "text", "text", "text", "qty", "text", "text", "text", "int"], rows: d.sensors.map(s => [s.restaurant || s.location, s.name, s.placement, s.type, s.c, s.out ? "yes" : "no", s.online && !s.stale ? "yes" : "no", s.last, s.battery])},
+    {title: "Receiving by supplier", header: ["Supplier", "Checked", "Not fit", "Average °C", "Highest °C"], formats: ["text", "int", "int", "qty", "qty"], rows: d.suppliers},
+    {title: "Spoil", header: ["Restaurant", "Day", "Product", "Quantity", "Unit", "Reason"], formats: ["text", "text", "text", "qty", "text", "text"], rows: R.flatMap(x => x.spoil.map(s => [x.name].concat(s)))},
+    {title: "Yield", header: ["Restaurant", "Day", "Product", "Supplier", "Invoice", "Gross kg", "Net kg"], formats: ["text", "text", "text", "text", "text", "qty", "qty"], rows: R.flatMap(x => x.firo.map(f => [x.name].concat(f)))}],
+    [`${d.period.from} to ${d.period.to} · Crunchtime Ops Execution, read ${d.read_at}`].concat(Object.values(d.definitions || {})));
 };
 // ---------- Sales → Location intelligence ----------
 // Every restaurant as a square, from the same Simphony read as the Sales tab (/api/sales).
@@ -9790,6 +10002,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="budget" && blTab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="people") ppShow(ppTab);
+  if(b.dataset.view==="opsexec") oxShow(oxTab);
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="bs" || b.dataset.view==="liquidity") loadCap(false);
   if(b.dataset.view==="gaps") loadDq(false);
@@ -9847,6 +10060,11 @@ function setHeader(){
   $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower);
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
+  if (v.id === "opsexec"){
+    $("title").textContent = `Operations & Food Safety · ${OX_TITLE[oxTab]} · ${$("company").value || data.meta.company || ""}`;
+    $("period").textContent = `${data.meta.period_label} · Crunchtime Ops Execution, read only`;
+    return;
+  }
   if (v.id === "people"){
     $("title").textContent = `People & Productivity · ${PP_TITLE[ppTab]} · ${$("company").value || data.meta.company || ""}`;
     $("period").textContent = ppTab === "workforce" || ppTab === "quality" ? "Odoo HR records, read only · sums by restaurant, no personal data"
