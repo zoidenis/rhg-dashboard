@@ -134,7 +134,7 @@ def sla_days(severity, role):
     """Days to the due date of an item of this severity owned by this role: the Action Center's SLA matrix, else
     the register's own (critical 2, warning 5, info 10)."""
     p = policy() or {}
-    dept = DEPARTMENT_OF_ROLE.get(role or "", "Finance")
+    dept = DEPARTMENT_OF_ROLE.get(role or "") or (p.get("admin_departments") or {}).get(str(role or "")[6:]) or "Finance"
     try:
         return int((p.get("sla") or {})[dept][SEVERITY_AC.get(severity, "high")])
     except (KeyError, TypeError, ValueError):
@@ -168,10 +168,28 @@ def _now():
     return datetime.now().isoformat(timespec="seconds")
 
 
+def _in_scope(scope, company, location):
+    """Does an account's access (Administration → Accounts) cover this company and location?"""
+    comps = (scope or {}).get("companies", "*")
+    if comps != "*" and str(company or "").upper() not in {str(c).upper() for c in comps}:
+        return False
+    locs = next((v for k, v in ((scope or {}).get("locations") or {}).items() if str(k).upper() == str(company or "").upper()), "*")
+    return locs == "*" or not location or str(location).upper() in {str(x).upper() for x in locs}
+
+
 def owner_of(source, kind, company, location):
-    """(role, "email, email") of a finding: the role of its type at its location in Email recipients, else at the
-    company (the company row and the group row)."""
-    role = OWNER_ROLE.get((source, kind)) or OWNER_ROLE.get((source, "*")) or DEFAULT_ROLE
+    """(role, "email, email") of a finding: the role of its type, as the Executive Action Center's responsibility
+    matrix sets it (a role of Administration: its accounts whose access covers the company and location; or a role
+    of Email recipients), else this register's rule; the people of a role of Email recipients at the location,
+    else at the company (the company row and the group row)."""
+    p = policy() or {}
+    rules = p.get("owner_rules") or {}
+    target = rules.get(f"{TOWER['name']}|{source}|{kind}") or rules.get(f"{TOWER['name']}|{source}|*") or ""
+    if target.startswith("admin:"):
+        name = target[6:]
+        emails = [a["email"] for a in (p.get("admin_people") or {}).get(name, []) if _in_scope(a.get("scope"), company, location)]
+        return target, ", ".join(dict.fromkeys(emails))
+    role = target[4:] if target.startswith("dir:") else (OWNER_ROLE.get((source, kind)) or OWNER_ROLE.get((source, "*")) or DEFAULT_ROLE)
     d = _directory()
     emails = []
     locs = next((v for k, v in (d.get("locations") or {}).items() if str(k).upper() == str(company or "").upper()), {})
@@ -559,22 +577,34 @@ def for_action_center(days=45):
              | {"history": x["history"][-6:]}
              for x in d["items"] if x["status"] in ACTIVE or (x["closed_at"] or "") >= since]
     return {"tower": TOWER["name"], "link": TOWER["link"], "sources": SOURCES, "roles": ROLE_LABEL,
-            "statuses": STATUSES, "items": items, "runs": d["runs"]}
+            "statuses": STATUSES, "items": items, "runs": d["runs"],
+            "owner_rules": [{"source": s_, "kind": k_, "role": r_} for (s_, k_), r_ in OWNER_ROLE.items()]}
 
 
 def apply_sla(actor="Executive Action Center"):
-    """Gives every active item that nobody re-dated by hand the due date of the SLA matrix (first seen + days)."""
+    """Applies the Action Center's matrices to every active item: the owner of the responsibility matrix to those
+    nobody handed over by hand, then the due date of the SLA matrix (first seen + days) to those nobody re-dated by
+    hand. Returns how many items changed."""
     n, now = 0, _now()
     with _lock:
         db = _db()
         for r in db.execute(f"SELECT {COLS} FROM ex WHERE status IN (?,?,?)", ACTIVE).fetchall():
             x = _row(r)
-            if any("Due:" in (h.get("note") or "") for h in x["history"]):
-                continue                                           # a person set this due date
-            due = (date.fromisoformat(x["first_seen"][:10]) + timedelta(days=sla_days(x["severity"], x["role"]))).isoformat()
-            if due != x["due"]:
-                x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": f"SLA due date {due}"})
-                db.execute("UPDATE ex SET due=?, history=? WHERE id=?", (due, json.dumps(x["history"][-60:]), x["id"]))
+            sets = {}
+            if not x["owner_set"] and not x["manual"]:
+                role, owner = owner_of(x["source"], x["kind"], x["company"], x["location"])
+                if (role, owner) != (x["role"], x["owner"]):
+                    sets.update(role=role, owner=owner)
+                    x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": f"Owner by the matrix: {owner or 'nobody in ' + role}"})
+                    x["role"] = role
+            if not any("Due:" in (h.get("note") or "") for h in x["history"]):
+                due = (date.fromisoformat(x["first_seen"][:10]) + timedelta(days=sla_days(x["severity"], x["role"]))).isoformat()
+                if due != x["due"]:
+                    sets["due"] = due
+                    x["history"].append({"ts": now, "by": actor, "to": x["status"], "note": f"SLA due date {due}"})
+            if sets:
+                sets["history"] = json.dumps(x["history"][-60:])
+                db.execute(f"UPDATE ex SET {', '.join(k + '=?' for k in sets)} WHERE id=?", (*sets.values(), x["id"]))
                 n += 1
         db.commit()
     return n

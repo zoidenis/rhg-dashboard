@@ -168,10 +168,11 @@ header{display:flex;justify-content:space-between}
       <div class="flt" id="escF"></div>
       <h3 style="font-size:14px;margin:16px 0 6px">Daily email</h3>
       <div class="flt" id="mailF"></div>
-      <div class="flt"><button class="btn dark" type="button" id="mxSave">Save</button><button class="btn" type="button" id="mxApply">Apply the SLA to open items</button><button class="btn" type="button" id="mxTest">Send me a test email</button><span class="msg" id="mxMsg"></span></div>
+      <div class="flt"><button class="btn dark" type="button" id="mxSave">Save</button><button class="btn" type="button" id="mxApply">Apply the matrices to open items</button><button class="btn" type="button" id="mxTest">Send me a test email</button><span class="msg" id="mxMsg"></span></div>
     </div>
-    <div class="card mx" style="margin-bottom:14px"><h2>Who owns what</h2><p class="hint">The role that owns each type of item in the registers (the controls' rules), its department, and how many items it holds now.</p><div class="scroll"><table id="rulesT"></table></div></div>
-    <div class="card mx"><h2>People in each role</h2><p class="hint">The responsibility matrix: for every company (and restaurant), the people in each role. The same directory as Settings → Email recipients by company. An owner is a pulse account when its email matches one.</p>
+    <div class="card mx" style="margin-bottom:14px"><h2>Who owns what</h2><p class="hint">The role that owns each type of item in the registers. Choose a role of Administration (its accounts own the items of the companies and restaurants their access covers) or a role of Email recipients; leave it on the register's rule otherwise. New items take it within 5 minutes; "Apply the matrices to open items" hands the open ones over (not those handed over by hand).</p><div class="scroll"><table id="rulesT"></table></div><span class="msg" id="rMsg"></span></div>
+    <div class="card mx" style="margin-bottom:14px"><h2>Roles of Administration</h2><p class="hint">The roles created in Administration → Roles & permissions and their accounts (Administration → Accounts), with the access of each. A role chosen above gives its items to these people; to add someone, give them the role in Administration.</p><div class="scroll"><table id="adminT"></table></div></div>
+    <div class="card mx"><h2>Roles of Email recipients</h2><p class="hint">For every company (and restaurant), the people in each role of Email recipients. The same directory as Settings → Email recipients by company; it also routes the reports. An owner is a pulse account when its email matches one.</p>
       <div class="flt"><select id="pCo" aria-label="Company"></select><span class="msg" id="pMsg"></span></div>
       <div class="scroll"><table id="peopleT"></table></div>
       <div class="flt" id="pEdit" hidden style="margin-top:12px"><select id="peRole" aria-label="Role"></select><input id="peLoc" placeholder="Restaurant code (blank = the whole company)" style="min-width:240px"><select id="peAcc" multiple size="4" aria-label="Pulse accounts" style="min-width:260px"></select><button class="btn dark" type="button" id="peSave">Save the role</button></div>
@@ -200,7 +201,7 @@ function ownerText(x){
   if (x.status === "Awaiting approval") return `<span class="meta">approver</span> ${esc(x.role_label)}`;
   if (x.owner_accounts.length) return x.owner_accounts.map(a => `<b>${esc(a.name)}</b>`).join(", ") + (x.owners_without_account.length ? ` <span class="noacc">+${x.owners_without_account.length} without account</span>` : "");
   if (x.owners.length) return esc(x.owners.join(", ")) + ` <span class="noacc">no pulse account</span>`;
-  return `<span class="noacc">nobody in the role ${esc(x.role_label || "")}</span>`;
+  return `<span class="noacc">nobody in the role <span data-no-i18n>${esc(x.role_label || "")}</span></span>`;
 }
 function itemRow(x){
   const late = x.overdue ? `<b style="color:var(--rhg-red)">${x.days_overdue} d late</b>${x.escalation ? `<span class="esc">L${x.escalation}</span>` : ""}` : x.due_soon ? `<b style="color:var(--rhg-amber)">due ${esc(x.due)}</b>` : x.active ? `due ${esc(x.due || "–")}` : `<span class="meta">${esc(x.status)} ${esc(String(x.closed_at || "").slice(0, 10))}</span>`;
@@ -312,7 +313,7 @@ async function openItem(uid){
   const accs = D.accounts || [];
   const body = `<p style="margin:0 0 8px">${esc(x.detail)}</p>
     <div class="row" style="align-items:center"><span class="sev ${esc(x.severity)}">${esc(SEV[x.severity])}</span><span class="st ${esc(x.status.replace(/ /g, ""))}">${esc(x.status)}</span><span class="meta">${esc(x.department)} · ${esc(x.source_label)} · found ${esc(x.first_seen)}${x.reopened ? ` · reopened ${x.reopened}×` : ""}</span></div>
-    <h4>Owner and deadline</h4><p style="margin:0">${ownerText(x)} <span class="meta">${x.role_label && x.status !== "Awaiting approval" ? "· role " + esc(x.role_label) : ""}</span></p>
+    <h4>Owner and deadline</h4><p style="margin:0">${ownerText(x)} <span class="meta">${x.role_label && x.status !== "Awaiting approval" ? "· role " + `<span data-no-i18n>${esc(x.role_label)}</span>` : ""}</span></p>
     <p style="margin:4px 0 0">Deadline <b>${esc(x.due || "–")}</b>${x.sla_due && x.sla_due !== x.due ? ` <span class="meta">(SLA ${esc(x.sla_due)})</span>` : ""}${x.overdue ? ` · <b style="color:var(--rhg-red)">${x.days_overdue} days late</b>${x.escalation ? ` · escalated L${x.escalation}` : ""}` : ""}</p>
     ${x.kpi ? `<h4>KPI followed by Unicorn</h4><p style="margin:0">${esc(x.kpi.metric)}: baseline ${esc(x.kpi.baseline ?? "–")} → latest ${esc(x.kpi.latest ?? "–")} (effect ${esc(x.kpi.effect ?? "–")}) · target ${esc(x.kpi.target ?? "–")}</p>` : ""}
     ${x.history.length ? `<h4>History</h4><ul style="margin:0;padding-left:18px">${x.history.slice().reverse().map(h => `<li><span class="meta">${esc(String(h.ts || h.at || "").slice(0, 16).replace("T", " "))} · ${esc(h.by || "")}</span> ${esc(h.to ? h.to + (h.note ? ": " : "") : "")}${esc(h.note || h.text || "")}</li>`).join("")}</ul>` : ""}
@@ -370,7 +371,13 @@ async function loadMatrix(){
     <label class="meta">at <input id="gT" value="${esc(G.time)}" ${ed ? "" : "disabled"} style="width:70px"></label><label class="meta">reminder <input type="number" id="gR" min="0" max="7" value="${G.reminder_days}" ${ed ? "" : "disabled"} style="width:56px"> day(s) before the deadline</label>
     ${D && D.settings.last_digest ? `<span class="meta">last sent ${esc(D.settings.last_digest.at)}${D.settings.last_digest.test ? " (test)" : ""}: ${D.settings.last_digest.sent.length} emails</span>` : ""}`;
   ["mxSave", "mxApply", "mxTest"].forEach(id => $(id).hidden = !ed);
-  $("rulesT").innerHTML = `<tr><th>Register</th><th>Type of item</th><th>Owner role</th><th>Department</th><th class="num">Items now</th></tr>` + (M.owner_rules.map(r => `<tr><td>${esc(r.tower)}</td><td>${esc(r.source)}</td><td>${esc((roles.find(x => x.key === r.role) || {}).label || r.role)}</td><td class="meta">${esc(r.department)}</td><td class="num">${fmtN(r.items)}</td></tr>`).join("") || `<tr><td colspan="5" class="meta">No item in the registers yet.</td></tr>`);
+  const ownerOpts = r => `<option value="">The register's rule: ${esc(r.default_label)}</option>`
+    + `<optgroup label="Roles of Administration">${M.admin_roles.map(a => `<option data-no-i18n value="admin:${esc(a.name)}"${r.owner === "admin:" + a.name ? " selected" : ""}>${esc(a.name)} (${a.people.length})</option>`).join("")}</optgroup>`
+    + `<optgroup label="Roles of Email recipients">${roles.map(x => `<option value="dir:${esc(x.key)}"${r.owner === "dir:" + x.key ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</optgroup>`;
+  $("rulesT").innerHTML = `<tr><th>Register</th><th>Type of item</th><th>Owner</th><th>Department</th><th class="num">Open now</th></tr>` + (M.owner_rules.map((r, i) => `<tr><td>${esc(r.tower)}</td><td>${esc(r.source_label)}${r.kind && r.kind !== "*" ? ` <span class="meta">· ${esc(r.kind)}</span>` : ""}</td>
+      <td>${ed ? `<select data-rule="${i}" aria-label="Owner">${ownerOpts(r)}</select>` : `<span data-no-i18n>${esc(r.owner_label)}</span>`}</td><td class="meta">${esc(r.department)}</td><td class="num">${fmtN(r.items)}</td></tr>`).join("") || `<tr><td colspan="5" class="meta">The registers could not be read.</td></tr>`);
+  $("adminT").innerHTML = `<tr><th>Role</th><th>Department</th><th>Accounts and their access</th></tr>` + M.admin_roles.map(a => `<tr><td class="name"><b data-no-i18n>${esc(a.name)}</b></td><td class="meta" title="${esc(a.department)}"><span>${esc(a.ac_department)}</span></td>
+      <td>${a.people.length ? a.people.map(p => `<b>${esc(p.name)}</b> <span class="meta"><span data-no-i18n>${esc(p.email)}</span> · ${p.access === "every company" ? "<span>every company</span>" : `<span data-no-i18n>${esc(p.access)}</span>`}</span>`).join("<br>") : `<span class="noacc">no account with an email</span>`}</td></tr>`).join("");
   const cos = [...new Set(M.people.map(p => p.company))]; if (!cos.includes("*")) cos.unshift("*");
   if (!$("pCo").options.length) $("pCo").innerHTML = cos.map(c => `<option value="${esc(c)}">${c === "*" ? "Whole group" : esc(c)}</option>`).join("");
   paintPeople();
@@ -398,9 +405,15 @@ $("mxSave").onclick = async () => {
     digest: {enabled: $("gOn").checked, time: $("gT").value, reminder_days: +$("gR").value}}); $("mxMsg").textContent = "Saved. The registers read the new SLA within 5 minutes."; load(); }
   catch (e) { $("mxMsg").textContent = e.message; }
 };
+$("rulesT").addEventListener("change", async e => {
+  const sel = e.target.closest("[data-rule]"); if (!sel) return;
+  const r = M.owner_rules[+sel.dataset.rule];
+  try { await post("/api/actions/owner-rule", {tower: r.tower, source: r.source, kind: r.kind, owner: sel.value}); $("rMsg").textContent = "Saved. Apply the matrices to hand the open items over."; loadMatrix(); }
+  catch (err) { $("rMsg").textContent = err.message; }
+});
 $("mxApply").onclick = async () => {
-  if (!confirm("Re-date every open item nobody re-dated by hand with the SLA matrix?")) return;
-  try { const j = await post("/api/actions/apply-sla", {}); $("mxMsg").textContent = "Re-dated: " + Object.entries(j.changed).map(([k, v]) => `${k} ${v}`).join(", "); load(); } catch (e) { $("mxMsg").textContent = e.message; }
+  if (!confirm("Hand every open item to the owner of the matrix (unless it was handed over by hand) and re-date it with the SLA (unless it was re-dated by hand)?")) return;
+  try { const j = await post("/api/actions/apply-sla", {}); $("mxMsg").textContent = "Items changed: " + Object.entries(j.changed).map(([k, v]) => `${k} ${v}`).join(", "); load(); } catch (e) { $("mxMsg").textContent = e.message; }
 };
 $("mxTest").onclick = async () => {
   try { const j = await post("/api/actions/email-test", {}); $("mxMsg").textContent = j.sent.map(s => `${s.owner}: ${s.status}${s.detail ? " · " + s.detail : ""}`).join("; "); } catch (e) { $("mxMsg").textContent = e.message; }

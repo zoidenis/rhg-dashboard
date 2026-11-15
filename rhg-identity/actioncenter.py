@@ -54,6 +54,9 @@ DEPARTMENT_OF_ROLE = {"purchasing_coordinator": "Purchasing", "purchasing_manage
 DEPARTMENT_OF_CAPABILITY = {"financial": "Finance", "purchasing": "Purchasing", "inventory": "Warehouse",
                             "restaurant": "Operations", "operations": "Operations", "people": "Operations",
                             "executive": "Executive", "data": "Finance"}
+# the department of a role of Administration (Admin → Roles: its department) in the Action Center
+DEPARTMENT_OF_ADMIN = {"finance": "Finance", "purchasing": "Purchasing", "sales": "Operations", "operations": "Operations",
+                       "hr": "Operations", "warehouse": "Warehouse", "inventory": "Warehouse", "management": "Executive"}
 SEVERITY_OF_REGISTER = {"critical": "critical", "warning": "high", "info": "low"}
 ACTIVE = ("Open", "In progress", "Awaiting verification", "Awaiting approval")
 DEFAULTS = {
@@ -104,6 +107,8 @@ def settings():
         s["digest"]["time"] = g["time"]
     if isinstance(g.get("reminder_days"), int) and 0 <= g["reminder_days"] <= 7:
         s["digest"]["reminder_days"] = g["reminder_days"]
+    s["owner_rules"] = {k: v for k, v in (d.get("owner_rules") or {}).items()
+                        if isinstance(v, str) and (v.startswith("admin:") or v.startswith("dir:"))}
     s["updated_at"], s["updated_by"] = d.get("updated_at"), d.get("updated_by")
     s["last_digest"] = d.get("last_digest")
     return s
@@ -155,10 +160,66 @@ def save_settings(patch, actor):
     return settings()
 
 
+def admin_roles():
+    """The roles of Administration (Admin → Roles & permissions) with their department and their active accounts
+    (email, name, access scope): a role of the responsibility matrix as people are given it in Administration."""
+    import auth
+    people = {}
+    for r in store.q("SELECT * FROM users WHERE active=1"):
+        if r["email"]:
+            people.setdefault(r["role"], []).append({"email": r["email"].strip().lower(), "name": r["name"],
+                                                     "username": r["username"], "scope": auth.effective_scope(r)})
+    out = []
+    for r in store.q("SELECT name, department FROM roles ORDER BY name"):
+        out.append({"name": r["name"], "department": r["department"] or "Other",
+                    "ac_department": DEPARTMENT_OF_ADMIN.get((r["department"] or "").strip().lower(), "Executive"),
+                    "people": sorted(people.get(r["name"], []), key=lambda p: p["name"])})
+    return out
+
+
 def policy():
-    """What the towers' registers read: the SLA matrix and whether the combined email replaces theirs."""
+    """What the towers' registers read: the SLA matrix, whether the combined email replaces theirs, the owner
+    of each type of item set in the responsibility matrix and the accounts of the roles of Administration."""
     s = settings()
-    return {"sla": s["sla"], "combined_digest": s["digest"]["enabled"]}
+    A = admin_roles()
+    return {"sla": s["sla"], "combined_digest": s["digest"]["enabled"], "owner_rules": s["owner_rules"],
+            "admin_people": {r["name"]: [{"email": p["email"], "scope": p["scope"]} for p in r["people"]] for r in A},
+            "admin_departments": {r["name"]: r["ac_department"] for r in A}}
+
+
+def save_owner_rule(tower, source, kind, target, actor):
+    """The owner of a type of item: "admin:<role of Administration>", "dir:<role of Email recipients>", or ""
+    for the register's own rule. The registers take it within 5 minutes; "Apply" hands over the open items."""
+    if tower not in [n for n, _ in TOWERS.values()] or not source:
+        raise ValueError("Unknown register or type of item.")
+    if target and not (target.startswith("admin:") or target.startswith("dir:")):
+        raise ValueError("Choose a role of Administration or of Email recipients.")
+    if target.startswith("admin:") and target[6:] not in {r["name"] for r in admin_roles()}:
+        raise ValueError("That role is not in Administration.")
+    key = f"{tower}|{source}|{kind or '*'}"
+    with _lock:
+        d = _read()
+        rules = d.get("owner_rules") or {}
+        if target:
+            rules[key] = target[:120]
+        else:
+            rules.pop(key, None)
+        d["owner_rules"], d["updated_at"], d["updated_by"] = rules, store.now(), actor
+        _write(d)
+    store.audit("action center owner rule", actor, key, {"owner": target or "the register's rule"})
+    return settings()["owner_rules"]
+
+
+def role_label(role, labels):
+    if str(role).startswith("admin:"):
+        return role[6:]
+    return labels.get(role, role or "")
+
+
+def department_of(role, default, admin=None):
+    if str(role).startswith("admin:"):
+        return (admin or {}).get(role[6:], "Executive")
+    return DEPARTMENT_OF_ROLE.get(role or "", default)
 
 
 # ---------------------------------------------------------------- reading the registers
@@ -260,6 +321,7 @@ def _finish(x, today, s, U):
 def collect(scope=None):
     """Every item of the registers and of Unicorn, unified. scope: the person's access (companies, locations)."""
     s, today, U = settings(), date.today().isoformat(), users()
+    admin_dept = {r["name"]: r["ac_department"] for r in admin_roles()}
     items, sources, errors, runs = [], {}, [], []
     for key, (name, _base) in TOWERS.items():
         d = _tower(key) or {}
@@ -273,7 +335,7 @@ def collect(scope=None):
             sources[f"{key}:{src}"] = f"{name} · {label}"
         runs += [dict(r, tower=name) for r in d.get("runs") or []]
         for r in d.get("items") or []:
-            dept = DEPARTMENT_OF_ROLE.get(r.get("role") or "", "Finance" if key == "finance" else "Purchasing")
+            dept = department_of(r.get("role") or "", "Finance" if key == "finance" else "Purchasing", admin_dept)
             sev = SEVERITY_OF_REGISTER.get(r.get("severity"), "high")
             st = "Closed" if r["status"] == "Closed" else r["status"]
             x = {"uid": f"{key}:{r['id']}", "origin": key, "tower": name, "ref": r["id"],
@@ -281,7 +343,7 @@ def collect(scope=None):
                  "department": dept, "kind": r.get("kind") or "", "company": r.get("company") or "",
                  "location": r.get("location") or "", "title": r.get("title") or "", "detail": r.get("detail") or "",
                  "severity": sev, "value": r.get("value"), "role": r.get("role") or "",
-                 "role_label": roles.get(r.get("role"), r.get("role") or ""),
+                 "role_label": role_label(r.get("role") or "", roles),
                  "owners": _emails(r.get("owner")), "owner_set_by_hand": bool(r.get("owner_set")),
                  "status": st, "first_seen": (r.get("first_seen") or "")[:10], "due": r.get("due") or "",
                  "sla_due": _due_from_sla(r.get("first_seen"), dept, sev, s["sla"]),
@@ -496,17 +558,44 @@ def matrix():
                 for e in _emails(text):
                     people.append({"company": co, "location": loc, "role": role, "email": e,
                                    "account": U.get(e, {}).get("name") or "", "username": U.get(e, {}).get("username") or ""})
-    owners = {}
+    A = admin_roles()
+    admin_dept = {r["name"]: r["ac_department"] for r in A}
+    rules_set = settings()["owner_rules"]
+    owner_rules = []
     for key in TOWERS:
         t = _tower(key) or {}
+        name = TOWERS[key][0]
+        labels = dict(t.get("roles") or {})
+        counts = {}
         for x in t.get("items") or []:
-            k = (TOWERS[key][0], (t.get("sources") or {}).get(x["source"], x["source"]), x.get("role") or "")
-            owners[k] = owners.get(k, 0) + 1
+            if x["status"] in ACTIVE:
+                counts[(x["source"], x.get("kind") or "")] = counts.get((x["source"], x.get("kind") or ""), 0) + 1
+        for rr in t.get("owner_rules") or []:
+            k = f"{name}|{rr['source']}|{rr['kind']}"
+            cur = rules_set.get(k) or ""
+            role = cur[6:] if cur.startswith("admin:") else cur[4:] if cur.startswith("dir:") else rr["role"]
+            label = cur[6:] if cur.startswith("admin:") else labels.get(role, role)
+            n = sum(v for (s_, k_), v in counts.items() if s_ == rr["source"] and (rr["kind"] == "*" or k_ == rr["kind"]))
+            owner_rules.append({"tower": name, "source": rr["source"], "kind": rr["kind"],
+                                "source_label": (t.get("sources") or {}).get(rr["source"], rr["source"]),
+                                "default_role": rr["role"], "default_label": labels.get(rr["role"], rr["role"]),
+                                "owner": cur, "owner_label": label, "set": bool(cur),
+                                "department": department_of(cur or rr["role"], "Finance", admin_dept), "items": n})
     return {"roles": roles, "people": sorted(people, key=lambda p: (p["company"] != "*", p["company"], p["location"], p["role"])),
-            "owner_rules": [{"tower": t, "source": s, "role": r, "department": DEPARTMENT_OF_ROLE.get(r, "Executive"),
-                             "items": n} for (t, s, r), n in sorted(owners.items())],
+            "admin_roles": [{k: r[k] for k in ("name", "department", "ac_department")}
+                            | {"people": [{"name": p["name"], "email": p["email"], "access": _scope_text(p["scope"])} for p in r["people"]]}
+                            for r in A],
+            "owner_rules": owner_rules,
             "accounts": [{"email": e, "name": u["name"], "username": u["username"], "role": u["role"]} for e, u in sorted(U.items(), key=lambda kv: kv[1]["name"])],
             "updated_at": d.get("updated_at"), "updated_by": d.get("updated_by")}
+
+
+def _scope_text(scope):
+    comps = (scope or {}).get("companies", "*")
+    if comps == "*":
+        return "every company"
+    locs = (scope or {}).get("locations") or {}
+    return "; ".join(f"{c}" + (f" ({', '.join(locs[c])})" if c in locs else "") for c in comps)
 
 
 def save_people(company, location, role, emails, actor):

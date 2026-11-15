@@ -60,3 +60,30 @@ def test_the_center_list_has_labels_and_recent_closures():
     st = {x["subject"]: x["status"] for x in r["items"]}
     assert st == {"X": "Closed", "G": "Open"}
     assert r["tower"] and "ap_ar" in r["sources"] and set(r["items"][0]) >= {"role", "owner", "due", "history", "overdue"}
+
+
+def test_owner_from_a_role_of_administration_by_access(monkeypatch):
+    pol = dict(SLA, owner_rules={f"{exreg.TOWER['name']}|negative_stock|stock": "admin:Sales analyst"},
+               admin_people={"Sales analyst": [{"email": "all@rhg.al", "scope": {"companies": "*", "locations": {}}},
+                                               {"email": "opa@rhg.al", "scope": {"companies": ["SALT"], "locations": {"SALT": ["OPA1"]}}},
+                                               {"email": "tbm@rhg.al", "scope": {"companies": ["TBM"], "locations": {}}}]},
+               admin_departments={"Sales analyst": "Operations"})
+    pol["sla"] = dict(SLA["sla"], Operations={"critical": 6, "high": 9, "medium": 12, "low": 15})
+    monkeypatch.setattr(exreg, "policy", lambda max_age=300: pol)
+    role, owner = exreg.owner_of("negative_stock", "stock", "SALT", "OPA1")
+    assert role == "admin:Sales analyst" and owner == "all@rhg.al, opa@rhg.al"
+    assert exreg.owner_of("negative_stock", "stock", "SALT", "LIFT")[1] == "all@rhg.al"
+    assert exreg.owner_of("negative_stock", "cost", "SALT", "OPA1")[0] == "cost_controller"      # not overridden
+    exreg.sync("negative_stock", "SALT", [{"subject": "A", "kind": "stock", "location": "OPA1", "title": "A", "severity": "critical", "value": 1}])
+    assert exreg.query("all")["items"][0]["due"] == d(6)                                          # Operations · critical
+
+
+def test_apply_hands_open_items_to_the_matrix_owner(monkeypatch):
+    exreg.sync("ap_ar", "SALT", [{"subject": "X", "title": "X", "severity": "warning", "value": 1}])
+    pol = dict(SLA, owner_rules={f"{exreg.TOWER['name']}|ap_ar|*": "admin:CFO"},
+               admin_people={"CFO": [{"email": "cfo@rhg.al", "scope": {"companies": "*", "locations": {}}}]},
+               admin_departments={"CFO": "Executive"})
+    monkeypatch.setattr(exreg, "policy", lambda max_age=300: pol)
+    assert exreg.apply_sla() == 1
+    x = exreg.query("all")["items"][0]
+    assert (x["role"], x["owner"]) == ("admin:CFO", "cfo@rhg.al")

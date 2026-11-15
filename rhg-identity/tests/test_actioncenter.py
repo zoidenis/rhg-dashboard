@@ -134,6 +134,35 @@ class Settings(Base):
         ac.save_settings({"digest": {"enabled": False}}, "geri")
 
 
+class AdminRoles(Base):
+    def setUp(self):
+        super().setUp()
+        if not store.one("SELECT 1 FROM roles WHERE name='Sales analyst'"):
+            store.run("INSERT INTO roles(name,description,permissions,system,department) VALUES(?,?,?,?,?)",
+                      ("Sales analyst", "", "[]", 0, "Sales"))
+        if not store.one("SELECT 1 FROM users WHERE username='sa'"):
+            store.run("INSERT INTO users(username,name,email,role,salt,hash,active,must_change,scope) VALUES(?,?,?,?,?,?,1,0,?)",
+                      ("sa", "Sara Analyst", "sara@rhg.al", "Sales analyst", "s", "h", '{"companies": ["SALT"], "locations": {}}'))
+
+    def test_roles_of_administration_in_the_matrix(self):
+        A = {r["name"]: r for r in ac.admin_roles()}
+        self.assertEqual((A["Sales analyst"]["ac_department"], A["Sales analyst"]["people"][0]["email"]), ("Operations", "sara@rhg.al"))
+        rules = ac.save_owner_rule("Finance", "negative_stock", "stock", "admin:Sales analyst", "geri")
+        self.assertEqual(rules["Finance|negative_stock|stock"], "admin:Sales analyst")
+        p = ac.policy()
+        self.assertEqual(p["admin_people"]["Sales analyst"][0]["scope"]["companies"], ["SALT"])
+        with self.assertRaises(ValueError):
+            ac.save_owner_rule("Finance", "negative_stock", "stock", "admin:No such role", "geri")
+        ac.save_owner_rule("Finance", "negative_stock", "stock", "", "geri")
+        self.assertNotIn("Finance|negative_stock|stock", ac.settings()["owner_rules"])
+
+    def test_an_item_owned_by_an_administration_role(self):
+        reg = dict(REG["finance"], items=[dict(REG["finance"]["items"][0], role="admin:Sales analyst", owner="sara@rhg.al")])
+        ac._tower = lambda key, max_age=60: reg if key == "finance" else REG[key]
+        x = next(i for i in ac.collect()["items"] if i["uid"] == "finance:n1")
+        self.assertEqual((x["role_label"], x["department"]), ("Sales analyst", "Operations"))
+
+
 class Email(Base):
     def test_one_email_per_owner_with_escalation(self):
         mails = []

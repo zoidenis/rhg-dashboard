@@ -535,7 +535,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": str(exc)})
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
-            elif url.path in ("/api/actions/settings", "/api/actions/apply-sla", "/api/actions/matrix", "/api/actions/email-test"):
+            elif url.path in ("/api/actions/settings", "/api/actions/apply-sla", "/api/actions/matrix", "/api/actions/email-test",
+                              "/api/actions/owner-rule"):
                 if not auth.can(user, "actioncenter.manage"):
                     self._send(403, {"error": "Your role cannot change the Action Center's matrices or emails."}); return
                 try:
@@ -543,6 +544,10 @@ class Handler(BaseHTTPRequestHandler):
                         self._send(200, {"settings": actioncenter.save_settings(body, user["username"])})
                     elif url.path.endswith("/apply-sla"):
                         self._send(200, {"changed": actioncenter.apply_sla(user.get("email") or user["username"])})
+                    elif url.path.endswith("/owner-rule"):
+                        self._send(200, {"owner_rules": actioncenter.save_owner_rule(
+                            str(body.get("tower") or ""), str(body.get("source") or ""), str(body.get("kind") or "*"),
+                            str(body.get("owner") or ""), user["username"])})
                     elif url.path.endswith("/matrix"):
                         emails = body.get("emails") if isinstance(body.get("emails"), list) else []
                         self._send(200, actioncenter.save_people(str(body.get("company") or "*")[:80], str(body.get("location") or "")[:40],
