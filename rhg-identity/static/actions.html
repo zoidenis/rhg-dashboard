@@ -26,6 +26,22 @@ header{display:flex;justify-content:space-between}
 .ac-tabs button.on{background:var(--rhg-primary);color:#fff;font-weight:600}
 .ac-tabs .n{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;background:var(--rhg-redbg);color:var(--rhg-red)}
 .ac-tabs button.on .n{background:rgba(255,255,255,.2);color:#fff}
+/* search over every item: beside the tabs */
+.ac-bar{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin:0 0 16px}
+.ac-bar .ac-tabs{margin:0}
+.ac-find{position:relative;flex:1;min-width:240px;max-width:460px}
+.ac-find input{width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 64px 12px 38px;font-size:14px;color:var(--ink)}
+.ac-find input:focus{outline:none;border-color:var(--rhg-primary);box-shadow:0 0 0 3px rgba(12,71,94,.12)}
+.ac-find svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--sub);pointer-events:none}
+.ac-find kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:600 11px/1 inherit;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--bg)}
+.ac-find button{all:unset;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--sub);font-size:13px;padding:4px 8px;border-radius:6px}
+.ac-find input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+.ac-find button:hover{color:var(--ink);background:var(--bg)}
+mark.hl{background:var(--rhg-amberbg,#fdf1dc);color:inherit;border-radius:3px;padding:0 1px}
+.sr-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
+.sr-head h2{font-size:18px;margin:0}
+.sr-head select{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:13px;color:var(--ink)}
+@media(max-width:760px){.ac-find{max-width:none;flex-basis:100%}.ac-find kbd{display:none}}
 .kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:14px}
 .kp .card.kpi{cursor:default}.kp .card.kpi.clickable{cursor:pointer}
 .grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
@@ -117,6 +133,7 @@ header{display:flex;justify-content:space-between}
     </div>
   </header>
 
+  <div class="ac-bar">
   <div class="ac-tabs" id="acTabs" role="tablist">
     <button type="button" data-t="executive" role="tab">Executive view</button>
     <button type="button" data-t="departments" role="tab">Departments</button>
@@ -124,6 +141,18 @@ header{display:flex;justify-content:space-between}
     <button type="button" data-t="unicorn" role="tab">Unicorn's tasks</button>
     <button type="button" data-t="matrix" role="tab">SLA &amp; responsibility matrix</button>
   </div>
+  <div class="ac-find" role="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="acQ" type="search" placeholder="Search every item: title, restaurant, owner, supplier…" aria-label="Search every item" autocomplete="off">
+    <kbd id="acQk">/</kbd><button type="button" id="acQx" hidden aria-label="Clear the search">✕</button>
+  </div>
+  </div>
+  <section id="vSearch" hidden>
+    <div class="sr-head"><h2 id="srH">Search</h2>
+      <select id="srSt" aria-label="Status"><option value="all">Open and closed</option><option value="active">Open only</option><option value="closed">Closed only</option></select>
+      <span class="msg" id="srMsg"></span></div>
+    <div class="list" id="srList"></div>
+  </section>
 
   <section id="vExecutive" hidden>
     <div class="kp" id="exKpis"></div>
@@ -214,15 +243,74 @@ function covers(sc, company, location){
   const locs = L ? L[1] : "*";
   return locs === "*" || !location || locs.map(v => String(v).toUpperCase()).includes(String(location).toUpperCase());
 }
+// ---- search: every item the person may see (open and closed), words in any order, accents ignored (ë = e, ç = c)
+let SQ = [], searchFrom = null;
+const fold = t => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function hl(h){
+  if (!SQ.length) return h;
+  const re = new RegExp("(" + SQ.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "gi");
+  return h.replace(/(<[^>]*>)|([^<]+)/g, (m, tag, txt) => tag || txt.replace(re, '<mark class="hl">$1</mark>'));
+}
+function haystack(x){
+  if (!x._hay) x._hay = fold([x.uid, x.uid.split(":")[1], x.title, x.detail, x.company, x.location, x.department, x.source_label, x.tower,
+    x.status, x.role_label, x.note, x.kind, x.owners.join(" "), (x.owner_accounts || []).map(a => a.name).join(" "),
+    (x.history || []).map(h => (h.note || h.text || "") + " " + (h.by || "")).join(" ")].join(" \u0001 "));
+  return x._hay;
+}
+function searchWhy(x){
+  // where a word was found when it is not in the title or place: the owner, the note, the detail or the history
+  const seen = fold(x.title + " " + x.company + " " + x.location);
+  const miss = SQ.filter(w => !seen.includes(fold(w)));
+  if (!miss.length) return "";
+  const parts = [["owner", x.owners.join(" ") + " " + (x.owner_accounts || []).map(a => a.name).join(" ")], ["detail", x.detail], ["note", x.note],
+    ["history", (x.history || []).map(h => h.note || h.text || "").join(" ")], ["code", x.uid]];
+  const hit = parts.find(([, t]) => miss.every(w => fold(t).includes(fold(w))));
+  return hit ? ` · <span class="meta">found in the ${hit[0]}</span>` : "";
+}
+function runSearch(){
+  const q = $("acQ").value.trim();
+  $("acQx").hidden = !q; $("acQk").hidden = !!q;
+  SQ = q.length >= 2 ? q.split(/\s+/).filter(Boolean).slice(0, 6) : [];
+  if (!SQ.length) {
+    if (!$("vSearch").hidden) { $("vSearch").hidden = true; show(searchFrom || tab); }
+    return;
+  }
+  if ($("vSearch").hidden) { searchFrom = tab;
+    ["executive", "departments", "mine", "unicorn", "matrix"].forEach(k => $("v" + k[0].toUpperCase() + k.slice(1)).hidden = true);
+    document.querySelectorAll("#acTabs button").forEach(b => { b.classList.remove("on"); b.setAttribute("aria-selected", "false"); });
+    $("vSearch").hidden = false; }
+  if (!D) return;
+  const words = SQ.map(fold), st = $("srSt").value;
+  const L = D.items.filter(x => (st === "all" || (st === "active" ? x.active : !x.active)) && words.every(w => haystack(x).includes(w)));
+  const inTitle = x => words.every(w => fold(x.title).includes(w)) ? 0 : 1;
+  L.sort((a, b) => inTitle(a) - inTitle(b));                          // the title first; otherwise the order of the list
+  $("srH").textContent = `Search: ${q}`;
+  $("srMsg").textContent = `${fmtN(L.length)} items` + (L.length > 200 ? " · the first 200 shown" : "");
+  $("srList").innerHTML = L.length ? L.slice(0, 200).map(itemRow).join("")
+    : `<div class="card"><p class="hint" style="margin:0">Nothing found. Try fewer words, a restaurant code, an owner's name or a supplier.</p></div>`;
+}
+let srT = null;
+$("acQ").addEventListener("input", () => { clearTimeout(srT); srT = setTimeout(runSearch, 120); });
+$("acQ").addEventListener("keydown", e => {
+  if (e.key === "Escape") { $("acQ").value = ""; runSearch(); $("acQ").blur(); e.stopPropagation(); }
+  if (e.key === "Enter") { const f = document.querySelector("#srList [data-u]"); if (f) openItem(f.dataset.u); }
+});
+$("acQx").onclick = () => { $("acQ").value = ""; runSearch(); $("acQ").focus(); };
+$("srSt").onchange = runSearch;
+document.addEventListener("keydown", e => {                          // "/" anywhere (not while typing) goes to the search
+  if (e.key === "/" && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "") && !$("bd")) {
+    e.preventDefault(); $("acQ").focus(); $("acQ").select(); }
+});
 function itemRow(x){
   const late = x.overdue ? `<b style="color:var(--rhg-red)">${x.days_overdue} d late</b>${x.escalation ? `<span class="esc">L${x.escalation}</span>` : ""}` : x.due_soon ? `<b style="color:var(--rhg-amber)">due ${esc(x.due)}</b>` : x.active ? `due ${esc(x.due || "–")}` : `<span class="meta">${esc(x.status)} ${esc(String(x.closed_at || "").slice(0, 10))}</span>`;
   return `<div class="it${x.overdue ? " late" : ""}" role="button" tabindex="0" data-u="${esc(x.uid)}">
     <div><span class="sev ${esc(x.severity)}">${esc(SEV[x.severity] || x.severity)}</span><div class="st ${esc(x.status.replace(/ /g, ""))}">${esc(x.status)}</div></div>
-    <div><div class="t">${esc(x.title)}</div><div class="s">${esc(x.department)} · ${esc(x.source_label)} · ${esc(x.company)}${x.location ? " · " + esc(x.location) : ""}</div></div>
+    <div><div class="t">${hl(esc(x.title))}</div><div class="s">${esc(x.department)} · ${esc(x.source_label)} · ${hl(esc(x.company))}${x.location ? " · " + hl(esc(x.location)) : ""}${SQ.length ? searchWhy(x) : ""}</div></div>
     <div class="o">${ownerText(x)}${canAssign(x) ? `<button class="asg" type="button" data-assign="${esc(x.uid)}">Assign</button>` : ""}</div><div class="d">${late}${x.value ? `<div class="meta">${fmtM(x.value)}</div>` : ""}</div></div>`;
 }
 function show(t){
   if (D && !D.tabs.includes(t)) t = D.tabs[0];
+  if (SQ.length) { searchFrom = t; return; }                     // while a search is shown it stays; the tab comes back after
   tab = t;
   document.querySelectorAll("#acTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
   ["executive", "departments", "mine", "unicorn", "matrix"].forEach(k => $("v" + k[0].toUpperCase() + k.slice(1)).hidden = k !== t);
@@ -231,7 +319,10 @@ function show(t){
   if (t === "unicorn") loadUnicorn();
   if (t === "matrix") loadMatrix();
 }
-document.querySelectorAll("#acTabs button").forEach(b => b.onclick = () => show(b.dataset.t));
+document.querySelectorAll("#acTabs button").forEach(b => b.onclick = () => {
+  if ($("acQ").value) { $("acQ").value = ""; SQ = []; $("acQx").hidden = true; $("acQk").hidden = false; $("vSearch").hidden = true; }
+  show(b.dataset.t);
+});
 async function load(){
   $("pill").className = "pill load"; $("pillText").textContent = "Reading the registers…";
   try { D = await get("/api/actions"); }
@@ -243,7 +334,7 @@ async function load(){
   if (!$("fSrc").dataset.done) { $("fSrc").dataset.done = 1;
     $("fSrc").insertAdjacentHTML("beforeend", Object.entries(D.sources).sort((a, b) => a[1].localeCompare(b[1])).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join(""));
     $("fCo").insertAdjacentHTML("beforeend", [...new Set(D.items.map(x => x.company).filter(Boolean))].sort().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("")); }
-  paint();
+  if (SQ.length) runSearch(); else paint();
 }
 $("reload").onclick = load;
 function paint(){
