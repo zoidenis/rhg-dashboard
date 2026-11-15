@@ -2405,7 +2405,19 @@ class Handler(BaseHTTPRequestHandler):
             return None                     # a change that names no company (an action, a setting): the role decides
         company = q.get("company") or (body or {}).get("company") or config.BC_COMPANY
         if path == "/api/companies":
-            self._scope_filter = lambda b: dict(b, companies=access.filter_companies(b.get("companies"), user))
+            # the companies of the access, and the departments of the chosen company the access covers: a person limited
+            # to some locations chooses only among theirs (Geri, 15 Nov 2026: a universal rule, by the access given)
+            L = access.locations(user, company) if access.company_ok(user, company) else set()
+            allowed = (scope_expand(company, L) | L) if L is not None else None
+
+            def _companies_cut(b):
+                b = dict(b, companies=access.filter_companies(b.get("companies"), user))
+                if allowed is not None:
+                    b["dimensions"] = [d for d in b.get("dimensions") or [] if str(d[0]).strip().upper() in allowed]
+                    b["limited"] = True
+                    b["scope"] = access.describe(user, company)
+                return b
+            self._scope_filter = _companies_cut
             return None
         multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
                         "/api/sales/menu/xlsx", "/api/sales/foodcost", "/api/sales/channel-profit", "/api/sales/channel-profit/xlsx",
@@ -2424,6 +2436,12 @@ class Handler(BaseHTTPRequestHandler):
         # the codes of the scope (BC code, department, Simphony reference): the screens that cut their answer
         # themselves (movement, typology, stock count, inventory) read them from here
         self._allowed = (scope_expand(company, L) | L) if L is not None else None
+        # a department outside the access is refused, not quietly dropped: the filter only offers theirs
+        if L is not None:
+            outside = [d for d in depts_of(q) if d not in self._allowed]
+            if outside:
+                return {"error": f"The department {', '.join(outside)} is outside your access ({access.describe(user, company)} of "
+                                 f"{company}).", "access": "location"}
         if path == "/api/sales":                                    # Sales: their restaurants, totals again
             self._scope_filter = lambda b: sales_cut(b, user, company)
         elif path in ("/api/inventory/items", "/api/inventory/items/xlsx"):

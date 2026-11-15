@@ -2486,9 +2486,22 @@ function snap(v){
 }
 // ---------- Department: one, several or all (the hidden <select multiple id="dimension"> holds the choice)
 const dimValues = () => Array.from($("dimension").selectedOptions).map(o => o.value).filter(Boolean);
+// a person limited to some locations sees only the departments of their access (the server lists and checks them)
+let dimLimited = false;
+const dimAll = () => dimLimited ? "All my departments" : "All departments";
+async function loadDims(company){
+  const keep = new Set(dimValues());
+  try {
+    const j = await (await fetch("/api/companies?company=" + encodeURIComponent(company || ""))).json();
+    dimLimited = !!j.limited;
+    $("dimension").innerHTML = `<option value="">${dimAll()}</option>` +
+      (j.dimensions || []).map(([code, name]) => `<option value="${esc(code)}"${keep.has(code) ? " selected" : ""}>${esc(code)} — ${esc(name)}</option>`).join("");
+  } catch (e) { /* keep the list there is */ }
+  dimSync();
+}
 function dimSync(){
   const v = Array.from($("dimension").selectedOptions).filter(o => o.value);
-  $("dimText").textContent = !v.length ? "All departments" : v.length === 1 ? v[0].text
+  $("dimText").textContent = !v.length ? dimAll() : v.length === 1 ? v[0].text
     : `${v.length} departments: ${v.map(o => o.value).join(", ")}`;
   $("dimBtn").title = v.length > 1 ? v.map(o => o.text).join("\n") : "";
 }
@@ -2497,13 +2510,13 @@ function dimOpen(){
   dimWork = new Set(dimValues());
   const opts = Array.from($("dimension").options).filter(o => o.value);
   $("dimList").innerHTML = (opts.length > 8 ? `<input type="search" id="dimQ" placeholder="Search departments">` : "")
-    + `<label class="dimf-opt all"><input type="checkbox" data-all="1"> <span>All departments</span></label>`
+    + `<label class="dimf-opt all"><input type="checkbox" data-all="1"> <span>${dimAll()}</span></label>`
     + `<div class="dimf-opts" role="listbox" aria-multiselectable="true">` + opts.map(o => `<label class="dimf-opt" data-t="${esc((o.value + " " + o.text).toLowerCase())}"><input type="checkbox" value="${esc(o.value)}"> <span>${esc(o.text)}</span></label>`).join("") + `</div>`
     + `<div class="dimf-foot"><span class="meta" id="dimCount"></span><span style="display:flex;gap:6px"><button type="button" class="mini" id="dimClear">All</button><button type="button" class="mini dark" id="dimApply">Apply</button></span></div>`;
   const paint = () => {
     $("dimList").querySelectorAll("input[value]").forEach(c => c.checked = dimWork.has(c.value));
     $("dimList").querySelector("[data-all]").checked = !dimWork.size;
-    $("dimCount").textContent = dimWork.size ? `${dimWork.size} chosen` : "All departments";
+    $("dimCount").textContent = dimWork.size ? `${dimWork.size} chosen` : dimAll();
   };
   $("dimList").onchange = e => {
     const c = e.target; if (c.type !== "checkbox") return;
@@ -2516,6 +2529,8 @@ function dimOpen(){
   $("dimApply").onclick = () => dimClose(true);
   paint();
   $("dimList").hidden = false; $("dimPick").classList.add("open"); $("dimBtn").setAttribute("aria-expanded", "true");
+  { const L = $("dimList"); L.style.left = ""; L.style.right = "";          // kept inside the window near its right edge
+    if (L.getBoundingClientRect().right > innerWidth - 8) { L.style.left = "auto"; L.style.right = "0"; } }
   if ($("dimQ")) $("dimQ").focus();
 }
 function dimClose(apply){
@@ -10223,7 +10238,8 @@ $("exportBtn").onclick = () => {
 $("pdfBtn").onclick = () => { document.body.classList.add("printing"); window.print(); };
 window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
 $("refreshBtn").onclick=()=>{ if (currentView().id === "opsexec") oxLoad(true); else load(); };
-["company","dimension"].forEach(id=>$(id).onchange=()=>load());
+$("company").onchange = async () => { await loadDims($("company").value); load(); };
+$("dimension").onchange = () => load();
 // the departments changed: every location screen is read again for them (the open one now, the others when opened)
 $("dimension").addEventListener("change", () => {
   flKey = clKey = klKey = ilKey = faKey = blKey = ""; if (typeof frKey !== "undefined") frKey = "";
@@ -10259,10 +10275,8 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
   $("anchor").value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-01`;
   try{
     const j = await (await fetch("/api/companies")).json();
-    $("company").innerHTML = (j.companies||[]).map(c=>`<option ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
-    $("dimension").innerHTML = '<option value="">All departments</option>' +
-      (j.dimensions||[]).map(([code,name])=>`<option value="${esc(code)}">${esc(code)} — ${esc(name)}</option>`).join("");
-    dimSync();
+    $("company").innerHTML = (j.companies||[]).map(c=>`<option value="${esc(c)}" ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
+    await loadDims($("company").value);   // the departments of the company shown, cut to the person's access
   }catch(e){ $("company").innerHTML = `<option>SALT</option>`; }
   urlFilters();
   openFromHash();
