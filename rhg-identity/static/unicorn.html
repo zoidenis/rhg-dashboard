@@ -130,6 +130,29 @@ header{display:flex;justify-content:space-between}
 .u-top.slim h1{font-size:20px}
 .u-top.slim .hdr-btns .btn{padding-top:6px;padding-bottom:6px}
 .u-top.slim .u-tabs{margin-bottom:10px}
+/* the period a finding is about, and the measure against its limit: in view first */
+.per{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;background:var(--rhg-sky,#e6f2f7);border:1px solid var(--line);border-left:4px solid var(--rhg-primary);border-radius:12px;padding:12px 16px;margin:4px 0 14px}
+.per .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--sub)}
+.per .v{font-family:var(--rhg-font-display);font-size:20px;font-weight:800;color:var(--ink);margin:2px 0 2px;line-height:1.2}
+.per .s{font-size:12.5px;color:var(--ink)}
+.per .c{font-size:12.5px;color:var(--sub);margin-top:6px}
+.per .c b{color:var(--ink);font-weight:600}
+.per .when{font-size:12px;color:var(--sub);line-height:1.6;border-left:1px solid var(--line);padding-left:14px}
+.per .when b{color:var(--ink);font-weight:600}
+.mz{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 4px}
+.mz>div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.mz>div>.k{font-size:11px;color:var(--sub);font-weight:600}
+.mz>div>.v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+.mz>div>.v.bad{color:var(--rhg-red)}
+.mz>div>.n{font-size:11.5px;color:var(--sub);margin-top:2px}
+.ft{width:100%;border-collapse:collapse;font-size:13px}
+.ft th{text-align:left;font-size:11px;font-weight:600;color:var(--sub);border-bottom:1px solid var(--line);padding:6px 8px}
+.ft td{border-bottom:1px solid var(--line);padding:6px 8px;font-variant-numeric:tabular-nums}
+.ft td.num,.ft th.num{text-align:right}
+.ft tr.hl td{background:var(--rhg-amberbg,#fdf1dc);font-weight:700}
+.ft tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--rhg-amber,#b26a00)}
+.pchip{display:inline-block;background:var(--rhg-sky,#e6f2f7);color:var(--rhg-primary);border-radius:6px;padding:1px 7px;font-weight:600;font-size:11.5px;white-space:nowrap}
+@media(max-width:760px){.per{grid-template-columns:1fr}.per .when{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:8px}.mz{grid-template-columns:1fr 1fr}}
 .rv{display:flex;flex-wrap:wrap;gap:4px}.rv span{background:var(--bg);border-radius:6px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}.rv span b{font-weight:600;color:var(--sub);margin-right:4px}
 .latest{position:absolute;right:0;top:-34px;z-index:30;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(22,24,29,.12)}
 .latest:hover{border-color:var(--rhg-primary)}
@@ -435,7 +458,7 @@ function paintFindings(){
   $("fMsg").textContent = `${F.length} shown${R.investigating.length ? " · investigating " + R.investigating.map(i => "F" + i).join(", ") : ""}`;
   $("fList").innerHTML = F.length ? F.map(f => `<button class="u-row" type="button" data-f="${f.id}">
       <div><span class="sev ${esc(f.severity)}">${esc(SEV_SQ[f.severity] || f.severity)}</span><div class="st ${esc(f.status)}">${esc(f.status)}</div></div>
-      <div><div class="t">F${f.id} · ${esc(f.title)}</div><div class="s">${esc(f.location_name || f.location || "")}${f.company && f.company !== f.location_name ? " · " + esc(f.company) : ""} · ${esc(f.period)} · ${esc(f.capability_label)}${f.seen_count > 1 ? ` · seen ${f.seen_count} times` : ""}</div></div>
+      <div><div class="t">F${f.id} · ${esc(f.title)}</div><div class="s">${esc(f.location_name || f.location || "")}${f.company && f.company !== f.location_name ? " · " + esc(f.company) : ""} · <span class="pchip"><span>${esc(periodOf(f).chip)}</span> · <span>${esc(periodOf(f).chipKind)}</span></span> · ${esc(f.capability_label)}${f.seen_count > 1 ? ` · seen ${f.seen_count} times` : ""}</div></div>
       <div class="r">${f.value != null ? `<span class="meta">value</span> ${esc(valU(f.value, f.unit))}${f.limit != null ? ` <span class="meta"><span>limit</span> ${esc(valU(f.limit, f.unit))}</span>` : ""}` : ""}<b>${f.impact != null ? fmtM(f.impact) + " " + esc(f.currency) : ""}</b><span class="meta">${f.impact != null ? "estimated impact" : ""}</span></div></button>`).join("")
     : `<div class="card"><p class="hint" style="margin:0">No finding here. Detectors run every morning with the brief, on the rules of the Rules tab.</p></div>`;
 }
@@ -447,16 +470,67 @@ function modal(title, sub, body){
 function closeModal(){ const b = $("uBd"); if (b) b.remove(); }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 $("fList").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b) openFinding(+b.dataset.f); });
+// ---- the period of a finding, said in words: which day or month, of what, and against what
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function monthLabel(p){ const m = /^(\d{4})-(\d{2})/.exec(p || ""); return m ? `${MONTHS[+m[2] - 1]} ${m[1]}` : (p || "–"); }
+function dayLabel(p){ const d = new Date(String(p || "").slice(0, 10) + "T12:00:00"); return isNaN(d) ? (p || "–") : d.toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long", year: "numeric"}); }
+function shortDay(p){ const d = new Date(String(p || "").slice(0, 10) + "T12:00:00"); return isNaN(d) ? (p || "–") : d.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}); }
+function periodOf(f){
+  const ev = f.evidence || {}, r = f.rule || "";
+  if (r.startsWith("pl.")) return {kind: "Closed month", value: monthLabel(f.period), what: "Profit & loss of the department, Business Central", vs: `Budget of ${monthLabel(f.period)}`, chip: monthLabel(f.period), chipKind: "closed month"};
+  if (r === "sales.drop_vs_last_year") return {kind: "One day", value: dayLabel(f.period), what: "Net sales of the restaurant, Simphony", vs: `Same weekday last year: ${dayLabel(ev.last_year_day)}`, chip: shortDay(f.period), chipKind: "one day"};
+  if (r === "sales.discounts_pct" || r === "sales.voids_pct") return {kind: "One day", value: dayLabel(f.period), what: "Gross sales of the restaurant, Simphony", vs: "The limit of the rule", chip: shortDay(f.period), chipKind: "one day"};
+  if (r === "sales.mtd_vs_budget") { const to = ev.day || f.last_seen; return {kind: "Month to date", value: `1 – ${shortDay(to)}`, what: `Net sales of ${monthLabel(f.period)} so far, Simphony`, vs: "Budget of the same days", chip: `${monthLabel(f.period)}`, chipKind: "month to date"}; }
+  if (r.startsWith("apar.")) return {kind: "Open balance on the day", value: dayLabel(f.last_seen), what: `${ev.side === "receivables" ? "Receivables" : "Payables"} older than ${ev.critical_days ?? "–"} days, Kartela`, vs: "Every open document on that day", chip: shortDay(f.last_seen), chipKind: "balance on the day"};
+  if (r === "purchasing.price_mover") return {kind: "Purchases of the month", value: monthLabel(f.period), what: `Average purchase cost so far, up to ${shortDay(f.last_seen)}, Business Central`, vs: "The previous average cost", chip: monthLabel(f.period), chipKind: "purchases of the month"};
+  if (r === "purchasing.invoices_without_po") return {kind: "One day", value: dayLabel(f.period), what: "Purchase invoices posted that day, Business Central", vs: "The limit of the rule", chip: shortDay(f.period), chipKind: "one day"};
+  return {kind: "Period", value: f.period || "–", what: "", vs: "", chip: f.period || "", chipKind: ""};
+}
+const METRIC = {labor_pct: "Labour cost %", food_pct: "Food cost %", ebitda_vs_budget_pct: "EBITDA against budget", vs_last_year_pct: "Sales against last year",
+  mtd_vs_budget_pct: "Sales against budget", discounts_pct_of_gross: "Discounts % of gross sales", voids_pct_of_gross: "Voids % of gross sales",
+  payables_beyond_critical: "Payables beyond the critical age", receivables_beyond_critical: "Receivables beyond the critical age",
+  price_change_pct: "Average cost change", invoices_without_po_pct: "Invoices without a purchase order"};
+const PL_ROWS = [["sales", "Sales"], ["food", "Food cost"], ["food_pct", "Food cost %"], ["labor", "Labour cost"], ["labor_pct", "Labour cost %"],
+  ["opex", "Operating expenses"], ["ebitda", "EBITDA"], ["ebitda_pct", "EBITDA %"]];
+const EV_LABEL = {yesterday: "Sales of the day", same_weekday_last_year: "Same weekday last year", last_year_day: "Day last year", month_to_date: "Sales month to date",
+  month_to_date_budget: "Budget month to date", day: "Up to", share: "Share of gross sales %", open: "Open in total", beyond_critical: "Beyond the critical age",
+  critical_days: "Critical age (days)", side: "Side", ebitda: "EBITDA", ebitda_budget: "EBITDA budget", month: "Month", largest: "Largest", invoices: "Invoices", mover: "Item"};
+function figuresTable(f){
+  const ev = f.evidence || {};
+  if (ev.actual && ev.budget) {
+    const pctK = k => k.endsWith("_pct");
+    const val = (k, v) => v == null ? "–" : pctK(k) ? fmtN(v, 1) + "%" : fmtN(v);
+    const rows = PL_ROWS.filter(([k]) => ev.actual[k] != null || ev.budget[k] != null).map(([k, l]) => {
+      const a = ev.actual[k], b = ev.budget[k], d = a != null && b != null ? a - b : null;
+      return `<tr class="${k === f.metric ? "hl" : ""}"><td>${l}</td><td class="num">${val(k, a)}</td><td class="num">${val(k, b)}</td><td class="num">${d == null ? "–" : (d > 0 ? "+" : "") + (pctK(k) ? fmtN(d, 1) + " pts" : fmtN(d))}</td></tr>`; }).join("");
+    return `<div class="u-scroll" style="border:0"><table class="ft"><tr><th>${esc(monthLabel(ev.month || f.period))}</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Difference</th></tr>${rows}</table></div>`;
+  }
+  const skip = new Set(["rule", "rule_status", "rule_value", "rule_version", "impact_formula", "side"]);
+  const rows = Object.entries(ev).filter(([k]) => !skip.has(k)).map(([k, v]) => {
+    const show = v == null ? "–" : typeof v === "number" ? fmtN(v, Number.isInteger(v) ? 0 : 1)
+      : typeof v === "object" ? Object.entries(v).map(([a, b]) => `${a}: ${typeof b === "number" ? fmtN(b, Number.isInteger(b) ? 0 : 1) : typeof b === "object" ? JSON.stringify(b) : b}`).join(" · ") : String(v);
+    return `<tr><td>${esc(EV_LABEL[k] || k)}</td><td data-no-i18n>${esc(show)}</td></tr>`; }).join("");
+  return rows ? `<table class="ft">${rows}</table>` : "";
+}
 async function openFinding(id){
   let j; try { j = await get("/api/unicorn/finding?id=" + id); } catch (e) { alert(e.message); return; }
   const f = j.finding, ev = f.evidence || {}, d = j.decision;
   const evRows = Object.entries(ev).filter(([k]) => !["rule", "rule_status", "rule_version", "rule_value", "impact_formula"].includes(k));
-  const body = `<p style="margin:0 0 8px">${esc(f.detail)}</p>
-    <div class="row"><span class="sev ${esc(f.severity)}">${esc(SEV_SQ[f.severity] || f.severity)}</span><span class="st ${esc(f.status)}">${esc(f.status)}</span>
-      <span class="meta">${esc(f.capability_label)} · first seen ${esc(f.first_seen)} · last seen ${esc(f.last_seen)}</span></div>
-    <h4>Measure</h4><p style="margin:0">${esc(f.metric)}: <b>${esc(valU(f.value, f.unit))}</b>${f.limit != null ? ` against the limit ${esc(valU(f.limit, f.unit))}` : ""}. Estimated impact <b>${f.impact != null ? fmtN(f.impact) + " " + esc(f.currency) : "–"}</b>${ev.impact_formula ? ` <span class="meta">(${esc(ev.impact_formula)})</span>` : ""}.</p>
+  const P = periodOf(f), pl = !!(ev.actual && ev.budget), bud = pl && ev.budget[f.metric] != null ? ev.budget[f.metric] : null;
+  const body = `<div class="per">
+      <div><div class="k">${esc(P.kind)}</div><div class="v">${esc(P.value)}</div><div class="s">${esc(P.what)}</div>${P.vs ? `<div class="c"><span>Compared with</span> <b>${esc(P.vs)}</b></div>` : ""}</div>
+      <div class="when"><div><span>Found on</span> <b>${esc(shortDay(f.first_seen))}</b></div><div><span>Last seen on</span> <b>${esc(shortDay(f.last_seen))}</b>${f.seen_count > 1 ? ` <span>· seen ${f.seen_count} times</span>` : ""}</div><div>${esc(f.capability_label)}</div></div>
+    </div>
+    <p style="margin:0 0 8px">${esc(f.detail)}</p>
+    <div class="row"><span class="sev ${esc(f.severity)}">${esc(SEV_SQ[f.severity] || f.severity)}</span><span class="st ${esc(f.status)}">${esc(f.status)}</span></div>
+    <h4>Measure</h4>
+    <div class="mz">
+      <div><div class="k">${esc(METRIC[f.metric] || f.metric)}</div><div class="v bad">${esc(valU(f.value, f.unit))}</div><div class="n">${bud != null ? `<span>budget</span> ${esc(valU(bud, f.unit))}` : "measured"}</div></div>
+      <div><div class="k">Limit of the rule</div><div class="v">${f.limit != null ? esc(valU(f.limit, f.unit)) : "–"}</div><div class="n">${ev.rule_status === "Approved" ? "approved by RHG" : "proposed, not yet approved"}</div></div>
+      <div><div class="k">Estimated impact</div><div class="v">${f.impact != null ? fmtM(f.impact) + " " + esc(f.currency) : "–"}</div><div class="n">${ev.impact_formula ? esc(ev.impact_formula) : ""}</div></div>
+    </div>
     <p class="meta" style="margin:4px 0 0">Rule ${esc(ev.rule || f.rule)} · version ${esc(ev.rule_version ?? "")} · ${ev.rule_status === "Approved" ? "approved by RHG" : "<b>proposed threshold, not yet approved</b>"}</p>
-    ${evRows.length ? `<h4>Figures read</h4><pre>${esc(evRows.map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n"))}</pre>` : ""}
+    ${evRows.length ? `<h4>Figures read</h4>${figuresTable(f)}` : ""}
     ${d ? `<h4>Unicorn's proposal · <span class="st ${esc(d.status)}">${esc(d.status)}</span></h4><p style="margin:0"><b>${esc(d.title)}</b></p><p style="margin:4px 0">${esc(d.rationale)}</p>` : ""}
     ${j.actions.length ? `<h4>Actions</h4><ul>${j.actions.map(a => `<li>${esc(a.title)} · ${esc(ownerName(a.owner))} · ${esc(a.due)} · ${esc(a.status)}${a.latest != null ? ` · latest ${esc(valU(a.latest, a.unit))}` : ""}</li>`).join("")}</ul>` : ""}
     ${j.trail.length ? `<h4>What Unicorn read (${j.trail.length})</h4><ul>${j.trail.map(t => `<li><b>${esc(t.tool)}</b> ${esc(JSON.stringify(t.args))} <span class="meta">${t.ok ? "" : "not read · "}${esc(t.summary)}</span></li>`).join("")}</ul>` : ""}
@@ -468,7 +542,7 @@ async function openFinding(id){
       ${["Dismissed", "Closed"].includes(f.status) ? `<button class="btn" type="button" id="fReopen">Reopen</button>` : ""}
       ${R.can_approve && !["Dismissed", "Closed"].includes(f.status) ? `<input id="fNote" placeholder="Reason (needed to dismiss)" style="flex:1;min-width:200px"><button class="btn" type="button" id="fDismiss">Dismiss</button><button class="btn" type="button" id="fCloseF">Close</button>` : ""}
     </div><p class="u-msg" id="fAct"></p>`;
-  modal(`F${f.id} · ${f.title}`, `${f.location_name || f.location || ""}${f.company && f.company !== f.location_name ? " · " + f.company : ""} · ${f.period}`, body);
+  modal(`F${f.id} · ${f.title}`, `${f.location_name || f.location || ""}${f.company && f.company !== f.location_name ? " · " + f.company : ""} · ${P.chip} · ${P.chipKind}`, body);
   const act = async (action, note) => {
     try { await post("/api/unicorn/finding", {id: f.id, action, note}); $("fAct").textContent = action === "investigate" ? "Unicorn is investigating; the proposal appears under Decisions & actions in a few minutes." : "Saved."; loadRegisters(); if (action !== "investigate") setTimeout(closeModal, 600); }
     catch (e) { $("fAct").textContent = e.message; }
