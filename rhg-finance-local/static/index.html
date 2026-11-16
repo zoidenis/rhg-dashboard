@@ -583,6 +583,10 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 @media (prefers-color-scheme: dark){:root{--ch-0:#5b86e0;--ch-1:#b97a22;--ch-2:#8c72d4;--ch-3:#1aa196;--ch-4:#6b6e74}}
 .ch-c0{background:var(--ch-0)}.ch-c1{background:var(--ch-1)}.ch-c2{background:var(--ch-2)}.ch-c3{background:var(--ch-3)}.ch-c4{background:var(--ch-4)}
 .ch-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;border-radius:4px;padding:1px 5px;margin-left:6px;border:1px solid var(--line);color:var(--sub)}
+.av-bar{position:relative;height:10px;background:var(--bg);border-radius:5px;min-width:90px}.av-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--data-cur)}.av-bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ch-1,#b26a00)}.av-bar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--sub);text-decoration:none}
+#avMode button{white-space:nowrap}
+#avMx .meta.down{color:var(--down)}#avMx .meta.up{color:var(--up)}
+#avMx td.av{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}#avMx td.av .meta{display:block;font-size:10.5px}
 .ch-sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .pl-sq .chl{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--sub)}
 .pl-sq .chl b{color:var(--ink);font-variant-numeric:tabular-nums}
@@ -1734,6 +1738,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
         <p class="meta" id="chStatus" style="margin:0 0 8px"></p>
         <div class="kpis" id="chKpis" style="margin-bottom:10px"></div>
         <div class="scroll"><table id="chTable" data-nosort></table></div>
+      </div>
+      <div class="card" id="slAvg" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>Average check by day part</h2>
+          <p class="hint">From Simphony's checks of every day part (its quarter hours, as the day parts of each restaurant are set in Simphony): what a check and a guest spent in the period chosen above, against the period before and the same dates last year. Net sales, VAT included.</p></div>
+          <div class="sh-ctl"><div class="fc-seg" role="tablist" id="avMode"><button type="button" data-m="check" class="on">Per check</button><button type="button" data-m="guest">Per guest</button></div></div></div>
+        <div class="kpis" id="avKpis" style="margin:10px 0"></div>
+        <div class="scroll"><table id="avTable" data-nosort></table></div>
+        <h3 style="font-size:14px;margin:16px 0 6px">By restaurant</h3>
+        <p class="hint" style="margin:0 0 8px" id="avMxNote"></p>
+        <div class="scroll"><table id="avMx" data-nosort></table></div>
       </div>
       <div id="slGrid"></div>
     </div>
@@ -5360,8 +5374,52 @@ function chTable(list, total, opts){
         <td class="num">${fmt(n)}</td><td class="num">${part ? (x.cur.count ? fmt(c / x.cur.count) : "–") : fmt(x.cur.avg)}</td>${part ? "" : `<td class="num meta">${fmt(x.ly.avg)}</td>`}</tr>`; }).join("") +
     (total ? `<tr class="total"><td>Total</td><td class="num">${fmt(sum)}</td><td class="num">100%</td><td class="num">${fmt(list.reduce((a, x) => a + val(x, "prev"), 0))}</td><td class="num">${chChip(flVar(sum, list.reduce((a, x) => a + val(x, "prev"), 0)))}</td><td class="num">${fmt(list.reduce((a, x) => a + val(x, "ly"), 0))}</td><td class="num">${chChip(flVar(sum, list.reduce((a, x) => a + val(x, "ly"), 0)))}</td><td></td><td></td>${part ? "" : "<td></td>"}</tr>` : "");
 }
+// ---- Average check by day part (the channels' read: Simphony's quarter hours by day part, for the three periods)
+let avMode = "check";
+function avOf(x, p){ const r = x && x[p]; if (!r) return null; return avMode === "guest" ? (r.guests ? r.net / r.guests : null) : (r.checks ? r.net / r.checks : null); }
+function avRender(){
+  const d = chData;
+  if (!d || d._q !== chQuery() || !d.available) { $("avKpis").innerHTML = ""; $("avTable").innerHTML = `<tr><td class="hint">${chPoll ? "Reading the day parts from Simphony…" : "No day part read for this period."}</td></tr>`; $("avMx").innerHTML = ""; $("avMxNote").textContent = ""; return; }
+  const C = d.currency, t = (d.totals || {})[C];
+  if (!t || !t.dayparts.length) { $("avKpis").innerHTML = ""; $("avTable").innerHTML = `<tr><td class="hint">No day part in this period.</td></tr>`; $("avMx").innerHTML = ""; return; }
+  const DP = t.dayparts, unit = avMode === "guest" ? "per guest" : "per check";
+  const sum = p => DP.reduce((a, x) => ({net: a.net + x[p].net, checks: a.checks + x[p].checks, guests: a.guests + x[p].guests}), {net: 0, checks: 0, guests: 0});
+  const T = {cur: sum("cur"), prev: sum("prev"), ly: sum("ly")};
+  const all = {cur: T.cur, prev: T.prev, ly: T.ly};
+  const k = (l, v, sub, c) => `<div class="card kpi"><div class="l">${l}</div><div class="v ${c || ""}">${v}</div><div class="s">${sub}</div></div>`;
+  const a = avOf(all, "cur"), ap = avOf(all, "prev"), al = avOf(all, "ly");
+  const best = DP.filter(x => avOf(x, "cur") != null).sort((x, y) => avOf(y, "cur") - avOf(x, "cur"))[0];
+  const gpc = T.cur.checks ? T.cur.guests / T.cur.checks : null, gpcL = T.ly.checks ? T.ly.guests / T.ly.checks : null;
+  $("avKpis").innerHTML = k(`Average ${unit} · ${esc(C)}`, a == null ? "–" : fmt(a), `${chChip(flVar(a, ap))} vs before · ${chChip(flVar(a, al))} vs last year`, flVar(a, al) != null && flVar(a, al) < 0 ? "up" : "")
+    + k("Checks", fmt(T.cur.checks), `${chChip(flVar(T.cur.checks, T.prev.checks))} vs before · ${chChip(flVar(T.cur.checks, T.ly.checks))} vs last year`)
+    + k("Guests per check", gpc == null ? "–" : fmt(gpc, 2), `${gpcL == null ? "–" : fmt(gpcL, 2)} last year`)
+    + k(`Highest ${unit}`, best ? esc(best.name) : "–", best ? `${fmt(avOf(best, "cur"))} ${esc(C)} · ${chChip(flVar(avOf(best, "cur"), avOf(best, "ly")))} vs last year` : "");
+  const mx = Math.max(1, ...DP.flatMap(x => ["cur", "prev", "ly"].map(p => avOf(x, p) || 0)));
+  const bar = x => { const c = avOf(x, "cur"), p = avOf(x, "prev"), l = avOf(x, "ly");
+    return `<div class="av-bar" title="now ${fmt(c)} · before ${fmt(p)} · last year ${fmt(l)}">${c != null ? `<i style="width:${(c / mx * 100).toFixed(1)}%"></i>` : ""}${p != null ? `<u style="left:${(p / mx * 100).toFixed(1)}%"></u>` : ""}${l != null ? `<b style="left:${(l / mx * 100).toFixed(1)}%"></b>` : ""}</div>`; };
+  $("avTable").innerHTML = `<tr><th>Day part</th><th class="num">Checks</th><th class="num">Share of checks</th><th class="num">Guests</th><th class="num">Net sales</th>
+      <th class="num">Average ${unit}</th><th style="min-width:130px"></th><th class="num">Before</th><th class="num">vs before</th><th class="num">Last year</th><th class="num">vs last year</th></tr>`
+    + DP.map(x => { const c = avOf(x, "cur"), p = avOf(x, "prev"), l = avOf(x, "ly");
+      return `<tr><td><b>${esc(x.name)}</b></td><td class="num">${fmt(x.cur.checks)}</td><td class="num meta">${T.cur.checks ? fmt(x.cur.checks / T.cur.checks * 100, 1) + "%" : "–"}</td><td class="num">${fmt(x.cur.guests)}</td><td class="num">${fmt(x.cur.net)}</td>
+        <td class="num"><b>${c == null ? "–" : fmt(c)}</b></td><td>${bar(x)}</td><td class="num meta">${p == null ? "–" : fmt(p)}</td><td class="num">${chChip(flVar(c, p))}</td><td class="num meta">${l == null ? "–" : fmt(l)}</td><td class="num">${chChip(flVar(c, l))}</td></tr>`; }).join("")
+    + `<tr class="total"><td>All day parts</td><td class="num">${fmt(T.cur.checks)}</td><td class="num">100%</td><td class="num">${fmt(T.cur.guests)}</td><td class="num">${fmt(T.cur.net)}</td><td class="num"><b>${a == null ? "–" : fmt(a)}</b></td><td></td><td class="num">${ap == null ? "–" : fmt(ap)}</td><td class="num">${chChip(flVar(a, ap))}</td><td class="num">${al == null ? "–" : fmt(al)}</td><td class="num">${chChip(flVar(a, al))}</td></tr>`
+    + `<tr><td colspan="11" class="meta" style="border:0"><span class="ch-sw" style="background:var(--data-cur)"></span>this period <span class="ch-sw" style="background:var(--sub);margin-left:10px"></span>before <span class="ch-sw" style="background:var(--ch-1,#b26a00);margin-left:10px"></span>last year</td></tr>`;
+  // restaurant × day part, the restaurants of the currency above (the others in their own squares)
+  const names = DP.map(x => x.name);
+  const L = (d.locations || []).filter(x => x.currency === C && (x.dayparts || []).length).sort((x, y) => (y.total.cur || 0) - (x.total.cur || 0));
+  const other = (d.locations || []).filter(x => x.currency !== C).length;
+  $("avMxNote").textContent = `Average ${unit} of each restaurant in each day part, ${C}; the small figure is the change against the same dates last year.` + (other ? ` ${other} restaurant(s) in another currency are left out here.` : "");
+  $("avMx").innerHTML = `<tr><th>Restaurant</th>${names.map(n => `<th class="num">${esc(n)}</th>`).join("")}<th class="num">All</th></tr>`
+    + L.map(x => { const by = Object.fromEntries(x.dayparts.map(r => [r.name, r]));
+      const tot = ["cur", "ly"].reduce((o, p) => (o[p] = x.dayparts.reduce((a, r) => ({net: a.net + r[p].net, checks: a.checks + r[p].checks, guests: a.guests + r[p].guests}), {net: 0, checks: 0, guests: 0}), o), {});
+      const cell = r => { if (!r) return `<td class="av meta">–</td>`; const c = avOf(r, "cur"), v = flVar(c, avOf(r, "ly"));
+        return `<td class="av">${c == null ? "–" : fmt(c)}<span class="meta ${v == null ? "" : v >= 0 ? "down" : "up"}">${v == null ? "" : (v >= 0 ? "+" : "") + fmt(v, 0) + "%"}</span></td>`; };
+      return `<tr><td><b>${esc(x.reg_name || x.name)}</b></td>${names.map(n => cell(by[n])).join("")}${cell(tot)}</tr>`; }).join("");
+}
+document.querySelectorAll("#avMode button").forEach(b => b.onclick = () => { avMode = b.dataset.m; document.querySelectorAll("#avMode button").forEach(x => x.classList.toggle("on", x === b)); avRender(); });
 function chRender(){
   if (!$("chTable")) return;
+  setTimeout(avRender, 0);
   const d = chData;
   if (!d || d._q !== chQuery()) { $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; if (!chPoll) readBanner("chStatus", {src: "Simphony", reading: true}); return; }
   if (!d.available) { $("chStatus").textContent = d.error || "Channels unavailable."; $("chKpis").innerHTML = ""; $("chTable").innerHTML = ""; return; }
