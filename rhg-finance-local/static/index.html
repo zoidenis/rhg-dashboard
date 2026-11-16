@@ -5210,7 +5210,7 @@ function slShowTab(tab){
   $("slStView").style.display = tab === "stockstop" ? "" : "none";
   $("slSrView").style.display = tab === "sevenrooms" ? "" : "none";
   $("slHow").style.display = tab === "stockstop" || tab === "sevenrooms" ? "none" : "";
-  if (tab === "sevenrooms") { if (!svData || svData.company !== ($("company").value || svData.company)) svLoad(false); } else clearTimeout(svTimer);
+  if (tab === "sevenrooms") { if (applyTopRange("sevenrooms", false) || !svData || svData.company !== ($("company").value || svData.company)) svLoad(false); } else clearTimeout(svTimer);
   if (tab === "stockstop") stLoad(false); else clearTimeout(stTimer);
   $("slMcView").style.display = tab === "menucost" ? "" : "none";
   if (tab === "menucost") mcLoad();
@@ -7384,8 +7384,11 @@ $("sxApply").onclick = () => {
 $("sxLast").onclick = () => { sxRng = null; loadSalesrec(false); };
 // the period chosen above (QA 14 Nov 2026: "none of the date filters works"): its days, to yesterday at most and the
 // last 93 of them; From/To here still choose any range of their own
-function sxFromTop(){
-  const iso = d => isoDay(d), y = new Date(); y.setDate(y.getDate() - 1);
+// ---- one rule for every screen with a From–To of its own (Geri, 16 Nov 2026): it starts as the period chosen above,
+// day for day (the month above from the 1st → From the 1st), up to yesterday (or today) and as many days as the screen
+// reads at a time; when the period above changes, it follows. A range chosen on the screen holds until then.
+function topRange(maxDays, untilToday){
+  const iso = d => isoDay(d), y = new Date(); if (!untilToday) y.setDate(y.getDate() - 1); y.setHours(0, 0, 0, 0);
   const m = $("mode").value, a = $("anchor").value; if (!a) return null;
   const A = new Date(a + "T00:00:00");
   let from = A, to;
@@ -7395,16 +7398,43 @@ function sxFromTop(){
   else { from = new Date(A.getFullYear(), A.getMonth(), 1); to = new Date(A.getFullYear(), A.getMonth() + 1, 0); }
   if (to > y) to = y;
   let note = "";
-  const first = new Date(to); first.setDate(first.getDate() - 92);
-  if (from < first) { from = first; note = "The last 93 days of the period chosen above (at most 93 at a time)."; }
+  if (maxDays) {
+    const first = new Date(to); first.setDate(first.getDate() - (maxDays - 1));
+    if (from < first) { from = first; note = `The last ${maxDays} days of the period chosen above (at most ${maxDays} at a time).`; }
+  }
   if (from > to) return null;
   return {from: iso(from), to: iso(to), note};
 }
+const sxFromTop = () => topRange(93);
+// the screens: how many days they read at a time, how the range is set and read
+const TOP_RANGES = {
+  salesrec: {max: 93, on: () => $("v-salesrec").classList.contains("on"), cur: () => sxRng || (sxData && {from: sxData.from, to: sxData.to}),
+             set: r => { sxRng = {from: r.from, to: r.to}; $("sxFrom").value = r.from; $("sxTo").value = r.to; }, load: () => loadSalesrec(false), status: "sxStatus"},
+  billyrec: {max: 62, on: () => $("v-billyrec").classList.contains("on"), cur: () => biRng || (biData && biData.range),
+             set: r => { biRng = {from: r.from, to: r.to}; $("biFrom").value = r.from; $("biTo").value = r.to; $("biRangeOff").hidden = false; },
+             load: () => loadBilly(false), status: "biRangeMsg"},
+  sevenrooms: {max: 62, on: () => $("v-sales").classList.contains("on") && typeof slTab !== "undefined" && slTab === "sevenrooms", cur: () => svRng || (svData && svData.range),
+             set: r => { svRng = {from: r.from, to: r.to}; $("svFrom").value = r.from; $("svTo").value = r.to; }, load: () => svLoad(false), status: "svStatus"},
+  recipes: {max: 0, on: () => $("v-recipes").classList.contains("on"), cur: () => ({from: $("rcFrom").value, to: $("rcTo").value}),
+             set: r => { $("rcFrom").value = r.from; $("rcTo").value = r.to; }, load: () => loadRecipes(false)},
+  fiscal: {max: 0, today: true, on: () => $("v-fiscal").classList.contains("on"), cur: () => ({from: $("fsFrom").value, to: $("fsTo").value}),
+             set: r => { $("fsFrom").value = r.from; $("fsTo").value = r.to; }, load: () => loadFiscal(false)},
+  fsales: {max: 0, today: true, on: () => $("v-fsales").classList.contains("on"), cur: () => ({from: $("fxFrom").value, to: $("fxTo").value}),
+             set: r => { $("fxFrom").value = r.from; $("fxTo").value = r.to; }, load: () => loadFiscalSales(false)},
+};
+// sets the screen's range from the period above; reads again when asked to and the range changed. true when it changed
+function applyTopRange(key, load){
+  const T = TOP_RANGES[key]; if (!T) return false;
+  const r = topRange(T.max, T.today); if (!r) return false;
+  const c = T.cur() || {};
+  if (c.from === r.from && c.to === r.to) return false;
+  T.set(r);
+  if (load) T.load();
+  if (r.note && T.status) setTimeout(() => { const e = $(T.status); if (e) e.insertAdjacentHTML("afterbegin", `<span class="meta" style="display:block">${esc(r.note)}</span>`); }, 0);
+  return true;
+}
 ["mode", "anchor", "anchorTo"].forEach(id => $(id).addEventListener("change", () => {
-  if (!$("v-salesrec").classList.contains("on")) return;
-  const r = sxFromTop(); if (!r) return;
-  sxRng = {from: r.from, to: r.to}; $("sxFrom").value = r.from; $("sxTo").value = r.to; loadSalesrec(false);
-  if (r.note) setTimeout(() => { $("sxStatus").insertAdjacentHTML("afterbegin", `<span class="meta" style="display:block">${esc(r.note)}</span>`); }, 0);
+  for (const k in TOP_RANGES) if (TOP_RANGES[k].on()) applyTopRange(k, true);
 }));
 $("dimension").addEventListener("change", () => { if ($("v-salesrec").classList.contains("on")) loadSalesrec(false); });
 $("sxExp").onclick = () => {
@@ -10122,7 +10152,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>{ x.classList.toggle("on",x===b); x.classList.toggle("sub-on", x.dataset.view===b.dataset.parent); });
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.view));
   if(b.dataset.view==="gl" && data && !data.gl.loaded) loadGL();
-  if(b.dataset.view==="recipes" && !rcData) rcQuick("30");
+  if(b.dataset.view==="recipes") { if (!applyTopRange("recipes", true) && !rcData) loadRecipes(false); }
   if(b.dataset.view==="itemmaster") isOpen();
   if(b.dataset.view==="movement" && !mvData) loadMovement(false);
   if(b.dataset.view==="invcharts") { if (!mvData) loadMovement(false); else renderInvCharts(); }
@@ -10132,13 +10162,13 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="shrinkage" && (!shData || shData.company !== ($("company").value || shData.company))) loadSh(false);
   if(b.dataset.view==="register") loadRegister();
   if(b.dataset.view==="receipts" && (!tkData || tkData.company !== ($("company").value || tkData.company))) loadReceipts(false);
-  if(b.dataset.view==="salesrec" && (!sxData || sxData.company !== ($("company").value || sxData.company))) loadSalesrec(false);
-  if(b.dataset.view==="billyrec" && (!biData || biData.company !== ($("company").value || biData.company))) loadBilly(false);
+  if(b.dataset.view==="salesrec") { if (applyTopRange("salesrec", false) || !sxData || sxData.company !== ($("company").value || sxData.company)) loadSalesrec(false); }
+  if(b.dataset.view==="billyrec") { if (applyTopRange("billyrec", false) || !biData || biData.company !== ($("company").value || biData.company)) loadBilly(false); }
   if(b.dataset.view==="emcpriv" && !epData) loadEp(false);
   if(b.dataset.view==="doccontrol") dkShowTab(dkTab);
   if(b.dataset.view==="settings") { liSettings(); loadKm(); loadAc(); }
-  if(b.dataset.view==="fiscal" && !fsData) loadFiscal(false);
-  if(b.dataset.view==="fsales" && !fxData) loadFiscalSales(false);
+  if(b.dataset.view==="fiscal") { if (applyTopRange("fiscal", false) || !fsData) loadFiscal(false); }
+  if(b.dataset.view==="fsales") { if (applyTopRange("fsales", false) || !fxData) loadFiscalSales(false); }
   if(b.dataset.view==="inventory" && data && !data.stockSummary) loadStockSummary();
   if(b.dataset.view==="inventory" && data && !(data.inventory||{}).loaded) loadInventory();
   if(b.dataset.view==="inventory" && ilTab === "loc" && (!ilData || ilKey !== ilQuery())) loadIl(false);
