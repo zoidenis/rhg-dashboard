@@ -1344,6 +1344,8 @@ $("logoutBtn").onclick = async () => {
     }).catch(() => {});
   }
   if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
+  if (["reports.manage", "finance.settings.manage", "purchasing.settings.manage", "actioncenter.manage", "admin.users.manage"].some(can))
+    $("adminLink").insertAdjacentHTML("afterbegin", `<div style="margin-bottom:6px"><a href="/reports-center">Reports center</a></div>`);
   const q = new URLSearchParams(location.search);
   const now = new Date().getFullYear();
   $("fYear").innerHTML = [now, now - 1, now - 2].map(y => `<option>${y}</option>`).join("");

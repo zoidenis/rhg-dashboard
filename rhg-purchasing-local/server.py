@@ -61,6 +61,7 @@ import operations
 import todayloc
 import quality
 import recipients
+import reportcat
 import reports
 import smtp_config
 import store
@@ -1451,6 +1452,54 @@ ACCESS_SCOPE_SET = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/
 ACCESS_FILTERED = {"/api/today/locations", "/api/locations", "/api/recipients/locations"}
 
 
+# ---------------------------------------------------------------- Reports center (identity, reportcat.py)
+def report_catalog():
+    """Every email Purchasing sends on its own: on or paused, when next, the last sends (identity's Reports center)."""
+    rc, items = reportcat, []
+    n = store.get_settings().get("notifications") or {}
+    items.append(rc.safe(lambda: rc.item(
+        "purchasing_daily", "Invoices without a PO · daily", "Purchasing", "daily",
+        rc.days_schedule(range(5) if n.get("working_days_only") else range(7), n.get("time"), "08:00"),
+        n.get("enabled"), notifier.next_run(), rc.runs(notify.recent_runs(40)), "settings", "ntCard",
+        routing="purchasing_daily", toggle=("notifications", "enabled")),
+        "purchasing_daily", "Invoices without a PO · daily", "Purchasing", "settings", "ntCard"))
+    items.append(rc.safe(lambda: rc.item(
+        "purchasing_weekly", "Purchasing report · weekly", "Purchasing", "weekly",
+        rc.weekly_schedule(n.get("weekly_day"), n.get("time"), "08:00"), n.get("weekly_report"), weekly_report.next_run(),
+        rc.runs(weekly_report.recent_runs(40)), "settings", "ntCard", routing="purchasing_weekly",
+        toggle=("notifications", "weekly_report")),
+        "purchasing_weekly", "Purchasing report · weekly", "Purchasing", "settings", "ntCard"))
+    items.append(rc.safe(lambda: rc.item(
+        "price_changes", "Purchase price changes · weekly", "Purchasing", "weekly",
+        rc.weekly_schedule(0, pricechg.settings()["time"], "08:30"), pricechg.settings()["enabled"], pricechg.next_run(),
+        rc.runs(pricechg.recent_runs(40)), "prices", "pqMailCard", routing="price_changes",
+        toggle=("notifications", "price_changes")),
+        "price_changes", "Purchase price changes · weekly", "Purchasing", "prices", "pqMailCard"))
+    items.append(rc.safe(lambda: rc.item(
+        "savings_monthly", "Price savings · monthly", "Purchasing", "monthly",
+        rc.monthly_schedule("first working day", n.get("time"), True, "08:00"), n.get("savings_monthly"),
+        savings_report.next_monthly(), rc.runs(savings_report.recent_runs(40), target=lambda e: (lambda p: p.get("label") or " → ".join(str(p.get(k) or "") for k in ("from", "to")).strip(" →")
+                                                  if isinstance(p, dict) else str(p or ""))(e.get("period"))),
+        "settings", "ntCard", routing="savings_monthly", toggle=("notifications", "savings_monthly")),
+        "savings_monthly", "Price savings · monthly", "Purchasing", "settings", "ntCard"))
+
+    def register_item():
+        s = exreg.settings()
+        combined = bool((exreg.policy() or {}).get("combined_digest"))
+        return rc.item("register_owners", "Daily controls · the owners' email", "Purchasing", "daily",
+                       rc.days_schedule(range(7), s.get("time"), "08:15"), s.get("enabled"), None, [], "register",
+                       "rgSetCard", toggle=("exception_register", "enabled"), combined=combined, logged=False,
+                       note="Sent in the Executive Action Center's email" if combined else "")
+    items.append(rc.safe(register_item, "register_owners", "Daily controls · the owners' email", "Purchasing",
+                         "register", "rgSetCard"))
+    try:
+        m = notify.smtp_info()
+        mail = {"configured": bool(m.get("configured")), "from": m.get("from") or ""}
+    except Exception:                                               # noqa: BLE001
+        mail = None
+    return reportcat.catalog(items, mail, "Purchasing")
+
+
 # ---------------------------------------------------------------- the exceptions register (exreg.py)
 # What Exceptions and the Action center were: the rules of the screens, read every day for the month in progress
 # and kept until the data shows them gone, and what people track by hand. Owners come from Email recipients.
@@ -1855,6 +1904,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, {"error": "Forbidden."})
             else:
                 self._send(200, exreg.for_action_center())
+            return
+        if url.path == "/internal/reports/catalog":
+            # identity's Reports center: every email of this tower, on or paused, its schedule and last sends
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, report_catalog())
             return
         if url.path == "/internal/compliance":
             # Finance → Control → Document control: the same reading as Invoices without PO, with the follow-up
@@ -2407,6 +2463,18 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"item": exreg.update(str(body.get("id") or ""), patch, actor)})
             except (KeyError, ValueError) as exc:
                 self._send(400, {"error": str(exc).strip("'\"")})
+            return
+        if url.path == "/internal/reports/toggle":       # identity's Reports center, for its user (checked there)
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            actor = str(body.get("actor") or "Reports center")[:120]
+            try:
+                key = reportcat.toggle(report_catalog()["items"], str(body.get("key") or ""), bool(body.get("enabled")),
+                                       store.save_settings, actor)
+                self._send(200, {"item": next(x for x in report_catalog()["items"] if x["key"] == key)})
+            except ValueError as exc:
+                self._send(400, {"error": str(exc)})
             return
         if url.path == "/internal/unicorn/tool":         # Unicorn (identity) reading one figure for an investigation
             if not self._service_call():

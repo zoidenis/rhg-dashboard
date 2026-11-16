@@ -21,6 +21,7 @@ import config
 import layouts
 import permissions
 import reports
+import reportcenter
 import screens
 import store
 import actioncenter
@@ -222,6 +223,11 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Bad service token."}); return
                 self._send(200, actioncenter.policy())
                 return
+            if url.path in ("/reports-center", "/reports-center.html"):
+                u = self._user()
+                page = "reports-center.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
             if url.path in ("/unicorn", "/unicorn.html"):
                 u = self._user()
                 page = "unicorn.html" if u and not u.get("must_change") else "login.html"
@@ -285,6 +291,12 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.can(user, "reports.manage"):
                     self._send(403, {"error": "Your role cannot schedule reports."}); return
                 self._send(200, reports.view(user))
+            elif url.path == "/api/reports-center":
+                # Reports center: every report pulse sends (both towers' own emails, the scheduled screens, the
+                # Action Center's email, Unicorn's brief), on or paused, failing or late, next and last sends
+                if not reportcenter.can_view(user):
+                    self._send(403, {"error": "Your role cannot see the reports."}); return
+                self._send(200, reportcenter.collect(user))
             elif url.path == "/api/reports/locations":
                 if not auth.can(user, "reports.manage"):
                     self._send(403, {"error": "Your role cannot schedule reports."}); return
@@ -475,6 +487,23 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, {"error": "Missing or wrong CSRF token."}); return
             if user.get("report"):                  # a report session only reads
                 self._send(403, {"error": "A report session cannot change anything."}); return
+
+            if url.path in ("/api/reports-center/toggle", "/api/reports-center/send"):
+                if not reportcenter.can_view(user):
+                    self._send(403, {"error": "Your role cannot see the reports."}); return
+                try:
+                    if url.path.endswith("/toggle"):
+                        reportcenter.toggle(user, str(body.get("id") or ""), bool(body.get("enabled")))
+                        self._send(200, {"ok": True})
+                    else:
+                        self._send(200, reportcenter.send(user, str(body.get("id") or ""), bool(body.get("test"))))
+                except PermissionError as exc:
+                    self._send(403, {"error": str(exc)})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+                except Exception as exc:                            # noqa: BLE001
+                    self._send(502, {"error": "The tower could not be reached: " + str(exc)[:160]})
+                return
 
             if url.path in ("/api/reports", "/api/reports/delete", "/api/reports/send"):
                 if not auth.can(user, "reports.manage"):

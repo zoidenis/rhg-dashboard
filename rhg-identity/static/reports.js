@@ -138,6 +138,7 @@
 .pr-link.danger{color:var(--up,#c2412d)}
 .pr-scroll{overflow-x:auto}
 .pr-sub{font-size:12px;color:var(--sub,#5f636b);margin-top:2px}
+a.pr-btn{text-decoration:none;display:inline-block}
 .pr-btn{font:inherit;font-weight:600;font-size:13px;padding:7px 12px;border-radius:10px;border:1px solid var(--line,#e3e1d9);background:var(--card,#fff);color:var(--ink,#16181d);cursor:pointer}
 .pr-btn.dark{background:var(--accent,var(--rhg-primary,#0c475e));border-color:transparent;color:#fff}
 .pr-btn:disabled{opacity:.55;cursor:default}
@@ -194,7 +195,7 @@
     host.innerHTML = `
       <div class="card-head"><div><h2>Scheduled reports</h2>
         <p class="hint"><span>Any screen of pulse sent by email, as often as you choose, to the people you choose.</span> <span>Each person receives the screen as they see it in pulse: their screens, companies and locations.</span> <span>The picture is in the email and the whole screen comes as a PDF.</span></p></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sender}<button class="pr-btn dark" type="button" id="prNew">New report</button></div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sender}<a class="pr-btn" href="/reports-center" title="Every report of pulse in one place: on or paused, failing or late, next and last sends">Reports center ›</a><button class="pr-btn dark" type="button" id="prNew">New report</button></div></div>
       ${rep.online ? "" : `<p class="pr-hint" style="color:var(--warn,#b86e0e)"><span>The report sender has not called in the last minutes, so nothing goes until it does.</span> <span>It runs on the server next to the towers (the reporter service).</span></p>`}
       <div class="pr-bar"><select id="prFApp" aria-label="Tower"><option value="">All towers</option>${["finance", "purchasing", "platform"].map(a => `<option value="${a}"${F.app === a ? " selected" : ""}>${esc(TOWERS[a])}</option>`).join("")}</select>
         <input id="prFQ" placeholder="Search reports" aria-label="Search reports" value="${esc(F.q)}"></div>
@@ -482,8 +483,32 @@
     box.insertBefore(b, box.firstChild);
   }
 
+  /* ------------------------------------------------------------------ a card asked for in the address */
+  // The Reports center opens a report's settings as /finance/?card=arCard#settings: the tower opens the screen of the
+  // hash, then the card is brought into view and marked a moment, and the address loses ?card.
+  function focusCard() {
+    let id = "";
+    try { id = new URLSearchParams(location.search).get("card") || ""; } catch (e) { return; }
+    if (!/^[A-Za-z][\w-]{0,40}$/.test(id)) return;
+    const t0 = Date.now();
+    const tick = () => {
+      const el = document.getElementById(id);
+      if (el && el.offsetParent !== null) {
+        el.scrollIntoView({behavior: "smooth", block: "start"});
+        const o = el.style.outline, off = el.style.outlineOffset;
+        el.style.outline = "3px solid var(--accent, #0c475e)"; el.style.outlineOffset = "3px";
+        setTimeout(() => { el.style.outline = o; el.style.outlineOffset = off; }, 2600);
+        try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) { /* kept */ }
+        return;
+      }
+      if (Date.now() - t0 < 20000) setTimeout(tick, 300);
+    };
+    setTimeout(tick, 400);
+  }
+
   /* ------------------------------------------------------------------ start */
   async function start() {
+    focusCard();
     try {
       const r = await fetch(API + "session", {credentials: "same-origin"});
       const j = await r.json();

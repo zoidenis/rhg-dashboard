@@ -281,6 +281,23 @@ def delete(rid, actor):
     return bool(r)
 
 
+def set_enabled(rid, enabled, actor):
+    """Pauses or resumes one report (the Reports center); resumed, it goes from its next slot, not the missed ones."""
+    with _lock:
+        d = _read()
+        r = d["reports"].get(str(rid))
+        if not r:
+            raise ValueError("That report no longer exists.")
+        if bool(r.get("enabled")) != bool(enabled):
+            r["enabled"] = bool(enabled)
+            if enabled:
+                r["armed_at"] = _now().isoformat()
+            _write(d)
+    store.audit("report resumed" if enabled else "report paused", actor, str(rid),
+                {"screen": r["screen"], "company": r["company"]})
+    return r
+
+
 # ---------------------------------------------------------------- the schedule
 def _hm(r):
     hh, _, mm = r.get("time", "08:00").partition(":")

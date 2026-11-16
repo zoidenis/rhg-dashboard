@@ -651,6 +651,8 @@ $("logoutBtn").onclick = async () => {
     .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (can("unicorn.use")) t.insertAdjacentHTML("beforeend", `<a href="/unicorn">Unicorn</a>`);
   if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
+  if (["reports.manage", "finance.settings.manage", "purchasing.settings.manage", "actioncenter.manage", "admin.users.manage"].some(can))
+    $("adminLink").insertAdjacentHTML("afterbegin", `<div style="margin-bottom:6px"><a href="/reports-center">Reports center</a></div>`);
   await load();
   if (!D) return;
   const h = location.hash.slice(1).split("/");

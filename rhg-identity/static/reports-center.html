@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>Reports center · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* Reports center: every report pulse sends (reportcenter.py). Shell as the Executive Action Center. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0}
+header{display:flex;justify-content:space-between}
+.adminlink{margin-top:auto;padding-top:16px}
+.adminlink a{color:var(--rhg-blue);font-size:11px;text-decoration:none;display:block;margin-top:4px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--down);display:inline-block}
+.pill.err .dot{background:var(--up)} .pill.load .dot{background:var(--warn)}
+/* banners: the mail server, a tower not reached, the report sender */
+.rc-ban{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:11px 14px;margin:0 0 12px;font-size:13px;line-height:1.45;border:1px solid}
+.rc-ban.err{background:var(--rhg-redbg);border-color:color-mix(in srgb,var(--rhg-red) 30%,transparent);color:var(--rhg-red)}
+.rc-ban.warn{background:var(--rhg-amberbg);border-color:color-mix(in srgb,var(--rhg-amber) 30%,transparent);color:var(--rhg-amber)}
+.rc-ban b{font-weight:700}.rc-ban .tx{color:var(--ink)}
+/* the counts: each one a filter */
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:12px;margin-bottom:14px}
+.kp .card.kpi{cursor:pointer;text-align:left;border:1px solid var(--line);font:inherit;color:inherit;width:100%}
+.kp .card.kpi:hover,.kp .card.kpi:focus-visible{border-color:var(--rhg-primary);outline:none}
+.kp .card.kpi.on{border-color:var(--rhg-primary);box-shadow:inset 0 0 0 1px var(--rhg-primary)}
+.kp .v.bad{color:var(--rhg-red)}.kp .v.mid{color:var(--rhg-amber)}.kp .v.good{color:var(--rhg-green)}
+/* filters */
+.flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.flt select{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--ink)}
+.rc-find{position:relative;flex:1;min-width:220px;max-width:380px}
+.rc-find input{width:100%;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 12px 8px 34px;font-size:13px;color:var(--ink)}
+.rc-find input:focus{outline:none;border-color:var(--rhg-primary);box-shadow:0 0 0 3px rgba(12,71,94,.12)}
+.rc-find svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--sub);pointer-events:none}
+.chipsel{display:flex;gap:6px;flex-wrap:wrap}
+.chipsel button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.chipsel button.on{background:var(--rhg-primary);border-color:var(--rhg-primary);color:#fff;font-weight:600}
+.chipsel .n{font-size:11px;opacity:.75;margin-left:4px}
+/* the list */
+.card h2{font-size:17px}
+.scroll{overflow-x:auto}
+table.rc{width:100%;border-collapse:collapse;min-width:900px}
+table.rc th:first-child{width:30%}
+table.rc td.sch{min-width:150px;font-size:12.5px}
+.sub.who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+table.rc th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;white-space:nowrap}
+table.rc td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:13px}
+table.rc tr.go{cursor:pointer}
+table.rc tr.go:hover td,table.rc tr.go:focus-visible td{background:var(--bg)}
+table.rc tr.go:focus-visible{outline:2px solid var(--rhg-primary);outline-offset:-2px}
+table.rc tr.grp td{background:var(--rhg-sky);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);padding:6px 10px}
+.nm{font-weight:600;font-size:13.5px}
+.sub{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.4}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 6px;background:var(--rhg-sky);color:var(--rhg-primary);margin-right:4px;vertical-align:1px}
+.st{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--rhg-sky);color:var(--sub)}
+.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.st.ok{background:var(--rhg-greenbg);color:var(--rhg-green)}
+.st.failing{background:var(--rhg-redbg);color:var(--rhg-red)}
+.st.late,.st.skipped{background:var(--rhg-amberbg);color:var(--rhg-amber)}
+.st.waiting,.st.combined{background:var(--rhg-sky);color:var(--rhg-primary)}
+.st.paused,.st.unknown{background:var(--rhg-sky);color:var(--sub)}
+.st.paused::before{border-radius:1px;width:6px;height:8px;background:linear-gradient(90deg,currentColor 0 35%,transparent 35% 65%,currentColor 65%)}
+.when{white-space:nowrap;font-variant-numeric:tabular-nums}
+.when .rel{display:block;font-size:11.5px;color:var(--sub)}
+.r-ok{color:var(--rhg-green)}.r-bad{color:var(--rhg-red)}.r-mid{color:var(--rhg-amber)}
+.wk{display:flex;gap:6px;align-items:center;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12.5px}
+.wk i{font-style:normal;font-size:11px;color:var(--sub)}
+/* on and off */
+.sw{all:unset;cursor:pointer;width:38px;height:22px;border-radius:999px;background:#c9c6bd;position:relative;flex-shrink:0;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s}
+.sw[aria-checked="true"]{background:var(--rhg-green)}
+.sw[aria-checked="true"]::after{left:19px}
+.sw:focus-visible{outline:2px solid var(--rhg-primary);outline-offset:2px}
+.sw[disabled]{cursor:not-allowed;opacity:.45}
+.sw.busy{opacity:.6;cursor:progress}
+/* coming up and the latest sends */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+.grid2>*,main .card,section{min-width:0}
+.feed{display:flex;flex-direction:column}
+.feed .fi{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%;color:inherit;font:inherit}
+.feed .fi:last-child{border-bottom:0}
+.feed .fi:hover,.feed .fi:focus-visible{background:var(--bg);outline:none}
+.feed .fi .t{font-variant-numeric:tabular-nums;font-size:12px;color:var(--sub);white-space:nowrap}
+.feed .fi .t b{display:block;color:var(--ink);font-size:13px}
+.feed .fi .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{color:var(--sub);font-size:13px;padding:10px 2px}
+/* the drawer of one report */
+.bd{position:fixed;inset:0;background:rgba(8,30,40,.55);z-index:90;display:flex;justify-content:flex-end}
+.dr{background:var(--card);color:var(--ink);width:100%;max-width:720px;height:100%;overflow:auto;box-shadow:-18px 0 50px rgba(0,0,0,.3);display:flex;flex-direction:column}
+.dr .mh{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:16px 20px;background:#08303f;color:#fff;position:sticky;top:0;z-index:2}
+.dr .mh h2{font-family:var(--rhg-font-display);font-size:18px;margin:0;color:#fff}
+.dr .mh .sub{color:#fff;opacity:.75}
+.dr .mh .x{all:unset;cursor:pointer;color:#fff;font-size:13px;border:1px solid #2b5a6c;border-radius:8px;padding:6px 12px;white-space:nowrap}
+.dr .mh .x:focus-visible{outline:2px solid #a0d8ea}
+.dr .mb{padding:16px 20px;font-size:13.5px;line-height:1.5}
+.dr h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin:18px 0 6px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.facts>div{border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+.facts .l{font-size:11px;color:var(--sub)}.facts .v{font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.why{border-radius:10px;padding:10px 12px;margin:12px 0 0;font-size:13px}
+.why.failing{background:var(--rhg-redbg)}.why.late,.why.skipped{background:var(--rhg-amberbg)}
+.why.ok{background:var(--rhg-greenbg)}.why.paused,.why.waiting,.why.combined,.why.unknown{background:var(--rhg-sky)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.acts .btn{min-width:0;justify-content:center;display:inline-flex;align-items:center;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:var(--card);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+.acts .btn:hover{border-color:var(--rhg-primary)}
+.acts .btn.dark{background:var(--rhg-primary);border-color:var(--rhg-primary);color:#fff}
+.acts .btn:focus-visible{outline:2px solid var(--rhg-primary);outline-offset:2px}
+.msg{font-size:12.5px;color:var(--sub);margin-top:8px;min-height:1em}
+.ppl{display:flex;gap:6px;flex-wrap:wrap}
+.ppl span{background:var(--rhg-sky);border-radius:999px;padding:3px 9px;font-size:12px}
+table.rn{width:100%;border-collapse:collapse;font-size:12.5px}
+table.rn th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600}
+table.rn td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.rn .det{color:var(--sub);font-size:12px;overflow-wrap:anywhere}
+.rn .tst{font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px;background:var(--rhg-sky);color:var(--rhg-primary);margin-left:4px}
+.mnav-btn,.mnav-bd{display:none}
+@media(max-width:1000px){.grid2{grid-template-columns:1fr}}
+@media(max-width:760px){
+  aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;transform:translateX(-105%);transition:transform .2s ease}
+  body.mnav-open aside{transform:none;box-shadow:0 0 32px rgba(0,0,0,.35)}
+  body.mnav-open{overflow:hidden}
+  .mnav-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}
+  body.mnav-open .mnav-bd{display:block}
+  .mnav-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px}
+  .mnav-btn svg{width:18px;height:18px}
+  main{padding:16px}
+  .rc-find{max-width:none;flex-basis:100%}
+  .feed .fi{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}.feed .fi .t{grid-column:1/-1}.feed .fi .t b{display:inline;margin-right:6px}
+  table.rn{min-width:560px}
+}
+@media (prefers-reduced-motion: reduce){aside,.sw,.sw::after{transition:none}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/actions">Executive Action Center</a>
+    <a href="/executive">Executive dashboard</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
+</aside>
+<div class="mnav-bd no-report" id="mnavBd"></div>
+<main>
+  <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
+  <header>
+    <div>
+      <div class="eyebrow">RHG / Reports center</div>
+      <h1>Reports center</h1>
+      <div class="period">Every report pulse sends: on or paused, failing or late, when it goes next and how the last sends went</div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn dark" id="reload" type="button">Read again</button></div>
+      <div class="hdr-meta"><span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading the reports…</span></span>
+        <span class="sep">|</span><span id="whoami"></span><button class="linkbtn" id="logoutBtn">Sign out</button></div>
+    </div>
+  </header>
+
+  <div id="bans"></div>
+  <div class="kp" id="kp"></div>
+  <div class="grid2">
+    <div class="card"><h2>Coming up</h2><p class="hint">The next sends of the reports that are on, soonest first.</p><div class="feed" id="next"></div></div>
+    <div class="card"><h2>Latest sends</h2><p class="hint">What went out, failed or was skipped, newest first (tests left out).</p><div class="feed" id="latest"></div></div>
+  </div>
+  <div class="card">
+    <div class="flt">
+      <div class="rc-find" role="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Search a report, a company, a role or a person" aria-label="Search the reports" autocomplete="off"></div>
+      <select id="fTower" aria-label="Tower"><option value="">All towers</option><option value="Finance">Finance</option><option value="Purchasing">Purchasing</option><option value="Platform">Platform</option></select>
+      <select id="fKind" aria-label="Kind"><option value="">All kinds</option><option value="email">Emails of the towers</option><option value="screen">Scheduled screens</option><option value="brief">Unicorn</option></select>
+      <select id="fFreq" aria-label="How often"><option value="">Any frequency</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>
+      <select id="fSort" aria-label="Order"><option value="state">Needs attention first</option><option value="next">Next send first</option><option value="tower">By tower</option><option value="name">By name</option></select>
+    </div>
+    <div class="chipsel" id="chips" style="margin-bottom:12px"></div>
+    <div class="scroll"><table class="rc" id="tbl"></table></div>
+    <p class="hint" id="foot" style="margin:10px 0 0"></p>
+  </div>
+</main>
+</div>
+<div id="drawer"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let me = null, CSRF = null, D = null, OPEN = null;
+const F = {state: "", tower: "", kind: "", freq: "", sort: "state", q: ""};
+const can = p => (me && me.permissions || []).includes(p);
+async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+async function post(u, body){ const r = await fetch(u, {method: "POST", credentials: "same-origin",
+  headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+
+const STATE = {failing: "Failing", late: "Late", skipped: "Skipped", waiting: "Not sent yet", ok: "Active",
+  combined: "Combined", paused: "Paused", unknown: "Not read"};
+const WHY = {
+  failing: "The last send failed, all of it or part. The reason is in the log below; fix it in its settings, the next run tries again.",
+  late: "It is on, but nothing has gone out for longer than its schedule allows. Check that the tower is running and look at the log.",
+  skipped: "The last run sent nothing: nobody to send it to, or nothing to report. The reason is in the log below.",
+  waiting: "It is on and has not gone out yet; the first send is at the next time.",
+  ok: "It is on and the last sends went out.",
+  combined: "It is on, but its content goes in the Executive Action Center's daily email to the owners, so it is not sent on its own.",
+  paused: "It is paused: it does not go out until it is resumed.",
+  unknown: "Its state could not be read."};
+const KIND = {email: "Email", screen: "Scheduled screen", brief: "Brief"};
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const ATTN = ["failing", "late", "skipped"];
+const w = t => `<span>${esc(t)}</span>`;                     // a word on its own, translated on its own
+
+// ---------------------------------------------------------------- dates
+const dt = s => { if (!s) return null; const d = new Date(String(s).slice(0, 19)); return isNaN(d) ? null : d; };
+const p2 = n => String(n).padStart(2, "0");
+const hm = d => `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+const dmy = d => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
+function dayWord(d){
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const x = new Date(d); x.setHours(0, 0, 0, 0);
+  const k = Math.round((x - t) / 864e5);
+  return k === 0 ? "Today" : k === 1 ? "Tomorrow" : k === -1 ? "Yesterday" : null;
+}
+function when(s){                                              // "Today 08:30", "Monday 17/11 08:30"
+  const d = dt(s); if (!d) return "–";
+  const wd = dayWord(d);
+  return wd ? `${w(wd)} ${hm(d)}` : `${w(DAYS[(d.getDay() + 6) % 7])} <span data-no-i18n>${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${hm(d)}</span>`;
+}
+function rel(s){
+  const d = dt(s); if (!d) return "";
+  const m = Math.round((d - Date.now()) / 6e4), a = Math.abs(m);
+  const v = a < 60 ? `${a} min` : a < 48 * 60 ? `${Math.round(a / 60)} h` : `${Math.round(a / 1440)} days`;
+  return m >= 0 ? `in ${v}` : `${v} ago`;
+}
+function sched(x, split){
+  const s = x.schedule || {}, t = !s.time ? "" : split ? `<div class="sub" data-no-i18n>${esc(s.time)}</div>` : ` · <span data-no-i18n>${esc(s.time)}</span>`;
+  if (Array.isArray(s.days)) {
+    const d = s.days;
+    const txt = d.length === 7 ? w("Every day") : d.length === 5 && d.every((v, i) => v === i) ? w("Working days")
+      : d.length ? d.map(i => w(DAYS[i])).join(", ") : w("No day set");
+    return txt + t;
+  }
+  if (s.weekly != null) return `${w("Every week")} · ${w(DAYS[s.weekly] || "Monday")}${t}`;
+  if (s.monthly != null) {
+    const m = String(s.monthly);
+    const day = /^\d+$/.test(m) ? `${w("Day")} <span data-no-i18n>${esc(m)}</span>` : w(m.charAt(0).toUpperCase() + m.slice(1));
+    return `${w("Every month")} · ${day}${s.final ? ` ${w("and the final on day")} <span data-no-i18n>${esc(s.final)}</span>` : ""}${t}`;
+  }
+  return "–";
+}
+const pill = st => `<span class="st ${esc(st)}">${esc(STATE[st] || st)}</span>`;
+const rs = st => st === "sent" ? `<b class="r-ok">Sent</b>` : st === "failed" ? `<b class="r-bad">Failed</b>` : `<b class="r-mid">Skipped</b>`;
+function whoGets(x){
+  if (x.kind === "screen") {
+    const n = (x.people || []).length, e = (x.emails || []).length;
+    return n || e ? [n ? `<span>${n} people</span>` : "", e ? `<span>${e} other addresses</span>` : ""].filter(Boolean).join(" + ") : "Nobody chosen";
+  }
+  if (x.roles && (x.roles.to.length || x.roles.cc.length))
+    return `${w("To")} ${x.roles.to.map(w).join(" / ") || "–"}${x.roles.cc.length ? ` · ${w("Cc")} ${x.roles.cc.map(w).join(" / ")}` : ""}`;
+  return x.id === "platform:ac_digest" ? "Each owner of open items" : x.kind === "brief" ? "Unicorn's chat, everyone who may use it" : "The addresses in its settings";
+}
+
+// ---------------------------------------------------------------- page
+function counts(xs){
+  const c = {all: xs.length, active: 0, paused: 0, attn: 0, waiting: 0, sent: 0, failed: 0};
+  xs.forEach(x => { if (x.enabled) c.active++; else c.paused++;
+    if (ATTN.includes(x.state)) c.attn++; if (x.state === "waiting") c.waiting++;
+    c.sent += x.sent_7d || 0; c.failed += x.failed_7d || 0; });
+  return c;
+}
+function banners(){
+  const out = [];
+  Object.entries(D.towers || {}).forEach(([k, t]) => {
+    if (!t.ok) out.push(`<div class="rc-ban err"><span><b>${esc(t.name)}</b> <span class="tx">could not be read: <span data-no-i18n>${esc(t.error || "")}</span>. Its reports are not in the list.</span></span></div>`);
+    else if (t.mail && t.mail.configured === false) out.push(`<div class="rc-ban err"><span><b>${esc(t.name)}</b> <span class="tx">The mail server is not set: none of these emails can go out. Set it in Purchasing → Settings → Mail server.</span></span></div>`);
+  });
+  const scr = D.items.filter(x => x.kind === "screen" && x.enabled);
+  if (scr.length && D.reporter && D.reporter.online === false)
+    out.push(`<div class="rc-ban warn"><span><b>Report sender</b> <span class="tx">is not running: the scheduled screens wait until it is back${D.reporter.seen_at ? ` (last seen ${when(D.reporter.seen_at)})` : ""}.</span></span></div>`);
+  (D.problems || []).forEach(p => out.push(`<div class="rc-ban warn"><span class="tx" data-no-i18n>${esc(p)}</span></div>`));
+  $("bans").innerHTML = out.join("");
+}
+function kpis(){
+  const c = counts(D.items);
+  const nx = D.items.filter(x => x.enabled && x.next_run).sort((a, b) => a.next_run.localeCompare(b.next_run))[0];
+  const k = (key, l, v, s, cls) => `<button type="button" class="card kpi${F.state === key ? " on" : ""}" data-k="${key}"><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></button>`;
+  $("kp").innerHTML = [
+    k("", "Reports", c.all, `${Object.values(D.towers).filter(t => t.ok).length + (D.items.some(x => x.app === "platform") ? 1 : 0)} sources`),
+    k("on", "Active", c.active, "on, going out on schedule", "good"),
+    k("paused", "Paused", c.paused, "not going out", c.paused ? "mid" : ""),
+    k("attn", "Need attention", c.attn, "failing, late or skipped", c.attn ? "bad" : "good"),
+    k("waiting", "Not sent yet", c.waiting, "on, first send to come"),
+    `<div class="card kpi" style="cursor:default"><div class="l">Sent in the last 7 days</div><div class="v">${c.sent}</div><div class="s">${c.failed ? `<b class="r-bad">${c.failed} failed</b>` : "none failed"}</div></div>`,
+    nx ? `<button type="button" class="card kpi" data-open="${esc(nx.id)}"><div class="l">Next send</div><div class="v" style="font-size:16px">${when(nx.next_run)}</div><div class="s">${esc(nx.name)}</div></button>`
+       : `<div class="card kpi" style="cursor:default"><div class="l">Next send</div><div class="v">–</div><div class="s">nothing on</div></div>`
+  ].join("");
+  $("kp").querySelectorAll("[data-k]").forEach(b => b.onclick = () => { F.state = F.state === b.dataset.k ? "" : b.dataset.k; paint(); });
+  $("kp").querySelectorAll("[data-open]").forEach(b => b.onclick = () => openItem(b.dataset.open));
+}
+function feeds(){
+  const nx = D.items.filter(x => x.enabled && x.next_run).sort((a, b) => a.next_run.localeCompare(b.next_run)).slice(0, 8);
+  $("next").innerHTML = nx.length ? nx.map(x => `<button type="button" class="fi" data-open="${esc(x.id)}"><span class="t"><b>${when(x.next_run)}</b>${esc(rel(x.next_run))}</span>
+      <span class="n"><span class="nm">${esc(x.name)}</span><div class="sub">${esc(x.tower)}${x.company ? ` · <span data-no-i18n>${esc(x.company)}</span>` : ""}</div></span>${pill(x.state)}</button>`).join("")
+    : `<div class="empty">No report is on.</div>`;
+  const all = [];
+  D.items.forEach(x => (x.runs || []).forEach(r => { if (!r.test) all.push([r, x]); }));
+  all.sort((a, b) => b[0].at.localeCompare(a[0].at));
+  $("latest").innerHTML = all.length ? all.slice(0, 10).map(([r, x]) => `<button type="button" class="fi" data-open="${esc(x.id)}"><span class="t"><b>${when(r.at)}</b>${esc(rel(r.at))}</span>
+      <span class="n"><span class="nm">${esc(x.name)}</span><div class="sub">${r.target ? `<span data-no-i18n>${esc(r.target)}</span>` : esc(x.tower)}</div></span>${rs(r.status)}</button>`).join("")
+    : `<div class="empty">Nothing has been sent yet.</div>`;
+  document.querySelectorAll(".feed [data-open]").forEach(b => b.onclick = () => openItem(b.dataset.open));
+}
+const fold = t => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+function hay(x){
+  return fold([x.name, x.tower, x.screen, x.company, KIND[x.kind], STATE[x.state], x.note, x.created_by,
+    ...(x.roles ? [...x.roles.to, ...x.roles.cc] : []), ...(x.people || []), ...(x.emails || []),
+    ...((x.runs || []).slice(0, 5).map(r => r.target))].join(" "));
+}
+function filtered(){
+  const words = fold(F.q).split(/\s+/).filter(Boolean);
+  return D.items.filter(x => (!F.tower || x.tower === F.tower) && (!F.kind || x.kind === F.kind) && (!F.freq || x.freq === F.freq)
+    && (!F.state || (F.state === "on" ? x.enabled : F.state === "attn" ? ATTN.includes(x.state) : x.state === F.state))
+    && (!words.length || (h => words.every(v => h.includes(v)))(hay(x))));
+}
+const ORDER = ["failing", "late", "skipped", "waiting", "ok", "combined", "paused", "unknown"];
+function sorted(xs){
+  const by = {state: (a, b) => ORDER.indexOf(a.state) - ORDER.indexOf(b.state) || a.tower.localeCompare(b.tower) || a.name.localeCompare(b.name),
+    next: (a, b) => (a.next_run || "9").localeCompare(b.next_run || "9") || a.name.localeCompare(b.name),
+    tower: (a, b) => a.tower.localeCompare(b.tower) || a.name.localeCompare(b.name),
+    name: (a, b) => a.name.localeCompare(b.name)};
+  return xs.slice().sort(by[F.sort] || by.state);
+}
+function row(x){
+  const l = x.last;
+  const last = l ? `<span class="when">${when(l.at)} ${rs(l.status)}<span class="rel"><span>${esc(rel(l.at))}</span>${x.last_batch && x.last_batch.to ? ` · <span>${x.last_batch.to} ${x.last_batch.to === 1 ? "recipient" : "recipients"}</span>` : ""}${x.last_batch && x.last_batch.sent + x.last_batch.failed + x.last_batch.skipped > 1 ? ` · <span>${x.last_batch.sent + x.last_batch.failed + x.last_batch.skipped} emails</span>` : ""}</span></span>`
+    : x.logged === false ? `<span class="sub">In the audit log</span>` : `<span class="sub">Never sent</span>`;
+  const nxt = x.enabled && x.next_run ? `<span class="when">${when(x.next_run)}<span class="rel">${esc(rel(x.next_run))}</span></span>` : `<span class="sub">–</span>`;
+  const wk = x.logged === false ? "" : `<span class="wk"><b class="r-ok">${x.sent_7d || 0}</b><i>sent</i>${x.failed_7d ? `<b class="r-bad">${x.failed_7d}</b><i>failed</i>` : ""}${x.skipped_7d ? `<b class="r-mid">${x.skipped_7d}</b><i>skipped</i>` : ""}</span>`;
+  const sw = `<button type="button" class="sw" role="switch" aria-checked="${x.enabled}" aria-label="On or off" data-sw="${esc(x.id)}"${x.can_toggle ? "" : ` disabled title="${esc(x.fixed ? "Turned on and off with its own setup" : "Your role cannot turn it on or off")}"`}></button>`;
+  return `<tr class="go" tabindex="0" data-id="${esc(x.id)}">
+    <td><div class="nm">${esc(x.name)}</div><div class="sub"><span class="tag">${esc(KIND[x.kind] || x.kind)}</span>${esc(x.tower)}${x.screen && x.screen !== x.name ? ` · <span data-no-i18n>${esc(x.screen)}</span>` : ""}${x.company ? ` · <span data-no-i18n>${esc(x.company)}</span>` : ""}</div><div class="sub who" title="${esc((x.roles ? [...x.roles.to, ...x.roles.cc] : [...(x.people || []), ...(x.emails || [])]).join(", "))}">${whoGets(x)}</div></td>
+    <td class="sch">${sched(x, true)}</td><td>${pill(x.state)}${x.queued ? `<div class="sub">Waiting to go</div>` : ""}</td><td>${nxt}</td><td>${last}${wk ? `<div style="margin-top:3px">${wk}</div>` : ""}</td><td>${sw}</td></tr>`;
+}
+function paint(){
+  kpis();
+  const base = D.items.filter(x => (!F.tower || x.tower === F.tower) && (!F.kind || x.kind === F.kind) && (!F.freq || x.freq === F.freq));
+  const c = counts(base);
+  const chip = (k, l, n) => `<button type="button" class="${F.state === k ? "on" : ""}" data-st="${k}">${esc(l)}<span class="n">${n}</span></button>`;
+  $("chips").innerHTML = chip("", "All", c.all) + chip("attn", "Need attention", c.attn) + chip("on", "Active", c.active) + chip("paused", "Paused", c.paused) + chip("waiting", "Not sent yet", c.waiting);
+  $("chips").querySelectorAll("[data-st]").forEach(b => b.onclick = () => { F.state = b.dataset.st; paint(); });
+  const xs = sorted(filtered());
+  let body = "", grp = null;
+  xs.forEach(x => {
+    const g = F.sort === "tower" ? x.tower : null;
+    if (g && g !== grp) { grp = g; body += `<tr class="grp"><td colspan="6">${esc(g)}</td></tr>`; }
+    body += row(x);
+  });
+  $("tbl").innerHTML = `<thead><tr><th>Report</th><th>Schedule</th><th>State</th><th>Next send</th><th>Last send · 7 days</th><th>On</th></tr></thead>
+    <tbody>${body || `<tr><td colspan="6" class="empty">No report matches.</td></tr>`}</tbody>`;
+  $("tbl").querySelectorAll("tr[data-id]").forEach(tr => {
+    tr.onclick = e => { if (!e.target.closest(".sw")) openItem(tr.dataset.id); };
+    tr.onkeydown = e => { if ((e.key === "Enter" || e.key === " ") && e.target === tr) { e.preventDefault(); openItem(tr.dataset.id); } };
+  });
+  $("tbl").querySelectorAll("[data-sw]").forEach(b => b.onclick = e => { e.stopPropagation(); flip(b.dataset.sw, b); });
+  $("foot").textContent = `${xs.length} of ${D.items.length} reports`;
+}
+async function flip(id, btn){
+  const x = D.items.find(v => v.id === id); if (!x || !x.can_toggle) return;
+  const on = !x.enabled;
+  if (!on && !confirm(`Pause "${x.name}"? It does not go out until it is resumed.`)) return;
+  if (btn) btn.classList.add("busy");
+  try { await post("/api/reports-center/toggle", {id, enabled: on}); await load(true); if (OPEN === id) openItem(id, on ? "Resumed." : "Paused."); }
+  catch (e) { if (btn) btn.classList.remove("busy"); alertMsg(e.message); }
+}
+function alertMsg(t){ const m = document.querySelector(".dr .msg"); if (m) m.textContent = t; else { $("pill").className = "pill err"; $("pillText").textContent = t; } }
+
+// ---------------------------------------------------------------- one report
+function openItem(id, msg){
+  const x = D.items.find(v => v.id === id); if (!x) return;
+  OPEN = id;
+  history.replaceState(null, "", "#" + encodeURIComponent(id));
+  const runs = x.runs || [];
+  const facts = [["State", pill(x.state)], ["Schedule", sched(x)], ["Next send", x.enabled && x.next_run ? `${when(x.next_run)} <div class="sub">${esc(rel(x.next_run))}</div>` : "–"],
+    ["Last sent", x.last_sent_at ? `${when(x.last_sent_at)} <div class="sub">${esc(rel(x.last_sent_at))}</div>` : "–"],
+    ["Last 7 days", `<b class="r-ok">${x.sent_7d || 0}</b> ${w("sent")} · <b class="${x.failed_7d ? "r-bad" : ""}">${x.failed_7d || 0}</b> ${w("failed")} · <b>${x.skipped_7d || 0}</b> ${w("skipped")}`]];
+  if (x.last_read) facts.push(["Last read from the Tax Administration", `${when(x.last_read.at)} <div class="sub" data-no-i18n>${esc(x.last_read.status || "")}</div>`]);
+  const ppl = x.kind === "screen" ? `${(x.people || []).length ? `<div class="ppl">${x.people.map(p => `<span data-no-i18n>${esc(p)}</span>`).join("")}</div>` : ""}
+      ${(x.emails || []).length ? `<div class="ppl" style="margin-top:6px">${x.emails.map(p => `<span data-no-i18n>${esc(p)}</span>`).join("")}</div>` : ""}
+      ${!(x.people || []).length && !(x.emails || []).length ? `<p class="sub">Nobody chosen yet.</p>` : ""}
+      <p class="sub">Each person receives the screen as they see it in pulse, with their companies and locations.</p>`
+    : `<p style="margin:0">${whoGets(x)}</p>${x.roles ? `<p class="sub">By role, company by company: Settings → Email recipients by company. A location with its own people gets its own email.</p>` : ""}`;
+  const rows = runs.map(r => `<tr><td class="when">${when(r.at)}${r.test ? `<span class="tst">TEST</span>` : ""}</td><td>${rs(r.status)}${r.partial ? ` <span class="sub">part</span>` : ""}</td>
+      <td><span data-no-i18n>${esc(r.target || "")}</span></td><td class="when">${r.to.length || r.to_n ? `<span title="${esc([...r.to, ...r.cc].join(", "))}">${r.to.length || r.to_n}${r.cc.length ? ` + ${r.cc.length} Cc` : ""}</span>` : "–"}</td>
+      <td><span data-no-i18n>${esc(r.actor === "scheduler" ? "" : r.actor)}</span>${r.actor === "scheduler" ? w("On schedule") : ""}</td><td class="det" data-no-i18n>${esc(r.detail)}</td></tr>`).join("");
+  const acts = [];
+  if (x.can_toggle) acts.push(`<button type="button" class="btn ${x.enabled ? "" : "dark"}" id="dToggle">${x.enabled ? "Pause" : "Resume"}</button>`);
+  if (x.can_send) acts.push(`<button type="button" class="btn dark" id="dSend">Send now</button><button type="button" class="btn" id="dTest">Test to me</button>`);
+  if (x.link) acts.push(`<a class="btn" href="${esc(x.link)}">${x.kind === "screen" ? "Open scheduled reports ›" : x.kind === "brief" ? "Open Unicorn ›" : "Open its settings ›"}</a>`);
+  $("drawer").innerHTML = `<div class="bd" id="dBd"><div class="dr" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+    <div class="mh"><div><h2 id="dTitle">${esc(x.name)}</h2><div class="sub">${esc(KIND[x.kind] || x.kind)} · ${esc(x.tower)}${x.company ? ` · <span data-no-i18n>${esc(x.company)}</span>` : ""}${x.screen && x.screen !== x.name ? ` · <span data-no-i18n>${esc(x.screen)}</span>` : ""}</div></div>
+      <button type="button" class="x" id="dClose">Close ✕</button></div>
+    <div class="mb">
+      <div class="facts">${facts.map(([l, v]) => `<div><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`).join("")}</div>
+      <div class="why ${esc(x.state)}">${esc(WHY[x.state] || "")}${x.error ? ` <span data-no-i18n>${esc(x.error)}</span>` : ""}${x.note ? `<div class="sub" style="margin-top:4px">${esc(x.note)}</div>` : ""}</div>
+      <div class="acts">${acts.join("")}</div><div class="msg" id="dMsg">${esc(msg || "")}</div>
+      <h4>Who receives it</h4>${ppl}
+      ${x.created_by ? `<p class="sub">Made by <span data-no-i18n>${esc(x.created_by)}</span>${x.created_at ? ` · <span data-no-i18n>${esc(dmy(dt(x.created_at)))}</span>` : ""}</p>` : ""}
+      <h4>The last sends</h4>
+      ${x.logged === false ? `<p class="sub">This email's sends are written in the audit log (Administration → Audit).</p>`
+        : runs.length ? `<div class="scroll"><table class="rn"><thead><tr><th>When</th><th>How</th><th>Company</th><th>Recipients</th><th>By</th><th>Detail</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : `<p class="sub">Not sent yet.</p>`}
+    </div></div></div>`;
+  const close = () => { $("drawer").innerHTML = ""; OPEN = null; history.replaceState(null, "", location.pathname + location.search); };
+  $("dClose").onclick = close;
+  $("dBd").onclick = e => { if (e.target.id === "dBd") close(); };
+  document.onkeydown = e => { if (e.key === "Escape" && OPEN) close(); };
+  if ($("dToggle")) $("dToggle").onclick = () => flip(x.id, null);
+  const send = async test => {
+    if (!test && !confirm(`Send "${x.name}" now to everyone who receives it?`)) return;
+    $("dMsg").textContent = "Sending…";
+    try { await post("/api/reports-center/send", {id: x.id, test}); await load(true); openItem(x.id, test ? "The test goes to you in a few minutes, as you see the screen." : "Queued: it goes in a few minutes."); }
+    catch (e) { $("dMsg").textContent = e.message; }
+  };
+  if ($("dSend")) $("dSend").onclick = () => send(false);
+  if ($("dTest")) $("dTest").onclick = () => send(true);
+  $("dClose").focus();
+}
+
+async function load(quiet){
+  if (!quiet) { $("pill").className = "pill load"; $("pillText").textContent = "Reading the reports…"; }
+  try {
+    D = await get("/api/reports-center");
+    $("pill").className = "pill"; $("pillText").innerHTML = `Read at <span data-no-i18n>${hm(dt(D.read_at))}</span>`;
+    banners(); feeds(); paint();
+  } catch (e) {
+    $("pill").className = "pill err"; $("pillText").textContent = e.message;
+    if (!D) $("tbl").innerHTML = `<tbody><tr><td class="empty">${esc(e.message)}</td></tr></tbody>`;
+  }
+}
+$("reload").onclick = () => load();
+$("q").oninput = e => { F.q = e.target.value; paint(); };
+$("fTower").onchange = e => { F.tower = e.target.value; paint(); };
+$("fKind").onchange = e => { F.kind = e.target.value; paint(); };
+$("fFreq").onchange = e => { F.freq = e.target.value; paint(); };
+$("fSort").onchange = e => { F.sort = e.target.value; paint(); };
+document.addEventListener("keydown", e => { if (e.key === "/" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !OPEN) { e.preventDefault(); $("q").focus(); } });
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login?signedout=1";
+};
+(async () => {
+  let s;
+  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  const held = p => (me.permissions || []).some(x => x.startsWith(p));
+  const t = $("towers");
+  if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  if (!held("platform.s.actions.")) { const ac = t.querySelector('a[href="/actions"]'); if (ac) ac.remove(); }
+  if (!held("platform.s.executive.")) { const ex = t.querySelector('a[href="/executive"]'); if (ex) ex.remove(); }
+  [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.people.", "/finance/#people", "People &amp; Productivity"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]
+    .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
+  if (can("unicorn.use")) t.insertAdjacentHTML("beforeend", `<a href="/unicorn">Unicorn</a>`);
+  $("adminLink").innerHTML = `<a href="/reports-center" aria-current="page"><b>Reports center</b></a>` +
+    (can("admin.users.manage") || can("admin.audit.view") ? `<a href="/admin">Administration · accounts, roles and audit</a>` : "");
+  await load();
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (D && h && D.items.some(x => x.id === h)) openItem(h);
+  setInterval(() => { if (!OPEN && document.visibilityState === "visible") load(true); }, 120000);
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+<script>
+(() => {
+  const btn = document.getElementById("mnavBtn"), body = document.body;
+  if (!btn) return;
+  const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
+  document.getElementById("mnavBd").addEventListener("click", () => set(false));
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("a")) set(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
+})();
+</script>
+</body>
+</html>

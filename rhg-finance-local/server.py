@@ -29,6 +29,7 @@ import sales_report
 import channels
 import pricelist
 import pl_memo
+import reportcat
 import cashloc
 import kartloc
 import supstock
@@ -2108,6 +2109,111 @@ def arap_status(user):
             "test": arap.test_status(user["username"])}
 
 
+
+# ---------------------------------------------------------------- Reports center (identity, reportcat.py)
+def _days_of(rep):
+    try:
+        days, hh, mm = rep._when(rep.settings())
+        return reportcat.days_schedule(days, f"{hh:02d}:{mm:02d}")
+    except Exception:                                               # noqa: BLE001
+        return {}
+
+
+def _daily_schedule(s, default):
+    return reportcat.days_schedule(range(5) if s.get("working_days_only", True) else range(7), s.get("time"), default)
+
+
+def report_catalog():
+    """Every email Finance sends on its own: on or paused, when next, the last sends (identity's Reports center)."""
+    rc, items = reportcat, []
+    a = arap.settings()
+    items.append(rc.safe(lambda: rc.item(
+        "arap_daily", "Payables and receivables exceptions · daily", "Finance", "daily", _daily_schedule(a, "08:00"),
+        a.get("enabled"), arap.next_run(), rc.runs(arap_notify.recent_runs(40)), "settings", "arCard",
+        routing="arap_daily", toggle=("arap_notify", "enabled")),
+        "arap_daily", "Payables and receivables exceptions · daily", "Finance", "settings", "arCard"))
+    items.append(rc.safe(lambda: rc.item(
+        "negative_daily", "Negative stock by location and item · daily", "Finance", "daily", _days_of(negrep),
+        negrep.settings().get("enabled"), negrep.next_run(), rc.runs(negstock.recent_runs(40)), "settings", "ngCard",
+        routing="negative_daily", toggle=("negative_report", "enabled")),
+        "negative_daily", "Negative stock by location and item · daily", "Finance", "settings", "ngCard"))
+    items.append(rc.safe(lambda: rc.item(
+        "stockstop_daily", "Sales blocked by stock · daily", "Finance", "daily", _days_of(ssrep),
+        ssrep.settings().get("enabled"), ssrep.next_run(), rc.runs(salestop_report.recent_runs(40)), "settings", "bxCard",
+        routing="stockstop_daily", toggle=("stockstop_report", "enabled")),
+        "stockstop_daily", "Sales blocked by stock · daily", "Finance", "settings", "bxCard"))
+    items.append(rc.safe(lambda: rc.item(
+        "sevenrooms_daily", "Reservations against Simphony · daily", "Finance", "daily", _days_of(srrep),
+        srrep.settings().get("enabled"), srrep.next_run(), rc.runs(sevenrooms_report.recent_runs(40)), "settings",
+        "srxCard", routing="sevenrooms_daily", toggle=("sevenrooms_report", "enabled")),
+        "sevenrooms_daily", "Reservations against Simphony · daily", "Finance", "settings", "srxCard"))
+
+    def fiscal_item():
+        s = fiscal.settings()
+        with fiscal._state_lock:
+            log = fiscal._read_state().get("runs", [])
+        reads = [e for e in log if e.get("kind") == "fetch"]
+        last_read = reads[0] if reads else None
+        return rc.item("fiscal_daily", "Fiscal invoices against BC · daily", "Finance", "daily",
+                       _daily_schedule(s, "07:30"), s.get("enabled"), fiscal.next_run(),
+                       rc.runs(log, keep=lambda e: e.get("kind") == "email"), "fiscal", "fsConn",
+                       routing="fiscal_daily", toggle=("fiscal", "enabled"),
+                       last_read={"at": str(last_read.get("ts") or "")[:19], "status": last_read.get("status"),
+                                  "detail": str(last_read.get("detail") or "")[:200]} if last_read else None)
+    items.append(rc.safe(fiscal_item, "fiscal_daily", "Fiscal invoices against BC · daily", "Finance", "fiscal", "fsConn"))
+
+    def register_item():
+        s = exreg.settings()
+        combined = bool((exreg.policy() or {}).get("combined_digest"))
+        return rc.item("register_owners", "Daily controls · the owners' email", "Finance", "daily",
+                       rc.days_schedule(range(7), s.get("time"), "08:15"), s.get("enabled"), None, [], "register",
+                       "rgSetCard", toggle=("exception_register", "enabled"), combined=combined, logged=False,
+                       note="Sent in the Executive Action Center's email" if combined else "")
+    items.append(rc.safe(register_item, "register_owners", "Daily controls · the owners' email", "Finance", "register",
+                         "rgSetCard"))
+    c = costrep.settings()
+    items.append(rc.safe(lambda: rc.item(
+        "cost_weekly", "Cost control · weekly", "Finance", "weekly", rc.weekly_schedule(c.get("day"), c.get("time"), "08:30"),
+        c.get("enabled"), costrep.next_run(), rc.runs(cost_report.recent_runs(40)), "settings", "crCard",
+        routing="cost_weekly", toggle=("cost_report", "enabled")),
+        "cost_weekly", "Cost control · weekly", "Finance", "settings", "crCard"))
+    sr = sales_report.settings()
+    items.append(rc.safe(lambda: rc.item(
+        "sales_weekly", "Sales against last year and budget · weekly", "Finance", "weekly",
+        rc.weekly_schedule(sr.get("day"), sr.get("time"), "08:00"), sr.get("enabled"), salesrep.next_run(),
+        rc.runs(sales_report.recent_runs(40)), "settings", "srCard", routing="sales_weekly",
+        toggle=("sales_report", "enabled")),
+        "sales_weekly", "Sales against last year and budget · weekly", "Finance", "settings", "srCard"))
+    b = brand_report.settings()
+
+    def brand_item(kind):
+        nxt = brandrep.next_runs()
+        if kind == "weekly":
+            return rc.item("brand_weekly", "Brand performance · weekly", "Finance", "weekly",
+                           rc.weekly_schedule(b.get("day"), b.get("time"), "09:00"), b.get("weekly"), nxt.get("weekly"),
+                           rc.runs(brand_report.recent_runs(60), keep=lambda e: e.get("kind") == "weekly"),
+                           "settings", "brCard", routing="brand_performance", toggle=("brand_report", "weekly"))
+        when = sorted(v for k, v in nxt.items() if k in ("monthly", "final") and v)
+        return rc.item("brand_monthly", "Brand performance · monthly", "Finance", "monthly",
+                       rc.monthly_schedule("first working day", b.get("time"), True, "09:00") | {"final": str(b.get("final_day") or "10")},
+                       b.get("monthly"), when[0] if when else None,
+                       rc.runs(brand_report.recent_runs(60), keep=lambda e: e.get("kind") in ("monthly", "final")),
+                       "settings", "brCard", routing="brand_performance", toggle=("brand_report", "monthly"))
+    items.append(rc.safe(lambda: brand_item("weekly"), "brand_weekly", "Brand performance · weekly", "Finance", "settings", "brCard"))
+    items.append(rc.safe(lambda: brand_item("monthly"), "brand_monthly", "Brand performance · monthly", "Finance", "settings", "brCard"))
+    pm = pl_memo.settings()
+    items.append(rc.safe(lambda: rc.item(
+        "pl_monthly", "P&L memo · monthly", "Finance", "monthly",
+        rc.monthly_schedule(str(pm.get("day") or "20"), pm.get("time"), pm.get("working_day", True), "09:00"),
+        pm.get("enabled"), plmemo.next_run(), rc.runs(pl_memo.recent_runs(40)), "settings", "pmCard",
+        routing="pl_monthly", toggle=("pl_memo", "enabled")),
+        "pl_monthly", "P&L memo · monthly", "Finance", "settings", "pmCard"))
+    try:
+        mail = arap_notify.mail_status()
+    except Exception:                                               # noqa: BLE001
+        mail = None
+    return reportcat.catalog(items, mail, "Finance")
+
 # ---------------------------------------------------------------- access scope (access.py)
 # downloads: the export action of the role (Admin → Roles & permissions → Actions)
 EXPORT_PATHS = {"/api/inventory/items/xlsx", "/api/billyrec/xlsx", "/api/sales/prices/xlsx", "/api/sales/menu/xlsx", "/api/sales/channel-profit/xlsx", "/api/inventory/sku/xlsx", "/api/movement/xlsx", "/api/fiscal/xlsx", "/api/typology/xlsx",
@@ -2815,6 +2921,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, {"error": "Forbidden."})
             else:
                 self._send(200, exreg.for_action_center())
+            return
+        if url.path == "/internal/reports/catalog":
+            # identity's Reports center: every email of this tower, on or paused, its schedule and last sends
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, report_catalog())
             return
         if url.path == "/internal/scope-options":
             # identity's Admin → Accounts → access: the companies and their locations to choose from
@@ -4011,6 +4124,19 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, {"item": exreg.update(str(body.get("id") or ""), patch, actor)})
             except (KeyError, ValueError) as exc:
                 self._send(400, {"error": str(exc).strip("'\"")})
+            return
+        if url.path == "/internal/reports/toggle":
+            # identity's Reports center turning one email on or off for its user (who may: checked in identity)
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            actor = str(body.get("actor") or "Reports center")[:120]
+            try:
+                key = reportcat.toggle(report_catalog()["items"], str(body.get("key") or ""), bool(body.get("enabled")),
+                                       store.save_settings, actor)
+                self._send(200, {"item": next(x for x in report_catalog()["items"] if x["key"] == key)})
+            except ValueError as exc:
+                self._send(400, {"error": str(exc)})
             return
         if url.path == "/internal/unicorn/tool":
             # Unicorn (identity) reading one figure it needs for an investigation or a question (unicorn_tools.py)
