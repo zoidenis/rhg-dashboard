@@ -2475,6 +2475,10 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = None                                   # cut by the handler (self._allowed)
         elif path == "/api/receipts":
             self._scope_filter = lambda b: dict(rcpt.cut(b, self._allowed), can_settings=False)
+        elif path == "/api/sales/channels":
+            # their restaurants, the totals (channels, day parts, partners) summed again from them; the generic cut
+            # dropped the totals and the screen could not read (alleshi, 16 Nov 2026)
+            self._scope_filter = lambda b: channels.cut(b, simphony_refs_in_scope(user))
         else:
             self._scope_filter = lambda b: access.filter_payload(b, user, company, scope_expand)
         return None

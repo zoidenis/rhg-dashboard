@@ -4785,7 +4785,8 @@ function ppRender(){
 function ppWorkforce(d){
   const R = d.locations, all = R.concat(d.support, d.unmapped), sum = (L, k) => L.reduce((a, x) => a + (x[k] || 0), 0);
   const last12 = (x, k) => x[k].slice(-13, -1).reduce((a, m) => a + m[1], 0);
-  readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading, lines: [fcSp(`${fmt(d.totals.active)} active and ${fmt(d.totals.archived)} archived employees · contracts from ${d.history_from || "–"}`)]});
+  readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading, lines: [d.totals ? fcSp(`${fmt(d.totals.active)} active and ${fmt(d.totals.archived)} archived employees · contracts from ${d.history_from || "–"}`)
+             : fcSp(`Your restaurants: ${(d.locations || []).map(L => L.name || L.ref).join(", ") || "–"}`)]});
   $("ppKpis").innerHTML = Pulse.tiles([
     {l: "Active employees", v: fmt(sum(all, "employees")), s: `${fmt(sum(R, "employees"))} in ${R.length} restaurants · ${fmt(sum(d.support, "employees"))} in support units`},
     {l: "FTE", v: fmt(sum(all, "fte"), 1), s: `${fmt(sum(all, "fte_unknown"))} people without hours a week in their schedule`, cls: sum(all, "fte_unknown") ? "warn" : ""},
@@ -7064,7 +7065,7 @@ function biStatusLine(){
             (d.errors || []).length ? esc(d.errors.slice(0, 3).join(" · ")) : "", d.read_error ? esc("Last read failed: " + d.read_error) : ""],
     lines: [`<span data-no-i18n>${esc(d.company)} · NUIS ${esc(d.nuis || "–")}</span>`,
             fcSp(`Days ${rdDay(days[0])} – ${rdDay(days[days.length - 1])}`) + (days.length ? " " + fcSp(`(${days.length} days, Simphony and Billy)`) : ""),
-            d.range && d.range.custom ? fcSp("Chosen range: not put in the exceptions register")
+            d.range && d.range.custom ? fcSp("The exceptions register is kept by the daily control, not by this read")
               : d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`) : ""]});
 }
 
@@ -7281,7 +7282,7 @@ function renderSalesrec(){
     warns: [d.read_error ? esc("Last read failed: " + d.read_error) : "", (d.errors || []).length ? esc(d.errors.slice(0, 3).join(" · ")) : ""],
     lines: [`<span data-no-i18n>${esc(d.company || "")}</span> · ` + fcSp(`Days ${rdDay(d.from)} – ${rdDay(d.to)}`),
             d.register ? fcSp(`Exceptions register updated: ${d.register.opened} new case(s) opened, ${d.register.closed} closed`)
-              : d.custom ? fcSp("Chosen range: not put in the exceptions register") : d.complete ? "" : fcSp("Not put in the exceptions register: the read was incomplete")]});
+              : d.custom ? fcSp("The exceptions register is kept by the daily control, not by this read") : d.complete ? "" : fcSp("Not put in the exceptions register: the read was incomplete")]});
   if (!sxRng) { if (document.activeElement !== $("sxFrom")) $("sxFrom").value = d.from; if (document.activeElement !== $("sxTo")) $("sxTo").value = d.to; }
   $("sxLast").hidden = !sxRng;
   sxSplitTable();
