@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>Settings · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* Settings: every setting of pulse in one place (Administration, reports and emails, rules, connections, audit).
+   Each setting is the card it always was, opened from where it lives (the towers, Administration, the Action
+   Center) in a frame without their menus: one card per page, so nothing has to be scrolled for long. */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+button,select,input{font:inherit;color:inherit}
+body{background:var(--bg,#f5f4f0);color:var(--ink,#16181d);overflow:hidden}
+.st-app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh;height:100dvh}
+/* the bar on top */
+.st-top{display:flex;align-items:center;gap:14px;padding:10px 20px;background:#08303f;color:#fff;min-height:58px}
+.st-top .gear{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.12);display:grid;place-items:center;flex:none}
+.st-top .gear svg{width:19px;height:19px}
+.st-top h1{font-family:var(--rhg-font-display,inherit);font-size:18px;margin:0;color:#fff;font-weight:800;letter-spacing:-.01em}
+.st-top .sp{flex:1}
+.st-top a.back{color:#fff;text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,.28);border-radius:9px;padding:7px 12px;white-space:nowrap}
+.st-top a.back:hover,.st-top a.back:focus-visible{background:rgba(255,255,255,.12);outline:none}
+.st-top .who{font-size:12px;opacity:.75;white-space:nowrap}
+.st-menu{display:none;all:unset;cursor:pointer;color:#fff;border:1px solid rgba(255,255,255,.28);border-radius:9px;padding:7px 10px;font-size:13px}
+.st-body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+/* the list of settings */
+.st-nav{background:var(--card,#fff);border-right:1px solid var(--line,#e3e1d9);display:flex;flex-direction:column;min-height:0}
+.st-find{position:relative;padding:14px 14px 10px}
+.st-find input{width:100%;border:1px solid var(--line,#e3e1d9);background:var(--bg,#f5f4f0);border-radius:10px;padding:9px 12px 9px 34px;font-size:13px}
+.st-find input:focus{outline:none;border-color:var(--rhg-primary,#0c475e);box-shadow:0 0 0 3px rgba(12,71,94,.12);background:var(--card,#fff)}
+.st-find svg{position:absolute;left:25px;top:50%;transform:translateY(-35%);width:15px;height:15px;color:var(--sub,#6b6f76);pointer-events:none}
+.st-list{overflow:auto;padding:0 8px 18px;flex:1;min-height:0}
+.st-home{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;cursor:pointer;text-align:left;border-radius:9px;padding:9px 12px;font-size:13.5px;font-weight:600;position:relative;margin-bottom:4px}
+.st-grp{margin-top:6px}
+.st-gh{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;cursor:pointer;text-align:left;border-radius:9px;padding:9px 12px;font-size:13.5px;font-weight:700}
+.st-gh .ic,.st-home .ic{width:20px;height:20px;color:var(--rhg-primary,#0c475e);flex:none}
+.st-gh .chev{margin-left:auto;width:14px;height:14px;color:var(--sub,#6b6f76);transition:transform .15s}
+.st-grp.shut .st-gh .chev{transform:rotate(-90deg)}
+.st-grp.shut .st-items{display:none}
+.st-sub{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub,#6b6f76);padding:8px 12px 3px 42px;font-weight:700}
+.st-it{display:block;width:100%;border:0;background:none;cursor:pointer;text-align:left;border-radius:9px;padding:7px 12px 7px 42px;font-size:13px;position:relative;color:var(--ink,#16181d)}
+.st-gh:hover,.st-it:hover,.st-home:hover{background:var(--bg,#f5f4f0)}
+.st-gh:focus-visible,.st-it:focus-visible,.st-home:focus-visible{outline:2px solid var(--rhg-primary,#0c475e);outline-offset:-2px}
+.st-it.on,.st-home.on{background:color-mix(in srgb,var(--rhg-primary,#0c475e) 9%,transparent);font-weight:700;color:var(--rhg-primary,#0c475e)}
+.st-it.on::before,.st-home.on::before{content:"";position:absolute;left:2px;top:7px;bottom:7px;width:3px;border-radius:3px;background:var(--rhg-primary,#0c475e)}
+.st-foot{border-top:1px solid var(--line,#e3e1d9);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.st-foot .powered{color:var(--sub,#6b6f76);font-size:11px;margin:0;display:inline-flex;gap:5px;align-items:baseline}
+.st-foot .powered .pulse-mark{color:var(--ink,#16181d);font-size:14px}
+.st-foot #langSw{margin:0;position:static;background:none;color:var(--ink,#16181d)}
+.st-none{font-size:12.5px;color:var(--sub,#6b6f76);padding:10px 12px}
+mark{background:var(--rhg-amberbg,#f8eedf);color:inherit;border-radius:3px;padding:0 1px}
+/* one setting */
+.st-main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.st-head{padding:18px 28px 12px;display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.st-crumb{font-size:11.5px;color:var(--sub,#6b6f76);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.st-head h2{font-family:var(--rhg-font-display,inherit);font-size:22px;margin:3px 0 0;letter-spacing:-.01em}
+.st-head p{margin:5px 0 0;color:var(--sub,#6b6f76);font-size:13.5px;max-width:760px;line-height:1.45}
+.st-head .acts{display:flex;gap:8px;align-items:center}
+.st-head .acts button{font-size:12.5px;color:var(--rhg-primary,#0c475e);border:1px solid var(--line,#e3e1d9);border-radius:9px;padding:7px 11px;background:var(--card,#fff);white-space:nowrap;cursor:pointer}
+.st-head .acts button:hover,.st-head .acts button:focus-visible{border-color:var(--rhg-primary,#0c475e);outline:none}
+.st-frame{position:relative;flex:1;min-height:0;margin:0 18px 18px;border-radius:14px;overflow:hidden;background:var(--bg,#f5f4f0)}
+.st-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent}
+.st-frame iframe[hidden]{display:none}
+.st-load{position:absolute;inset:0;display:grid;place-items:center;background:var(--bg,#f5f4f0);color:var(--sub,#6b6f76);font-size:13px;z-index:2}
+.st-load .spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--line,#e3e1d9);border-top-color:var(--rhg-primary,#0c475e);animation:st-spin .8s linear infinite;margin:0 auto 10px}
+@keyframes st-spin{to{transform:rotate(360deg)}}
+/* the first page: every group and its settings */
+.st-homev{overflow:auto;padding:4px 28px 28px;min-height:0;flex:1}
+.st-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.st-tile{background:var(--card,#fff);border:1px solid var(--line,#e3e1d9);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.st-tile .th{display:flex;gap:10px;align-items:center}
+.st-tile .th .ic{width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--rhg-primary,#0c475e) 9%,transparent);color:var(--rhg-primary,#0c475e);display:grid;place-items:center;flex:none}
+.st-tile .th .ic svg{width:19px;height:19px}
+.st-tile .th b{font-size:15px}
+.st-tile .th small{display:block;font-size:12px;color:var(--sub,#6b6f76);font-weight:400}
+.st-tile ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.st-tile li button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:7px 8px;border-radius:8px;font-size:13px}
+.st-tile li button:hover,.st-tile li button:focus-visible{background:var(--bg,#f5f4f0);color:var(--rhg-primary,#0c475e)}
+.st-tile li button::after{content:"›";color:var(--sub,#6b6f76)}
+.st-tile .more{font-size:12px;color:var(--sub,#6b6f76);padding:2px 8px}
+.st-empty{background:var(--card,#fff);border:1px solid var(--line,#e3e1d9);border-radius:14px;padding:22px;color:var(--sub,#6b6f76)}
+.st-bd{display:none}
+@media(max-width:900px){
+  .st-body{grid-template-columns:1fr}
+  .st-nav{position:fixed;left:0;top:0;bottom:0;width:300px;max-width:88vw;z-index:40;transform:translateX(-105%);transition:transform .2s ease;box-shadow:0 0 32px rgba(0,0,0,.25)}
+  body.st-open .st-nav{transform:none}
+  body.st-open .st-bd{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35}
+  .st-menu{display:inline-flex}
+  .st-top{padding:10px 14px;gap:10px}
+  .st-top .who{display:none}
+  .st-head{padding:14px 16px 10px}
+  .st-frame{margin:0 8px 8px}
+  .st-homev{padding:4px 16px 20px}
+}
+@media(max-width:520px){.st-top h1{font-size:16px}.st-top a.back span{display:none}}
+@media (prefers-reduced-motion: reduce){.st-nav{transition:none}.st-load .spin{animation:none}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="st-app">
+  <div class="st-top">
+    <button class="st-menu" id="stMenu" type="button" aria-label="All settings" aria-expanded="false">☰ <span>All settings</span></button>
+    <span class="gear" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+    <h1>Settings</h1>
+    <span class="sp"></span>
+    <span class="who" id="who"></span>
+    <a class="back" id="back" href="/">← <span>Back to pulse</span></a>
+  </div>
+  <div class="st-body">
+    <div class="st-nav" id="nav" role="navigation" aria-label="Settings">
+      <div class="st-find"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Find a setting" aria-label="Find a setting" autocomplete="off"></div>
+      <div class="st-list" id="list"></div>
+      <div class="st-foot" id="navFoot"><span class="powered">powered by <span class="pulse-mark">pulse</span></span></div>
+    </div>
+    <div class="st-bd" id="bd"></div>
+    <main class="st-main" id="main"></main>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fold = t => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+let me = null;
+const can = p => !!me && (me.permissions || []).includes(p);
+const any = (...ps) => ps.some(can);
+
+const ICON = {
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  admin: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  reports: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  rules: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  conn: '<path d="M9 7V3M15 7V3"/><rect x="6" y="7" width="12" height="6" rx="2"/><path d="M12 13v3a4 4 0 0 1-4 4H6"/>',
+  audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
+};
+const svg = (k, cls) => `<svg class="${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
+const CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+// ---------------------------------------------------------------- what is where
+// A card of a tower opens as /<tower>/?embed=settings&cards=<card id>: the tower shows that card only.
+const FIN = c => "/finance/?embed=settings&cards=" + c, PUR = c => "/purchasing/?embed=settings&cards=" + c;
+const finSet = () => can("finance.s.settings") && can("finance.view"), purSet = () => can("purchasing.s.settings") && can("purchasing.view");
+const towerOf = c => finSet() ? FIN(c) : PUR(c);
+const REPORTS_VIEW = () => any("reports.manage", "finance.settings.manage", "purchasing.settings.manage", "actioncenter.manage", "admin.users.manage");
+const GROUPS = [
+  {id: "admin", label: "Administration", hint: "Accounts, roles and sessions", items: [
+    {id: "accounts", label: "Accounts", desc: "Who signs in to pulse, the role of each and the companies and locations they see.", src: "/admin?embed=1&tab=users", ok: () => can("admin.users.manage")},
+    {id: "roles", label: "Roles & permissions", desc: "What each role opens and may do: the screens, the tabs and the actions.", src: "/admin?embed=1&tab=roles", ok: () => can("admin.users.manage")},
+    {id: "sessions", label: "Active sessions", desc: "Who is signed in now, from where; a session can be ended here.", src: "/admin?embed=1&tab=sessions", ok: () => can("admin.users.manage")}]},
+  {id: "reports", label: "Reports & emails", hint: "What goes out, when and to whom", items: [
+    {id: "reports-center", label: "Reports center", desc: "Every report pulse sends: on or paused, failing or late, when it goes next and how the last sends went.", src: "/reports-center?embed=1", ok: REPORTS_VIEW},
+    {id: "scheduled", label: "Scheduled reports", desc: "Any screen of pulse sent by email, as often as you choose, to the people you choose.", src: () => towerOf("pulseReports"), ok: () => can("reports.manage") && (finSet() || purSet())},
+    {id: "recipients", label: "Who receives which report", desc: "The people in each role, company by company and location by location, and the roles each report goes to.", src: () => towerOf("rcCard"), ok: () => finSet() || purSet()},
+    {sub: "Finance emails"},
+    {id: "em-arap", label: "Receivables & payables · daily", desc: "The exceptions of payables and receivables, every morning.", src: FIN("arCard"), ok: finSet},
+    {id: "em-negative", label: "Negative stock · daily", desc: "Every item below zero by location, to the people who fix it.", src: FIN("ngCard"), ok: finSet},
+    {id: "em-stockstop", label: "Sales blocked by stock · daily", desc: "The items whose stock stops the sales from posting, and today's sales at risk.", src: FIN("bxCard"), ok: finSet},
+    {id: "em-sevenrooms", label: "SevenRooms ↔ Simphony · daily", desc: "Yesterday's reservations against the checks, and today's book.", src: FIN("srxCard"), ok: finSet},
+    {id: "em-cost", label: "Cost control · weekly", desc: "The week's cost control, by company and location.", src: FIN("crCard"), ok: finSet},
+    {id: "em-sales", label: "Sales · weekly", desc: "Sales against last year and the budget, by restaurant.", src: FIN("srCard"), ok: finSet},
+    {id: "em-brand", label: "Brand performance", desc: "Each brand's week and month, to its people.", src: FIN("brCard"), ok: finSet},
+    {id: "em-pl", label: "P&L memo · monthly", desc: "The month's P&L memo, by company and restaurant.", src: FIN("pmCard"), ok: finSet},
+    {sub: "Purchasing emails"},
+    {id: "em-purchasing", label: "Invoices without a PO, weekly report, savings", desc: "The daily email of invoices without a purchase order, the weekly purchasing report and the monthly savings.", src: PUR("ntCard"), ok: purSet},
+    {id: "em-pricechg", label: "Purchase price changes · weekly", desc: "Every Monday, last week's price changes to each purchaser and to the Purchasing manager.", src: PUR("pqMailCard"), ok: purSet},
+    {sub: "The owners of the exceptions"},
+    {id: "em-owners-fin", label: "Daily controls · Finance", desc: "The controls that fill the Finance exceptions register, and the owners' daily email.", src: FIN("rgSetCard"), ok: () => finSet() && can("finance.s.register")},
+    {id: "em-owners-pur", label: "Daily controls · Purchasing", desc: "The controls that fill the Purchasing exceptions register, and the owners' daily email.", src: PUR("rgSetCard"), ok: () => purSet() && can("purchasing.s.register")}]},
+  {id: "rules", label: "Rules & thresholds", hint: "Limits, mappings and the SLA", items: [
+    {sub: "Finance"},
+    {id: "fin-materiality", label: "Materiality and alert rules", desc: "The limits every exception and the brief are measured against, the owners, the budget and the inventory accounts.", src: FIN("thCard"), ok: finSet},
+    {id: "fin-kpi", label: "KPI library and account mapping", desc: "Which G/L accounts make each KPI and line of the statements.", src: FIN("kmCard"), ok: finSet},
+    {id: "fin-central", label: "Central costs to the restaurants", desc: "How the central costs are shared among the restaurants.", src: FIN("acCard"), ok: finSet},
+    {id: "fin-locintel", label: "Location intelligence", desc: "The restaurant registry and the thresholds of Location intelligence.", src: FIN("liSetCard"), ok: finSet},
+    {sub: "Purchasing"},
+    {id: "pur-sla", label: "Service-level thresholds", desc: "The limits of the exceptions, the brief and the SLA, the purchase types and the delivery rhythm.", src: PUR("slCard"), ok: purSet},
+    {id: "pur-purchasers", label: "Purchasers", desc: "Who each Purchaser Code is, and how long an order may stay at each step.", src: PUR("prSetCard"), ok: purSet},
+    {sub: "Executive Action Center"},
+    {id: "ac-matrix", label: "SLA & responsibility matrix", desc: "Deadlines by department and severity, who owns what, escalation and the owners' daily email.", src: "/actions?embed=1#matrix", ok: () => any("platform.s.actions.matrix", "actioncenter.manage")}]},
+  {id: "conn", label: "Connections", hint: "The systems pulse reads", items: [
+    {id: "mail-server", label: "Mail server", desc: "The SMTP server every email of pulse goes out through.", src: PUR("ntServer"), ok: purSet},
+    {id: "conn-simphony", label: "Simphony · sales", desc: "The Business Intelligence API account that reads the sales.", src: FIN("spCard"), ok: finSet},
+    {id: "conn-simphony-config", label: "Simphony · configuration", desc: "The Configuration API account that reads users, roles and privileges.", src: FIN("epSet"), ok: finSet},
+    {id: "conn-tax", label: "Tax Administration", desc: "The certificate and the reading of the fiscal invoices, and their daily email.", src: FIN("fsConn"), ok: finSet},
+    {id: "conn-billy", label: "Billy", desc: "The fiscal sales accounts of Billy and how they map to the restaurants.", src: FIN("biSet"), ok: finSet},
+    {id: "conn-sevenrooms", label: "SevenRooms", desc: "The SevenRooms API and the venues of each restaurant.", src: FIN("svSet"), ok: finSet},
+    {id: "conn-odoo", label: "Odoo", desc: "The Odoo connection of People & Productivity and its restaurants.", src: FIN("ppSet"), ok: finSet},
+    {id: "conn-crunchtime", label: "Crunchtime", desc: "Crunchtime Ops Execution: checklists, food safety and forms.", src: FIN("oxSet"), ok: finSet}]},
+  {id: "audit", label: "Audit", hint: "Who changed what", items: [
+    {id: "audit-platform", label: "Accounts and access", desc: "Every sign-in, account, role and access change of pulse.", src: "/admin?embed=1&tab=audit", ok: () => can("admin.users.manage")},
+    {id: "audit-fin", label: "Finance", desc: "Every action, comment and setting changed in Finance.", src: FIN("auditCard"), ok: finSet},
+    {id: "audit-pur", label: "Purchasing", desc: "Every assignment, status, comment and setting changed in Purchasing.", src: PUR("auditCard"), ok: purSet}]}
+];
+const ITEMS = {};
+let VISIBLE = [];
+const srcOf = it => typeof it.src === "function" ? it.src() : it.src;
+
+// ---------------------------------------------------------------- the list
+let SQ = "";
+const shut = new Set();
+function hl(t){
+  if (!SQ) return esc(t);
+  const words = fold(SQ).split(/\s+/).filter(Boolean), src = String(t), f = fold(src);
+  const marks = new Array(src.length).fill(false);
+  words.forEach(wd => { let i = f.indexOf(wd); while (i >= 0) { for (let k = i; k < i + wd.length; k++) marks[k] = true; i = f.indexOf(wd, i + 1); } });
+  let out = "", on = false;
+  for (let i = 0; i < src.length; i++) { if (marks[i] !== on) { out += marks[i] ? "<mark>" : "</mark>"; on = marks[i]; } out += esc(src[i]); }
+  return out + (on ? "</mark>" : "");
+}
+function matches(g, it){ const words = fold(SQ).split(/\s+/).filter(Boolean); const h = fold([g.label, it.label, it.desc, it.sub_of].join(" ")); return words.every(w => h.includes(w)); }
+function paintList(){
+  let html = `<button class="st-home${CUR === "" ? " on" : ""}" type="button" data-go="">${svg("home", "ic")}<span>All settings</span></button>`;
+  let shown = 0;
+  VISIBLE.forEach(g => {
+    let sub = null, body = "";
+    g.items.forEach(it => {
+      if (it.sub) { sub = it.sub; return; }
+      if (SQ && !matches(g, it)) return;
+      if (sub) { body += `<div class="st-sub">${esc(sub)}</div>`; sub = null; }
+      body += `<button class="st-it${CUR === it.id ? " on" : ""}" type="button" data-go="${esc(it.id)}"${CUR === it.id ? ' aria-current="page"' : ""}>${hl(it.label)}</button>`;
+      shown++;
+    });
+    if (!body) return;
+    const closed = shut.has(g.id) && !SQ;
+    html += `<div class="st-grp${closed ? " shut" : ""}"><button class="st-gh" type="button" data-grp="${esc(g.id)}" aria-expanded="${!closed}">${svg(g.id, "ic")}<span>${esc(g.label)}</span>${CHEV}</button><div class="st-items">${body}</div></div>`;
+  });
+  if (SQ && !shown) html += `<div class="st-none">No setting matches.</div>`;
+  $("list").innerHTML = html;
+  $("list").querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+  $("list").querySelectorAll("[data-grp]").forEach(b => b.onclick = () => { const k = b.dataset.grp; shut.has(k) ? shut.delete(k) : shut.add(k); paintList(); });
+}
+
+// ---------------------------------------------------------------- a setting, in its frame
+let CUR = null;
+const FRAMES = new Map();                  // the settings opened last stay ready (at most 6)
+function frameFor(it){
+  let f = FRAMES.get(it.id);
+  if (f) { FRAMES.delete(it.id); FRAMES.set(it.id, f); return f; }
+  f = document.createElement("iframe");
+  f.title = it.label; f.src = srcOf(it); f.dataset.id = it.id; f.hidden = true; f.dataset.loaded = "";
+  f.addEventListener("load", () => { f.dataset.loaded = "1"; if (CUR === it.id) $("stLoad").hidden = true; });
+  FRAMES.set(it.id, f);
+  if (FRAMES.size > 6) { const [k, old] = FRAMES.entries().next().value; FRAMES.delete(k); old.remove(); }
+  return f;
+}
+function go(id, keepHash){
+  if (id && !ITEMS[id]) id = "";
+  CUR = id;
+  document.body.classList.remove("st-open"); $("stMenu").setAttribute("aria-expanded", "false");
+  if (!keepHash) history.replaceState(null, "", location.pathname + location.search + (id ? "#" + id : ""));
+  paintList();
+  if (!id) { home(); document.title = "Settings · RHG"; return; }
+  const it = ITEMS[id], g = it.group;
+  document.title = `${it.label} · Settings · RHG`;
+  let box = $("stFrame");
+  if (!box) {
+    $("main").innerHTML = `<div class="st-head"><div><div class="st-crumb" id="stCrumb"></div><h2 id="stTitle"></h2><p id="stDesc"></p></div><div class="acts" id="stActs"></div></div>
+      <div class="st-frame" id="stFrame"><div class="st-load" id="stLoad"><div><div class="spin"></div><span>Opening…</span></div></div></div>`;
+    box = $("stFrame");
+  }
+  $("stCrumb").innerHTML = `<span>Settings</span> · <span>${esc(g.label)}</span>${it.sub_of ? ` · <span>${esc(it.sub_of)}</span>` : ""}`;
+  $("stTitle").textContent = it.label; $("stDesc").textContent = it.desc || "";
+  $("stActs").innerHTML = `<button type="button" id="stReload" title="Read this setting again">↻ Read again</button>`;
+  $("stReload").onclick = () => { const f = FRAMES.get(it.id); if (f) { f.dataset.loaded = ""; $("stLoad").hidden = false; f.src = srcOf(it); } };
+  box.querySelectorAll("iframe").forEach(x => x.hidden = true);
+  const f = frameFor(it);
+  if (!f.isConnected) box.appendChild(f);
+  f.hidden = false;
+  $("stLoad").hidden = !!f.dataset.loaded;
+}
+function home(){
+  const tiles = VISIBLE.map(g => {
+    const list = g.items.filter(x => !x.sub);
+    return `<section class="st-tile"><div class="th"><span class="ic">${svg(g.id)}</span><div><b>${esc(g.label)}</b><small>${esc(g.hint)}</small></div></div>
+      <ul>${list.slice(0, 6).map(x => `<li><button type="button" data-go="${esc(x.id)}">${esc(x.label)}</button></li>`).join("")}</ul>
+      ${list.length > 6 ? `<button type="button" class="more" data-grp-open="${esc(g.id)}" style="all:unset;cursor:pointer;font-size:12px;color:var(--rhg-primary,#0c475e);padding:2px 8px"><span>${list.length - 6} more</span> ›</button>` : ""}</section>`;
+  }).join("");
+  $("main").innerHTML = `<div class="st-head"><div><div class="st-crumb">Settings</div><h2>Hello, <span data-no-i18n>${esc((me.name || me.username).split(" ")[0])}</span></h2>
+      <p>Every setting of pulse in one place. Choose one on the left, or find it by name.</p></div></div>
+    <div class="st-homev">${tiles ? `<div class="st-tiles">${tiles}</div>` : `<div class="st-empty">Your role has no settings to change. Ask the administrator.</div>`}</div>`;
+  $("main").querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+  $("main").querySelectorAll("[data-grp-open]").forEach(b => b.onclick = () => {
+    const g = VISIBLE.find(x => x.id === b.dataset.grpOpen); const first = g && g.items.find(x => !x.sub); if (first) go(first.id); });
+}
+
+// ---------------------------------------------------------------- start
+$("q").addEventListener("input", e => { SQ = e.target.value.trim(); paintList(); });
+$("q").addEventListener("keydown", e => {
+  if (e.key === "Enter") { const b = $("list").querySelector(".st-it"); if (b) go(b.dataset.go); }
+  if (e.key === "Escape") { e.target.value = ""; SQ = ""; paintList(); }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); $("q").focus(); }
+  if (e.key === "Escape" && document.body.classList.contains("st-open")) { document.body.classList.remove("st-open"); $("stMenu").setAttribute("aria-expanded", "false"); }
+});
+$("stMenu").onclick = () => { const o = !document.body.classList.contains("st-open"); document.body.classList.toggle("st-open", o); $("stMenu").setAttribute("aria-expanded", String(o)); if (o) $("q").focus(); };
+$("bd").onclick = () => { document.body.classList.remove("st-open"); $("stMenu").setAttribute("aria-expanded", "false"); };
+window.addEventListener("hashchange", () => { const h = decodeURIComponent(location.hash.slice(1)); if (h !== (CUR || "")) go(h, true); });
+(async () => {
+  let s;
+  try { const r = await fetch("/api/session", {credentials: "same-origin"}); s = await r.json(); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user;
+  $("who").textContent = `${me.name || me.username} · ${me.role}`;
+  // back to the page Settings was opened from (same site only)
+  try { const f = new URLSearchParams(location.search).get("from"); const u = f && new URL(f, location.origin);
+    if (u && u.origin === location.origin && !u.pathname.startsWith("/settings")) $("back").href = u.pathname + u.search + u.hash; } catch (e) { /* stays "/" */ }
+  VISIBLE = GROUPS.map(g => {
+    let sub = null;
+    const items = [];
+    g.items.forEach(it => {
+      if (it.sub) { items.push(it); sub = it.sub; return; }
+      if (!it.ok()) return;
+      it.group = g; it.sub_of = sub; ITEMS[it.id] = it; items.push(it);
+    });
+    // a heading with nothing under it goes
+    const clean = items.filter((it, i) => !it.sub || (items[i + 1] && !items[i + 1].sub));
+    return {...g, items: clean};
+  }).filter(g => g.items.some(x => !x.sub));
+  go(decodeURIComponent(location.hash.slice(1)), true);
+  // the language switch (i18n runtime) goes to the foot of the list, not over the bar on top
+  const moveSw = () => { const sw = $("langSw"); if (sw && sw.parentNode !== $("navFoot")) { sw.classList.remove("float"); $("navFoot").insertBefore(sw, $("navFoot").firstChild); } };
+  moveSw(); new MutationObserver(moveSw).observe(document.body, {childList: true});
+})();
+</script>
+</body>
+</html>

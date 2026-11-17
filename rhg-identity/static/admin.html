@@ -107,7 +107,14 @@ tr:last-child td{border-bottom:0}
   .urow .line{display:flex;justify-content:space-between;gap:12px;font-size:13px}
   .urow .line span:first-child{color:var(--sub)}
 }
+/* inside Settings (?embed=1&tab=…): the tab only, no menu or title */
+html.embed aside, html.embed #title, html.embed #burger{display:none!important}
+html.embed main{padding:6px 4px 40px}
+html.embed body{background:transparent}
+html.embed header.top{justify-content:flex-end;margin-bottom:12px}
+html.embed header.top:has(#newUser[hidden]){display:none}
 </style>
+<script>if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add("embed");</script>
 </head>
 <body>
 <div class="shell">
@@ -621,11 +628,13 @@ window.close = close;
   ME = j.user; CSRF = j.user.csrf;
   if(!ME.permissions.includes("admin.users.manage")){ location.href = "/"; return; }
   $("me").textContent = `${ME.name} · ${ME.role}`;
-  go("users");
+  const want = new URLSearchParams(location.search).get("tab");
+  go(TABS[want] ? want : "users");
 })();
 if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 </script>
 <script src="/select.js"></script>
 <script src="/tables.js"></script>
+<script src="/gear.js"></script>
 </body>
 </html>

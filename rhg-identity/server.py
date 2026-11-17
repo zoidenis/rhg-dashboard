@@ -44,6 +44,7 @@ STATIC_FILES = {
     "tables.js": "application/javascript; charset=utf-8",
     "pulse.js": "application/javascript; charset=utf-8",
     "reports.js": "application/javascript; charset=utf-8",
+    "gear.js": "application/javascript; charset=utf-8",
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",
                 "/brand.css", "/app.css", "/icon.svg", "/manifest.webmanifest", "/sw.js",
@@ -222,6 +223,12 @@ class Handler(BaseHTTPRequestHandler):
                 if not self._service_ok():
                     self._send(403, {"error": "Bad service token."}); return
                 self._send(200, actioncenter.policy())
+                return
+            if url.path in ("/settings", "/settings.html"):
+                # Settings: every setting of pulse in one place (the cards open in frames from where they live)
+                u = self._user()
+                page = "settings.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
                 return
             if url.path in ("/reports-center", "/reports-center.html"):
                 u = self._user()

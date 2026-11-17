@@ -19,15 +19,15 @@
   const TOWERS = {finance: "Finance & Inventory", purchasing: "Purchasing", platform: "Platform"};
   // Emails that keep their own settings (their own schedule and the Email recipients by role)
   const BUILTIN = [
-    {app: "finance", label: "Receivables & payables email", view: "settings", card: "arCard", pill: "arPill", when: "Every day"},
-    {app: "finance", label: "Negative stock daily email", view: "settings", card: "ngCard", pill: "ngPill", when: "Every day"},
-    {app: "finance", label: "Daily controls and the owners' email", view: "register", card: "rgSetCard", pill: "rgPill", when: "Every day"},
-    {app: "finance", label: "Cost control weekly email", view: "settings", card: "crCard", pill: "crPill", when: "Every week"},
-    {app: "finance", label: "Sales weekly email", view: "settings", card: "srCard", pill: "srPill", when: "Every week"},
-    {app: "finance", label: "Brand performance email", view: "settings", card: "brCard", pill: "brPill", when: "Every week"},
-    {app: "finance", label: "P&L memo · monthly", view: "settings", card: "pmCard", pill: "pmPill", when: "Every month"},
-    {app: "purchasing", label: "Email notifications", view: "settings", card: "ntCard", pill: "", when: "Every day"},
-    {app: "purchasing", label: "Price changes · weekly email", view: "prices", card: "pqMailCard", pill: "pqPillT", when: "Every week"}
+    {app: "finance", label: "Receivables & payables email", tab: "em-arap", pill: "arPill", when: "Every day"},
+    {app: "finance", label: "Negative stock daily email", tab: "em-negative", pill: "ngPill", when: "Every day"},
+    {app: "finance", label: "Daily controls and the owners' email", tab: "em-owners-fin", pill: "rgPill", when: "Every day"},
+    {app: "finance", label: "Cost control weekly email", tab: "em-cost", pill: "crPill", when: "Every week"},
+    {app: "finance", label: "Sales weekly email", tab: "em-sales", pill: "srPill", when: "Every week"},
+    {app: "finance", label: "Brand performance email", tab: "em-brand", pill: "brPill", when: "Every week"},
+    {app: "finance", label: "P&L memo · monthly", tab: "em-pl", pill: "pmPill", when: "Every month"},
+    {app: "purchasing", label: "Email notifications", tab: "em-purchasing", pill: "", when: "Every day"},
+    {app: "purchasing", label: "Price changes · weekly email", tab: "em-pricechg", pill: "pqPillT", when: "Every week"}
   ];
   let ME = null, D = null, LOCS = null, LOCS_ERR = "", EDIT = null, busy = false;
 
@@ -195,7 +195,7 @@ a.pr-btn{text-decoration:none;display:inline-block}
     host.innerHTML = `
       <div class="card-head"><div><h2>Scheduled reports</h2>
         <p class="hint"><span>Any screen of pulse sent by email, as often as you choose, to the people you choose.</span> <span>Each person receives the screen as they see it in pulse: their screens, companies and locations.</span> <span>The picture is in the email and the whole screen comes as a PDF.</span></p></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sender}<a class="pr-btn" href="/reports-center" title="Every report of pulse in one place: on or paused, failing or late, next and last sends">Reports center ›</a><button class="pr-btn dark" type="button" id="prNew">New report</button></div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${sender}<a class="pr-btn" href="/settings#reports-center" title="Every report of pulse in one place: on or paused, failing or late, next and last sends">Reports center ›</a><button class="pr-btn dark" type="button" id="prNew">New report</button></div></div>
       ${rep.online ? "" : `<p class="pr-hint" style="color:var(--warn,#b86e0e)"><span>The report sender has not called in the last minutes, so nothing goes until it does.</span> <span>It runs on the server next to the towers (the reporter service).</span></p>`}
       <div class="pr-bar"><select id="prFApp" aria-label="Tower"><option value="">All towers</option>${["finance", "purchasing", "platform"].map(a => `<option value="${a}"${F.app === a ? " selected" : ""}>${esc(TOWERS[a])}</option>`).join("")}</select>
         <input id="prFQ" placeholder="Search reports" aria-label="Search reports" value="${esc(F.q)}"></div>
@@ -219,19 +219,11 @@ a.pr-btn{text-decoration:none;display:inline-block}
         <div class="pr-scroll"><table class="pr-tbl"><tbody>${BUILTIN.map(b => {
           const pill = APP === b.app && b.pill && document.getElementById(b.pill);
           return `<tr><td><b>${esc(b.label)}</b><div class="pr-sub">${esc(TOWERS[b.app])}</div></td><td>${span(b.when)}</td><td>${pill ? chip(/off/i.test(pill.textContent) ? "off" : "ok", pill.textContent.trim()) : ""}</td>
-            <td class="pr-act"><a class="pr-link" href="/${b.app}/#${b.view}" data-card="${b.card}" data-app="${b.app}">Its settings ›</a></td></tr>`; }).join("")}</tbody></table></div></details>`;
+            <td class="pr-act"><a class="pr-link" href="/settings#${b.tab}">Its settings ›</a></td></tr>`; }).join("")}</tbody></table></div></details>`;
     host.querySelector("#prNew").onclick = () => editor(null);
     host.querySelector("#prFApp").onchange = e => { F.app = e.target.value; paint(); };
     host.querySelector("#prFQ").oninput = e => { F.q = e.target.value.toLowerCase(); const at = e.target.selectionStart; paint();
       const q = document.getElementById("prFQ"); q.focus(); q.setSelectionRange(at, at); };
-    host.querySelectorAll("a[data-card]").forEach(a => a.onclick = ev => {
-      if (a.dataset.app !== APP) return;
-      const card = document.getElementById(a.dataset.card);
-      const nav = document.querySelector(`#nav button[data-view="${a.getAttribute("href").split("#")[1]}"]`);
-      ev.preventDefault();
-      if (nav && !nav.classList.contains("on")) nav.click();
-      if (card) setTimeout(() => card.scrollIntoView({behavior: "smooth", block: "start"}), 60);
-    });
     host.querySelectorAll("tr[data-id] button[data-a]").forEach(b => b.onclick = () => act(b, b.closest("tr").dataset.id));
   }
   async function act(b, id) {

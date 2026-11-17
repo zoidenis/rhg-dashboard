@@ -50,6 +50,13 @@ nav button.on,nav button.sub-on{background:rgba(255,255,255,.09);color:#fff;font
 html.embed aside, html.embed main > header, html.embed main > .filters, html.embed #banner, html.embed #printHead{display:none!important}
 html.embed main{padding:4px 2px 30px}
 html.embed body{background:transparent}
+/* inside pulse's Settings (?embed=settings&cards=…): the cards asked for only */
+html.embed-set main > :not(.view), html.embed-set main > .view:not(#v-embed){display:none!important}
+html.embed-set main{padding:6px 4px 40px}
+html.embed-set #v-embed > .card{margin-bottom:16px}
+html.embed-set #ntCard.no-server #ntServer{display:none}
+/* settings live in Settings now: the owners' email of the register and the price changes email are set there */
+html:not(.embed-set) #rgSetCard, html:not(.embed-set) #pqMailCard{display:none!important}
 nav .count{background:#5c1d1a;color:#ffb4ae;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
 .side-foot{flex:none;font-size:12px;color:#7c8290;line-height:1.5;padding:0 6px}
 main{flex:1;min-width:0;padding:22px 28px 60px}
@@ -451,6 +458,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 </style>
 <!-- brand layer last, so the Revo tokens override the built-in defaults -->
 <link rel="stylesheet" href="/brand.css">
+<script>if (/[?&]embed=settings(&|$)/.test(location.search)) document.documentElement.classList.add("embed-set");</script><!-- inside Settings: no flash of the whole page -->
 </head>
 <body>
 <div class="app">
@@ -1109,7 +1117,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-settings">
-    <div class="card" style="margin-bottom:16px">
+    <div class="card" style="margin-bottom:16px" id="slCard">
       <h2>Service-level thresholds</h2><p class="hint">Applied to every exception, brief and SLA calculation on the next refresh.</p>
       <div class="formgrid" id="thresholdForm"></div>
       <div class="formgrid" id="ownerForm"></div>
@@ -1200,7 +1208,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <div class="scroll" style="margin-top:8px"><table id="ntRuns"></table></div>
     </div>
     <div class="card" style="margin-bottom:16px" id="rcCard" data-header="RHG-Purchasing"></div>
-    <div class="card"><h2>Audit history</h2><p class="hint">Every action assignment, status change, comment and threshold change made in this app.</p>
+    <div class="card" id="auditCard"><h2>Audit history</h2><p class="hint">Every action assignment, status change, comment and threshold change made in this app.</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
 
@@ -4201,6 +4209,7 @@ $("purchNav").onclick = () => {
 };
 function openFromHash(){
   let v = (location.hash || "").slice(1);
+  if (v === "settings" || v === "accounts") { toSettings(v === "accounts" ? "accounts" : ""); return; }
   if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();
@@ -4915,7 +4924,7 @@ $("mode").onchange = () => {
 };
 
 setInterval(() => {
-  if (!data || busy) return;
+  if (!data || busy || EMBED === "settings") return;
   countdown--;
   if (countdown <= 0) { if (!document.hidden) load(false); else countdown = refreshSec; }
   else if (!$("pill").classList.contains("err")) {
@@ -4923,6 +4932,35 @@ setInterval(() => {
     $("pillText").textContent = `LIVE · updated ${t} · next in ${countdown}s`;
   }
 }, 1000);
+
+// ---------------------------------------------------------------- inside pulse's Settings (identity /settings)
+// Settings opens /purchasing/?embed=settings&cards=ntCard in a frame: this page then shows only those cards, without the
+// menu, the header and the filters, and reads only what they need (the dashboard only for the thresholds and purchasers).
+// Out of the frame, Settings (the menu, #settings) opens pulse's Settings.
+const SET_EMBED = (() => { try { const q = new URLSearchParams(location.search);
+  return q.get("embed") === "settings" ? (q.get("cards") || "").split(",").filter(x => /^[A-Za-z][\w-]{0,40}$/.test(x)).slice(0, 12) : null; } catch (e) { return null; } })();
+if (SET_EMBED) document.documentElement.classList.add("embed-set");
+const SET_OPEN = {slCard: () => load(true), prSetCard: () => load(true), ntCard: () => loadNotify(), ntServer: () => loadNotify(),
+  rcCard: () => { if (window.rcLoad) rcLoad(); }, auditCard: () => loadAudit(), pqMailCard: () => loadPq(false),
+  rgSetCard: () => loadRegister()};
+const SET_SELF = new Set(["pulseReports", "rgSetCard"]);
+function setEmbedStart(){
+  const host = document.createElement("section"); host.className = "view on"; host.id = "v-embed";
+  document.querySelector("main").appendChild(host);
+  document.querySelectorAll("main > .view").forEach(v => { if (v !== host) v.classList.remove("on"); });
+  SET_EMBED.forEach(id => {
+    let el = $(id); if (!el) return;
+    if (id === "ntServer") { const c = document.createElement("div"); c.className = "card"; c.appendChild(el); el.style.marginBottom = "0"; el = c; }
+    host.appendChild(el);
+    if (!SET_SELF.has(id)) { if (el.style.display === "none") el.style.display = ""; el.hidden = false; } });
+  if ($("ntCard") && $("ntCard").parentNode === host && !SET_EMBED.includes("ntServer")) $("ntCard").classList.add("no-server");
+  if (!host.children.length) host.innerHTML = `<div class="card"><p class="hint" style="margin:0">This setting is not part of Purchasing.</p></div>`;
+  [...new Set(SET_EMBED.map(id => SET_OPEN[id]).filter(Boolean))].forEach(f => { try { f(); } catch (e) { console.error(e); } });
+}
+function toSettings(tab){   // back from Settings comes to this screen (never to #settings, which would open Settings again)
+  const back = location.pathname + (/^#(settings|accounts)$/.test(location.hash) ? "" : location.hash);
+  location.assign("/settings?from=" + encodeURIComponent(back) + (tab ? "#" + tab : "")); }
+if (!SET_EMBED) { const sb = document.querySelector('#nav button[data-view="settings"]'); if (sb) sb.onclick = () => toSettings(""); }
 
 // ?embed=stock (Finance → Inventory → Stock & working capital): that screen only, for the company asked
 const EMBED = new URLSearchParams(location.search).get("embed") || "";
@@ -4937,6 +4975,7 @@ if (EMBED) document.documentElement.classList.add("embed");
     if (r.ok) $("company").innerHTML = j.companies.map(c => `<option ${c===pickCo?"selected":""}>${esc(c)}</option>`).join("");
     else throw new Error(j.error);
   } catch(e) { $("company").innerHTML = `<option>SALT</option>`; }
+  if (EMBED === "settings") { setEmbedStart(); return; }
   if (EMBED) {                 // the screen only: no dashboard read
     const b = document.querySelector(`#nav button[data-view="${CSS.escape(EMBED)}"]`); if (b) b.click();
     return;
@@ -5668,6 +5707,7 @@ $("company").addEventListener("change", () => { prData = null; if ($("v-purchase
 <script src="layout.js" data-app="purchasing"></script>
 <script src="recipients.js"></script>
 <script src="/reports.js"></script><!-- scheduled reports: any screen by email (identity) -->
+<script src="/gear.js"></script><!-- the way into Settings (identity) -->
 <script>
 // phone: the side menu as a drawer (Control center, Purchasing, Finance, Inventory, Sales and every screen)
 (() => {

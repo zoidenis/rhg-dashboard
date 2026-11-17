@@ -644,8 +644,16 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
 #sxSplit tr.sx-tot td{border-top:2px solid var(--line);font-weight:650}
 .sx-why{margin:6px 0 0;padding:10px 12px;border-left:3px solid var(--warn);background:var(--bg);border-radius:6px}
 .sx-why h4{margin:0 0 4px;font-size:13px}.sx-why p{margin:2px 0}
+/* inside pulse's Settings (?embed=settings&cards=…): the cards asked for only, no menu, header or filters */
+html.embed-set aside, html.embed-set main > :not(.view), html.embed-set main > .view:not(#v-embed){display:none!important}
+html.embed-set main{padding:6px 4px 40px}
+html.embed-set body{background:transparent}
+html.embed-set #v-embed > .card{margin-bottom:15px}
+/* settings live in Settings now: the owners' email of the register is set there */
+html:not(.embed-set) #rgSetCard{display:none!important}
 </style>
 <link rel="stylesheet" href="/brand.css">
+<script>if (/[?&]embed=settings(&|$)/.test(location.search)) document.documentElement.classList.add("embed-set");</script><!-- inside Settings: no flash of the whole page -->
 </head>
 <body>
 <div class="app">
@@ -2152,7 +2160,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
   </section>
 
   <section class="view" id="v-settings">
-    <div class="card" style="margin-bottom:15px"><h2>Materiality and alert rules</h2>
+    <div class="card" style="margin-bottom:15px" id="thCard"><h2>Materiality and alert rules</h2>
       <p class="hint">Applied to every exception and to the brief on the next refresh.</p>
       <div class="formgrid" id="thresholdForm"></div>
       <div class="formgrid" id="ownerForm"></div>
@@ -2442,7 +2450,7 @@ tr.sh-it{cursor:pointer}tr.sh-it:hover td{background:var(--bg)}
       <div class="scroll" style="margin-top:10px"><table id="pmRuns"></table></div>
     </div>
     <div class="card" style="margin-bottom:15px" id="rcCard" data-header="RHG-Finance"></div>
-    <div class="card"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
+    <div class="card" id="auditCard"><h2>Audit history</h2><p class="hint">Every action, comment and threshold change made here</p>
       <div class="scroll"><table id="auditTable"></table></div></div>
   </section>
 
@@ -10348,6 +10356,7 @@ function urlFilters(){
 }
 function openFromHash(){
   let v = (location.hash || "").slice(1);
+  if ((v === "settings" || v === "accounts") && typeof SET_EMBED !== "undefined" && !SET_EMBED) { toSettings(v === "accounts" ? "accounts" : ""); return; }
   if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }
   if (v === "stockstop") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("stockstop"); return; }
@@ -10411,7 +10420,46 @@ $("anchorTo").onchange=()=>{
 $("rangeBtn").onclick = () => { $("mode").value = "range"; $("mode").onchange(); setTimeout(() => { try { $("anchorTo").showPicker(); } catch(e) { $("anchorTo").focus(); } }, 50); };
 $("mode").onchange=()=>{ $("anchorLabel").firstChild.textContent=MODE_LABEL[$("mode").value]+" ";
   if($("anchor").value) $("anchor").value=snap($("anchor").value); rangeSync(); load(); };
-setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRESH||180)*1000);
+setInterval(()=>{ if(data && !busy && !document.hidden && !SET_EMBED) load(); }, (window.REFRESH||180)*1000);
+
+// ---------------------------------------------------------------- inside pulse's Settings (identity /settings)
+// Settings opens /finance/?embed=settings&cards=arCard in a frame: this page then shows only those cards, without the
+// menu, the header and the filters, and reads only what they need (the dashboard only for Materiality and alert rules).
+// Out of the frame, Settings (the menu, #settings, the Connection buttons of the screens) opens pulse's Settings.
+const SET_EMBED = (() => { try { const q = new URLSearchParams(location.search);
+  return q.get("embed") === "settings" ? (q.get("cards") || "").split(",").filter(x => /^[A-Za-z][\w-]{0,40}$/.test(x)).slice(0, 12) : null; } catch (e) { return null; } })();
+if (SET_EMBED) document.documentElement.classList.add("embed-set");
+const SET_OPEN = {
+  thCard: () => load(), kmCard: () => loadKm(), acCard: () => loadAc(), liSetCard: () => liSettings(), spCard: () => loadSimphony(),
+  arCard: () => loadArap(), crCard: () => loadCostReport(), ngCard: () => loadNegReport(), bxCard: () => loadBxReport(),
+  srxCard: () => loadSrxReport(), brCard: () => loadBrandReport(), srCard: () => loadSalesReport(), pmCard: () => loadPlMemo(),
+  rcCard: () => { if (window.rcLoad && !window.rcDone) { window.rcDone = true; rcLoad(); } }, auditCard: () => loadAudit(),
+  fsConn: () => loadFiscalStatus(), rgSetCard: () => loadRegister(), epSet: () => epOpenSettings(),
+  // the cards a screen opens with a button: they show themselves
+  svSet: () => svOpenSettings(true), biSet: () => $("biSetBtn").onclick(), oxSet: () => oxSetOpen(true), ppSet: () => ppSetOpen(true)};
+const SET_SELF = new Set(["svSet", "biSet", "oxSet", "ppSet", "pulseReports", "rgSetCard"]);
+function setEmbedStart(){
+  const host = document.createElement("section"); host.className = "view on"; host.id = "v-embed";
+  document.querySelector("main").appendChild(host);
+  document.querySelectorAll("main > .view").forEach(v => { if (v !== host) v.classList.remove("on"); });
+  SET_EMBED.forEach(id => { const el = $(id); if (!el) return; host.appendChild(el);
+    if (!SET_SELF.has(id)) { if (el.style.display === "none") el.style.display = ""; el.hidden = false; } });
+  if (!host.children.length) host.innerHTML = `<div class="card"><p class="hint" style="margin:0">This setting is not part of Finance.</p></div>`;
+  SET_EMBED.forEach(id => { try { const f = SET_OPEN[id]; if (f) f(); } catch (e) { console.error(e); } });
+}
+async function epOpenSettings(){
+  $("epSet").hidden = false;
+  try { const j = await readJSON(await fetch("/api/emcpriv/settings")); if (j.error) throw new Error(j.error); epConn(j.connection || {}); }
+  catch (e) { $("epSet").insertAdjacentHTML("beforeend", `<p class="meta">${esc("Could not read the connection: " + e.message)}</p>`); }
+}
+const SET_TAB = {svSet: "conn-sevenrooms", biSet: "conn-billy", oxSet: "conn-crunchtime", ppSet: "conn-odoo", epSet: "conn-simphony-config"};
+function toSettings(tab){   // back from Settings comes to this screen (never to #settings, which would open Settings again)
+  const back = location.pathname + (/^#(settings|accounts)$/.test(location.hash) ? "" : location.hash);
+  location.assign("/settings?from=" + encodeURIComponent(back) + (tab ? "#" + tab : "")); }
+if (!SET_EMBED) {
+  const sb = document.querySelector('#nav button[data-view="settings"]'); if (sb) sb.onclick = () => toSettings("");
+  [["svSetBtn", "svSet"], ["biSetBtn", "biSet"], ["oxSetBtn", "oxSet"], ["ppSetBtn", "ppSet"], ["epSetBtn", "epSet"]].forEach(([b, c]) => { if ($(b)) $(b).onclick = () => toSettings(SET_TAB[c]); });
+}
 
 (async ()=>{
   if(!await loadSession()) return;
@@ -10422,6 +10470,7 @@ setInterval(()=>{ if(data && !busy && !document.hidden) load(); }, (window.REFRE
     $("company").innerHTML = (j.companies||[]).map(c=>`<option value="${esc(c)}" ${c===j.default?"selected":""}>${esc(c)}</option>`).join("");
     await loadDims($("company").value);   // the departments of the company shown, cut to the person's access
   }catch(e){ $("company").innerHTML = `<option>SALT</option>`; }
+  if (SET_EMBED) { setEmbedStart(); return; }
   urlFilters();
   openFromHash();
   load();
@@ -12732,6 +12781,7 @@ locRegLoad();
 <script src="layout.js" data-app="finance"></script>
 <script src="recipients.js"></script>
 <script src="/reports.js"></script><!-- scheduled reports: any screen by email (identity) -->
+<script src="/gear.js"></script><!-- the way into Settings (identity) -->
 <script>
 // phone: the side menu as a drawer (Control center, Purchasing, Finance, Inventory, Sales and every screen)
 (() => {

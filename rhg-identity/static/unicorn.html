@@ -745,9 +745,6 @@ $("logoutBtn").onclick = async () => {
   const links = [["purchasing.view","/purchasing/","Purchasing"],["finance.view","/finance/","Finance"],["finance.inventory.view","/finance/#inventory","Inventory"],["finance.view","/finance/#sales","Sales"],["finance.s.people.","/finance/#people","People &amp; Productivity"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]].filter(([p]) => p.endsWith(".") ? (me.permissions || []).some(x => x.startsWith(p)) : can(p));
   $("towers").insertAdjacentHTML("beforeend", links.map(([,h,l]) => `<a href="${h}">${l}</a>`).join(""));
   if (!(me.permissions || []).some(x => x.startsWith("platform.s.actions."))) { const ac = document.querySelector('#towers a[href="/actions"]'); if (ac) ac.remove(); }
-  if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
-  if (["reports.manage", "finance.settings.manage", "purchasing.settings.manage", "actioncenter.manage", "admin.users.manage"].some(can))
-    $("adminLink").insertAdjacentHTML("afterbegin", `<div style="margin-bottom:6px"><a href="/reports-center">Reports center</a></div>`);
   if (!can("unicorn.use")) {
     $("feed").innerHTML = `<div class="empty-state">${AV}<b style="color:var(--ink)">Unicorn is for management.</b><p>Your role does not include “Talk to Unicorn”. Ask an administrator if you need it.</p></div>`;
     document.querySelector(".composer").hidden = true; $("briefBtn").hidden = true; $("pill").hidden = true; $("sub").textContent = "";
@@ -783,5 +780,6 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
   window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
 })();
 </script>
+<script src="/gear.js"></script><!-- the way into Settings (identity) -->
 </body>
 </html>

@@ -110,6 +110,14 @@ tr.go .arr{color:var(--rhg-primary);opacity:0;transition:opacity .12s}tr.go:hove
 @media (prefers-reduced-motion: reduce){aside{transition:none}}
 </style>
 <link rel="stylesheet" href="/brand.css">
+<style>
+/* inside Settings (?embed=1): the content only, no menu or page header */
+html.embed aside, html.embed main > header, html.embed .mnav-btn, html.embed .mnav-bd{display:none!important}
+html.embed .ac-bar{display:none!important}
+html.embed main{padding:6px 4px 40px!important}
+html.embed body{background:transparent}
+</style>
+<script>if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add("embed");</script>
 </head>
 <body>
 <div class="app">
@@ -652,9 +660,6 @@ $("logoutBtn").onclick = async () => {
   [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.people.", "/finance/#people", "People &amp; Productivity"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]
     .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (can("unicorn.use")) t.insertAdjacentHTML("beforeend", `<a href="/unicorn">Unicorn</a>`);
-  if (can("admin.users.manage") || can("admin.audit.view")) $("adminLink").innerHTML = `<a href="/admin">Administration · accounts, roles and audit</a>`;
-  if (["reports.manage", "finance.settings.manage", "purchasing.settings.manage", "actioncenter.manage", "admin.users.manage"].some(can))
-    $("adminLink").insertAdjacentHTML("afterbegin", `<div style="margin-bottom:6px"><a href="/reports-center">Reports center</a></div>`);
   await load();
   if (!D) return;
   const h = location.hash.slice(1).split("/");
@@ -675,5 +680,6 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
   window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
 })();
 </script>
+<script src="/gear.js"></script><!-- the way into Settings (identity) -->
 </body>
 </html>

@@ -3606,6 +3606,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(raw)))
                 self.end_headers()
                 self.wfile.write(raw)
+            elif url.path == "/api/emcpriv/settings":
+                # Settings → Connections → Simphony · configuration: the connection only, without reading Simphony
+                if not auth.can(user, "settings"):
+                    self._send(403, {"error": "Your role does not include Settings."})
+                    return
+                self._send(200, {"connection": emcpriv.info()})
             elif url.path == "/api/emcpriv":
                 # Control → EMC privileges: the Simphony users, their roles and what each role allows (emcpriv.py)
                 if not auth.can(user, "finance.s.emcpriv"):

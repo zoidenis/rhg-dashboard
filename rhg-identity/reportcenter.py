@@ -23,6 +23,15 @@ import unicorn
 TOWER_PERM = {"finance": "finance.settings.manage", "purchasing": "purchasing.settings.manage"}
 VIEW_PERMS = ("reports.manage", "finance.settings.manage", "purchasing.settings.manage", "actioncenter.manage",
               "admin.users.manage")
+# where each email is set: the tab of Settings (static/settings.html) that holds its card
+SETTINGS_TAB = {("finance", "arap_daily"): "em-arap", ("finance", "negative_daily"): "em-negative",
+                ("finance", "stockstop_daily"): "em-stockstop", ("finance", "sevenrooms_daily"): "em-sevenrooms",
+                ("finance", "fiscal_daily"): "conn-tax", ("finance", "register_owners"): "em-owners-fin",
+                ("finance", "cost_weekly"): "em-cost", ("finance", "sales_weekly"): "em-sales",
+                ("finance", "brand_weekly"): "em-brand", ("finance", "brand_monthly"): "em-brand",
+                ("finance", "pl_monthly"): "em-pl", ("purchasing", "purchasing_daily"): "em-purchasing",
+                ("purchasing", "purchasing_weekly"): "em-purchasing", ("purchasing", "savings_monthly"): "em-purchasing",
+                ("purchasing", "price_changes"): "em-pricechg", ("purchasing", "register_owners"): "em-owners-pur"}
 STATES = ("failing", "late", "skipped", "waiting", "ok", "combined", "paused", "unknown")
 
 
@@ -124,7 +133,7 @@ def _tower_items(app, routing, towers):
             r["to_n"], r["cc_n"] = len(r.get("to") or []), len(r.get("cc") or [])
         out.append(x | {"id": f"{app}:{x['key']}", "app": app, "tower": label, "kind": "email",
                         "roles": routing.get(x.get("routing") or "") if x.get("routing") else None,
-                        "link": f"/{app}/?card={x.get('card') or ''}#{x.get('view') or 'settings'}"})
+                        "link": "/settings#" + SETTINGS_TAB.get((app, x["key"]), "reports-center")})
     return out
 
 
@@ -160,7 +169,7 @@ def _screen_items(user):
                     "queued": bool(r.get("queued")), "missing": bool(r.get("missing")),
                     "error": "The screen is no longer in pulse." if r.get("missing") else None,
                     "created_by": names.get(r.get("created_by"), r.get("created_by")), "created_at": r.get("created_at"),
-                    "link": f"/{app if app in ('finance', 'purchasing') else 'finance'}/?card=pulseReports#settings"})
+                    "link": "/settings#scheduled"})
     return out, v.get("reporter") or {}
 
 
@@ -183,7 +192,7 @@ def _digest_item(now):
     return {"id": "platform:ac_digest", "key": "ac_digest", "app": "platform", "tower": "Platform", "kind": "email",
             "name": "Executive Action Center · the owners' daily email", "freq": "daily",
             "schedule": {"days": list(range(7)), "time": g.get("time") or "08:30"}, "enabled": bool(g.get("enabled")),
-            "next_run": nxt, "runs": runs, "link": "/actions#matrix",
+            "next_run": nxt, "runs": runs, "link": "/settings#ac-matrix",
             "note": "One email per owner of open items, every register and Unicorn; escalations in Cc."}
 
 
