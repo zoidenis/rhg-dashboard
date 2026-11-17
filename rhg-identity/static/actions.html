@@ -49,6 +49,8 @@ tr.go{cursor:pointer}tr.go:hover td,tr.go:focus-visible td{background:var(--bg)}
 tr.go .arr{color:var(--rhg-primary);opacity:0;transition:opacity .12s}tr.go:hover .arr,tr.go:focus-visible .arr{opacity:1}
 #uDuties,#uRuns{min-width:0}
 .ac-find button[hidden],.ac-find kbd[hidden]{display:none}
+/* "all:unset" above sets display, which beats the hidden attribute: a tab the role does not hold stays hidden */
+.ac-tabs button[hidden]{display:none}
 .grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
 .grid2>*,main .card,section{min-width:0}
 .grid2 .it{grid-template-columns:86px minmax(0,1fr)}.grid2 .it .o,.grid2 .it .d{grid-column:2;text-align:left}
