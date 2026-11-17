@@ -388,6 +388,14 @@ td.num,th.num{text-align:right}
 #tyTable tr.ty-type.open td:first-child::before{transform:rotate(90deg)}
 #tyTable tr.ty-fam{display:none}#tyTable tr.ty-fam.show{display:table-row}
 #tyTable tr.ty-fam td:first-child{padding-left:30px;color:var(--sub)}
+/* a family's items (pop-up): every column of the table on one screen */
+.ty-items-pop th{white-space:normal;vertical-align:bottom;padding:8px 6px;font-size:11px;line-height:1.25}
+.ty-items-pop td{padding:7px 6px}
+.ty-items-pop td:first-child{max-width:260px}.ty-items-pop td:first-child b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.ty-items-pop .ty-st{white-space:nowrap}
+#tyTable tr.ty-fam[data-fam]{cursor:pointer}#tyTable tr.ty-fam[data-fam]:hover td,#tyTable tr.ty-fam[data-fam]:focus-visible td{background:var(--bg)}
+#tyTable tr.ty-fam[data-fam] td:first-child::after{content:" ›";color:var(--accent);opacity:0}#tyTable tr.ty-fam[data-fam]:hover td:first-child::after{opacity:1}
+#tyTable tr.ty-fam[data-fam]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 #tyTable tr.ty-total td{font-weight:700;border-top:2px solid var(--line)}
 .ty-share{display:inline-block;height:6px;border-radius:3px;background:var(--ty-c1);vertical-align:middle;margin-right:6px}
 #tyHeat td.c{text-align:center;font-variant-numeric:tabular-nums;font-weight:600;border:2px solid var(--card);border-radius:6px;min-width:58px}
@@ -1254,7 +1262,7 @@ html:not(.embed-set) #rgSetCard{display:none!important}
       <div class="ty-callout" id="tyCallout" style="display:none"></div>
     </div>
     <div class="card"><div class="card-head"><div><h2>Inventory typology</h2>
-      <p class="hint">Stock value by nature, then by item type (BC Item Category Group 2) and family (Group 4). Click a type to open its families.</p></div></div>
+      <p class="hint">Stock value by nature, then by item type (BC Item Category Group 2) and family (Group 4). Click a type to open its families, and a family for its items.</p></div></div>
       <div class="ty-stack" id="tyStack"></div><div class="ty-legend" id="tyLegend"></div>
       <div class="scroll" style="margin-top:12px"><table id="tyTable"></table></div>
       <p class="hint" id="tyHow" style="margin-top:10px;line-height:1.55"></p></div>
@@ -9403,14 +9411,14 @@ function renderTypology(){
     h += row("ty-type", `<span class="ty-sw" style="background:${TY_COL[t.nat]}"></span>${esc(t.typ)}`, t, `data-ty="${i}"`);
     const fs = Object.values(famsOf).filter(f => f.typ === t.typ).sort((a, b) => b.v - a.v);
     const small = fs.length > 6 ? fs.filter(f => f.v < 1e6) : [];
-    fs.filter(f => !small.includes(f)).forEach(f => h += row(`ty-fam ty-f${i}`, esc(f.fam), f));
+    fs.filter(f => !small.includes(f)).forEach(f => h += row(`ty-fam ty-f${i}`, esc(f.fam), f, `data-typ="${esc(t.typ)}" data-fam="${esc(JSON.stringify([f.fam]))}" data-lab="${esc(f.fam)}" tabindex="0" role="button" title="Open its items"`));
     if (small.length) {
       const s = {nat: t.nat, lines: 0, v: 0, use: 0, ex: 0, nouse: 0, tw: 0, cw: 0, dw: 0};
       small.forEach(f => ["lines", "v", "use", "ex", "nouse", "tw", "cw", "dw"].forEach(k => s[k] += f[k]));
       const tt = tyTurned(t.nat);
       s.doh = tt && s.use > 0 ? Math.round(s.v / (s.use / days)) : null; s.turn = tt && s.v && s.use ? s.use * 365 / days / s.v : null;
       s.tg = tt && s.dw ? Math.round(s.tw / s.dw) : null; s.cyc = tt && s.dw ? s.cw / s.dw : null; s.band = !tt ? "na" : !s.use && s.v > 0 ? "nouse" : tyBand(s.doh, s.tg);
-      h += row(`ty-fam ty-f${i}`, `${small.length} smaller families`, s);
+      h += row(`ty-fam ty-f${i}`, `${small.length} smaller families`, s, `data-typ="${esc(t.typ)}" data-fam="${esc(JSON.stringify(small.map(f => f.fam)))}" data-lab="${esc(`${t.typ} · ${small.length} smaller families`)}" tabindex="0" role="button" title="Open their items"`);
     }
   });
   const tt = {lines: all.lines, v: all.v, use: turnU, ex: all.ex, nouse: all.nouse, doh: turnU ? Math.round(turnV / (turnU / days)) : null,
@@ -9418,6 +9426,11 @@ function renderTypology(){
   h += `<tr class="ty-total"><td>Total</td><td class="num">${fmt(tt.lines)}</td><td class="num">${tyM(tt.v)}</td><td class="num">100%</td><td class="num">${tyM(tt.use)}</td><td class="num">${tyDays(tt.doh)}</td><td></td><td></td><td class="num">${tt.turn ? tt.turn.toFixed(1) + "×" : "–"}</td><td class="num">${tyM(tt.ex)}</td><td class="num">${tyM(tt.nouse)}</td><td class="meta">cover and turnover: food, beverage, resale</td></tr>`;
   $("tyTable").innerHTML = h;
   document.querySelectorAll("#tyTable tr.ty-type").forEach(tr => tr.onclick = () => { tr.classList.toggle("open"); document.querySelectorAll("#tyTable .ty-f" + tr.dataset.ty).forEach(x => x.classList.toggle("show")); });
+  // a family (or the smaller families together) opens its items, with the same figures
+  document.querySelectorAll("#tyTable tr[data-fam]").forEach(tr => {
+    tr.onclick = () => tyFamPop(tr.dataset.typ, JSON.parse(tr.dataset.fam), tr.dataset.lab);
+    tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tr.onclick(); } };
+  });
   $("tyHow").innerHTML = `<b>How it is read.</b> Days of cover = stock value ÷ average daily use at cost; turnover = yearly use ÷ stock value. Use = recipe (assembly) consumption and sales net of returns${d.rules.supplies_adjustments ? "; for operating supplies also negative adjustments" : ""}. Transfers out of ${esc(d.rules.distribution.join(", "))} count only on those locations, not in the group total. Target = days between deliveries (or production runs) seen in the history + ${d.rules.safety_days} safety days, or the family target in Settings. Equipment and uniforms are not turned over.`;
   tyBars(tyAgg(r => r[1] + "\u0001" + r[2])); tyHeat(); tyItems();
 }
@@ -9464,6 +9477,61 @@ function tyHeat(){
     }).join("") + "</tr>";
   }
   $("tyHeat").innerHTML = h;
+}
+// ---- Typology & turnover → a family's items: the figures of the table, item by item (location filter as the screen)
+async function tyFamPop(typ, fams, label){
+  const d = tyData, loc = $("tyLoc").value, days = d.history_days;
+  const sub = `${esc(typ)}${fams.length === 1 && fams[0] !== typ ? "" : ""} · ${esc(d.company)} · stock as of ${esc(d.as_of)} · ${days} days · ${loc ? esc(loc) : "all locations"}`;
+  const body = Pulse.pop({title: esc(label), sub, wide: true, body: `<p class="hint" style="margin:0">Reading the items…</p>`});
+  let j;
+  try {
+    const p = new URLSearchParams({company: d.company, days: String(days), as_of: d.as_of, type: typ, family: fams.join("\u0001")});
+    j = await readJSON(await fetch("/api/typology/family?" + p.toString()));
+    if (j.error) throw new Error(j.error);
+  } catch (e) { body.innerHTML = `<p class="hint" style="margin:0">${esc("Could not read the items: " + e.message)}</p>`; return; }
+  if (!body.isConnected) return;
+  const dist = new Set((j.distribution || []).map(x => x.toUpperCase())), group = !loc, by = {};
+  for (const r of j.rows) {
+    const [l, it, desc, unit, fam, n, qty, lines, v, neg, use, nouse, ex, tw, cw, dw, cnt] = r;
+    if (loc && l !== loc) continue;
+    const a = by[it] ||= {it, desc, unit, fam, nat: n, qty: 0, lines: 0, v: 0, use: 0, nouse: 0, ex: 0, tw: 0, cw: 0, dw: 0, cnt: 0, locs: new Set()};
+    a.qty += qty; a.lines += lines; a.v += v; a.nouse += nouse; a.ex += ex; a.cnt += cnt; if (lines) a.locs.add(l);
+    if (group && dist.has(String(l).toUpperCase())) continue;          // the restaurants' use is not counted twice
+    a.use += use; a.tw += tw; a.cw += cw; a.dw += dw;
+  }
+  const list = Object.values(by).filter(a => a.v || a.use || a.qty).map(a => {
+    const t = tyTurned(a.nat);
+    a.doh = t && a.use > 0 ? Math.round(a.v / (a.use / days)) : null;
+    a.turn = t && a.v > 0 && a.use > 0 ? a.use * 365 / days / a.v : null;
+    a.tg = t && a.dw ? Math.round(a.tw / a.dw) : null;
+    a.cyc = t && a.dw ? a.cw / a.dw : null;
+    a.band = !t ? "na" : !a.use && a.v > 0 ? "nouse" : tyBand(a.doh, a.tg);
+    return a;
+  }).sort((x, y) => y.v - x.v);
+  const T = list.reduce((s, a) => { ["v", "use", "ex", "nouse", "lines", "tw", "cw", "dw"].forEach(k => s[k] += a[k]); return s; }, {v: 0, use: 0, ex: 0, nouse: 0, lines: 0, tw: 0, cw: 0, dw: 0});
+  const tot = T.v || 1, turned = list.some(a => tyTurned(a.nat));
+  const doh = turned && T.use > 0 ? Math.round(T.v / (T.use / days)) : null;
+  const tile = (l, v, s, cls) => `<div class="pz-tile"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s || ""}</div></div>`;
+  const many = fams.length > 1;
+  body.innerHTML = `<div class="pz-tiles">${tile("Items", fmt(list.length), `${fmt(T.lines)} item-location lines with stock`)}
+      ${tile("Stock value", tyM(T.v), "at item unit cost")}${tile(`Used, ${days} days`, T.use ? tyM(T.use) : "–", "at cost")}
+      ${tile("Days of cover", tyDays(doh), T.use && T.v ? `turnover ${(T.use * 365 / days / T.v).toFixed(1)}× a year` : "")}
+      ${tile("Above target", T.ex ? tyM(T.ex) : "–", T.v ? `${Math.round(T.ex / tot * 100)}% of the stock` : "", T.ex ? "up" : "")}
+      ${tile("No use", T.nouse ? tyM(T.nouse) : "–", "stock with no use in the history", T.nouse ? "warn" : "")}</div>
+    <p class="hint" style="margin:0 0 8px">The same figures as the table, item by item${loc ? ` at ${esc(loc)}` : ", every location together (the transfers out of the distribution locations are not counted as use, so nothing counts twice)"}. Click an item for its card.${j.rows_total > j.rows.length ? ` The largest ${fmt(j.rows.length)} of ${fmt(j.rows_total)} lines.` : ""}</p>
+    <div class="scroll"><table class="ty-tbl ty-items-pop"><thead><tr><th>Item</th>${many ? "<th>Family</th>" : ""}<th class="num">Lines</th><th class="num">Qty on hand</th><th class="num">Stock value</th><th class="num">Share</th>
+      <th class="num">Used, ${days} days</th><th class="num">Days of cover</th><th class="num">Delivery every</th><th class="num">Target days</th><th class="num">Turnover / yr</th>
+      <th class="num">Above target</th><th class="num">No use</th><th>Status</th></tr></thead><tbody>
+    ${list.map(a => `<tr data-pulse="item|${esc(a.it)}" tabindex="0" style="cursor:pointer"><td><b>${esc(a.desc || a.it)}</b><div class="meta">${esc(a.it)}</div></td>${many ? `<td class="meta">${esc(a.fam)}</td>` : ""}
+      <td class="num" title="${esc([...a.locs].join(", "))}">${fmt(a.lines)}</td><td class="num">${fmt(a.qty, Math.abs(a.qty) % 1 ? 2 : 0)} <span class="meta">${esc(a.unit)}</span></td><td class="num">${tyM(a.v)}</td>
+      <td class="num"><span class="ty-share" style="width:${Math.max(2, a.v / tot * 50)}px"></span>${(a.v / tot * 100).toFixed(1)}%</td>
+      <td class="num">${a.use ? tyM(a.use) : "–"}</td><td class="num">${tyDays(a.doh)}</td><td class="num">${a.cyc != null ? a.cyc.toFixed(1) : "–"}</td>
+      <td class="num">${a.tg != null ? fmt(a.tg) : "–"}</td><td class="num">${a.turn != null ? a.turn.toFixed(1) + "×" : "–"}</td>
+      <td class="num">${a.ex ? tyM(a.ex) : "–"}</td><td class="num">${a.nouse ? tyM(a.nouse) : "–"}</td><td>${tySt(a.band)}${a.cnt ? ` <span class="ty-st count" title="Fresh: more days of cover than the shelf can hold">⚑ Count it</span>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="${many ? 14 : 13}" class="hint">No item with stock or use for this selection.</td></tr>`}
+    <tr class="ty-total"><td>Total</td>${many ? "<td></td>" : ""}<td class="num">${fmt(T.lines)}</td><td></td><td class="num">${tyM(T.v)}</td><td class="num">100%</td><td class="num">${T.use ? tyM(T.use) : "–"}</td>
+      <td class="num">${tyDays(doh)}</td><td class="num">${T.dw && turned ? (T.cw / T.dw).toFixed(1) : "–"}</td><td class="num">${T.dw && turned ? fmt(Math.round(T.tw / T.dw)) : "–"}</td><td class="num">${T.use && T.v ? (T.use * 365 / days / T.v).toFixed(1) + "×" : "–"}</td><td class="num">${T.ex ? tyM(T.ex) : "–"}</td><td class="num">${T.nouse ? tyM(T.nouse) : "–"}</td><td></td></tr>
+    </tbody></table></div>`;
 }
 function tyItems(){
   const d = tyData, loc = $("tyLoc").value, nat = $("tyNat").value, only = $("tyOnlyCount").checked;

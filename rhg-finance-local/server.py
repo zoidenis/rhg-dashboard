@@ -2238,7 +2238,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/discharge", "/api/discharge/xlsx",
                          # Inventory: Movement & dead stock, Typology & turnover, Stock count analysis
                          "/api/movement", "/api/movement/rows", "/api/movement/xlsx",
-                         "/api/typology", "/api/typology/xlsx", "/api/stockcount", "/api/stockcount/xlsx",
+                         "/api/typology", "/api/typology/xlsx", "/api/typology/family", "/api/stockcount", "/api/stockcount/xlsx",
                          "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview", "/api/shrinkage/config",
                          "/api/shrinkage/count", "/api/shrinkage/waste",
                          # Sales → Blocked by stock: cut to the person's locations
@@ -2265,7 +2265,7 @@ LOCATION_CUTS = {
     "/api/sales/stockstop": lambda b, A: salestop.cut(b, A), "/api/sales/stockstop/xlsx": lambda b, A: salestop.cut(b, A),
     "/api/executive": lambda b, A: executive.cut(b, A), "/api/transit": lambda b, A: transit.cut(b, A),
     "/api/billyrec": lambda b, A: billyrec.cut(b, A), "/api/receipts": lambda b, A: rcpt.cut(b, A)}
-SELF_CUT = {"/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
+SELF_CUT = {"/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx", "/api/typology/family",
             "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview",
             "/api/shrinkage/config", "/api/shrinkage/count", "/api/shrinkage/waste", "/api/sevenrooms",
             "/api/sevenrooms/xlsx", "/api/billyrec/rows", "/api/billyrec/xlsx", "/api/people", "/api/opsexec"}
@@ -2559,6 +2559,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path in ("/api/discharge", "/api/discharge/xlsx"):     # its lines, interventions and squares; no company view
             self._scope_filter = lambda b: recipeuse.cut(b, self._allowed)
         elif path in ("/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx",
+                      "/api/typology/family",
                       "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx",
                       "/api/shrinkage/overview", "/api/shrinkage/config", "/api/shrinkage/count",
                       "/api/shrinkage/waste"):
@@ -3840,6 +3841,27 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(body)
                 else:
                     self._send(404, {"error": "Not found"})
+            elif url.path == "/api/typology/family":
+                # Typology & turnover → a family's pop-up: its items, location by location, from the report held
+                if not auth.can(user, "finance.inventory.view"):
+                    self._send(403, {"error": "Your role does not include Inventory."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                try:
+                    days = int(q.get("days") or 90)
+                except ValueError:
+                    days = 90
+                r = movement.held(company, q.get("as_of") or "", days)
+                if not r:
+                    self._send(409, {"error": "Read the report again first."})
+                    return
+                fams = [f for f in (q.get("family") or "").split("\u0001") if f][:200]
+                if not q.get("type") or not fams:
+                    self._send(400, {"error": "Choose a type and a family."})
+                    return
+                m = recipes.master_cached(company) or {}
+                self._send(200, typology.family_items(movement.cut(r, self._allowed), m.get("items") or {},
+                                                      store.get_settings(), q.get("type"), fams))
             elif url.path in ("/api/typology", "/api/typology/xlsx"):
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})

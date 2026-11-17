@@ -90,6 +90,49 @@ def classify(card, natures):
     return typ, fam or typ, natures.get(typ, "supplies")
 
 
+def _line(R, days, card, qty, cost, use, adj_neg, rdays):
+    """The figures of one location and item: its nature, value, use, cover against target."""
+    typ, fam, nat = classify(card, R["natures"])
+    used = use + (adj_neg if nat == "supplies" and R["supplies_adjustments"] else 0.0)
+    value = qty * cost if qty > 0 else 0.0
+    daily = max(used, 0.0) * cost / days
+    cycle = days / rdays if rdays else None
+    if fam in R["targets"]:
+        target, source = R["targets"][fam], "settings"
+    elif cycle is not None:
+        target, source = math.ceil(cycle + R["safety_days"]), "deliveries"
+    else:
+        target, source = None, ""
+    doh = value / daily if daily > 0 else None
+    turned = nat not in ("equipment",)
+    excess = max(0.0, value - target * daily) if turned and target and daily > 0 else 0.0
+    fresh_check = bool(fam in R["fresh"] and value > 0 and (doh is None or doh > R["fresh_days"]))
+    return {"typ": typ, "fam": fam, "nat": nat, "value": value, "daily": daily, "cycle": cycle, "target": target,
+            "source": source, "doh": doh, "turned": turned, "excess": excess, "fresh": fresh_check}
+
+
+def _add(g, x, qty, cost, days):
+    """Adds one line to the additive figures of a group (a family at a location, or an item at a location)."""
+    value, daily, target, cycle = x["value"], x["daily"], x["target"], x["cycle"]
+    g["lines"] += 1 if qty > 0 else 0
+    g["value"] += value
+    g["neg"] += qty * cost if qty < 0 else 0.0
+    g["use"] += daily * days
+    g["nouse"] += value if value > 0 and daily <= 0 else 0.0
+    g["excess"] += x["excess"]
+    if target and daily > 0:
+        g["tw"] += target * daily
+        g["dw"] += daily
+    if cycle is not None and daily > 0:
+        g["cw"] += cycle * daily
+    g["count"] += 1 if x["fresh"] else 0
+
+
+def _blank(nat):
+    return {"nature": nat, "lines": 0, "value": 0.0, "neg": 0.0, "use": 0.0, "nouse": 0.0, "excess": 0.0, "tw": 0.0,
+            "cw": 0.0, "dw": 0.0, "count": 0}
+
+
 def analyse(mv, items, settings):
     """mv: the held Movement result (with _typo); items: item cards from the recipes master."""
     R = rules(settings)
@@ -99,42 +142,16 @@ def analyse(mv, items, settings):
     lines = []
     for loc, it, qty, cost, use, adj_neg, rdays in mv.get("_typo") or []:
         card = items.get(it) or {}
-        typ, fam, nat = classify(card, R["natures"])
-        used = use + (adj_neg if nat == "supplies" and R["supplies_adjustments"] else 0.0)
-        value = qty * cost if qty > 0 else 0.0
-        daily = max(used, 0.0) * cost / days
-        cycle = days / rdays if rdays else None
-        if fam in R["targets"]:
-            target, source = R["targets"][fam], "settings"
-        elif cycle is not None:
-            target, source = math.ceil(cycle + R["safety_days"]), "deliveries"
-        else:
-            target, source = None, ""
-        doh = value / daily if daily > 0 else None
-        turned = nat not in ("equipment",)
-        excess = max(0.0, value - target * daily) if turned and target and daily > 0 else 0.0
-        fresh_check = bool(fam in R["fresh"] and value > 0 and (doh is None or doh > R["fresh_days"]))
-        g = groups.setdefault((loc, typ, fam), {"nature": nat, "lines": 0, "value": 0.0, "neg": 0.0, "use": 0.0,
-                                                 "nouse": 0.0, "excess": 0.0, "tw": 0.0, "cw": 0.0, "dw": 0.0,
-                                                 "count": 0})
-        g["lines"] += 1 if qty > 0 else 0
-        g["value"] += value
-        g["neg"] += qty * cost if qty < 0 else 0.0
-        g["use"] += daily * days
-        g["nouse"] += value if value > 0 and daily <= 0 else 0.0
-        g["excess"] += excess
-        if target and daily > 0:
-            g["tw"] += target * daily
-            g["dw"] += daily
-        if cycle is not None and daily > 0:
-            g["cw"] += cycle * daily
-        g["count"] += 1 if fresh_check else 0
-        if turned and value > 0 and (fresh_check or (target and doh is not None and doh > 3 * target)
-                                     or (daily <= 0 and value >= 100000)):
+        x = _line(R, days, card, qty, cost, use, adj_neg, rdays)
+        typ, fam, nat = x["typ"], x["fam"], x["nat"]
+        value, daily, doh, target, cycle = x["value"], x["daily"], x["doh"], x["target"], x["cycle"]
+        _add(groups.setdefault((loc, typ, fam), _blank(nat)), x, qty, cost, days)
+        if x["turned"] and value > 0 and (x["fresh"] or (target and doh is not None and doh > 3 * target)
+                                          or (daily <= 0 and value >= 100000)):
             lines.append([loc, it, card.get("Description") or "", typ, fam, nat, round(qty, 3),
                           card.get("Base_Unit_of_Measure") or "", round(value, 0), round(daily * days / cost, 3)
-                          if cost else 0.0, round(doh, 0) if doh is not None else None, target, source,
-                          round(cycle, 1) if cycle else None, round(excess, 0), fresh_check])
+                          if cost else 0.0, round(doh, 0) if doh is not None else None, target, x["source"],
+                          round(cycle, 1) if cycle else None, round(x["excess"], 0), x["fresh"]])
     rows = [[loc, typ, fam, g["nature"], g["lines"], round(g["value"], 0), round(g["neg"], 0), round(g["use"], 0),
              round(g["nouse"], 0), round(g["excess"], 0), round(g["tw"], 2), round(g["cw"], 2), round(g["dw"], 2),
              g["count"]] for (loc, typ, fam), g in groups.items()]
@@ -157,6 +174,37 @@ def analyse(mv, items, settings):
                   "natures": R["natures"]},
         "definitions": DEFINITIONS,
     }
+
+
+def family_items(mv, items, settings, typ, families):
+    """The items of one type and some of its families, location by location, in the additive shape of the
+    typology rows (Typology & turnover → a family's pop-up): [location, item, description, unit, family,
+    nature, qty, lines, value, negative, use, no_use, excess, target_w, cycle_w, daily_w, count_flags]."""
+    R = rules(settings)
+    days = mv["history_days"]
+    want = {str(f).strip().upper() for f in families}
+    typ = str(typ or "").strip().upper()
+    out = {}
+    for loc, it, qty, cost, use, adj_neg, rdays in mv.get("_typo") or []:
+        card = items.get(it) or {}
+        x = _line(R, days, card, qty, cost, use, adj_neg, rdays)
+        if x["typ"] != typ or x["fam"] not in want:
+            continue
+        g = out.get((loc, it))
+        if g is None:
+            g = out[(loc, it)] = _blank(x["nat"]) | {"qty": 0.0, "fam": x["fam"], "desc": card.get("Description") or "",
+                                                      "unit": card.get("Base_Unit_of_Measure") or ""}
+        g["qty"] += qty
+        _add(g, x, qty, cost, days)
+    rows = [[loc, it, g["desc"], g["unit"], g["fam"], g["nature"], round(g["qty"], 3), g["lines"], round(g["value"], 0),
+             round(g["neg"], 0), round(g["use"], 0), round(g["nouse"], 0), round(g["excess"], 0), round(g["tw"], 2),
+             round(g["cw"], 2), round(g["dw"], 2), g["count"]] for (loc, it), g in out.items()]
+    rows.sort(key=lambda r: -r[8])
+    return {"company": mv["company"], "as_of": mv["as_of"], "history_days": days, "type": typ,
+            "families": sorted(want), "distribution": sorted(R["distribution"]),
+            "cols": ["location", "item", "description", "unit", "family", "nature", "qty", "lines", "value", "negative",
+                     "use", "no_use", "excess", "target_w", "cycle_w", "daily_w", "count_flags"],
+            "rows": rows[:20000], "rows_total": len(rows)}
 
 
 DEFINITIONS = {
