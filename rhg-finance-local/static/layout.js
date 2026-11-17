@@ -5,8 +5,8 @@
    taken from the page as it is served (the screen, the block's id or its heading), so a layout keeps
    working when figures change.
 
-   Whose layout: a role's layout is what everyone in the role sees; a person's own layout wins over it
-   until they reset it. Both are held by identity (GET/POST /api/layout at the root of the site) under
+   Whose layout: everyone's layout is the tower for all; a role's layout is what everyone in the role
+   sees, over everyone's; a person's own layout wins over both until they reset it. Both are held by identity (GET/POST /api/layout at the root of the site) under
    the rights layout.personal and layout.roles.manage. Hidden = left out of view only; nothing is
    removed, no data access changes, and every hidden section comes back with Show or a reset.
 
@@ -180,7 +180,7 @@
     if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
     return j;
   }
-  function effective(info) { return (info && (info.personal || info.role_layout)) || null; }
+  function effective(info) { return (info && (info.personal || info.role_layout || info.all_layout)) || null; }
   function remember(layout) {
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(layout || null)); } catch (e) { /* storage off */ }
   }
@@ -349,6 +349,7 @@
   function targets() {
     const out = [];
     if (L.info.can.personal) out.push(["me", "Only me"]);
+    if (L.info.can.roles) out.push(["all", "Everyone"]);
     if (L.info.can.roles) (L.info.roles || []).forEach(r => out.push(["role:" + r, "Role · " + r]));
     return out;
   }
@@ -361,6 +362,7 @@
     bar.innerHTML = `<div class="lay-h"><b>Customize layout</b>
         <label>For <select id="layFor">${t.map(([v, l]) => `<option value="${v}"${v === L.target ? " selected" : ""}>${l.replace(/</g, "&lt;")}</option>`).join("")}</select></label></div>
       <p class="lay-tip" id="layTip"></p>
+      <label class="lay-ovr" id="layOvrBox" hidden><input type="checkbox" id="layOvr"> <span>Also for the roles and people with a layout of their own (theirs are removed)</span></label>
       <div class="lay-b"><button type="button" id="layReset"></button><button type="button" id="layCancel">Cancel</button><button type="button" id="laySave" class="lay-primary">Save</button></div>
       <p class="lay-msg" id="layMsg" role="status" aria-live="polite"></p>`;
     document.body.appendChild(bar);
@@ -371,12 +373,20 @@
     document.getElementById("layReset").onclick = reset;
   }
   function paintBar() {
-    const me = L.target === "me";
-    const role = me ? "" : L.target.slice(5);
+    const me = L.target === "me", all = L.target === "all";
+    const role = me || all ? "" : L.target.slice(5);
+    const own = (L.info.own_roles || []), people = L.info.own_people || 0;
+    const keep = [own.length ? `${own.length} ${own.length === 1 ? "role keeps" : "roles keep"} a layout of their own (${own.join(", ")})` : "",
+                  people ? `${people} ${people === 1 ? "person keeps" : "people keep"} their own` : ""].filter(Boolean).join("; ");
     document.getElementById("layTip").textContent = me
       ? "Drag a section, tab or menu item to move it; the eye hides or shows it. Only you see this layout; it wins over your role's."
+      : all
+      ? "Drag a section, tab or menu item to move it; the eye hides or shows it. Everyone sees this layout, unless their role or they themselves keep one of their own." + (keep ? " Now " + keep + "." : "")
       : `Drag a section, tab or menu item to move it; the eye hides or shows it. Everyone with the role ${role} sees this layout, unless they keep one of their own.`;
-    document.getElementById("layReset").textContent = me ? "Use my role's layout" : "Back to the standard layout";
+    document.getElementById("layReset").textContent = me ? "Use my role's layout" : all ? "Back to the standard layout"
+      : (L.info.all_layout ? "Use everyone's layout" : "Back to the standard layout");
+    const box = document.getElementById("layOvrBox");
+    box.hidden = !(all && keep); if (box.hidden) document.getElementById("layOvr").checked = false;
   }
   function say(t, err) {
     const m = document.getElementById("layMsg");
@@ -388,37 +398,48 @@
     try {
       let lay;
       if (v === "me") lay = effective(L.info);
+      else if (v === "all") lay = L.info.all_layout || null;
       else {
         const j = await call("layout?app=" + APP + "&role=" + encodeURIComponent(v.slice(5)));
-        lay = j.asked_layout || null;
+        lay = j.asked_layout || L.info.all_layout || null;        // a role without its own starts from everyone's
       }
       stopEdit(); apply(lay); startEdit(); say("");
-      document.getElementById("layFor").value = v;
+      document.getElementById("layFor").value = v; paintBar();
     } catch (e) { say(e.message, true); }
   }
+  const bodyFor = layout => L.target === "me" ? { app: APP, scope: "me", layout }
+    : L.target === "all" ? { app: APP, scope: "all", layout } : { app: APP, scope: "role", role: L.target.slice(5), layout };
   async function save() {
     const layout = snapshot();
-    const me = L.target === "me";
+    const me = L.target === "me", all = L.target === "all";
+    const body = bodyFor(layout);
+    if (all && document.getElementById("layOvr").checked) {
+      if (!confirm("Save this layout for everyone and remove the layouts the roles and people keep of their own? They all see this one.")) return;
+      body.override = true;
+    }
     say("Saving…");
     try {
-      await call("layout", me ? { app: APP, scope: "me", layout } : { app: APP, scope: "role", role: L.target.slice(5), layout });
+      await call("layout", body);
       await refresh();
       stopEdit();
       apply(effective(L.info));
-      note(me ? "Your layout is saved." : `The layout of ${L.target.slice(5)} is saved.`
-        + (!me && L.info.personal ? " You keep your own layout; reset it to see the role's." : ""));
+      const mine = L.info.personal ? " You keep your own layout; reset it to see this one." : "";
+      note(me ? "Your layout is saved." : all ? "The layout for everyone is saved." + (body.override ? "" : mine)
+        : `The layout of ${L.target.slice(5)} is saved.` + mine);
     } catch (e) { say(e.message, true); }
   }
   async function reset() {
-    const me = L.target === "me";
-    const what = me ? "your own layout (your role's layout comes back)" : `the layout of ${L.target.slice(5)} (the standard layout comes back)`;
+    const me = L.target === "me", all = L.target === "all";
+    const what = me ? "your own layout (your role's layout comes back)" : all ? "the layout for everyone (the standard layout comes back)"
+      : `the layout of ${L.target.slice(5)} (${L.info.all_layout ? "everyone's layout" : "the standard layout"} comes back)`;
     if (!confirm(`Remove ${what}? Hidden sections show again.`)) return;
     say("Resetting…");
     try {
-      await call("layout", me ? { app: APP, scope: "me", layout: null } : { app: APP, scope: "role", role: L.target.slice(5), layout: null });
+      await call("layout", bodyFor(null));
       await refresh();
       stopEdit(); apply(effective(L.info));
-      note(me ? "Back to your role's layout." : `${L.target.slice(5)} is back to the standard layout.`);
+      note(me ? "Back to your role's layout." : all ? "Everyone is back to the standard layout."
+        : `${L.target.slice(5)} is back to ${L.info.all_layout ? "everyone's" : "the standard"} layout.`);
     } catch (e) { say(e.message, true); }
   }
   function note(t) {
@@ -494,6 +515,9 @@ body.lay-edit main [data-lay].lay-ghost:not(button) > .lay-ctl{opacity:1}
 #layBar label{display:flex;gap:8px;align-items:center;color:var(--sub,#5f636b);font-size:12px}
 #layBar select{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line,#e3e1d9);border-radius:8px;background:var(--card,#fff);color:var(--ink,#16181d)}
 #layBar .lay-tip{margin:0;color:var(--sub,#5f636b);font-size:12px;line-height:1.5}
+#layBar .lay-ovr{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.45;color:var(--ink,#16181d);cursor:pointer}
+#layBar .lay-ovr[hidden]{display:none}
+#layBar .lay-ovr input{margin:2px 0 0;flex:none}
 #layBar .lay-b{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #layBar button{font:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;
   border:1px solid var(--line,#e3e1d9);background:var(--card,#fff);color:var(--ink,#16181d)}
