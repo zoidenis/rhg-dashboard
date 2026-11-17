@@ -92,3 +92,6 @@ input:focus,select:focus,.btn:focus-visible{outline:2px solid var(--accent);outl
 .powered{display:flex;align-items:baseline;gap:5px;font-size:11px;color:rgba(255,255,255,.62);margin-top:10px}
 .powered .pulse-mark{font-size:15px;color:#fff}
 h1,h2,h3{font-family:"Manrope",system-ui,sans-serif}
+
+/* hidden means hidden, whatever a page styles the element with (see brand.css) */
+[hidden]{display:none !important}

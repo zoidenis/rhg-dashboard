@@ -319,3 +319,8 @@ tr.total td, .total td{ font-weight: 600; background: transparent; }
   .hdr-btns .btn{ min-width: 0; }
   .rhg-row{ flex-wrap: wrap; }
 }
+
+/* Hidden means hidden, everywhere. A page that styles an element with its own display (a tab button with
+   "all:unset; display:inline-flex", a filter row with display:flex) would otherwise show it although the code
+   hid it: a tab or a control a role does not hold must never appear, whatever the page's own styles. */
+[hidden]{ display: none !important; }
