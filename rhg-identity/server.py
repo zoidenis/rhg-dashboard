@@ -25,6 +25,7 @@ import reportcenter
 import screens
 import store
 import actioncenter
+import notifications
 import unicorn
 import unicorn_registers as ureg
 
@@ -46,6 +47,7 @@ STATIC_FILES = {
     "reports.js": "application/javascript; charset=utf-8",
     "gear.js": "application/javascript; charset=utf-8",
     "export.js": "application/javascript; charset=utf-8",
+    "notify.js": "application/javascript; charset=utf-8",
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",
                 "/brand.css", "/app.css", "/icon.svg", "/manifest.webmanifest", "/sw.js",
@@ -236,6 +238,11 @@ class Handler(BaseHTTPRequestHandler):
                 page = "reports-center.html" if u and not u.get("must_change") else "login.html"
                 self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
                 return
+            if url.path in ("/notifications", "/notifications.html"):
+                u = self._user()
+                page = "notifications.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
             if url.path in ("/unicorn", "/unicorn.html"):
                 u = self._user()
                 page = "unicorn.html" if u and not u.get("must_change") else "login.html"
@@ -285,6 +292,21 @@ class Handler(BaseHTTPRequestHandler):
                                             "description": r["description"], "system": bool(r["system"])}
                                            for r in store.q("SELECT * FROM roles ORDER BY name")],
                                  "permissions": permissions.PERMISSIONS})
+            elif url.path == "/api/notifications/count":
+                # the bell: how many unread, and the newest id (a page shows the new ones as they come)
+                self._send(200, {"unread": notifications.unread(user["username"]), "latest": notifications.latest_id(user["username"])})
+            elif url.path == "/api/notifications":
+                qs = parse_qs(url.query)
+                g = lambda k: (qs.get(k) or [""])[0]
+                self._send(200, {"items": notifications.listing(user["username"], g("unread") == "1",
+                                                                g("before") if g("before").isdigit() else None,
+                                                                g("kind") or None, int(g("limit")) if g("limit").isdigit() else 50,
+                                                                g("after") if g("after").isdigit() else None),
+                                 "unread": notifications.unread(user["username"]), "kinds": notifications.KINDS})
+            elif url.path == "/api/notifications/prefs":
+                self._send(200, {"prefs": notifications.prefs(user["username"]), "kinds": notifications.KINDS,
+                                 "settings": notifications.settings(), "can_manage": auth.can(user, "actioncenter.manage"),
+                                 "email": user.get("email") or "", "last_scan": notifications._meta("last_scan")})
             elif url.path == "/api/screens":
                 # The screens of pulse (menus and tabs) for the towers' menus: what the signed-in person may open.
                 self._send(200, {"catalogue": screens.catalogue(), "held": [p for p in user["permissions"] if ".s." in p],
@@ -383,6 +405,7 @@ class Handler(BaseHTTPRequestHandler):
                                  "can_rules": auth.can(user, "unicorn.rules.manage"),
                                  "investigating": sorted(unicorn._investigating), "enabled": unicorn.enabled()})
             elif url.path == "/api/unicorn/finding":
+                notifications.poke()                    # a delegation or a decision makes an action: its owner hears of it
                 if not auth.can(user, "unicorn.use"):
                     self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
                 fid = (parse_qs(url.query).get("id") or ["0"])[0]
@@ -602,12 +625,23 @@ class Handler(BaseHTTPRequestHandler):
                                                                        body.get("note"), bool(body.get("copy_me")), user)})
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
+            elif url.path == "/api/notifications/read":
+                n = notifications.mark_read(user["username"], body.get("ids") if isinstance(body.get("ids"), list) else [],
+                                            bool(body.get("all")), body.get("read", True) is not False)
+                self._send(200, {"changed": n, "unread": notifications.unread(user["username"])})
+            elif url.path == "/api/notifications/prefs":
+                self._send(200, {"prefs": notifications.save_prefs(user["username"], body.get("prefs") or {})})
+            elif url.path == "/api/notifications/settings":
+                if not auth.can(user, "actioncenter.manage"):
+                    self._send(403, {"error": "Only a manager of the Action Center switches the notification emails on."}); return
+                self._send(200, {"settings": notifications.save_settings(body, user["username"])})
             elif url.path == "/api/actions/item":
                 if not any(auth.can(user, f"platform.s.actions.{t}") for t in ("executive", "departments", "mine")):
                     self._send(403, {"error": "Your role does not include the Executive Action Center."}); return
                 try:
                     x = actioncenter.update(str(body.get("uid") or ""), {k: body.get(k) for k in ("status", "comment", "owner", "due")},
                                             user, auth.can)
+                    notifications.poke()
                     self._send(200, {"item": x})
                 except PermissionError as exc:
                     self._send(403, {"error": str(exc)})
@@ -621,6 +655,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, actioncenter.assign(uids, str(body.get("owner") or ""), str(body.get("due") or ""),
                                                         str(body.get("comment") or ""), user, auth.can,
                                                         notify=bool(body.get("notify"))))
+                    notifications.poke()
                 except PermissionError as exc:
                     self._send(403, {"error": str(exc)})
                 except (ValueError, RuntimeError) as exc:
@@ -698,6 +733,7 @@ class Handler(BaseHTTPRequestHandler):
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
             elif url.path == "/api/unicorn/decision":
+                notifications.poke()
                 if not auth.can(user, "unicorn.decisions.approve"):
                     self._send(403, {"error": "Your role cannot approve or refuse Unicorn's proposals."}); return
                 try:
@@ -714,6 +750,7 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
             elif url.path == "/api/unicorn/action":
+                notifications.poke()
                 if not auth.can(user, "unicorn.use"):
                     self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
                 try:
@@ -827,6 +864,7 @@ def main():
     threading.Thread(target=sweeper, daemon=True).start()
     unicorn.start()
     actioncenter.start()
+    notifications.start()
     if not unicorn.enabled():
         print("Unicorn: no ANTHROPIC_API_KEY in .env - the business analyst stays off until one is set.")
 

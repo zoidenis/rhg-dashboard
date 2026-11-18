@@ -663,9 +663,26 @@ $("logoutBtn").onclick = async () => {
   await load();
   if (!D) return;
   const h = location.hash.slice(1).split("/");
+  if (h[0] === "item") { show(D.tabs.includes("mine") ? "mine" : D.tabs.includes("executive") ? "executive" : D.tabs[0]); openFromHash(); return; }
   if (h[1]) dept = decodeURIComponent(h[1]);
   show(D.tabs.includes(h[0]) ? h[0] : D.tabs.includes("executive") ? "executive" : D.tabs[0]);
 })();
+// a notification opens its task: #item/<uid>
+function openFromHash(){
+  const h = location.hash.slice(1);
+  if (!h.startsWith("item/") || !D) return;
+  const uid = decodeURIComponent(h.slice(5));
+  if (D.items.some(i => i.uid === uid)) openItem(uid);
+  else {
+    const m = document.createElement("div");
+    m.className = "card"; m.setAttribute("role", "status"); m.style.cssText = "margin:0 0 14px;border-left:4px solid var(--rhg-amber)";
+    m.textContent = "This task is no longer in the Action Center, or it is outside your access.";
+    const hd = document.querySelector("main > header"); hd ? hd.insertAdjacentElement("afterend", m) : document.querySelector("main").prepend(m);
+    setTimeout(() => m.remove(), 9000);
+  }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+window.addEventListener("hashchange", openFromHash);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 <script>

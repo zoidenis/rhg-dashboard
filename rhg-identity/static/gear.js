@@ -10,6 +10,10 @@
   window.PulseGear = true;
   const framed = (() => { try { return window.top !== window; } catch (e) { return true; } })();
   const embedded = /[?&]embed=/.test(location.search);
+  // the bell of notifications (notify.js) on every page that has the gear
+  if (!framed && !embedded && !window.PulseNotify && !document.querySelector('script[src="/notify.js"]')) {
+    const s = document.createElement("script"); s.src = "/notify.js"; s.defer = true; document.head.appendChild(s);
+  }
 
   if (framed && embedded) {
     // a link inside a setting leaves Settings for the page it names

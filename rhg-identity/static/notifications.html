@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>Notifications · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* Notifications: what changed on the person's tasks (notifications.py). Shell as the Reports center. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0}
+header{display:flex;justify-content:space-between}
+.adminlink{margin-top:auto;padding-top:16px}
+.nt-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:16px;align-items:start}
+@media(max-width:1000px){.nt-grid{grid-template-columns:1fr}}
+.nt-flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.nt-seg{display:inline-flex;gap:6px}
+.nt-seg button{all:unset;cursor:pointer;font-size:13px;padding:6px 13px;border-radius:999px;border:1px solid var(--line);color:var(--sub);background:var(--card)}
+.nt-seg button.on{background:var(--rhg-primary);border-color:var(--rhg-primary);color:#fff}
+.nt-flt select{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:13px;color:var(--ink)}
+#ntList{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+#ntList .pn-row:last-child{border-bottom:0}
+.nt-more{display:flex;justify-content:center;margin-top:12px}
+table.nt-pref{width:100%;border-collapse:collapse;font-size:13px}
+table.nt-pref th,table.nt-pref td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+table.nt-pref th:not(:first-child),table.nt-pref td:not(:first-child){text-align:center;width:90px}
+.nt-msg{font-size:12.5px;color:var(--sub);margin-top:8px;min-height:1em}
+.nt-switch{display:flex;gap:10px;align-items:center;font-size:13.5px}
+table.nt-pref .nt-k{display:flex;align-items:center;gap:10px}
+.mnav-btn,.mnav-bd{display:none}
+@media(max-width:760px){
+  aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;transform:translateX(-105%);transition:transform .2s ease}
+  body.mnav-open aside{transform:none;box-shadow:0 0 32px rgba(0,0,0,.35)}
+  body.mnav-open{overflow:hidden}
+  .mnav-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}
+  body.mnav-open .mnav-bd{display:block}
+  .mnav-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px}
+  .mnav-btn svg{width:18px;height:18px}
+  main{padding:16px}
+  .rc-find{max-width:none;flex-basis:100%}
+  .feed .fi{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}.feed .fi .t{grid-column:1/-1}.feed .fi .t b{display:inline;margin-right:6px}
+  table.rn{min-width:560px}
+}
+@media (prefers-reduced-motion: reduce){aside,.sw,.sw::after{transition:none}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/actions">Executive Action Center</a>
+    <a href="/executive">Executive dashboard</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
+</aside>
+<div class="mnav-bd no-report" id="mnavBd"></div>
+<main>
+  <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
+  <header>
+    <div>
+      <div class="eyebrow">RHG / Notifications</div>
+      <h1>Notifications</h1>
+      <div class="period">What changed on your tasks, wherever it was changed: the Action Center, the towers' registers, Unicorn or the daily controls</div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn" id="allRead" type="button">Mark all as read</button><button class="btn dark" id="reload" type="button">Read again</button></div>
+      <div class="hdr-meta"><span id="whoami"></span><button class="linkbtn" id="logoutBtn">Sign out</button></div>
+    </div>
+  </header>
+  <div class="nt-grid">
+    <div class="card">
+      <div class="nt-flt">
+        <div class="nt-seg" role="group" aria-label="Show"><button type="button" data-s="unread" class="on">Unread <b id="ntUn"></b></button><button type="button" data-s="all">All</button></div>
+        <select id="ntKind" aria-label="Kind"><option value="">Every kind</option></select>
+      </div>
+      <div id="ntList"><div class="pn-empty">Reading…</div></div>
+      <div class="nt-more"><button class="btn" id="ntMore" type="button" hidden>Show older</button></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>My choices</h2>
+        <p class="hint">What reaches you in pulse and what also by email (one email every 10 minutes at most, with what is new). You never receive a notification for a change you made yourself.</p>
+        <table class="nt-pref" id="ntPrefs"></table>
+        <div class="nt-msg" id="ntPrefMsg"></div>
+      </div>
+      <div class="card" id="ntAdmin" hidden>
+        <h2>Notification emails</h2>
+        <p class="hint">For everyone: when it is off, notifications stay in pulse only. The emails go through the mail server of Settings.</p>
+        <label class="nt-switch"><input type="checkbox" id="ntEmail"> <span>Send notification emails</span></label>
+        <div class="nt-msg" id="ntAdminMsg"></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+<script src="/notify.js"></script><!-- the bell and the pieces of a notification (identity) -->
+<script>
+const $ = id => document.getElementById(id);
+let me = null, CSRF = null, SHOW = "unread", KIND = "", ITEMS = [], P = null;
+const esc = s => PulseNotify.esc(s);
+async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; }
+async function post(u, b){ const r = await fetch(u, {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: JSON.stringify(b || {})}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; }
+function qs(before){ const p = new URLSearchParams({limit: "50"}); if (SHOW === "unread") p.set("unread", "1"); if (KIND) p.set("kind", KIND); if (before) p.set("before", before); return p.toString(); }
+function paint(){
+  $("ntList").innerHTML = ITEMS.length ? ITEMS.map(PulseNotify.row).join("") : `<div class="pn-empty">${SHOW === "unread" ? "No unread notifications." : "No notifications."}</div>`;
+  document.querySelectorAll(".nt-seg button").forEach(b => b.classList.toggle("on", b.dataset.s === SHOW));
+}
+async function load(more){
+  try {
+    const d = await get("/" + "api/notifications?" + qs(more ? ITEMS[ITEMS.length - 1].id : ""));
+    ITEMS = more ? ITEMS.concat(d.items) : d.items;
+    $("ntUn").textContent = d.unread ? String(d.unread) : ""; PulseNotify.setUnread(d.unread);
+    $("ntMore").hidden = d.items.length < 50;
+    if ($("ntKind").options.length === 1) Object.entries(d.kinds).forEach(([k, l]) => $("ntKind").insertAdjacentHTML("beforeend", `<option value="${esc(k)}">${esc(l)}</option>`));
+    paint();
+  } catch (e) { $("ntList").innerHTML = `<div class="pn-empty">${esc(e.message)}</div>`; }
+}
+async function loadPrefs(){
+  P = await get("/" + "api/notifications/prefs");
+  $("ntPrefs").innerHTML = `<tr><th>Kind</th><th>In pulse</th><th>By email</th></tr>` + Object.entries(P.kinds).map(([k, l]) =>
+    `<tr><td><div class="nt-k">${PulseNotify.icon(k)} <span>${esc(l)}</span></div></td>
+      <td><input type="checkbox" data-k="${esc(k)}" data-c="app" aria-label="${esc(l)}: in pulse" ${P.prefs[k].app ? "checked" : ""}></td>
+      <td><input type="checkbox" data-k="${esc(k)}" data-c="email" aria-label="${esc(l)}: by email" ${P.prefs[k].email ? "checked" : ""}></td></tr>`).join("");
+  $("ntPrefMsg").textContent = !P.email ? "Your account has no email address: emails cannot reach you."
+    : P.settings.email_enabled ? `Emails go to ${P.email}.` : "Notification emails are switched off for everyone at the moment; your choices apply when they are switched on.";
+  if (P.can_manage) {
+    $("ntAdmin").hidden = false; $("ntEmail").checked = P.settings.email_enabled;
+    const ls = P.last_scan;
+    $("ntAdminMsg").textContent = ls ? `Last comparison ${ls.at.replace("T", " ")}: ${ls.items} items read, ${ls.made} notifications made.` : "The first comparison runs a few minutes after pulse starts.";
+  }
+}
+$("ntPrefs").addEventListener("change", async e => {
+  const c = e.target.closest("input[data-k]"); if (!c) return;
+  try { const d = await post("/" + "api/notifications/prefs", {prefs: {[c.dataset.k]: {[c.dataset.c]: c.checked}}}); P.prefs = d.prefs; $("ntPrefMsg").textContent = "Saved."; }
+  catch (err) { c.checked = !c.checked; $("ntPrefMsg").textContent = err.message; }
+});
+$("ntEmail").onchange = async e => {
+  try { await post("/" + "api/notifications/settings", {email_enabled: e.target.checked}); $("ntAdminMsg").textContent = e.target.checked ? "Notification emails are on." : "Notification emails are off."; await loadPrefs(); }
+  catch (err) { e.target.checked = !e.target.checked; $("ntAdminMsg").textContent = err.message; }
+};
+document.querySelector(".nt-seg").onclick = e => { const b = e.target.closest("[data-s]"); if (b) { SHOW = b.dataset.s; load(); } };
+$("ntKind").onchange = e => { KIND = e.target.value; load(); };
+$("ntMore").onclick = () => load(true);
+$("reload").onclick = () => load();
+$("allRead").onclick = async () => { const d = await post("/" + "api/notifications/read", {all: true}); PulseNotify.setUnread(d.unread); load(); };
+$("ntList").addEventListener("click", async e => {
+  const a = e.target.closest("[data-pn]"); if (!a) return;
+  e.preventDefault();
+  const n = ITEMS.find(x => x.id === +a.dataset.pn);
+  if (n && !n.read) { try { await post("/" + "api/notifications/read", {ids: [n.id]}); } catch (err) { /* opens anyway */ } }
+  location.href = a.getAttribute("href");
+});
+window.addEventListener("pulse-notify", () => { if (SHOW === "unread" || !KIND) load(); });
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login?signedout=1";
+};
+(async () => {
+  let s;
+  try { s = await get("/" + "api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  const held = p => (me.permissions || []).some(x => x.startsWith(p));
+  const t = $("towers");
+  if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  if (!held("platform.s.actions.")) { const ac = t.querySelector('a[href="/actions"]'); if (ac) ac.remove(); }
+  if (!held("platform.s.executive.")) { const ex = t.querySelector('a[href="/executive"]'); if (ex) ex.remove(); }
+  [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.people.", "/finance/#people", "People &amp; Productivity"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]
+    .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
+  if ((me.permissions || []).includes("unicorn.use")) t.insertAdjacentHTML("beforeend", `<a href="/unicorn">Unicorn</a>`);
+  await Promise.all([load(), loadPrefs().catch(() => {})]);
+})();
+</script>
+<script>
+(() => {
+  const btn = document.getElementById("mnavBtn"), body = document.body;
+  if (!btn) return;
+  const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
+  document.getElementById("mnavBd").addEventListener("click", () => set(false));
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("a")) set(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
+})();
+</script>
+<script src="/gear.js"></script><!-- the way into Settings (identity) -->
+</body>
+</html>
