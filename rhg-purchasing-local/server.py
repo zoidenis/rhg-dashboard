@@ -1937,7 +1937,8 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 info = smtp_config.info()
                 self._send(200, {"configured": info.get("configured"), "from": info.get("from"),
-                                 "host": info.get("host")})
+                                 "host": "Microsoft Graph" if info.get("transport") == "graph" else info.get("host"),
+                                 "transport": info.get("transport")})
             return
         user = self._user()
         try:
@@ -2805,8 +2806,12 @@ def main():
     exreg.start(register_controls)
     pricechg.Weekly(client, lambda: notifier.companies(), company_currency).start()
     smtp = notify.smtp_info()
-    print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]
-                               else "mail server not configured in Settings"))
+    if smtp["transport"] == "graph":
+        print("Email notices: Microsoft Graph from " + smtp["from"] if smtp["configured"]
+              else "Email notices: Microsoft Graph not ready: " + (smtp["graph"].get("error") or "set the From mailbox"))
+    else:
+        print("Email notices: " + ("mail server " + smtp["host"] if smtp["configured"]
+                                   else "mail server not configured in Settings"))
     if "--no-browser" not in sys.argv:
         threading.Timer(1.0, lambda: webbrowser.open(link)).start()
     try:

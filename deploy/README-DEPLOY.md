@@ -142,6 +142,82 @@ Pastaj `docker compose up -d finance` (rikrijon kontejnerin, që të lexojë `.e
 "Connection to the Tax Administration" tregon nëse certifikata u hap dhe deri kur vlen.
 `/opt/rhg/secrets` është jashtë dosjeve që deploy-i i zëvendëson, kështu që nuk preket.
 
+## Email me Microsoft Graph (në vend të SMTP AUTH)
+
+Microsoft e çaktivizon SMTP AUTH me fjalëkalim (Basic) si parazgjedhje për tenant-ët ekzistues në
+fund të dhjetorit 2026. Pulse dërgon atëherë me Microsoft Graph: një aplikacion në Entra ID me
+**certifikatë** (asnjë fjalëkalim apo client secret), që mund të dërgojë **vetëm** nga kutia e Pulse.
+I gjithë email-i (Purchasing, Finance, Action Center, raportet) kalon nga Purchasing, ndaj
+konfigurohet vetëm aty. Asnjë çelës nuk kalon në chat apo në git.
+
+**1. Kutia (Microsoft 365 admin center).** Krijoni një kuti të përbashkët (shared mailbox),
+p.sh. `pulse@rhg.al`. Nuk kërkon licencë.
+
+**2. Certifikata, në server.** Çelësi privat krijohet në server dhe nuk del prej andej:
+
+```bash
+sudo mkdir -p /opt/rhg/secrets/mail && cd /opt/rhg/secrets/mail
+sudo openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes -subj "/CN=RHG Pulse mail" \
+     -keyout pulse-graph.pem -out pulse-graph.crt
+sudo sh -c 'cat pulse-graph.crt >> pulse-graph.pem'     # pem = çelësi + certifikata
+UID_RHG=$(docker compose -f /opt/rhg/deploy/docker-compose.yml exec -T purchasing id -u)
+sudo chown "$UID_RHG" pulse-graph.pem && sudo chmod 400 pulse-graph.pem
+sudo chmod 711 /opt/rhg/secrets /opt/rhg/secrets/mail
+```
+
+`pulse-graph.crt` është vetëm pjesa publike: atë e shkarkoni për hapin 3. `pulse-graph.pem` nuk
+kopjohet askund.
+
+**3. Aplikacioni (Entra admin center → App registrations → New registration).**
+- Emri `RHG Pulse – server`, *Single tenant*, pa redirect URI.
+- Shënoni **Application (client) ID** dhe **Directory (tenant) ID**.
+- *Certificates & secrets → Certificates → Upload certificate*: `pulse-graph.crt`.
+- **Mos** shtoni `Mail.Send` te *API permissions*. Leja atje vlen për çdo kuti të tenant-it.
+  Leja jepet në hapin 4, vetëm për kutinë e Pulse.
+- Te *Enterprise applications → RHG Pulse – server* shënoni **Object ID** (i service principal-it,
+  jo ai i app registration).
+
+**4. Leja vetëm për kutinë e Pulse (Exchange Online PowerShell, RBAC for Applications).**
+
+```powershell
+Connect-ExchangeOnline
+New-ServicePrincipal -AppId <CLIENT_ID> -ObjectId <OBJECT_ID_E_ENTERPRISE_APP> -DisplayName "RHG Pulse"
+New-ManagementScope -Name "RHG Pulse - kutia" -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'pulse@rhg.al'"
+New-ManagementRoleAssignment -App <CLIENT_ID> -Role "Application Mail.Send" -CustomResourceScope "RHG Pulse - kutia"
+# email-et mbi ~3.5 MB (eksportet deri në 9.5 MB) kalojnë si draft në po atë kuti:
+New-ManagementRoleAssignment -App <CLIENT_ID> -Role "Application Mail.ReadWrite" -CustomResourceScope "RHG Pulse - kutia"
+# kontrolli: duhet të dalë InScope = True për pulse@rhg.al, dhe False për një kuti tjetër
+Test-ServicePrincipalAuthorization -Identity <CLIENT_ID> -Resource pulse@rhg.al
+Test-ServicePrincipalAuthorization -Identity <CLIENT_ID> -Resource fkuka@rhg.al
+```
+
+Ndryshimet e roleve mund të duan nga 30 minuta deri në 2 orë që të vlejnë.
+
+**5. Pulse.** Te `/opt/rhg/rhg-purchasing-local/.env`:
+
+```
+GRAPH_TENANT_ID=<Directory (tenant) ID>
+GRAPH_CLIENT_ID=<Application (client) ID>
+GRAPH_CERT_PATH=/app/secrets/pulse-graph.pem
+```
+
+Pastaj `docker compose up -d purchasing`. Te Purchasing → Settings → Email notifications:
+*From address* = `pulse@rhg.al`, **Save mail server**, pastaj **Send a test**. Pill-i lart duhet
+të thotë "Microsoft 365 · Graph · from pulse@rhg.al". Nëse nuk është gati, aty shfaqet arsyeja
+(certifikata nuk u gjet, mungon tenant-i, refuzim nga Microsoft). Logu i nisjes e thotë po ashtu.
+
+**6. Pastrimi, pasi testi del mirë.** Hiqni `SMTP_PASSWORD` nga `.env` dhe fjalëkalimin e ruajtur
+(Settings → "Remove saved App Password" → Save). Pastaj, nëse asgjë tjetër nuk dërgon me SMTP
+nga ajo kuti, mbylleni SMTP AUTH për kutinë e vjetër:
+`Set-CASMailbox -Identity <kutia e vjetër> -SmtpClientAuthenticationDisabled $true`.
+
+**Rrotullimi (çdo 12 muaj).** Settings tregon datën e skadimit dhe paralajmëron 30 ditë para
+afatit. Krijoni certifikatën e re me hapin 2 (mbi të njëjtin skedar), ngarkoni `.crt` e re te
+aplikacioni (e vjetra mund të mbetet deri sa të skadojë). Pulse e lexon vetë skedarin e ri, pa rinisje.
+
+**Kthim prapa.** `MAIL_TRANSPORT=smtp` te `.env` dhe `docker compose up -d purchasing`. Vlen vetëm
+deri sa Microsoft ta mbyllë SMTP AUTH.
+
 ## Unicorn (analisti i biznesit brenda pulse)
 
 Unicorn shkruan çdo ditë në 08:00 brief-in e mëngjesit (shifrat e djeshme nga Finance dhe Purchasing) dhe u
