@@ -78,3 +78,18 @@ def test_due_date_can_be_moved():
 def test_an_owner_name_is_kept_as_a_note_not_refused():
     x = exreg.track({"title": "T", "company": "SALT", "owner": "Purchasing Coordinator"}, "geri")
     assert x["history"][0]["note"].startswith("Tracked by hand") is False and "Suggested owner" in x["history"][0]["note"]
+
+
+def test_a_tracked_exception_closes_when_the_data_no_longer_has_it():
+    # an item tracked by hand before the rule was in the register (moved from the old Action center)
+    keep = exreg.track({"title": "Still open", "company": "SALT", "source_exception": "ar-old-1"}, "geri", "geri@rhg.al")
+    gone = exreg.track({"title": "Paid in BC", "company": "SALT", "source_exception": "ar-old-2"}, "geri", "geri@rhg.al")
+    other = exreg.track({"title": "Not a rule", "company": "SALT", "source_exception": "k9"}, "geri", "geri@rhg.al")
+    tracks = lambda s: s.startswith(("ap-", "ar-"))
+    exreg.sync("ap_ar", "SALT", [{"subject": "ar-old-1", "title": "Still open", "severity": "critical", "value": 5}], tracks=tracks)
+    st = {x["id"]: x["status"] for x in exreg.query("all")["items"]}
+    assert st[keep["id"]] == "Open" and st[gone["id"]] == "Closed" and st[other["id"]] == "Open"
+    # a run of one location never closes them
+    again = exreg.track({"title": "Paid", "company": "SALT", "source_exception": "ar-old-3"}, "geri", "geri@rhg.al")
+    exreg.sync("ap_ar", "SALT", [], locations=["OPA1"], tracks=tracks)
+    assert {x["id"]: x["status"] for x in exreg.query("all")["items"]}[again["id"]] == "Open"

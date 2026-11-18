@@ -220,10 +220,12 @@ COLS = "id, source, kind, company, location, subject, title, detail, severity, v
        "first_seen, last_seen, due, closed_at, closed_by, note, reopened, history, extra"
 
 
-def sync(source, company, findings, locations=None, actor="control run", in_scope=None):
+def sync(source, company, findings, locations=None, actor="control run", in_scope=None, tracks=None):
     """findings: [{"subject", "kind", "title", "detail", "severity", "value", "location"}] of one run. locations: the
     locations the run read (None = the whole company); in_scope(item) → bool: the items the run covered (its days);
-    only items of that scope are closed when not found."""
+    only items of that scope are closed when not found. tracks(subject) → bool: the subjects of this source that an
+    item tracked by hand can follow (an exception someone pressed Track on): such an item closes too when the
+    exception is no longer found by a whole-company run."""
     if source == "manual":                                         # tracked by hand: no run closes them
         return {"found": 0, "opened": 0, "closed": 0, "reopened": 0}
     now, today = _now(), date.today()
@@ -281,6 +283,18 @@ def sync(source, company, findings, locations=None, actor="control run", in_scop
             db.execute("UPDATE ex SET status='Closed', closed_at=?, closed_by=?, note=?, history=? WHERE id=?",
                        (now, actor, "Verified by the data", json.dumps(x["history"][-60:]), x["id"]))
             closed += 1
+        if tracks is not None and locations is None and in_scope is None:
+            found = {str(f["subject"]) for f in findings}
+            for r in db.execute(f"SELECT {COLS} FROM ex WHERE source='manual' AND company=? AND status IN (?,?,?)",
+                                (company, *ACTIVE)).fetchall():
+                x = _row(r)
+                if not x["subject"] or x["subject"] in found or not tracks(x["subject"]):
+                    continue
+                x["history"].append({"ts": now, "by": actor, "to": "Closed",
+                                     "note": "Verified: the exception it tracks is no longer found in the data"})
+                db.execute("UPDATE ex SET status='Closed', closed_at=?, closed_by=?, note=?, history=? WHERE id=?",
+                           (now, actor, "Verified by the data", json.dumps(x["history"][-60:]), x["id"]))
+                closed += 1
         db.execute("INSERT INTO runs VALUES (?,?,?,?,?,?,?)", (source, company, now, len(findings), opened, closed, reopened))
         db.execute("DELETE FROM runs WHERE rowid NOT IN (SELECT rowid FROM runs ORDER BY rowid DESC LIMIT 500)")
         db.commit()

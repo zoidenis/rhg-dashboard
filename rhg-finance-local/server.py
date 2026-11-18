@@ -1884,6 +1884,10 @@ def _rule_findings(exceptions, location=""):
     return out
 
 
+# an item tracked by hand on an exception of these rules (its subject is the exception's code) closes with it
+TRACKED_CODES = {"ap_ar": lambda s: str(s).startswith(("ap-", "ar-"))}
+
+
 def register_finance_rules(company, actor="control run"):
     """What Exceptions showed, kept in the register: the rules on the open supplier and customer entries (as of
     today), the P&L and balance sheet and the cash of the month in progress, and the material G/L entries of its
@@ -1899,7 +1903,8 @@ def register_finance_rules(company, actor="control run"):
     for src, ex in groups.items():
         miss = [x for x in RULE_SOURCES[src] if x in failed]
         out[src] = ({"skipped": "Business Central did not answer: " + ", ".join(miss)} if miss
-                    else exreg.sync(src, company, _rule_findings(ex), actor=actor))
+                    else exreg.sync(src, company, _rule_findings(ex), actor=actor,
+                                    tracks=TRACKED_CODES.get(src)))
     return out
 
 
