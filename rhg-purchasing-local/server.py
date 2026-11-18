@@ -550,7 +550,7 @@ def _dashboard_build(company, week, location, mode="week", remember=True):
         sup_rows = sup_all[:20]
         ops = {
             "events": operations.events(docs, pos, reqs=reqs, closed_reqs=closed_reqs, order_hist=order_hist),
-            "purchase_orders": pos[:60],
+            "purchase_orders": pos[:500],
             "requisitions": reqs, "closed_requisitions": closed_reqs,
             "requisition_status": ({"available": True, "open": len(reqs),
                                     "note": (req_status or {}).get("_note", ""),
@@ -575,7 +575,9 @@ def _dashboard_build(company, week, location, mode="week", remember=True):
                 "awaiting_invoice": sum(p["received_not_invoiced"] for p in pos),
                 "awaiting_invoice_orders": sum(1 for p in pos if p["received_not_invoiced"] > 0),
                 "value": sum(p.get("amount") or 0 for p in pos),
-                "shown": min(len(pos), 60),
+                "shown": min(len(pos), 500),
+                "invoice_due": sum(1 for p in pos if p.get("flag") == "invoice_due"),
+                "stale": sum(1 for p in pos if p.get("flag") == "stale"),
                 "note": "Every open purchase order Business Central holds today, whatever its date. An "
                         "order raised in August and still open counts here, so this figure is larger than "
                         "an extract filtered to one month.",
