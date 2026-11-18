@@ -7,6 +7,7 @@ import threading
 from urllib.parse import urlsplit
 
 import config
+import graph_mail
 import store
 
 SMTP_FILE = store.DATA_DIR / "smtp.json"
@@ -43,13 +44,20 @@ def current():
 
 
 def _public(values):
-    return {k: values[k] for k in _FIELDS if k != "password"} | {
+    out = {k: values[k] for k in _FIELDS if k != "password"} | {
         "has_password": bool(values["password"]),
         "configured": ready(values),
+        "transport": "graph" if graph_mail.active() else "smtp",
     }
+    if out["transport"] == "graph":
+        out["graph"] = graph_mail.status()
+    return out
 
 
 def ready(values):
+    if graph_mail.active():
+        # Graph sends from the From mailbox; host, user and password are not used
+        return bool(values["from"]) and graph_mail.ready()
     return bool(values["host"] and values["from"]
                 and (not values["user"] or (values["password"] and values["security"] != "none")))
 

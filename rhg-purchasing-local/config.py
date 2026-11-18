@@ -116,5 +116,14 @@ SMTP_PORT = int(get("SMTP_PORT", "465" if SMTP_SECURITY == "ssl" else "587"))
 SMTP_USER = get("SMTP_USER", "")
 SMTP_PASSWORD = get("SMTP_PASSWORD", "")
 SMTP_FROM = get("SMTP_FROM", SMTP_USER)
+# Microsoft Graph (OAuth) in place of SMTP AUTH, which Microsoft turns off by default at the end of December 2026.
+# Set the tenant and the app registration; the certificate (private key + certificate, PEM or .pfx) stays on the
+# server. MAIL_TRANSPORT: graph | smtp; blank means Graph once GRAPH_TENANT_ID and GRAPH_CLIENT_ID are set.
+# The From address in Settings is the mailbox Graph sends from.
+MAIL_TRANSPORT = get("MAIL_TRANSPORT", "")
+GRAPH_TENANT_ID = get("GRAPH_TENANT_ID", "")
+GRAPH_CLIENT_ID = get("GRAPH_CLIENT_ID", "")
+GRAPH_CERT_PATH = get("GRAPH_CERT_PATH", "")
+GRAPH_CERT_PASSWORD = get("GRAPH_CERT_PASSWORD", "")
 # Address the emails link to, so a reader lands on the right screen
 PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")

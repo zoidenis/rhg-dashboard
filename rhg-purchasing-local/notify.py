@@ -28,6 +28,7 @@ from email.utils import formatdate, make_msgid
 
 import config
 import currency
+import graph_mail
 import recipients as recipients_dir
 import smtp_config
 import store
@@ -65,6 +66,9 @@ def send_mail(to, cc, subject, html_body, text_body, attachments=None, inline=No
     html shows with src="cid:<cid>"."""
     smtp = smtp_config.current()
     if not smtp_config.ready(smtp):
+        if graph_mail.active():
+            problem = graph_mail.status().get("error") or "Enter the From mailbox in Settings."
+            raise RuntimeError("Microsoft Graph email is not ready: " + problem)
         raise RuntimeError("Complete the mail server settings before sending email.")
     msg = EmailMessage()
     msg["From"] = smtp["from"]
@@ -84,6 +88,9 @@ def send_mail(to, cc, subject, html_body, text_body, attachments=None, inline=No
             part.add_related(data, maintype=maintype, subtype=subtype, cid=f"<{cid}>", disposition="inline")
     for name, maintype, subtype, data in attachments or []:
         msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
+    if graph_mail.active():
+        graph_mail.send(msg, smtp["from"])
+        return
     context = ssl.create_default_context()
     if smtp["security"] == "ssl":
         server = smtplib.SMTP_SSL(smtp["host"], smtp["port"], timeout=30, context=context)

@@ -59,6 +59,9 @@ services:
       COOKIE_NAME: "rhg_session"
     volumes:
       - purchasing-data:/app/data
+      # certificate of the Entra ID app that sends email through Microsoft Graph: only on the server,
+      # outside the code that deploy replaces; read-only, and separate from Finance's fiscal certificate
+      - /opt/rhg/secrets/mail:/app/secrets:ro
     networks: [rhg]
     healthcheck:
       test: ["CMD", "python", "-c",
