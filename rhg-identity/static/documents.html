@@ -28,17 +28,50 @@ header{display:flex;justify-content:space-between}
 .dc-card{margin-bottom:16px;min-width:0}
 .dc-card h2{font-size:17px;margin:0 0 4px}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table.dc{min-width:1100px}
-table.dc td{vertical-align:top;font-size:12.5px}
-table.dc td.doc a{font-weight:600;color:var(--ink);text-decoration:none}
-table.dc td.doc a:hover,table.dc td.doc a:focus-visible{color:var(--accent);text-decoration:underline}
-table.dc td.doc small{display:block;color:var(--sub);font-size:11px;margin-top:2px;word-break:break-all}
-table.dc .miss{color:var(--sub);font-size:11.5px;line-height:1.4}
-table.dc .miss b{color:var(--ink)}
-table.dc .rhg-pill{font-size:10.5px;padding:1px 8px;margin:0 4px 4px 0;display:inline-block;white-space:normal}
-table.dc .na{color:var(--sub)}
 .dc-note{font-size:12px;color:var(--sub);margin:8px 0 0}
-.dc-empty{color:var(--sub);padding:14px 0}
+.dc-empty{color:var(--sub)}
+.dc-seg .count{display:inline-block;min-width:18px;margin-left:6px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:700;text-align:center;background:var(--up);color:#fff}
+.dc-seg .count.n{background:var(--bg);color:var(--sub)}
+.dc-seg button.on .count.n{background:rgba(255,255,255,.2);color:#fff}
+.dc-flt input[type=search]{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:13px;color:var(--ink);flex:1 1 220px;min-width:0}
+.dc-flt input:focus-visible,.dc-flt select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.dc-say ul{margin:4px 0 0;padding-left:18px;line-height:1.6;font-size:13.5px}
+.dc-say li{margin:2px 0}
+.dc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;margin-bottom:16px}
+.dc-grid>.card{margin:0;min-width:0}
+.dc-doc b{display:block;font-weight:600;overflow-wrap:anywhere}
+.dc-doc small{display:block;color:var(--sub);font-size:11px;margin-top:1px;overflow-wrap:anywhere}
+.pz-list td{font-size:12.5px;vertical-align:top}
+.dc-st .rhg-pill{font-size:10.5px;padding:1px 8px;display:inline-block;white-space:nowrap}
+.dc-st .more{font-size:11px;color:var(--sub);margin-left:4px}
+.dc-flags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.dc-flags .rhg-pill{font-size:12px;padding:4px 10px}
+.dc-kv{width:100%;border-collapse:collapse}
+.dc-kv th{text-align:left;font-weight:600;color:var(--sub);font-size:12px;width:38%;padding:6px 10px 6px 0;vertical-align:top}
+.dc-kv td{font-size:13px;padding:6px 0;overflow-wrap:anywhere}
+.dc-kv tr+tr th,.dc-kv tr+tr td{border-top:1px solid var(--line)}
+.dc-kv .na{color:var(--sub)}
+.dc-kv th{background:none}
+#cTable table,#pTable table,.pl-body .pz-list table{min-width:600px}
+.dc-grid .pz-list table{min-width:420px}
+.dc-doc{min-width:150px}
+.dc-kv .rhg-pill{font-size:10.5px;padding:1px 8px}
+.dc-sp{text-decoration:none;display:inline-flex;align-items:center}
+.dc-sp:hover{background:rgba(255,255,255,.08)}
+.dc-file{font-size:12px;color:var(--sub);margin-top:10px;overflow-wrap:anywhere}
+.na{color:var(--sub)}
+/* the pop-ups (Pulse): the same frame as the towers' */
+.pl-bd{position:fixed;inset:0;background:rgba(8,48,63,.45);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:60}
+.pl-bd.show{display:flex}
+.pl-pop{background:var(--bg);border-radius:16px;width:min(1180px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.pl-pop .ph{background:var(--side,#08303f);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pl-pop .ph h2{font-size:20px;color:#fff;margin:0;overflow-wrap:anywhere}
+.pl-pop .ph .sub{color:#a0d8ea;font-size:12.5px}
+.pl-pop .ph .sp{flex:1}
+.pl-pop .ph .close{background:transparent;border:1px solid #2b5a6c;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}
+.pl-body{padding:16px 18px 18px}
+.pl-body .pz-tile .v small,.pz-tile .v small{font-size:12px;font-weight:600;margin-left:3px;color:var(--sub)}
+@media (max-width:600px){.pl-bd{padding:0}.pl-pop{border-radius:0;min-height:100%}}
 .mnav-btn,.mnav-bd{display:none}
 @media(max-width:760px){
   aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;transform:translateX(-105%);transition:transform .2s ease}
@@ -84,127 +117,319 @@ table.dc .na{color:var(--sub)}
   </header>
 
   <div class="dc-seg no-report" role="tablist" aria-label="Show">
-    <button type="button" role="tab" data-v="contracts" class="on" aria-selected="true">Contracts</button>
-    <button type="button" role="tab" data-v="policies" aria-selected="false">Policies &amp; SOPs</button>
+    <button type="button" role="tab" data-v="contracts" class="on" aria-selected="true">Contracts <span class="count" id="tcC" hidden></span></button>
+    <button type="button" role="tab" data-v="policies" aria-selected="false">Policies &amp; SOPs <span class="count" id="tcP" hidden></span></button>
+    <button type="button" role="tab" data-v="libraries" aria-selected="false">Libraries <span class="count n" id="tcL" hidden></span></button>
   </div>
 
   <section id="vContracts">
-    <div class="kpis six" id="cKpis"></div>
+    <div id="cKpis"></div>
+    <div id="cBody"></div>
     <div class="card dc-card">
-      <h2>Contracts</h2>
-      <p class="hint">What is missing is what Pulse needs to warn before a notice deadline or an end date: counterparty, dates, owner. "In a signed library but Draft" is a contract filed under Të nënshkruara whose status was never changed.</p>
+      <h2>Every contract</h2>
+      <p class="hint">Click a contract for all its columns, what is missing and the way to SharePoint.</p>
       <div class="dc-flt no-report">
+        <input type="search" id="cQ" placeholder="Search a contract, counterparty or ID" aria-label="Search">
         <select id="cEntity" aria-label="Entity"><option value="">Every entity</option></select>
-        <select id="cStage" aria-label="Library"><option value="">Në punë and Të nënshkruara</option><option>Të nënshkruara</option><option>Në punë</option></select>
+        <select id="cStage" aria-label="Library"><option value="">Në punë and Të nënshkruara</option><option value="Të nënshkruara">Të nënshkruara</option><option value="Në punë">Në punë</option></select>
         <select id="cShow" aria-label="Show"><option value="">Every contract</option><option value="attention">Needing attention</option><option value="missing">With something missing</option><option value="complete">Complete</option></select>
+        <span class="meta" id="cCount"></span>
       </div>
-      <div class="scroll"><table class="dc" id="cTable"></table></div>
-      <div class="dc-empty" id="cEmpty" hidden></div>
+      <div id="cTable"></div>
     </div>
   </section>
 
   <section id="vPolicies" hidden>
-    <div class="kpis five" id="pKpis"></div>
+    <div id="pKpis"></div>
+    <div id="pBody"></div>
     <div class="card dc-card">
-      <h2>Policies &amp; SOPs</h2>
-      <p class="hint">A version 0.x is a draft; Të publikuara holds what was approved. A policy whose review date has passed is out of date until it is reviewed again.</p>
+      <h2>Every policy and SOP</h2>
+      <p class="hint">Click a document for all its columns, what is missing and the way to SharePoint.</p>
       <div class="dc-flt no-report">
+        <input type="search" id="pQ" placeholder="Search a document or code" aria-label="Search">
         <select id="pBrand" aria-label="Brand"><option value="">Every brand</option></select>
-        <select id="pStage" aria-label="Library"><option value="">Every library</option><option>Në punë</option><option>Të publikuara</option><option>Arkiv</option></select>
+        <select id="pStage" aria-label="Library"><option value="">Every library</option><option value="Në punë">Në punë</option><option value="Të publikuara">Të publikuara</option><option value="Arkiv">Arkiv</option></select>
+        <select id="pShow" aria-label="Show"><option value="">Every document</option><option value="attention">Needing attention</option><option value="missing">With something missing</option><option value="complete">Complete</option></select>
+        <span class="meta" id="pCount"></span>
       </div>
-      <div class="scroll"><table class="dc" id="pTable"></table></div>
-      <div class="dc-empty" id="pEmpty" hidden></div>
+      <div id="pTable"></div>
     </div>
   </section>
 
-  <div class="card dc-card">
-    <h2>Libraries</h2>
-    <p class="hint">Every library of the two sites and how many files it holds, empty ones included.</p>
-    <div class="scroll"><table id="lTable"></table></div>
-  </div>
+  <section id="vLibraries" hidden>
+    <div id="lKpis"></div>
+    <div id="lBody"></div>
+  </section>
   <p class="dc-note" id="note"></p>
 </main>
 </div>
+<script src="/pulse.js"></script><!-- the pop-ups, tiles, bars and lists (identity) -->
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const SP = /^https:\/\/[^\/]*sharepoint\.com(\/|$)/i;
-let me = null, CSRF = null, D = null, VIEW = "contracts";
+const VIEWS = ["contracts", "policies", "libraries"];
+let me = null, CSRF = null, D = null, VIEW = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "contracts";
 async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+const n = v => Pulse.num(v);
 const day = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "";
-const cell = v => Array.isArray(v) ? (v.length ? esc(v.join(", ")) : `<span class="na">–</span>`) : (v === "" || v == null ? `<span class="na">–</span>` : esc(v));
-const doc = x => `<td class="doc">${SP.test(x.url || "") ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title || x.name)} ↗</a>` : esc(x.title || x.name)}${x.title && x.title !== x.name ? `<small>${esc(x.name)}</small>` : ""}</td>`;
-const flags = x => (x.flags || []).map(f => `<span class="rhg-pill ${f.level === "critical" ? "critical" : f.level === "warning" ? "warning" : "info"}">${esc(f.text)}</span>`).join("") || `<span class="na">–</span>`;
-const missing = x => x.missing && x.missing.length ? `<div class="miss"><b>${x.missing.length}</b> · ${esc(x.missing.join(", "))}</div>` : `<span class="rhg-pill ok">Complete</span>`;
-const kpi = (l, v, s) => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div><div class="s"><span class="meta">${esc(s || "")}</span></div></div>`;
-const dateCell = (iso, days) => iso ? `${esc(day(iso))}${days != null && days >= 0 && days <= 60 ? `<br><span class="meta">in ${days} days</span>` : ""}` : `<span class="na">–</span>`;
+const raw = s => `<span data-no-i18n>${esc(s)}</span>`;                    // names and codes typed in SharePoint
+const NA = `<span class="na">–</span>`;
+const blank = v => v == null || v === "" || (Array.isArray(v) && !v.length);
+const pill = f => `<span class="rhg-pill ${f.level === "critical" ? "critical" : f.level === "warning" ? "warning" : "info"}">${esc(f.text)}</span>`;
+const spLink = (url, label) => SP.test(url || "") ? `<a class="close dc-sp" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label || "Open in SharePoint")} ↗</a>` : "";
+const inDays = d => d == null ? "" : d < 0 ? `${n(-d)} days ago` : d === 0 ? "today" : `in ${n(d)} days`;
+const dateTxt = (iso, d) => iso ? `${esc(day(iso))}${d != null && d <= 60 ? `<br><span class="meta">${inDays(d)}</span>` : ""}` : NA;
+const C = () => (D && D.contracts) || [], P = () => (D && D.policies) || [];
+const docOf = key => { const [k, i] = String(key).split(":"); return (k === "c" ? C() : P())[+i]; };
+const keyOf = x => (C().includes(x) ? "c:" : "p:") + (C().includes(x) ? C().indexOf(x) : P().indexOf(x));
+const hasFlag = (x, start) => (x.flags || []).some(f => f.text.startsWith(start));
+const worst = x => (x.flags || []).some(f => f.level === "critical") ? 2 : (x.flags || []).some(f => f.level === "warning") ? 1 : 0;
+function state(x){
+  const f = (x.flags || []).slice().sort((a, b) => (b.level === "critical") - (a.level === "critical") || (b.level === "warning") - (a.level === "warning"));
+  if (f.length) return `<span class="dc-st">${pill(f[0])}${f.length > 1 ? `<span class="more">+${f.length - 1}</span>` : ""}${x.missing.length ? `<span class="more">· ${n(x.missing.length)} missing</span>` : ""}</span>`;
+  return `<span class="dc-st">${x.missing.length ? `<span class="rhg-pill info">${n(x.missing.length)} missing</span>` : `<span class="rhg-pill ok">Complete</span>`}</span>`;
+}
+const docCell = (x, sub) => `<div class="dc-doc"><b data-no-i18n>${esc(x.title || x.name)}</b>${sub ? `<small data-no-i18n>${esc(sub)}</small>` : ""}</div>`;
+const say = lines => { const L = lines.filter(Boolean); return L.length ? `<div class="card dc-card dc-say"><h2>What it says</h2><ul>${L.map(t => `<li>${t}</li>`).join("")}</ul></div>` : ""; };
+const card = (title, hint, html) => `<div class="card dc-card"><h2>${esc(title)}</h2>${hint ? `<p class="hint">${esc(hint)}</p>` : ""}${html}</div>`;
+const countBy = (list, f) => list.reduce((m, x) => { [].concat(f(x)).filter(v => !blank(v)).forEach(k => m[k] = (m[k] || 0) + 1); return m; }, {});
+const topOf = m => Object.entries(m).sort((a, b) => b[1] - a[1]);
+
+// ---- what needs attention: one case per kind of flag (the server's checks), each opens its documents
+const C_CASES = [
+  {k: "notice", t: "Notice deadline near or passed", w: "decide to renew or end before it", f: x => hasFlag(x, "Notice deadline")},
+  {k: "ended", t: "Ended but still active", w: "end date passed, status Aktiv or Nënshkruar", f: x => hasFlag(x, "Ended ")},
+  {k: "ending", t: "Ending within 60 days", w: "the end date is close", f: x => hasFlag(x, "Ends in")},
+  {k: "signed", t: "Signed library, status not updated", w: "under Të nënshkruara but Draft or empty", f: x => hasFlag(x, "In a signed library")},
+  {k: "inwork", t: "Signed but still in Në punë", w: "status Nënshkruar or Aktiv, not moved", f: x => hasFlag(x, "Status ")},
+  {k: "missing", t: "Something missing", w: "a column Pulse needs is empty", f: x => x.missing.length > 0}];
+const P_CASES = [
+  {k: "review", t: "Review date passed", w: "out of date until it is reviewed", f: x => hasFlag(x, "Review date passed")},
+  {k: "expired", t: "Expired", w: "the expiry date has passed", f: x => hasFlag(x, "Expired")},
+  {k: "unapproved", t: "Published, not approved", w: "in Të publikuara without approval", f: x => hasFlag(x, "In a published library")},
+  {k: "draft", t: "Draft versions", w: "version 0.x", f: x => hasFlag(x, "Draft version")},
+  {k: "owner", t: "Without an owner", w: "Përgjegjësi i dokumentit is empty", f: x => x.missing.includes("Owner")},
+  {k: "missing", t: "Something missing", w: "a column Pulse needs is empty", f: x => x.missing.length > 0}];
+
+// ---- the tables of documents (on the page and in the pop-ups)
+const cRows = list => list.map(x => ({open: "dcx|" + keyOf(x), cells: [docCell(x, x.counterparty || x.contract_id), x.entity ? raw(x.entity) : NA, x.status ? raw(x.status) : NA,
+  x.open_ended === true && !x.end ? "Open-ended" : dateTxt(x.end, x.days_to_end), dateTxt(x.notice_deadline, x.days_to_notice), state(x)]}));
+const C_HEAD = [["Contract"], ["Entity"], ["Status"], ["Ends"], ["Notice by"], ["State"]];
+const pRows = list => list.map(x => ({open: "dcx|" + keyOf(x), cells: [docCell(x, x.code), x.brand ? raw(x.brand) : NA, x.version ? raw(x.version) : NA,
+  x.status ? raw(x.status) : NA, x.approval ? esc(x.approval) : NA, x.review ? esc(day(x.review)) : NA, state(x)]}));
+const P_HEAD = [["Document"], ["Brand"], ["Version"], ["Status"], ["Approval"], ["Review"], ["State"]];
+const order = list => list.slice().sort((a, b) => worst(b) - worst(a) || b.flags.length - a.flags.length || b.missing.length - a.missing.length
+  || String(a.title || a.name).localeCompare(String(b.title || b.name)));
 
 function options(sel, values){
   const keep = sel.value;
   sel.querySelectorAll("option:not(:first-child)").forEach(o => o.remove());
-  [...new Set(values.filter(Boolean))].sort().forEach(v => sel.insertAdjacentHTML("beforeend", `<option>${esc(v)}</option>`));
-  sel.value = keep;
+  [...new Set(values.filter(Boolean))].sort().forEach(v => sel.insertAdjacentHTML("beforeend", `<option value="${esc(v)}" data-no-i18n>${esc(v)}</option>`));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
 }
+const match = (x, q, keys) => !q || keys.some(k => String(x[k] || "").toLowerCase().includes(q));
+const show = (x, s) => !s || (s === "attention" ? x.flags.length : s === "missing" ? x.missing.length : !x.missing.length);
 
+// ---- Contracts
 function renderContracts(){
-  const s = D.summary, all = D.contracts;
-  $("cKpis").innerHTML = kpi("Contracts", s.contracts, "in RHG-KONTRATA")
-    + kpi("Complete", `${s.contracts_complete} / ${s.contracts}`, "nothing missing")
-    + kpi("With an end date", `${s.contracts_with_end} / ${s.contracts}`, "or open-ended")
-    + kpi("With a counterparty", `${s.contracts_with_counterparty} / ${s.contracts}`, "Kundërpala / Furnitori")
-    + kpi("Need attention", s.contracts_flagged, "status, deadlines")
-    + kpi("Notice within 60 days", s.notices_60, "to decide renew or end");
+  const s = D.summary, all = C(), today = D.today || new Date().toISOString().slice(0, 10);
+  const miss = topOf(countBy(all, x => x.missing)), noticeSoon = all.filter(x => x.days_to_notice != null && x.days_to_notice >= 0 && x.days_to_notice <= 60);
+  $("cKpis").innerHTML = Pulse.tiles([
+    {l: "Contracts", v: n(s.contracts), s: "in RHG-KONTRATA", open: "dcs|c:all"},
+    {l: "Complete", v: `${n(s.contracts_complete)} <small>/ ${n(s.contracts)}</small>`, s: "every column Pulse needs", open: "dcs|c:complete"},
+    {l: "Need attention", v: n(s.contracts_flagged), s: "status, deadlines, end dates", cls: s.contracts_flagged ? "up" : "", open: "dcs|c:attention"},
+    {l: "Notice within 60 days", v: n(s.notices_60), s: "to decide renew or end", cls: s.notices_60 ? "warn" : "", open: "dcs|c:notice60"},
+    {l: "With an end date", v: `${n(s.contracts_with_end)} <small>/ ${n(s.contracts)}</small>`, s: "or open-ended", open: "dcs|c:noend"},
+    {l: "With a counterparty", v: `${n(s.contracts_with_counterparty)} <small>/ ${n(s.contracts)}</small>`, s: "Kundërpala / Furnitori", open: "dcs|c:nocp"}]);
+  if (!all.length) { $("cBody").innerHTML = say(["RHG-KONTRATA holds no contract yet: the numbers fill in as contracts are filed there."]); $("cTable").innerHTML = ""; $("cCount").textContent = ""; return; }
+  const near = noticeSoon.slice().sort((a, b) => a.days_to_notice - b.days_to_notice)[0];
+  const cnt = c => all.filter(c.f).length;
+  const ent = topOf(countBy(all, x => x.entity || "(no entity)"));
+  // what comes up in the next 90 days: notice deadlines and end dates
+  const soon = [];
+  all.forEach(x => {
+    if (x.notice_deadline && x.days_to_notice != null && x.days_to_notice >= 0 && x.days_to_notice <= 90) soon.push([x.notice_deadline, "Notice deadline", x, x.days_to_notice]);
+    if (x.end && x.days_to_end != null && x.days_to_end >= 0 && x.days_to_end <= 90) soon.push([x.end, "End date", x, x.days_to_end]);
+  });
+  soon.sort((a, b) => a[0].localeCompare(b[0]));
+  $("cBody").innerHTML = say([
+      `<b>${n(s.contracts_complete)}</b> of ${n(s.contracts)} contracts have every column Pulse needs.${miss.length ? ` The column missing most is <b>${esc(miss[0][0])}</b> (${n(miss[0][1])} contracts).` : ""}`,
+      noticeSoon.length ? `<b>${n(noticeSoon.length)}</b> notice deadline(s) fall in the next 60 days; the nearest: ${raw(near.title || near.name)}, <b>${esc(day(near.notice_deadline))}</b>.` : "No notice deadline falls in the next 60 days.",
+      cnt(C_CASES[1]) ? `<b>${n(cnt(C_CASES[1]))}</b> contract(s) ended but are still marked Aktiv or Nënshkruar.` : "",
+      cnt(C_CASES[3]) ? `<b>${n(cnt(C_CASES[3]))}</b> contract(s) are filed as signed but their status is still Draft or empty.` : ""])
+    + card("Needs attention", "What the columns say needs a decision or a correction. Click a case for its contracts.",
+      Pulse.cases(C_CASES.map(c => ({n: cnt(c), t: c.t, w: c.w, open: "dcs|c:case:" + c.k}))))
+    + `<div class="dc-grid">`
+    + card("Coming up · 90 days", "Notice deadlines and end dates from today on.",
+      Pulse.list([["Date"], ["What"], ["Contract"], ["When"]], soon.map(([d, w, x, dd]) => ({open: "dcx|" + keyOf(x),
+        cells: [esc(day(d)), esc(w), docCell(x, x.counterparty), inDays(dd)]})), {none: "Nothing falls due in the next 90 days.", max: 360}))
+    + card("By entity", "Complete and with something missing; click an entity for its contracts.",
+      Pulse.bars(ent.map(([e]) => { const L = all.filter(x => (x.entity || "(no entity)") === e), ok = L.filter(x => !x.missing.length).length, fl = L.filter(x => x.flags.length).length;
+        return {key: e, segs: [[ok, "var(--ch-3)", "Complete"], [L.length - ok, "var(--ch-1)", "Something missing"]],
+          text: `<b>${n(L.length)}</b>${fl ? ` <span class="meta">${n(fl)} need attention</span>` : ""}`, open: "dcs|c:ent:" + e}; }),
+        [["var(--ch-3)", "Complete"], ["var(--ch-1)", "Something missing"]]))
+    + `</div>`
+    + (miss.length ? card("What is missing most", "Each column Pulse needs and how many contracts leave it empty; click one for those contracts.",
+      Pulse.bars(miss.map(([k, v]) => ({key: k, segs: [[v, "var(--ch-1)", "contracts"]], text: `<b>${n(v)}</b> <span class="meta">of ${n(all.length)}</span>`, open: "dcs|c:miss:" + k})))) : "");
   options($("cEntity"), all.map(x => x.entity));
-  const ent = $("cEntity").value, st = $("cStage").value, show = $("cShow").value;
-  const rows = all.filter(x => (!ent || x.entity === ent) && (!st || x.stage === st)
-    && (show !== "attention" || x.flags.length) && (show !== "missing" || x.missing.length) && (show !== "complete" || !x.missing.length));
-  $("cTable").innerHTML = `<tr><th>Contract</th><th>Entity</th><th>Library</th><th>Counterparty</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Notice by</th><th>Owner</th><th>Missing</th><th>Attention</th></tr>`
-    + rows.map(x => `<tr>${doc(x)}<td>${cell(x.entity)}</td><td>${cell(x.stage)}</td><td>${cell(x.counterparty)}</td><td>${cell(x.type)}</td>`
-      + `<td>${cell(x.status)}</td><td>${dateCell(x.start)}</td><td>${x.open_ended === true && !x.end ? "Open-ended" : dateCell(x.end, x.days_to_end)}</td>`
-      + `<td>${dateCell(x.notice_deadline, x.days_to_notice)}</td><td>${cell(x.owner)}</td><td>${missing(x)}</td><td>${flags(x)}</td></tr>`).join("");
-  $("cTable").hidden = !rows.length;
-  $("cEmpty").hidden = !!rows.length;
-  $("cEmpty").textContent = all.length ? "No contract matches this selection." : "RHG-KONTRATA holds no contract yet.";
+  const e = $("cEntity").value, st = $("cStage").value, sh = $("cShow").value, q = $("cQ").value.trim().toLowerCase();
+  const rows = order(all.filter(x => (!e || x.entity === e) && (!st || x.stage === st) && show(x, sh) && match(x, q, ["title", "name", "counterparty", "contract_id", "type", "owner"])));
+  $("cCount").textContent = `${n(rows.length)} of ${n(all.length)}`;
+  $("cTable").innerHTML = Pulse.list(C_HEAD, cRows(rows), {none: "No contract matches this selection."});
 }
 
+// ---- Policies & SOPs
 function renderPolicies(){
-  const s = D.summary, all = D.policies;
-  $("pKpis").innerHTML = kpi("Documents", s.policies, "in RHG-Politika")
-    + kpi("Approved", `${s.policies_approved} / ${s.policies}`, "content approval")
-    + kpi("Drafts", s.policies_draft, "version 0.x or status Draft")
-    + kpi("Review overdue", s.policies_overdue, "review date passed")
-    + kpi("Complete", `${s.policies_complete} / ${s.policies}`, "nothing missing");
+  const s = D.summary, all = P();
+  const miss = topOf(countBy(all, x => x.missing));
+  $("pKpis").innerHTML = Pulse.tiles([
+    {l: "Documents", v: n(s.policies), s: "in RHG-Politika", open: "dcs|p:all"},
+    {l: "Approved", v: `${n(s.policies_approved)} <small>/ ${n(s.policies)}</small>`, s: "content approval", open: "dcs|p:approved"},
+    {l: "Drafts", v: n(s.policies_draft), s: "version 0.x or status Draft", open: "dcs|p:drafts"},
+    {l: "Review overdue", v: n(s.policies_overdue), s: "review date passed", cls: s.policies_overdue ? "up" : "", open: "dcs|p:case:review"},
+    {l: "Complete", v: `${n(s.policies_complete)} <small>/ ${n(s.policies)}</small>`, s: "every column Pulse needs", open: "dcs|p:complete"}]);
+  if (!all.length) { $("pBody").innerHTML = say(["RHG-Politika holds no policy or SOP yet."]); $("pTable").innerHTML = ""; $("pCount").textContent = ""; return; }
+  const cnt = c => all.filter(c.f).length;
+  const over = all.filter(P_CASES[0].f).sort((a, b) => String(a.review).localeCompare(String(b.review)))[0];
+  const brands = topOf(countBy(all, x => x.brand || "(no brand)"));
+  $("pBody").innerHTML = say([
+      `<b>${n(s.policies_approved)}</b> of ${n(s.policies)} documents are approved; <b>${n(s.policies_draft)}</b> are drafts.`,
+      over ? `<b>${n(s.policies_overdue)}</b> document(s) are past their review date; the oldest: ${raw(over.title || over.name)} (<b>${esc(day(over.review))}</b>).` : "No document is past its review date.",
+      cnt(P_CASES[2]) ? `<b>${n(cnt(P_CASES[2]))}</b> document(s) sit in a published library without approval.` : "",
+      miss.length ? `<b>${n(s.policies_complete)}</b> of ${n(s.policies)} have every column Pulse needs. The column missing most is <b>${esc(miss[0][0])}</b> (${n(miss[0][1])} documents).` : `Every document has the columns Pulse needs.`])
+    + card("Needs attention", "Click a case for its documents.",
+      Pulse.cases(P_CASES.map(c => ({n: cnt(c), t: c.t, w: c.w, open: "dcs|p:case:" + c.k}))))
+    + `<div class="dc-grid">`
+    + card("By brand", "Where each brand's documents are; click a brand for them.",
+      Pulse.bars(brands.map(([b]) => { const L = all.filter(x => (x.brand || "(no brand)") === b), seg = st => L.filter(x => x.stage === st).length;
+        return {key: b, segs: [[seg("Të publikuara"), "var(--ch-3)", "Të publikuara"], [seg("Në punë"), "var(--ch-1)", "Në punë"], [seg("Arkiv"), "var(--ch-4)", "Arkiv"]],
+          text: `<b>${n(L.length)}</b>`, open: "dcs|p:brand:" + b}; }),
+        [["var(--ch-3)", "Të publikuara"], ["var(--ch-1)", "Në punë"], ["var(--ch-4)", "Arkiv"]]))
+    + (miss.length ? card("What is missing most", "Click a column for the documents that leave it empty.",
+      Pulse.bars(miss.map(([k, v]) => ({key: k, segs: [[v, "var(--ch-1)", "documents"]], text: `<b>${n(v)}</b> <span class="meta">of ${n(all.length)}</span>`, open: "dcs|p:miss:" + k})))) : "")
+    + `</div>`;
   options($("pBrand"), all.map(x => x.brand));
-  const br = $("pBrand").value, st = $("pStage").value;
-  const rows = all.filter(x => (!br || x.brand === br) && (!st || x.stage === st));
-  $("pTable").innerHTML = `<tr><th>Document</th><th>Code</th><th>Brand</th><th>Library</th><th>Version</th><th>Status</th><th>Approval</th><th>Owner</th><th>Review</th><th>Missing</th><th>Attention</th></tr>`
-    + rows.map(x => `<tr>${doc(x)}<td>${cell(x.code)}</td><td>${cell(x.brand)}</td><td>${cell(x.stage)}</td><td>${cell(x.version)}</td>`
-      + `<td>${cell(x.status)}</td><td>${cell(x.approval)}</td><td>${cell(x.owner)}</td><td>${dateCell(x.review)}</td><td>${missing(x)}</td><td>${flags(x)}</td></tr>`).join("");
-  $("pTable").hidden = !rows.length;
-  $("pEmpty").hidden = !!rows.length;
-  $("pEmpty").textContent = all.length ? "No document matches this selection." : "RHG-Politika holds no policy or SOP yet.";
+  const br = $("pBrand").value, st = $("pStage").value, sh = $("pShow").value, q = $("pQ").value.trim().toLowerCase();
+  const rows = order(all.filter(x => (!br || x.brand === br) && (!st || x.stage === st) && show(x, sh) && match(x, q, ["title", "name", "code", "category", "owner", "department"])));
+  $("pCount").textContent = `${n(rows.length)} of ${n(all.length)}`;
+  $("pTable").innerHTML = Pulse.list(P_HEAD, pRows(rows), {none: "No document matches this selection."});
 }
 
+// ---- Libraries
+const LIBS = () => (D && D.libraries) || [];
 function renderLibraries(){
-  const libs = D.libraries.filter(l => l.kind === VIEW).sort((a, b) => b.files - a.files || a.library.localeCompare(b.library));
-  $("lTable").innerHTML = `<tr><th>Library</th><th>${VIEW === "contracts" ? "Entity" : "Brand"}</th><th>Stage</th><th class="num">Files</th></tr>`
-    + libs.map(l => `<tr><td>${SP.test(l.url || "") ? `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.library)} ↗</a>` : esc(l.library)}</td>`
-      + `<td>${cell(l.owner)}</td><td>${cell(l.stage)}</td><td class="num">${l.files}</td></tr>`).join("");
+  const L = LIBS(), files = k => L.filter(l => l.kind === k).reduce((a, l) => a + (l.files || 0), 0);
+  $("lKpis").innerHTML = Pulse.tiles([
+    {l: "Libraries", v: n(L.length), s: "of RHG-KONTRATA and RHG-Politika"},
+    {l: "Empty", v: n(L.filter(l => !l.files).length), s: "no file yet"},
+    {l: "Contract files", v: n(files("contracts")), s: D.contracts_site && D.contracts_site.name ? raw(D.contracts_site.name) : "RHG-KONTRATA", open: "dcs|c:all"},
+    {l: "Policy and SOP files", v: n(files("policies")), s: D.policies_site && D.policies_site.name ? raw(D.policies_site.name) : "RHG-Politika", open: "dcs|p:all"}]);
+  const block = (k, title) => { const ls = L.map((l, i) => [l, i]).filter(([l]) => l.kind === k).sort((a, b) => b[0].files - a[0].files || a[0].library.localeCompare(b[0].library));
+    return card(title, "Files in each library, empty ones included; click a library for its files.",
+      Pulse.bars(ls.map(([l, i]) => ({key: l.library, segs: [[l.files, "var(--ch-0)", "files"]], text: `<b>${n(l.files)}</b>${l.files ? "" : ` <span class="meta">empty</span>`}`, open: "dcl|" + i})), null, {none: "No library."})); };
+  $("lBody").innerHTML = `<div class="dc-grid">${block("contracts", "Contracts · RHG-KONTRATA")}${block("policies", "Policies & SOPs · RHG-Politika")}</div>`;
 }
 
+// ---- pop-ups
+function setPop(titleHtml, label, sub, list, kind){
+  const fl = list.filter(x => x.flags.length).length, ok = list.filter(x => !x.missing.length).length;
+  Pulse.pop({title: titleHtml, sub, label, body: Pulse.tiles([
+      {l: kind === "c" ? "Contracts" : "Documents", v: n(list.length)},
+      {l: "Complete", v: `${n(ok)} <small>/ ${n(list.length)}</small>`},
+      {l: "Need attention", v: n(fl), cls: fl ? "up" : ""}])
+    + Pulse.list(kind === "c" ? C_HEAD : P_HEAD, (kind === "c" ? cRows : pRows)(order(list)), {none: "None."})});
+}
+Pulse.on("dcs", id => {
+  if (!D) return;
+  const [k, what, ...rest] = id.split(":"), arg = rest.join(":"), all = k === "c" ? C() : P(), cases = k === "c" ? C_CASES : P_CASES;
+  const T = {all: [k === "c" ? "Every contract" : "Every policy and SOP", () => true],
+    complete: ["Complete", x => !x.missing.length], attention: ["Need attention", x => x.flags.length],
+    notice60: ["Notice within 60 days", x => x.days_to_notice != null && x.days_to_notice >= 0 && x.days_to_notice <= 60],
+    noend: ["Without an end date", x => !(x.end || x.open_ended === true)], nocp: ["Without a counterparty", x => blank(x.counterparty)],
+    approved: ["Approved", x => x.approval === "Approved"], drafts: ["Drafts", x => String(x.version || "").startsWith("0.") || x.status === "Draft"]};
+  let title, f, sub = k === "c" ? "RHG-KONTRATA" : "RHG-Politika";
+  if (what === "case") { const c = cases.find(c => c.k === arg); if (!c) return; title = c.t; f = c.f; sub = c.w; }
+  else if (what === "ent") { title = arg; f = x => (x.entity || "(no entity)") === arg; sub = "Contracts of the entity"; }
+  else if (what === "brand") { title = arg; f = x => (x.brand || "(no brand)") === arg; sub = "Policies and SOPs of the brand"; }
+  else if (what === "miss") { title = arg; f = x => x.missing.includes(arg); sub = "Missing: the column is empty in SharePoint"; }
+  else if (T[what]) [title, f] = T[what];
+  else return;
+  setPop(what === "ent" || what === "brand" ? raw(title) : esc(title), title, esc(sub), all.filter(f), k);
+});
+Pulse.on("dcl", id => {
+  const l = LIBS()[+id]; if (!l) return;
+  const list = (l.kind === "contracts" ? C() : P()).filter(x => x.library === l.library);
+  Pulse.pop({title: raw(l.library), label: l.library, sub: `${esc(l.kind === "contracts" ? "Contracts" : "Policies & SOPs")} · ${raw(l.stage || "")}`, actions: spLink(l.url, "Open the library"),
+    body: list.length ? Pulse.tiles([{l: "Files", v: n(l.files)}, {l: "Complete", v: `${n(list.filter(x => !x.missing.length).length)} <small>/ ${n(list.length)}</small>`},
+        {l: "Need attention", v: n(list.filter(x => x.flags.length).length)}])
+      + Pulse.list(l.kind === "contracts" ? C_HEAD : P_HEAD, (l.kind === "contracts" ? cRows : pRows)(order(list)))
+      : `<p class="meta">This library holds no file yet.</p>`});
+});
+const C_FIELDS = [["contract_id", "Contract ID"], ["counterparty", "Counterparty"], ["type", "Type"], ["status", "Status"], ["entity", "Entity"], ["scope", "Brand / location"],
+  ["start", "Start date", 1], ["end", "End date", 1], ["signed", "Signature date", 1], ["notice_deadline", "Notice deadline", 1], ["notice_period", "Notice period"],
+  ["auto_renewal", "Automatic renewal"], ["open_ended", "Open-ended"], ["owner", "Owner"], ["category", "DMS category"], ["approval_ref", "Approval reference"],
+  ["parent_id", "Amendment of"], ["stage", "Library stage"]];
+const P_FIELDS = [["code", "Document code"], ["category", "Category"], ["status", "Status"], ["version", "Version"], ["approval", "Approval"], ["approval_route", "Approval route"],
+  ["approval_ref", "Approval reference"], ["owner", "Owner"], ["department", "Owning department"], ["brand", "Brand"], ["brand_codes", "Brand codes"], ["units", "Units"],
+  ["entity", "Legal entity"], ["scope_level", "Scope"], ["confidentiality", "Confidentiality"], ["date", "Document date", 1], ["effective", "Effective from", 1],
+  ["review", "Review date", 1], ["expiry", "Expiry date", 1], ["stage", "Library stage"]];
+function value(x, k, isDate){
+  let v = x[k];
+  if (k === "notice_period" && !blank(v)) v = `${v} ${x.notice_unit || ""}`.trim();
+  if (v === true) return "Yes";
+  if (v === false) return "No";
+  if (blank(v)) return null;
+  if (isDate) return esc(day(v));
+  return raw(Array.isArray(v) ? v.join(", ") : v);
+}
+Pulse.on("dcx", key => {
+  const x = docOf(key); if (!x) return;
+  const isC = key.startsWith("c:"), fields = isC ? C_FIELDS : P_FIELDS;
+  const needLabels = new Set(x.missing || []);
+  const rows = fields.filter(([k]) => !(k === "end" && x.open_ended === true && !x.end)).map(([k, label, d]) => {
+    const v = value(x, k, d);
+    return `<tr><th>${esc(label)}</th><td>${v == null ? (needLabels.has(label) ? `<span class="rhg-pill warning">Missing</span>` : NA) : v}</td></tr>`;
+  }).join("");
+  const tiles = isC ? [
+      {l: "Start", v: x.start ? esc(day(x.start)) : "–"},
+      {l: "End", v: x.open_ended === true && !x.end ? "Open-ended" : x.end ? esc(day(x.end)) : "–", s: x.days_to_end != null ? inDays(x.days_to_end) : "", cls: x.days_to_end != null && x.days_to_end <= 60 ? "warn" : ""},
+      {l: "Notice by", v: x.notice_deadline ? esc(day(x.notice_deadline)) : "–", s: x.days_to_notice != null ? inDays(x.days_to_notice) : "", cls: x.days_to_notice != null && x.days_to_notice <= 30 ? "up" : x.days_to_notice != null && x.days_to_notice <= 60 ? "warn" : ""},
+      {l: "Signed", v: x.signed ? esc(day(x.signed)) : "–"}]
+    : [{l: "Version", v: x.version ? raw(x.version) : "–"}, {l: "Approval", v: x.approval ? esc(x.approval) : "–", cls: x.approval && x.approval !== "Approved" ? "warn" : ""},
+      {l: "Effective from", v: x.effective ? esc(day(x.effective)) : "–"}, {l: "Review", v: x.review ? esc(day(x.review)) : "–", cls: x.review && x.review < (D.today || "") ? "up" : ""}];
+  const same = isC && x.counterparty ? C().filter(y => y !== x && y.counterparty === x.counterparty) : [];
+  Pulse.pop({title: raw(x.title || x.name), label: x.title || x.name, wide: false,
+    sub: `${raw(isC ? x.entity || "" : x.brand || "")}${(isC ? x.entity : x.brand) ? " · " : ""}${raw(x.library || "")}`,
+    actions: spLink(x.url),
+    body: `<div class="dc-flags">${(x.flags || []).map(pill).join("") || `<span class="rhg-pill ok">Nothing needs attention</span>`}${x.missing.length ? `<span class="rhg-pill info">${n(x.missing.length)} missing</span>` : ""}</div>`
+      + Pulse.tiles(tiles)
+      + Pulse.panel("What SharePoint records", `<table class="dc-kv" data-nosort>${rows}</table>`)
+      + (same.length ? Pulse.panel(`Other contracts with ${x.counterparty}`, Pulse.list(C_HEAD, cRows(order(same)))) : "")
+      + `<p class="dc-file"><span>File</span> <span data-no-i18n>${esc(x.name)}</span>${x.modified ? ` · <span>changed ${esc(day(x.modified))}</span>` : ""}${x.modified_by ? ` <span>by</span> ${raw(x.modified_by)}` : ""}</p>`
+      + `<p class="dc-file">Pulse reads its columns only, never its content; the file opens in SharePoint, which checks your own access.</p>`});
+});
+
+// names typed in SharePoint (entities, brands, libraries) stay as they are in the bars
+const keepNames = el => el.querySelectorAll('.pz-hr[data-pulse^="dcs|c:ent:"] .k, .pz-hr[data-pulse^="dcs|p:brand:"] .k, .pz-hr[data-pulse^="dcl|"] .k').forEach(k => k.setAttribute("data-no-i18n", ""));
 function render(){
   document.querySelectorAll(".dc-seg button").forEach(b => { const on = b.dataset.v === VIEW; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
   $("vContracts").hidden = VIEW !== "contracts";
   $("vPolicies").hidden = VIEW !== "policies";
+  $("vLibraries").hidden = VIEW !== "libraries";
   if (!D) return;
-  if (VIEW === "contracts") renderContracts(); else renderPolicies();
-  renderLibraries();
+  const s = D.summary || {}, badge = (el, v, title) => { el.hidden = !v; el.textContent = n(v); el.title = title; };
+  badge($("tcC"), s.contracts_flagged, "contracts needing attention");
+  badge($("tcP"), P().filter(x => x.flags.some(f => f.level !== "info")).length, "documents needing attention");
+  badge($("tcL"), LIBS().length, "libraries");
+  if (VIEW === "contracts") renderContracts(); else if (VIEW === "policies") renderPolicies(); else renderLibraries();
+  keepNames(document.querySelector("main"));
 }
 
 async function load(refresh){
   $("pill").className = "pill load"; $("pillText").textContent = "Reading SharePoint…";
   try {
-    const j = await get("/api/m365/documents" + (refresh ? "?refresh=1" : ""));
+    const j = await get("/" + "api/m365/documents" + (refresh ? "?refresh=1" : ""));
     if (j.available === false) throw new Error(j.error || "SharePoint could not be read");
     D = j;
     const at = j.read_at ? new Date(j.read_at).toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"}) : "";
@@ -214,22 +439,24 @@ async function load(refresh){
     render();
   } catch (e) {
     $("pill").className = "pill err"; $("pillText").textContent = "Not read";
-    const msg = `<div class="dc-empty">${esc(e.message)}</div>`;
-    if (!D) { $("cKpis").innerHTML = ""; $("cTable").innerHTML = ""; $("cEmpty").hidden = false; $("cEmpty").textContent = e.message; $("lTable").innerHTML = ""; }
-    $("note").innerHTML = msg;
+    if (!D) ["cKpis", "cBody", "cTable", "pKpis", "pBody", "pTable", "lKpis", "lBody"].forEach(id => $(id).innerHTML = "");
+    $("note").innerHTML = `<span class="dc-empty">${esc(e.message)}</span>`;
   }
 }
 
-document.querySelector(".dc-seg").onclick = e => { const b = e.target.closest("[data-v]"); if (b) { VIEW = b.dataset.v; render(); } };
-["cEntity", "cStage", "cShow", "pBrand", "pStage"].forEach(id => $(id).onchange = render);
+document.querySelector(".dc-seg").onclick = e => { const b = e.target.closest("[data-v]"); if (b) { VIEW = b.dataset.v; history.replaceState(null, "", "#" + VIEW); render(); } };
+window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== VIEW) { VIEW = v; render(); } });
+["cEntity", "cStage", "cShow", "pBrand", "pStage", "pShow"].forEach(id => $(id).onchange = render);
+let qT = null;
+["cQ", "pQ"].forEach(id => $(id).oninput = () => { clearTimeout(qT); qT = setTimeout(render, 150); });
 $("reload").onclick = () => load(true);
 $("logoutBtn").onclick = async () => {
-  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  try { await fetch("/" + "api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
   location.href = "/login?signedout=1";
 };
 (async () => {
   let s;
-  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  try { s = await get("/" + "api/session"); } catch (e) { location.href = "/login"; return; }
   if (!s.user || s.user.must_change) { location.href = "/login"; return; }
   me = s.user; CSRF = s.user.csrf;
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
@@ -241,12 +468,12 @@ $("logoutBtn").onclick = async () => {
   [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"]]
     .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (!s.m365_docs) {
-    document.querySelector(".dc-seg").remove(); $("vContracts").remove(); $("vPolicies").remove();
-    document.querySelectorAll(".dc-card").forEach(c => c.remove());
+    document.querySelector(".dc-seg").remove(); ["vContracts", "vPolicies", "vLibraries"].forEach(id => $(id).remove());
     $("reload").remove(); $("pgExport").remove(); $("pill").remove();
     $("note").textContent = "Contracts and SOPs are not open to your account.";
     return;
   }
+  render();
   load();
 })();
 </script>
@@ -265,10 +492,10 @@ $("logoutBtn").onclick = async () => {
 <script src="/tables.js"></script><!-- sort and filter for every table (identity) -->
 <script src="/notify.js"></script><!-- the bell (identity) -->
 <script src="/gear.js"></script><!-- the way into Settings (identity) -->
-<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
 <script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
 <script>
-document.getElementById("pgExport") && (document.getElementById("pgExport").onclick = () => PulseExport.view(document.querySelector("main"), "Contracts & SOPs"));
+document.getElementById("pgExport") && (document.getElementById("pgExport").onclick = () => PulseExport.view(document.querySelector("main > section:not([hidden])") || document.querySelector("main"),
+  ["Contracts & SOPs", (document.querySelector(".dc-seg button.on") || {}).firstChild ? document.querySelector(".dc-seg button.on").firstChild.textContent.trim() : ""].filter(Boolean).join(" · ")));
 </script>
 </body>
 </html>
