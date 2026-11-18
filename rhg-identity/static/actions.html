@@ -142,7 +142,7 @@ html.embed body{background:transparent}
       <div class="period" id="sub">Every control's items, their owners, SLA deadlines and progress</div>
     </div>
     <div class="hdr-side">
-      <div class="hdr-btns"><button class="btn dark" id="reload" type="button">Read again</button></div>
+      <div class="hdr-btns"><button class="btn exp" id="pgExport" type="button" title="Excel, PDF or send by email: what this tab shows">Export ▾</button><button class="btn dark" id="reload" type="button">Read again</button></div>
       <div class="hdr-meta"><span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading the registers…</span></span>
         <span class="sep">|</span><span id="whoami"></span><button class="linkbtn" id="logoutBtn">Sign out</button></div>
     </div>
@@ -460,7 +460,7 @@ async function openItem(uid){
         <div class="row"><button class="btn dark" type="button" id="iSave">Save</button>${x.link ? `<a class="btn" href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}<span class="msg" id="iMsg"></span></div>`
       : `<p class="meta">Only its owner or a manager updates it.${x.link ? ` <a href="${esc(x.link)}">Open in ${esc(x.tower)}</a>` : ""}</p>`}
     <h4>Export or send</h4>
-    <div class="row"><button class="btn" type="button" id="xX">Excel</button><button class="btn" type="button" id="xP">PDF</button><button class="btn" type="button" id="xM">Send by email…</button><span class="msg" id="xMsg"></span></div>
+    <div class="row"><button class="btn exp-btn" type="button" id="xX">Excel</button><button class="btn exp-btn" type="button" id="xP">PDF</button><button class="btn exp-btn" type="button" id="xM">Send by email…</button><span class="msg" id="xMsg"></span></div>
     <div id="xBox" hidden style="margin-top:8px">
       <div class="row"><label style="flex:1;min-width:240px">To<input id="xTo" list="xAcc" placeholder="name@rhg.al, another@rhg.al"></label>
         <label>File<select id="xF"><option value="pdf">PDF</option><option value="xlsx">Excel</option></select></label></div>
@@ -681,5 +681,15 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 })();
 </script>
 <script src="/gear.js"></script><!-- the way into Settings (identity) -->
+<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+// Export ▾ of the header: the open tab (or the search) as it shows, its items one row each
+document.getElementById("pgExport").onclick = () => {
+  const sec = document.querySelector("main > section:not([hidden])"), on = document.querySelector("#acTabs button.on");
+  const what = sec && sec.id === "vSearch" ? "Search: " + document.getElementById("acQ").value : on ? on.textContent.replace(/\s*\d+$/, "").trim() : "";
+  return PulseExport.view(sec || document.querySelector("main"), ["Executive Action Center", what].filter(Boolean).join(" · "));
+};
+</script>
 </body>
 </html>

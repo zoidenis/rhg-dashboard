@@ -756,8 +756,8 @@ html:not(.embed-set) #rgSetCard{display:none!important}
       <h1 id="title">Executive overview</h1><div class="period" id="period">Loading your data…</div></div>
     <div class="hdr-side">
       <div class="hdr-btns">
-        <button class="btn" id="exportBtn">Export CSV</button>
-        <button class="btn" id="pdfBtn">Export PDF</button>
+        <button class="btn exp" id="exportBtn" title="Excel, PDF or send by email: what this screen shows">Export ▾</button>
+        <button class="btn" id="pdfBtn" title="Print the screen, or save it as a PDF as it looks">Print</button>
         <button class="btn dark" id="refreshBtn" title="Reads the open screen again: Business Central at once; the Simphony days already read come from what was kept. Each Simphony screen has its own Read again, which asks Simphony itself.">Refresh now</button>
       </div>
       <div class="hdr-meta">
@@ -5685,13 +5685,14 @@ function exportGo(url){ if (exportMode === "capture") { exportCaptured = {url}; 
     menu.className = "exp-menu"; menu.setAttribute("role", "menu");
     menu.innerHTML = `<button type="button" role="menuitem" data-f="xlsx"><span class="k">XLSX</span><span>Excel</span></button>` +
       `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button><hr>` +
-      `<button type="button" role="menuitem" data-f="mail"><span class="k">@</span><span>Send by email…</span></button>`;
+      `<button type="button" role="menuitem" data-f="mail"><span class="k">@</span><span>Send by email…</span></button>` +
+      (el.__csv ? `<hr><button type="button" role="menuitem" data-f="csv"><span class="k">CSV</span><span>CSV, as before</span></button>` : "");
     (el.closest(".modal-bg") || document.body).appendChild(menu);
     const r = el.getBoundingClientRect(), host = menu.offsetParent || document.body, hr = host === document.body ? {top: -window.scrollY, left: -window.scrollX} : host.getBoundingClientRect();
     const sy = host === document.body ? 0 : host.scrollTop, sx = host === document.body ? 0 : host.scrollLeft;
     menu.style.top = (r.bottom - hr.top + sy + 4) + "px";
     menu.style.left = Math.max(8, Math.min(r.left - hr.left + sx, document.documentElement.clientWidth - hr.left + sx - menu.offsetWidth - 8)) + "px";
-    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); if (f === "mail") mailDialog(el); else run(el, f); });
+    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); if (f === "mail") mailDialog(el); else if (f === "csv") el.__csv(); else run(el, f); });
     menu.querySelector("button").focus({preventScroll: true});
     openedAt = Date.now();
   }
@@ -10442,7 +10443,15 @@ function bindGotoViews(root){
 }
 bindGotoViews(document);
 // Export CSV: the tables of the open screen, one block each; Export PDF: the open screen
+// Export ▾ of the header: what the open screen shows (its KPIs and tables) as Excel, PDF or by email; CSV as before
 $("exportBtn").onclick = () => {
+  const view = document.querySelector(".view.on"); if (!view) return;
+  const v = currentView(), co = (data && data.meta && data.meta.company) || $("company").value || "";
+  return xlsxTable(`${v.label}${co ? " · " + co : ""}`, Pulse.sheets(view),
+    [`${v.label}${co ? " · " + co : ""}`, ($("period") || {}).textContent || "", "What the screen showed, " + new Date().toLocaleString("en-GB"),
+     "Read from the tower; nothing was changed in Business Central."].filter(Boolean)).catch(e => alert("Could not export: " + e.message));
+};
+$("exportBtn").__csv = () => {
   const view = document.querySelector(".view.on"); if (!view || !data) return;
   const cell = t => `"${String(t).replace(/\s+/g," ").trim().replace(/"/g,'""')}"`;
   const blocks = Array.from(view.querySelectorAll("table")).filter(t => t.rows.length > 1 && !t.closest("[hidden]")).map(t => {

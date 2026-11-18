@@ -203,7 +203,7 @@ header{display:flex;justify-content:space-between}
       <div class="period" id="sub">Loading your data…</div>
     </div>
     <div class="hdr-side">
-      <div class="hdr-btns"><button class="btn dark" id="briefBtn">Write today's brief now</button></div>
+      <div class="hdr-btns"><button class="btn exp" id="pgExport" type="button" title="Excel, PDF or send by email: what this tab shows">Export ▾</button><button class="btn dark" id="briefBtn">Write today's brief now</button></div>
       <div class="hdr-meta">
         <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Loading your data…</span></span>
         <span class="sep">|</span>
@@ -561,7 +561,7 @@ async function openFinding(id){
     </div>` : ""}
     <p class="u-msg" id="fAct"></p>
     <h4>Export or send</h4>
-    <div class="row"><button class="btn" type="button" id="xP">PDF</button><button class="btn" type="button" id="xX">Excel</button><button class="btn" type="button" id="xM">Send by email…</button><span class="u-msg" id="xMsg"></span></div>
+    <div class="row"><button class="btn exp-btn" type="button" id="xP">PDF</button><button class="btn exp-btn" type="button" id="xX">Excel</button><button class="btn exp-btn" type="button" id="xM">Send by email…</button><span class="u-msg" id="xMsg"></span></div>
     <div class="dlg" id="xBox" hidden>
       <div class="row"><label style="flex:1;min-width:240px">To<input id="xTo" list="xAcc" placeholder="name@rhg.al, another@rhg.al"></label>
         <label>File<select id="xF"><option value="pdf">PDF</option><option value="xlsx">Excel</option></select></label></div>
@@ -781,5 +781,15 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 })();
 </script>
 <script src="/gear.js"></script><!-- the way into Settings (identity) -->
+<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+// Export ▾ of the header: the open tab (findings, decisions and actions, rules) as it shows
+document.getElementById("pgExport").onclick = () => {
+  const sec = document.querySelector(".u-view:not([hidden])"), on = document.querySelector("#uTabs button.on");
+  if (!sec) return Promise.reject(new Error("Open Findings, Decisions or Rules to export them; the chat is not a table."));
+  return PulseExport.view(sec, ["Unicorn", on ? on.textContent.replace(/\s*\d+$/, "").trim() : ""].filter(Boolean).join(" · "));
+};
+</script>
 </body>
 </html>

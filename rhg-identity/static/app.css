@@ -95,3 +95,7 @@ h1,h2,h3{font-family:"Manrope",system-ui,sans-serif}
 
 /* hidden means hidden, whatever a page styles the element with (see brand.css) */
 [hidden]{display:none !important}
+
+/* Export: blue with white text, as in brand.css */
+.exp, .exp-btn{background:#3b6fd8!important;border-color:#3b6fd8!important;color:#fff!important;font-weight:600}
+.exp:hover, .exp-btn:hover{background:#2f5bb8!important;border-color:#2f5bb8!important}

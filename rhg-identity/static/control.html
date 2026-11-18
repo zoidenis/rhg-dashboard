@@ -116,7 +116,7 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
       <div class="period" id="today"></div>
     </div>
     <div class="hdr-side">
-      <div class="hdr-btns"><button class="btn dark" id="refreshBtn">Refresh now</button></div>
+      <div class="hdr-btns"><button class="btn exp" id="pgExport" type="button" title="Excel, PDF or send by email: what this page shows">Export ▾</button><button class="btn dark" id="refreshBtn">Refresh now</button></div>
       <div class="hdr-meta">
         <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading the towers…</span></span>
         <span class="sep">|</span>
@@ -599,5 +599,11 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 })();
 </script>
 <script src="/gear.js"></script><!-- the way into Settings (identity) -->
+<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+document.getElementById("pgExport").onclick = () => PulseExport.view(document.querySelector("main"),
+  ["Control center", (document.getElementById("company") || {}).value || ""].filter(Boolean).join(" · "));
+</script>
 </body>
 </html>

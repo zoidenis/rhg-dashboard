@@ -112,7 +112,6 @@ html.embed aside, html.embed #title, html.embed #burger{display:none!important}
 html.embed main{padding:6px 4px 40px}
 html.embed body{background:transparent}
 html.embed header.top{justify-content:flex-end;margin-bottom:12px}
-html.embed header.top:has(#newUser[hidden]){display:none}
 </style>
 <script>if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add("embed");</script>
 </head>
@@ -138,6 +137,7 @@ html.embed header.top:has(#newUser[hidden]){display:none}
     <header class="top">
       <button class="burger" id="burger" aria-label="Menu">☰</button>
       <h2 id="title">Accounts</h2>
+      <button class="btn exp" id="pgExport" type="button" title="Excel, PDF or send by email: what this tab shows">Export ▾</button>
       <button class="btn primary" id="newUser">New account</button>
     </header>
     <div id="view" class="grid"></div>
@@ -636,5 +636,10 @@ if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catc
 <script src="/select.js"></script>
 <script src="/tables.js"></script>
 <script src="/gear.js"></script>
+<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+document.getElementById("pgExport").onclick = () => PulseExport.view(document.getElementById("view"), "Administration · " + document.getElementById("title").textContent);
+</script>
 </body>
 </html>

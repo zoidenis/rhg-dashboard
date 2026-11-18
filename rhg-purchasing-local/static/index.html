@@ -535,8 +535,8 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     </div>
     <div class="hdr-side status">
       <div class="hdr-btns">
-        <button class="btn" id="exportBtn">Export CSV</button>
-        <button class="btn" id="pdfBtn">Export PDF</button>
+        <button class="btn exp" id="exportBtn" title="Excel, PDF or send by email: what this screen shows">Export ▾</button>
+        <button class="btn" id="pdfBtn" title="Print the screen, or save it as a PDF as it looks">Print</button>
         <button class="btn dark" id="refreshBtn">Refresh now</button>
       </div>
       <div class="hdr-meta">
@@ -1307,7 +1307,7 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <div class="mhead"><div><h2 id="modalTitle">Records</h2><p class="hint" id="modalHint" style="margin:0"></p></div>
-      <div style="display:flex;gap:8px"><button class="mini" id="modalCsv">Export CSV</button><button class="mini dark" id="modalClose">Close</button></div></div>
+      <div style="display:flex;gap:8px"><button class="mini exp" id="modalCsv" type="button">Export ▾</button><button class="mini dark" id="modalClose">Close</button></div></div>
     <div id="modalBody"></div>
   </div>
 </div>
@@ -1416,13 +1416,14 @@ function exportGo(url){ if (exportMode === "capture") { exportCaptured = {url}; 
     menu.className = "exp-menu"; menu.setAttribute("role", "menu");
     menu.innerHTML = `<button type="button" role="menuitem" data-f="xlsx"><span class="k">XLSX</span><span>Excel</span></button>` +
       `<button type="button" role="menuitem" data-f="pdf"><span class="k">PDF</span><span>PDF</span></button><hr>` +
-      `<button type="button" role="menuitem" data-f="mail"><span class="k">@</span><span>Send by email…</span></button>`;
+      `<button type="button" role="menuitem" data-f="mail"><span class="k">@</span><span>Send by email…</span></button>` +
+      (el.__csv ? `<hr><button type="button" role="menuitem" data-f="csv"><span class="k">CSV</span><span>CSV, as before</span></button>` : "");
     (el.closest(".modal-bg") || document.body).appendChild(menu);
     const r = el.getBoundingClientRect(), host = menu.offsetParent || document.body, hr = host === document.body ? {top: -window.scrollY, left: -window.scrollX} : host.getBoundingClientRect();
     const sy = host === document.body ? 0 : host.scrollTop, sx = host === document.body ? 0 : host.scrollLeft;
     menu.style.top = (r.bottom - hr.top + sy + 4) + "px";
     menu.style.left = Math.max(8, Math.min(r.left - hr.left + sx, document.documentElement.clientWidth - hr.left + sx - menu.offsetWidth - 8)) + "px";
-    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); if (f === "mail") mailDialog(el); else run(el, f); });
+    menu.querySelectorAll("button").forEach(b => b.onclick = ev => { ev.stopPropagation(); const f = b.dataset.f; close(); if (f === "mail") mailDialog(el); else if (f === "csv") el.__csv(); else run(el, f); });
     menu.querySelector("button").focus({preventScroll: true});
     openedAt = Date.now();
   }
@@ -2020,6 +2021,11 @@ $("modalClose").onclick = () => $("modalBg").classList.remove("on");
 $("modalBg").onclick = e => { if (e.target === $("modalBg")) $("modalBg").classList.remove("on"); };
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("modalBg").classList.remove("on"); });
 $("modalCsv").onclick = () => {
+  const t = $("modalTitle").textContent, h = $("modalHint").textContent;
+  return xlsxTable(t, Pulse.sheets($("modalBody")), [t, h, "Read from the tower; nothing was changed in Business Central."].filter(Boolean))
+    .catch(e => alert("Could not export: " + e.message));
+};
+$("modalCsv").__csv = () => {
   if (!modalRows.length) return;
   const lines = [modalCols].concat(modalRows.map(r => modalCols.map(c => r[c] ?? "")));
   const csv = lines.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
@@ -2999,7 +3005,8 @@ function renderContract(){
 // ---------- accounts and permissions ----------
 let me = null, roles = {};
 function can(p){
-  const platform = {settings:"purchasing.settings.manage", actions:"purchasing.actions.manage"};
+  const platform = {view:"purchasing.view", settings:"purchasing.settings.manage", actions:"purchasing.actions.manage",
+                    export:"purchasing.export", users:"admin.users.manage"};
   return !!me && ((me.can||[]).includes(p) || (me.permissions||[]).includes(platform[p] || p));
 }
 async function loadSession(){
@@ -4216,7 +4223,15 @@ function openFromHash(){
 }
 window.addEventListener("hashchange", openFromHash);
 $("refreshBtn").onclick = () => load(true);
-$("exportBtn").onclick = exportCsv;
+// Export ▾ of the header: what the open screen shows (its KPIs and tables) as Excel, PDF or by email; CSV as before
+$("exportBtn").onclick = () => {
+  const view = document.querySelector(".view.on"); if (!view) return;
+  const v = currentView(), co = (data && data.meta && data.meta.company) || $("company").value || "";
+  return xlsxTable(`${v.label}${co ? " · " + co : ""}`, Pulse.sheets(view),
+    [`${v.label}${co ? " · " + co : ""}`, ($("period") || {}).textContent || "", "What the screen showed, " + new Date().toLocaleString("en-GB"),
+     "Read from the tower; nothing was changed in Business Central."].filter(Boolean)).catch(e => alert("Could not export: " + e.message));
+};
+$("exportBtn").__csv = exportCsv;
 $("search").oninput = () => data && renderMovers();
 
 
@@ -4932,6 +4947,18 @@ setInterval(() => {
     $("pillText").textContent = `LIVE · updated ${t} · next in ${countdown}s`;
   }
 }, 1000);
+
+// the cards that had only "Export CSV": Export ▾ as everywhere (Excel, PDF or email of what the card shows), CSV in its menu
+["exCsv", "repCsv", "pricesCsv"].forEach(id => {
+  const b = $(id); if (!b) return;
+  b.__csv = b.onclick; b.classList.add("exp"); b.textContent = "Export ▾"; b.type = "button";
+  b.onclick = () => {
+    const card = b.closest(".card") || b.closest("section"), h = card && card.querySelector("h2");
+    const t = [currentView().label, h ? h.textContent.trim() : ""].filter((x, i, a) => x && (i === 0 || !a[0].includes(x))).join(" · ");
+    return xlsxTable(t, Pulse.sheets(card), [t, ($("period") || {}).textContent || "", "Read from the tower; nothing was changed in Business Central."].filter(Boolean))
+      .catch(e => alert("Could not export: " + e.message));
+  };
+});
 
 // ---------------------------------------------------------------- inside pulse's Settings (identity /settings)
 // Settings opens /purchasing/?embed=settings&cards=ntCard in a frame: this page then shows only those cards, without the

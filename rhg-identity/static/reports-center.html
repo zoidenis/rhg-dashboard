@@ -169,7 +169,7 @@ html.embed body{background:transparent}
       <div class="period">Every report pulse sends: on or paused, failing or late, when it goes next and how the last sends went</div>
     </div>
     <div class="hdr-side">
-      <div class="hdr-btns"><button class="btn dark" id="reload" type="button">Read again</button></div>
+      <div class="hdr-btns"><button class="btn exp" id="pgExport" type="button" title="Excel, PDF or send by email: the reports and their state">Export ▾</button><button class="btn dark" id="reload" type="button">Read again</button></div>
       <div class="hdr-meta"><span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading the reports…</span></span>
         <span class="sep">|</span><span id="whoami"></span><button class="linkbtn" id="logoutBtn">Sign out</button></div>
     </div>
@@ -415,7 +415,7 @@ function openItem(id, msg){
   if (x.link) acts.push(`<a class="btn" href="${esc(x.link)}">${x.kind === "screen" ? "Open scheduled reports ›" : x.kind === "brief" ? "Open Unicorn ›" : "Open its settings ›"}</a>`);
   $("drawer").innerHTML = `<div class="bd" id="dBd"><div class="dr" role="dialog" aria-modal="true" aria-labelledby="dTitle">
     <div class="mh"><div><h2 id="dTitle">${esc(x.name)}</h2><div class="sub">${esc(KIND[x.kind] || x.kind)} · ${esc(x.tower)}${x.company ? ` · <span data-no-i18n>${esc(x.company)}</span>` : ""}${x.screen && x.screen !== x.name ? ` · <span data-no-i18n>${esc(x.screen)}</span>` : ""}</div></div>
-      <button type="button" class="x" id="dClose">Close ✕</button></div>
+      <div style="display:flex;gap:8px;align-items:flex-start"><button type="button" class="x exp" id="dExport" title="Excel, PDF or send by email: this report and its last sends">Export ▾</button><button type="button" class="x" id="dClose">Close ✕</button></div></div>
     <div class="mb">
       <div class="facts">${facts.map(([l, v]) => `<div><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`).join("")}</div>
       <div class="why ${esc(x.state)}">${esc(WHY[x.state] || "")}${x.error ? ` <span data-no-i18n>${esc(x.error)}</span>` : ""}${x.note ? `<div class="sub" style="margin-top:4px">${esc(x.note)}</div>` : ""}</div>
@@ -429,6 +429,7 @@ function openItem(id, msg){
     </div></div></div>`;
   const close = () => { $("drawer").innerHTML = ""; OPEN = null; history.replaceState(null, "", location.pathname + location.search); };
   $("dClose").onclick = close;
+  $("dExport").onclick = () => PulseExport.view(document.querySelector("#drawer .mb"), `Reports center · ${x.name}`);
   $("dBd").onclick = e => { if (e.target.id === "dBd") close(); };
   document.onkeydown = e => { if (e.key === "Escape" && OPEN) close(); };
   if ($("dToggle")) $("dToggle").onclick = () => flip(x.id, null);
@@ -499,5 +500,10 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 })();
 </script>
 <script src="/gear.js"></script><!-- the way into Settings (identity) -->
+<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+document.getElementById("pgExport").onclick = () => PulseExport.view(document.querySelector("main"), "Reports center");
+</script>
 </body>
 </html>

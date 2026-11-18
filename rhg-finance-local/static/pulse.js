@@ -113,15 +113,23 @@ details.pz-fold{margin-top:10px}details.pz-fold>summary{cursor:pointer;font-size
     rows = rows.map(r => r.map((x, i) => x && typeof x === "object" ? (formats[i] === "pct" ? x.pct : x.t) : x));
     return {title: (title || "Sheet").slice(0, 31), header, rows, formats};
   }
+  // shown, or folded away in a <details> (a table kept closed under "Table" is still what the screen holds)
+  function shownEl(el, top){
+    for (let x = el; x && x !== top.parentElement; x = x.parentElement) {
+      if (x.tagName === "DETAILS") continue;
+      if (x.hidden || getComputedStyle(x).display === "none") return false;
+    }
+    return true;
+  }
   function popSheets(pop){
     const body = pop.querySelector(".pl-body") || pop, out = [];
     const popTitle = cellText(pop.querySelector(".ph h2") || document.createElement("i")) || "Table";
-    const tiles = [...body.querySelectorAll(".pz-tile, .pl-tile, .kpi")].filter(t => !t.closest("table"));
+    const tiles = [...body.querySelectorAll(".pz-tile, .pl-tile, .kpi")].filter(t => !t.closest("table") && shownEl(t, body));
     if (tiles.length) out.push(sheetOf("Summary", ["Figure", "Value", "Note"], tiles.map(t =>
       [cellText(t.querySelector(".l") || t), cellValue(cellText(t.querySelector(".v") || t)), cellText(t.querySelector(".s") || document.createElement("i"))])));
     // the Summary's values mix numbers and text: a percentage there stays as written
     body.querySelectorAll("table, .pz-hb, .pz-cols").forEach(el => {
-      if (el.closest(".pz-tile, .pl-tile") || (el.tagName === "TABLE" && el.parentElement.closest("table"))) return;
+      if (el.closest(".pz-tile, .pl-tile") || (el.tagName === "TABLE" && el.parentElement.closest("table")) || !shownEl(el, body)) return;
       const title = heading(el, body) || popTitle;
       if (el.tagName === "TABLE") {
         const trs = [...el.rows].filter(r => r.cells.length);

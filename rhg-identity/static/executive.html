@@ -167,7 +167,7 @@ a.fh-c:hover{border-color:var(--accent)}
       <div class="period" id="periodLabel">Reading…</div>
     </div>
     <div class="hdr-side">
-      <div class="hdr-btns"><button class="btn dark" id="refreshBtn">Refresh now</button></div>
+      <div class="hdr-btns"><button class="btn exp" id="pgExport" type="button" title="Excel, PDF or send by email: what this tab shows">Export ▾</button><button class="btn dark" id="refreshBtn">Refresh now</button></div>
       <div class="hdr-meta">
         <span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading…</span></span>
         <span class="sep">|</span><span id="whoami"></span>
@@ -1383,5 +1383,13 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 })();
 </script>
 <script src="/gear.js"></script><!-- the way into Settings (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+// Export ▾ of the header: what the open tab shows (its KPIs and tables)
+document.getElementById("pgExport").onclick = () => {
+  const tab = document.querySelector("#tabs button.on"), co = (document.getElementById("fCompany") || {}).value || "";
+  return PulseExport.view(document.getElementById("view"), ["Executive dashboard", tab ? tab.textContent.trim() : "", co].filter(Boolean).join(" · "));
+};
+</script>
 </body>
 </html>

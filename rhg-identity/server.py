@@ -45,6 +45,7 @@ STATIC_FILES = {
     "pulse.js": "application/javascript; charset=utf-8",
     "reports.js": "application/javascript; charset=utf-8",
     "gear.js": "application/javascript; charset=utf-8",
+    "export.js": "application/javascript; charset=utf-8",
 }
 PUBLIC_PATHS = {"/", "/login", "/login.html", "/api/login", "/api/session",
                 "/brand.css", "/app.css", "/icon.svg", "/manifest.webmanifest", "/sw.js",
@@ -562,6 +563,28 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Your role cannot talk to Unicorn."}); return
                 try:
                     self._send(200, {"messages": unicorn.ask(user, body.get("text"))})
+                except (ValueError, RuntimeError) as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path in ("/api/export/table", "/api/export/email"):
+                # Export ▾ of the platform's pages and pop-ups (export.js): what the page shows, built by Purchasing
+                # as every export of pulse (Excel or PDF), downloaded or sent by email; for the roles that may export
+                if not any(p.endswith(".export") for p in user.get("permissions") or []):
+                    self._send(403, {"error": "Your role cannot export (it needs the export right of a tower)."}); return
+                t = body.get("table") or {}
+                table = {"name": str(t.get("name") or "pulse")[:150], "sheets": t.get("sheets") if isinstance(t.get("sheets"), list) else [],
+                         "notes": [str(x)[:300] for x in (t.get("notes") or [])][:12]}
+                fmt = "pdf" if body.get("format") == "pdf" else "xlsx"
+                try:
+                    if url.path.endswith("/table"):
+                        fname, ctype, data = actioncenter.build_file(table, fmt, user, "pulse")
+                        self._send(200, data, ctype or "application/octet-stream",
+                                   [("Content-Disposition", f'attachment; filename="{fname}"')])
+                    else:
+                        title = str(body.get("title") or table["name"])[:150]
+                        self._send(200, {"sent": actioncenter.send_file(
+                            table, fmt, body.get("to"), body.get("note"), bool(body.get("copy_me")), user,
+                            source="pulse", title=title, detail="", rows=[], where=str(body.get("where") or "pulse")[:120],
+                            what="pulse")})
                 except (ValueError, RuntimeError) as exc:
                     self._send(400, {"error": str(exc)})
             elif url.path in ("/api/actions/export", "/api/actions/send"):
