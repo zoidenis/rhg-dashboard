@@ -63,6 +63,7 @@ import quality
 import recipients
 import reportcat
 import reports
+import sharepoint
 import smtp_config
 import store
 from bc_client import BCClient, BCError, PeriodCache
@@ -1932,6 +1933,13 @@ class Handler(BaseHTTPRequestHandler):
                                    for x in exreg.query("all", company=company, limit=100000)["items"]
                                    if x["subject"] in keys}
             self._send(200, out)
+            return
+        if url.path == "/internal/sharepoint/navigation":
+            # identity (Control center): the navigation register of RHG Home, read with the Graph app (sharepoint.py)
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, sharepoint.navigation(force=parse_qs(url.query).get("refresh") == ["1"]))
             return
         if url.path == "/internal/mail/status":
             if not self._service_call():

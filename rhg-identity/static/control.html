@@ -72,6 +72,14 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
 .cc-viz{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .cc-viz{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}}
 :root[data-theme="dark"] .cc-viz{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300}
+/* RHG Home: the destinations of the SharePoint portal, from its navigation register (a tree: Portal → sites → brand → units) */
+.rh-tree{list-style:none;margin:0;padding:0}
+.rh-tree .rh-tree{margin-left:18px;padding-left:12px;border-left:1px solid var(--line)}
+.rh-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0}
+.rh-row a{font-weight:600;font-size:13.5px;color:var(--ink);text-decoration:none}
+.rh-row a:hover,.rh-row a:focus-visible{color:var(--accent);text-decoration:underline}
+.rh-row .rh-meta{font-size:11.5px;color:var(--sub)}
+.rh-row .rhg-pill{font-size:10.5px;padding:1px 8px}
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.towers-grid{grid-template-columns:1fr}}
 /* phone: the side menu becomes a drawer, opened by the Menu button at the top (Finance, Purchasing, Sales…) */
 .mnav-btn,.mnav-bd{display:none}
@@ -177,6 +185,14 @@ table.cc-heat{border-collapse:separate;border-spacing:2px;width:100%;margin-top:
       <span class="rhg-pill info">Crunchtime Ops Execution</span><a class="btn dark" href="/finance/#opsexec">Open tower →</a></div>
   </div>
 
+  <div class="card cc-card" id="rhgHome" hidden>
+    <div class="card-head"><div><h2>RHG Home · SharePoint</h2>
+      <p class="hint">The destinations of RHG Home, from its navigation register. A link opens SharePoint, which shows only what your own Microsoft 365 account may see: pulse reads RHG Home and nothing else.</p></div>
+      <button class="btn no-report" id="rhRefresh" type="button">Read again</button></div>
+    <div id="rhList" style="margin-top:10px"><div class="empty">Reading RHG Home…</div></div>
+    <p class="meta" id="rhNote" style="margin:8px 0 0"></p>
+  </div>
+
   <div class="card cc-risk" style="margin-bottom:20px" id="ccRisk"><h2 style="font-size:18px">Risks by priority</h2>
     <p class="hint" style="margin:2px 0 0;font-size:12.5px;color:var(--sub)"><span>Purchasing and Finance exceptions and the alerts of every restaurant, critical first, then by value.</span></p>
     <div class="cc-flt" id="ccFlt" hidden></div>
@@ -207,6 +223,38 @@ function elsewhere(){
   return holds("finance.s.") ? "/finance/" : holds("purchasing.s.") ? "/purchasing/" : holds("platform.s.executive.") ? "/executive"
     : can("unicorn.use") ? "/unicorn" : can("admin.users.manage") ? "/admin" : null;
 }
+
+// RHG Home on SharePoint: the navigation register (Regjistri Navigimit RHG), read by Purchasing with the Graph app.
+// Draft destinations show as such; those the register switches off, has not verified or gives no address are left out.
+const RH_PILL = {"miratuar": "ok", "draft": "warning", "në rishikim": "info"};
+function renderRhgHome(j){
+  const box = $("rhgHome"), list = $("rhList"), note = $("rhNote");
+  box.hidden = false;
+  if (!j || j.available === false) { list.innerHTML = `<div class="empty">RHG Home could not be read: ${esc((j && j.error) || "no answer")}</div>`; note.textContent = ""; return; }
+  const items = (j.items || []).filter(x => /^https:\/\/[^\/]*sharepoint\.com(\/|$)/i.test(x.url || "")), codes = new Set(items.map(x => x.code).filter(Boolean)), kids = {};
+  items.forEach(x => { const p = x.parent && codes.has(x.parent) && x.parent !== x.code ? x.parent : ""; (kids[p] ||= []).push(x); });
+  const seen = new Set();
+  const tree = parent => `<ul class="rh-tree">${(kids[parent] || []).filter(x => !seen.has(x)).map(x => { seen.add(x);
+    const st = (x.status || "").toLowerCase(), tip = [x.owner && "Owner: " + x.owner, x.audience && "Audience: " + x.audience, x.note].filter(Boolean).join("\n");
+    return `<li><div class="rh-row"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tip)}">${esc(x.title)} ↗</a>`
+      + `<span class="rh-meta">${esc([x.type, x.location || x.brand].filter(Boolean).join(" · "))}</span>`
+      + (x.status ? `<span class="rhg-pill ${RH_PILL[st] || "info"}">${esc(x.status)}</span>` : "")
+      + (x.approved === "Po" ? `<span class="rhg-pill ok">Approved</span>` : "")
+      + `</div>${x.code && kids[x.code] ? tree(x.code) : ""}</li>`; }).join("")}</ul>`;
+  list.innerHTML = items.length ? tree("") : `<div class="empty">The navigation register has no destination to show yet.</div>`;
+  const hid = j.hidden || [], at = j.read_at ? new Date(j.read_at).toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"}) : "";
+  note.innerHTML = [`Read from <a href="${esc(j.list_url || j.site_url || "#")}" target="_blank" rel="noopener noreferrer">${esc(j.list || "the navigation register")}</a>${at ? " at " + esc(at) : ""}`,
+    hid.length ? `${hid.length} not shown (switched off, not verified or without an address): ${esc(hid.map(x => x.title).join(", "))}` : "",
+    j.stale ? `<span class="warn">${esc(j.error || "Last reading kept.")}</span>` : ""].filter(Boolean).join(" · ");
+  const t = $("towers");
+  if (j.site_url && !t.querySelector("#rhLink")) t.insertAdjacentHTML("beforeend", `<a href="${esc(j.site_url)}" id="rhLink" target="_blank" rel="noopener noreferrer">RHG Home ↗</a>`);
+}
+async function loadRhgHome(refresh){
+  if (refresh) $("rhList").innerHTML = `<div class="empty">Reading RHG Home…</div>`;
+  try { renderRhgHome(await get("/api/rhghome" + (refresh ? "?refresh=1" : ""))); }
+  catch (e) { renderRhgHome({available: false, error: e.message}); }
+}
+$("rhRefresh").onclick = () => loadRhgHome(true);
 
 async function get(path){
   const r = await fetch(path, {credentials: "same-origin"});
@@ -580,6 +628,7 @@ $("logoutBtn").onclick = signOut;
     } catch (e) {}
   }
   load(); loadCC();
+  if (can("m365.home.view")) loadRhgHome();
   setInterval(() => { if (!document.hidden) load(); }, 120000);
 })();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

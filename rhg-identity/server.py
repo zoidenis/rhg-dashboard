@@ -136,6 +136,20 @@ def scope_options():
         return 502, {"error": f"Finance could not list the companies and locations: {str(exc)[:160]}"}
 
 
+def rhghome(refresh=False):
+    """(status, body): RHG Home's navigation register, from Purchasing (/internal/sharepoint/navigation), which reads
+    it on SharePoint with the Graph app (read-only, RHG-Home only)."""
+    import urllib.error
+    import urllib.request
+    url = actioncenter.PURCHASING_URL + "/internal/sharepoint/navigation" + ("?refresh=1" if refresh else "")
+    req = urllib.request.Request(url, headers={"X-Service-Token": config.SERVICE_TOKEN})
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            return 200, json.loads(r.read() or b"{}")
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        return 200, {"available": False, "error": f"Purchasing could not read RHG Home: {str(exc)[:160]}"}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "RHG-Identity"
 
@@ -331,6 +345,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.can(user, "reports.manage"):
                     self._send(403, {"error": "Your role cannot schedule reports."}); return
                 self._send(*scope_options_cached())
+            elif url.path == "/api/rhghome":
+                # RHG Home on SharePoint: its navigation register, read by Purchasing with the Graph app
+                if not auth.can(user, "m365.home.view"):
+                    self._send(403, {"error": "Your role cannot see RHG Home."}); return
+                self._send(*rhghome(parse_qs(url.query).get("refresh") == ["1"]))
             elif url.path == "/api/unicorn/status":
                 # For the menus: may this person talk to Unicorn, and how many briefs are unread.
                 ok = auth.can(user, "unicorn.use")

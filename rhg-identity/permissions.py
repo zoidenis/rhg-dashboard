@@ -51,6 +51,9 @@ PERMISSIONS = {
     # --- Scheduled reports (any screen of pulse sent by email, as each recipient sees it)
     "reports.manage":        "Schedule screens as email reports and choose who receives them",
 
+    # --- Microsoft 365 (read with the Entra ID app; a link opens only what the person's own account may see)
+    "m365.home.view":        "RHG Home: the SharePoint navigation register in the Control center",
+
     # --- Platform
     "admin.users.manage":    "Create, edit and disable accounts",
     "admin.roles.manage":    "Change what roles are allowed to do",
@@ -79,6 +82,7 @@ ACTIONS = {
     "unicorn.rules.manage": "Unicorn: change the rules library (thresholds, policies, approved decisions)",
     "actioncenter.manage": "Executive Action Center: SLA and responsibility matrices, deadlines, the daily email",
     "reports.manage": "Scheduled reports: send screens by email, choose how often and to whom",
+    "m365.home.view": "RHG Home: see the SharePoint navigation register (Regjistri Navigimit) in the Control center",
     "layout.personal": "Rearrange and hide sections for yourself",
     "layout.roles.manage": "Set the sections each role sees, and their order",
     "admin.users.manage": "Administration: create, edit and disable accounts, and their access",

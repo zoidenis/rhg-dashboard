@@ -125,5 +125,9 @@ GRAPH_TENANT_ID = get("GRAPH_TENANT_ID", "")
 GRAPH_CLIENT_ID = get("GRAPH_CLIENT_ID", "")
 GRAPH_CERT_PATH = get("GRAPH_CERT_PATH", "")
 GRAPH_CERT_PASSWORD = get("GRAPH_CERT_PASSWORD", "")
+# RHG Home on SharePoint, read with the same app (Sites.Selected, "read" granted on this one site): its navigation
+# register is shown in the Control center (sharepoint.py).
+SP_HOME_SITE = get("SP_HOME_SITE", "revoal.sharepoint.com:/sites/RHG-Home")
+SP_NAV_LIST = get("SP_NAV_LIST", "Regjistri Navigimit RHG")
 # Address the emails link to, so a reader lands on the right screen
 PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")
