@@ -46,6 +46,25 @@ nav button.on,nav button.sub-on{background:rgba(160,216,234,.16);color:#fff;font
 .readst.run{border-left-color:var(--rhg-primary,#0c475e)}.readst.run .ic{background:var(--rhg-primary,#0c475e)}
 .readst.warn{border-left-color:var(--warn,#b26a00);background:var(--rhg-amberbg,#fdf1dc)}.readst.warn .ic{background:var(--warn,#b26a00)}
 .readst.err{border-left-color:var(--rhg-red,#c0392b);background:var(--rhg-redbg,#fbe9e7)}.readst.err .ic{background:var(--rhg-red,#c0392b)}
+.pp-say ul{margin:4px 0 0;padding-left:18px;line-height:1.6;font-size:13.5px}
+.pp-say li{margin:2px 0}
+.pp-b{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;background:var(--soft,#f1efe8);color:var(--ink)}
+.pp-b.ok{background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}
+.pp-b.warn,.pp-b.quiet{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--ink)}
+.pp-b.up,.pp-b.busy{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.pp-b.na,.pp-b.nosales,.pp-b.nostaff,.pp-b.none{color:var(--sub)}
+.pp-lg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--sub)}
+.pp-lg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px}
+table.pp-grid{border-collapse:separate;border-spacing:3px}
+table.pp-grid th{font-size:11px;text-align:center;color:var(--sub);font-weight:600;padding:2px}
+table.pp-grid tr th:first-child{text-align:left;padding-right:8px;white-space:nowrap}
+.pp-c{min-width:30px;height:28px;text-align:center;font-size:11.5px;font-weight:600;border-radius:5px;padding:0 2px;cursor:pointer;
+  background:color-mix(in srgb,var(--c) 30%,var(--card));color:var(--ink)}
+.pp-c.busy{background:color-mix(in srgb,var(--c) 70%,var(--card));color:#fff}
+.pp-c.none{background:transparent;cursor:default}
+.pp-c:hover,.pp-c:focus-visible{outline:2px solid var(--ink);outline-offset:-1px}
+.pp-conf{display:flex;gap:8px;align-items:flex-start;padding:10px 14px;margin-bottom:14px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:12.5px;color:var(--sub)}
+.pp-how{padding:10px 12px;margin:0 0 12px;border-left:3px solid var(--pulse-blue,#3b6fd8);background:color-mix(in srgb,var(--pulse-blue,#3b6fd8) 7%,transparent);border-radius:6px;font-size:13px;line-height:1.5}
 .fc-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .fc-seg button{all:unset;cursor:pointer;padding:6px 11px;font-size:12px;color:var(--sub)}
 .fc-seg button.on{background:var(--accent);color:var(--card)}
@@ -4734,7 +4753,7 @@ const PP_HINT = {
   workforce: "Active employees by restaurant, section (front of house, back of house, management) and position; FTE where the contract's schedule gives its hours; headcount at each month end, hires and leavers from the contracts. From Odoo Employees and Contracts.",
   productivity: "Simphony's net sales, checks and guests against Odoo's actual hours of the same restaurant and business days, for the period chosen above, and the week by week trend. Team figures of a restaurant, not the productivity of a person.",
   scheduling: "When the restaurant is busy against the people on shift: the average of each weekday and hour of the period, Simphony's sales and checks against Odoo's planned and actual staff. Choose the restaurant and what the grid shows.",
-  personnel: "The personnel cost Business Central holds on the payroll accounts of each department, month by month, against its net revenue and the budget: labour cost %. Click a restaurant for its months and accounts.",
+  personnel: "The personnel cost Business Central holds on the payroll accounts of each department, month by month, against its net revenue and the budget: labour cost %. Click a restaurant for its months; no person or account is shown.",
   quality: "What to correct in Odoo so the figures above hold: employees without a manager, work location, position or running contract, schedules without hours a week, attendances with a forgotten check-out or waiting for review, and restaurants without a mapping."};
 function ppPart(){ return ppTab === "quality" ? "workforce" : ppTab; }
 function ppQs(){ const p = new URLSearchParams(params()); p.set("part", ppPart()); return p.toString(); }
@@ -4797,31 +4816,52 @@ function ppRender(){
   $("ppDefs").innerHTML = Object.values(d.definitions || {}).map(t => `<p style="margin:0 0 6px">${esc(t)}</p>`).join("");
   ({workforce: ppWorkforce, productivity: ppProductivity, scheduling: ppScheduling, personnel: ppPersonnel, quality: ppQuality})[ppTab](d);
 }
+// ---- shared pieces: plain-language highlights on top of every tab, the open months, a badge
+const ppL12 = (x, k) => x[k].slice(-13, -1).reduce((a, m) => a + m[1], 0);
+const ppPct = (a, b) => b ? a / b * 100 : null;
+const ppBadge = (cls, t) => `<span class="pp-b ${cls}">${esc(t)}</span>`;
+function ppSay(lines){
+  const L = lines.filter(Boolean);
+  return L.length ? `<div class="card pp-say" style="margin-bottom:14px"><h2>What it says</h2><ul>${L.map(t => `<li>${t}</li>`).join("")}</ul></div>` : "";
+}
+const ppWd = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const ppHr = h => String(h).padStart(2, "0") + ":00";
+
 // A. Workforce
 function ppWorkforce(d){
   const R = d.locations, all = R.concat(d.support, d.unmapped), sum = (L, k) => L.reduce((a, x) => a + (x[k] || 0), 0);
-  const last12 = (x, k) => x[k].slice(-13, -1).reduce((a, m) => a + m[1], 0);
   readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading, lines: [d.totals ? fcSp(`${fmt(d.totals.active)} active and ${fmt(d.totals.archived)} archived employees · contracts from ${d.history_from || "–"}`)
              : fcSp(`Your restaurants: ${(d.locations || []).map(L => L.name || L.ref).join(", ") || "–"}`)]});
+  const months = d.months.slice(-13), tot = months.map(k => all.reduce((a, x) => a + ((x.trend.find(t => t[0] === k) || [0, 0])[1]), 0));
+  const hires = all.reduce((a, x) => a + ppL12(x, "hires"), 0), leavers = all.reduce((a, x) => a + ppL12(x, "leavers"), 0);
+  const avgHc = (() => { const hs = all.map(x => x.trend.slice(-13, -1)).flat().reduce((m, t) => (m[t[0]] = (m[t[0]] || 0) + t[1], m), {}); const v = Object.values(hs); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; })();
+  const turn = avgHc ? leavers / avgHc * 100 : null;
+  const top = R.slice().sort((a, b) => (b.turnover_12m ?? -1) - (a.turnover_12m ?? -1)).filter(x => x.turnover_12m != null && x.employees >= 5)[0];
+  const chg = tot.length > 12 ? tot[tot.length - 1] - tot[0] : null;
   $("ppKpis").innerHTML = Pulse.tiles([
-    {l: "Active employees", v: fmt(sum(all, "employees")), s: `${fmt(sum(R, "employees"))} in ${R.length} restaurants · ${fmt(sum(d.support, "employees"))} in support units`},
-    {l: "FTE", v: fmt(sum(all, "fte"), 1), s: `${fmt(sum(all, "fte_unknown"))} people without hours a week in their schedule`, cls: sum(all, "fte_unknown") ? "warn" : ""},
-    {l: "Hires · 12 months", v: fmt(all.reduce((a, x) => a + last12(x, "hires"), 0)), s: "first contracts of the twelve closed months"},
-    {l: "Leavers · 12 months", v: fmt(all.reduce((a, x) => a + last12(x, "leavers"), 0)), s: "last contracts closed"},
+    {l: "Active employees", v: fmt(sum(all, "employees")), s: `${fmt(sum(R, "employees"))} in ${R.length} restaurants · ${fmt(sum(d.support, "employees"))} in support units`, open: "ppx|w-emp"},
+    {l: "FTE", v: fmt(sum(all, "fte"), 1), s: `${fmt(sum(all, "fte_unknown"))} people without hours a week in their schedule`, cls: sum(all, "fte_unknown") ? "warn" : "", open: "ppx|w-fte"},
+    {l: "Hires · 12 months", v: fmt(hires), s: "first contracts of the twelve closed months", open: "ppx|w-hires"},
+    {l: "Leavers · 12 months", v: fmt(leavers), s: "last contracts closed", open: "ppx|w-leavers"},
+    {l: "Turnover · 12 months", v: turn == null ? "–" : fmt(turn, 1) + "%", s: "leavers / average headcount", open: "ppx|w-turn"},
     {l: "Transfers", v: fmt(d.transfers_list.reduce((a, t) => a + t[2], 0)), s: "between restaurants, in the months shown", open: "ppk|transfers"},
     {l: "Needs review", v: fmt(d.unmapped.length), s: "Odoo restaurants mapped to no restaurant of Settings", cls: d.unmapped.length ? "warn" : "", open: "ppk|review"}]);
-  const months = d.months.slice(-13), tot = months.map(k => all.reduce((a, x) => a + ((x.trend.find(t => t[0] === k) || [0, 0])[1]), 0));
-  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>By restaurant</h2><p class="hint">Active employees by section; click a restaurant for its positions and months.</p>`
+  $("ppBody").innerHTML = ppSay([
+      `<b>${fmt(sum(all, "employees"))}</b> people work today, <b>${fmt(sum(all, "fte"), 1)}</b> full-time equivalents${sum(all, "fte_unknown") ? ` (${fmt(sum(all, "fte_unknown"))} without hours a week in their schedule are not in the FTE)` : ""}.`,
+      chg != null ? `Headcount is <b>${chg >= 0 ? "up" : "down"} ${fmt(Math.abs(chg))}</b> against twelve months ago (${fmt(tot[0])} → ${fmt(tot[tot.length - 1])}).` : "",
+      `In the last twelve closed months <b>${fmt(hires)}</b> people were hired and <b>${fmt(leavers)}</b> left: a turnover of <b>${turn == null ? "–" : fmt(turn, 1) + "%"}</b>.`,
+      top ? `The highest turnover is at <b>${esc(top.name)}</b>: ${fmt(top.turnover_12m, 1)}% of its average headcount left in twelve months.` : "",
+      d.unmapped.length ? `${fmt(d.unmapped.length)} Odoo restaurant(s) map to no restaurant of Settings: their people are counted, but not under a restaurant.` : ""])
+    + `<div class="card" style="margin-bottom:14px"><h2>By restaurant</h2><p class="hint">Active employees by section; click a restaurant for its positions and months.</p>`
     + Pulse.bars(R.concat(d.support).map(x => ({key: x.name, segs: [[x.sections.FOH || 0, "var(--ch-0)", "front of house"], [x.sections.BOH || 0, "var(--ch-1)", "back of house"], [x.sections.MGMT || 0, "var(--ch-2)", "management"], [x.sections.Other || 0, "var(--ch-4)", "other"]],
         text: `<b>${fmt(x.employees)}</b> <span class="meta">FTE ${fmt(x.fte, 1)}</span>`, open: "ppw|" + x.unit})),
       [["var(--ch-0)", "front of house"], ["var(--ch-1)", "back of house"], ["var(--ch-2)", "management"], ["var(--ch-4)", "other"]]) + `</div>`
-    + `<div class="card" style="margin-bottom:14px"><h2>Headcount at each month end</h2><p class="hint">Employees under contract on the last day of the month, every Odoo restaurant; the running month to today.</p>`
-    + Pulse.cols(months.map((k, i) => ({label: k.slice(2), segs: [[tot[i], "var(--ch-0)", "headcount"]], tip: `${k}: ${fmt(tot[i])} employees`})), null, {maxLabel: v => fmt(v)}) + `</div>`
-    + `<div class="card"><h2>Every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Employees</th><th class="num">FOH</th><th class="num">BOH</th><th class="num">Mgmt</th><th class="num">FTE</th><th class="num">Hires 12m</th><th class="num">Leavers 12m</th><th class="num">Turnover 12m</th><th>Mapping</th></tr>`
-    + all.map(x => `<tr data-pulse="ppw|${esc(x.unit)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.unit)}${x.company ? " · " + esc(x.company) : ""}</div></td><td class="num"><b>${fmt(x.employees)}</b></td>
+    + `<div class="card" style="margin-bottom:14px"><h2>Headcount at each month end</h2><p class="hint">Employees under contract on the last day of the month, every Odoo restaurant; the running month to today. Click a month for its restaurants, hires and leavers.</p>`
+    + Pulse.cols(months.map((k, i) => ({label: k.slice(2), segs: [[tot[i], "var(--ch-0)", "headcount"]], tip: `${k}: ${fmt(tot[i])} employees`, open: "ppx|w-month:" + k})), null, {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="card"><h2>Every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Employees</th><th class="num">Front of house</th><th class="num">Back of house</th><th class="num">Management</th><th class="num">FTE</th><th class="num">Hires 12m</th><th class="num">Leavers 12m</th><th class="num">Turnover 12m</th></tr>`
+    + all.map(x => `<tr data-pulse="ppw|${esc(x.unit)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${x.how === "mapped" ? esc(x.unit) : x.how === "needs review" ? "Needs review" : "support unit"}</div></td><td class="num"><b>${fmt(x.employees)}</b></td>
       <td class="num">${fmt(x.sections.FOH || 0)}</td><td class="num">${fmt(x.sections.BOH || 0)}</td><td class="num">${fmt(x.sections.MGMT || 0)}</td><td class="num">${fmt(x.fte, 1)}${x.fte_unknown ? `<div class="meta">${x.fte_unknown} unknown</div>` : ""}</td>
-      <td class="num">${fmt(last12(x, "hires"))}</td><td class="num">${fmt(last12(x, "leavers"))}</td><td class="num">${x.turnover_12m == null ? "–" : fmt(x.turnover_12m, 1) + "%"}</td>
-      <td class="meta">${x.how === "mapped" ? esc(x.ref) : x.how === "needs review" ? '<span class="chip warn">Needs review</span>' : "support"}</td></tr>`).join("") + `</table></div></div>`;
+      <td class="num">${fmt(ppL12(x, "hires"))}</td><td class="num">${fmt(ppL12(x, "leavers"))}</td><td class="num">${x.turnover_12m == null ? "–" : fmt(x.turnover_12m, 1) + "%"}</td></tr>`).join("") + `</table></div></div>`;
 }
 Pulse.on("ppw", unit => {
   const d = ppData.workforce, x = d && d.locations.concat(d.support, d.unmapped).find(r => r.unit === unit); if (!x) return;
@@ -4829,10 +4869,12 @@ Pulse.on("ppw", unit => {
   Pulse.pop({title: esc(x.name), sub: esc(`${x.unit} · Odoo · ${fmt(x.employees)} active employees`), body: Pulse.tiles([
       {l: "Employees", v: fmt(x.employees), s: `FOH ${x.sections.FOH || 0} · BOH ${x.sections.BOH || 0} · Mgmt ${x.sections.MGMT || 0}`},
       {l: "FTE", v: fmt(x.fte, 1), s: x.fte_unknown ? `${x.fte_unknown} without hours a week` : ""},
+      {l: "Hires · 12 months", v: fmt(ppL12(x, "hires"))}, {l: "Leavers · 12 months", v: fmt(ppL12(x, "leavers"))},
       {l: "Turnover · 12 months", v: x.turnover_12m == null ? "–" : fmt(x.turnover_12m, 1) + "%", s: "leavers / average headcount"},
-      {l: "Without a manager", v: fmt(x.no_manager), s: `${fmt(x.no_location)} without a work location`, cls: x.no_manager ? "warn" : ""}])
+      {l: "Records to complete", v: fmt(x.no_manager + x.no_location + x.no_job + x.no_contract), s: "missing manager, location, position or contract", cls: (x.no_manager + x.no_location + x.no_job + x.no_contract) ? "warn" : "", open: "ppq|" + x.unit}])
     + Pulse.panel("Headcount, hires and leavers", Pulse.cols(months.map(k => { const h = (x.trend.find(t => t[0] === k) || [0, 0])[1], hi = (x.hires.find(t => t[0] === k) || [0, 0])[1], lv = (x.leavers.find(t => t[0] === k) || [0, 0])[1];
-        return {label: k.slice(2), segs: [[h, "var(--ch-0)", "headcount"]], tip: `${k}: ${h} employees · ${hi} hired · ${lv} left`}; }), null, {maxLabel: v => fmt(v)}))
+        return {label: k.slice(2), segs: [[h, "var(--ch-0)", "headcount"]], tip: `${k}: ${h} employees · ${hi} hired · ${lv} left`}; }), null, {maxLabel: v => fmt(v)})
+      + Pulse.list([["Month"], ["Employees at the month end", 1], ["Hired", 1], ["Left", 1]], months.slice().reverse().map(k => ({cells: [esc(k), fmt((x.trend.find(t => t[0] === k) || [0, 0])[1]), fmt((x.hires.find(t => t[0] === k) || [0, 0])[1]), fmt((x.leavers.find(t => t[0] === k) || [0, 0])[1])]}))))
     + Pulse.panel("By position", Pulse.bars(Object.entries(x.jobs).sort((a, b) => b[1] - a[1]).map(([j, n]) => ({key: j, segs: [[n, "var(--ch-0)", "employees"]], text: fmt(n)}))))});
 });
 Pulse.on("ppk", kind => {
@@ -4840,42 +4882,138 @@ Pulse.on("ppk", kind => {
   if (kind === "transfers") Pulse.pop({title: "Transfers between restaurants", sub: "From the employees' contracts", body: Pulse.list([["Month"], ["From → to"], ["Employees", 1]], d.transfers_list.slice().reverse().map(t => ({cells: [esc(t[0]), esc(t[1]), fmt(t[2])]})), {max: 480, none: "No transfer in the months held."})});
   if (kind === "review") Pulse.pop({title: "Odoo restaurants to review", sub: "Mapped to a reference that is not a restaurant of Settings → Location intelligence", body: Pulse.list([["Odoo restaurant"], ["Mapped to"], ["Employees", 1]], d.unmapped.map(x => ({cells: [esc(x.unit), esc(x.ref || "–"), fmt(x.employees)]})), {none: "None: every Odoo restaurant maps to a restaurant, or is a support unit."})});
 });
+// the tiles of every tab: the figure, restaurant by restaurant
+Pulse.on("ppx", key => {
+  const [k, arg] = key.split(":");
+  const w = ppData.workforce, p = ppData.productivity, c = ppData.personnel;
+  const W = w ? w.locations.concat(w.support, w.unmapped) : [], P = p ? p.locations : [];
+  const rk = (rows, f) => rows.slice().sort((a, b) => (f(b) ?? -Infinity) - (f(a) ?? -Infinity));
+  const pop = (title, sub, body) => Pulse.pop({title: esc(title), sub: esc(sub), body});
+  if (k === "w-emp") pop("Active employees", "Odoo · by restaurant and section", Pulse.list([["Restaurant"], ["Employees", 1], ["Front of house", 1], ["Back of house", 1], ["Management", 1], ["Other", 1], ["Share", 1]],
+    rk(W, x => x.employees).map(x => ({cells: [esc(x.name), `<b>${fmt(x.employees)}</b>`, fmt(x.sections.FOH || 0), fmt(x.sections.BOH || 0), fmt(x.sections.MGMT || 0), fmt(x.sections.Other || 0), fmt(ppPct(x.employees, W.reduce((a, y) => a + y.employees, 0)), 1) + "%"], open: "ppw|" + x.unit}))));
+  if (k === "w-fte") pop("Full-time equivalents", "FTE = weekly hours of the running contract's schedule / 40", Pulse.list([["Restaurant"], ["FTE", 1], ["Employees", 1], ["FTE per employee", 1], ["Without hours a week", 1]],
+    rk(W, x => x.fte).map(x => ({cells: [esc(x.name), `<b>${fmt(x.fte, 1)}</b>`, fmt(x.employees), x.employees - x.fte_unknown ? fmt(x.fte / (x.employees - x.fte_unknown), 2) : "–", x.fte_unknown ? `<span class="warn">${fmt(x.fte_unknown)}</span>` : "0"], open: "ppw|" + x.unit}))));
+  if (k === "w-hires" || k === "w-leavers") {
+    const f = k === "w-hires" ? "hires" : "leavers", ms = w.months.slice(-13, -1);
+    pop(f === "hires" ? "Hires · twelve closed months" : "Leavers · twelve closed months", "From the contracts in Odoo",
+      Pulse.panel("Month by month", Pulse.cols(ms.map(m => { const v = W.reduce((a, x) => a + ((x[f].find(t => t[0] === m) || [0, 0])[1]), 0); return {label: m.slice(2), segs: [[v, f === "hires" ? "var(--ch-0)" : "var(--ch-1)", f]], tip: `${m}: ${fmt(v)}`}; }), null, {maxLabel: v => fmt(v)}))
+      + Pulse.panel("By restaurant", Pulse.list([["Restaurant"], [f === "hires" ? "Hired" : "Left", 1], ["Employees now", 1]], rk(W, x => ppL12(x, f)).filter(x => ppL12(x, f)).map(x => ({cells: [esc(x.name), `<b>${fmt(ppL12(x, f))}</b>`, fmt(x.employees)], open: "ppw|" + x.unit})), {none: "None in twelve months."})));
+  }
+  if (k === "w-turn") pop("Turnover · twelve months", "Leavers of the twelve closed months / average headcount at those month ends",
+    Pulse.bars(rk(W, x => x.turnover_12m).filter(x => x.turnover_12m != null).map(x => ({key: x.name, segs: [[x.turnover_12m, x.turnover_12m >= 50 ? "var(--up)" : "var(--ch-0)", "turnover %"]], text: `<b>${fmt(x.turnover_12m, 1)}%</b> <span class="meta">${fmt(ppL12(x, "leavers"))} left · ${fmt(x.employees)} now</span>`, open: "ppw|" + x.unit})), null, {none: "No restaurant with twelve months of headcount."})
+    + `<p class="hint" style="margin-top:8px">A restaurant with few people moves a lot with one leaver: read the turnover with its headcount.</p>`);
+  if (k === "w-month") {
+    const m = arg;
+    pop(`Headcount at the end of ${m}`, "Employees under contract on the last day of the month, hires and leavers of the month",
+      Pulse.list([["Restaurant"], ["Employees", 1], ["Hired", 1], ["Left", 1]], rk(W, x => (x.trend.find(t => t[0] === m) || [0, 0])[1]).map(x => ({cells: [esc(x.name), `<b>${fmt((x.trend.find(t => t[0] === m) || [0, 0])[1])}</b>`, fmt((x.hires.find(t => t[0] === m) || [0, 0])[1]), fmt((x.leavers.find(t => t[0] === m) || [0, 0])[1])], open: "ppw|" + x.unit})).filter(r => r.cells[1] !== "<b>0</b>")));
+  }
+  if (k === "p-splh" || k === "p-cplh" || k === "p-gplh") {
+    const f = k.slice(2), dec = f === "splh" ? 0 : 2, lab = {splh: "Sales per labour hour", cplh: "Checks per labour hour", gplh: "Guests per labour hour"}[f];
+    pop(lab, `${p.period.from} – ${p.period.to} · the days both Simphony and Odoo answered`,
+      Pulse.bars(rk(P, x => x[f]).filter(x => x[f] != null).map(x => ({key: x.name, segs: [[x[f], "var(--ch-0)", lab]], text: `<b>${fmt(x[f], dec)}</b>${f === "splh" && x.change_splh != null ? ` <span class="meta">${ppPctS(x.change_splh)}</span>` : ""}`, open: "ppp|" + x.ref})))
+      + Pulse.list([["Restaurant"], [lab, 1], ["Net sales", 1], ["Checks", 1], ["Guests", 1], ["Actual hours", 1], ["Days counted", 1]], rk(P, x => x[f]).map(x => ({cells: [esc(x.name), `<b>${ppN(x[f], dec)}</b>`, fmt(x.net), fmt(x.checks), fmt(x.guests), fmt(x.hours), `${x.both_days} of ${x.days}`], open: "ppp|" + x.ref}))));
+  }
+  if (k === "p-hours") pop("Actual hours", `${p.period.from} – ${p.period.to} · Odoo attendances`,
+    Pulse.bars(rk(P, x => x.hours).map(x => ({key: x.name, segs: [[x.sections.FOH || 0, "var(--ch-0)", "front of house"], [x.sections.BOH || 0, "var(--ch-1)", "back of house"], [x.sections.MGMT || 0, "var(--ch-2)", "management"], [x.sections.Other || 0, "var(--ch-4)", "other"]], text: `<b>${fmt(x.hours)}</b> h`, open: "ppp|" + x.ref})),
+      [["var(--ch-0)", "front of house"], ["var(--ch-1)", "back of house"], ["var(--ch-2)", "management"], ["var(--ch-4)", "other"]])
+    + Pulse.list([["Restaurant"], ["Actual hours", 1], ["Front of house", 1], ["Back of house", 1], ["Management", 1], ["Overtime", 1], ["Overtime %", 1]], rk(P, x => x.hours).map(x => ({cells: [esc(x.name), `<b>${fmt(x.hours)}</b>`, fmt(x.sections.FOH || 0), fmt(x.sections.BOH || 0), fmt(x.sections.MGMT || 0), fmt(x.overtime), x.hours ? fmt(x.overtime / x.hours * 100, 1) + "%" : "–"], open: "ppp|" + x.ref}))));
+  if (k === "p-ot") pop("Overtime", `${p.period.from} – ${p.period.to} · overtime hours of Odoo's attendances against all actual hours`,
+    Pulse.bars(rk(P, x => x.hours ? x.overtime / x.hours : null).filter(x => x.hours).map(x => ({key: x.name, segs: [[x.overtime / x.hours * 100, "var(--ch-1)", "overtime %"]], text: `<b>${fmt(x.overtime / x.hours * 100, 1)}%</b> <span class="meta">${fmt(x.overtime)} of ${fmt(x.hours)} h</span>`, open: "ppp|" + x.ref}))));
+  if (k === "p-net") pop("Net sales", `${p.period.from} – ${p.period.to} · Simphony`,
+    Pulse.list([["Restaurant"], ["Net sales", 1], ["Checks", 1], ["Guests", 1], ["Average check", 1]], rk(P, x => x.net).map(x => ({cells: [esc(x.name), `<b>${fmt(x.net)}</b>`, fmt(x.checks), fmt(x.guests), x.checks ? fmt(x.net / x.checks) : "–"], open: "ppp|" + x.ref}))));
+  if (k === "p-sup") pop("Support units", "Hours of the units that are not a restaurant: the warehouse, the central kitchen, head office",
+    Pulse.list([["Odoo unit"], ["Actual hours", 1], ["Planned hours", 1]], p.support.map(x => ({cells: [esc(x.unit), fmt(x.hours), x.planned ? fmt(x.planned) : "–"]})), {none: "No support unit with hours."}));
+  if (k === "p-week") {
+    const wk = arg;
+    pop(`Week of ${wk}`, "Every restaurant that week: Simphony against Odoo",
+      Pulse.list([["Restaurant"], ["Net sales", 1], ["Checks", 1], ["Actual hours", 1], ["Planned hours", 1], ["Sales / hour", 1]],
+        P.map(x => ({x, w: x.weeks.find(v => v[0] === wk)})).filter(o => o.w).sort((a, b) => (b.w[6] || 0) - (a.w[6] || 0)).map(({x, w: v}) => ({cells: [esc(x.name), fmt(v[1]), fmt(v[2]), fmt(v[4]), v[5] ? fmt(v[5]) : "–", `<b>${ppN(v[6])}</b>`], open: "ppp|" + x.ref}))));
+  }
+  if (k === "s-adh") pop("Planned against actual", `${p.period.from} – ${p.period.to} · Odoo Planning against Odoo attendances`,
+    Pulse.list([["Restaurant"], ["Planned hours", 1], ["Actual hours", 1], ["Actual / planned", 1], ["Reading"]], rk(P, x => x.planned_days ? Math.abs(x.hours / x.planned - 1) : -1).map(x => ({cells: [esc(x.name), x.planned_days ? fmt(x.planned) : "–", fmt(x.hours), x.planned_days && x.planned ? fmt(x.hours / x.planned * 100) + "%" : "–", ppAdh(x)], open: "pps|" + x.ref}))));
+  if (k === "s-issues") pop("Attendances to correct", `${p.period.from} – ${p.period.to} · in Odoo Attendances, by HR or the restaurant manager`,
+    `<p class="hint" style="margin:0 0 10px">A forgotten check-out has no hours (open more than 16 hours); a very long attendance (over 14 hours) is counted but probably closed late; one waiting for review is counted until it is rejected.</p>`
+    + Pulse.list([["Restaurant"], ["Forgotten check-outs", 1], ["Longer than 14 h", 1], ["Waiting for review", 1], ["Rejected hours", 1]], rk(P, ppIss).map(x => { const s = x.states || {}; return {cells: [esc(x.name), fmt(x.forgotten), fmt(x.long || 0), fmt((s.pending || 0) + (s.escalated || 0) + (s.no_review || 0)), fmt(x.rejected_hours, 1)], open: "pps|" + x.ref}; })));
+  if (k === "c-dept" || k === "c-pct" || k === "c-bud") {
+    const C = c.currency || "ALL", R = c.locations;
+    const head = [["Department"], [`Personnel cost ${C}`, 1], ["Net revenue", 1], ["Labour cost %", 1], ["Budget", 1], ["Against budget", 1]];
+    const f = k === "c-pct" ? x => x.pct : k === "c-bud" ? x => x.budget ? x.cost - x.budget : null : x => x.cost;
+    pop({"c-dept": "Personnel cost by department", "c-pct": "Labour cost % by restaurant", "c-bud": "Personnel cost against the budget"}[k], `${c.company} · ${c.year} · Business Central · confidential: no person, no account`,
+      (k === "c-pct" ? Pulse.bars(rk(R.filter(x => x.pct != null && x.group === "restaurant"), x => x.pct).map(x => ({key: x.name, segs: [[x.pct, "var(--ch-0)", "labour cost %"]], text: `<b>${fmt(x.pct, 1)}%</b>`, open: "ppc|" + x.dept}))) : "")
+      + Pulse.list(head, rk(R, f).map(x => ({cells: [esc(x.name), `<b>${fmt(x.cost)}</b>`, x.sales ? fmt(x.sales) : "–", x.pct == null ? "–" : fmt(x.pct, 1) + "%", x.budget ? fmt(x.budget) : "–", ppVsBud(x)], open: "ppc|" + x.dept}))));
+  }
+  if (k === "c-month") {
+    const m = arg, C = c.currency || "ALL";
+    pop(`Personnel cost · ${m}`, `${c.company} · Business Central${c.provisional.includes(m) ? " · provisional" : ""}`,
+      Pulse.list([["Department"], [`Personnel cost ${C}`, 1], ["Net revenue", 1], ["Labour cost %", 1], ["Budget", 1]],
+        c.locations.map(x => ({x, v: x.months.find(r => r[0] === m)})).filter(o => o.v && (o.v[1] || o.v[2])).sort((a, b) => b.v[1] - a.v[1]).map(({x, v}) => ({cells: [esc(x.name), `<b>${fmt(v[1])}</b>`, v[2] ? fmt(v[2]) : "–", v[3] == null ? "–" : fmt(v[3], 1) + "%", v[4] ? fmt(v[4]) : "–"], open: "ppc|" + x.dept}))));
+  }
+});
+
 // B. Labour productivity
 function ppProductivity(d){
   const R = d.locations, C = (R[0] || {}).currency || "ALL";
-  const tn = R.reduce((a, x) => a + x.net, 0), th = R.reduce((a, x) => a + x.hours, 0);
+  const tn = R.reduce((a, x) => a + x.net, 0), th = R.reduce((a, x) => a + x.hours, 0), ot = R.reduce((a, x) => a + x.overtime, 0);
   const W = d.weekly, wn = W.reduce((a, w) => a + w[1], 0), wh = W.reduce((a, w) => a + w[4], 0), wc = W.reduce((a, w) => a + w[2], 0), wg = W.reduce((a, w) => a + w[3], 0);
   readBanner("ppStatus", {src: "Simphony and Odoo", at: d.read_at, reading: d.reading, warns: d.errors.length ? [esc("Simphony: " + d.errors.join("; "))] : [],
     lines: [fcSp(`Days ${rdDay(d.period.from)} – ${rdDay(d.period.to)}`) + (d.prior ? " " + fcSp(`against ${rdDay(d.prior.from)} – ${rdDay(d.prior.to)}`) : "")]});
+  const ranked = R.filter(x => x.splh != null).sort((a, b) => b.splh - a.splh), best = ranked[0], worst = ranked[ranked.length - 1];
+  const up = R.filter(x => x.change_splh != null && x.change_splh >= 5).length, down = R.filter(x => x.change_splh != null && x.change_splh <= -5).length;
   $("ppKpis").innerHTML = Pulse.tiles([
-    {l: `Sales per labour hour · ${C}`, v: wh ? fmt(wn / wh) : "–", s: "net sales / actual hours, the days both systems answered"},
-    {l: "Checks per labour hour", v: wh ? fmt(wc / wh, 2) : "–", s: `${fmt(wc)} checks`},
-    {l: "Guests per labour hour", v: wh ? fmt(wg / wh, 2) : "–", s: "covers keyed in Simphony"},
-    {l: "Actual hours", v: fmt(th), s: `${fmt(R.reduce((a, x) => a + x.overtime, 0))} overtime · Odoo attendances`},
-    {l: `Net sales · ${C}`, v: fmt(tn), s: `${R.length} restaurants with hours`},
-    {l: "Support units", v: fmt(d.support.reduce((a, x) => a + x.hours, 0)), s: "hours of the warehouse, central kitchen, head office: not in a restaurant"}]);
-  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Sales per labour hour by restaurant</h2><p class="hint">Net sales per actual hour, with the change against the comparison period; click a restaurant for its weeks and days.</p>`
-    + Pulse.bars(R.filter(x => x.splh != null).sort((a, b) => b.splh - a.splh).map(x => ({key: x.name, segs: [[x.splh, "var(--ch-0)", "sales per labour hour"]], text: `<b>${fmt(x.splh)}</b> <span class="meta">${x.change_splh == null ? "" : ppPctS(x.change_splh)}</span>`, open: "ppp|" + x.ref})), null, {none: "No restaurant with both sales and hours in this period."}) + `</div>`
-    + `<div class="card" style="margin-bottom:14px"><h2>Week by week</h2><p class="hint">Sales per labour hour of every restaurant together, by week (Monday).</p>`
-    + Pulse.cols(W.map(w => ({label: w[0].slice(5), segs: [[w[5] || 0, "var(--ch-0)", "sales per labour hour"]], tip: `Week of ${w[0]}: ${fmt(w[5])} per hour · ${fmt(w[1])} net sales · ${fmt(w[4])} hours`})), null, {maxLabel: v => fmt(v)}) + `</div>`
-    + `<div class="card"><h2>Every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Net sales</th><th class="num">Actual hours</th><th class="num">Sales / hour</th><th class="num">Checks / hour</th><th class="num">Guests / hour</th><th class="num">Comparison</th><th class="num">Change</th><th class="num">FOH / BOH / Mgmt hours</th><th class="num">Days with both</th></tr>`
-    + R.map(x => `<tr data-pulse="ppp|${esc(x.ref)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.units.join(", "))}</div></td><td class="num">${fmt(x.net)}</td><td class="num">${fmt(x.hours)}</td>
-      <td class="num"><b>${ppN(x.splh)}</b></td><td class="num">${ppN(x.cplh, 2)}</td><td class="num">${ppN(x.gplh, 2)}</td><td class="num">${ppN(x.prev_splh)}</td><td class="num">${x.change_splh == null ? "–" : ppPctS(x.change_splh)}</td>
-      <td class="num">${fmt(x.sections.FOH)} / ${fmt(x.sections.BOH)} / ${fmt(x.sections.MGMT)}</td><td class="num">${x.both_days} of ${x.days}</td></tr>`).join("") + `</table></div></div>`;
+    {l: `Sales per labour hour · ${C}`, v: wh ? fmt(wn / wh) : "–", s: "net sales / actual hours, the days both systems answered", open: "ppx|p-splh"},
+    {l: "Checks per labour hour", v: wh ? fmt(wc / wh, 2) : "–", s: `${fmt(wc)} checks`, open: "ppx|p-cplh"},
+    {l: "Guests per labour hour", v: wh ? fmt(wg / wh, 2) : "–", s: "covers keyed in Simphony", open: "ppx|p-gplh"},
+    {l: "Actual hours", v: fmt(th), s: "Odoo attendances, by section", open: "ppx|p-hours"},
+    {l: "Overtime", v: th ? fmt(ot / th * 100, 1) + "%" : "–", s: `${fmt(ot)} overtime hours of ${fmt(th)}`, cls: th && ot / th > 0.1 ? "warn" : "", open: "ppx|p-ot"},
+    {l: `Net sales · ${C}`, v: fmt(tn), s: `${R.length} restaurants with hours`, open: "ppx|p-net"},
+    {l: "Support units", v: fmt(d.support.reduce((a, x) => a + x.hours, 0)), s: "hours outside the restaurants", open: "ppx|p-sup"}]);
+  $("ppBody").innerHTML = ppSay([
+      wh ? `Every restaurant together made <b>${fmt(wn / wh)} ${esc(C)}</b> of net sales for each hour worked, and served <b>${fmt(wg / wh, 1)}</b> guests per hour worked.` : "",
+      best && worst && best !== worst ? `The most productive was <b>${esc(best.name)}</b> (${fmt(best.splh)} per hour); the least, <b>${esc(worst.name)}</b> (${fmt(worst.splh)}).` : "",
+      d.prior && (up || down) ? `Against the comparison period, ${fmt(up)} restaurant(s) improved by 5% or more and ${fmt(down)} fell by 5% or more.` : "",
+      th ? `Overtime was <b>${fmt(ot / th * 100, 1)}%</b> of the hours worked (${fmt(ot)} hours).` : "",
+      R.some(x => x.both_days < x.days) ? "A day counts only when both Simphony and Odoo answered for it; see Days counted." : ""])
+    + `<div class="card" style="margin-bottom:14px"><h2>Sales per labour hour by restaurant</h2><p class="hint">Net sales per actual hour, with the change against the comparison period; click a restaurant for its weeks and days.</p>`
+    + Pulse.bars(ranked.map(x => ({key: x.name, segs: [[x.splh, "var(--ch-0)", "sales per labour hour"]], text: `<b>${fmt(x.splh)}</b> <span class="meta">${x.change_splh == null ? "" : ppPctS(x.change_splh)}</span>`, open: "ppp|" + x.ref})), null, {none: "No restaurant with both sales and hours in this period."}) + `</div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>Week by week</h2><p class="hint">Sales per labour hour of every restaurant together, by week (Monday). Click a week for its restaurants.</p>`
+    + Pulse.cols(W.map(w => ({label: w[0].slice(5), segs: [[w[5] || 0, "var(--ch-0)", "sales per labour hour"]], tip: `Week of ${w[0]}: ${fmt(w[5])} per hour · ${fmt(w[1])} net sales · ${fmt(w[4])} hours`, open: "ppx|p-week:" + w[0]})), null, {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="card"><h2>Every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Net sales</th><th class="num">Actual hours</th><th class="num">Sales / hour</th><th class="num">Checks / hour</th><th class="num">Guests / hour</th><th class="num">Change</th><th class="num">Overtime</th><th class="num">Days counted</th></tr>`
+    + R.map(x => `<tr data-pulse="ppp|${esc(x.ref)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b></td><td class="num">${fmt(x.net)}</td><td class="num">${fmt(x.hours)}</td>
+      <td class="num"><b>${ppN(x.splh)}</b></td><td class="num">${ppN(x.cplh, 2)}</td><td class="num">${ppN(x.gplh, 2)}</td><td class="num">${x.change_splh == null ? "–" : ppPctS(x.change_splh)}</td>
+      <td class="num">${x.hours ? fmt(x.overtime / x.hours * 100, 1) + "%" : "–"}</td><td class="num">${x.both_days} of ${x.days}</td></tr>`).join("") + `</table></div></div>`;
 }
 Pulse.on("ppp", ref => {
   const d = ppData.productivity, x = d && d.locations.find(L => L.ref === ref); if (!x) return;
   Pulse.pop({title: esc(x.name), sub: esc(`${d.period.from} to ${d.period.to} · Simphony ${x.ref} · Odoo ${x.units.join(", ")}`), body: Pulse.tiles([
       {l: "Sales per labour hour", v: ppN(x.splh), s: x.prev_splh ? `comparison ${fmt(x.prev_splh)} · ${ppPctS(x.change_splh)}` : ""},
       {l: "Checks per labour hour", v: ppN(x.cplh, 2)}, {l: "Guests per labour hour", v: ppN(x.gplh, 2)},
-      {l: "Actual hours", v: fmt(x.hours), s: `planned ${x.planned_days ? fmt(x.planned) : "– (no plan in Odoo)"}`},
-      {l: "Overtime hours", v: fmt(x.overtime)}, {l: "Days with both systems", v: `${x.both_days} of ${x.days}`, s: `${x.days_sales} with sales · ${x.days_hours} with hours`}])
+      {l: "Actual hours", v: fmt(x.hours), s: `planned ${x.planned_days ? fmt(x.planned) : "– (no plan in Odoo)"}`, open: "pps|" + x.ref},
+      {l: "Overtime", v: x.hours ? fmt(x.overtime / x.hours * 100, 1) + "%" : "–", s: `${fmt(x.overtime)} hours`}, {l: "Days counted", v: `${x.both_days} of ${x.days}`, s: `${x.days_sales} with sales · ${x.days_hours} with hours`}])
     + Pulse.panel("Week by week", Pulse.cols(x.weeks.map(w => ({label: w[0].slice(5), segs: [[w[6] || 0, "var(--ch-0)", "sales per labour hour"]], tip: `Week of ${w[0]}: ${fmt(w[6])} per hour · ${fmt(w[1])} sales · ${fmt(w[4])} hours`})), null, {maxLabel: v => fmt(v)}))
+    + Pulse.panel("Hours by section", Pulse.bars(Object.entries({"Front of house": x.sections.FOH, "Back of house": x.sections.BOH, "Management": x.sections.MGMT, "Other": x.sections.Other}).filter(e => e[1]).map(([k, v]) => ({key: k, segs: [[v, "var(--ch-0)", "hours"]], text: `${fmt(v)} h · ${fmt(ppPct(v, x.hours), 1)}%`}))))
     + Pulse.panel("Day by day", Pulse.list([["Business day"], ["Net sales", 1], ["Checks", 1], ["Guests", 1], ["Actual hours", 1], ["Planned hours", 1], ["Sales / hour", 1]],
         x.daily.slice().reverse().map(r => ({cells: [esc(r[0]), r[6] ? fmt(r[1]) : '<span class="meta">not read</span>', fmt(r[2]), fmt(r[3]), r[4] ? fmt(r[4], 1) : '<span class="meta">none</span>', r[5] ? fmt(r[5], 1) : "–", r[6] && r[4] ? fmt(r[1] / r[4]) : "–"]})), {max: 380}))});
 });
-// C, E. Scheduling & attendance: the day × hour grid
-const PP_METRIC = {net: ["Net sales", 0, 0], checks: ["Checks", 1, 1], actual: ["Actual staff", 2, 1], planned: ["Planned staff", 3, 1], splh: ["Sales per labour hour", 4, 0]};
+
+// C, E. Scheduling & attendance: staffing against demand, in plain words
+const ppIss = x => (x.forgotten || 0) + (x.long || 0) + ((x.states || {}).pending || 0) + ((x.states || {}).escalated || 0) + ((x.states || {}).no_review || 0);
+function ppAdh(x){
+  if (!x.planned_days || !x.planned) return ppBadge("na", "No plan in Odoo");
+  const r = x.hours / x.planned * 100;
+  return r > 110 ? ppBadge("up", `Over plan +${fmt(r - 100)}%`) : r < 90 ? ppBadge("warn", `Under plan −${fmt(100 - r)}%`) : ppBadge("ok", "On plan");
+}
+// a cell of the grid: its people on shift against its sales, against the restaurant's own usual sales per labour hour
+function ppCells(x, d){
+  const own = x.thresholds.splh_high || x.thresholds.splh_low;
+  const vals = x.grid.flat().filter(c => c[4] != null && c[0] > 0).map(c => c[4]).sort((a, b) => a - b);
+  const med = vals.length ? vals[Math.floor(vals.length / 2)] : null;
+  const hi = own ? x.thresholds.splh_high : med && med * 1.3, lo = own ? x.thresholds.splh_low : med && med * 0.7;
+  const band = c => { if (!(c[2] > 0) && !(c[0] > 0)) return "none"; if (!(c[2] > 0)) return "nostaff"; if (!(c[0] > 0)) return "nosales";
+    if (c[4] == null) return "none"; return hi && c[4] > hi ? "busy" : lo && c[4] < lo ? "quiet" : "ok"; };
+  return {med, hi, lo, own, band};
+}
+const PP_BAND = {busy: ["Busy for the team on shift", "var(--up)"], ok: ["Balanced", "var(--down)"], quiet: ["Quiet for the team on shift", "var(--warn)"],
+  nosales: ["Staff on shift, no sales", "#9a978c"], nostaff: ["Sales with nobody checked in", "#c9c6bd"]};
 function ppScheduling(d){
   const R = d.locations;
   const sel = $("ppLoc"), cur = ppSel || sel.value;
@@ -4885,76 +5023,192 @@ function ppScheduling(d){
   readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading,
     lines: [fcSp(`Days ${rdDay(d.period.from)} – ${rdDay(d.period.to)}`), fcSp(`business day from ${String(d.day_start).padStart(2, "0")}:00`)]});
   if (!x) { $("ppKpis").innerHTML = ""; $("ppBody").innerHTML = '<div class="card"><p class="meta">No restaurant with hours in this period.</p></div>'; return; }
-  const st = x.states || {}, rev = (st.pending || 0) + (st.escalated || 0) + (st.no_review || 0);
+  const st = x.states || {}, rev = (st.pending || 0) + (st.escalated || 0) + (st.no_review || 0), iss = ppIss(x);
+  const K = ppCells(x, d), hours = Array.from({length: 24}, (_, i) => (i + d.day_start) % 24);
+  const live = hours.filter(h => x.grid.some(row => row[h][0] > 0 || row[h][2] > 0));
+  const n = {busy: 0, quiet: 0, nosales: 0};
+  x.grid.forEach(row => live.forEach(h => { const b = K.band(row[h]); if (b in n) n[b]++; }));
+  const adh = x.planned_days && x.planned ? x.hours / x.planned * 100 : null;
   $("ppKpis").innerHTML = Pulse.tiles([
-    {l: "Actual hours", v: fmt(x.hours), s: "Odoo attendances"},
-    {l: "Planned hours", v: x.planned_days ? fmt(x.planned) : "–", s: x.planned_days ? `${x.planned_days} days planned in Odoo Planning` : "no plan in Odoo for this restaurant"},
-    {l: "Plan − actual", v: x.planned_days ? fmt(x.planned - x.hours) : "–", s: "hours", cls: x.planned_days && Math.abs(x.planned - x.hours) > x.planned * 0.1 ? "warn" : ""},
-    {l: "Forgotten check-outs", v: fmt(x.forgotten), s: "open for more than 16 hours: no hours counted", cls: x.forgotten ? "warn" : ""},
-    {l: "Waiting for review", v: fmt(rev), s: `pending ${st.pending || 0} · escalated ${st.escalated || 0} · not reviewed ${st.no_review || 0}`, cls: rev ? "warn" : ""},
-    {l: "Longer than 14 hours", v: fmt(x.long || 0), s: `attendances to check · ${fmt(x.rejected_hours, 1)} rejected hours left out`, cls: x.long ? "warn" : ""}]);
-  const M = PP_METRIC[ppMetric], idx = M[1];
-  const vals = x.grid.flat().map(c => c[idx]).filter(v => v != null && v > 0), max = Math.max(1e-9, ...vals);
-  const hours = Array.from({length: 24}, (_, i) => (i + d.day_start) % 24);
-  const seg = Object.entries(PP_METRIC).map(([k, m]) => `<button type="button" data-ppm="${k}" class="${k === ppMetric ? "on" : ""}">${esc(m[0])}</button>`).join("");
-  const cell = (c, wd, h) => { const v = c[idx]; const a = v == null || v <= 0 ? 0 : Math.max(0.08, v / max);
-    const sh = v >= 10000 ? fmt(v / 1000) + "k" : v >= 1000 ? fmt(v / 1000, 1) + "k" : fmt(v, M[2]);
-    return `<td title="${esc(`${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][wd]} ${String(h).padStart(2, "0")}:00 · sales ${fmt(c[0])} · checks ${fmt(c[1], 1)} · actual staff ${fmt(c[2], 1)} · planned ${fmt(c[3], 1)} · sales per labour hour ${c[4] == null ? "–" : fmt(c[4])}`)}" style="background:color-mix(in srgb, var(--accent) ${Math.round(a * 85)}%, transparent);color:${a > 0.55 ? "#fff" : "var(--ink)"};text-align:center;font-size:11px;padding:4px 2px;min-width:30px">${v == null || v <= 0 ? "" : sh}</td>`; };
-  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><div class="card-head"><div><h2>Day × hour</h2><p class="hint">The average of each weekday and hour of the period at ${esc(x.name)}. Hover a cell for all its figures.</p></div></div>
-      <div class="fc-seg" role="tablist" id="ppSeg">${seg}</div>
-      <div class="scroll" style="margin-top:10px"><table data-nosort style="border-collapse:separate;border-spacing:2px"><tr><th></th>${hours.map(h => `<th style="font-size:10.5px;text-align:center">${String(h).padStart(2, "0")}</th>`).join("")}</tr>
-      ${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((n, wd) => `<tr><th style="font-size:12px">${n}</th>${hours.map(h => cell(x.grid[wd][h], wd, h)).join("")}</tr>`).join("")}</table></div></div>`
-    + `<div class="card" style="margin-bottom:14px"><h2>Signals</h2><p class="hint">${x.thresholds.splh_high || x.thresholds.splh_low ? `Hours whose sales per labour hour are above ${ppN(x.thresholds.splh_high)} or under ${ppN(x.thresholds.splh_low)} (Connection → Thresholds): hours to look at, not a cause.` : "No thresholds of sales per labour hour are set for this restaurant, so no hour is called short or over staffed. They are set under Connection → Thresholds."}</p>`
-    + (x.signals.length ? Pulse.list([["Weekday"], ["Hour"], ["Signal"], ["Sales per labour hour", 1]], x.signals.map(s => ({cells: [esc(s[0]), String(s[1]).padStart(2, "0") + ":00", esc(s[2]), fmt(s[3])]}))) : "") + `</div>`
-    + `<div class="card"><h2>Planned against actual, every restaurant</h2><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Planned hours</th><th class="num">Actual hours</th><th class="num">Difference</th><th class="num">Overtime</th><th class="num">Forgotten check-outs</th><th class="num">Longer than 14 h</th><th class="num">Waiting for review</th><th class="num">Rejected hours</th></tr>`
-    + R.map(L => { const s2 = L.states || {}; return `<tr><td class="name">${esc(L.name)}</td><td class="num">${L.planned_days ? fmt(L.planned) : '<span class="meta">no plan</span>'}</td><td class="num">${fmt(L.hours)}</td><td class="num">${L.planned_days ? fmt(L.hours - L.planned) : "–"}</td><td class="num">${fmt(L.overtime)}</td><td class="num">${fmt(L.forgotten)}</td><td class="num">${fmt(L.long || 0)}</td><td class="num">${fmt((s2.pending || 0) + (s2.escalated || 0) + (s2.no_review || 0))}</td><td class="num">${fmt(L.rejected_hours, 1)}</td></tr>`; }).join("") + `</table></div></div>`;
-  document.querySelectorAll("#ppSeg [data-ppm]").forEach(b => b.onclick = () => { ppMetric = b.dataset.ppm; ppScheduling(d); });
+    {l: "Actual hours", v: fmt(x.hours), s: "Odoo attendances", open: "pps|" + x.ref},
+    {l: "Planned hours", v: x.planned_days ? fmt(x.planned) : "–", s: x.planned_days ? `${x.planned_days} days planned in Odoo Planning` : "no plan in Odoo for this restaurant", open: "pps|" + x.ref},
+    {l: "Actual against plan", v: adh == null ? "–" : fmt(adh) + "%", s: adh == null ? "no plan to compare" : adh > 110 ? "more hours worked than planned" : adh < 90 ? "fewer hours worked than planned" : "within 10% of the plan", cls: adh != null && Math.abs(adh - 100) > 10 ? "warn" : "", open: "ppx|s-adh"},
+    {l: "Busy hours", v: fmt(n.busy), s: "weekday-hours with more sales than usual for the team on shift", cls: n.busy ? "up" : "", open: "ppg|busy"},
+    {l: "Quiet hours", v: fmt(n.quiet), s: "weekday-hours with fewer sales than usual for the team on shift", cls: n.quiet ? "warn" : "", open: "ppg|quiet"},
+    {l: "Attendances to correct", v: fmt(iss), s: `${fmt(x.forgotten)} forgotten check-outs · ${fmt(x.long || 0)} over 14 h · ${fmt(rev)} waiting for review`, cls: iss ? "warn" : "", open: "ppx|s-issues"}]);
+  // the weekdays in short: the usual day of the restaurant
+  const days = ppWd.map((nm, wd) => { const row = x.grid[wd], net = row.reduce((a, c) => a + c[0], 0), staffH = row.reduce((a, c) => a + c[5], 0);
+    const peak = live.slice().sort((a, b) => row[b][0] - row[a][0])[0]; return {nm, wd, net, staffH, splh: staffH ? net / staffH : null, peak: peak != null && row[peak][0] > 0 ? peak : null, peakStaff: peak != null ? row[peak][2] : 0}; });
+  const busiest = days.slice().sort((a, b) => b.net - a.net)[0];
+  const say = [
+    adh == null ? `${esc(x.name)} has no plan in Odoo Planning for this period: only the hours worked are known.` : `${esc(x.name)} worked <b>${fmt(x.hours)}</b> hours against <b>${fmt(x.planned)}</b> planned: <b>${fmt(adh)}%</b> of the plan.`,
+    busiest && busiest.net ? `The busiest day is <b>${esc(busiest.nm)}</b>, on average ${fmt(busiest.net)} of sales${busiest.peak != null ? `, its peak at <b>${ppHr(busiest.peak)}</b> with ${fmt(busiest.peakStaff, 1)} people on shift` : ""}.` : "",
+    K.med ? `Usually each hour worked brings ${fmt(K.med)} of sales here. ${n.busy ? `<b>${fmt(n.busy)}</b> weekday-hours bring much more (the team may be short)` : "No hour brings much more"}${n.quiet ? `; <b>${fmt(n.quiet)}</b> bring much less (more people than the sales need)` : ""}.` : "",
+    n.nosales ? `${fmt(n.nosales)} weekday-hours have people on shift and no sales (opening, closing, preparation).` : "",
+    iss ? `${fmt(iss)} attendances need a correction in Odoo before the hours are final.` : "Every attendance of the period is closed and reviewed."];
+  const cell = (row, wd, h) => { const c = row[h], b = K.band(c);
+    if (b === "none") return `<td class="pp-c none"></td>`;
+    const [lab, col] = PP_BAND[b];
+    return `<td class="pp-c ${b}" style="--c:${col}" data-pulse="ppg|cell:${wd}:${h}" tabindex="0" title="${esc(`${ppWd[wd]} ${ppHr(h)} · ${lab} · sales ${fmt(c[0])} · ${fmt(c[2], 1)} people on shift (planned ${fmt(c[3], 1)})`)}">${c[2] > 0 ? fmt(c[2], c[2] < 10 ? 1 : 0) : "·"}</td>`; };
+  $("ppBody").innerHTML = ppSay(say)
+    + `<div class="card" style="margin-bottom:14px"><div class="card-head"><div><h2>Staffing against demand</h2><p class="hint">Each box is a weekday and an hour of ${esc(x.name)}, the average of the period: the number is the <b>people on shift</b>; the colour says how the sales of that hour compare with ${K.own ? "the thresholds set for this restaurant" : `what an hour worked usually brings here (${K.med ? fmt(K.med) : "–"} of sales)`}. Click a box for its figures.</p></div></div>
+      <div class="pp-lg">${Object.entries(PP_BAND).map(([k, v]) => `<span><i style="background:${v[1]}"></i>${esc(v[0])}</span>`).join("")}</div>
+      <div class="scroll" style="margin-top:10px"><table data-nosort class="pp-grid"><tr><th></th>${live.map(h => `<th>${String(h).padStart(2, "0")}</th>`).join("")}</tr>
+      ${ppWd.map((nm, wd) => `<tr><th>${esc(nm)}</th>${live.map(h => cell(x.grid[wd], wd, h)).join("")}</tr>`).join("")}</table></div></div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>The week in short</h2><p class="hint">The average of each weekday of the period at ${esc(x.name)}.</p>`
+    + Pulse.list([["Weekday"], ["Sales", 1], ["Hours worked", 1], ["Sales per hour worked", 1], ["Busiest hour"], ["People on shift then", 1]],
+        days.map(v => ({cells: [esc(v.nm), fmt(v.net), fmt(v.staffH, 1), ppN(v.splh), v.peak == null ? "–" : ppHr(v.peak), v.peak == null ? "–" : fmt(v.peakStaff, 1)], open: "ppg|day:" + v.wd}))) + `</div>`
+    + `<div class="card"><h2>Every restaurant: plan and attendances</h2><p class="hint">Hours planned in Odoo Planning against the hours worked, and the attendances still to correct. Click a restaurant for its days.</p><div class="scroll"><table data-nosort><tr><th>Restaurant</th><th class="num">Planned hours</th><th class="num">Hours worked</th><th>Against plan</th><th class="num">Overtime</th><th class="num">Attendances to correct</th></tr>`
+    + R.map(L => `<tr data-pulse="pps|${esc(L.ref)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(L.name)}</b></td><td class="num">${L.planned_days ? fmt(L.planned) : '<span class="meta">no plan</span>'}</td><td class="num">${fmt(L.hours)}</td><td>${ppAdh(L)}</td><td class="num">${fmt(L.overtime)}</td><td class="num">${ppIss(L) ? `<b class="warn">${fmt(ppIss(L))}</b>` : "0"}</td></tr>`).join("") + `</table></div></div>`;
 }
 $("ppLoc").onchange = () => { ppSel = $("ppLoc").value; if (ppData.productivity) ppScheduling(ppData.productivity); };
-// D. Personnel cost (BC)
+// a restaurant's plan and attendances, day by day
+Pulse.on("pps", ref => {
+  const d = ppData.productivity, x = d && d.locations.find(L => L.ref === ref); if (!x) return;
+  const st = x.states || {};
+  Pulse.pop({title: esc(x.name), sub: esc(`${d.period.from} to ${d.period.to} · plan and attendances · Odoo`), body: Pulse.tiles([
+      {l: "Planned hours", v: x.planned_days ? fmt(x.planned) : "–", s: x.planned_days ? `${x.planned_days} days with a plan` : "no plan in Odoo"},
+      {l: "Hours worked", v: fmt(x.hours), s: `${x.days_hours} days with attendances`}, {l: "Against plan", v: ppAdh(x)},
+      {l: "Overtime", v: fmt(x.overtime), s: x.hours ? fmt(x.overtime / x.hours * 100, 1) + "% of the hours" : ""},
+      {l: "Forgotten check-outs", v: fmt(x.forgotten), s: "no hours counted", cls: x.forgotten ? "warn" : ""},
+      {l: "Waiting for review", v: fmt((st.pending || 0) + (st.escalated || 0) + (st.no_review || 0)), s: `${fmt(x.long || 0)} longer than 14 h · ${fmt(x.rejected_hours, 1)} rejected hours`}])
+    + Pulse.panel("Day by day", Pulse.list([["Business day"], ["Planned hours", 1], ["Hours worked", 1], ["Difference", 1], ["Sales", 1], ["Sales per hour worked", 1]],
+        x.daily.slice().reverse().map(r => ({cells: [esc(r[0]), r[5] ? fmt(r[5], 1) : "–", r[4] ? fmt(r[4], 1) : '<span class="meta">none</span>', r[5] ? `<span class="${r[4] - r[5] > 0 ? "up" : "down"}">${r[4] - r[5] > 0 ? "+" : ""}${fmt(r[4] - r[5], 1)}</span>` : "–", r[6] ? fmt(r[1]) : '<span class="meta">not read</span>', r[6] && r[4] ? fmt(r[1] / r[4]) : "–"]})), {max: 420}))});
+});
+// the grid: one weekday-hour, one weekday, or every busy or quiet hour of the restaurant shown
+Pulse.on("ppg", key => {
+  const d = ppData.productivity, x = d && d.locations.find(L => L.ref === $("ppLoc").value); if (!x) return;
+  const K = ppCells(x, d), parts = key.split(":");
+  const hours = Array.from({length: 24}, (_, i) => (i + d.day_start) % 24);
+  const usual = K.med ? `Usually an hour worked brings ${fmt(K.med)} of sales here.` : "";
+  if (parts[0] === "cell") {
+    const wd = +parts[1], h = +parts[2], c = x.grid[wd][h], b = K.band(c), lab = (PP_BAND[b] || ["–"])[0];
+    const why = {busy: "More sales than usual for the people on shift: the team may be short at this hour; look at the service times and the plan.",
+      quiet: "Fewer sales than usual for the people on shift: more people than the sales need, unless they prepare or clean.",
+      ok: "Sales and people on shift are in line with the restaurant's usual hour.", nosales: "People on shift and no sales: opening, closing or preparation.",
+      nostaff: "Sales and nobody checked in: an attendance may be missing in Odoo."}[b] || "";
+    Pulse.pop({title: esc(`${x.name} · ${ppWd[wd]} ${ppHr(h)}`), sub: esc(`The average of the ${ppWd[wd]}s of ${d.period.from} – ${d.period.to}`), wide: false, body: Pulse.tiles([
+        {l: "Sales", v: fmt(c[0]), s: `${fmt(c[1], 1)} checks`}, {l: "People on shift", v: fmt(c[2], 1), s: `planned ${fmt(c[3], 1)}`},
+        {l: "Sales per hour worked", v: ppN(c[4]), s: usual}, {l: "Reading", v: ppBadge(b, lab)}]) + `<p class="hint" style="margin:10px 0 0">${esc(why)}</p>`});
+    return;
+  }
+  if (parts[0] === "day") {
+    const wd = +parts[1], row = x.grid[wd], live = hours.filter(hh => row[hh][0] > 0 || row[hh][2] > 0);
+    Pulse.pop({title: esc(`${x.name} · ${ppWd[wd]}`), sub: esc(`The average ${ppWd[wd]} of ${d.period.from} – ${d.period.to}`), body:
+      Pulse.panel("Sales and people on shift, hour by hour", Pulse.cols(live.map(hh => ({label: ppHr(hh).slice(0, 2), segs: [[row[hh][0], "var(--ch-0)", "sales"]], tip: `${ppHr(hh)}: sales ${fmt(row[hh][0])} · ${fmt(row[hh][2], 1)} people on shift (planned ${fmt(row[hh][3], 1)})`})), null, {maxLabel: v => fmt(v)}))
+      + Pulse.list([["Hour"], ["Sales", 1], ["Checks", 1], ["People on shift", 1], ["Planned", 1], ["Sales per hour worked", 1], ["Reading"]],
+          live.map(hh => { const c = row[hh], b = K.band(c); return {cells: [ppHr(hh), fmt(c[0]), fmt(c[1], 1), fmt(c[2], 1), fmt(c[3], 1), ppN(c[4]), ppBadge(b, (PP_BAND[b] || ["–"])[0])]}; }))});
+    return;
+  }
+  const want = parts[0], rows = [];
+  x.grid.forEach((row, wd) => hours.forEach(hh => { if (K.band(row[hh]) === want) rows.push({wd, hh, c: row[hh]}); }));
+  rows.sort((a, b) => want === "busy" ? b.c[4] - a.c[4] : a.c[4] - b.c[4]);
+  Pulse.pop({title: esc(`${x.name} · ${want === "busy" ? "busy hours" : "quiet hours"}`), sub: esc(usual), body:
+    `<p class="hint" style="margin:0 0 10px">${want === "busy" ? "Hours whose sales are well above what an hour worked usually brings here: the team on shift may be short." : "Hours whose sales are well below what an hour worked usually brings here: more people on shift than the sales need."}</p>`
+    + Pulse.list([["Weekday"], ["Hour"], ["Sales", 1], ["People on shift", 1], ["Planned", 1], ["Sales per hour worked", 1]], rows.map(r => ({cells: [esc(ppWd[r.wd]), ppHr(r.hh), fmt(r.c[0]), fmt(r.c[2], 1), fmt(r.c[3], 1), `<b>${ppN(r.c[4])}</b>`], open: `ppg|cell:${r.wd}:${r.hh}`})), {none: "None."})});
+});
+
+// D. Personnel cost (BC): confidential by construction (people.personnel)
+function ppVsBud(x){ return x.budget ? (x.cost > x.budget ? `<span class="up">+${fmt(x.cost - x.budget)}</span>` : `<span class="down">−${fmt(x.budget - x.cost)}</span>`) : "–"; }
 function ppPersonnel(d){
-  const R = d.locations, C = d.currency || "ALL", cost = R.reduce((a, x) => a + x.cost, 0), sales = R.filter(x => x.group === "restaurant").reduce((a, x) => a + x.sales, 0);
-  const rc = R.filter(x => x.group === "restaurant").reduce((a, x) => a + x.cost, 0), bud = R.reduce((a, x) => a + (x.budget || 0), 0);
+  const R = d.locations, C = d.currency || "ALL", cost = R.reduce((a, x) => a + x.cost, 0), Rr = R.filter(x => x.group === "restaurant");
+  const sales = Rr.reduce((a, x) => a + x.sales, 0), rc = Rr.reduce((a, x) => a + x.cost, 0), bud = R.reduce((a, x) => a + (x.budget || 0), 0), bc = R.reduce((a, x) => a + (x.budget ? x.cost : 0), 0), nb = R.filter(x => x.budget).length;
   readBanner("ppStatus", {src: "Business Central", at: d.read_at, reading: d.pending, stage: d.pending ? "still being read" : "",
     warns: d.provisional.length ? [fcSp(`provisional: ${d.provisional.join(", ")}`)] : [],
     lines: [`<span data-no-i18n>${esc(d.company)}</span> · ` + fcSp(`${d.year} · posting months ${d.months[0] || "–"} to ${d.months[d.months.length - 1] || "–"}`)]});
   if (d.pending && !R.length) { ppTimer = setTimeout(() => { if (ppTab === "personnel") ppLoad(true); }, 5000); }
+  const ranked = Rr.filter(x => x.pct != null).sort((a, b) => b.pct - a.pct);
+  const monthsTot = d.months.map(k => R.reduce((a, x) => a + ((x.months.find(m => m[0] === k) || [0, 0])[1]), 0));
+  const lastFull = d.months.filter(k => !d.provisional.includes(k)).slice(-1)[0];
   $("ppKpis").innerHTML = Pulse.tiles([
-    {l: `Personnel cost · ${C}`, v: fmt(cost), s: "every department, the year to date"},
-    {l: "Restaurants", v: fmt(rc), s: `${fmt(cost - rc)} on head office, central kitchen, warehouse`},
-    {l: "Labour cost %", v: sales ? fmt(rc / sales * 100, 1) + "%" : "–", s: "restaurants' personnel cost / their net revenue"},
-    {l: `Budget · ${C}`, v: bud ? fmt(bud) : "–", s: d.budget ? `${d.budget_name}` : "no budget with personnel accounts"}]);
-  $("ppBody").innerHTML = `<div class="card" style="margin-bottom:14px"><h2>Month by month</h2><p class="hint">Personnel cost of every department by posting month; a month whose payroll is not posted yet is low.</p>`
-    + Pulse.cols(d.months.map(k => { const v = R.reduce((a, x) => a + ((x.months.find(m => m[0] === k) || [0, 0])[1]), 0); return {label: k.slice(2), segs: [[v, "var(--ch-0)", "personnel cost"]], tip: `${k}: ${fmt(v)} ${C}`}; }), null, {maxLabel: v => fmt(v)}) + `</div>`
-    + `<div class="card"><h2>By department</h2><div class="scroll"><table data-nosort><tr><th>Department</th><th class="num">Personnel cost</th><th class="num">Net revenue</th><th class="num">Labour cost %</th><th class="num">Budget</th><th class="num">vs budget</th></tr>`
-    + R.map(x => `<tr data-pulse="ppc|${esc(x.dept)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${esc(x.dept)}${x.group === "support" ? " · support" : ""}</div></td><td class="num"><b>${fmt(x.cost)}</b></td><td class="num">${x.sales ? fmt(x.sales) : "–"}</td>
-      <td class="num">${x.pct == null ? "–" : fmt(x.pct, 1) + "%"}</td><td class="num">${x.budget ? fmt(x.budget) : "–"}</td><td class="num">${x.budget ? (x.cost > x.budget ? `<span class="up">+${fmt(x.cost - x.budget)}</span>` : `<span class="down">−${fmt(x.budget - x.cost)}</span>`) : "–"}</td></tr>`).join("") + `</table></div></div>`;
+    {l: `Personnel cost · ${C}`, v: fmt(cost), s: "every department, the year to date", open: "ppx|c-dept"},
+    {l: "In the restaurants", v: fmt(rc), s: `${fmt(cost - rc)} on head office and the central units`, open: "ppx|c-dept"},
+    {l: "Labour cost %", v: sales ? fmt(rc / sales * 100, 1) + "%" : "–", s: "restaurants' personnel cost / their net revenue", open: "ppx|c-pct"},
+    {l: `Budget · ${C}`, v: bud ? fmt(bud) : "–", s: d.budget ? (bud ? `${bc > bud ? "+" : "−"}${fmt(Math.abs(bc - bud))} against it · ${fmt(nb)} of ${fmt(R.length)} lines with a budget · ${esc(d.budget_name)}` : esc(d.budget_name)) : "no budget with personnel accounts", cls: bud && bc > bud ? "up" : "", open: "ppx|c-bud"}]);
+  $("ppBody").innerHTML = `<div class="pp-conf">🔒 <span>Confidential by design: no salary of a person, no account and no name is shown. A restaurant is shown on its own only with ${d.k_min || 3} people or more; head office, the central units and small departments only together.${d.withheld ? ` ${fmt(d.withheld)} small department(s) are left out: together they are still fewer than ${d.k_min || 3} people.` : ""}</span></div>`
+    + ppSay([
+      sales ? `The restaurants spent <b>${fmt(rc / sales * 100, 1)}%</b> of their net revenue on personnel in ${d.year} (${fmt(rc)} ${esc(C)} on ${fmt(sales)}).` : "",
+      ranked.length > 1 ? `The highest labour cost % is at <b>${esc(ranked[0].name)}</b> (${fmt(ranked[0].pct, 1)}%); the lowest at <b>${esc(ranked[ranked.length - 1].name)}</b> (${fmt(ranked[ranked.length - 1].pct, 1)}%).` : "",
+      bud ? `Where a budget is set (${fmt(nb)} of ${fmt(R.length)} lines), the personnel cost is <b>${bc > bud ? "over" : "under"} it by ${fmt(Math.abs(bc - bud))} ${esc(C)}</b> (${fmt(bc)} against ${fmt(bud)}).` : "",
+      lastFull ? `The last month with its payroll posted is ${esc(lastFull)}: ${fmt(monthsTot[d.months.indexOf(lastFull)])} ${esc(C)}.` : "",
+      d.provisional.length ? `${esc(d.provisional.join(", "))}: the payroll is not posted in full yet, so the figures are low.` : ""])
+    + `<div class="card" style="margin-bottom:14px"><h2>Labour cost % by restaurant</h2><p class="hint">Personnel cost against the net revenue of the same restaurant; click one for its months.</p>`
+    + Pulse.bars(ranked.map(x => ({key: x.name, segs: [[x.pct, "var(--ch-0)", "labour cost %"]], text: `<b>${fmt(x.pct, 1)}%</b> <span class="meta">${fmt(x.cost)} ${esc(C)}</span>`, open: "ppc|" + x.dept})), null, {none: "No restaurant with net revenue in this year."}) + `</div>`
+    + `<div class="card" style="margin-bottom:14px"><h2>Month by month</h2><p class="hint">Personnel cost of every department by posting month; a month whose payroll is not posted yet is low. Click a month for its departments.</p>`
+    + Pulse.cols(d.months.map((k, i) => ({label: k.slice(2), segs: [[monthsTot[i], d.provisional.includes(k) ? "var(--ch-4)" : "var(--ch-0)", "personnel cost"]], tip: `${k}: ${fmt(monthsTot[i])} ${C}${d.provisional.includes(k) ? " · provisional" : ""}`, open: "ppx|c-month:" + k})), null, {maxLabel: v => fmt(v)}) + `</div>`
+    + `<div class="card"><h2>By department</h2><div class="scroll"><table data-nosort><tr><th>Department</th><th class="num">Personnel cost</th><th class="num">Net revenue</th><th class="num">Labour cost %</th><th class="num">Against budget</th></tr>`
+    + R.map(x => `<tr data-pulse="ppc|${esc(x.dept)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.name)}</b><div class="meta">${x.group === "combined" ? `${fmt(x.departments)} departments together` : x.people ? `${fmt(x.people)} people` : ""}</div></td><td class="num"><b>${fmt(x.cost)}</b></td><td class="num">${x.sales ? fmt(x.sales) : "–"}</td>
+      <td class="num">${x.pct == null ? "–" : fmt(x.pct, 1) + "%"}</td><td class="num">${ppVsBud(x)}</td></tr>`).join("") + `</table></div></div>`;
 }
 Pulse.on("ppc", dept => {
   const d = ppData.personnel, x = d && d.locations.find(L => L.dept === dept); if (!x) return;
-  const C = d.currency || "ALL";
-  Pulse.pop({title: esc(x.name), sub: esc(`${x.dept} · ${d.year} · Business Central`), body: Pulse.tiles([
-      {l: `Personnel cost · ${C}`, v: fmt(x.cost)}, {l: "Net revenue", v: x.sales ? fmt(x.sales) : "–"}, {l: "Labour cost %", v: x.pct == null ? "–" : fmt(x.pct, 1) + "%"}, {l: "Budget", v: x.budget ? fmt(x.budget) : "–"}])
-    + Pulse.panel("Month by month", Pulse.list([["Month"], [`Personnel cost ${C}`, 1], ["Kitchen", 1], ["Service", 1], ["Management", 1], ["Other", 1], ["Net revenue", 1], ["Labour cost %", 1], ["Budget", 1]],
-        x.months.map(m => ({cells: [esc(m[0]) + (d.provisional.includes(m[0]) ? ' <span class="meta">provisional</span>' : ""), fmt(m[1]), fmt(m[5].labor_kitchen || 0), fmt(m[5].labor_service || 0), fmt(m[5].labor_management || 0), fmt(m[5].labor_other || 0), m[2] ? fmt(m[2]) : "–", m[3] == null ? "–" : fmt(m[3], 1) + "%", m[4] ? fmt(m[4]) : "–"]}))))
-    + Pulse.panel("By account", Pulse.list([["Account"], ["Name"], [`Amount ${C}`, 1]], x.accounts.map(a => ({cells: [esc(a[0]), esc(a[1]), fmt(a[2])]}))))});
+  const C = d.currency || "ALL", S = x.sections, SL = {labor_kitchen: "Kitchen", labor_service: "Service", labor_management: "Management", labor_other: "Other"};
+  Pulse.pop({title: esc(x.name), sub: esc(`${x.group === "combined" ? `${x.departments} departments together` : x.dept} · ${d.year} · Business Central · confidential`), body: Pulse.tiles([
+      {l: `Personnel cost · ${C}`, v: fmt(x.cost)}, {l: "Net revenue", v: x.sales ? fmt(x.sales) : "–"}, {l: "Labour cost %", v: x.pct == null ? "–" : fmt(x.pct, 1) + "%"}, {l: "Against budget", v: ppVsBud(x), s: x.budget ? `budget ${fmt(x.budget)}` : ""}])
+    + (S ? Pulse.panel("By section", Pulse.bars(Object.entries(S).filter(e => e[1].cost).map(([k, v]) => ({key: SL[k] || k, segs: [[v.cost, "var(--ch-0)", "personnel cost"]], text: `${fmt(v.cost)} · ${fmt(ppPct(v.cost, x.cost), 1)}% <span class="meta">${fmt(v.people)} people</span>`}))))
+         : `<p class="hint" style="margin:8px 0 0">${x.group === "combined" ? "Shown only together: no department of this line is shown alone." : `Not split into kitchen, service and management: a section has fewer than ${d.k_min || 3} people, so its cost would show a salary.`}</p>`)
+    + Pulse.panel("Month by month", Pulse.list([["Month"], [`Personnel cost ${C}`, 1]].concat(S ? Object.keys(S).map(k => [SL[k] || k, 1]) : []).concat([["Net revenue", 1], ["Labour cost %", 1], ["Budget", 1]]),
+        x.months.map(m => ({cells: [esc(m[0]) + (d.provisional.includes(m[0]) ? ' <span class="meta">provisional</span>' : ""), fmt(m[1])].concat(S ? Object.keys(S).map(k => fmt((m[5] || {})[k] || 0)) : []).concat([m[2] ? fmt(m[2]) : "–", m[3] == null ? "–" : fmt(m[3], 1) + "%", m[4] ? fmt(m[4]) : "–"])}))))});
 });
-// HR data quality
+
+// HR data quality: what to correct in Odoo, where, and how
+const PP_Q = {
+  no_manager: ["Without a manager", "Employees → the employee → Work Information → Manager.", "Approvals, attendances to review and the Action Center owners follow the manager."],
+  no_location: ["Without a work location", "Employees → the employee → Work Information → Work Location.", "The work location places the person in a restaurant for planning and attendance."],
+  no_job: ["Without a position", "Employees → the employee → Job Position.", "Positions make the headcount by position and the plan by role."],
+  no_contract: ["Without a running contract", "Employees → Contracts → a running contract for the employee.", "Without a running contract the person has no hours a week: not in the FTE, not in the headcount at month ends."],
+  fte_unknown: ["Schedule without hours a week", "Contracts → Working Schedule: a schedule that says its hours a week (not a 24-hour or \"Company Schedule\").", "The FTE is the schedule's weekly hours / 40: without them the person is not counted in the FTE."],
+  forgotten: ["Forgotten check-outs", "Attendances → filter Check Out not set → close each with its real time.", "An attendance open more than 16 hours counts no hours: the restaurant's hours are short."],
+  long: ["Attendances longer than 14 hours", "Attendances → the long ones → correct the check-out.", "Counted, but probably closed late: the hours are too many."],
+  review: ["Attendances waiting for review", "Attendances → To review → approve or reject.", "An attendance waiting for review is counted until it is rejected."]};
 function ppQuality(d){
   const all = d.locations.concat(d.support, d.unmapped), sum = k => all.reduce((a, x) => a + (x[k] || 0), 0);
   const pr = ppData.productivity, PL = pr ? pr.locations : [];
-  const longA = PL.reduce((a, x) => a + (x.long || 0), 0);
-  const forgot = PL.reduce((a, x) => a + x.forgotten, 0), rev = PL.reduce((a, x) => a + (x.states.pending || 0) + (x.states.escalated || 0) + (x.states.no_review || 0), 0);
+  const att = {forgotten: PL.reduce((a, x) => a + x.forgotten, 0), long: PL.reduce((a, x) => a + (x.long || 0), 0),
+    review: PL.reduce((a, x) => a + ((x.states || {}).pending || 0) + ((x.states || {}).escalated || 0) + ((x.states || {}).no_review || 0), 0)};
+  const E = sum("employees"), gaps = sum("no_manager") + sum("no_location") + sum("no_job") + sum("no_contract");
+  const score = E ? (1 - gaps / (4 * E)) * 100 : null;
   readBanner("ppStatus", {src: "Odoo", at: d.read_at, reading: d.reading,
     lines: [pr ? fcSp(`attendances ${rdDay(pr.period.from)} – ${rdDay(pr.period.to)}`) : fcSp("open Labour productivity for the attendances of the period")]});
+  const worst = all.filter(x => x.employees).map(x => ({x, s: (1 - (x.no_manager + x.no_location + x.no_job + x.no_contract) / (4 * x.employees)) * 100})).sort((a, b) => a.s - b.s)[0];
   $("ppKpis").innerHTML = Pulse.tiles([
-    {l: "Without a manager", v: fmt(sum("no_manager")), cls: sum("no_manager") ? "warn" : ""}, {l: "Without a work location", v: fmt(sum("no_location")), cls: sum("no_location") ? "warn" : ""},
-    {l: "Without a position", v: fmt(sum("no_job"))}, {l: "Without a running contract", v: fmt(sum("no_contract")), cls: sum("no_contract") ? "warn" : ""},
-    {l: "Schedule without hours a week", v: fmt(sum("fte_unknown")), s: "FTE not counted"},
-    {l: "Forgotten check-outs", v: pr ? fmt(forgot) : "–", s: pr ? `${fmt(longA)} longer than 14 hours · ${fmt(rev)} waiting for review` : "", cls: forgot || longA ? "warn" : ""}]);
-  $("ppBody").innerHTML = `<div class="card"><h2>By Odoo restaurant</h2><p class="hint">Counts only; the names are corrected in Odoo by HR.</p><div class="scroll"><table data-nosort><tr><th>Odoo restaurant</th><th class="num">Employees</th><th class="num">No manager</th><th class="num">No work location</th><th class="num">No position</th><th class="num">No running contract</th><th class="num">FTE unknown</th><th>Mapping</th></tr>`
-    + all.map(x => `<tr><td class="name">${esc(x.unit)}</td><td class="num">${fmt(x.employees)}</td><td class="num">${fmt(x.no_manager)}</td><td class="num">${fmt(x.no_location)}</td><td class="num">${fmt(x.no_job)}</td><td class="num">${fmt(x.no_contract)}</td><td class="num">${fmt(x.fte_unknown)}</td><td class="meta">${x.how === "mapped" ? esc(x.ref) : x.how === "needs review" ? '<span class="chip warn">Needs review</span>' : "support"}</td></tr>`).join("") + `</table></div></div>`;
+    {l: "Records complete", v: score == null ? "–" : fmt(score, 1) + "%", s: "manager, work location, position and running contract filled in, of every active employee", cls: score != null && score < 95 ? "warn" : "", open: "ppq|*"},
+    {l: "Fields to fill in", v: fmt(gaps), s: `${fmt(E)} active employees`, cls: gaps ? "warn" : "", open: "ppq|*"},
+    {l: "Attendances to correct", v: pr ? fmt(att.forgotten + att.long + att.review) : "–", s: pr ? "forgotten, too long or waiting for review" : "open Labour productivity first", cls: att.forgotten + att.long + att.review ? "warn" : "", open: "ppx|s-issues"},
+    {l: "Restaurants to map", v: fmt(d.unmapped.length), s: "Odoo restaurants with no restaurant of Settings", cls: d.unmapped.length ? "warn" : "", open: "ppk|review"}]);
+  $("ppBody").innerHTML = ppSay([
+      score == null ? "" : `<b>${fmt(score, 1)}%</b> of the required fields of the active employees are filled in; ${fmt(gaps)} are missing.`,
+      worst && worst.s < 100 ? `The records to complete first are at <b>${esc(worst.x.name)}</b> (${fmt(worst.s, 1)}% complete).` : "",
+      pr ? (att.forgotten + att.long + att.review ? `${fmt(att.forgotten + att.long + att.review)} attendances of ${esc(rdDay(pr.period.from))} – ${esc(rdDay(pr.period.to))} need a correction before the hours are final.` : "Every attendance of the period is closed and reviewed.") : "",
+      "Only counts are shown: HR finds the people in Odoo with the filters given in each box."])
+    + `<div class="card" style="margin-bottom:14px"><h2>What to correct in Odoo</h2><p class="hint">Click a box for the restaurants and how to correct it.</p>`
+    + Pulse.cases(["no_manager", "no_location", "no_job", "no_contract", "fte_unknown"].map(k => ({n: sum(k), t: PP_Q[k][0], w: PP_Q[k][2], open: "ppq|issue:" + k}))
+        .concat(pr ? ["forgotten", "long", "review"].map(k => ({n: att[k], t: PP_Q[k][0], w: PP_Q[k][2], open: "ppq|issue:" + k})) : [])) + `</div>`
+    + `<div class="card"><h2>By Odoo restaurant</h2><p class="hint">Counts only; click a restaurant for its gaps.</p><div class="scroll"><table data-nosort><tr><th>Odoo restaurant</th><th class="num">Employees</th><th class="num">Records complete</th><th class="num">No manager</th><th class="num">No work location</th><th class="num">No position</th><th class="num">No running contract</th><th class="num">Schedule without hours</th></tr>`
+    + all.map(x => { const g = x.no_manager + x.no_location + x.no_job + x.no_contract, s = x.employees ? (1 - g / (4 * x.employees)) * 100 : null;
+        return `<tr data-pulse="ppq|${esc(x.unit)}" tabindex="0" style="cursor:pointer"><td class="name"><b>${esc(x.unit)}</b><div class="meta">${x.how === "mapped" ? esc(x.name) : x.how === "needs review" ? "Needs review" : "support unit"}</div></td><td class="num">${fmt(x.employees)}</td><td class="num">${s == null ? "–" : `<b class="${s < 95 ? "warn" : ""}">${fmt(s, 1)}%</b>`}</td><td class="num">${fmt(x.no_manager)}</td><td class="num">${fmt(x.no_location)}</td><td class="num">${fmt(x.no_job)}</td><td class="num">${fmt(x.no_contract)}</td><td class="num">${fmt(x.fte_unknown)}</td></tr>`; }).join("") + `</table></div></div>`;
 }
+Pulse.on("ppq", key => {
+  const d = ppData.workforce; if (!d) return;
+  const all = d.locations.concat(d.support, d.unmapped), pr = ppData.productivity, PL = pr ? pr.locations : [];
+  const attOf = (x, k) => k === "forgotten" ? x.forgotten : k === "long" ? (x.long || 0) : ((x.states || {}).pending || 0) + ((x.states || {}).escalated || 0) + ((x.states || {}).no_review || 0);
+  if (key.startsWith("issue:")) {
+    const k = key.slice(6), [t, how, why] = PP_Q[k], isAtt = ["forgotten", "long", "review"].includes(k);
+    const rows = isAtt ? PL.map(x => ({n: x.name, v: attOf(x, k), of: x.hours ? `${fmt(x.hours)} h worked` : ""})) : all.map(x => ({n: x.unit, v: x[k] || 0, of: `${fmt(x.employees)} employees`, unit: x.unit}));
+    Pulse.pop({title: esc(t), sub: esc(why), wide: false, body: `<div class="pp-how"><b>How to correct it in Odoo</b><br>${esc(how)}</div>`
+      + Pulse.list([[isAtt ? "Restaurant" : "Odoo restaurant"], ["To correct", 1], [""]], rows.filter(r => r.v).sort((a, b) => b.v - a.v).map(r => ({cells: [esc(r.n), `<b>${fmt(r.v)}</b>`, `<span class="meta">${esc(r.of)}</span>`], open: r.unit ? "ppq|" + r.unit : null})), {none: "Nothing to correct."})});
+    return;
+  }
+  if (key === "*") {
+    Pulse.pop({title: "Employee records to complete", sub: "Odoo · active employees", body: Pulse.cases(["no_manager", "no_location", "no_job", "no_contract", "fte_unknown"].map(k => ({n: all.reduce((a, x) => a + (x[k] || 0), 0), t: PP_Q[k][0], w: PP_Q[k][1], open: "ppq|issue:" + k})))});
+    return;
+  }
+  const x = all.find(r => r.unit === key); if (!x) return;
+  const g = x.no_manager + x.no_location + x.no_job + x.no_contract;
+  Pulse.pop({title: esc(x.unit), sub: esc(`${x.how === "mapped" ? x.name + " · " : ""}${fmt(x.employees)} active employees · Odoo`), body: Pulse.tiles([
+      {l: "Records complete", v: x.employees ? fmt((1 - g / (4 * x.employees)) * 100, 1) + "%" : "–"}, {l: "Fields to fill in", v: fmt(g), cls: g ? "warn" : ""}, {l: "FTE", v: fmt(x.fte, 1), s: x.fte_unknown ? `${x.fte_unknown} without hours a week` : ""}])
+    + Pulse.list([["What"], ["Employees", 1], ["How to correct it in Odoo"]], ["no_manager", "no_location", "no_job", "no_contract", "fte_unknown"].filter(k => x[k]).map(k => ({cells: [esc(PP_Q[k][0]), `<b>${fmt(x[k])}</b>`, `<span class="meta">${esc(PP_Q[k][1])}</span>`]})), {none: "Nothing to complete here."})});
+});
 // the connection (Settings permission)
 function ppSetOpen(show){ $("ppSet").style.display = show ? "" : "none"; if (show) odLoad(); }
 $("ppSetBtn").onclick = () => ppSetOpen($("ppSet").style.display === "none");
@@ -5001,8 +5255,7 @@ $("ppExp").onclick = () => {
       {title: "Departments", header: ["Department", "Restaurant", "Group", "Personnel cost", "Net revenue", "Labour cost %", "Budget"], formats: ["text", "text", "text", "num", "num", "pct", "num"],
        rows: d.locations.map(x => [x.dept, x.name, x.group, x.cost, x.sales, x.pct == null ? null : x.pct / 100, x.budget])},
       {title: "Months", header: ["Department", "Month", "Personnel cost", "Kitchen", "Service", "Management", "Other", "Net revenue", "Labour cost %", "Budget"], formats: ["text", "text", "num", "num", "num", "num", "num", "num", "pct", "num"],
-       rows: d.locations.flatMap(x => x.months.map(m => [x.dept, m[0], m[1], m[5].labor_kitchen || 0, m[5].labor_service || 0, m[5].labor_management || 0, m[5].labor_other || 0, m[2], m[3] == null ? null : m[3] / 100, m[4]]))},
-      {title: "Accounts", header: ["Department", "Account", "Name", "Amount"], formats: ["text", "text", "text", "num"], rows: d.locations.flatMap(x => x.accounts.map(a => [x.dept, a[0], a[1], a[2]]))}],
+       rows: d.locations.flatMap(x => x.months.map(m => [x.name, m[0], m[1]].concat(["labor_kitchen", "labor_service", "labor_management", "labor_other"].map(k => m[5] ? m[5][k] || 0 : null)).concat([m[2], m[3] == null ? null : m[3] / 100, m[4]])))}],
       [`${d.company} · ${d.year} · Business Central`].concat(defs));
   } else {
     xlsxTable(`Labour productivity ${d.period.from} ${d.period.to}`, [

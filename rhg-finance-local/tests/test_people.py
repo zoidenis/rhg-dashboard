@@ -53,6 +53,42 @@ class Personnel(unittest.TestCase):
         self.assertEqual((x["cost"], x["sales"], x["pct"]), (120, 1000, 12.0))
         self.assertEqual(r["months"], ["2026-09"])
 
+    def _cube(self):
+        acc = {"6411": ["Kitchen", "labor_kitchen"], "6412": ["Service", "labor_service"], "7011": ["Sales", "sales"]}
+        m = lambda k, sv: {"2026-09": {"6411": k, "6412": sv, "7011": 10000}}
+        return {"accounts": acc, "actual": {"SALT": m(300, 200), "MINI": m(90, 0), "HQ": {"2026-09": {"6411": 500}}}}
+
+    def _run(self, heads):
+        from unittest import mock
+        reg = [{"dept": "SALT", "ref": "SALT", "name": "Salt"}, {"dept": "MINI", "ref": "MINI", "name": "Mini"}]
+        with mock.patch.object(people.locintel, "registry", return_value=reg):
+            return people.personnel(self._cube(), 2026, None, heads)
+
+    def test_confidential_no_accounts_small_teams_together(self):
+        r = self._run({"SALT": {"FOH": 5, "BOH": 4, "MGMT": 1, "Other": 0, "total": 10}, "MINI": {"FOH": 1, "BOH": 1, "MGMT": 0, "Other": 0, "total": 2}})
+        by = {x["dept"]: x for x in r["locations"]}
+        self.assertEqual(set(by), {"SALT", "*SUPPORT"})
+        self.assertNotIn("accounts", by["SALT"])
+        self.assertEqual(by["*SUPPORT"]["departments"], 2)          # MINI (2 people) with head office
+        self.assertEqual(by["*SUPPORT"]["cost"], 590)
+        self.assertIsNone(by["*SUPPORT"]["sections"])
+        # every section with cost has 3 people or more: split
+        self.assertEqual(by["SALT"]["sections"]["labor_kitchen"], {"cost": 300, "people": 4})
+
+    def test_no_split_when_a_section_is_small(self):
+        r = self._run({"SALT": {"FOH": 2, "BOH": 4, "MGMT": 1, "Other": 0, "total": 7}})
+        x = next(x for x in r["locations"] if x["dept"] == "SALT")
+        self.assertIsNone(x["sections"])
+        self.assertTrue(all(m[5] is None for m in x["months"]))
+
+    def test_a_lone_small_team_is_withheld(self):
+        from unittest import mock
+        reg = [{"dept": "SALT", "ref": "SALT", "name": "Salt"}, {"dept": "MINI", "ref": "MINI", "name": "Mini"}]
+        with mock.patch.object(people.locintel, "registry", return_value=reg):
+            r = people.personnel(self._cube(), 2026, {"MINI"}, {"MINI": {"FOH": 1, "BOH": 1, "MGMT": 0, "Other": 0, "total": 2}})
+        self.assertEqual(r["locations"], [])
+        self.assertEqual(r["withheld"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

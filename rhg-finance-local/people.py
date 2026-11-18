@@ -356,11 +356,41 @@ def workforce():
 
 # ---------------------------------------------------------------- D: personnel cost (BC)
 LABOUR = ("labor_kitchen", "labor_service", "labor_management", "labor_other")
+# a cost split is shown only for groups of at least K_MIN people: a salary of one person is never on the screen
+K_MIN = 3
+SECTION_OF = {"labor_kitchen": "BOH", "labor_service": "FOH", "labor_management": "MGMT", "labor_other": "Other"}
 
 
-def personnel(cube, year, allowed_depts=None):
+def heads_by_dept(settings=None):
+    """{BC department or location (upper): {"FOH", "BOH", "MGMT", "Other", "total"}}: the active employees of the
+    Odoo restaurants mapped to each restaurant of the registry; {} when Odoo cannot be read."""
+    try:
+        if not odoo.info().get("configured"):
+            return {}
+        w = odoo.workforce()
+    except Exception:                                              # noqa: BLE001
+        return {}
+    reg, m = places(settings)
+    out = {}
+    for u, v in (w.get("now") or {}).items():
+        ref, how = unit_ref(u, reg, m)
+        if how != "mapped":
+            continue
+        r = reg.get(ref) or {}
+        for key in {(r.get("dept") or "").upper(), (r.get("bc") or "").upper()} - {""}:
+            h = out.setdefault(key, {"FOH": 0, "BOH": 0, "MGMT": 0, "Other": 0, "total": 0})
+            for sec, n in (v.get("sections") or {}).items():
+                h[sec if sec in h else "Other"] += n
+            h["total"] += v.get("employees") or 0
+    return out
+
+
+def personnel(cube, year, allowed_depts=None, heads=None):
     """From the Executive dashboard cube of BC (by department, month and account): personnel cost by department and
-    month, its accounts, net revenue and the budget, and labour cost %."""
+    month, net revenue and the budget, and labour cost %. Confidential by construction: no account or person, a
+    department of fewer than K_MIN people (or of unknown size, outside the restaurants) only inside one combined line,
+    and the split by section (kitchen, service, management) only where every section with cost has K_MIN people."""
+    heads = heads or {}
     accounts = cube.get("accounts") or {}
     actual = cube.get("actual") or {}
     bud = cube.get("budget") or {}
@@ -373,26 +403,25 @@ def personnel(cube, year, allowed_depts=None):
     months = sorted({k for d in actual.values() for k in d if len(k) == 7 and k[:4] == str(year)})
 
     def sums(src, dept, ks):
-        lab, sales, by_acc = defaultdict(float), 0.0, defaultdict(float)
+        lab, sales = defaultdict(float), 0.0
         for k in ks:
             for no, v in ((src or {}).get(dept) or {}).get(k, {}).items():
                 a = accounts.get(no)
                 b = a[1] if a else ""
                 if b in LABOUR:
                     lab[b] += v
-                    by_acc[no] += v
                 elif b == "sales":
                     sales += v
-        return lab, sales, by_acc
-    rows = []
+        return lab, sales
+    rows, small = [], []
     for d in sorted(actual):
         if d == "*" or (allowed_depts is not None and d.upper() not in allowed_depts):
             continue
-        per_m = []
-        tot_l, tot_s, tot_b, accs = 0.0, 0.0, 0.0, defaultdict(float)
+        per_m, cats = [], defaultdict(float)
+        tot_l, tot_s, tot_b = 0.0, 0.0, 0.0
         for k in months:
-            lab, sales, by_acc = sums(actual, d, [k])
-            blab, bsales, _ = sums(bcells, d, [k]) if bcells else ({}, 0.0, {})
+            lab, sales = sums(actual, d, [k])
+            blab, _ = sums(bcells, d, [k]) if bcells else ({}, 0.0)
             L = sum(lab.values())
             B = sum(blab.values()) if blab else None
             per_m.append([k, round(L), round(sales), round(L / sales * 100, 1) if sales > 0 else None,
@@ -400,18 +429,46 @@ def personnel(cube, year, allowed_depts=None):
             tot_l += L
             tot_s += sales
             tot_b += B or 0
-            for no, v in by_acc.items():
-                accs[no] += v
+            for x, v in lab.items():
+                cats[x] += v
         if not tot_l and not tot_s:
             continue
         r = reg.get(d.upper()) or {}
-        rows.append({"dept": d, "ref": r.get("ref") or "", "bc": r.get("bc") or "", "name": r.get("name") or d,
-                     "group": "restaurant" if r else "support",
-                     "cost": round(tot_l), "sales": round(tot_s), "pct": round(tot_l / tot_s * 100, 1) if tot_s > 0 else None,
-                     "budget": round(tot_b) if tot_b else None, "months": per_m,
-                     "accounts": sorted(([no, (accounts.get(no) or [no])[0], round(v)] for no, v in accs.items()), key=lambda x: -abs(x[2]))})
-    rows.sort(key=lambda x: -x["cost"])
-    return {"available": True, "year": year, "months": months, "locations": rows,
+        H = heads.get(d.upper())
+        people = H["total"] if H else None
+        row = {"dept": d, "ref": r.get("ref") or "", "bc": r.get("bc") or "", "name": r.get("name") or d,
+               "group": "restaurant" if r else "support", "people": people,
+               "cost": round(tot_l), "sales": round(tot_s), "pct": round(tot_l / tot_s * 100, 1) if tot_s > 0 else None,
+               "budget": round(tot_b) if tot_b else None, "months": per_m}
+        # only a restaurant of K_MIN people or more (or of unknown size: a restaurant team) on a line of its own
+        if not r or (people is not None and people < K_MIN):
+            small.append(row)
+            continue
+        split_ok = bool(H) and all(H.get(SECTION_OF[c], 0) >= K_MIN for c, v in cats.items() if abs(v) >= 1)
+        row["split"] = split_ok
+        row["sections"] = {c: {"cost": round(v), "people": H.get(SECTION_OF[c], 0)} for c, v in cats.items()} if split_ok else None
+        if not split_ok:
+            for m_ in row["months"]:
+                m_[5] = None
+        rows.append(row)
+    withheld = 0
+    # the combined line itself must not be one small team: every size known and under K_MIN together → not shown
+    if small and all(x["people"] is not None for x in small) and sum(x["people"] for x in small) < K_MIN:
+        withheld, small = len(small), []
+    if small:
+        cm = []
+        for i, k in enumerate(months):
+            L = sum(x["months"][i][1] for x in small)
+            S = sum(x["months"][i][2] for x in small)
+            B = sum(x["months"][i][4] or 0 for x in small)
+            cm.append([k, L, S, round(L / S * 100, 1) if S > 0 else None, B or None, None])
+        c, s_ = sum(x["cost"] for x in small), sum(x["sales"] for x in small)
+        rows.append({"dept": "*SUPPORT", "ref": "", "bc": "", "name": "Head office, central units and small departments",
+                     "group": "combined", "people": None, "departments": len(small), "split": False, "sections": None,
+                     "cost": c, "sales": s_, "pct": round(c / s_ * 100, 1) if s_ > 0 else None,
+                     "budget": sum(x["budget"] or 0 for x in small) or None, "months": cm})
+    rows.sort(key=lambda x: (x["group"] == "combined", -x["cost"]))
+    return {"available": True, "year": year, "months": months, "locations": rows, "k_min": K_MIN, "withheld": withheld,
             "pending": bool(cube.get("pending")), "provisional": cube.get("provisional") or [],
             "budget": bool(bcells), "budget_name": bud.get("name"),
             "definitions": {
@@ -421,6 +478,11 @@ def personnel(cube, year, allowed_depts=None):
                         "month, so the figures are monthly; a month whose payroll is not posted yet is low or empty.",
                 "pct": "Labour cost % = personnel cost / net revenue of the same department and month (Business Central, "
                        "the accounting period; Simphony's business days are not mixed in).",
+                "confidential": f"Confidential by design: no salary of a person, no account and no name. A restaurant "
+                                f"is shown on its own only with {K_MIN} people or more; head office, the central units and "
+                                f"any department of fewer than {K_MIN} people are shown only together, in one line. The split "
+                                f"into kitchen, service and management is shown only where each of them has {K_MIN} "
+                                f"people or more (Odoo's active employees by section).",
                 "central": "Head office, the central kitchen and the warehouse carry their own personnel cost on their "
                            "departments; it is not spread over the restaurants here.",
                 "budget": "Budget: the personnel accounts of the G/L budget of Settings, when it has them."}}

@@ -3264,7 +3264,7 @@ class Handler(BaseHTTPRequestHandler):
                         year = date.today().year
                     cube = executive.request(client, company, year, company_currency(company), refresh=False)
                     A = {x.upper() for x in self._allowed} if self._allowed is not None else None
-                    r = people.personnel(cube, year, A)
+                    r = people.personnel(cube, year, A, people.heads_by_dept())
                     r.update(company=company, currency=company_currency(company), can_settings=auth.can(user, "settings"))
                     self._send(200, r)
                     return
