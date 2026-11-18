@@ -129,5 +129,8 @@ GRAPH_CERT_PASSWORD = get("GRAPH_CERT_PASSWORD", "")
 # register is shown in the Control center (sharepoint.py).
 SP_HOME_SITE = get("SP_HOME_SITE", "revoal.sharepoint.com:/sites/RHG-Home")
 SP_NAV_LIST = get("SP_NAV_LIST", "Regjistri Navigimit RHG")
+# Contracts and policies: each file's columns (never its content), "read" granted on these two sites only
+SP_CONTRACTS_SITE = get("SP_CONTRACTS_SITE", "revoal.sharepoint.com:/sites/RHG-KONTRATA")
+SP_POLICIES_SITE = get("SP_POLICIES_SITE", "revoal.sharepoint.com:/sites/RHG-Politika")
 # Address the emails link to, so a reader lands on the right screen
 PUBLIC_URL = get("PUBLIC_URL", "https://dashboard.rhg.al")

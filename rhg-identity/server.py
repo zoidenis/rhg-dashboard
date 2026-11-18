@@ -150,6 +150,27 @@ def rhghome(refresh=False):
         return 200, {"available": False, "error": f"Purchasing could not read RHG Home: {str(exc)[:160]}"}
 
 
+def docs_allowed(user):
+    """Contracts & SOPs: pulse reads them with its own app, so SharePoint does not check the person; only the accounts
+    named in M365_DOCS_USERS (usernames, comma separated; for now Fabian Kuka alone, 18 Nov 2026) see them. The
+    username, not the email, which an administrator can change."""
+    names = {n.strip().lower() for n in (config.get("M365_DOCS_USERS", "fkuka@rhg.al") or "").split(",") if n.strip()}
+    return bool(user) and str(user.get("username") or "").lower() in names
+
+
+def m365_documents(refresh=False):
+    """(status, body): every contract and policy file's columns, from Purchasing (/internal/sharepoint/documents)."""
+    import urllib.error
+    import urllib.request
+    url = actioncenter.PURCHASING_URL + "/internal/sharepoint/documents" + ("?refresh=1" if refresh else "")
+    req = urllib.request.Request(url, headers={"X-Service-Token": config.SERVICE_TOKEN})
+    try:
+        with urllib.request.urlopen(req, timeout=150) as r:
+            return 200, json.loads(r.read() or b"{}")
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        return 200, {"available": False, "error": f"Purchasing could not read SharePoint: {str(exc)[:160]}"}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "RHG-Identity"
 
@@ -252,6 +273,11 @@ class Handler(BaseHTTPRequestHandler):
                 page = "reports-center.html" if u and not u.get("must_change") else "login.html"
                 self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
                 return
+            if url.path in ("/documents", "/documents.html"):
+                u = self._user()
+                page = "documents.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
             if url.path in ("/notifications", "/notifications.html"):
                 u = self._user()
                 page = "notifications.html" if u and not u.get("must_change") else "login.html"
@@ -290,7 +316,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if url.path == "/api/session":
                 u = self._user()
-                self._send(200, {"user": u, "permissions": permissions.PERMISSIONS})
+                self._send(200, {"user": u, "permissions": permissions.PERMISSIONS, "m365_docs": docs_allowed(u)})
                 return
 
             user = self._user()
@@ -345,6 +371,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.can(user, "reports.manage"):
                     self._send(403, {"error": "Your role cannot schedule reports."}); return
                 self._send(*scope_options_cached())
+            elif url.path == "/api/m365/documents":
+                # Contracts & SOPs from SharePoint (columns only; files open in SharePoint), for the named accounts
+                if not docs_allowed(user):
+                    self._send(403, {"error": "Contracts and SOPs are not open to your account."}); return
+                refresh = parse_qs(url.query).get("refresh") == ["1"]
+                if refresh:
+                    store.audit("m365 documents read again", user["username"], "Contracts & SOPs", {}, self._ip())
+                self._send(*m365_documents(refresh))
             elif url.path == "/api/rhghome":
                 # RHG Home on SharePoint: its navigation register, read by Purchasing with the Graph app
                 if not auth.can(user, "m365.home.view"):

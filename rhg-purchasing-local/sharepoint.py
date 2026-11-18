@@ -11,7 +11,7 @@ without a SharePoint address.
 """
 import threading
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from urllib.parse import quote, urlsplit
 
 import config
@@ -98,19 +98,238 @@ def _read():
             "read_at": datetime.now().isoformat(timespec="seconds")}
 
 
-def navigation(force=False):
-    """The navigation register of RHG Home, read at most every TTL seconds."""
+def _cached(cache, read, force):
+    """read() at most every TTL seconds; when SharePoint does not answer, the last good reading, marked stale."""
     if not (config.GRAPH_TENANT_ID and config.GRAPH_CLIENT_ID):
         return {"available": False, "error": "Microsoft 365 is not connected (GRAPH_TENANT_ID, GRAPH_CLIENT_ID)."}
     with _lock:
-        if not force and _cache["value"] and _cache["value"].get("available") and time.time() - _cache["at"] < TTL:
-            return _cache["value"]
+        if not force and cache["value"] and cache["value"].get("available") and time.time() - cache["at"] < TTL:
+            return cache["value"]
         try:
-            value = _read()
+            value = read()
         except Exception as exc:                                   # noqa: BLE001
-            stale = _cache["value"] if _cache["value"] and _cache["value"].get("available") else None
-            if stale:   # SharePoint did not answer: keep showing the last good reading, and say so
+            stale = cache["value"] if cache["value"] and cache["value"].get("available") else None
+            if stale:
                 return dict(stale, stale=True, error=f"Last reading kept: {str(exc)[:200]}")
             return {"available": False, "error": str(exc)[:300]}
-        _cache.update(at=time.time(), value=value)
+        cache.update(at=time.time(), value=value)
         return value
+
+
+def navigation(force=False):
+    """The navigation register of RHG Home, read at most every TTL seconds."""
+    return _cached(_cache, _read, force)
+
+
+# ---------------------------------------------------------------- contracts and policies (RHG-KONTRATA, RHG-Politika)
+# What is read is the description of each file (its columns), never its content: the file itself opens in SharePoint,
+# which checks the person's own access. The libraries are named "Kontrata - <entity> - Në punë | Të nënshkruara",
+# "Politika dhe SOP - <brand> - Në punë | Të publikuara" and "Arkiv publikimi - Politika dhe SOP - <brand>".
+_docs_cache = {"at": 0.0, "value": None}
+
+CONTRACT_COLUMNS = {
+    "Contract Title": "title", "Contract ID": "contract_id", "Contract Type": "type", "Contract Status": "status",
+    "Kundërpala / Furnitori": "counterparty", "Brand / Location Scope": "scope", "Starting Date": "start",
+    "Ending Date": "end", "Signature Date": "signed", "Notice Deadline": "notice_deadline",
+    "Notice Period": "notice_period", "Notice Period Unit": "notice_unit", "Automatic Renewal": "auto_renewal",
+    "Open-ended Contract": "open_ended", "Contract Owner": "owner", "Kategoria DMS": "category",
+    "Approval Reference": "approval_ref", "Amendment / Parent Contract ID": "parent_id"}
+POLICY_COLUMNS = {
+    "Kodi i dokumentit": "code", "Kategoria e dokumentit": "category", "Kategoria DMS": "category",
+    "Statusi i dokumentit": "status", "Brandi": "brand_codes", "Brand": "brand_codes", "Njësia": "units",
+    "Lokacioni": "units", "Rruga e aprovimit": "approval_route", "Përgjegjësi i dokumentit": "owner",
+    "Departamenti pronar": "department", "Data e hyrjes në fuqi": "effective", "Data e rishikimit": "review",
+    "Data e skadimit": "expiry", "Konfidencialiteti": "confidentiality", "Entiteti ligjor": "entity",
+    "Referenca e aprovimit": "approval_ref", "Data e dokumentit": "date", "Fusha e zbatimit": "scope_level"}
+DATES = {"start", "end", "signed", "notice_deadline", "effective", "review", "expiry", "date"}
+STAGES = ("Në punë", "Të nënshkruara", "Të publikuara")
+MODERATION = {0: "Approved", 1: "Rejected", 2: "Pending", 3: "Draft", 4: "Scheduled"}
+CONTRACT_NEEDS = {"contract_id": "Contract ID", "counterparty": "Counterparty", "type": "Type", "scope": "Brand / location",
+                  "start": "Start date", "end": "End date", "notice_deadline": "Notice deadline", "owner": "Owner"}
+POLICY_NEEDS = {"code": "Document code", "category": "Category", "status": "Status", "owner": "Owner",
+                "department": "Owning department", "review": "Review date"}
+
+
+def _library(name):
+    """(entity or brand, stage) from a library's name."""
+    parts = [p.strip() for p in name.split(" - ")]
+    if name.startswith("Arkiv publikimi"):
+        return parts[-1], "Arkiv"
+    if len(parts) >= 3 and parts[-1] in STAGES:
+        return " - ".join(parts[1:-1]), parts[-1]
+    return "", name
+
+
+def _day(value):
+    """A date-only column is the site's local midnight stored in UTC (22:00 or 23:00 the day before in Tirana):
+    half a day later is always the right calendar day."""
+    if not value:
+        return ""
+    try:
+        return (datetime.fromisoformat(str(value).replace("Z", "+00:00")) + timedelta(hours=12)).date().isoformat()
+    except ValueError:
+        return ""
+
+
+def _people(site_id):
+    """{lookup id: name} from the site's user information list, for the person columns (owner)."""
+    g = graph_mail.GRAPH
+    try:
+        lists = _all(f"{g}/sites/{site_id}/lists?$select=id,displayName,system")
+        uil = [x for x in lists if x.get("displayName") == "User Information List"]
+        if not uil:
+            return {}
+        rows = _all(f"{g}/sites/{site_id}/lists/{uil[0]['id']}/items?expand=fields($select=Title,EMail)&$top=500")
+        return {str(r.get("id")): (r.get("fields") or {}).get("Title") or "" for r in rows}
+    except Exception:                                              # noqa: BLE001 - names are a convenience
+        return {}
+
+
+def _value(fields, name, kind, people):
+    if kind == "personOrGroup":
+        ids = fields.get(name + "LookupId")
+        if ids in (None, "", []):
+            return ""
+        ids = ids if isinstance(ids, list) else [ids]
+        return ", ".join(people.get(str(i), "set") for i in ids)
+    v = fields.get(name)
+    if isinstance(v, list):
+        return [str(x) for x in v if x not in (None, "")]
+    return v
+
+
+def _read_site(path, columns):
+    """Every document library of one site: [(library, [file records])] with the columns named in `columns`."""
+    g = graph_mail.GRAPH
+    site = _get(f"{g}/sites/{path}?$select=id,displayName,webUrl")
+    people = _people(site["id"])
+    out = []
+    for lst in _all(f"{g}/sites/{site['id']}/lists?$select=id,displayName,webUrl,list"):
+        meta = lst.get("list") or {}
+        if meta.get("template") != "documentLibrary" or meta.get("hidden"):
+            continue
+        base = f"{g}/sites/{site['id']}/lists/{quote(lst['id'], safe='')}"
+        cols = {}
+        for c in _all(base + "/columns"):
+            key = columns.get(c.get("displayName"))
+            if key and key not in cols.values():
+                kind = next((k for k in ("personOrGroup", "dateTime", "boolean", "number", "choice", "text") if k in c), "")
+                cols[c["name"]] = (key, kind)
+        files = []
+        for row in _all(base + "/items?expand=fields&$top=500"):
+            f = row.get("fields") or {}
+            if str(f.get("ContentType", "")).startswith("Folder") or "FileLeafRef" not in f:
+                continue
+            x = {key: _value(f, name, kind, people) for name, (key, kind) in cols.items()}
+            for k in list(x):
+                if k in DATES:
+                    x[k] = _day(x[k])
+                elif x[k] is None:
+                    x[k] = ""
+            mod = f.get("_ModerationStatus")
+            x.update(name=f.get("FileLeafRef") or "", url=_safe_url(row.get("webUrl")),
+                     version=str(f.get("_UIVersionString") or ""),
+                     approval=MODERATION.get(mod, "") if isinstance(mod, int) else "",
+                     modified=str(row.get("lastModifiedDateTime") or "")[:10],
+                     modified_by=((row.get("lastModifiedBy") or {}).get("user") or {}).get("displayName", ""))
+            files.append(x)
+        out.append(({"site": site.get("displayName") or "", "library": lst.get("displayName") or "",
+                     "url": _safe_url(lst.get("webUrl")), "files": len(files)}, files))
+    return site, out
+
+
+def _blank(v):
+    return v in (None, "", [], {})
+
+
+def _contract_checks(x, stage, today):
+    status = str(x.get("status") or "")
+    open_ended = x.get("open_ended") is True
+    need = dict(CONTRACT_NEEDS)
+    if open_ended:
+        need.pop("end", None)
+        need.pop("notice_deadline", None)
+    if stage == "Të nënshkruara":
+        need["signed"] = "Signature date"
+    x["missing"] = [label for key, label in need.items() if _blank(x.get(key))]
+    flags = []
+    if stage == "Të nënshkruara" and status in ("", "Draft", "Në aprovim"):
+        flags.append(("warning", f"In a signed library but its status is {status or 'empty'}"))
+    if stage == "Në punë" and status in ("Nënshkruar", "Aktiv"):
+        flags.append(("warning", f"Status {status} but still in Në punë"))
+    live = status not in ("Skaduar", "Ndërprerë", "Pezulluar")
+    x["days_to_notice"] = x["days_to_end"] = None
+    if x.get("notice_deadline"):
+        d = (date.fromisoformat(x["notice_deadline"]) - today).days
+        x["days_to_notice"] = d
+        ended = bool(x.get("end")) and x["end"] < today.isoformat()   # then the end date speaks, not the notice
+        if live and d < 0 and not ended:
+            flags.append(("critical", f"Notice deadline passed {-d} days ago"))
+        elif live and 0 <= d <= 30:
+            flags.append(("critical", f"Notice deadline in {d} days"))
+        elif live and 30 < d <= 60:
+            flags.append(("warning", f"Notice deadline in {d} days"))
+    if x.get("end"):
+        d = (date.fromisoformat(x["end"]) - today).days
+        x["days_to_end"] = d
+        if d < 0 and status in ("Aktiv", "Nënshkruar"):
+            flags.append(("critical", f"Ended {-d} days ago but still {status}"))
+        elif live and 0 <= d <= 60:
+            flags.append(("warning", f"Ends in {d} days"))
+    x["flags"] = [{"level": lv, "text": t} for lv, t in flags]
+    return x
+
+
+def _policy_checks(x, stage, today):
+    x["missing"] = [label for key, label in POLICY_NEEDS.items() if _blank(x.get(key))]
+    flags = []
+    if x.get("version", "").startswith("0."):
+        flags.append(("info", f"Draft version {x['version']}"))
+    if stage == "Të publikuara" and x.get("approval") not in ("", "Approved"):
+        flags.append(("warning", f"In a published library, approval {x['approval']}"))
+    if x.get("review") and x["review"] < today.isoformat():
+        flags.append(("critical", f"Review date passed ({x['review']})"))
+    if x.get("expiry") and x["expiry"] < today.isoformat():
+        flags.append(("critical", f"Expired ({x['expiry']})"))
+    x["flags"] = [{"level": lv, "text": t} for lv, t in flags]
+    return x
+
+
+def _read_documents():
+    today = date.today()
+    out = {"available": True, "today": today.isoformat(), "libraries": [], "contracts": [], "policies": []}
+    for kind, path, columns in (("contracts", config.SP_CONTRACTS_SITE, CONTRACT_COLUMNS),
+                                ("policies", config.SP_POLICIES_SITE, POLICY_COLUMNS)):
+        site, libs = _read_site(path, columns)
+        out[kind + "_site"] = {"name": site.get("displayName") or "", "url": _safe_url(site.get("webUrl"))}
+        for lib, files in libs:
+            owner, stage = _library(lib["library"])
+            out["libraries"].append(dict(lib, kind=kind, owner=owner, stage=stage))
+            for x in files:
+                x.update(library=lib["library"], stage=stage,
+                         **({"entity": owner} if kind == "contracts" else {"brand": owner}))
+                if kind == "contracts":
+                    x["title"] = x.get("title") or x["name"]
+                    out[kind].append(_contract_checks(x, stage, today))
+                else:
+                    out[kind].append(_policy_checks(x, stage, today))
+    c, p = out["contracts"], out["policies"]
+    out["summary"] = {
+        "contracts": len(c), "contracts_complete": sum(1 for x in c if not x["missing"]),
+        "contracts_with_end": sum(1 for x in c if x.get("end") or x.get("open_ended") is True),
+        "contracts_with_counterparty": sum(1 for x in c if not _blank(x.get("counterparty"))),
+        "contracts_flagged": sum(1 for x in c if x["flags"]),
+        "notices_60": sum(1 for x in c if x["days_to_notice"] is not None and 0 <= x["days_to_notice"] <= 60),
+        "policies": len(p), "policies_approved": sum(1 for x in p if x.get("approval") == "Approved"),
+        "policies_draft": sum(1 for x in p if x.get("version", "").startswith("0.") or x.get("status") == "Draft"),
+        "policies_overdue": sum(1 for x in p if x.get("review") and x["review"] < today.isoformat()),
+        "policies_complete": sum(1 for x in p if not x["missing"]),
+    }
+    out["read_at"] = datetime.now().isoformat(timespec="seconds")
+    return out
+
+
+def documents(force=False):
+    """Contracts (RHG-KONTRATA) and policies and SOPs (RHG-Politika): each file's columns, what is missing, and
+    what needs attention; read at most every TTL seconds."""
+    return _cached(_docs_cache, _read_documents, force)

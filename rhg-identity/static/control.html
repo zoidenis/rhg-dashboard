@@ -621,6 +621,7 @@ $("logoutBtn").onclick = signOut;
     return;
   }
   shell();
+  if (s.m365_docs) $("towers").insertAdjacentHTML("beforeend", `<a href="/documents">Contracts &amp; SOPs</a>`);
   if (can("purchasing.view")) {
     try {
       const c = await get("/purchasing/api/companies");

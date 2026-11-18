@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08303f">
+<title>Contracts &amp; SOPs · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+/* Contracts & SOPs: every file of RHG-KONTRATA and RHG-Politika on SharePoint, by its columns (sharepoint.py in
+   Purchasing). Only the accounts named in M365_DOCS_USERS see it. Shell as Notifications. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+button,select,input{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+aside{flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+main{flex:1;min-width:0}
+header{display:flex;justify-content:space-between}
+.adminlink{margin-top:auto;padding-top:16px}
+.dc-seg{display:inline-flex;gap:6px;margin:0 0 14px}
+.dc-seg button{all:unset;cursor:pointer;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);color:var(--sub);background:var(--card)}
+.dc-seg button.on{background:var(--rhg-primary);border-color:var(--rhg-primary);color:#fff}
+.dc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dc-flt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.dc-flt select{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;font-size:13px;color:var(--ink)}
+.dc-card{margin-bottom:16px;min-width:0}
+.dc-card h2{font-size:17px;margin:0 0 4px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.dc{min-width:1100px}
+table.dc td{vertical-align:top;font-size:12.5px}
+table.dc td.doc a{font-weight:600;color:var(--ink);text-decoration:none}
+table.dc td.doc a:hover,table.dc td.doc a:focus-visible{color:var(--accent);text-decoration:underline}
+table.dc td.doc small{display:block;color:var(--sub);font-size:11px;margin-top:2px;word-break:break-all}
+table.dc .miss{color:var(--sub);font-size:11.5px;line-height:1.4}
+table.dc .miss b{color:var(--ink)}
+table.dc .rhg-pill{font-size:10.5px;padding:1px 8px;margin:0 4px 4px 0;display:inline-block;white-space:normal}
+table.dc .na{color:var(--sub)}
+.dc-note{font-size:12px;color:var(--sub);margin:8px 0 0}
+.dc-empty{color:var(--sub);padding:14px 0}
+.mnav-btn,.mnav-bd{display:none}
+@media(max-width:760px){
+  aside{display:flex;position:fixed;left:0;top:0;bottom:0;z-index:70;height:100vh;height:100dvh;overflow-y:auto;transform:translateX(-105%);transition:transform .2s ease}
+  body.mnav-open aside{transform:none;box-shadow:0 0 32px rgba(0,0,0,.35)}
+  body.mnav-open{overflow:hidden}
+  .mnav-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}
+  body.mnav-open .mnav-bd{display:block}
+  .mnav-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px}
+  .mnav-btn svg{width:18px;height:18px}
+  main{padding:16px}
+}
+@media (prefers-reduced-motion: reduce){aside{transition:none}}
+</style>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
+  <div class="towers" aria-label="Control towers" id="towers">
+    <span class="lbl">Control towers</span>
+    <a href="/">Control center</a>
+    <a href="/actions">Executive Action Center</a>
+    <a href="/executive">Executive dashboard</a>
+    <a href="/documents" class="on" aria-current="page">Contracts &amp; SOPs</a>
+  </div>
+  <div class="adminlink" id="adminLink"></div>
+  <div class="powered">powered by <span class="pulse-mark">pulse</span></div>
+</aside>
+<div class="mnav-bd no-report" id="mnavBd"></div>
+<main>
+  <button class="mnav-btn no-report" id="mnavBtn" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
+  <header>
+    <div>
+      <div class="eyebrow">RHG / SharePoint</div>
+      <h1>Contracts &amp; SOPs</h1>
+      <div class="period">Every file of RHG-KONTRATA and RHG-Politika, by what SharePoint records about it. Nothing is written to SharePoint; a file opens there, which checks your own access.</div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns"><button class="btn exp no-report" id="pgExport" type="button" title="Excel, PDF or send by email: what this page shows">Export ▾</button><button class="btn dark no-report" id="reload" type="button">Read again</button></div>
+      <div class="hdr-meta"><span class="pill load" id="pill"><span class="dot"></span><span id="pillText">Reading SharePoint…</span></span><span class="sep">|</span><span id="whoami"></span><button class="linkbtn" id="logoutBtn">Sign out</button></div>
+    </div>
+  </header>
+
+  <div class="dc-seg no-report" role="tablist" aria-label="Show">
+    <button type="button" role="tab" data-v="contracts" class="on" aria-selected="true">Contracts</button>
+    <button type="button" role="tab" data-v="policies" aria-selected="false">Policies &amp; SOPs</button>
+  </div>
+
+  <section id="vContracts">
+    <div class="kpis six" id="cKpis"></div>
+    <div class="card dc-card">
+      <h2>Contracts</h2>
+      <p class="hint">What is missing is what Pulse needs to warn before a notice deadline or an end date: counterparty, dates, owner. "In a signed library but Draft" is a contract filed under Të nënshkruara whose status was never changed.</p>
+      <div class="dc-flt no-report">
+        <select id="cEntity" aria-label="Entity"><option value="">Every entity</option></select>
+        <select id="cStage" aria-label="Library"><option value="">Në punë and Të nënshkruara</option><option>Të nënshkruara</option><option>Në punë</option></select>
+        <select id="cShow" aria-label="Show"><option value="">Every contract</option><option value="attention">Needing attention</option><option value="missing">With something missing</option><option value="complete">Complete</option></select>
+      </div>
+      <div class="scroll"><table class="dc" id="cTable"></table></div>
+      <div class="dc-empty" id="cEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section id="vPolicies" hidden>
+    <div class="kpis five" id="pKpis"></div>
+    <div class="card dc-card">
+      <h2>Policies &amp; SOPs</h2>
+      <p class="hint">A version 0.x is a draft; Të publikuara holds what was approved. A policy whose review date has passed is out of date until it is reviewed again.</p>
+      <div class="dc-flt no-report">
+        <select id="pBrand" aria-label="Brand"><option value="">Every brand</option></select>
+        <select id="pStage" aria-label="Library"><option value="">Every library</option><option>Në punë</option><option>Të publikuara</option><option>Arkiv</option></select>
+      </div>
+      <div class="scroll"><table class="dc" id="pTable"></table></div>
+      <div class="dc-empty" id="pEmpty" hidden></div>
+    </div>
+  </section>
+
+  <div class="card dc-card">
+    <h2>Libraries</h2>
+    <p class="hint">Every library of the two sites and how many files it holds, empty ones included.</p>
+    <div class="scroll"><table id="lTable"></table></div>
+  </div>
+  <p class="dc-note" id="note"></p>
+</main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SP = /^https:\/\/[^\/]*sharepoint\.com(\/|$)/i;
+let me = null, CSRF = null, D = null, VIEW = "contracts";
+async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+const day = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}) : "";
+const cell = v => Array.isArray(v) ? (v.length ? esc(v.join(", ")) : `<span class="na">–</span>`) : (v === "" || v == null ? `<span class="na">–</span>` : esc(v));
+const doc = x => `<td class="doc">${SP.test(x.url || "") ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title || x.name)} ↗</a>` : esc(x.title || x.name)}${x.title && x.title !== x.name ? `<small>${esc(x.name)}</small>` : ""}</td>`;
+const flags = x => (x.flags || []).map(f => `<span class="rhg-pill ${f.level === "critical" ? "critical" : f.level === "warning" ? "warning" : "info"}">${esc(f.text)}</span>`).join("") || `<span class="na">–</span>`;
+const missing = x => x.missing && x.missing.length ? `<div class="miss"><b>${x.missing.length}</b> · ${esc(x.missing.join(", "))}</div>` : `<span class="rhg-pill ok">Complete</span>`;
+const kpi = (l, v, s) => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div><div class="s"><span class="meta">${esc(s || "")}</span></div></div>`;
+const dateCell = (iso, days) => iso ? `${esc(day(iso))}${days != null && days >= 0 && days <= 60 ? `<br><span class="meta">in ${days} days</span>` : ""}` : `<span class="na">–</span>`;
+
+function options(sel, values){
+  const keep = sel.value;
+  sel.querySelectorAll("option:not(:first-child)").forEach(o => o.remove());
+  [...new Set(values.filter(Boolean))].sort().forEach(v => sel.insertAdjacentHTML("beforeend", `<option>${esc(v)}</option>`));
+  sel.value = keep;
+}
+
+function renderContracts(){
+  const s = D.summary, all = D.contracts;
+  $("cKpis").innerHTML = kpi("Contracts", s.contracts, "in RHG-KONTRATA")
+    + kpi("Complete", `${s.contracts_complete} / ${s.contracts}`, "nothing missing")
+    + kpi("With an end date", `${s.contracts_with_end} / ${s.contracts}`, "or open-ended")
+    + kpi("With a counterparty", `${s.contracts_with_counterparty} / ${s.contracts}`, "Kundërpala / Furnitori")
+    + kpi("Need attention", s.contracts_flagged, "status, deadlines")
+    + kpi("Notice within 60 days", s.notices_60, "to decide renew or end");
+  options($("cEntity"), all.map(x => x.entity));
+  const ent = $("cEntity").value, st = $("cStage").value, show = $("cShow").value;
+  const rows = all.filter(x => (!ent || x.entity === ent) && (!st || x.stage === st)
+    && (show !== "attention" || x.flags.length) && (show !== "missing" || x.missing.length) && (show !== "complete" || !x.missing.length));
+  $("cTable").innerHTML = `<tr><th>Contract</th><th>Entity</th><th>Library</th><th>Counterparty</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Notice by</th><th>Owner</th><th>Missing</th><th>Attention</th></tr>`
+    + rows.map(x => `<tr>${doc(x)}<td>${cell(x.entity)}</td><td>${cell(x.stage)}</td><td>${cell(x.counterparty)}</td><td>${cell(x.type)}</td>`
+      + `<td>${cell(x.status)}</td><td>${dateCell(x.start)}</td><td>${x.open_ended === true && !x.end ? "Open-ended" : dateCell(x.end, x.days_to_end)}</td>`
+      + `<td>${dateCell(x.notice_deadline, x.days_to_notice)}</td><td>${cell(x.owner)}</td><td>${missing(x)}</td><td>${flags(x)}</td></tr>`).join("");
+  $("cTable").hidden = !rows.length;
+  $("cEmpty").hidden = !!rows.length;
+  $("cEmpty").textContent = all.length ? "No contract matches this selection." : "RHG-KONTRATA holds no contract yet.";
+}
+
+function renderPolicies(){
+  const s = D.summary, all = D.policies;
+  $("pKpis").innerHTML = kpi("Documents", s.policies, "in RHG-Politika")
+    + kpi("Approved", `${s.policies_approved} / ${s.policies}`, "content approval")
+    + kpi("Drafts", s.policies_draft, "version 0.x or status Draft")
+    + kpi("Review overdue", s.policies_overdue, "review date passed")
+    + kpi("Complete", `${s.policies_complete} / ${s.policies}`, "nothing missing");
+  options($("pBrand"), all.map(x => x.brand));
+  const br = $("pBrand").value, st = $("pStage").value;
+  const rows = all.filter(x => (!br || x.brand === br) && (!st || x.stage === st));
+  $("pTable").innerHTML = `<tr><th>Document</th><th>Code</th><th>Brand</th><th>Library</th><th>Version</th><th>Status</th><th>Approval</th><th>Owner</th><th>Review</th><th>Missing</th><th>Attention</th></tr>`
+    + rows.map(x => `<tr>${doc(x)}<td>${cell(x.code)}</td><td>${cell(x.brand)}</td><td>${cell(x.stage)}</td><td>${cell(x.version)}</td>`
+      + `<td>${cell(x.status)}</td><td>${cell(x.approval)}</td><td>${cell(x.owner)}</td><td>${dateCell(x.review)}</td><td>${missing(x)}</td><td>${flags(x)}</td></tr>`).join("");
+  $("pTable").hidden = !rows.length;
+  $("pEmpty").hidden = !!rows.length;
+  $("pEmpty").textContent = all.length ? "No document matches this selection." : "RHG-Politika holds no policy or SOP yet.";
+}
+
+function renderLibraries(){
+  const libs = D.libraries.filter(l => l.kind === VIEW).sort((a, b) => b.files - a.files || a.library.localeCompare(b.library));
+  $("lTable").innerHTML = `<tr><th>Library</th><th>${VIEW === "contracts" ? "Entity" : "Brand"}</th><th>Stage</th><th class="num">Files</th></tr>`
+    + libs.map(l => `<tr><td>${SP.test(l.url || "") ? `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.library)} ↗</a>` : esc(l.library)}</td>`
+      + `<td>${cell(l.owner)}</td><td>${cell(l.stage)}</td><td class="num">${l.files}</td></tr>`).join("");
+}
+
+function render(){
+  document.querySelectorAll(".dc-seg button").forEach(b => { const on = b.dataset.v === VIEW; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
+  $("vContracts").hidden = VIEW !== "contracts";
+  $("vPolicies").hidden = VIEW !== "policies";
+  if (!D) return;
+  if (VIEW === "contracts") renderContracts(); else renderPolicies();
+  renderLibraries();
+}
+
+async function load(refresh){
+  $("pill").className = "pill load"; $("pillText").textContent = "Reading SharePoint…";
+  try {
+    const j = await get("/api/m365/documents" + (refresh ? "?refresh=1" : ""));
+    if (j.available === false) throw new Error(j.error || "SharePoint could not be read");
+    D = j;
+    const at = j.read_at ? new Date(j.read_at).toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"}) : "";
+    $("pill").className = "pill" + (j.stale ? " err" : "");
+    $("pillText").textContent = j.stale ? "Last reading kept" : `Read at ${at}`;
+    $("note").textContent = (j.stale ? j.error + " · " : "") + "Read from SharePoint every 10 minutes with pulse's own app, which may only read RHG-KONTRATA, RHG-Politika and RHG-Home.";
+    render();
+  } catch (e) {
+    $("pill").className = "pill err"; $("pillText").textContent = "Not read";
+    const msg = `<div class="dc-empty">${esc(e.message)}</div>`;
+    if (!D) { $("cKpis").innerHTML = ""; $("cTable").innerHTML = ""; $("cEmpty").hidden = false; $("cEmpty").textContent = e.message; $("lTable").innerHTML = ""; }
+    $("note").innerHTML = msg;
+  }
+}
+
+document.querySelector(".dc-seg").onclick = e => { const b = e.target.closest("[data-v]"); if (b) { VIEW = b.dataset.v; render(); } };
+["cEntity", "cStage", "cShow", "pBrand", "pStage"].forEach(id => $(id).onchange = render);
+$("reload").onclick = () => load(true);
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login?signedout=1";
+};
+(async () => {
+  let s;
+  try { s = await get("/api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
+  const held = p => (me.permissions || []).some(x => x.startsWith(p));
+  const t = $("towers");
+  if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  if (!held("platform.s.actions.")) { const ac = t.querySelector('a[href="/actions"]'); if (ac) ac.remove(); }
+  if (!held("platform.s.executive.")) { const ex = t.querySelector('a[href="/executive"]'); if (ex) ex.remove(); }
+  [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"]]
+    .filter(([p]) => held(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
+  if (!s.m365_docs) {
+    document.querySelector(".dc-seg").remove(); $("vContracts").remove(); $("vPolicies").remove();
+    document.querySelectorAll(".dc-card").forEach(c => c.remove());
+    $("reload").remove(); $("pgExport").remove(); $("pill").remove();
+    $("note").textContent = "Contracts and SOPs are not open to your account.";
+    return;
+  }
+  load();
+})();
+</script>
+<script>
+(() => {
+  const btn = document.getElementById("mnavBtn"), body = document.body;
+  if (!btn) return;
+  const set = open => { body.classList.toggle("mnav-open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  btn.addEventListener("click", () => set(!body.classList.contains("mnav-open")));
+  document.getElementById("mnavBd").addEventListener("click", () => set(false));
+  document.querySelector("aside").addEventListener("click", e => { if (e.target.closest("a")) set(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && body.classList.contains("mnav-open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", () => { if (window.innerWidth > 760) set(false); });
+})();
+</script>
+<script src="/tables.js"></script><!-- sort and filter for every table (identity) -->
+<script src="/notify.js"></script><!-- the bell (identity) -->
+<script src="/gear.js"></script><!-- the way into Settings (identity) -->
+<script src="/pulse.js"></script><!-- reads the tiles and tables for Export (identity) -->
+<script src="/export.js"></script><!-- Export ▾: Excel, PDF or email (identity) -->
+<script>
+document.getElementById("pgExport") && (document.getElementById("pgExport").onclick = () => PulseExport.view(document.querySelector("main"), "Contracts & SOPs"));
+</script>
+</body>
+</html>

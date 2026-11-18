@@ -1941,6 +1941,13 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(200, sharepoint.navigation(force=parse_qs(url.query).get("refresh") == ["1"]))
             return
+        if url.path == "/internal/sharepoint/documents":
+            # identity (Contracts & SOPs): the columns of every contract and policy file, read with the Graph app
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+            else:
+                self._send(200, sharepoint.documents(force=parse_qs(url.query).get("refresh") == ["1"]))
+            return
         if url.path == "/internal/mail/status":
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})
