@@ -164,6 +164,12 @@ PLATFORM = [
         ("mine", "My items", "location", []),
         ("unicorn", "Unicorn's tasks", "company", []),
         ("matrix", "SLA & responsibility matrix", "company", [])]),
+    # Contracts & SOPs (/documents): RHG-KONTRATA and RHG-Politika on SharePoint, by their columns. Confidential: the
+    # Administrator role does not get it by itself (permissions.NOT_FOR_ADMIN); a role gets it only when ticked.
+    ("documents", "Contracts & SOPs", "Platform", "dcTabs", [
+        ("contracts", "Contracts", "company", []),
+        ("policies", "Policies & SOPs", "company", []),
+        ("libraries", "Libraries", "company", [])]),
 ]
 # the parts of Location intelligence (Executive dashboard), as above
 LI_PARTS = ("company_sales", "company_pl", "pl", "bc_sales", "purch_inv")

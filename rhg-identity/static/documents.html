@@ -168,7 +168,7 @@ header{display:flex;justify-content:space-between}
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const SP = /^https:\/\/[^\/]*sharepoint\.com(\/|$)/i;
-const VIEWS = ["contracts", "policies", "libraries"];
+let VIEWS = ["contracts", "policies", "libraries"];          // cut to the tabs the role holds (session)
 let me = null, CSRF = null, D = null, VIEW = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "contracts";
 async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
 const n = v => Pulse.num(v);
@@ -364,7 +364,7 @@ Pulse.on("dcl", id => {
     body: list.length ? Pulse.tiles([{l: "Files", v: n(l.files)}, {l: "Complete", v: `${n(list.filter(x => !x.missing.length).length)} <small>/ ${n(list.length)}</small>`},
         {l: "Need attention", v: n(list.filter(x => x.flags.length).length)}])
       + Pulse.list(l.kind === "contracts" ? C_HEAD : P_HEAD, (l.kind === "contracts" ? cRows : pRows)(order(list)))
-      : `<p class="meta">This library holds no file yet.</p>`});
+      : `<p class="meta">${l.files ? "Its files are in a tab your role does not open." : "This library holds no file yet."}</p>`});
 });
 const C_FIELDS = [["contract_id", "Contract ID"], ["counterparty", "Counterparty"], ["type", "Type"], ["status", "Status"], ["entity", "Entity"], ["scope", "Brand / location"],
   ["start", "Start date", 1], ["end", "End date", 1], ["signed", "Signature date", 1], ["notice_deadline", "Notice deadline", 1], ["notice_period", "Notice period"],
@@ -446,6 +446,13 @@ async function load(refresh){
 
 document.querySelector(".dc-seg").onclick = e => { const b = e.target.closest("[data-v]"); if (b) { VIEW = b.dataset.v; history.replaceState(null, "", "#" + VIEW); render(); } };
 window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== VIEW) { VIEW = v; render(); } });
+// only the tabs the person may open (Roles & permissions → Platform → Contracts & SOPs)
+function holdTabs(tabs){
+  VIEWS = VIEWS.filter(v => tabs.includes(v));
+  document.querySelectorAll(".dc-seg [data-v]").forEach(b => { b.hidden = !VIEWS.includes(b.dataset.v); });
+  if (!VIEWS.includes(VIEW)) VIEW = VIEWS[0];
+  document.querySelector(".dc-seg").hidden = VIEWS.length < 2;
+}
 ["cEntity", "cStage", "cShow", "pBrand", "pStage", "pShow"].forEach(id => $(id).onchange = render);
 let qT = null;
 ["cQ", "pQ"].forEach(id => $(id).oninput = () => { clearTimeout(qT); qT = setTimeout(render, 150); });
@@ -473,6 +480,7 @@ $("logoutBtn").onclick = async () => {
     $("note").textContent = "Contracts and SOPs are not open to your account.";
     return;
   }
+  holdTabs(s.m365_docs_tabs || VIEWS);
   render();
   load();
 })();

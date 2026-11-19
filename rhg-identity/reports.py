@@ -40,7 +40,8 @@ RETRY_MINUTES, MAX_TRIES, LEASE_MINUTES = 20, 3, 60
 MAX_RECIPIENTS = 60
 MAX_EMAILS = 20
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
-NOT_REPORTS = {"finance.s.settings", "purchasing.s.settings"}
+NOT_REPORTS = {"finance.s.settings", "purchasing.s.settings", "platform.s.documents.contracts",
+               "platform.s.documents.policies", "platform.s.documents.libraries"}
 PUBLIC_URL = (config.get("PUBLIC_URL", "https://dashboard.rhg.al") or "").rstrip("/")
 
 

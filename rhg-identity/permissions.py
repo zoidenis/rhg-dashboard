@@ -93,6 +93,11 @@ ACTIONS = {
 for _p, (_label, _kind, _g) in screens.SCREENS.items():
     PERMISSIONS[_p] = _label
 
+# Screens the Administrator role does not hold by itself (contracts are confidential): a role holds them only when
+# they are ticked for it in Roles & permissions; the accounts named in M365_DOCS_USERS keep them as before.
+CONFIDENTIAL = ("platform.s.documents.",)          # never given by a default role or a migration either
+NOT_FOR_ADMIN = {p for p in PERMISSIONS if p.startswith(CONFIDENTIAL)}
+
 
 def effective(perms):
     """What a role really holds: its screens and actions, and the data rights its screens bring."""
@@ -113,7 +118,7 @@ def screens_for_rights(rights):
             continue
         if app == "platform":
             need = set(g) or {"finance.view"}
-        if need and need <= rights:
+        if need and need <= rights and not p.startswith(CONFIDENTIAL):
             out.append(p)
     return out
 
@@ -121,7 +126,7 @@ def screens_for_rights(rights):
 def _s(*prefixes, but=()):
     """The screens under the given prefixes (finance.s.kartela, purchasing.s ...), less those listed in but."""
     return [p for p in screens.SCREENS if any(p == x or p.startswith(x + ".") for x in prefixes)
-            and not any(p == y or p.startswith(y + ".") for y in but)]
+            and not any(p == y or p.startswith(y + ".") for y in but) and not p.startswith(CONFIDENTIAL)]
 
 
 _FIN_ALL = _s("finance.s")
@@ -138,7 +143,7 @@ _PUR_ACT = ["purchasing.export", "purchasing.actions.manage", "purchasing.settin
 DEFAULT_ROLES = {
     "Administrator": {"department": "Management", "system": True,
                       "description": "Everything, including accounts, roles and the audit trail.",
-                      "permissions": list(PERMISSIONS)},
+                      "permissions": [p for p in PERMISSIONS if p not in NOT_FOR_ADMIN]},
     # --- management
     "CEO": {"department": "Management", "system": False,
             "description": "Every screen of both towers and the executive dashboard; Unicorn; read only.",

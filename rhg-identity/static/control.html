@@ -221,7 +221,7 @@ function myLocs(co){
 // Where a person without the control center goes instead: the first screen their role holds.
 function elsewhere(){
   return holds("finance.s.") ? "/finance/" : holds("purchasing.s.") ? "/purchasing/" : holds("platform.s.executive.") ? "/executive"
-    : can("unicorn.use") ? "/unicorn" : can("admin.users.manage") ? "/admin" : null;
+    : holds("platform.s.documents.") ? "/documents" : can("unicorn.use") ? "/unicorn" : can("admin.users.manage") ? "/admin" : null;
 }
 
 // RHG Home on SharePoint: the navigation register (Regjistri Navigimit RHG), read by Purchasing with the Graph app.
@@ -621,7 +621,7 @@ $("logoutBtn").onclick = signOut;
     return;
   }
   shell();
-  if (s.m365_docs) $("towers").insertAdjacentHTML("beforeend", `<a href="/documents">Contracts &amp; SOPs</a>`);
+  if (s.m365_docs && !$("towers").querySelector('a[href="/documents"]')) $("towers").insertAdjacentHTML("beforeend", `<a href="/documents">Contracts &amp; SOPs</a>`);
   if (can("purchasing.view")) {
     try {
       const c = await get("/purchasing/api/companies");

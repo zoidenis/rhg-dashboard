@@ -163,7 +163,7 @@ def _seed_roles(conn):
     # catalogue after it was stored.
     for r in conn.execute("SELECT name, permissions FROM roles WHERE system=1").fetchall():
         held = json.loads(r["permissions"] or "[]")
-        missing = [p for p in permissions.PERMISSIONS if p not in held]
+        missing = [p for p in permissions.PERMISSIONS if p not in held and p not in permissions.NOT_FOR_ADMIN]
         if missing:
             conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + missing), r["name"]))
 

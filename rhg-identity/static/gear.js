@@ -56,9 +56,19 @@
     a.addEventListener("click", () => { a.href = "/settings?from=" + encodeURIComponent(location.pathname + location.search + location.hash); });
     return a;
   }
+  // Contracts & SOPs in the side menu of every page, for whoever may open it (Roles & permissions, or M365_DOCS_USERS)
+  function docsLink(s) {
+    const t = document.querySelector("aside .towers, aside #towers");
+    if (!t || !s.m365_docs || t.querySelector('a[href="/documents"]')) return;
+    const a = document.createElement("a");
+    a.href = "/documents"; a.textContent = "Contracts & SOPs";
+    const after = t.querySelector('a[href="/actions"], a[href="/executive"]');
+    if (after && after.nextSibling) t.insertBefore(a, after.nextSibling); else t.appendChild(a);
+  }
   async function start() {
-    let u = null;
-    try { const r = await fetch("/" + "api/session", {credentials: "same-origin"}); u = (await r.json()).user; } catch (e) { return; }
+    let u = null, s = {};
+    try { const r = await fetch("/" + "api/session", {credentials: "same-origin"}); s = await r.json(); u = s.user; } catch (e) { return; }
+    if (u && !u.report) docsLink(s);
     if (!u || u.report || u.must_change || !PERMS.some(p => (u.permissions || []).includes(p))) return;
     if (location.pathname.indexOf("/settings") === 0) return;
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);

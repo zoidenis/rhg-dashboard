@@ -150,12 +150,53 @@ def rhghome(refresh=False):
         return 200, {"available": False, "error": f"Purchasing could not read RHG Home: {str(exc)[:160]}"}
 
 
-def docs_allowed(user):
-    """Contracts & SOPs: pulse reads them with its own app, so SharePoint does not check the person; only the accounts
-    named in M365_DOCS_USERS (usernames, comma separated; for now Fabian Kuka alone, 18 Nov 2026) see them. The
-    username, not the email, which an administrator can change."""
+DOCS_TABS = ("contracts", "policies", "libraries")
+
+
+def docs_tabs(user):
+    """Contracts & SOPs: pulse reads them with its own app, so SharePoint does not check the person. The tabs the person
+    may open: every tab for the accounts named in M365_DOCS_USERS (usernames, comma separated; Fabian Kuka, 18 Nov
+    2026), else those their role holds (Roles & permissions → Platform → Contracts & SOPs, 19 Nov 2026). The files are
+    not split by company or location, so an account whose access is cut to some companies or locations sees none.
+    The username, not the email, which an administrator can change."""
+    if not user:
+        return []
     names = {n.strip().lower() for n in (config.get("M365_DOCS_USERS", "fkuka@rhg.al") or "").split(",") if n.strip()}
-    return bool(user) and str(user.get("username") or "").lower() in names
+    if str(user.get("username") or "").lower() in names:
+        return list(DOCS_TABS)
+    sc = user.get("scope") or auth.ALL_SCOPE
+    if sc.get("companies", "*") != "*" or any(v != "*" for v in (sc.get("locations") or {}).values()):
+        return []
+    held = set(user.get("permissions") or [])
+    return [t for t in DOCS_TABS if f"platform.s.documents.{t}" in held]
+
+
+def docs_allowed(user):
+    return bool(docs_tabs(user))
+
+
+def docs_cut(body, tabs):
+    """The answer of /api/m365/documents with only the tabs the person may open."""
+    if not isinstance(body, dict) or body.get("available") is False:
+        return body
+    out = dict(body)
+    keep = {"contracts"} if "contracts" in tabs else set()
+    keep |= {"policies"} if "policies" in tabs else set()
+    if "contracts" not in keep:
+        out["contracts"] = []
+        out.pop("contracts_site", None)
+    if "policies" not in keep:
+        out["policies"] = []
+        out.pop("policies_site", None)
+    out["libraries"] = list(body.get("libraries") or []) if "libraries" in tabs else []   # names and counts only
+    s = dict(body.get("summary") or {})
+    for k in list(s):
+        if (k.startswith("contracts") or k == "notices_60") and "contracts" not in keep \
+                or k.startswith("policies") and "policies" not in keep:
+            s[k] = 0
+    out["summary"] = s
+    out["tabs"] = list(tabs)
+    return out
 
 
 def m365_documents(refresh=False):
@@ -316,7 +357,8 @@ class Handler(BaseHTTPRequestHandler):
 
             if url.path == "/api/session":
                 u = self._user()
-                self._send(200, {"user": u, "permissions": permissions.PERMISSIONS, "m365_docs": docs_allowed(u)})
+                self._send(200, {"user": u, "permissions": permissions.PERMISSIONS, "m365_docs": docs_allowed(u),
+                                 "m365_docs_tabs": docs_tabs(u)})
                 return
 
             user = self._user()
@@ -372,13 +414,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "Your role cannot schedule reports."}); return
                 self._send(*scope_options_cached())
             elif url.path == "/api/m365/documents":
-                # Contracts & SOPs from SharePoint (columns only; files open in SharePoint), for the named accounts
-                if not docs_allowed(user):
+                # Contracts & SOPs from SharePoint (columns only; files open in SharePoint): the tabs the person holds
+                tabs = docs_tabs(user)
+                if not tabs:
                     self._send(403, {"error": "Contracts and SOPs are not open to your account."}); return
                 refresh = parse_qs(url.query).get("refresh") == ["1"]
                 if refresh:
                     store.audit("m365 documents read again", user["username"], "Contracts & SOPs", {}, self._ip())
-                self._send(*m365_documents(refresh))
+                status, body = m365_documents(refresh)
+                self._send(status, docs_cut(body, tabs))
             elif url.path == "/api/rhghome":
                 # RHG Home on SharePoint: its navigation register, read by Purchasing with the Graph app
                 if not auth.can(user, "m365.home.view"):
