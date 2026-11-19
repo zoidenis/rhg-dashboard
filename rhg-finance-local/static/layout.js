@@ -620,7 +620,30 @@ body.lay-edit main{padding-bottom:190px}
     fixActive();
   }
 
-  // The screen in view must be one the person may open: else the first one they may.
+  // The screen the address asks for (#doccontrol, #transit…), when the person may open it: [menu, tab or null].
+  function asked() {
+    const v = decodeURIComponent((location.hash || "").slice(1));
+    if (!v) return null;
+    const m = S.cat.menus.find(x => x.view === v && menuOk(x) && navBtn(x.view));
+    if (m) return [m, null];
+    for (const x of S.cat.menus) {
+      const t = x.tabs.find(t => t.tab === v && keyOk(t.key, t.kind));
+      if (t && navBtn(x.view)) return [x, t];
+    }
+    return null;
+  }
+  function openAsked(a) {
+    const [m, t] = a, b = navBtn(m.view);
+    S.busy++;
+    if (!b.classList.contains("on")) b.click();
+    const bar = t && m.bar && document.getElementById(m.bar);
+    const tb = bar && bar.querySelector('button[data-t="' + t.tab + '"]');
+    if (tb && !tb.classList.contains("on")) tb.click();
+  }
+
+  // The screen in view must be one the person may open: else the one the address asks for (a link, a scheduled
+  // report), else the first one they may. Without the address first, a link to a screen opened while the page was
+  // still on its default screen went to the first screen of the menu (Transfers in transit → Sales, 19 Nov 2026).
   function fixActive() {
     if (!S.cat || S.busy > 6) return;
     const on = document.querySelector("#nav button.on");
@@ -628,8 +651,12 @@ body.lay-edit main{padding-bottom:190px}
     const m = view && S.cat.menus.find(x => x.view === view);
     if (!m) return;                                     // a screen outside the catalogue (Users)
     if (!menuOk(m)) {
-      const f = S.cat.menus.find(x => menuOk(x) && navBtn(x.view));
-      if (f) { S.busy++; navBtn(f.view).click(); }
+      const a = asked();
+      if (a && a[0] !== m) openAsked(a);
+      else {
+        const f = S.cat.menus.find(x => menuOk(x) && navBtn(x.view));
+        if (f) { S.busy++; navBtn(f.view).click(); }
+      }
     } else if (m.bar) {
       const bar = document.getElementById(m.bar);
       const cur = bar && bar.querySelector("button.on");
