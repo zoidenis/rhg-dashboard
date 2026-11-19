@@ -213,7 +213,9 @@ def _mailbox(sender):
 
 def send(msg, sender):
     """Send an email.message.EmailMessage from the mailbox `sender`."""
-    raw = base64.b64encode(msg.as_bytes())
+    # MIME lines end in CRLF (RFC 5322). Python writes bare LF by default; Exchange then reads a quoted-printable
+    # soft break "=\n" wrongly and the HTML of the email shows "=" in place of a letter every ~76 characters.
+    raw = base64.b64encode(msg.as_bytes(policy=msg.policy.clone(linesep="\r\n")))
     if len(raw) <= MIME_LIMIT:
         r = _call("POST", _mailbox(sender) + "/sendMail", data=raw, headers={"Content-Type": "text/plain"})
         if r.status_code != 202:

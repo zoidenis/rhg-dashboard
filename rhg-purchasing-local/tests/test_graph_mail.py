@@ -166,6 +166,18 @@ class GraphMail(unittest.TestCase):
         self.assertEqual(sent["Subject"], "Fatura pa PO")
         self.assertEqual(sent["Cc"], "c@rhg.al")
 
+    def test_mime_lines_end_in_crlf(self):
+        # bare LF made Exchange show "=" in place of letters in quoted-printable bodies (pulse@rhg.al, 19 Nov 2026)
+        self.request.return_value = response(202)
+        msg = self.message()
+        msg.get_body(("html",)).set_content("<p>Përshëndetje " + "Executive Action Center " * 20 + "</p>", subtype="html")
+        graph_mail.send(msg, SENDER)
+        raw = base64.b64decode(self.request.call_args.kwargs["data"])
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))
+        self.assertIn(b"=\r\n", raw)                                     # soft breaks are CRLF
+        sent = email.message_from_bytes(raw, policy=policy.default)
+        self.assertIn("Executive Action Center " * 20, sent.get_body(("html",)).get_content())
+
     def test_refusal_explains_missing_mailbox_rights(self):
         self.request.return_value = response(403, {"error": {"code": "ErrorAccessDenied", "message": "Access is denied."}})
         with self.assertRaisesRegex(RuntimeError, "ErrorAccessDenied.*Exchange role assignment"):
