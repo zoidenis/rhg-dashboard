@@ -143,7 +143,7 @@ def build(client, company, latest_fn, parallel_fn, progress=None, today=None):
     b = today - timedelta(days=1)
     days = _days(b - timedelta(days=int(P["days"]) - 1), b)
     reg = [r for r in locintel.registry(settings) if (r.get("company") or "").upper() == (company or "").upper()
-           and r.get("ref") and (r.get("dept") or r.get("bc"))]
+           and r.get("ref") and (r.get("dept") or r.get("bc")) and not locintel.is_franchise(r)]   # a franchise posts nothing in BC
     if not reg:
         raise ValueError(f"No restaurant of {company} has a Simphony reference and a department in Settings → "
                          "Location intelligence.")

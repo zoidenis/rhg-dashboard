@@ -300,6 +300,13 @@ def sync(source, company, findings, locations=None, actor="control run", in_scop
     return {"found": len(findings), "opened": opened, "closed": closed, "reopened": reopened}
 
 
+def companies_of(source):
+    """The companies with active items of a source."""
+    with _lock:
+        return [r[0] for r in _db().execute("SELECT DISTINCT company FROM ex WHERE source=? AND status IN (?,?,?)",
+                                            (source, *ACTIVE)).fetchall()]
+
+
 def retire(source, company, test, note, actor="control run"):
     """Closes the active items of a source that test(item) says the control no longer reads (an invoice posted
     before its window, a price rise of a month gone): not verified by the data, so the note says why."""

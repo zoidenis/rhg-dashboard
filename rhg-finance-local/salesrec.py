@@ -117,11 +117,12 @@ def _dates(a, b):
 def restaurants(company, settings=None):
     """The registry rows of a company whose POS sales are invoiced to a customer."""
     return [r for r in locintel.registry(settings) if (r.get("company") or "").upper() == (company or "").upper()
-            and r.get("customer")]
+            and r.get("customer") and not locintel.is_franchise(r)]                  # a franchise posts nothing in BC
 
 
 def companies(settings=None):
-    return sorted({r["company"] for r in locintel.registry(settings) if r.get("company") and r.get("customer")})
+    return sorted({r["company"] for r in locintel.registry(settings) if r.get("company") and r.get("customer")
+                   and not locintel.is_franchise(r)})
 
 
 # ---------------------------------------------------------------- reads

@@ -1908,11 +1908,59 @@ def register_finance_rules(company, actor="control run"):
     return out
 
 
+# The controls that expect a restaurant's sales and takings posted in RHG's BC (and fiscalized under RHG's NUIS)
+FRANCHISE_SOURCES = ("receipts_rec", "sales_rec", "billy_rec")
+FRANCHISE_NOTE = "Franchise: its sales and takings are not posted in RHG's BC (Settings → Location intelligence, ownership=franchise)."
+
+
+def franchise_mark():
+    """Once (Geri, 19 Nov 2026): OPA Shkodër is a franchise. A registry saved in Settings before ownership existed gets
+    "ownership=franchise" on the OPA_SK line; data/franchise_marked.json remembers it, so a change made later in
+    Settings stays as it is."""
+    flag = store.DATA_DIR / "franchise_marked.json"
+    if flag.exists():
+        return False
+    text = (store.get_settings().get("locations") or {}).get("registry") or ""
+    changed = False
+    if text.strip():
+        lines = []
+        for line in text.split("\n"):
+            ref = line.split("|", 1)[0].strip().upper()
+            if ref == "OPA_SK" and "ownership=" not in line.replace(" ", "").lower():
+                line = line.rstrip() + " | ownership=franchise"
+                changed = True
+            lines.append(line)
+        if changed:
+            store.save_settings({"locations": {"registry": "\n".join(lines)}}, actor="pulse")
+    flag.write_text(json.dumps({"at": datetime.now().isoformat(timespec="seconds"), "registry_changed": changed}))
+    return changed
+
+
+def franchise_retire():
+    """Closes the open items of the controls above that belong to a franchise (by its code, department or name):
+    a franchise posts nothing in RHG's BC, so they are not exceptions. Runs at start and with every control run."""
+    codes = locintel.franchise_codes()
+    if not codes:
+        return 0
+    n = 0
+    for src in FRANCHISE_SOURCES:
+        for company in exreg.companies_of(src):
+            n += exreg.retire(src, company, lambda x: (x.get("location") or "").strip().upper() in codes,
+                              FRANCHISE_NOTE, actor="pulse")
+    return n
+
+
 def register_controls(actor="scheduler", force=False):
     """The daily control run: every company of the negative stock email, read once a day (the 07:30 email has
     usually read it already), the sales reconciliation Simphony ↔ BC of every company with restaurants, and
     Simphony ↔ Billy of every company with a Billy account."""
     out = []
+    try:
+        gone = franchise_retire()
+        if gone:
+            out.append({"control": "franchise", "status": f"{gone} items of franchises closed"})
+    except Exception:                                               # noqa: BLE001
+        traceback.print_exc()
     try:
         known = {c.upper() for c in client.companies()}
     except Exception:                                               # noqa: BLE001
@@ -4894,6 +4942,15 @@ def main():
             print(f"Exceptions register: {moved} actions of the Action center moved in.")
     except Exception:                                               # noqa: BLE001
         traceback.print_exc()
+    def _franchise():
+        try:
+            franchise_mark()
+            n = franchise_retire()
+            if n:
+                print(f"Exceptions register: {n} items of franchises closed (not posted in RHG's BC).")
+        except Exception:                                           # noqa: BLE001
+            traceback.print_exc()
+    threading.Timer(20, _franchise).start()
     exreg.start(register_controls)
     billyrec.start(_latest)                 # Simphony ↔ Billy: the daily read before the 08:00 reports
     brandrep.start()

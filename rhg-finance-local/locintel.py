@@ -40,7 +40,7 @@ OPA_9KAT | OPA 9 Katëshet       | brand=OPA         | company=SALT | bc=OPA 9KA
 OPA_A    | OPA Arena            | brand=OPA         | company=SALT | bc=OPA3       | customer=OPA3     | area=Arena Center     | map=63,52
 OPA_TE   | OPA TEG              | brand=OPA         | company=SALT | bc=OPA TEG    | customer=OPA TEG  | area=Tirana East Gate | map=84,80
 OPA_Q    | OPA QTU              | brand=OPA         | company=SALT | bc=OPA QTU    | customer=OPA QTU  | area=QTU, Kashar      | map=14,40
-OPA_SK   | OPA Shkodër          | brand=OPA         | company=SALT | bc=OPASHKODER | customer=         | area=Shkodër          | region=Shkodër | dept=OPA SHKODER
+OPA_SK   | OPA Shkodër          | brand=OPA         | company=SALT | bc=OPASHKODER | customer=         | area=Shkodër          | region=Shkodër | dept=OPA SHKODER | ownership=franchise
 OPA_RK   | OPA Rruga e Kavajës  | brand=OPA         | company=SALT | bc=           | customer=         | area=Rr. e Kavajës    | dept=OPA2
 SALT_GC  | SALT Green Coast     | brand=SALT        | company=SALT | bc=SALT GC    | customer=SALT GC  | area=Palasë           | seasonal
 SIN      | SIN GC               | brand=SIN         | company=SALT | bc=SIN        | customer=SIN      | area=Palasë           | seasonal
@@ -65,6 +65,18 @@ def registry(settings=None, inactive=False):
     (RHG otherwise)."""
     rows = _registry(settings)
     return rows if inactive else [r for r in rows if not r["inactive"]]
+
+
+def is_franchise(r):
+    """A franchise (ownership=franchise in the registry): its sales and takings are not posted in RHG's BC and it
+    fiscalizes under its own NUIS, so the controls that expect RHG's postings leave it out (Geri, 19 Nov 2026)."""
+    return (r.get("ownership") or "").lower() == "franchise"
+
+
+def franchise_codes(settings=None):
+    """Every code and name of the franchises (Simphony reference, BC location, department, name), upper case."""
+    return {(r.get(k) or "").strip().upper() for r in _registry(settings) if is_franchise(r)
+            for k in ("ref", "bc", "dept", "name")} - {""}
 
 
 def inactive_refs(settings=None):

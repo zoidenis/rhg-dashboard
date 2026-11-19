@@ -588,7 +588,8 @@ def build(company, latest_fn, progress=None, today=None, frm=None, to=None):
     acct = billy.account(company)
     if not acct:
         raise ValueError(f"{company} has no Billy account with a password (Finance → Settings → Billy).")
-    regs = [r for r in restaurants(company, settings) if (r.get("ref") or "").upper() not in S["exclude"]]
+    regs = [r for r in restaurants(company, settings) if (r.get("ref") or "").upper() not in S["exclude"]
+            and not locintel.is_franchise(r)]                        # a franchise fiscalizes under its own NUIS
     yday = today - timedelta(days=1)
     if frm or to:
         days = _dates(*check_range(frm, to, today))
