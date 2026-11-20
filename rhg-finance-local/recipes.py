@@ -41,7 +41,7 @@ ITEM_FIELDS = ("No,Description,Type,Assembly_Policy,Assembly_BOM,Replenishment_S
                "Sales_Unit_of_Measure,Purch_Unit_of_Measure,Costing_Method,Unit_Cost,Standard_Cost,"
                "Last_Direct_Cost,Item_Category_Code,Item_Category_Group_1,Item_Category_Group_2,"
                "Item_Category_Group_3,Item_Category_Group_4,Inventory_Posting_Group,Gen_Prod_Posting_Group,Blocked,"
-               "Last_Date_Modified")
+               "Last_Date_Modified,VAT_Prod_Posting_Group")
 STATUSES = ("VALID", "MISSING", "INCOMPLETE", "INACTIVE", "PENDING REVIEW", "NOT REQUIRED")
 
 _lock = threading.Lock()

@@ -5,14 +5,21 @@ Sources
   * Simphony Reporting and Analytics, getMenuItemDailyTotals, one call per location and business day: items
     sold and sales by menu item (sales less the VAT, before discounts; item discounts apart), kept in
     data/menu_items.db (closed days are never read again). getMenuItemDimensions gives names and groups.
-  * Business Central, the item cards and Assembly BOMs of the company of each location (recipes.master): the
-    Simphony menu item number is the BC item number (the POS import posts it as ItemNo). The cost of a portion:
-      - the recipe: quantity per × unit conversion × the component's unit cost, for an item with a BOM;
+  * Business Central, the item cards and Assembly BOMs of the company of each location (recipes.master). The BC item
+    of a menu item is the one the POS import posts for it (MIDSimphonyArchive: Menu_Item_Number → ItemNo, e.g.
+    10025002 Chicken Gyros → A2405); else the item with the menu item number. The cost of a portion (Geri, 20 Nov
+    2026):
+      - an item with a recipe (Assembly BOM): its Standard Cost on the item card (BC rolls the BOM up into it);
+        without a Standard Cost, the recipe at today's unit costs (quantity per × unit conversion × unit cost);
       - the item's unit cost, for an item sold as bought (bottles, soft drinks);
       - else the preparation cost Simphony holds; else none ("No cost").
+  * The menu price: the item's price in Simphony EMC (getMenuItemPrices: the lowest price level with a real price,
+    the most common across revenue centres), VAT included; without VAT at the VAT % of the BC item (its VAT Prod.
+    Posting Group, e.g. TVSH20). The margin is taken on it; the average price received is shown beside it.
 Method, within each menu section (Simphony family group, or major group):
   * popularity: the item's share of the section's items sold (menu mix) against 70% of an equal share (1 / items);
-  * contribution margin = average net price − portion cost, against the section's average margin weighted by
+  * contribution margin = the EMC menu price without VAT (else the average price received) − portion cost,
+    against the section's average margin weighted by
     items sold;
   * Star (popular, high margin), Plowhorse (popular, low margin), Puzzle (high margin, sold little), Dog (low
     margin, sold little). Items with no cost are ranked by popularity only; items sold at no price and POS
@@ -21,10 +28,13 @@ A brand or all of RHG sums its locations by menu item; locations in another curr
 rates of Settings. Nothing is written to Simphony or Business Central.
 """
 import io
+import json
+import re
 import sqlite3
 import threading
 import time
 import traceback
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 
@@ -146,7 +156,9 @@ def vat_by_item(ref, a, b):
 
 # ---------------------------------------------------------------- costs from Business Central
 def _coster(m):
-    """cost(item) -> (unit cost or None, basis) from a recipes.master."""
+    """cost(item) -> (unit cost or None, basis) from a recipes.master. An item with a recipe costs its Standard Cost
+    (the BOM rolled up by BC), else the recipe at today's unit costs. cost.recipe(item) -> the recipe at today's unit
+    costs or None; cost.card(item) -> the item card or None."""
     items = m.get("items") or {}
     uom = {(it, code): per for it, code, per in m.get("uom") or []}
     lines = {}
@@ -163,22 +175,90 @@ def _coster(m):
             return memo[item]
         comps = [x for x in lines.get(item) or [] if x[0] == "Item"]
         if comps:
-            total, ok = 0.0, True
-            for _t, no, qty, unit in comps:
-                comp = items.get(no) or {}
-                base = str(comp.get("Base_Unit_of_Measure") or "").upper()
-                per = 1.0 if not unit or unit == base else uom.get((no, unit))
-                uc = float(comp.get("Unit_Cost") or 0)
-                if not comp or not per or per <= 0 or qty <= 0 or uc <= 0:
-                    ok = False
-                if per and per > 0:
-                    total += qty * per * uc
+            std = float(card.get("Standard_Cost") or 0)
+            if std > 0:
+                memo[item] = (round(std, 2), "Standard cost (Assembly BOM)")
+                return memo[item]
+            total, ok = recipe(item)
             memo[item] = (round(total, 2), "Recipe" if ok else "Recipe, incomplete") if total > 0 else (None, "Recipe without cost")
             return memo[item]
         uc = float(card.get("Unit_Cost") or 0)
         memo[item] = (uc, "Item cost") if uc > 0 else (None, "No recipe, no cost")
         return memo[item]
+
+    def recipe(item):
+        """(the recipe at today's unit costs, every component costed) of an item with a BOM; (0, False) without."""
+        total, ok = 0.0, True
+        comps = [x for x in lines.get(item) or [] if x[0] == "Item"]
+        for _t, no, qty, unit in comps:
+            comp = items.get(no) or {}
+            base = str(comp.get("Base_Unit_of_Measure") or "").upper()
+            per = 1.0 if not unit or unit == base else uom.get((no, unit))
+            uc = float(comp.get("Unit_Cost") or 0)
+            if not comp or not per or per <= 0 or qty <= 0 or uc <= 0:
+                ok = False
+            if per and per > 0:
+                total += qty * per * uc
+        return total, ok and bool(comps)
+    cost.recipe = lambda item: (round(recipe(item)[0], 2) or None) if lines.get(item) else None
+    cost.card = lambda item: items.get(item)
     return cost
+
+
+def vat_pct(card):
+    """The VAT % of a BC item from its VAT Prod. Posting Group (TVSH20 → 20, TVSH0 → 0); None when it names none."""
+    m = re.search(r"(\d+(?:[.,]\d+)?)", str((card or {}).get("VAT_Prod_Posting_Group") or ""))
+    return float(m.group(1).replace(",", ".")) if m else None
+
+
+# the BC item the POS import posts for each menu item, by company: {company: {"at", "map": {menu item: BC item}}}
+_bcmap, MAP_FILE, MAP_TTL = {}, store.DATA_DIR / "menu_bc_map.json", 6 * 3600
+
+
+def bc_map(client, company, a, b):
+    """{menu item number: BC item number} as the POS import posts them (MIDSimphonyArchive, the period read), on top
+    of what earlier reads found (kept in data/menu_bc_map.json, so a day not imported yet keeps its item)."""
+    hit = _bcmap.get(company)
+    if hit and time.time() - hit["at"] < MAP_TTL and hit.get("span") == (a, b):
+        return hit["map"]
+    try:
+        held = json.loads(MAP_FILE.read_text()) if MAP_FILE.exists() else {}
+    except (OSError, ValueError):
+        held = {}
+    m = dict(held.get(company) or {})
+    rows = client._get_all(client._url(company, config.E_POS_ARCHIVE), {
+        "$filter": f"TransactionDateArch ge {a} and TransactionDateArch le {b}",
+        "$select": "Menu_Item_Number,ItemNo,TransactionDateArch"}, page_size=5000)
+    last = {}
+    for r in rows:
+        mi, it = str(r.get("Menu_Item_Number") or "").strip(), str(r.get("ItemNo") or "").strip()
+        d = str(r.get("TransactionDateArch") or "")[:10]
+        if mi and it and d >= last.get(mi, ""):
+            last[mi] = d
+            m[mi] = it
+    held[company] = m
+    try:
+        MAP_FILE.write_text(json.dumps(held))
+    except OSError:
+        pass
+    _bcmap[company] = {"at": time.time(), "span": (a, b), "map": m}
+    return m
+
+
+def emc_prices(ref):
+    """{menu item: (the EMC price for the report, the lowest real price)} of a location, VAT included: the lowest
+    price level with a real price, the most common across revenue centres; prices of 1 or less are placeholders."""
+    by = {}
+    for r in simphony.menu_item_prices(ref):
+        p = r.get("price")
+        if p is not None and float(p) > 1:
+            by.setdefault(r["num"], []).append((r.get("level"), float(p)))
+    out = {}
+    for num, rs in by.items():
+        lv = min((lvl for lvl, _p in rs if lvl is not None), default=None)
+        ps = [p for lvl, p in rs if lvl == lv] or [p for _l, p in rs]
+        out[num] = (Counter(ps).most_common(1)[0][0], min(p for _l, p in rs))
+    return out
 
 
 def priced_shares(ref, a, b, prices=None):
@@ -265,7 +345,7 @@ def build(periods, latest_fn, client, refs=None, progress=None):
     for ref, mi, net, qty, disc, prep, rtn in q:
         sold.setdefault(ref, []).append((mi, net or 0, qty or 0, disc or 0, prep or 0, rtn or 0))
     technical = recipes.technical_matcher(settings)
-    masters, costers = {}, {}
+    masters, costers, maps = {}, {}, {}
     out_locs, rows = [], {}
     for l in locs:
         ref = l["locRef"]
@@ -279,6 +359,11 @@ def build(periods, latest_fn, client, refs=None, progress=None):
                 traceback.print_exc()
                 errors.append(f"BC item cards and recipes of {company} could not be read: {str(exc)[:160]}")
                 costers[company] = lambda it: (None, "BC not read")
+            try:
+                maps[company] = bc_map(client, company, c_from.isoformat(), c_to.isoformat())
+            except Exception as exc:                               # noqa: BLE001
+                maps[company] = {}
+                errors.append(f"The BC items of the menu items (POS import of {company}) could not be read: {str(exc)[:140]}")
         try:
             names = simphony.menu_items(ref)
         except Exception as exc:                                   # noqa: BLE001
@@ -288,18 +373,33 @@ def build(periods, latest_fn, client, refs=None, progress=None):
                          "company": company, "bc": rg.get("bc") or "",
                          "currency": rg.get("currency") or locintel.norm_currency(l.get("currency")) or fallback})
         lst = []
-        shares = priced_shares(ref, c_from.isoformat(), c_to.isoformat())
+        try:
+            prices = emc_prices(ref)
+        except Exception as exc:                                   # noqa: BLE001
+            prices = {}
+            errors.append(f"{ref}: menu item prices (EMC): {str(exc)[:120]}")
+        shares = priced_shares(ref, c_from.isoformat(), c_to.isoformat(), prices={k: v[1] for k, v in prices.items()})
+        coster, bmap = costers[company], maps.get(company) or {}
+        card_of, recipe_of = getattr(coster, "card", lambda it: None), getattr(coster, "recipe", lambda it: None)
         for mi, net, qty, disc, prep, rtn in sold.get(ref, []):
             nm = names.get(mi) or {}
             if nm.get("excluded") or (qty <= 0 and abs(net) < 0.01):
                 continue
             name = nm.get("name") or f"Item {mi}"
-            uc, basis = costers[company](str(mi))
+            bc = bmap.get(str(mi)) or str(mi)                     # the BC item the POS import posts for it
+            uc, basis = coster(bc)
+            card = card_of(bc)
+            vat = vat_pct(card)
+            emc = (prices.get(mi) or (None, None))[0]
             if uc is None and prep > 0 and qty > 0:
                 uc, basis = prep / qty, "Simphony prep cost"
             lst.append({"mi": mi, "name": name, "major": nm.get("major") or "Other", "family": nm.get("family") or "Other",
                         "qty": qty, "net": net, "disc": disc, "rtn": rtn, "unit_cost": uc, "basis": basis,
                         "priced_share": round(shares.get(mi, 1.0), 4),
+                        "bc_item": bc if card else "", "emc": emc, "vat": vat,
+                        "emc_ex": round(emc / (1 + vat / 100), 4) if emc and vat is not None else None,
+                        "std_cost": round(float(card.get("Standard_Cost") or 0), 2) if card else None,
+                        "recipe_cost": recipe_of(bc),
                         "technical": bool(technical(str(mi), name))})
         rows[ref] = lst
     return {"period": {"from": c_from.isoformat(), "to": c_to.isoformat(), "label": label, "days": len(days)},
@@ -429,7 +529,8 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                     continue
                 a = agg.setdefault(r["mi"], {"mi": r["mi"], "name": r["name"], "major": r["major"], "family": r["family"],
                                              "qty": 0.0, "net": 0.0, "disc": 0.0, "rtn": 0.0, "costq": 0.0, "costv": 0.0,
-                                             "combo_qty": 0.0, "combo_cost": 0.0,
+                                             "combo_qty": 0.0, "combo_cost": 0.0, "emcv": 0.0, "emcvi": 0.0,
+                                             "emcq": 0.0, "emc_set": set(), "bc": set(), "std": None, "recipe": None,
                                              "bases": set(), "locations": set()})
                 # units rung at no price inside a combo meal are apart: the price, popularity and margin of the item
                 # are those of the units sold at a price; their cost is shown apart (it belongs to the combo)
@@ -437,6 +538,18 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                 q, cq_ = r["qty"] * share, r["qty"] * (1 - share)
                 a["qty"] += q
                 a["combo_qty"] += cq_
+                if r.get("bc_item"):
+                    a["bc"].add(r["bc_item"])
+                if r.get("std_cost") and a["std"] is None:
+                    a["std"] = r["std_cost"] * f
+                if r.get("recipe_cost") and a["recipe"] is None:
+                    a["recipe"] = r["recipe_cost"] * f
+                if r.get("emc"):
+                    a["emc_set"].add(round(r["emc"] * f, 2))
+                if r.get("emc_ex"):                                  # the EMC price without VAT, for the margin
+                    a["emcv"] += r["emc_ex"] * q * f
+                    a["emcvi"] += r["emc"] * q * f
+                    a["emcq"] += q
                 if r["unit_cost"] is not None:
                     a["combo_cost"] += r["unit_cost"] * cq_ * f
                 a["net"] += r["net"] * f
@@ -454,7 +567,9 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                     combo_only.append({"mi": a["mi"], "name": a["name"], "section": a[sec_key],
                                        "combo_qty": round(a["combo_qty"], 2), "combo_cost": round(a["combo_cost"], 0)})
                 continue
-            price = a["net"] / a["qty"]
+            avg = a["net"] / a["qty"]
+            emc_ok = a["emcq"] >= a["qty"] * 0.999 and a["emcq"] > 0
+            price = a["emcv"] / a["emcq"] if emc_ok else avg              # the menu price of EMC, else as received
             cost = a["costv"] / a["costq"] if a["costq"] >= a["qty"] * 0.999 and a["costq"] > 0 else None
             basis = sorted(a["bases"])
             it = {"mi": a["mi"], "name": a["name"], "major": a["major"], "family": a["family"],
@@ -462,7 +577,14 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                   "disc": round(a["disc"], 0), "rtn": a["rtn"], "cost": round(cost, 2) if cost is not None else None,
                   "basis": basis[0] if len(basis) == 1 else ", ".join(basis),
                   "locations": sorted(a["locations"]),
-                  "combo_qty": round(a["combo_qty"], 2), "combo_cost": round(a["combo_cost"], 0)}
+                  "combo_qty": round(a["combo_qty"], 2), "combo_cost": round(a["combo_cost"], 0),
+                  "price_source": "EMC" if emc_ok else "Average received",
+                  "avg_price": round(avg, 2),
+                  "emc_incl": round(a["emcvi"] / a["emcq"], 2) if emc_ok else None,
+                  "emc_range": [min(a["emc_set"]), max(a["emc_set"])] if a["emc_set"] else None,
+                  "bc_item": ", ".join(sorted(a["bc"])),
+                  "std_cost": round(a["std"], 2) if a["std"] is not None else None,
+                  "recipe_cost": round(a["recipe"], 2) if a["recipe"] is not None else None}
             it["cm"] = round(price - cost, 2) if cost is not None else None
             it["cm_total"] = round(it["cm"] * a["qty"], 0) if cost is not None else None
             it["cost_pct"] = round(cost / price * 100, 1) if cost is not None and price > 0 else None
@@ -494,6 +616,8 @@ def analyse(ds, level="all", key="", section="family", settings=None):
             flags.append(f"Item discounts {it['disc_pct']:.0f}% of sales")
         if it["rtn"]:
             flags.append(f"{it['rtn']:.0f} returned")
+        if it["price_source"] != "EMC":
+            flags.append("No price in EMC (or no VAT % on its BC item): margin on the average price received")
         if it["combo_qty"]:
             flags.append(f"{it['combo_qty']:.0f} more rung inside combo meals at no price: left out of its price and margin")
         it["flags"] = flags
@@ -567,7 +691,8 @@ def analyse(ds, level="all", key="", section="family", settings=None):
             "locations": [{"ref": L["ref"], "name": L["name"], "brand": L["brand"]} for L in locs],
             "definitions": dict(DEFINITIONS, method=(
                 f"Within each menu section (family group, or major group): popularity = the item's share of the items sold "
-                f"in the section against {S['pop']:g}% of an equal share; contribution margin = average net price − portion "
+                f"in the section against {S['pop']:g}% of an equal share; contribution margin = the EMC menu price "
+                f"without VAT (else the average price received) − portion "
                 f"cost against the section's average margin "
                 + ("weighted by items sold" if S["margin"] == "weighted" else "of its items, each counted once")
                 + ". Star = popular and high margin; Plowhorse = popular, low margin; Puzzle = high margin, sold little; "
@@ -578,11 +703,16 @@ DEFINITIONS = {
     "sales": "Items sold and sales by menu item from Simphony (getMenuItemDailyTotals), sales less the VAT and before "
              "discounts; item discounts are shown apart. The period of the filters, to the last business day Simphony "
              "has closed.",
-    "cost": "Portion cost from Business Central (the Simphony menu item number is the BC item number): the recipe "
-            "(Assembly BOM: quantity per × unit conversion × the component's unit cost), or the item's unit cost for an "
-            "item sold as bought; else the preparation cost Simphony holds. Estimated: unit costs, not the posted cost.",
+    "cost": "Portion cost from Business Central, on the BC item the POS import posts for the menu item "
+            "(MIDSimphonyArchive), else the item with the menu item number: for an item with a recipe (Assembly BOM) "
+            "its Standard Cost, else the recipe at today's unit costs (quantity per × unit conversion × unit cost); "
+            "the item's unit cost for an item sold as bought; else the preparation cost Simphony holds.",
+    "price": "The price is the menu price set in Simphony EMC (getMenuItemPrices, VAT included), without VAT at the "
+             "VAT % of the BC item; the average price received (net sales / items sold) is shown beside it and used "
+             "when EMC has no price.",
     "method": "Within each menu section (family group, or major group): popularity = the item's share of the items "
-              "sold in the section against 70% of an equal share; contribution margin = average net price − portion "
+              "sold in the section against 70% of an equal share; contribution margin = the EMC menu price without VAT "
+              "(else the average price received) − portion "
               "cost against the section's average margin weighted by items sold. Star = popular and high margin; "
               "Plowhorse = popular, low margin; Puzzle = high margin, sold little; Dog = low margin, sold little.",
     "combos": "A menu item rung inside a combo meal is at no price (the combo item carries the price, and BC holds no "
@@ -596,6 +726,64 @@ DEFINITIONS = {
 
 
 # ---------------------------------------------------------------- Excel
+def columns_explained(C, S):
+    """(column, how it is worked out) of the Items sheet, for its Read me."""
+    pop = S.get("pop", 70)
+    return [
+        ("Menu item", "the Simphony menu item number (EMC)."),
+        ("BC item", "the Business Central item the POS import posts for the menu item (MIDSimphonyArchive: Menu Item "
+                    "Number → Item No.); blank when BC has no item for it. Its card, recipe and VAT % are used."),
+        ("Section / Major group / Family group", "the Simphony groups of the menu item; the section is the family "
+                                                 "group (or the major group, as chosen on the screen)."),
+        ("Class", f"Star, Plowhorse, Puzzle or Dog within its section: popular when its Menu mix % is at least the "
+                  f"section's Popularity line % ({pop:g}% of an equal share = {pop:g}% × 100 / items of the section); "
+                  "a high margin when its Margin is at least the section's average margin (weighted by items sold, "
+                  "or simple, as set in the Parameters). No cost = no portion cost in BC: ranked by popularity only."),
+        ("Items sold", "units sold at a price in the period (Simphony getMenuItemDailyTotals, slsCnt), all the "
+                       "locations of the selection; units rung inside combo meals at no price are not in it."),
+        ("In combos at no price", "units rung inside combo meals at no price = units sold − its sales VAT included "
+                                  "/ its lowest real EMC price (never below 0)."),
+        ("Menu mix %", "Items sold of the item / Items sold of every item of its section × 100."),
+        (f"Net sales {C}", "sales without VAT, before item discounts (Simphony slsTtl − VAT), of the period."),
+        (f"EMC price incl. VAT {C}", "the menu price set in Simphony EMC (getMenuItemPrices): the lowest price level "
+                                     "with a real price (above 1), the most common across revenue centres; for "
+                                     "several locations, weighted by the units each sold."),
+        ("EMC prices differ by location", "the lowest and the highest EMC price when the locations differ."),
+        (f"EMC price excl. VAT {C}", "EMC price incl. VAT / (1 + VAT % of the BC item, from its VAT Prod. Posting "
+                                     "Group, e.g. TVSH20 = 20%)."),
+        (f"Avg price received {C}", "Net sales / Items sold: what came in per unit (after combos, before item discounts)."),
+        ("Price used", "EMC when every unit has an EMC price and a VAT %; else Average received."),
+        (f"Portion cost {C}", "the cost of one portion, by the Cost basis."),
+        ("Cost basis", "Standard cost (Assembly BOM) = the Standard Cost of the BC item card for an item with a recipe "
+                       "(BC rolls the BOM up into it); Recipe / Recipe, incomplete = without a Standard Cost, the BOM "
+                       "at today's unit costs (incomplete: a component without cost or unit conversion); Item cost = "
+                       "the unit cost of an item sold as bought; Simphony prep cost; Not in BC; No recipe, no cost."),
+        (f"Standard cost (BC) {C}", "the Standard Cost field of the BC item card."),
+        (f"Recipe at today's unit costs {C}", "Σ over the BOM lines of quantity per × unit conversion × the "
+                                              "component's unit cost today, to compare with the Standard Cost."),
+        ("Cost %", "Portion cost / price used × 100."),
+        (f"Margin {C}", "price used − Portion cost (contribution margin of one unit)."),
+        (f"Total margin {C}", "Margin × Items sold."),
+        (f"Item discounts {C}", "item discounts without VAT (Simphony dscTtl − dscVatTtl), shown apart."),
+        ("Locations", "the Simphony locations (locRef) that sold the item in the period."),
+        ("Operations / Sales", "what to do by its class."),
+        ("Flags", "cost above the target, recipe incomplete, no BC item, discounts above the limit, returns, units in "
+                  "combos, no EMC price."),
+    ]
+
+
+def sections_explained(C, S):
+    return [
+        ("Items / Items sold / Net sales", "the items of the section with a price, their units sold and sales."),
+        (f"Total margin {C}", "Σ Total margin of its items with a cost."),
+        ("Cost %", "Σ (Portion cost × Items sold) / Σ Net sales of its items with a cost × 100."),
+        (f"Avg margin {C}", "the section's average margin: Σ (Margin × Items sold) / Σ Items sold of its items with a "
+                            "cost (or the simple mean, as set in the Parameters)."),
+        ("Popularity line %", f"{S.get('pop', 70):g}% × 100 / items of the section."),
+        ("Stars … No cost", "the items of each class."),
+    ]
+
+
 def render_xlsx(r):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -624,15 +812,25 @@ def render_xlsx(r):
         return ws
     L = dict(LABEL, noprice="No price")
     C = r["currency"]
-    sheet("Items", ["Menu item", "Name", "Section", "Major group", "Family group", "Class", "Items sold", "Menu mix %",
-                    f"Net sales {C}", f"Avg price {C}", f"Portion cost {C}", "Cost basis", "Cost %", f"Margin {C}",
-                    f"Total margin {C}", f"Item discounts {C}", "Locations", "Operations", "Sales", "Flags"],
-          [[it["mi"], it["name"], it["section"], it["major"], it["family"], L.get(it["cls"], it["cls"]), it["qty"],
-            round(it["mm"] * 100, 2) if it.get("mm") is not None else None, it["net"], it["price"], it["cost"], it["basis"],
-            it["cost_pct"], it["cm"], it["cm_total"], it["disc"], ", ".join(it["locations"]), it["ops"], it["sales"],
-            "; ".join(it["flags"])] for it in r["items"]],
-          [None] * 6 + [qty, '0.00', money, '#,##0.00', '#,##0.00', None, pct, '#,##0.00', money, money] + [None] * 4,
-          [11, 34, 22, 16, 22, 11, 10, 9, 13, 11, 11, 18, 8, 11, 13, 12, 20, 60, 60, 60], first=True)
+    rng = lambda it: (f"{it['emc_range'][0]:,.2f} – {it['emc_range'][1]:,.2f}" if it.get("emc_range")
+                      and it["emc_range"][0] != it["emc_range"][1] else None)
+    sheet("Items", ["Menu item", "BC item", "Name", "Section", "Major group", "Family group", "Class", "Items sold",
+                    "In combos at no price", "Menu mix %", f"Net sales {C}", f"EMC price incl. VAT {C}",
+                    "EMC prices differ by location", f"EMC price excl. VAT {C}", f"Avg price received {C}",
+                    "Price used", f"Portion cost {C}", "Cost basis", f"Standard cost (BC) {C}",
+                    f"Recipe at today's unit costs {C}", "Cost %", f"Margin {C}", f"Total margin {C}",
+                    f"Item discounts {C}", "Locations", "Operations", "Sales", "Flags"],
+          [[it["mi"], it.get("bc_item") or None, it["name"], it["section"], it["major"], it["family"],
+            L.get(it["cls"], it["cls"]), it["qty"], it.get("combo_qty") or None,
+            round(it["mm"] * 100, 2) if it.get("mm") is not None else None, it["net"], it.get("emc_incl"), rng(it),
+            it["price"] if it.get("price_source") == "EMC" else None, it.get("avg_price", it["price"]),
+            it.get("price_source") or "Average received", it["cost"], it["basis"], it.get("std_cost"),
+            it.get("recipe_cost"), it["cost_pct"], it["cm"], it["cm_total"], it["disc"], ", ".join(it["locations"]),
+            it["ops"], it["sales"], "; ".join(it["flags"])] for it in r["items"]],
+          [None] * 7 + [qty, qty, '0.00', money, '#,##0.00', None, '#,##0.00', '#,##0.00', None, '#,##0.00', None,
+                        '#,##0.00', '#,##0.00', pct, '#,##0.00', money, money] + [None] * 4,
+          [11, 11, 34, 22, 16, 22, 11, 10, 10, 9, 13, 12, 14, 12, 12, 12, 11, 24, 12, 12, 8, 11, 13, 12, 20, 60, 60, 60],
+          first=True)
     sheet("Sections", ["Section", "Items", "Items sold", f"Net sales {C}", f"Total margin {C}", "Cost %", f"Avg margin {C}",
                        "Popularity line %", "Stars", "Plowhorses", "Puzzles", "Dogs", "No cost"],
           [[s["section"], s["items"], s["qty"], s["net"], s["cm"], s["cost_pct"], s["avg_cm"], s["threshold_pct"],
@@ -650,7 +848,12 @@ def render_xlsx(r):
                [[f"{r['title']} · {r['period']['from']} to {r['period']['to']} · amounts in {C}"
                  + (" (converted at the group rates of Settings)" if r["converted"] else "")]]
                + [[f"{LABEL[c]}: {MEANING[c]}. Operations: {ACTION[c][0]} Sales: {ACTION[c][1]}"] for c in CLASSES]
-               + [[v] for v in DEFINITIONS.values()] + [["Simphony and Business Central were only read."]], [None], [140])
+               + [[v] for v in DEFINITIONS.values()]
+               + [[""], ["How each column of Items is worked out"]]
+               + [[f"{k}: {v}"] for k, v in columns_explained(C, r["settings"])]
+               + [[""], ["How each column of Sections is worked out"]]
+               + [[f"{k}: {v}"] for k, v in sections_explained(C, r["settings"])]
+               + [["Simphony and Business Central were only read."]], [None], [140])
     for row in ws.iter_rows(min_row=2):
         row[0].alignment = Alignment(wrap_text=True, vertical="top")
     buf = io.BytesIO()
