@@ -1586,6 +1586,7 @@ html:not(.embed-set) #rgSetCard{display:none!important}
         <p class="meta" id="meStatus" style="margin:0"></p>
       </div>
       <div class="kpis six" id="meKpis"></div>
+      <p class="hint" id="meCombo" hidden style="margin:-6px 0 14px"></p>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>The menu matrix</h2>
         <p class="hint">Each dot is a menu item: to the right, more popular than its section's popularity line; up, a higher margin than its section's average. Size = net sales. Hover for the figures; click a dot for its row.</p></div>
         <label class="meta">Section <select id="meChartSec"><option value="">All sections</option></select></label></div>
@@ -4421,6 +4422,10 @@ function meRender(){
     card("Portion cost", k.cost_pct != null ? fmt(k.cost_pct, 1) + "%" : "–", `target ${fmt(S.target)}% · ${k.costed_share != null ? fmt(k.costed_share, 0) + "% of sales costed" : ""}`, k.cost_pct > S.target ? "up" : "") +
     card("Stars · Plowhorses", `${fmt(d.classes.star.items)} · ${fmt(d.classes.plowhorse.items)}`, `${ilM(d.classes.star.net + d.classes.plowhorse.net)} of sales`) +
     card("Puzzles · Dogs", `${fmt(d.classes.puzzle.items)} · ${fmt(d.classes.dog.items)}`, `${fmt(d.classes.nocost.items)} with no cost`, d.classes.dog.items ? "warn" : "");
+  // units rung inside combo meals at no price: apart from the items' price and margin
+  const cq = k.in_combos || 0;
+  $("meCombo").hidden = !cq;
+  if (cq) $("meCombo").innerHTML = `${fmt(cq)} units were rung inside combo meals at no price (portion cost ${ilM(k.in_combos_cost)} ${esc(C)}): they are left out of the items' price, popularity and margin. <a href="#" data-pulse="mecombo">See the items</a>`;
   readBanner("meStatus", {src: "Simphony", at: d.read_at, warns: (d.errors || []).length ? [fcSp(`${d.errors.length} read(s) failed`)] : [],
     lines: [fcSp(`${d.title} · ${d.period.label ? d.period.label + " · " : ""}${d.period.from} → ${d.period.to} · ${d.selection.length} location${d.selection.length === 1 ? "" : "s"}`)]})
     + ` · ${esc(C)}${d.converted ? " (converted at the group rates of Settings)" : ""}${d.missing_rates.length ? " · no rate for " + d.missing_rates.join(", ") + ", left out" : ""}`
@@ -4436,6 +4441,18 @@ function meRender(){
   meChart(); meQuad(); meActs(); meSecs(); meItems(); meAcross();
   $("meDefs").innerHTML = Object.values(d.definitions).map(t => `<p style="margin:0 0 8px">${esc(t)}</p>`).join("");
 }
+// the items rung inside combo meals at no price, with their units and portion cost
+Pulse.on("mecombo", () => {
+  const d = meData; if (!d) return;
+  const rows = d.items.filter(i => i.combo_qty).map(i => ({mi: i.mi, name: i.name, section: i.section, at: i.qty, cq: i.combo_qty, cc: i.combo_cost}))
+    .concat((d.combo_only || []).map(i => ({mi: i.mi, name: i.name, section: i.section, at: 0, cq: i.combo_qty, cc: i.combo_cost})))
+    .sort((a, b) => b.cq - a.cq);
+  Pulse.pop({title: "Rung inside combo meals", sub: esc(`${d.title} · ${d.period.from} → ${d.period.to}`),
+    body: `<p class="hint" style="margin:0 0 10px">${esc(d.definitions.combos || "")}</p>` + Pulse.list(
+      [["Item"], ["Section"], ["Sold at a price", 1], ["In combos at no price", 1], ["Their portion cost", 1]],
+      rows.map(r => ({cells: [`<b data-no-i18n>${esc(r.name)}</b><div class="meta">${esc(r.mi)}</div>`, `<span data-no-i18n>${esc(r.section)}</span>`,
+        fmt(r.at), fmt(r.cq), ilM(r.cc)]})), {none: "None."})});
+});
 // the classification parameters, changed from the tab (saved in Settings → Inventory)
 const ME_DEF = {pop: 70, margin: "weighted", target: 32, disc: 15};
 function meParFill(S){

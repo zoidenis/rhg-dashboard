@@ -51,7 +51,10 @@ def weekly(ds, level="all", key="", settings=None):
     currency = reporting if convert else (next(iter(curs)) if curs else reporting)
     a, b = ds["period"]["from"], ds["period"]["to"]
     # the portion cost of every item of every location, as menueng.build costed it for this period
-    cost = {(ref, r["mi"]): (r["unit_cost"], r["technical"]) for ref, lst in ds["rows"].items() for r in lst}
+    # units rung inside combo meals at no price are left out with the combo's own sales (BC does not cost the
+    # combo): cost and sales both of the items sold at a price
+    cost = {(ref, r["mi"]): (r["unit_cost"], r["technical"], r.get("priced_share", 1.0))
+            for ref, lst in ds["rows"].items() for r in lst}
     refs = [L["ref"] for L in sel]
     fx = {L["ref"]: (rates.get(L["currency"]) if convert else 1.0) for L in sel}
     weeks, months, by_loc, skipped = {}, {}, {}, sorted(L["ref"] for L in sel if fx[L["ref"]] is None)
@@ -79,11 +82,11 @@ def weekly(ds, level="all", key="", settings=None):
         l_["net"] += (net or 0) * f
         if c[0] is not None:
             w["net_costed"] += (net or 0) * f
-            w["cost"] += c[0] * qty * f
+            w["cost"] += c[0] * qty * c[2] * f
             mo["net_costed"] += (net or 0) * f
-            mo["cost"] += c[0] * qty * f
+            mo["cost"] += c[0] * qty * c[2] * f
             l_["net_costed"] += (net or 0) * f
-            l_["cost"] += c[0] * qty * f
+            l_["cost"] += c[0] * qty * c[2] * f
     pct = lambda x: round(x["cost"] / x["net_costed"] * 100, 1) if x["net_costed"] > 0 else None
     share = lambda x: round(x["net_costed"] / x["net"] * 100, 1) if x["net"] > 0 else None
     out_weeks = [{"week": k, "to": min((date.fromisoformat(k) + timedelta(days=6)).isoformat(), b),

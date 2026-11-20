@@ -181,6 +181,37 @@ def _coster(m):
     return cost
 
 
+def priced_shares(ref, a, b, prices=None):
+    """{menu item: share of its units sold at a price} of one location between two dates. A menu item that is part of
+    a combo meal is rung at no price inside the combo (the combo item carries the price, and in BC it has no recipe):
+    e.g. Truffle Chicken Gyros Big, 140 units 1-19 Nov 2026, 58 of them at 0 in "Truffle Chicken Gyros Big Combo".
+    Counted with the others they pulled its price per unit from 390 to 229 and its cost to 53% (Geri, 20 Nov 2026).
+    Units at a price = the item's sales VAT included before discounts (miv) / its lowest real price in Simphony
+    (getMenuItemPrices), capped at the units sold: the lowest price never takes for a combo a unit sold at a
+    higher price level. Items without a price in Simphony, or days not held VAT included, count every unit."""
+    if prices is None:
+        try:
+            prices = {}
+            for r in simphony.menu_item_prices(ref):
+                p = r.get("price")
+                if p is not None and float(p) > 1:                         # 1 or less: placeholders, open prices
+                    prices[r["num"]] = min(prices.get(r["num"], float(p)), float(p))
+        except Exception:                                          # noqa: BLE001 - no prices: every unit counts
+            return {}
+    with _db_lock:
+        rows = _db().execute("SELECT mi, SUM(sls), SUM(cnt) FROM miv WHERE ref=? AND day>=? AND day<=? GROUP BY mi",
+                             (ref, a, b)).fetchall()
+    out = {}
+    for mi, sls, cnt in rows:
+        p = prices.get(mi)
+        if not p or not cnt or cnt <= 0:
+            continue
+        at_price = min(float(cnt), max(0.0, round((sls or 0) / p)))
+        if at_price < cnt:
+            out[mi] = at_price / cnt
+    return out
+
+
 def items_by_order_type(ref, a, b):
     """[(day, ot, mi, net, qty, prep)] of one location between two dates, from the held days."""
     with _db_lock:
@@ -257,6 +288,7 @@ def build(periods, latest_fn, client, refs=None, progress=None):
                          "company": company, "bc": rg.get("bc") or "",
                          "currency": rg.get("currency") or locintel.norm_currency(l.get("currency")) or fallback})
         lst = []
+        shares = priced_shares(ref, c_from.isoformat(), c_to.isoformat())
         for mi, net, qty, disc, prep, rtn in sold.get(ref, []):
             nm = names.get(mi) or {}
             if nm.get("excluded") or (qty <= 0 and abs(net) < 0.01):
@@ -267,6 +299,7 @@ def build(periods, latest_fn, client, refs=None, progress=None):
                 uc, basis = prep / qty, "Simphony prep cost"
             lst.append({"mi": mi, "name": name, "major": nm.get("major") or "Other", "family": nm.get("family") or "Other",
                         "qty": qty, "net": net, "disc": disc, "rtn": rtn, "unit_cost": uc, "basis": basis,
+                        "priced_share": round(shares.get(mi, 1.0), 4),
                         "technical": bool(technical(str(mi), name))})
         rows[ref] = lst
     return {"period": {"from": c_from.isoformat(), "to": c_to.isoformat(), "label": label, "days": len(days)},
@@ -396,19 +429,30 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                     continue
                 a = agg.setdefault(r["mi"], {"mi": r["mi"], "name": r["name"], "major": r["major"], "family": r["family"],
                                              "qty": 0.0, "net": 0.0, "disc": 0.0, "rtn": 0.0, "costq": 0.0, "costv": 0.0,
+                                             "combo_qty": 0.0, "combo_cost": 0.0,
                                              "bases": set(), "locations": set()})
-                a["qty"] += r["qty"]
+                # units rung at no price inside a combo meal are apart: the price, popularity and margin of the item
+                # are those of the units sold at a price; their cost is shown apart (it belongs to the combo)
+                share = r.get("priced_share", 1.0)
+                q, cq_ = r["qty"] * share, r["qty"] * (1 - share)
+                a["qty"] += q
+                a["combo_qty"] += cq_
+                if r["unit_cost"] is not None:
+                    a["combo_cost"] += r["unit_cost"] * cq_ * f
                 a["net"] += r["net"] * f
                 a["disc"] += r["disc"] * f
                 a["rtn"] += r["rtn"]
                 a["bases"].add(r["basis"])
                 a["locations"].add(L["ref"])
                 if r["unit_cost"] is not None:
-                    a["costq"] += r["qty"]
-                    a["costv"] += r["unit_cost"] * r["qty"] * f
-        items = []
+                    a["costq"] += q
+                    a["costv"] += r["unit_cost"] * q * f
+        items, combo_only = [], []
         for a in agg.values():
             if a["qty"] <= 0:
+                if a["combo_qty"] > 0:                             # rung only inside combo meals, at no price
+                    combo_only.append({"mi": a["mi"], "name": a["name"], "section": a[sec_key],
+                                       "combo_qty": round(a["combo_qty"], 2), "combo_cost": round(a["combo_cost"], 0)})
                 continue
             price = a["net"] / a["qty"]
             cost = a["costv"] / a["costq"] if a["costq"] >= a["qty"] * 0.999 and a["costq"] > 0 else None
@@ -417,7 +461,8 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                   "section": a[sec_key], "qty": round(a["qty"], 2), "net": round(a["net"], 0), "price": round(price, 2),
                   "disc": round(a["disc"], 0), "rtn": a["rtn"], "cost": round(cost, 2) if cost is not None else None,
                   "basis": basis[0] if len(basis) == 1 else ", ".join(basis),
-                  "locations": sorted(a["locations"])}
+                  "locations": sorted(a["locations"]),
+                  "combo_qty": round(a["combo_qty"], 2), "combo_cost": round(a["combo_cost"], 0)}
             it["cm"] = round(price - cost, 2) if cost is not None else None
             it["cm_total"] = round(it["cm"] * a["qty"], 0) if cost is not None else None
             it["cost_pct"] = round(cost / price * 100, 1) if cost is not None and price > 0 else None
@@ -430,9 +475,11 @@ def analyse(ds, level="all", key="", section="family", settings=None):
         for it in items:
             if it["price"] <= 0:
                 it.update(cls="noprice", x=None, y=None, mm=None)
+        collect.combo_only = combo_only
         return items, secs, avg
 
     items, secs, avg = collect(sel)
+    combo_only = sorted(collect.combo_only, key=lambda x: -x["combo_qty"])
     for it in items:
         flags = []
         if it["cls"] == "noprice":
@@ -447,6 +494,8 @@ def analyse(ds, level="all", key="", section="family", settings=None):
             flags.append(f"Item discounts {it['disc_pct']:.0f}% of sales")
         if it["rtn"]:
             flags.append(f"{it['rtn']:.0f} returned")
+        if it["combo_qty"]:
+            flags.append(f"{it['combo_qty']:.0f} more rung inside combo meals at no price: left out of its price and margin")
         it["flags"] = flags
         ops, sales = ACTION.get(it["cls"], ("", ""))
         it["ops"], it["sales"] = ops, sales
@@ -506,7 +555,12 @@ def analyse(ds, level="all", key="", section="family", settings=None):
                      "cm": round(cm_total, 0), "cm_pct": round(cm_total / net_costed * 100, 1) if net_costed else None,
                      "cost_pct": round((net_costed - cm_total) / net_costed * 100, 1) if net_costed else None,
                      "costed_share": round(net_costed / net * 100, 1) if net else None,
-                     "noprice": sum(1 for it in items if it["cls"] == "noprice")},
+                     "noprice": sum(1 for it in items if it["cls"] == "noprice"),
+                     # units rung inside combo meals at no price (their cost belongs to the combo, which BC does not
+                     # cost): left out of the items' price and margin
+                     "in_combos": round(sum(it["combo_qty"] for it in items) + sum(x["combo_qty"] for x in combo_only), 0),
+                     "in_combos_cost": round(sum(it["combo_cost"] for it in items) + sum(x["combo_cost"] for x in combo_only), 0)},
+            "combo_only": combo_only,
             "classes": by_cls, "labels": LABEL, "meaning": MEANING, "advice": ACTION,
             "items": sorted(items, key=lambda i: -i["net"]), "sections": sections, "actions": actions,
             "across": across[:200], "brands": brands,
@@ -531,6 +585,11 @@ DEFINITIONS = {
               "sold in the section against 70% of an equal share; contribution margin = average net price − portion "
               "cost against the section's average margin weighted by items sold. Star = popular and high margin; "
               "Plowhorse = popular, low margin; Puzzle = high margin, sold little; Dog = low margin, sold little.",
+    "combos": "A menu item rung inside a combo meal is at no price (the combo item carries the price, and BC holds no "
+              "recipe for the combo). Those units are counted apart: the item's price, popularity and margin are of the "
+              "units sold at a price, i.e. its sales VAT included / its lowest real price in Simphony (no more than the "
+              "units sold). Their portion cost is shown apart and left out of the theoretical food cost with the combo's "
+              "own sales.",
     "scope": "A brand or all of RHG sums its locations by menu item; another currency is converted at the group rates "
              "of Settings. POS technical items (Settings → Inventory) and items sold at no price stay out of the matrix.",
 }
