@@ -1972,7 +1972,7 @@ def register_controls(actor="scheduler", force=False):
             out.append({"company": c, "control": "sales_rec", "status": "already read today"})
             continue
         try:
-            r = salesrec.build(client, c, _latest)
+            r = salesrec.build(client, c, _latest, since=exreg.oldest_open_day("sales_rec", c))
             salesrec.remember(c, r)
             reg = register_after_sales(c, r)
             out.append({"company": c, "control": "sales_rec", "status": "synced" if reg else "not synced",

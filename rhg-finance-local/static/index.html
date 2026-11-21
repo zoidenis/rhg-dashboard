@@ -344,7 +344,7 @@ td.num,th.num{text-align:right}
   background:var(--bg);color:var(--sub);border:2px solid transparent}
 #sxGrid td.c.ok{background:var(--down-bg);color:var(--down)}
 #sxGrid td.c.not_imported,#sxGrid td.c.invoice_diff{background:var(--up-bg);color:var(--up)}
-#sxGrid td.c.import_diff,#sxGrid td.c.not_posted,#sxGrid td.c.service_charge{background:var(--warn-bg);color:var(--warn)}
+#sxGrid td.c.import_diff,#sxGrid td.c.not_posted,#sxGrid td.c.service_charge,#sxGrid td.c.vat_diff{background:var(--warn-bg);color:var(--warn)}
 #sxGrid td.c.pending{background:var(--card);border:2px dashed var(--line)}
 #sxGrid td.c.open_wait{background:var(--card);border:2px dashed var(--warn);color:var(--warn)}
 #sxGrid td.c.no_sales{background:none;color:var(--line)}
@@ -2095,6 +2095,7 @@ html:not(.embed-set) #rgSetCard{display:none!important}
         <label class="field">Posting lag (days)<input id="sxSPost" type="number" min="0" max="30"></label>
         <label class="field">Tolerance (amount)<input id="sxSAbs" type="number" min="0"></label>
         <label class="field">Tolerance (%)<input id="sxSPct" type="number" min="0" max="100" step="0.1"></label>
+        <label class="field">Service charge G/L accounts (start of the number, comma separated)<input id="sxSSvc" type="text" placeholder="75"></label>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn dark" id="sxSave">Save</button><span class="meta" id="sxMsg"></span></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
@@ -7508,14 +7509,14 @@ $("biSave").onclick = async () => {
     biCfg.connection = j.connection; biDrawAccts(j.connection.accounts || []); $("biMsg").textContent = "Saved. Read again to apply."; } catch(e){ $("biMsg").textContent = e.message; }
 };
 // ---------------------------------------------------------------- Simphony ↔ BC
-const SX_SHORT = {not_imported: "none", import_diff: "", service_charge: "svc", invoice_diff: "inv", not_posted: "open", open_wait: "open", pending: "…", ok: "✓", no_sales: "·"};
+const SX_SHORT = {not_imported: "none", import_diff: "", vat_diff: "VAT", service_charge: "svc", invoice_diff: "inv", not_posted: "open", open_wait: "open", pending: "…", ok: "✓", no_sales: "·"};
 const sxM = v => v == null || isNaN(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
 const sxS = v => (v > 0 ? "+" : v < 0 ? "−" : "") + sxM(Math.abs(v));
 // Simphony ↔ BC shows every amount exact, to the cent (Geri, 13 Nov 2026: no rounding)
 const sxE = v => v == null || isNaN(v) ? "–" : (Number(v) + 0).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const sxES = v => v == null || isNaN(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + sxE(Math.abs(v));
 let sxData = null, sxTimer = null, sxSel = null, sxRng = null;
-const SX_BAD = ["not_imported", "import_diff", "service_charge", "invoice_diff", "not_posted"];
+const SX_BAD = ["not_imported", "import_diff", "vat_diff", "service_charge", "invoice_diff", "not_posted"];
 const SX_WAIT = ["pending", "open_wait"];
 function sxQuery(refresh){
   const p = new URLSearchParams({company: $("company").value || ""});
@@ -7590,12 +7591,12 @@ function renderSalesrec(){
     : `<tr><td class="meta">Every menu item of the period is imported with a BC item that exists, is not blocked and has its recipe.</td></tr>`;
   $("sxSetCard").style.display = can("settings") ? "" : "none";
   const S = d.settings;
-  [["sxSDays", "days"], ["sxSImp", "import_lag"], ["sxSPost", "post_lag"], ["sxSAbs", "tol_abs"], ["sxSPct", "tol_pct"]].forEach(([id, key]) => { if (document.activeElement !== $(id)) $(id).value = S[key]; });
+  [["sxSDays", "days"], ["sxSImp", "import_lag"], ["sxSPost", "post_lag"], ["sxSAbs", "tol_abs"], ["sxSPct", "tol_pct"], ["sxSSvc", "svc_accounts"]].forEach(([id, key]) => { if (document.activeElement !== $(id)) $(id).value = Array.isArray(S[key]) ? S[key].join(", ") : S[key]; });
   $("sxDefs").innerHTML = `<p><b>Simphony.</b> Menu items sold by business day (Reporting and Analytics), VAT included, after item discounts; items marked not included in sales are left out. Without VAT and the VAT: from the same read (Simphony's VAT on each item after its discounts).</p>
     <p><b>Imported.</b> The POS import of Business Central (MID Simphony Archive): line totals (before discounts) plus the line discounts, by transaction date and the restaurant's customer (Settings → Locations registry). Its VAT: each BC item at the VAT % BC posted it at in the period; an item never posted in the period has its VAT unknown, shown apart.</p>
     <p><b>Posted.</b> Sales invoices less credit memos of that customer on that posting date (customer ledger); without VAT and the VAT from their posted lines.</p>
     <p><b>Open.</b> A day imported and not posted in BC: imported lines not in a sales document, or no sales invoice of the customer on that date. RHG does not post a day whose value is wrong, so an open day after the ${S.post_lag}-day posting lag is a day to correct. What is still unpaid on a posted invoice is the takings: Control → Takings POS ↔ BC checks them.</p>
-    <p><b>Exceptions.</b> Not imported after ${S.import_lag} days → Chief accountant. Import ≠ Simphony, beyond ${sxE(S.tol_abs)} or ${S.tol_pct}% → Chief accountant, with the menu items that differ. Service charge not in BC (Simphony charged one, the day was posted with the menu items only) → Chief accountant. Open (not posted) after ${S.post_lag} days → Chief accountant. Invoice ≠ import → Chief accountant. Menu item problems → Cost controller. Owners come from Email recipients by company; every exception closes by itself when the data meets.</p>
+    <p><b>Exceptions.</b> Not imported after ${S.import_lag} days → Chief accountant. Import ≠ Simphony, beyond ${sxE(S.tol_abs)} or ${S.tol_pct}% → Chief accountant, with the menu items that differ. VAT ≠ Simphony (Simphony's VAT by its tax types against the VAT % of each BC item), with the menu items whose rates differ → Chief accountant. Service charge not in BC (Simphony charged one; BC has it neither on the invoice of the day nor on the service charge accounts ${esc((S.svc_accounts || []).join(", "))}) → Chief accountant. Open (not posted) after ${S.post_lag} days → Chief accountant. Invoice ≠ import → Chief accountant. Menu item problems → Cost controller. Owners come from Email recipients by company; every exception closes by itself when the data meets.</p>
     <p><b>Read again.</b> Business Central is read anew every time (the import, the invoices and their lines), Simphony's last seven days too; older Simphony days are kept as read.</p>`;
 }
 function sxSplitTable(){
@@ -7659,6 +7660,9 @@ function sxCellPop(li, x){
         {l: "Unpaid on the invoice", v: sxE(c.remaining), s: c.remaining ? "the takings not applied yet: Takings POS ↔ BC" : c.inv == null ? "–" : "settled"}])
       + (c.issues || []).map(k => `<div class="sx-why"><h4>${esc(d.statuses[k])}</h4><p>${esc((c.why || {})[k] || "")}</p>${(d.help || {})[k] ? `<p class="meta"><b>${fcSp("What to do")}:</b> <span>${esc(d.help[k].fix)}</span>${d.help[k].owner ? ` · <b>${fcSp("Owner")}:</b> <span>${esc(d.help[k].owner)}</span>` : ""}</p>` : ""}</div>`).join("")
       + Pulse.panel("Sales in four parts", sxSplitRows(c))
+      + ((c.vat_items || []).length ? Pulse.panel("Menu items with another tax rate", Pulse.list([["Menu item"], ["BC item"], ["Simphony tax %", 1], ["BC item VAT %", 1], ["Sales", 1]],
+          c.vat_items.map(m => ({cells: [`<b>${esc(m.mi)}</b> <span data-no-i18n>${esc(m.name || "")}</span>`, esc(m.item || "–"), fmt(m.sim_rate, 1) + "%", fmt(m.bc_rate, 1) + "%", sxE(m.sales)]}))),
+          c.vat_items_n > c.vat_items.length ? esc(`${fmt(c.vat_items_n - c.vat_items.length)} more`) : "") : "")
       + Pulse.panel("Menu items that differ", it.length ? Pulse.bars(it.slice(0, 12).map(m => ({key: `${m.mi} ${m.name || ""}`, segs: [[Math.abs(m.diff), m.diff < 0 ? "var(--ch-1)" : "var(--ch-0)", m.diff < 0 ? "imported less" : "imported more"]], text: sxES(m.diff)})),
           [["var(--ch-0)", "imported more than Simphony"], ["var(--ch-1)", "imported less"]])
         + Pulse.fold(Pulse.list([["Menu item"], ["BC item"], ["Simphony qty", 1], ["Imported qty", 1], ["Simphony", 1], ["Imported", 1], ["Difference", 1]],
@@ -7805,7 +7809,7 @@ $("sxReg").onclick = () => { navTo("register"); $("rgSource").innerHTML = `<opti
 $("sxSave").onclick = async () => {
   $("sxMsg").textContent = "Saving…";
   try{ await simphonyPost("/api/salesrec/settings", {days: $("sxSDays").value, import_lag: $("sxSImp").value, post_lag: $("sxSPost").value,
-      tol_abs: $("sxSAbs").value, tol_pct: $("sxSPct").value});
+      tol_abs: $("sxSAbs").value, tol_pct: $("sxSPct").value, svc_accounts: $("sxSSvc").value});
     $("sxMsg").textContent = "Saved. Reading again with the new limits…"; loadSalesrec(true); }
   catch(e){ $("sxMsg").textContent = "Could not save: " + e.message; }
 };

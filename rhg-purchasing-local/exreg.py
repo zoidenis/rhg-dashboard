@@ -699,6 +699,15 @@ def settings():
             "time": s.get("time") or "08:15", "escalate_days": esc, "escalate_roles": s.get("escalate_roles") or "coo, cfo"}
 
 
+def oldest_open_day(source, company):
+    """The oldest day (YYYY-MM-DD at the start of the subject) of the active items of a source, or None."""
+    with _lock:
+        rows = _db().execute("SELECT subject FROM ex WHERE source=? AND company=? AND status IN (?,?,?)",
+                             (source, company, *ACTIVE)).fetchall()
+    days = sorted(s[:10] for (s,) in rows if s and len(s) >= 10 and s[4] == "-" and s[7] == "-")
+    return days[0] if days else None
+
+
 def synced_today(source, company):
     with _lock:
         r = _db().execute("SELECT MAX(at) FROM runs WHERE source=? AND company=?", (source, company)).fetchone()

@@ -34,14 +34,20 @@ import store
 
 E_ARCHIVE = config.E_POS_ARCHIVE
 E_SINV, E_SCM = config.get("E_SALES_INV", "PBSI1"), config.get("E_SALES_CM", "PBSC1")
-DEFAULTS = {"days": "14", "import_lag": "2", "post_lag": "4", "settle_days": "7", "tol_abs": "1000", "tol_pct": "0.5"}
+DEFAULTS = {"days": "14", "import_lag": "2", "post_lag": "4", "settle_days": "7", "tol_abs": "1", "tol_pct": "0",
+            "svc_accounts": "75"}
+# the old defaults (until 21 Nov 2026): 1,000 or 0.5% of the day, so a 7 M day hid up to 37,000 (QA: 1,100 and 1,461
+# reconciled); a setting still at both is read as the new defaults
+OLD_TOL = ("1000", "0.5")
 MAX_RANGE = 93
 # "Open" = the day's sales are not posted in BC: RHG does not post a day whose value is wrong (Geri, 13 Nov 2026).
 # What is still open on a posted invoice (the takings not applied to it) is shown, but checked in Takings POS ↔ BC.
-STATUS = {"not_imported": "Not imported", "import_diff": "Import ≠ Simphony", "invoice_diff": "Invoice ≠ import",
+STATUS = {"not_imported": "Not imported", "import_diff": "Import ≠ Simphony", "vat_diff": "VAT ≠ Simphony",
+          "invoice_diff": "Invoice ≠ import",
           "not_posted": "Open: not posted in BC", "service_charge": "Service charge not in BC", "pending": "Not imported yet (within the lag)",
           "open_wait": "Open: not posted yet (within the lag)", "ok": "Reconciled", "no_sales": "No sales"}
-RANK = ("not_imported", "import_diff", "service_charge", "invoice_diff", "not_posted", "pending", "open_wait", "ok", "no_sales")
+RANK = ("not_imported", "import_diff", "vat_diff", "service_charge", "invoice_diff", "not_posted", "pending", "open_wait",
+        "ok", "no_sales")
 MAPPING = {"no_item": "Imported with no BC item", "unknown_item": "BC item does not exist",
            "blocked_item": "BC item is blocked", "no_recipe": "Needs a recipe, has none",
            "not_in_import": "Sold in Simphony, never imported"}
@@ -60,6 +66,14 @@ HELP = {
                               "another price; discounts imported differently; items not included in sales.",
                     "fix": "Compare the listed menu items with Simphony's report of the day; re-import the day or "
                            "correct the lines before posting.", "owner": "Chief accountant"},
+    "vat_diff": {"means": "The VAT of the day differs between Simphony and Business Central, beyond the tolerance: Simphony's "
+                          "is the tax it collected by its tax types (operations daily totals, taxCollTtl, on the sales "
+                          "after discounts), BC's is the import at the VAT % of each BC item (and the invoice as posted). "
+                          "The menu items whose tax rate in Simphony is not the VAT % of their BC item are listed.",
+                 "causes": "A menu item with another tax class in Simphony EMC than the VAT Prod. Posting Group of its BC "
+                           "item (e.g. 6% against TVSH20); a BC item without a VAT % that BC knows.",
+                 "fix": "Set the same rate on both sides: the tax class of the menu item in EMC or the VAT Prod. Posting "
+                        "Group of the BC item; then post the day.", "owner": "Chief accountant"},
     "service_charge": {"means": "Simphony charged a service charge on the day's checks, on top of the menu items, and the "
                                 "day was posted in BC without it: the POS import carries the menu items only, and the "
                                 "invoice of the day does not add the service charge either.",
@@ -101,9 +115,13 @@ def settings_of(settings):
             return max(lo, min(hi, float(s[k])))
         except (TypeError, ValueError):
             return float(DEFAULTS[k])
+    if (str(s.get("tol_abs")), str(s.get("tol_pct"))) == OLD_TOL:
+        s["tol_abs"], s["tol_pct"] = DEFAULTS["tol_abs"], DEFAULTS["tol_pct"]
     return {"days": int(num("days", 3, 62)), "import_lag": int(num("import_lag", 0, 30)),
             "post_lag": int(num("post_lag", 0, 30)), "settle_days": int(num("settle_days", 0, 90)),
-            "tol_abs": num("tol_abs", 0, 1e9), "tol_pct": num("tol_pct", 0, 100)}
+            "tol_abs": num("tol_abs", 0, 1e9), "tol_pct": num("tol_pct", 0, 100),
+            # the G/L accounts of the service charge: posted on an invoice of its own, no items (Geri, 21 Nov 2026)
+            "svc_accounts": [x.strip() for x in str(s.get("svc_accounts") or "75").replace(";", ",").split(",") if x.strip()]}
 
 
 def _dates(a, b):
@@ -137,7 +155,7 @@ def _or(field, values):
     return "(" + " or ".join(f"{field} eq '" + str(v).replace("'", "''") + "'" for v in values) + ")"
 
 
-def read_bc(client, company, a, b, customers):
+def read_bc(client, company, a, b, customers, svc_accounts=("75",)):
     """imp: {(customer, day): {"mi": {menu item: [total, count, discount, BC item, name]}, "unposted", "rows",
     "imported_at"}}; inv: {(customer, day): {"amount", "remaining", "docs"}}; posted: {(customer, day): {"ex", "incl",
     "disc", "lines"}} from the posted invoice and credit memo lines; vat: {BC item: VAT % as posted}."""
@@ -182,27 +200,40 @@ def read_bc(client, company, a, b, customers):
             for r in client._get_all(client._url(company, ent), {
                     "$filter": f"Posting_Date ge {a} and Posting_Date le {b} and "
                                + _or("Sell_to_Customer_No_", customers),
-                    "$select": "Sell_to_Customer_No_,Posting_Date,No_,Amount,Amount_Including_VAT,Line_Discount_Amount,"
-                               "VAT__"}, page_size=5000):
+                    "$select": "Sell_to_Customer_No_,Posting_Date,Document_No_,No_,Amount,Amount_Including_VAT,"
+                               "Line_Discount_Amount,VAT__"}, page_size=5000):
                 c = cust.get(str(r.get("Sell_to_Customer_No_") or "").upper())
                 if not c:
                     continue
                 d = str(r.get("Posting_Date") or "")[:10]
-                x = posted.setdefault((c, d), {"ex": 0.0, "incl": 0.0, "disc": 0.0, "lines": 0})
+                x = posted.setdefault((c, d), {"ex": 0.0, "incl": 0.0, "disc": 0.0, "lines": 0, "svc": 0.0, "svc_docs": []})
+                no = str(r.get("No_") or "").strip()
+                if no and any(no.startswith(acc) for acc in svc_accounts):
+                    # the service charge: an invoice of its own on a 75 account, no items (Geri, 21 Nov 2026)
+                    x["svc"] += sign * _f(r.get("Amount_Including_VAT"))
+                    doc = str(r.get("Document_No_") or "")
+                    if doc and doc not in x["svc_docs"]:
+                        x["svc_docs"].append(doc)
+                    continue
                 x["ex"] += sign * _f(r.get("Amount"))
                 x["incl"] += sign * _f(r.get("Amount_Including_VAT"))
                 x["disc"] += sign * _f(r.get("Line_Discount_Amount"))
                 x["lines"] += 1
-                no = str(r.get("No_") or "").strip()
                 if no and sign > 0 and r.get("VAT__") is not None:
                     vat[no] = _f(r.get("VAT__"))
     return imp, inv, posted, vat
 
 
 def _svc_of(ref, day, latest):
-    """The service charge of one restaurant's business day (operations daily totals, svcTtl)."""
+    """One restaurant's business day as Simphony totals it (operations daily totals): {svc, net, tax, disc}. net
+    (netSlsTtl) is VAT included and after discounts, tax (taxCollTtl) the VAT collected by the tax types: the Taxes
+    report of R&A (QA 21 Nov 2026, OPA TEG: net 7,394,902.75, tax 1,232,483.32). The menu items' own VAT (vatTtl) is
+    on the price before discounts and is not used for the day."""
     row = simphony.daily_totals(ref, day, latest) or {}
-    return round(sum(float(r.get("svcTtl") or 0) for r in row.get("rvcs") or []), 2)
+    rv = row.get("rvcs") or []
+    f = lambda k: sum(float(r.get(k) or 0) for r in rv)
+    return {"svc": round(f("svcTtl"), 2), "net": round(f("netSlsTtl"), 2), "tax": round(f("taxCollTtl"), 2),
+            "disc": round(abs(f("itmDscTtl")) + abs(f("subDscTtl")), 2), "has": bool(rv)}
 
 
 def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
@@ -216,7 +247,7 @@ def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
         except Exception:                                           # noqa: BLE001
             latest[ref] = None
     jobs = [(r, d) for r in refs for d in days if latest.get(r) and d <= latest[r]]
-    done, svc = 0, {}
+    done, svc, tot = 0, {}, {}
 
     def one(r, d):
         menueng.read_day(r, d, latest.get(r), True, bool(force_from and d >= force_from))
@@ -227,8 +258,10 @@ def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
             done += 1
             try:
                 v = f.result()
-                if v:
-                    svc.setdefault(futs[f][0], {})[futs[f][1]] = v
+                if v and v.get("svc"):
+                    svc.setdefault(futs[f][0], {})[futs[f][1]] = v["svc"]
+                if v and v.get("has"):
+                    tot.setdefault(futs[f][0], {})[futs[f][1]] = v
             except Exception as exc:                                # noqa: BLE001
                 if len(errors) < 6:
                     errors.append(f"Simphony {futs[f][0]} {futs[f][1]}: {str(exc)[:140]}")
@@ -236,7 +269,7 @@ def read_simphony(refs, days, latest_fn, progress=None, force_from=None):
                 progress(f"Simphony · {done} of {len(jobs)} days")
     out = {r: menueng.items_vat(r, days[0], days[-1]) for r in refs}
     vat = {r: menueng.vat_by_item(r, days[0], days[-1]) for r in refs}
-    return out, latest, errors, vat, svc
+    return out, latest, errors, vat, svc, tot
 
 
 # ---------------------------------------------------------------- the reconciliation
@@ -272,7 +305,18 @@ def explain(L, d, c, k, S, ccy):
         return (f"Imported {money(c['imp'])} {ccy}; {what}, {c['age']} days later "
                 + (f"(posting lag {S['post_lag']} days): the day is open." if k == "not_posted"
                    else f"(within the {S['post_lag']}-day posting lag)."))
+    if k == "vat_diff":
+        b = c.get("b") or {}
+        sv, iv_ = (b.get("sim") or {}).get("vat"), ((b.get("imp") or b.get("inv")) or {}).get("vat")
+        top = "; ".join(f"{x['mi']} {x['name'] or ''} {x['sim_rate']:g}% in Simphony, {x['bc_rate']:g}% on BC item {x['item']}"
+                        for x in (c.get("vat_items") or [])[:5])
+        return (f"VAT in Simphony {money(sv)} {ccy} (by its tax types, after discounts) against {money(iv_)} in BC "
+                f"(the VAT % of each BC item) on {d} ({(iv_ or 0) - (sv or 0):+,.2f})"
+                + (f"; {c.get('vat_items_n', 0)} menu item(s) carry another rate: {top}." if top else "."))
     if k == "service_charge":
+        if c.get("svc_posted"):
+            return (f"Simphony charged a service charge of {money(c['svc'])} {ccy} on {d}; BC posted "
+                    f"{money(c['svc_posted'])} on the service charge account ({', '.join(((c.get('b') or {}).get('inv') or {}).get('svc_docs') or []) or 'its invoice'}).")
         return (f"Simphony charged a service charge of {money(c['svc'])} {ccy} on {d}, on top of the menu items "
                 f"({money(c['sim'])}); the day is posted in BC at {money(c['inv'])} ({', '.join(c['docs'])}), the "
                 f"menu items only: the service charge is not in BC.")
@@ -315,12 +359,20 @@ def totals(locs, maps):
 
 
 def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, currency="ALL", sim_on=True,
-            dims=None, posted=None, vat_item=None, sim_vat=None, svc=None):
+            dims=None, posted=None, vat_item=None, sim_vat=None, svc=None, tot=None):
     """dims: {ref: simphony.menu_items(ref)}: names, and the items not included in sales (left out). svc: {ref: {day:
     service charge}}: on top of the menu items; never in the POS import, so the invoice is expected to carry it."""
     today = today or date.today()
-    dims, posted, vat_item, sim_vat, svc = dims or {}, posted or {}, vat_item or {}, sim_vat or {}, svc or {}
+    dims, posted, vat_item, sim_vat, svc, tot = dims or {}, posted or {}, vat_item or {}, sim_vat or {}, svc or {}, tot or {}
     items = (master or {}).get("items") or {}
+
+    def bc_rate(item):
+        """The VAT % of a BC item: as posted on its invoice lines, else from its VAT Prod. Posting Group."""
+        if not item:
+            return None
+        if item in vat_item:
+            return vat_item[item]
+        return menueng.vat_pct(items.get(item)) if items.get(item) else None
     has_bom = {p for p, *_ in (master or {}).get("bom") or []}
 
     def gap(a, b):
@@ -338,7 +390,10 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
         for d in days:
             age = (today - date.fromisoformat(d)).days
             sd = sim_days.get(d) if sim_on else None
-            s_t = round(sum(v[0] - v[2] for v in sd.values()), 2) if sd is not None else None
+            dt = (tot.get(ref) or {}).get(d) if sd is not None else None
+            # Simphony's day as Simphony totals it (net sales VAT included, after discounts); the menu items when the
+            # daily totals were not read
+            s_t = (dt["net"] if dt else round(sum(v[0] - v[2] for v in sd.values()), 2)) if sd is not None else None
             unmapped = round(sum(v[0] - v[2] for k, v in sd.items() if str(k) not in ever), 2) if sd and imp else 0.0
             im = imp.get((cu, d))
             i_t = round(sum(v[0] + v[2] for v in im["mi"].values()), 2) if im else None
@@ -353,7 +408,16 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
                 issues.append("not_posted" if age > S["post_lag"] else "open_wait")
             svc_t = round((svc.get(ref) or {}).get(d) or 0.0, 2) if sd is not None else 0.0
             svc_posted = 0.0
-            if v_t is not None:
+            pb = posted.get((cu, d))
+            if pb and pb.get("svc"):
+                svc_posted = round(pb["svc"], 2)              # its own invoice on a 75 account (or a line of the day's)
+            if v_t is not None and svc_posted:
+                base = i_t if i_t is not None else s_t
+                if base is not None and gap(v_t, base + svc_posted):
+                    issues.append("invoice_diff")
+                if svc_t >= 0.5 and gap(svc_posted, svc_t):
+                    issues.append("service_charge")             # posted, at another amount than Simphony's
+            elif v_t is not None:
                 base = i_t if i_t is not None else s_t
                 # the invoice carries the service charge on top (as it should) when it is nearer to it than without
                 if base is not None and svc_t >= 0.5 and abs(v_t - base - svc_t) < abs(v_t - base):
@@ -364,9 +428,6 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
                     issues.append("invoice_diff")
                 elif svc_t >= 0.5:
                     issues.append("service_charge")     # posted as the menu items only
-            if not issues:
-                issues = ["no_sales"] if not (s_t or i_t or v_t) else ["ok"]
-            status = min(issues, key=RANK.index)
             diffs = []
             if sd is not None and im:
                 for mi in set(str(k) for k in sd) | set(im["mi"]):
@@ -382,10 +443,18 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
                 diffs.sort(key=lambda x: -abs(x["diff"]))
             # each figure in four: before discounts, discounts, VAT, with and without VAT
             split = {}
-            if sd is not None:
-                sv = (sim_vat.get(ref) or {}).get(d) or {}
-                split["sim"] = _part(sum(v[0] for v in sd.values()), sum(v[2] for v in sd.values()),
-                                     sum(sv.get(k, 0.0) for k in sd))
+            sv = (sim_vat.get(ref) or {}).get(d) or {} if sd is not None else {}
+            if dt:
+                # the day as Simphony totals it: VAT by its tax types on the sales after discounts
+                split["sim"] = _part(dt["net"] + dt["disc"], dt["disc"], dt["tax"])
+            elif sd is not None and any(k in sv for k in sd):
+                # no daily totals: each menu item's VAT at its own rate, on its sales after discounts
+                vt = 0.0
+                for k, v in sd.items():
+                    g, t = v[0], sv.get(k, 0.0)
+                    rate = t / (g - t) if g - t > 0 else 0.0               # vatTtl is on the price before discounts
+                    vt += (v[0] - v[2]) * rate / (1 + rate)
+                split["sim"] = _part(sum(v[0] for v in sd.values()), sum(v[2] for v in sd.values()), vt)
             if im:
                 g = sum(v[0] for v in im["mi"].values())
                 ds = -sum(v[2] for v in im["mi"].values())
@@ -398,17 +467,39 @@ def analyse(company, regs, days, sim, latest, imp, inv, master, S, today=None, c
                     else:
                         vt += net * rate / (100 + rate)
                 split["imp"] = _part(g, ds, vt, unk)
-            pb = posted.get((cu, d))
             if pb:
                 split["inv"] = {"gross": _r(pb["incl"] + pb["disc"]), "disc": _r(pb["disc"]), "incl": _r(pb["incl"]),
                                 "vat": _r(pb["incl"] - pb["ex"]), "ex": _r(pb["ex"]), "vat_unknown": 0.0,
-                                "lines": pb["lines"]}
+                                "lines": pb["lines"], "svc": _r(pb.get("svc") or 0), "svc_docs": pb.get("svc_docs") or []}
+            # VAT: Simphony's by its tax types against BC's by the VAT % of each item (the import, and as posted)
+            vat_items = []
+            if "sim" in split and ("imp" in split or "inv" in split):
+                bcv = split["imp"] if "imp" in split and not split["imp"]["vat_unknown"] else split.get("inv")
+                if bcv and gap(split["sim"]["vat"], bcv["vat"]):
+                    issues.append("vat_diff")
+                if sd and im:
+                    for k, v in sd.items():
+                        g, t = v[0], sv.get(k, 0.0)
+                        if g <= 0:
+                            continue
+                        sr = round(t / (g - t) * 100, 1) if g - t > 0 else None
+                        b_ = im["mi"].get(str(k))
+                        br = bc_rate(b_[3]) if b_ else None
+                        if sr is not None and br is not None and abs(sr - br) > 0.5:
+                            nm = (b_ or [""] * 5)[4] or ((dims.get(ref) or {}).get(k) or {}).get("name", "")
+                            vat_items.append({"mi": str(k), "name": nm, "item": b_[3], "sim_rate": sr, "bc_rate": br,
+                                              "sales": round(v[0] - v[2], 2)})
+                    vat_items.sort(key=lambda x: -x["sales"])
+            if not issues:
+                issues = ["no_sales"] if not (s_t or i_t or v_t) else ["ok"]
+            status = min(issues, key=RANK.index)
             cell = {"status": status, "issues": [i for i in dict.fromkeys(issues) if i not in ("ok", "no_sales")],
                     "sim": s_t, "imp": i_t, "inv": v_t, "age": age,
                     "remaining": round(iv["remaining"], 2) if iv else None, "docs": iv["docs"] if iv else [],
                     "unposted": im["unposted"] if im else 0, "rows": im["rows"] if im else 0,
                     "imported_at": im["imported_at"] if im else "", "items": diffs[:25], "items_n": len(diffs),
-                    "unmapped": unmapped, "b": split, "svc": svc_t, "svc_posted": svc_posted}
+                    "unmapped": unmapped, "b": split, "svc": svc_t, "svc_posted": svc_posted, "vat_items": vat_items[:25],
+                    "vat_items_n": len(vat_items)}
             cell["why"] = {k: explain(L, d, cell, k, S, currency) for k in cell["issues"]}
             L["cells"][d] = cell
             L["issues"] += sum(1 for i in cell["issues"] if i not in ("pending", "open_wait"))
@@ -502,9 +593,11 @@ def key_of(company, frm=None, to=None):
     return f"{company}|{frm}|{to}" if frm and to else company
 
 
-def build(client, company, latest_fn, progress=None, today=None, frm=None, to=None, refresh=False):
+def build(client, company, latest_fn, progress=None, today=None, frm=None, to=None, refresh=False, since=None):
     """The last days of Settings, or the range frm–to. refresh ("Read again"): Simphony's last seven days are read
-    again too; Business Central is read anew every time."""
+    again too, and the BC item cards; Business Central is read anew every time. since: the daily control reads back to
+    the oldest open exception (no more than MAX_RANGE days), so a day corrected in BC after it left the window closes
+    its exception (QA 21 Nov 2026: LIFT's service charge of 1 Nov posted on the 16th stayed open)."""
     today = today or date.today()
     settings = store.get_settings()
     S = settings_of(settings)
@@ -516,14 +609,19 @@ def build(client, company, latest_fn, progress=None, today=None, frm=None, to=No
     else:
         b = today - timedelta(days=1)
         a = b - timedelta(days=S["days"] - 1)
+        if since:
+            try:
+                a = max(min(a, date.fromisoformat(since)), b - timedelta(days=MAX_RANGE - 1))
+            except ValueError:
+                pass
     days = _dates(a, b)
     errors = []
     sim_on = bool(simphony.info().get("configured"))
-    sim, latest, dims, sim_vat, svc = {}, {}, {}, {}, {}
+    sim, latest, dims, sim_vat, svc, tot = {}, {}, {}, {}, {}, {}
     if sim_on:
         (progress or (lambda *_: None))("Simphony · menu items by day")
         force = (today - timedelta(days=7)).isoformat() if refresh else None
-        sim, latest, errs, sim_vat, svc = read_simphony([r["ref"] for r in regs], days, latest_fn, progress, force)
+        sim, latest, errs, sim_vat, svc, tot = read_simphony([r["ref"] for r in regs], days, latest_fn, progress, force)
         errors += errs
         for ref in sim:
             try:
@@ -531,15 +629,18 @@ def build(client, company, latest_fn, progress=None, today=None, frm=None, to=No
             except Exception:                                       # noqa: BLE001
                 dims[ref] = {}
     (progress or (lambda *_: None))("Business Central · POS import, invoices and their lines")
-    imp, inv, posted, vat_item = read_bc(client, company, days[0], days[-1], [r["customer"] for r in regs])
+    imp, inv, posted, vat_item = read_bc(client, company, days[0], days[-1], [r["customer"] for r in regs],
+                                         S["svc_accounts"])
     (progress or (lambda *_: None))("Business Central · item cards and recipes")
     try:
-        m = recipes.master_cached(company) or recipes.master(client, company)
+        # read anew every six hours, and on "Read again": items added in BC show at once (QA 21 Nov 2026: new BC
+        # items never appeared, the cards last read were used whatever their age)
+        m = recipes.master(client, company, force=refresh)
     except Exception as exc:                                        # noqa: BLE001
         m, errors = {}, errors + [f"Item cards: {str(exc)[:160]}"]
     ccy = ((settings.get("group") or {}).get("reporting_currency") or "ALL")
     r = analyse(company, regs, days, sim, latest, imp, inv, m, S, today, ccy, sim_on, dims, posted, vat_item, sim_vat,
-                svc)
+                svc, tot)
     r.update(errors=errors, checked_at=datetime.now().isoformat(timespec="seconds"),
              complete=not errors, custom=bool(frm and to))
     return r
@@ -572,8 +673,9 @@ def findings(r):
     """The exceptions of a reconciliation for exreg.sync (source "sales_rec") and the days it covered."""
     out, ccy = [], r.get("currency") or ""
     sev = {"not_imported": "critical", "import_diff": "warning", "invoice_diff": "critical", "not_posted": "warning",
-           "service_charge": "warning"}
+           "service_charge": "warning", "vat_diff": "warning"}
     titles = {"not_imported": "sales not imported in BC", "import_diff": "import differs from Simphony",
+              "vat_diff": "VAT differs from Simphony",
               "service_charge": "service charge not in BC",
               "not_posted": "open: sales not posted in BC", "invoice_diff": "invoice differs from the import"}
     for L in r["locations"]:
@@ -582,9 +684,11 @@ def findings(r):
                 if k not in sev:
                     continue
                 base = c["imp"] if c["imp"] is not None else c["sim"]
+                b = c.get("b") or {}
                 value = {"not_imported": c["sim"], "import_diff": (c["imp"] or 0) - (c["sim"] or 0) + c["unmapped"],
                          "not_posted": base, "invoice_diff": (c["inv"] or 0) - (base or 0),
-                         "service_charge": c.get("svc") or 0}[k]
+                         "service_charge": (c.get("svc") or 0) - (c.get("svc_posted") or 0),
+                         "vat_diff": ((b.get("imp") or b.get("inv") or {}).get("vat") or 0) - ((b.get("sim") or {}).get("vat") or 0)}[k]
                 out.append({"subject": f"{d} {k}", "kind": k, "location": L["bc"], "title": f"{L['name']} {d}: {titles[k]}",
                             "detail": (c.get("why") or {}).get(k) or explain(L, d, c, k, r["settings"], ccy),
                             "severity": "critical" if k == "import_diff" and base and abs(value) > 0.05 * abs(base)
