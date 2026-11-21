@@ -524,6 +524,28 @@ def menu_items(loc_ref, max_age=6 * 3600):
     return value
 
 
+_emp_cache = {}
+
+
+def employees(loc_ref, max_age=6 * 3600):
+    """{employee number: {"name": "R. Rexhepi" (as a receipt prints it), "payroll": payroll ID}} of one location
+    (getEmployeeDimensions), for the exports of Simphony ↔ Billy (QA 21 Nov 2026: the object number alone does not
+    say who). No PIN or other personal data is read."""
+    hit = _emp_cache.get(loc_ref)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
+    rows = (call("getEmployeeDimensions", {"locRef": loc_ref}) or {}).get("employees") or []
+    value = {}
+    for e in rows:
+        if e.get("num") is None:
+            continue
+        f, l = (e.get("fName") or "").strip(), (e.get("lName") or "").strip()
+        value[int(e["num"])] = {"name": (f"{f[:1]}. " if f else "") + l,
+                                "payroll": str(e.get("payrollId") or e.get("externalPayrollID") or "")}
+    _emp_cache[loc_ref] = (time.time(), value)
+    return value
+
+
 def menu_item_prices(loc_ref, max_age=3600, history=False):
     """The active prices of one location (getMenuItemPrices): [{num, rvc, level, level_name, price, cost, from,
     to}]. Active: no "effective to" date, or one still to come. history=True: every price effective since three years

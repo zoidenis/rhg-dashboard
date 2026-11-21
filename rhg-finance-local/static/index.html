@@ -1988,9 +1988,11 @@ html:not(.embed-set) #rgSetCard{display:none!important}
         <p class="hint" id="biNote"><span>Every Simphony check against the invoice Billy fiscalized for it: whether, with which IIC and FIC and at what time; the tills and units (kiosks included), shifts and operators, the summary invoices, and the sales book in the columns of the law in place of the Self-Care download.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <button class="mini dark" id="biRead">Read again</button><button class="mini exp" id="biXlsx">Sales book · Export ▾</button><button class="mini" id="biSetBtn" style="display:none">Connection &amp; mapping</button></div></div>
-      <div class="filters" style="margin:12px 0 0;align-items:flex-end"><label>From<input type="date" id="biFrom"></label><label>To<input type="date" id="biTo"></label>
-        <button class="mini" type="button" id="biRange">Read this range</button><button class="mini" type="button" id="biRangeOff" hidden>Back to the last days</button>
-        <span class="meta" id="biRangeMsg"><span>Any days up to yesterday, 62 at most; the usual view is the last days of Settings.</span></span></div>
+      <!-- one date filter (QA 21 Nov 2026): the days are the period chosen above, to yesterday, 62 at most -->
+      <div class="filters" style="margin:12px 0 0;align-items:flex-end"><span hidden><input type="date" id="biFrom"><input type="date" id="biTo">
+        <button class="mini" type="button" id="biRange">Read this range</button><button class="mini" type="button" id="biRangeOff" hidden>Back to the last days</button></span>
+        <span class="meta"><b id="biRangeTxt"></b></span>
+        <span class="meta" id="biRangeMsg"><span>The days are the period chosen above (Period, From – Until), up to yesterday, 62 at most.</span></span></div>
       <div class="kpis" id="biKpis" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
       <div class="meta" id="biStatus"></div>
     </div>
@@ -2055,7 +2057,7 @@ html:not(.embed-set) #rgSetCard{display:none!important}
       <p class="hint"><span>Invoices that sum up other invoices (their IIC references): fiscalized or not, and which of the invoices they refer to are found in Billy for the period.</span></p></div></div>
       <div class="scroll"><table id="biSum"></table></div></div></div>
     <div class="bi-p" data-p="book" hidden><div class="card"><div class="card-head"><div><h2>Sales book</h2>
-      <p class="hint"><span>Every invoice of the period in the columns of the sales book (exempt, without VAT, zero rate and exports, taxable value and VAT by rate), checked against the law; the Excel is the book with the cases.</span></p></div></div>
+      <p class="hint"><span>Every invoice of the period in the columns of the sales book of the law (exempt, without VAT, exports of goods, supplies at 0%, taxable value and VAT by rate), with its number, NSLF, NIVF, the EIC and process of an e-invoice, checked against the law; the Excel is the book with the cases.</span></p></div></div>
       <div class="kpis" id="biBookK"></div><div class="sk-chips" id="biBookChips"></div>
       <div class="scroll" style="max-height:620px"><table id="biBook"></table></div><p class="meta" id="biBookMore"></p></div></div>
     <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the reconciliation works</summary>
@@ -7154,7 +7156,7 @@ async function loadBilly(refresh){
     const p = biRngP(new URLSearchParams({company: $("company").value || ""}));
     const j = await readJSON(await fetch("/api/billyrec?" + p.toString() + (refresh ? "&refresh=1" : "")));
     $("biSetBtn").style.display = j.can_settings ? "" : "none";
-    if (j.pending) { readBanner("biStatus", {src: "Simphony and Billy", reading: true, stage: `${biRng ? `${biRng.from} → ${biRng.to} · ` : ""}${j.stage || ""}`}); biTimer = setTimeout(() => loadBilly(false), 4000); return; }
+    if (j.pending) { if (biData) biRangeSync(); readBanner("biStatus", {src: "Simphony and Billy", reading: true, stage: `${biRng ? `${biRng.from} → ${biRng.to} · ` : ""}${j.stage || ""}`}); biTimer = setTimeout(() => loadBilly(false), 4000); return; }
     if (j.available === false || j.error) throw Object.assign(new Error(j.error || "not available"), {companies: j.companies || []});
     // the last read is shown at once; a new one may be running behind it
     const same = biData && biData.gen === j.gen && biData.checked_at === j.checked_at && biData.company === j.company;
@@ -7377,11 +7379,11 @@ function biChecks(more){
 function biInv(more){
   const d = biData;
   biTable("invoices", {ref: $("biFLoc").value}, (rows, total, err) => {
-    $("biInv").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Status</th><th>Restaurant</th><th>Unit</th><th>Till</th><th>Operator</th><th>Shift</th><th>IIC</th><th>FIC</th></tr>` +
-      (err ? biErrRow(11, err) : rows.map(i => `<tr><td>${esc((i.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(i.num)}</b></td><td class="num">${fmt(i.total, 2)}</td>
-        <td><span class="rhg-pill ${i.status === "no_fic" ? "critical" : "medium"}">${esc(d.inv_status[i.status])}</span></td><td>${esc(i.ref || "–")}</td><td>${esc(i.bu)}</td><td>${esc(i.tcr)}</td><td>${esc(i.op)}</td><td>${esc(i.shift)}</td>
+    $("biInv").innerHTML = `<tr><th>Issued</th><th>Invoice</th><th class="num">Total</th><th>Status</th><th>Issued from</th><th>Restaurant</th><th>Unit</th><th>Till</th><th>Operator</th><th>Shift</th><th>IIC</th><th>FIC</th></tr>` +
+      (err ? biErrRow(12, err) : rows.map(i => `<tr><td>${esc((i.issue || "").replace("T", " ").slice(0, 16))}</td><td><b>${esc(i.num)}</b></td><td class="num">${fmt(i.total, 2)}</td>
+        <td><span class="rhg-pill ${i.status === "no_fic" ? "critical" : i.status === "cancelled" || i.status === "zero" ? "low" : "medium"}">${esc(d.inv_status[i.status] || i.status)}</span>${i.pair ? `<div class="meta">${fcSp("with")} ${esc(i.pair)}</div>` : ""}</td><td class="meta">${i.source === "bc" ? "Business Central" : i.source === "pos" ? "POS till" : ""}</td><td>${esc(i.ref || "–")}</td><td>${esc(i.bu)}</td><td>${esc(i.tcr)}</td><td>${esc(i.op)}</td><td>${esc(i.shift)}</td>
         <td class="meta" title="${esc(i.iic)}">${esc((i.iic || "").slice(0, 12))}…</td><td class="meta">${esc((i.fic || "–").slice(0, 13))}</td></tr>`).join("")
-        || `<tr><td colspan="11" class="meta">${fcSp("Every fiscalized invoice has its Simphony check, and every invoice of the bridge has a FIC.")}</td></tr>`);
+        || `<tr><td colspan="12" class="meta">${fcSp("Every fiscalized invoice has its Simphony check, and every invoice of the bridge has a FIC.")}</td></tr>`);
     biMore("biInvMore", "invoices", rows, total, "The Excel has every one.");
   }, more);
 }
@@ -7434,19 +7436,19 @@ function biSum(){
 function biBook(more){
   const d = biData, rates = d.rates.filter(r => r > 0).sort((a, b) => b - a), T = d.book_totals || {};
   const card = (l, v) => `<div class="card kpi"><div class="l">${fcSp(l)}</div><div class="v">${biM(v)}</div></div>`;
-  $("biBookK").innerHTML = card("Total with VAT", T.total || 0) + card("Exempt", T.exempt || 0) + card("Without VAT", T.no_vat || 0) + card("Zero rate and exports", T.zero || 0) +
+  $("biBookK").innerHTML = card("Total with VAT", T.total || 0) + card("Exempt", T.exempt || 0) + card("Without VAT", T.no_vat || 0) + card("Exports of goods", T.export || 0) + card("Supplies at 0%", T.zero || 0) +
     rates.map(r => card(`Taxable ${r}%`, T["b" + r] || 0) + card(`VAT ${r}%`, T["v" + r] || 0)).join("");
   const counts = d.book_errors || {}, keys = Object.keys(counts).filter(k => counts[k]).sort((a, b) => counts[b] - counts[a]);
   $("biBookChips").innerHTML = [["", "Every invoice", d.book_count || 0], ["*", "With a case", d.book_cases || 0], ...keys.map(k => [k, d.error_labels[k] || k, counts[k]])]
     .map(([k, l, n]) => `<button data-be="${esc(k)}" class="${biBookErr === k ? "on" : ""}"><span>${esc(l)}</span> · ${fmt(n)}</button>`).join("");
   $("biBookChips").querySelectorAll("[data-be]").forEach(b => b.onclick = () => { biBookErr = b.dataset.be; biBook(); });
   biTable("book", {st: biBookErr}, (rows, total, err) => {
-    $("biBook").innerHTML = `<tr><th>Date</th><th>No.</th><th>Invoice</th><th>Buyer</th><th class="num">Total</th><th class="num">Exempt</th><th class="num">No VAT</th><th class="num">0% / export</th>${rates.map(r => `<th class="num">Taxable ${r}%</th><th class="num">VAT ${r}%</th>`).join("")}<th>Till</th><th>Cases</th></tr>` +
-      (err ? biErrRow(10 + rates.length * 2, err) : rows.map(b => `<tr><td>${esc((b.issue || "").slice(0, 16).replace("T", " "))}</td><td>${esc(b.ord ?? "")}</td><td><b>${esc(b.num)}</b>${b.eic ? `<div class="meta">EIC</div>` : ""}</td><td>${esc(b.buyer || "")}${b.buyer_id ? `<div class="meta">${esc(b.buyer_id)}</div>` : ""}</td>
-        <td class="num">${fmt(b.total, 2)}</td><td class="num">${b.exempt ? fmt(b.exempt, 2) : ""}</td><td class="num">${b.no_vat ? fmt(b.no_vat, 2) : ""}</td><td class="num">${b.zero ? fmt(b.zero, 2) : ""}</td>
+    $("biBook").innerHTML = `<tr><th>Date</th><th>No.</th><th>Invoice</th><th>Buyer</th><th class="num">Total</th><th class="num">Exempt</th><th class="num">No VAT</th><th class="num">Exports</th><th class="num">0%</th>${rates.map(r => `<th class="num">Taxable ${r}%</th><th class="num">VAT ${r}%</th>`).join("")}<th>Till</th><th>Cases</th></tr>` +
+      (err ? biErrRow(11 + rates.length * 2, err) : rows.map(b => `<tr><td>${esc((b.issue || "").slice(0, 16).replace("T", " "))}</td><td>${esc(b.ord ?? "")}</td><td><b>${esc(b.num)}</b>${b.eic ? `<div class="meta" title="${esc(b.eic)}">EIC ${esc(b.eic.slice(0, 8))}…${b.process ? " · " + esc(b.process) : ""}</div>` : b.process ? `<div class="meta">${esc(b.process)}</div>` : ""}</td><td>${esc(b.buyer || "")}${b.buyer_id ? `<div class="meta">${esc(b.buyer_id)}</div>` : ""}</td>
+        <td class="num">${fmt(b.total, 2)}</td><td class="num">${b.exempt ? fmt(b.exempt, 2) : ""}</td><td class="num">${b.no_vat ? fmt(b.no_vat, 2) : ""}</td><td class="num">${b.export ? fmt(b.export, 2) : ""}</td><td class="num">${b.zero ? fmt(b.zero, 2) : ""}</td>
         ${rates.map(r => `<td class="num">${b["b" + r] ? fmt(b["b" + r], 2) : ""}</td><td class="num">${b["v" + r] ? fmt(b["v" + r], 2) : ""}</td>`).join("")}<td>${esc(b.tcr)}</td>
         <td>${b.errors.map(e => `<span class="rhg-pill ${e === "no_fic" ? "critical" : e === "no_detail" ? "" : "medium"}" style="margin:1px">${esc(d.error_labels[e] || e)}</span>`).join("")}</td></tr>`).join("")
-        || `<tr><td colspan="${10 + rates.length * 2}" class="meta">${fcSp("No invoice with this filter.")}</td></tr>`);
+        || `<tr><td colspan="${11 + rates.length * 2}" class="meta">${fcSp("No invoice with this filter.")}</td></tr>`);
     biMore("biBookMore", "book", rows, total, "The Excel has the whole book.");
   }, more);
 }
@@ -7462,9 +7464,11 @@ $("biRead").onclick = () => loadBilly(true);
 $("biXlsx").onclick = () => { if (biData) exportGo("/api/billyrec/xlsx?" + biRngP(new URLSearchParams({company: biData.company})).toString()); };
 // a range of its own: read apart from the last days (and kept a while: the three last ranges of a company)
 function biRangeSync(){
-  const d = biData, R = d.range || {from: d.days[0], to: d.days[d.days.length - 1]};
+  // the range asked (the period above) wins over the one of the read shown while the new one is read
+  const d = biData, S = d.range || {from: d.days[0], to: d.days[d.days.length - 1]}, R = biRng || S;
   [["biFrom", R.from], ["biTo", R.to]].forEach(([id, v]) => { if (document.activeElement !== $(id)) $(id).value = v; $(id).max = biYday(); });
   $("biRangeOff").hidden = !biRng;
+  $("biRangeTxt").textContent = `Days ${R.from} → ${R.to}` + (S.from !== R.from || S.to !== R.to ? ` · shown until it is read: ${S.from} → ${S.to}` : "");
 }
 $("biRange").onclick = () => {
   const a = $("biFrom").value, b = $("biTo").value, n = a && b ? (new Date(b) - new Date(a)) / 864e5 + 1 : 0;

@@ -260,6 +260,41 @@ def corrective_of(x):
     return str(ref or "").upper(), str(low.get("type") or "")
 
 
+def _norm(k):
+    return re.sub(r"[^a-z0-9]", "", str(k).lower())
+
+
+def pick(x, *names):
+    """The first of the names an invoice carries, any casing or separators, at the top or one level down (Billy's
+    two methods do not name every field alike: the invoice number, EIC and process were missing from the sales book,
+    QA 21 Nov 2026)."""
+    want = [_norm(n) for n in names]
+    top = {_norm(k): v for k, v in x.items()}
+    for w in want:
+        v = top.get(w)
+        if v not in (None, "", [], {}):
+            return v
+    for v in x.values():
+        if isinstance(v, dict):
+            low = {_norm(k): u for k, u in v.items()}
+            for w in want:
+                u = low.get(w)
+                if u not in (None, "", [], {}) and not isinstance(u, (dict, list)):
+                    return u
+    return None
+
+
+def inv_number(x, ord_, issue, tcr, kind):
+    """The invoice number as Billy gives it, else as the law writes it: order number/year, and /till code on a cash
+    invoice (e.g. 60803/2026/zk574kl217 on the receipt; 86733/2026 for a non-cash one)."""
+    n = pick(x, "invNum", "invoiceNumber", "invNumber", "invoiceNo", "docNumber", "documentNumber", "nrFature")
+    if n:
+        return str(n), False
+    if ord_ in (None, "") or not issue:
+        return "", False
+    return f"{ord_}/{str(issue)[:4]}" + (f"/{tcr}" if tcr and str(kind or "").upper() == "CASH" else ""), True
+
+
 def compact(x, source):
     """A Billy invoice (either method) → the fields the reconciliation and the sales book use."""
     buyer = x.get("buyer") or {}
@@ -275,15 +310,29 @@ def compact(x, source):
         refs = [refs]
     refs = [str(r.get("iic") or r.get("IIC") if isinstance(r, dict) else r) for r in (refs or []) if r]
     pays = _pay_types(x)
-    return {"src": source, "iic": (x.get("iic") or "").upper(), "fic": x.get("fic") or "", "num": x.get("invNum") or "",
-            "ord": x.get("invOrdNum"), "issue": local(x.get("issueDateTime")), "sent": local(x.get("sendDateTime")),
+    ord_ = pick(x, "invOrdNum", "invoiceOrderNumber", "ordNum")
+    issue = local(x.get("issueDateTime") or pick(x, "issueDateTime", "issueDate"))
+    tcr = str(x.get("tcrcode") or pick(x, "tcrCode") or "").lower()
+    kind = x.get("typeOfInv") or pick(x, "typeOfInv", "invoiceType") or ""
+    num, built = inv_number(x, ord_, issue, tcr, kind)
+    return {"src": source, "iic": str(x.get("iic") or pick(x, "iic", "nslf") or "").upper(),
+            "fic": str(x.get("fic") or pick(x, "fic", "nivf") or ""), "num": num, "num_built": built,
+            "ord": ord_, "issue": issue, "sent": local(x.get("sendDateTime")),
             "total": _f(x.get("totPrice")), "wo_vat": _f(x.get("totPriceWoVAT")), "vat": _f(x.get("totVATAmt")),
-            "type": x.get("typeOfInv") or "", "tcr": (x.get("tcrcode") or "").lower(),
+            "type": kind, "tcr": tcr,
             "bu": (x.get("businUnitCode") or "").lower(), "op": (x.get("operatorCode") or "").lower(),
             "buyer_id": (buyer.get("idnum") or "") if isinstance(buyer, dict) else "",
             "buyer_type": (buyer.get("idtype") or "") if isinstance(buyer, dict) else "",
             "buyer": (buyer.get("name") or "") if isinstance(buyer, dict) else "",
-            "einv": bool(x.get("isEinvoice")), "eic": x.get("eic") or "", "corr": bool(x.get("correctiveInv")),
+            "einv": bool(x.get("isEinvoice") or pick(x, "isEinvoice", "eic", "einvoiceCode")),
+            "eic": str(pick(x, "eic", "einvoiceCode", "eInvCode", "einvCode") or "").lower(),
+            # the e-invoice process (P1–P12: P11 partial and final invoicing, P2 periodic deliveries …)
+            "process": str(pick(x, "profileId", "profileID", "processType", "process", "busProcess",
+                                "businessProcess", "einvProcess") or ""),
+            "doc_type": str(pick(x, "invType", "documentType", "docType", "einvType", "typeOfEinv") or ""),
+            "err": str(pick(x, "errorMessage", "fiscalizationError", "fiscError", "errorDescription", "faultString",
+                            "error") or "")[:300],
+            "corr": bool(x.get("correctiveInv")),
             "corr_ref": corrective_of(x)[0], "corr_type": corrective_of(x)[1],
             "refs": refs, "taxes": taxes, "pays": pays, "order": any("ORDER" in p[0] for p in pays),
             "reverse": bool(x.get("isReverseCharge")),

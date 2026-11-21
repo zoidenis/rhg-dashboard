@@ -60,7 +60,10 @@ DEFAULTS = {"days": "7", "window": "20", "tol": "1", "late": "60", "rates": "20,
 STATUS = {"ok": "Fiscalized", "late": "Fiscalized late", "late48": "Fiscalized after 48 h", "missing": "Not fiscalized",
           "pending": "Pending", "zero": "No amount"}
 INV_STATUS = {"matched": "With a Simphony check", "no_check": "No Simphony check", "no_fic": "Not fiscalized (no FIC)",
-              "other_till": "Till without Simphony", "summary": "Summary invoice"}
+              "other_till": "Till without Simphony", "summary": "Summary invoice", "zero": "No amount",
+              "cancelled": "Cancelled by a corrective invoice (storno)"}
+# where an invoice was issued: an e-invoice (non-cash, to a business: issued from Business Central) or a till
+SOURCES = {"bc": "Business Central (e-invoice)", "pos": "POS till"}
 ERRORS = {"total": "Total ≠ value without VAT + VAT", "base_sum": "VAT groups ≠ value without VAT",
           "vat_sum": "VAT of the groups ≠ VAT of the invoice", "vat_rate": "VAT ≠ value × rate",
           "rate": "Rate not in the law", "exempt_vat": "Exempt group with VAT", "no_group": "No VAT group, no exemption",
@@ -388,7 +391,7 @@ def _place(invs, checks_by_ref, M, S, own=None):
 # ---------------------------------------------------------------- the sales book
 def book_row(i, S):
     """An invoice → its sales book columns and the errors of its mapping to them."""
-    errs, cols = [], {"exempt": 0.0, "no_vat": 0.0, "zero": 0.0}
+    errs, cols = [], {"exempt": 0.0, "no_vat": 0.0, "export": 0.0, "zero": 0.0}
     rates = S["rates"]
     for r in rates:
         if r > 0:
@@ -411,6 +414,11 @@ def book_row(i, S):
         elif tot is not None:
             cols["no_vat" if i.get("in_vat") is False else "zero"] += tot
     for rate, exempt, base, v, _n in taxes:
+        # exports of goods are a column of their own in the sales book (g), apart from the exempt sales (ë) and
+        # from the supplies at 0% (gj) (QA 21 Nov 2026)
+        if exempt and "EXPORT" in str(exempt).upper():
+            cols["export"] += base
+            continue
         if exempt:
             cols["exempt"] += base
             if v and abs(v) > 0.5:
@@ -769,6 +777,68 @@ def _trim():
         pass
 
 
+def source_of(i):
+    """bc: an e-invoice, or a non-cash invoice to a business (issued from Business Central); pos: a till's."""
+    if i.get("einv") or i.get("eic") or (str(i.get("type") or "").upper() == "NONCASH" and i.get("buyer_id")):
+        return "bc"
+    return "pos"
+
+
+def storno(invs, corr_index=None, number_of=None):
+    """An invoice cancelled by a corrective invoice, and the corrective, are "Cancelled" (storno) when they have no
+    check: the corrective names the IIC of the invoice it corrects (correctiveInv), for the original looked up in the
+    correctives of the whole period, so the parts of a read agree. They are not invoices without a check (QA 21 Nov
+    2026: SALT 141,912 and −141,912 at 00:36)."""
+    idx = corr_index if corr_index is not None else {}
+    if corr_index is None:
+        for i in invs:
+            if i.get("corr_ref"):
+                idx.setdefault(i["corr_ref"].upper(), []).append(i)
+    for i in invs:
+        if i.get("status") != "no_check":
+            continue
+        if i.get("corr_ref") and (i.get("corr") or (i["total"] or 0) < 0):
+            ref = i["corr_ref"].upper()
+            i["status"], i["pair"] = "cancelled", "IIC " + ref[:12]          # the same whatever days are read
+            continue
+        cs = [c for c in idx.get((i["iic"] or "").upper(), ()) if abs((c.get("total") or 0) + (i["total"] or 0)) <= 1]
+        if cs:
+            i["status"], i["pair"] = "cancelled", cs[0].get("num") or (cs[0].get("iic") or "")[:12]
+
+
+def why_missing(oc, c, near, inv_by, S):
+    """A not-fiscalized check: why, as far as Simphony and Billy tell (Simphony does not keep the fiscal error)."""
+    out = []
+    if c.get("how") == "its invoice has no FIC":
+        i = inv_by.get(c.get("inv") or "") or {}
+        out.append("Its invoice reached Billy without a FIC" + (f": {i['err']}" if i.get("err") else ""))
+    if c.get("reopen"):
+        out.append("Reopened after closing" + (f" ({c['reopen_at'].replace('T', ' ')})" if c.get("reopen_at") else ""))
+    if c.get("xfer"):
+        out.append("Transferred" + (f" to check {c['xfer_to']}" if c.get("xfer_to") else ""))
+    if c.get("split"):
+        out.append("Split")
+    if c.get("rt") or c.get("vd"):
+        out.append("Returns or voids on the check")
+    if _TOKEN.search((c.get("info") or "").upper()) and re.search(r"\b[0-9A-F]{32}\b", (c.get("info") or "").upper()):
+        out.append("The check names an IIC that Billy does not have")
+    t = _ts(oc["clsd"])
+    best = None
+    for a in range(round(oc["total"] - S["tol"]) - 1, round(oc["total"] + S["tol"]) + 2):
+        for i in near.get((oc["ref"], a), ()):
+            if abs(i["total"] - oc["total"]) <= S["tol"] + 0.005 and t is not None:
+                d = i["_t"] - t                                 # after the closing: the days every part reads
+                if 0 <= d <= LATE_LIMIT and (best is None or d < best[0]):
+                    best = (d, i)
+    if best:
+        d, i = best
+        out.append(f"First invoice of the same total after the closing: {i['num'] or i['iic'][:12]} at "
+                   f"{(i['issue'] or '').replace('T', ' ')}, {round(d / 60)} min later, taken by another check or outside the window")
+    else:
+        out.append("No invoice of this total at the restaurant in Billy in the 72 hours after the closing")
+    return "; ".join(out)
+
+
 def analyse(company, nuis, regs, days, inv, checks, latest, S, today, last_day=None, pre_used=frozenset(), nxt=None,
             ret_used=frozenset(), corr_index=None, number_of=None):
     """One part of the period. days: its own days; inv: {key: invoice} (load_invoices), with those of the days
@@ -856,11 +926,15 @@ def analyse(company, nuis, regs, days, inv, checks, latest, S, today, last_day=N
             st = "summary"
         elif i["_k"] in matched_inv:
             st = "matched"
+        elif i["total"] is None or abs(i["total"]) < 0.01:
+            st = "zero"                                         # an invoice of no amount: nothing to fiscalize
         elif i["loc"] not in refs_with_checks or (i["tcr"] and i["tcr"] not in tills_with_match):
             st = "other_till"
         else:
             st = "no_check"
         i["status"] = st
+        i["source"] = source_of(i)
+    storno(invs, corr_index, number_of)
     mine = [i for i in invs if own(i)]                          # the invoices of this part's days
     # tills and units, the kiosks included
     tills = {}
@@ -919,7 +993,8 @@ def analyse(company, nuis, regs, days, inv, checks, latest, S, today, last_day=N
         book.append({"issue": i["issue"], "ord": i["ord"], "num": i["num"], "iic": i["iic"], "fic": i["fic"],
                      "buyer": i["buyer"], "buyer_id": i["buyer_id"], "type": i["type"], "total": i["total"],
                      "bu": i["bu"], "tcr": i["tcr"], "op": i["op"], "ref": i["loc"], "einv": i["einv"], "eic": i["eic"],
-                     **cols, "errors": errs})
+                     "process": i.get("process") or "", "doc_type": i.get("doc_type") or "",
+                     "source": SOURCES.get(i.get("source") or source_of(i), ""), **cols, "errors": errs})
     # orders: placed like invoices, and whether an invoice of the same total follows on the same till
     orders = [o for o in orders if own(o)]
     oloc, _p = _place(orders, {}, M, S) if orders else ({}, {})
@@ -977,8 +1052,19 @@ def analyse(company, nuis, regs, days, inv, checks, latest, S, today, last_day=N
                      "missing_value": sum(c["total"] for c in cs if c["status"] == "missing")})
     no_check = sorted(({"iic": i["iic"], "fic": i["fic"], "num": i["num"], "issue": i["issue"], "total": i["total"],
                         "tcr": i["tcr"], "bu": i["bu"], "op": i["op"], "ref": i["loc"], "status": i["status"],
-                        "shift": shift_of(i["issue"], S)}
-                       for i in mine if i["status"] in ("no_check", "no_fic")), key=lambda x: x["issue"] or "")
+                        "shift": shift_of(i["issue"], S), "source": i.get("source") or "", "pair": i.get("pair") or "",
+                        "err": i.get("err") or "", "einv": i.get("einv"), "eic": i.get("eic") or ""}
+                       for i in mine if i["status"] in ("no_check", "no_fic", "cancelled", "zero")),
+                      key=lambda x: x["issue"] or "")
+    # why each check is not fiscalized: what Billy has of its total near it (QA 21 Nov 2026: an error column)
+    near = defaultdict(list)
+    for i in invs:
+        if i["total"] is not None and i["_t"] is not None:
+            near[(i["loc"], round(i["total"]))].append(i)
+    by_cid = {c["id"]: c for lst in checks.values() for c in lst}
+    for oc in out_checks:
+        if oc["status"] == "missing":
+            oc["why"] = why_missing(oc, by_cid.get(oc["id"]) or {}, near, inv_by, S)
     own_keys = {i["_k"] for i in mine} | {o["_k"] for o in orders}
     return {"checks": out_checks, "invoices": no_check, "book": book, "orders": out_orders, "summary": summary,
             "events": returns["events"], "loose": returns["loose"], "marks": returns["marks"],
@@ -1220,11 +1306,13 @@ DEFINITIONS = {
 # summary invoices and the gen; the screen asks for the rows a page at a time, the Excel streams them. A read is
 # registered (gens) only when it is complete; then the reads before it are deleted.
 COLS = {"checks": ["ref", "day", "num", "id", "clsd", "total", "emp", "rvc", "ws", "shift", "status", "how", "iic", "fic",
-                   "inv_num", "issued", "delay_min", "tcr", "op"],
-        "invoices": ["iic", "fic", "num", "issue", "total", "tcr", "bu", "op", "ref", "status", "shift"],
+                   "inv_num", "issued", "delay_min", "tcr", "op", "why"],
+        "invoices": ["iic", "fic", "num", "issue", "total", "tcr", "bu", "op", "ref", "status", "shift", "source", "pair",
+                     "err", "einv", "eic"],
         "orders": ["issue", "num", "iic", "fic", "total", "tcr", "bu", "op", "ref", "pays", "closed_by", "invoiced", "after_min"],
         "loose": ["iic", "fic", "num", "issue", "total", "ref", "tcr", "op", "marked", "corr_ref", "refers_to"]}
-BOOK_HEAD = ["issue", "ord", "num", "iic", "fic", "buyer", "buyer_id", "type", "total", "bu", "tcr", "op", "ref", "einv", "eic"]
+BOOK_HEAD = ["issue", "ord", "num", "iic", "fic", "buyer", "buyer_id", "type", "total", "bu", "tcr", "op", "ref", "einv", "eic",
+             "process", "doc_type", "source"]
 ROW_KINDS = ("checks", "invoices", "book", "orders", "events", "loose")
 RET_CHIPS = {"need": "st<>'no_effect'", "unfiscalized": "st='unfiscalized'", "pending": "st='pending'",
              "closed": "st IN ('closed_ref','closed_self')", "amount": "st='closed_amount'", "no_effect": "st='no_effect'", "all": ""}
@@ -1232,7 +1320,7 @@ _rlocal = threading.local()
 
 
 def book_keys(rates):
-    return BOOK_HEAD + ["exempt", "no_vat", "zero"] + [k for r in rates if r > 0 for k in (f"b{r:g}", f"v{r:g}")] + ["errors"]
+    return BOOK_HEAD + ["exempt", "no_vat", "export", "zero"] + [k for r in rates if r > 0 for k in (f"b{r:g}", f"v{r:g}")] + ["errors"]
 
 
 def _rows_path():
@@ -1365,6 +1453,7 @@ class _Acc:
             return part.setdefault(ref or "", {"checks": 0, "fiscalized": 0, "missing": 0, "missing_value": 0.0, "late": 0,
                                                "late48": 0, "invoices": 0, "no_check": 0, "no_check_value": 0.0, "no_fic": 0,
                                                "no_fic_value": 0.0, "other_till": 0, "summary": 0, "book_errors": 0,
+                                               "cancelled": 0, "cancelled_value": 0.0, "zero": 0, "zero_value": 0.0,
                                                "book_nodetail": 0, "orders": 0, "orders_value": 0.0, "orders_open": 0,
                                                "be": {}, "bt": {}, "ret": {"st": {}, "kind": {}, "unf_value": 0.0, "loose": 0, "loose_value": 0.0}})
         for c in res["checks"]:
@@ -1400,7 +1489,7 @@ class _Acc:
             for e in b["errors"]:
                 x["be"][e] = x["be"].get(e, 0) + 1
             for k in self.keys:
-                if k == "total" or k in ("exempt", "no_vat", "zero") or re.fullmatch(r"[bv]\d+(\.\d+)?", k):
+                if k == "total" or k in ("exempt", "no_vat", "export", "zero") or re.fullmatch(r"[bv]\d+(\.\d+)?", k):
                     x["bt"][k] = x["bt"].get(k, 0) + (b.get(k) or 0)
             for e in case:
                 d = self.berr.setdefault(e, {"n": 0, "value": 0.0, "ex": []})
@@ -1860,10 +1949,35 @@ def in_scope(r):
 
 
 # ---------------------------------------------------------------- the Excel: the sales book and the cases
+# the sales book in the columns of the law (Libri i Shitjeve, QA 21 Nov 2026): the total e = ë + f + g + gj + the
+# taxable value and VAT of each rate; exports of goods (g) apart from the supplies at 0% (gj)
 BOOK_COLS = [("issue", "Data dhe ora"), ("ord", "Nr. rendor"), ("num", "Nr. i faturës"), ("iic", "NSLF (IIC)"),
-             ("fic", "NIVF (FIC)"), ("buyer", "Blerësi"), ("buyer_id", "NIPT i blerësit"), ("type", "Pagesa"),
-             ("total", "Vlera totale me TVSH"), ("exempt", "Shitje të përjashtuara"), ("no_vat", "Shitje pa TVSH"),
-             ("zero", "Shitje me 0% / eksporte")]
+             ("fic", "NIVF (FIC)"), ("eic", "EIC (fatura elektronike)"), ("buyer", "Blerësi"), ("buyer_id", "NIPT i blerësit"),
+             ("type", "Pagesa"), ("total", "Totali i shitjeve (e)"), ("exempt", "Shitjet e përjashtuara (ë)"),
+             ("no_vat", "Shitjet pa TVSH (f)"), ("export", "Eksporte mallrash (g)"), ("zero", "Furnizime me 0% (gj)")]
+RATE_LETTERS = ["h", "i", "j", "k", "l", "ll", "m", "n", "nj", "o", "p", "q"]
+
+
+def eic_by_number(company):
+    """{invoice number: EIC} of the e-invoices the Tax Administration lists for the company (Fiscal sales), for the
+    e-invoices whose EIC Billy does not give."""
+    try:
+        import fiscal
+        with fiscal._lock:
+            rows = fiscal._db().execute("SELECT inv_no, eic FROM einv_sales WHERE company=?", (company,)).fetchall()
+        return {str(n).strip(): e for n, e in rows if n and e}
+    except Exception:                                                # noqa: BLE001
+        return {}
+
+
+def employee_of(ref, num):
+    """(name as the receipt prints it, payroll ID) of a Simphony employee, or ("", "")."""
+    try:
+        e = simphony.employees(ref).get(int(num)) if num not in (None, "") else None
+    except Exception:                                                # noqa: BLE001
+        simphony._emp_cache[ref] = (time.time(), {})                  # not asked again for every row
+        e = None
+    return (e["name"], e["payroll"]) if e else ("", "")
 
 
 def render_xlsx(r, keep=None):
@@ -1885,8 +1999,12 @@ def render_xlsx(r, keep=None):
         ws.append(row)
 
     rates = sorted((x for x in r["rates"] if x > 0), reverse=True)
-    cols = BOOK_COLS + [c for x in rates for c in ((f"b{x:g}", f"Vlera e tatueshme {x:g}%"), (f"v{x:g}", f"TVSH {x:g}%"))] + \
-        [("bu", "Njësia (BU)"), ("tcr", "Arka (TCR)"), ("op", "Operatori"), ("ref", "Restoranti"), ("eic", "EIC"), ("errors", "Gabime")]
+    lt = iter(RATE_LETTERS)
+    cols = BOOK_COLS + [c for x in rates for c in ((f"b{x:g}", f"Shitje me shkallë {x:g}%: Vlera e tatueshme ({next(lt, '')})"),
+                                                   (f"v{x:g}", f"Shitje me shkallë {x:g}%: TVSH ({next(lt, '')})"))] + \
+        [("bu", "Njësia (BU)"), ("tcr", "Arka (TCR)"), ("op", "Operatori"), ("ref", "Restoranti"),
+         ("process", "Procesi (P1–P12)"), ("doc_type", "Lloji i dokumentit"), ("source", "Lëshuar nga"), ("errors", "Gabime")]
+    eics = eic_by_number(r["company"])
 
     def new(title, header, pre=()):
         ws = wb.create_sheet(title)
@@ -1898,23 +2016,40 @@ def render_xlsx(r, keep=None):
         return ws
     ws = new("Libri i Shitjes", [c[1] for c in cols], [f"Libri i Shitjes · {r['company']} · NIPT {r['nuis']} · {r['days'][0]} – {r['days'][-1]}"])
     labels = r["error_labels"]
+    amount_keys = [k for k, _ in cols if k == "total" or k in ("exempt", "no_vat", "export", "zero") or re.fullmatch(r"[bv]\d+(\.\d+)?", k)]
     for b in iter_rows(r, "book", keep):
+        if not b.get("eic") and b.get("num") in eics:
+            b["eic"] = eics[b["num"]]
         ws.append([", ".join(labels.get(e, e) for e in b["errors"]) if k == "errors" else
-                   (b.get(k) or "").replace("T", " ") if k == "issue" else b.get(k) for k, _ in cols])
+                   (b.get(k) or "").replace("T", " ") if k == "issue" else
+                   (b.get(k) or 0) if k in amount_keys and k != "total" else b.get(k) for k, _ in cols])
     bt = _sum_agg(r, keep).get("bt") or {}
-    ws.append(["Totali"] + [""] * 7 + [round(bt.get(k) or 0, 2) for k, _ in cols[8:-6]])
-    w2 = new("Checks not fiscalized", ["Restaurant", "Business day", "Check", "Closed", "Total", "Employee", "Shift", "Status"])
+    ws.append([round(bt.get(k) or 0, 2) if k in amount_keys else "Totali" if n == 0 else "" for n, (k, _) in enumerate(cols)])
+    status = dict(r["status"])
+    w2 = new("Checks not fiscalized", ["Restaurant", "Business day", "Check", "Closed", "Total", "Employee no.", "Employee",
+                                       "Payroll ID", "Shift", "Status", "Error / why"])
     for st in ("missing", "late48"):
         for c in iter_rows(r, "checks", keep, st=st):
-            w2.append([c["ref"], c["day"], c["num"], c["clsd"], c["total"], c["emp"], c["shift"], r["status"][c["status"]]])
-    w3 = new("Invoices without check", ["Issued", "Number", "IIC", "FIC", "Total", "Business unit", "Till", "Operator", "Restaurant", "Status"])
+            name, pay = employee_of(c["ref"], c["emp"])
+            w2.append([c["ref"], c["day"], c["num"], c["clsd"], c["total"], c["emp"], name, pay, c["shift"],
+                       status.get(c["status"], c["status"]), c.get("why") or ("" if c["status"] == "missing" else c.get("how") or "")])
+    inv_st = dict(INV_STATUS, **(r.get("inv_status") or {}))
+    w3 = new("Invoices without check", ["Issued", "Number", "IIC", "FIC", "EIC", "Total", "Business unit", "Till", "Operator",
+                                        "Restaurant", "Status", "Void / storno", "Issued from", "Billy error"])
     for i in iter_rows(r, "invoices", keep):
-        w3.append([i["issue"], i["num"], i["iic"], i["fic"], i["total"], i["bu"], i["tcr"], i["op"], i["ref"], r["inv_status"][i["status"]]])
+        w3.append([i["issue"], i["num"], i["iic"], i["fic"], i.get("eic") or eics.get(i["num"] or "", ""), i["total"], i["bu"],
+                   i["tcr"], i["op"], i["ref"], inv_st.get(i["status"], i["status"]),
+                   (f"yes, with {i['pair']}" if i.get("pair") else "yes") if i["status"] == "cancelled" else "no",
+                   SOURCES.get(i.get("source") or "", ""), i.get("err") or ""])
     w4 = new("Shift & operator", ["Restaurant", "Shift", "Operator", "Employees", "Checks", "Simphony", "Fiscalized", "Difference",
                                   "Not fiscalized", "Invoices without check"])
     for o in r["operators"]:
         if keep is None or o["ref"] in keep:
-            w4.append([o["ref"], o["shift"], o["op"], ", ".join(o["emps"]), o["checks"], o["sim"], o["fisc"], o["diff"],
+            emps = []
+            for e in o["emps"]:
+                name, pay = employee_of(o["ref"], e)
+                emps.append(" ".join(x for x in (str(e), name, f"(payroll {pay})" if pay else "") if x))
+            w4.append([o["ref"], o["shift"], o["op"], ", ".join(emps), o["checks"], o["sim"], o["fisc"], o["diff"],
                        o["not_fisc"], o["no_check"]])
     w6 = new("Orders", ["Issued", "Number", "IIC", "FIC", "Total", "Till", "Operator", "Restaurant", "Payment", "Invoice after (min)"])
     for x in iter_rows(r, "orders", keep):

@@ -253,7 +253,22 @@ class Parts(unittest.TestCase):
         book = list(wb["Libri i Shitjes"].iter_rows(values_only=True))
         self.assertEqual(len(book), 2 + r["kpis"]["invoices"] + 1)        # title, header, every invoice, total
         self.assertEqual(book[-1][0], "Totali")
-        self.assertAlmostEqual(book[-1][8], sum(x[8] or 0 for x in book[2:-1]), places=1)
+        head = list(book[1])
+        for h in ("Totali i shitjeve (e)", "Shitjet e përjashtuara (ë)", "Shitjet pa TVSH (f)", "Eksporte mallrash (g)",
+                  "Furnizime me 0% (gj)", "Shitje me shkallë 20%: Vlera e tatueshme (h)", "Shitje me shkallë 20%: TVSH (i)",
+                  "EIC (fatura elektronike)", "Procesi (P1–P12)", "Nr. i faturës"):
+            self.assertIn(h, head)
+        t = head.index("Totali i shitjeve (e)")
+        self.assertAlmostEqual(book[-1][t], sum(x[t] or 0 for x in book[2:-1]), places=1)
+        # every invoice has its number (Billy's, or order number/year/till as the law writes it)
+        self.assertTrue(all(x[head.index("Nr. i faturës")] for x in book[2:-1]))
+        # the total of the law: e = ë + f + g + gj + the taxable values and VAT
+        parts = [i for i, h in enumerate(head) if h and (h.endswith(("(ë)", "(f)", "(g)", "(gj)")) or h.startswith("Shitje me shkallë"))]
+        for x in book[2:-1]:
+            self.assertAlmostEqual(x[t] or 0, sum(x[i] or 0 for i in parts), delta=1.01)
+        nf = list(wb["Checks not fiscalized"].iter_rows(values_only=True))
+        self.assertEqual(nf[0][-1], "Error / why")
+        self.assertTrue(all(x[-1] for x in nf[1:] if x[9] == "Not fiscalized"))
         ret = load_workbook(io.BytesIO(billyrec.render_returns_xlsx(r, None, st="unfiscalized")), read_only=True)
         self.assertEqual(sum(1 for _ in ret["Returns tracking"].iter_rows()) - 1, r["returns"]["kpis"]["unfiscalized"])
 
