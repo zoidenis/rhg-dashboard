@@ -213,6 +213,7 @@ def vat_pct(card):
 
 # the BC item the POS import posts for each menu item, by company: {company: {"at", "map": {menu item: BC item}}}
 _bcmap, MAP_FILE, MAP_TTL = {}, store.DATA_DIR / "menu_bc_map.json", 6 * 3600
+_maplock = threading.Lock()
 
 
 def bc_map(client, company, a, b):
@@ -243,6 +244,54 @@ def bc_map(client, company, a, b):
         pass
     _bcmap[company] = {"at": time.time(), "span": (a, b), "map": m}
     return m
+
+
+def remember_map(company, pairs):
+    """Adds {menu item: BC item} pairs seen in the POS import (salesrec reads it every day) to the held map."""
+    pairs = {str(k).strip(): str(v).strip() for k, v in (pairs or {}).items() if str(k).strip() and str(v).strip()}
+    if not pairs:
+        return
+    with _maplock:
+        try:
+            held = json.loads(MAP_FILE.read_text()) if MAP_FILE.exists() else {}
+        except (OSError, ValueError):
+            held = {}
+        m = held.setdefault(company, {})
+        if all(m.get(k) == v for k, v in pairs.items()):
+            return
+        m.update(pairs)
+        try:
+            MAP_FILE.write_text(json.dumps(held))
+        except OSError:
+            pass
+        if company in _bcmap:
+            _bcmap[company]["map"].update(pairs)
+
+
+def bc_map_held(company):
+    """{menu item: BC item} as last read (no read from BC)."""
+    hit = _bcmap.get(company)
+    if hit:
+        return hit["map"]
+    try:
+        return (json.loads(MAP_FILE.read_text()) if MAP_FILE.exists() else {}).get(company) or {}
+    except (OSError, ValueError):
+        return {}
+
+
+def tax_rates(ref, a, b):
+    """{menu item: tax %} of one location as Simphony charged it on the days held between two dates: its VAT
+    (vatTtl, on the price before discounts) over its sales without VAT, both before discounts. Simphony's tax class
+    of the item is not in its reporting API; the sales carry it."""
+    tot = {}
+    sls = items_vat(ref, a, b)
+    for day, vat in vat_by_item(ref, a, b).items():
+        for mi, t in vat.items():
+            g = ((sls.get(day) or {}).get(mi) or (0.0,))[0]
+            x = tot.setdefault(mi, [0.0, 0.0])
+            x[0] += t
+            x[1] += g - t
+    return {mi: round(t / n * 100, 1) for mi, (t, n) in tot.items() if n > 0.5 and t >= 0}
 
 
 def emc_prices(ref):

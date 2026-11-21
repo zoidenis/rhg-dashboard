@@ -524,18 +524,23 @@ def menu_items(loc_ref, max_age=6 * 3600):
     return value
 
 
-def menu_item_prices(loc_ref, max_age=3600):
+def menu_item_prices(loc_ref, max_age=3600, history=False):
     """The active prices of one location (getMenuItemPrices): [{num, rvc, level, level_name, price, cost, from,
-    to}]. Active: no "effective to" date, or one still to come."""
-    hit = _prices_cache.get(loc_ref)
+    to}]. Active: no "effective to" date, or one still to come. history=True: every price effective since three years
+    ago, the ended ones too (effFrDt), for the items no longer sold (Menu prices → Inactive, QA 21 Nov 2026)."""
+    key = (loc_ref, "h") if history else loc_ref
+    hit = _prices_cache.get(key)
     if hit and time.time() - hit[0] < max_age:
         return hit[1]
-    rows = (call("getMenuItemPrices", {"locRef": loc_ref}) or {}).get("menuItemPrices") or []
+    args = {"locRef": loc_ref}
+    if history:
+        args["effFrDt"] = (date.today() - timedelta(days=3 * 365)).isoformat()
+    rows = (call("getMenuItemPrices", args) or {}).get("menuItemPrices") or []
     value = [{"num": int(r["num"]), "rvc": r.get("rvcNum"), "level": r.get("prcLvlNum"),
               "level_name": (r.get("prcLvlName") or "").strip(), "price": r.get("price"), "cost": r.get("cost"),
               "from": str(r.get("effFrDt") or "")[:10], "to": str(r.get("effToDt") or "")[:10]}
              for r in rows if r.get("num") is not None]
-    _prices_cache[loc_ref] = (time.time(), value)
+    _prices_cache[key] = (time.time(), value)
     return value
 
 

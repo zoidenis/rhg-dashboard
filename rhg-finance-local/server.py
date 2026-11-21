@@ -3223,11 +3223,12 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     r = pricelist.request(refs, (q.get("location") or "")[:40], (q.get("level") or "")[:99],
                                           (q.get("group") or "")[:99], (q.get("q") or "")[:80],
-                                          0 if xlsx else 600, q.get("refresh") == "1")
+                                          0 if xlsx else 600, q.get("refresh") == "1", (q.get("status") or "active")[:10])
                 except simphony.SimphonyError as exc:
                     self._send(502, {"error": str(exc)})
                     return
                 if not xlsx:
+                    r.pop("spread_all", None)
                     self._send(200, r)
                     return
                 body = pricelist.render_xlsx(r, pdf=q.get("pdf") == "1")

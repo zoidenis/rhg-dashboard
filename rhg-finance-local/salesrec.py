@@ -181,6 +181,8 @@ def read_bc(client, company, a, b, customers, svc_accounts=("75",)):
         x["rows"] += 1
         x["unposted"] += 0 if r.get("Postuar") else 1
         x["imported_at"] = max(x["imported_at"], str(r.get("SystemCreatedAt88448") or "")[:16])
+    # the BC item of each menu item, for Menu prices (its VAT %) and Menu engineering
+    menueng.remember_map(company, {mi: m[3] for x in imp.values() for mi, m in x["mi"].items() if m[3]})
     led = client._get_all(client._url(company, config.E_CUSTOMER), {
         "$filter": f"Posting_Date ge {a} and Posting_Date le {b} and "
                    f"(Document_Type eq 'Invoice' or Document_Type eq 'Credit Memo')",

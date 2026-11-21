@@ -1546,18 +1546,19 @@ html:not(.embed-set) #rgSetCard{display:none!important}
     <div id="slPrView" style="display:none">
       <div class="card" style="margin-bottom:16px">
         <div class="card-head"><div><h2>Menu prices</h2>
-          <p class="hint">The active price of every menu item at every Simphony location, by revenue centre and price level, with the cost Simphony holds and that cost as a share of the price (menu prices usually include VAT). Filter here; the Excel holds every price of the filter, and a sheet with one row per item and a column per location.</p></div>
+          <p class="hint">The price of every menu item at every Simphony location, by revenue centre and price level, with the cost Simphony holds and that cost as a share of the price (menu prices usually include VAT), and the tax rate: as Simphony charged it on the item's sales of the last 31 days, and the VAT % of the BC item it is posted to. Status: active items have a price in force; inactive ones had prices that have all ended. Filter here; the Excel holds every price of the filter, and a sheet with one row per item and a column per location.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp dark" id="prxXlsx">Export ▾</button><button class="mini" id="prxRead">Read again</button></div></div>
         <div class="filters" style="margin:6px 0 8px">
           <label>Location<select id="prxLoc"><option value="">All locations</option></select></label>
           <label>Price level<select id="prxLvl"><option value="">All levels</option></select></label>
           <label>Major group<select id="prxGrp"><option value="">All groups</option></select></label>
+          <label>Status<select id="prxSt"><option value="active">Active</option><option value="inactive">Inactive (prices ended)</option><option value="future">Not active yet</option><option value="all">All</option></select></label>
           <label>Item<input id="prxQ" placeholder="name, number or family"></label>
         </div>
         <p class="meta" id="prxNote" style="margin:0"></p>
       </div>
       <div class="card" style="margin-bottom:16px"><h2>Prices</h2><p class="hint" id="prxHint"></p><div class="scroll" style="max-height:620px"><table id="prxTable"></table></div></div>
-      <div class="card"><h2>Same item, different prices</h2><p class="hint">Items sold at more than one location at a different base price (the lowest price level with a real price), in the same currency, widest gap first. Prices of 1 or less are placeholders or open prices and are left out.</p><div class="scroll"><table id="prxSpread"></table></div></div>
+      <div class="card"><h2>Same item, different prices</h2><p class="hint">The same product at more than one location of a brand at a different base price (the lowest price level with a real price), in the same currency, widest gap first. The same product = the same brand, the same item number (PLU) and the same name. Active prices only; prices of 1 or less are placeholders or open prices and are left out.</p><div class="scroll"><table id="prxSpread"></table></div></div>
     </div>
     <div id="slMeView" style="display:none">
       <div class="card" style="margin-bottom:16px">
@@ -5764,7 +5765,9 @@ function chPanels(l){
 
 // ---------- Sales → Menu prices (pricelist.py, /api/sales/prices) ----------
 let prxData = null, prxBusy = false, prxTimer = null;
-const prxQs = () => scopeQs(new URLSearchParams({location: $("prxLoc").value, level: $("prxLvl").value, group: $("prxGrp").value, q: $("prxQ").value.trim()})).toString();
+const prxQs = () => scopeQs(new URLSearchParams({location: $("prxLoc").value, level: $("prxLvl").value, group: $("prxGrp").value, status: $("prxSt").value, q: $("prxQ").value.trim()})).toString();
+const prxTax = r => { const s = r.tax_sim, b = r.vat_bc, off = s != null && b != null && Math.abs(s - b) >= 0.5;
+  return `<td class="num${off ? " fl-bad" : ""}">${s == null ? "–" : fmt(s, 1) + "%"}</td><td class="num${off ? " fl-bad" : ""}">${b == null ? "–" : fmt(b, 1) + "%"}${r.bc_item ? `<div class="meta" data-no-i18n>${esc(r.bc_item)}</div>` : ""}</td>`; };
 async function prxLoad(refresh){
   if (prxBusy) return; prxBusy = true;
   $("prxNote").textContent = refresh || !prxData ? "Reading the prices and menu items of every location from Simphony…" : "Filtering…";
@@ -5783,19 +5786,21 @@ function prxRender(){
   const d = prxData; if (!d) return;
   const o = d.options || {}, f = d.filters || {};
   prxFill($("prxLoc"), o.locations || [], "All locations", f.location); prxFill($("prxLvl"), o.levels || [], "All levels", f.level); prxFill($("prxGrp"), o.groups || [], "All groups", f.group);
-  $("prxNote").textContent = `${fmt(d.count)} prices of ${fmt(d.items)} items at ${fmt(d.locations_n)} location${d.locations_n === 1 ? "" : "s"} (of ${fmt(d.total)} prices) · read from Simphony ${d.read_at}` + (d.errors.length ? ` · not read: ${d.errors.join("; ")}` : "");
+  if (f.status) $("prxSt").value = f.status;
+  const sc = d.status_counts || {};
+  $("prxNote").textContent = `${fmt(d.count)} prices of ${fmt(d.items)} items at ${fmt(d.locations_n)} location${d.locations_n === 1 ? "" : "s"} · active ${fmt(sc.active || 0)}, inactive ${fmt(sc.inactive || 0)}${sc.future ? `, not active yet ${fmt(sc.future)}` : ""} · read from Simphony ${d.read_at}` + (d.errors.length ? ` · not read: ${d.errors.join("; ")}` : "");
   $("prxHint").textContent = d.count > d.rows.length ? `The first ${fmt(d.rows.length)} shown; the Excel holds all ${fmt(d.count)}.` : "Each location in its own currency.";
-  $("prxTable").innerHTML = `<thead><tr><th>Item</th><th>Group</th><th>Location</th><th>Revenue centre</th><th>Price level</th><th class="num">Price</th><th class="num">Cost</th><th class="num">Cost %</th><th>Effective</th></tr></thead><tbody>` +
-    (d.rows.map(r => `<tr><td>${esc(r.name)}<div class="meta">${esc(r.num)}${r.name2 ? " · " + esc(r.name2) : ""}${r.excluded ? " · not in sales" : ""}</div></td>
+  $("prxTable").innerHTML = `<thead><tr><th>Item</th><th>Group</th><th>Location</th><th>Revenue centre</th><th>Price level</th><th class="num">Price</th><th class="num">Cost</th><th class="num">Cost %</th><th class="num">Tax % Simphony</th><th class="num">VAT % BC item</th><th>Effective</th></tr></thead><tbody>` +
+    (d.rows.map(r => `<tr><td>${esc(r.name)}<div class="meta">${esc(r.num)}${r.name2 ? " · " + esc(r.name2) : ""}${r.excluded ? " · not in sales" : ""}${r.status === "inactive" ? " · inactive" : r.status === "future" ? " · not active yet" : ""}</div></td>
       <td>${esc(r.major)}<div class="meta">${esc(r.family)}</div></td><td>${esc(r.location)}<div class="meta">${esc(r.ref)}${r.currency ? " · " + esc(r.currency) : ""}</div></td>
       <td>${esc(r.rvc_name || r.rvc || "")}</td><td>${esc(r.level_name)}</td><td class="num"><b>${r.price == null ? "–" : fmt(r.price, 2)}</b></td>
-      <td class="num">${r.cost == null ? "–" : fmt(r.cost, 2)}</td><td class="num">${r.cost_pct == null ? "–" : fmt(r.cost_pct, 1) + "%"}</td>
-      <td class="meta">${esc(r.from || "")}${r.to ? " → " + esc(r.to) : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="hint">No price matches the filter.</td></tr>`) + "</tbody>";
-  $("prxSpread").innerHTML = (d.spread || []).length ? `<thead><tr><th>Item</th><th class="num">Lowest</th><th>at</th><th class="num">Highest</th><th>at</th><th class="num">Gap</th><th class="num">Locations</th></tr></thead><tbody>` +
-    d.spread.map(x => `<tr><td>${esc(x.name)}<div class="meta">${esc(x.num)} · ${esc(x.currency)}</div></td><td class="num">${fmt(x.low, 2)}</td><td>${esc(x.low_at)}</td><td class="num">${fmt(x.high, 2)}</td><td>${esc(x.high_at)}</td><td class="num"><b>${fmt(x.gap_pct, 1)}%</b></td><td class="num">${fmt(x.locations)}</td></tr>`).join("") + "</tbody>"
+      <td class="num">${r.cost == null ? "–" : fmt(r.cost, 2)}</td><td class="num">${r.cost_pct == null ? "–" : fmt(r.cost_pct, 1) + "%"}</td>${prxTax(r)}
+      <td class="meta">${esc(r.from || "")}${r.to ? " → " + esc(r.to) : ""}</td></tr>`).join("") || `<tr><td colspan="11" class="hint">No price matches the filter.</td></tr>`) + "</tbody>";
+  $("prxSpread").innerHTML = (d.spread || []).length ? `<thead><tr><th>Brand</th><th>Item</th><th class="num">Lowest</th><th>at</th><th class="num">Highest</th><th>at</th><th class="num">Gap</th><th class="num">Locations</th></tr></thead><tbody>` +
+    d.spread.map(x => `<tr><td data-no-i18n>${esc(x.brand || "–")}</td><td>${esc(x.name)}<div class="meta">${esc(x.num)} · ${esc(x.currency)}</div></td><td class="num">${fmt(x.low, 2)}</td><td>${esc(x.low_at)}</td><td class="num">${fmt(x.high, 2)}</td><td>${esc(x.high_at)}</td><td class="num"><b>${fmt(x.gap_pct, 1)}%</b></td><td class="num">${fmt(x.locations)}</td></tr>`).join("") + "</tbody>"
     : `<tr><td class="hint">Every item of the filter has the same base price wherever it is sold.</td></tr>`;
 }
-["prxLoc", "prxLvl", "prxGrp"].forEach(id => $(id).onchange = () => prxLoad());
+["prxLoc", "prxLvl", "prxGrp", "prxSt"].forEach(id => $(id).onchange = () => prxLoad());
 $("prxQ").oninput = () => { clearTimeout(prxTimer); prxTimer = setTimeout(() => prxLoad(), 400); };
 $("prxRead").onclick = () => prxLoad(true);
 ["company", "dimension"].forEach(id => $(id).addEventListener("change", () => { if (prxData) { prxData = null; $("prxLoc").value = ""; if ($("slPrView") && $("slPrView").style.display !== "none") prxLoad(); } }));
