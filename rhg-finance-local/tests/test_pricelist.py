@@ -22,14 +22,15 @@ def price(num, p, to="", fr="2025-01-01", rvc=1, level=1):
 
 
 ACTIVE = {"OPA_B": [price(1, 470.0), price(2, 300.0)], "OPA_T": [price(1, 490.0), price(2, 300.0)],
-          "SALT": [price(1, 900.0)]}
+          "SALT": [price(1, 900.0)], "OPA_TI": [price(1, 650.0)]}
 HIST = {"OPA_B": ACTIVE["OPA_B"] + [price(9, 250.0, to=PAST), price(9, 240.0, to="2025-06-01"), price(8, 99.0, fr=LATER)],
-        "OPA_T": ACTIVE["OPA_T"], "SALT": ACTIVE["SALT"]}
+        "OPA_T": ACTIVE["OPA_T"], "SALT": ACTIVE["SALT"], "OPA_TI": ACTIVE["OPA_TI"]}
 NAMES = {"OPA_B": {1: "Truffle Gyros", 2: "Chicken Gyros", 9: "Old Pita", 8: "New Wrap"},
-         "OPA_T": {1: "Truffle  gyros", 2: "Chicken Gyros Big"}, "SALT": {1: "Truffle Gyros"}}
+         "OPA_T": {1: "Truffle  gyros", 2: "Chicken Gyros Big"}, "SALT": {1: "Truffle Gyros"}, "OPA_TI": {1: "Truffle Gyros"}}
 REG = [{"ref": "OPA_B", "name": "OPA Bllok", "brand": "OPA", "company": "OPA", "currency": "ALL"},
        {"ref": "OPA_T", "name": "OPA TEG", "brand": "OPA", "company": "OPA", "currency": "ALL"},
-       {"ref": "SALT", "name": "SALT", "brand": "SALT", "company": "SALT", "currency": "ALL"}]
+       {"ref": "SALT", "name": "SALT", "brand": "SALT", "company": "SALT", "currency": "ALL"},
+       {"ref": "OPA_TI", "name": "OPA · TIA Airport", "brand": "OPA", "company": "SALT", "currency": "ALL", "area": "Rinas airport"}]
 
 
 @pytest.fixture(autouse=True)
@@ -53,12 +54,12 @@ def mocked(monkeypatch):
 def test_active_is_the_default_and_inactive_items_are_listed_apart():
     r = pricelist.request(None)
     assert {x["num"] for x in r["rows"] if x["ref"] == "OPA_B"} == {1, 2}
-    assert r["status_counts"] == {"active": 5, "inactive": 1, "future": 1}
+    assert r["status_counts"] == {"active": 6, "inactive": 1, "future": 1}
     gone = pricelist.request(None, status="inactive")["rows"]
     # item 9 had two ended prices at the same revenue centre and level: the one that ended last is shown
     assert [(x["num"], x["price"], x["to"]) for x in gone] == [(9, 250.0, PAST)]
     assert [x["num"] for x in pricelist.request(None, status="future")["rows"]] == [8]
-    assert pricelist.request(None, status="all")["count"] == 7
+    assert pricelist.request(None, status="all")["count"] == 8
 
 
 def test_tax_rate_of_simphony_and_of_the_bc_item():
@@ -72,7 +73,27 @@ def test_same_product_by_brand_plu_and_name():
     sp = pricelist.request(None)["spread"]
     # Truffle Gyros at two OPAs (same name once spaces and case are set aside); SALT's item 1 is another brand;
     # item 2 is named differently at OPA TEG, so it is not the same product
+    # OPA · TIA Airport (650) is a price group of its own, not compared with the other OPAs (Geri, 22 Nov 2026)
     assert [(x["brand"], x["num"], x["low"], x["high"], x["locations"]) for x in sp] == [("OPA", 1, 470.0, 490.0, 2)]
+
+
+def test_airport_and_registry_price_groups():
+    import locintel as L
+    assert L.price_group({"brand": "OPA", "area": "Rinas airport"}) == "OPA · AIRPORT"
+    assert L.price_group({"brand": "OPA", "area": "Blloku"}) == "OPA"
+    assert L.price_group({"brand": "OPA", "area": "Rinas airport", "pricegroup": "OPA"}) == "OPA"
+    text = "OPA_TI | OPA · TIA Airport | brand=OPA | area=Rinas airport\nOPA_B | OPA Bllok | brand=OPA | pricegroup=OPA city"
+    reg = {r["ref"]: r for r in L._registry({"locations": {"registry": text}})}
+    assert reg["OPA_TI"]["price_group"] == "OPA · AIRPORT" and reg["OPA_B"]["price_group"] == "OPA CITY"
+
+
+def test_one_row_per_item_and_an_items_prices():
+    r = pricelist.request(None)
+    it = {x["num"]: x for x in r["item_rows"]}
+    assert (it[1]["locations"], it[1]["low"], it[1]["high"]) == (4, 470.0, 900.0)
+    assert it[2]["tax_diff"] and r["tax_n"] == 1 and r["tax_items"][0]["num"] == 2
+    one = pricelist.request(None, item=9, status="all")
+    assert {x["num"] for x in one["rows"]} == {9} and one["items_n"] == 1
 
 
 def test_excel_has_the_status_the_tax_and_the_comparison():

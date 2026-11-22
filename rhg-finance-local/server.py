@@ -3223,7 +3223,8 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     r = pricelist.request(refs, (q.get("location") or "")[:40], (q.get("level") or "")[:99],
                                           (q.get("group") or "")[:99], (q.get("q") or "")[:80],
-                                          0 if xlsx else 600, q.get("refresh") == "1", (q.get("status") or "active")[:10])
+                                          0 if xlsx else 600, q.get("refresh") == "1", (q.get("status") or "active")[:10],
+                                          int(q["item"]) if (q.get("item") or "").isdigit() else None)
                 except simphony.SimphonyError as exc:
                     self._send(502, {"error": str(exc)})
                     return

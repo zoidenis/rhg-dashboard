@@ -94,6 +94,7 @@ def _read(refresh=False):
                     status = "future"
                 rows.append({
                     "ref": ref, "location": loc_name, "brand": rg.get("brand") or "", "company": rg.get("company") or "",
+                    "group": rg.get("price_group") or locintel.price_group(rg) if rg else "",
                     "currency": cur, "num": p["num"], "name": it.get("name") or f"Item {p['num']}",
                     "name2": it.get("name2") or "", "major": it.get("major") or "", "family": it.get("family") or "",
                     "excluded": bool(it.get("excluded")),
@@ -117,9 +118,10 @@ def _read(refresh=False):
 STATUSES = {"active": "Active", "inactive": "Inactive (prices ended)", "future": "Not active yet", "all": "All"}
 
 
-def request(refs=None, location="", level="", group="", q="", limit=600, refresh=False, status="active"):
+def request(refs=None, location="", level="", group="", q="", limit=600, refresh=False, status="active", item=None):
     """The price list, filtered. refs: the Simphony locations the person may see (None = all). status: active
-    (default), inactive (every price of the item at the location has ended), future, or all."""
+    (default), inactive (every price of the item at the location has ended), future, or all. item: one menu item
+    number, every price of it (the item's pop-up on the screen)."""
     d = _read(refresh)
     status = status if status in STATUSES else "active"
     every = [r for r in d["rows"] if refs is None or r["ref"].upper() in refs]
@@ -133,10 +135,16 @@ def request(refs=None, location="", level="", group="", q="", limit=600, refresh
            if (not location or r["ref"] == location) and (not level or r["level_name"] == level)
            and (not group or r["major"] == group)
            and (not ql or ql in r["name"].lower() or ql in r["name2"].lower() or ql == str(r["num"])
-                or ql in r["family"].lower())]
+                or ql in r["family"].lower())
+           and (item is None or r["num"] == item)]
     # the comparison holds the active prices only, whatever the status filter
     spread = _spread([r for r in out if r.get("status", "active") == "active"])
+    items = _items(out)
+    tax = [x for x in items if x["tax_diff"]]
+    cap = (limit or 0) and max(1, limit // 2)
     return {"rows": out[:limit] if limit else out, "count": len(out), "total": len(rows),
+            # one row per menu item for the screen (Geri, 22 Nov 2026: less scrolling), its prices in a pop-up
+            "item_rows": items[:cap] if cap else items, "items_n": len(items), "tax_items": tax[:200], "tax_n": len(tax),
             "items": len({r["num"] for r in out}), "locations_n": len({r["ref"] for r in out}),
             "spread": spread[:60], "spread_all": spread, "spread_n": len(spread), "options": opts, "read_at": d["read_at"], "errors": d["errors"],
             "statuses": STATUSES, "status_counts": dict(counts),
@@ -160,6 +168,33 @@ def _base_price(rs):
     return Counter(ps).most_common(1)[0][0] if ps else None
 
 
+def _items(rows):
+    """One row per menu item: its locations, the lowest and highest base price (in the main currency), the tax %
+    Simphony charged and the VAT % of its BC item (the most common), whether they differ anywhere, its statuses."""
+    by = {}
+    for r in rows:
+        by.setdefault(r["num"], []).append(r)
+    main = Counter(r["currency"] for r in rows).most_common(1)[0][0] if rows else ""
+    out = []
+    for num, rs in by.items():
+        locs = {}
+        for r in rs:
+            locs.setdefault(r["ref"], []).append(r)
+        base = [p for p in (_base_price(v) for v in locs.values() if v[0]["currency"] == main) if p]
+        ts = Counter(r["tax_sim"] for r in rs if r.get("tax_sim") is not None).most_common(1)
+        vb = Counter(r["vat_bc"] for r in rs if r.get("vat_bc") is not None).most_common(1)
+        out.append({"num": num, "name": Counter(r["name"] for r in rs).most_common(1)[0][0], "major": rs[0]["major"],
+                    "family": rs[0]["family"], "locations": len(locs), "prices": len(rs), "currency": main,
+                    "low": min(base) if base else None, "high": max(base) if base else None,
+                    "tax_sim": ts[0][0] if ts else None, "vat_bc": vb[0][0] if vb else None,
+                    "tax_diff": any(r.get("tax_sim") is not None and r.get("vat_bc") is not None
+                                    and abs(r["tax_sim"] - r["vat_bc"]) >= 0.5 for r in rs),
+                    "statuses": sorted({r.get("status", "active") for r in rs}),
+                    "excluded": all(r.get("excluded") for r in rs)})
+    out.sort(key=lambda x: (x["major"], x["family"], x["name"]))
+    return out
+
+
 def _matrix(rows):
     by = {}
     for r in rows:
@@ -174,12 +209,13 @@ def norm_name(s):
 
 def _spread(rows):
     """The same product sold at more than one location of a brand at different base prices (same currency), widest
-    gap first: the same brand, the same menu item number (PLU) and the same name, so that two products sharing a
-    number across brands or renamed at one location are not taken for one (QA 21 Nov 2026). Prices of 1 or less are
-    left out (placeholders, open prices)."""
+    gap first: the same price group (the brand; an airport unit apart: locintel.price_group), the same menu item
+    number (PLU) and the same name, so that two products sharing a number across brands or renamed at one location
+    are not taken for one (QA 21 Nov 2026). Prices of 1 or less are left out (placeholders, open prices)."""
     by = {}
     for r in rows:
-        by.setdefault((r.get("brand") or "", r["num"], norm_name(r["name"])), {}).setdefault(r["ref"], []).append(r)
+        g = r.get("group") or r.get("brand") or ""
+        by.setdefault((g, r["num"], norm_name(r["name"])), {}).setdefault(r["ref"], []).append(r)
     out = []
     for (brand, num, _n), locs in by.items():
         by_cur = {}

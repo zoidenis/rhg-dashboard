@@ -30,6 +30,8 @@ import typology
 #   area      shown under the name;  region = anything but blank puts it outside the city map
 #   currency  overrides what Simphony says (blank in Simphony means the group currency)
 #   map=x,y   position on the city map in % of its width and height;  seasonal = closes off season
+#   pricegroup  the units whose menu prices are compared with each other (Menu prices → Same item, different
+#             prices); blank = the brand, and an airport unit (area or name with "airport") a group of its own
 DEFAULT_REGISTRY = """\
 SALT     | SALT Tirana          | brand=SALT        | company=SALT | bc=SALT       | customer=SALT     | area=Blloku           | map=41,53
 LIFT     | LIFT Steak & Rooftop | brand=LIFT        | company=SALT | bc=LIFT       | customer=LIFT     | area=Qendër           | map=52,40
@@ -57,6 +59,19 @@ USE_KINDS = ("sale", "sale_return", "consumption", "output")
 def norm_currency(code):
     c = (code or "").strip().upper()
     return CURRENCY_ALIASES.get(c, c)
+
+
+def price_group(r):
+    """The group a unit's menu prices are compared in: pricegroup= of the registry, else the brand; a unit at an
+    airport has other prices and parameters, so it is a group of its own (Geri, 22 Nov 2026: OPA · TIA Airport is not
+    compared with the other OPAs)."""
+    g = (r.get("pricegroup") or "").strip()
+    if g:
+        return g.upper()
+    b = (r.get("brand") or "").upper()
+    if "airport" in f"{r.get('area') or ''} {r.get('name') or ''}".lower():
+        return f"{b} · AIRPORT" if b else "AIRPORT"
+    return b
 
 
 def registry(settings=None, inactive=False):
@@ -109,7 +124,7 @@ def _registry(settings=None):
         seen.add(ref)
         d = {"ref": ref, "name": ref, "brand": "", "company": "", "bc": "", "customer": "", "area": "",
              "region": "", "currency": "", "dept": "", "x": None, "y": None, "seasonal": False, "inactive": False,
-             "ownership": "RHG"}
+             "ownership": "RHG", "pricegroup": ""}
         for i, p in enumerate(parts[1:]):
             if "=" in p:
                 k, _, v = p.partition("=")
@@ -135,6 +150,7 @@ def _registry(settings=None):
                 d["name"] = p[:80]
         d["brand"] = (d["brand"] or d["name"].split()[0]).upper()
         d["dept"] = d["dept"] or d["bc"]
+        d["price_group"] = price_group(d)
         out.append(d)
     return out
 
