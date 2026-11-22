@@ -1864,13 +1864,35 @@ table.bn-plan td{padding:3px 4px}
             <label class="field">Paid at the quarter end (%)<input type="number" id="bnPlQ" min="0" max="100"></label>
             <label class="field">Super bonus from quarter score<input type="number" id="bnPlSup" step="0.01" min="1" max="6"></label>
             <label class="field">Currency <span class="meta">blank: the company's</span><input id="bnPlCur" maxlength="6"></label>
-            <label class="field">Positions that qualify<input id="bnPlPos" maxlength="200"></label></div>
+            <label class="field">Positions that qualify<input id="bnPlPos" maxlength="200"></label>
+            <div class="field">Reviews from<span style="display:flex;gap:10px;font-weight:400;color:var(--ink)"><label><input type="checkbox" id="bnRsGoogle"> Google</label><label><input type="checkbox" id="bnRsWolt"> Wolt</label><label><input type="checkbox" id="bnRsSr"> SevenRooms</label></span></div></div>
           <h3 style="font-size:14px;margin:6px 0">Bonus range</h3>
           <div class="scroll"><table class="bn-t bn-plan" id="bnPlanRanges"></table></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="mini" id="bnRangeAdd" type="button">Add a line</button><button class="btn dark" id="bnPlanSave" type="button">Save the plan</button><span class="meta" id="bnPlanMsg"></span></div></div>
         <div class="card"><div class="card-head"><div><h2>Units</h2>
           <p class="hint"><span>The plan each unit uses and what it sets apart. A franchise does not qualify unless set so.</span></p></div></div>
-          <div class="scroll"><table class="bn-t" id="bnUnits"></table></div></div></div>
+          <div class="scroll"><table class="bn-t" id="bnUnits"></table></div></div>
+        <div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Review sources</h2>
+          <p class="hint"><span>Where the Reviews KPI comes from: the month's reviews on Google and Wolt (and SevenRooms where it is connected), their average weighted by their number.</span> <span>Secrets are typed here, stay on the server and are never shown again. No reviewer's name is kept.</span></p></div>
+          <div class="sh-ctl"><button class="mini" id="rvSync" type="button">Read now</button></div></div>
+          <p class="meta" id="rvState"></p>
+          <h3 style="font-size:14px;margin:10px 0 4px">Google</h3>
+          <p class="hint" style="margin:0 0 8px"><span>Exact: the Google Business Profile API with the account that manages the OPA profiles (every review with its date and stars). Approximate until then: the Places API key (the public overall rating and the number of new reviews of the month; Google rounds the rating to one decimal, so it is not the month's own average).</span></p>
+          <div class="formgrid"><label class="field">Business Profile · OAuth client ID<input id="rvCid" autocomplete="off" spellcheck="false"></label>
+            <label class="field">OAuth client secret<input id="rvCsec" type="password" autocomplete="new-password"></label>
+            <label class="field">Refresh token of the managing account<input id="rvRtok" type="password" autocomplete="new-password"></label>
+            <label class="field">Places API key <span class="meta">optional, approximate</span><input id="rvKey" type="password" autocomplete="new-password"></label></div>
+          <label class="field">Units → Google <span class="meta">one per line: Simphony reference = Google place ID (or a Business Profile location, locations/…)</span><textarea id="rvGMap" spellcheck="false" style="min-height:96px"></textarea></label>
+          <div style="margin-top:8px"><button class="mini" id="rvLocs" type="button">Find the Business Profile locations</button> <span class="meta" id="rvLocMsg"></span></div>
+          <div class="scroll" style="margin-top:8px"><table class="bn-t" id="rvLocTable"></table></div>
+          <h3 style="font-size:14px;margin:14px 0 4px">Wolt</h3>
+          <p class="hint" style="margin:0 0 8px"><span>Wolt sends each review to the webhook below (its official consumer reviews integration), signed with the secret. Give the address and the secret to the Wolt account manager, who switches it on for each venue.</span> <span>The address must be reachable from the internet: open this one path on the server, the rest stays behind the VPN.</span></p>
+          <div class="formgrid"><label class="field">Webhook address<input id="rvHook" readonly></label>
+            <label class="field">Signing secret<input id="rvWsec" readonly></label></div>
+          <div style="margin-bottom:8px"><button class="mini" id="rvNewSec" type="button">Create a new secret</button></div>
+          <label class="field">Units → Wolt <span class="meta">one per line: Simphony reference = Wolt venue ID; the venues already heard from are listed below</span><textarea id="rvWMap" spellcheck="false" style="min-height:70px"></textarea></label>
+          <div class="scroll" style="margin-top:8px"><table class="bn-t" id="rvSeen"></table></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn dark" id="rvSave" type="button">Save the review sources</button><span class="meta" id="rvMsg"></span></div></div></div>
     </div>
     <div id="slMain">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Sales from Simphony</h2>
@@ -2542,6 +2564,7 @@ table.bn-plan td{padding:3px 4px}
   <div class="bn-cats" id="bnPopCats"></div>
   <div class="scroll"><table class="bn-t" id="bnPopKpis"></table></div>
   <div class="bn-ed" id="bnPopLock"></div>
+  <details id="bnPopRv" style="margin-top:10px"><summary><b>Reviews of the month with a comment</b> <span class="meta" id="bnPopRvN"></span></summary><div class="scroll" style="max-height:320px"><table class="bn-t" id="bnPopRvT"></table></div></details>
 </div></div>
 <div class="modal-bg" id="bnUnitPop" role="dialog" aria-modal="true" aria-labelledby="bnUnitT"><div class="modal" style="max-width:900px">
   <div class="mhead"><div><h2 id="bnUnitT">Unit plan</h2><p class="hint" style="margin:0">Blank fields follow the plan.</p></div>
@@ -5688,10 +5711,10 @@ function bnDetail(ref, keep){
   $("bnPopCats").innerHTML = (u.categories || []).map(c => `<div>${esc(c.name)} · ${fmt(c.weight, 0)}%<b>${bnScore(c.score)}</b></div>`).join("");
   $("bnPopKpis").innerHTML = `<thead><tr><th>KPI</th><th class="num">Weight</th><th class="num">Actual</th><th class="num">Target</th><th class="num">Compared</th><th class="c">Score</th><th>Bands (scores 2→6)</th><th>Source</th><th></th></tr></thead><tbody>`
     + u.kpis.map(r => `<tr><td><b>${esc(r.label)}</b><div class="meta">${esc(r.category)}</div></td><td class="num">${fmt(r.weight, 0)}%</td>
-      <td class="num">${bnVal(r, r.value)}${r.provisional ? ` <span class="tag">${fcSp("provisional")}</span>` : ""}</td><td class="num">${bnVal(r, r.target)}</td>
+      <td class="num">${bnVal(r, r.value)}${r.provisional ? ` <span class="tag">${fcSp("provisional")}</span>` : ""}${r.approximate ? ` <span class="tag" title="${esc("Google's overall rating, not only this month's reviews")}">${fcSp("approximate")}</span>` : ""}</td><td class="num">${bnVal(r, r.target)}</td>
       <td class="num">${esc(bnX(r))}</td><td class="c">${bnS(r.score)}</td>
       <td class="meta">${esc(r.cuts.map(c => r.method === "delta" ? (c > 0 ? "+" : "") + c : c).join(" / "))}${r.method === "ratio" ? " %" : r.method === "delta" ? " pts" : ""} · ${r.better === "lower" ? "lower is better" : "higher is better"}</td>
-      <td class="meta" style="white-space:normal;min-width:220px">${esc(r.status || "")}${r.status ? "<br>" : ""}${esc(r.manual ? `Entered by ${r.manual.by} on ${String(r.manual.at || "").replace("T", " ")}${r.manual.note ? ": " + r.manual.note : ""}${r.auto && r.auto.value != null ? ` (automatic: ${bnVal(r, r.auto.value)})` : ""}` : (r.auto && r.auto.detail) || r.source)}</td>
+      <td class="meta" style="white-space:normal;min-width:220px">${r.channels ? esc(Object.entries(r.channels).map(([c, v]) => `${{google: "Google", wolt: "Wolt", sevenrooms: "SevenRooms"}[c] || c} ${v.value == null ? "–" : fmt(v.value, 2)} (${v.count ?? "?"})`).join(" · ")) + "<br>" : ""}${esc(r.status || "")}${r.status ? "<br>" : ""}${esc(r.manual ? `Entered by ${r.manual.by} on ${String(r.manual.at || "").replace("T", " ")}${r.manual.note ? ": " + r.manual.note : ""}${r.auto && r.auto.value != null ? ` (automatic: ${bnVal(r, r.auto.value)})` : ""}` : (r.auto && r.auto.detail) || r.source)}</td>
       <td>${u.locked ? "" : `<button class="mini" type="button" data-ed="${esc(r.key)}">Enter</button>`}</td></tr>
       <tr class="bn-edrow" data-for="${esc(r.key)}" hidden><td colspan="9"><div class="bn-ed">
         <label class="field">Actual${r.unit === "pct" ? " (%)" : ""}<input type="number" step="any" data-f="value" value="${r.manual && r.manual.value != null ? r.manual.value : ""}" placeholder="${r.auto && r.auto.value != null ? r.auto.value : ""}"></label>
@@ -5716,7 +5739,15 @@ function bnDetail(ref, keep){
     try { await bnPost("/api/bonus/lock", {ref, month: bnData.month}); $("bnLockMsg").textContent = "Locked."; bnLoad(false); } catch (e) { $("bnLockMsg").textContent = "Not locked: " + e.message; } };
   if (ul) ul.onclick = async () => { const why = $("bnUnlockWhy").value.trim(); if (why.length < 5) { $("bnLockMsg").textContent = "Say why (it goes in the audit trail)."; return; }
     try { await bnPost("/api/bonus/unlock", {ref, month: bnData.month, reason: why}); bnLoad(false); } catch (e) { $("bnLockMsg").textContent = "Not unlocked: " + e.message; } };
-  if (!keep) $("bnPop").classList.add("on");
+  if (!keep) { $("bnPop").classList.add("on"); bnComments(ref); }
+}
+async function bnComments(ref){
+  $("bnPopRvT").innerHTML = ""; $("bnPopRvN").textContent = "";
+  try { const j = await readJSON(await fetch("/api/bonus/comments?" + new URLSearchParams({company: bnCo(), month: bnData.month, ref})));
+    const C = j.comments || [];
+    $("bnPopRvN").textContent = C.length ? `${C.length}, the lowest first` : "none";
+    $("bnPopRvT").innerHTML = C.map(c => `<tr><td>${esc({google: "Google", wolt: "Wolt"}[c.src] || c.src)}</td><td class="meta">${esc(c.day)}</td><td class="c">${bnS(Math.round(c.rating))}</td><td style="white-space:normal">${esc(c.comment)}</td></tr>`).join("");
+  } catch (e) { $("bnPopRvN").textContent = e.message; }
 }
 $("bnPopClose").onclick = () => { $("bnPop").classList.remove("on"); bnOpen = null; };
 
@@ -5796,9 +5827,49 @@ function bnRenderCfg(){
   $("bnPlanKpis").querySelectorAll('[data-f="weight"]').forEach(i => i.oninput = sumW); sumW();
   $("bnPlMin").value = P.min_score; $("bnPlQ").value = (P.payout || {}).quarter_pct ?? 50; $("bnPlSup").value = (P.super || {}).min_score ?? "";
   $("bnPlCur").value = P.currency || ""; $("bnPlPos").value = P.positions || "";
+  const RS = P.review_sources || ["google", "wolt", "sevenrooms"];
+  $("bnRsGoogle").checked = RS.includes("google"); $("bnRsWolt").checked = RS.includes("wolt"); $("bnRsSr").checked = RS.includes("sevenrooms");
   bnRangeTable("bnPlanRanges", P.ranges);
   bnRenderUnits();
+  rvLoad();
 }
+// ---- the review sources (reviews.py)
+async function rvLoad(){
+  try { const j = await readJSON(await fetch("/api/bonus/reviews")); if (j.error) throw new Error(j.error); rvRender(j); }
+  catch (e) { $("rvState").textContent = "Could not read the review sources: " + e.message; }
+}
+function rvRender(j){
+  const g = j.google, w = j.wolt, st = j.state || {};
+  $("rvCid").value = g.client_id || ""; $("rvGMap").value = g.map || ""; $("rvWMap").value = w.map || "";
+  [["rvCsec", g.client_secret_set], ["rvRtok", g.refresh_token_set], ["rvKey", g.api_key_set]].forEach(([id, on]) => { $(id).value = ""; $(id).placeholder = on ? "saved · type to replace" : ""; });
+  $("rvHook").value = location.origin + location.pathname.replace(/\/[^/]*$/, "") + "/hooks/wolt/reviews";
+  $("rvWsec").value = w.secret_set ? "saved · create a new one to see it" : "none yet";
+  $("rvState").textContent = [g.business_profile ? `Google Business Profile connected${st.google_sync ? ", last read " + st.google_sync.replace("T", " ") : ""}` : "Google Business Profile not connected",
+    g.places ? `Places API on${st.places_sync ? ", last snapshot " + st.places_sync.replace("T", " ") : ""}` : "",
+    st.google_error ? "Google: " + st.google_error : "", st.places_error ? "Places: " + st.places_error : "",
+    w.secret_set ? "Wolt webhook ready" : "Wolt webhook: no secret yet"].filter(Boolean).join(" · ");
+  const seen = (j.seen || {}).wolt || [];
+  $("rvSeen").innerHTML = seen.length ? `<thead><tr><th>Wolt venue ID</th><th class="num">Reviews</th><th>Last</th></tr></thead><tbody>` + seen.map(x => `<tr><td><code>${esc(x.key)}</code></td><td class="num">${fmt(x.n)}</td><td>${esc(x.last || "")}</td></tr>`).join("") + `</tbody>` : "";
+}
+$("rvSave").onclick = async () => {
+  $("rvMsg").textContent = "Saving…";
+  try { const j = await bnPost("/api/bonus/reviews", {google: {client_id: $("rvCid").value, client_secret: $("rvCsec").value, refresh_token: $("rvRtok").value, api_key: $("rvKey").value, map: $("rvGMap").value},
+      wolt: {map: $("rvWMap").value}}); rvRender(j); $("rvMsg").textContent = "Saved."; } catch (e) { $("rvMsg").textContent = "Not saved: " + e.message; }
+};
+$("rvNewSec").onclick = async () => {
+  if ($("rvNewSec").dataset.sure !== "1") { $("rvNewSec").dataset.sure = "1"; $("rvMsg").textContent = "Click again: the old secret stops working, and Wolt needs the new one."; return; }
+  $("rvNewSec").dataset.sure = "";
+  try { const j = await bnPost("/api/bonus/reviews", {wolt: {new_secret: true}}); rvRender(j); $("rvWsec").value = j.wolt_secret_once || ""; $("rvMsg").textContent = "Copy the secret now and give it to Wolt: it is not shown again."; }
+  catch (e) { $("rvMsg").textContent = "Not created: " + e.message; }
+};
+$("rvSync").onclick = async () => { try { await bnPost("/api/bonus/reviews/sync", {}); $("rvMsg").textContent = "Reading Google now; open the scorecard again in a minute."; setTimeout(rvLoad, 20000); } catch (e) { $("rvMsg").textContent = e.message; } };
+$("rvLocs").onclick = async () => {
+  $("rvLocMsg").textContent = "Asking Google…";
+  try { const j = await readJSON(await fetch("/api/bonus/reviews/locations")); if (j.error) throw new Error(j.error);
+    $("rvLocMsg").textContent = `${j.locations.length} location(s) the account manages`;
+    $("rvLocTable").innerHTML = `<thead><tr><th>Business Profile location</th><th>Address</th><th>Place ID</th></tr></thead><tbody>` + j.locations.map(L => `<tr><td>${esc(L.title)}</td><td class="meta">${esc(L.address)}</td><td><code>${esc(L.place_id || L.location)}</code></td></tr>`).join("") + `</tbody>`;
+  } catch (e) { $("rvLocMsg").textContent = "Not read: " + e.message; }
+};
 function bnRangeTable(id, R){
   const rs = [...(R || [])].sort((a, b) => a.min - b.min);
   $(id).innerHTML = `<thead><tr><th class="num">Score from</th><th class="num">to</th><th class="num">Bonus</th><th></th></tr></thead><tbody>`
@@ -5815,7 +5886,8 @@ function bnPlanFromForm(){
       return {key: tr.dataset.k, label: g("label"), weight: g("weight"), method: g("method"), better: g("better"), target: g("target"), min_count: g("min_count"),
         cuts: [0, 1, 2, 3, 4].map(i => tr.querySelector(`[data-c="${i}"]`).value)}; }),
     ranges: bnRangesOf("bnPlanRanges"), min_score: $("bnPlMin").value, payout: {quarter_pct: $("bnPlQ").value}, super: {min_score: $("bnPlSup").value},
-    currency: $("bnPlCur").value, positions: $("bnPlPos").value};
+    currency: $("bnPlCur").value, positions: $("bnPlPos").value,
+    review_sources: [["google", "bnRsGoogle"], ["wolt", "bnRsWolt"], ["sevenrooms", "bnRsSr"]].filter(([, id]) => $(id).checked).map(([k]) => k)};
 }
 $("bnPlanSave").onclick = async () => {
   $("bnPlanMsg").textContent = "Saving…";
