@@ -139,6 +139,12 @@ a.fh-c:hover{border-color:var(--accent)}
 @media (prefers-reduced-motion: reduce){aside{transition:none}}
 @media(max-width:760px){main{padding:16px} header{flex-direction:column} .hdr-side{align-items:flex-start}
   .kpis{grid-template-columns:1fr 1fr}}
+.au-heat td.au-bad{background:color-mix(in srgb,var(--up,#c0392b) 12%,transparent)}
+.au-heat td.au-bad2{background:color-mix(in srgb,var(--up,#c0392b) 26%,transparent)}
+.au-heat td.au-good{background:color-mix(in srgb,var(--down,#1e8e5a) 14%,transparent)}
+.au-say{margin:4px 0 0;padding-left:18px;line-height:1.6;font-size:13.5px}.au-say li{margin:3px 0}
+.au-own{display:inline-block;min-width:38px;text-align:center;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;color:#fff;background:#08303f}
+.au-own.au-coo{background:#2c7a7b}.au-own.au-cfo{background:#8a5a00}
 </style>
 <link rel="stylesheet" href="/brand.css">
 <link rel="stylesheet" href="/locintel.css">
@@ -198,6 +204,7 @@ a.fh-c:hover{border-color:var(--accent)}
     <button data-tab="balance">Balance &amp; capital</button>
     <button data-tab="purchasing">Purchasing</button>
     <button data-tab="locations" id="tabLocations">Location intelligence</button>
+    <button data-tab="audit">Audit</button>
   </div>
 
   <div id="banner"></div>
@@ -1039,9 +1046,125 @@ function drawSavings(keys){
   $("tbExtra").innerHTML = tbl(sv.worst || [], "bad");
 }
 
+/* ------------------------------------------------------------ Audit (Geri, 22 Nov 2026)
+   Each restaurant against its budget (else last year): the cost lines over it and by how much, the accounts behind
+   the overrun, the items whose dearer purchase prices took the margin (Purchasing's price savings), and the
+   decisions it calls for, with who owns them. Built from what the page has read: nothing more is asked of BC. */
+const AU_TOL = 2;                         // points of revenue (food, labour) over the comparison that call for action
+const AU_COST = [["food", "Food cost"], ["labor", "Labour"], ["opex", "Other operating costs"]];
+function auHow(){ return hasBudget() ? "budget" : "ly"; }
+function auRows(keys){
+  const how = auHow();
+  return depts().map(d => {
+    const a = actual(d.code, keys), c = comparison(d.code, keys, how);
+    if (!(a.sales > 0) || !c) return null;
+    const over = {}; let costOver = 0;
+    AU_COST.forEach(([k]) => { over[k] = a[k] - c[k]; if (over[k] > 0) costOver += over[k]; });
+    // the accounts over the comparison, largest first (costs only: buckets other than revenue)
+    const accs = Object.keys(Object.assign({}, a.acc, c.acc)).map(no => {
+      const b = bucketOf(no); if (b === "sales" || b === "other_income" || b === "da" || b === "below") return null;
+      const v = (a.acc[no] || 0) - (c.acc[no] || 0);
+      return v > 0.5 ? {no, name: ((S.fin.accounts[no] || [])[0]) || no, bucket: b, a: a.acc[no] || 0, c: c.acc[no] || 0, v} : null; }).filter(Boolean).sort((x, y) => y.v - x.v);
+    const svd = S.pur && S.pur.savings && S.pur.savings.ranges && S.pur.savings.ranges[`${F.mode}|${F.end}`];
+    const items = (svd && svd[d.code] && svd[d.code].worst) || [];
+    return {code: d.code, name: d.name, a, c, over, costOver, accs, items, extra: (svd && svd[d.code] && svd[d.code].extra) || 0,
+            gap: a.ebitda - c.ebitda, foodPts: a.foodPct != null && c.foodPct != null ? a.foodPct - c.foodPct : null,
+            laborPts: a.laborPct != null && c.laborPct != null ? a.laborPct - c.laborPct : null,
+            salesGap: c.sales ? (a.sales - c.sales) / c.sales * 100 : null};
+  }).filter(Boolean).sort((x, y) => x.gap - y.gap);
+}
+// the decisions: rules a CFO would apply, each with its owner and what it is worth
+function auActions(rows){
+  const out = [], how = auHow(), cmp = how === "budget" ? "budget" : "last year";
+  rows.forEach(r => {
+    if (r.foodPts != null && r.foodPts > AU_TOL) {
+      const it = r.items.slice(0, 3).map(x => ((S.pur.savings.names || {})[x[0]] || x[0])).join(", ");
+      out.push({w: r.over.food, who: "COO", r, t: `Food cost ${pct(r.a.foodPct)} against ${pct(r.c.foodPct)} (${cmp}): audit recipes and portions, waste and stock counts${it ? `; renegotiate or replace ${it}` : ""}.`}); }
+    if (r.laborPts != null && r.laborPts > AU_TOL)
+      out.push({w: r.over.labor, who: "COO", r, t: `Labour ${pct(r.a.laborPct)} against ${pct(r.c.laborPct)} (${cmp}): match the rota to the sales by hour, overtime and extra shifts to approval.`});
+    if (r.over.opex > 0 && r.c.opex && r.over.opex / r.c.opex > 0.1 && r.accs.length) {
+      const top = r.accs.filter(x => x.bucket === "opex").slice(0, 2);
+      if (top.length) out.push({w: r.over.opex, who: "CFO", r, t: `Operating costs ${fmt(r.over.opex)} ${C()} over ${cmp}, most in ${top.map(x => `${x.no} ${x.name} (+${compact(x.v)})`).join(", ")}: ask for the invoices behind them and stop what is not approved.`}); }
+    if (r.salesGap != null && r.salesGap < -10 && r.costOver <= 0)
+      out.push({w: r.c.sales - r.a.sales, who: "CEO", r, t: `Revenue ${fmt(Math.abs(r.salesGap), 1)}% under ${cmp} with costs on plan: the cost base is set for sales that are not coming; decide on opening hours, staffing and marketing.`});
+    const unb = r.accs.filter(x => !x.c && x.a > 0).reduce((s_, x) => s_ + x.a, 0);
+    if (how === "budget" && unb > Math.max(50000, r.a.sales * 0.005))
+      out.push({w: unb, who: "CFO", r, t: `${fmt(unb)} ${C()} spent on accounts with no budget: approve them into the budget or stop them.`});
+    if (r.extra > Math.max(50000, r.a.sales * 0.005) && r.items.length)
+      out.push({w: r.extra, who: "CFO", r, t: `Dearer purchase prices added ${fmt(r.extra)} ${C()} against last year; the most: ${r.items.slice(0, 3).map(x => `${(S.pur.savings.names || {})[x[0]] || x[0]} ${x[2] ? (x[1] >= x[2] ? "+" : "") + fmt((x[1] - x[2]) / x[2] * 100, 0) + "%" : ""}`).join(", ")}: tender them or set a contract price.`});
+  });
+  return out.sort((x, y) => y.w - x.w);
+}
+function auHeat(v, base){ if (v == null || !base) return ""; const r = v / Math.abs(base); return r > 0.1 ? "au-bad2" : r > 0.02 ? "au-bad" : r < -0.02 ? "au-good" : ""; }
+function viewAudit(){
+  const keys = rangeKeys(), how = auHow(), cmp = how === "budget" ? "budget" : "last year", rows = auRows(keys), acts = auActions(rows);
+  if (!rows.length) { $("view").innerHTML = `<div class="card"><p class="hint" style="margin:0">No restaurant with revenue and a ${esc(cmp)} in ${esc(periodText(keys))}.</p></div>`; return; }
+  const below = rows.filter(r => r.gap < 0), costOver = rows.reduce((s_, r) => s_ + r.costOver, 0), extra = rows.reduce((s_, r) => s_ + r.extra, 0);
+  const foodBad = rows.filter(r => r.foodPts != null && r.foodPts > AU_TOL), labBad = rows.filter(r => r.laborPts != null && r.laborPts > AU_TOL);
+  const gapSum = below.reduce((s_, r) => s_ + r.gap, 0), worst = rows[0];
+  let h = (how === "budget" ? "" : `<div class="card"><p class="hint" style="margin:0">No budget for ${esc(String(F.year))} in Business Central: every restaurant is set against the same period last year.</p></div>`)
+    + `<div class="kpis">`
+    + tile(`EBITDA under ${cmp}`, `${below.length} <small class="meta">/ ${rows.length}</small>`, "", `restaurants · ${compact(gapSum)} ${C()} in all`, below.length ? `<span class="dl bad">▼ to act on</span>` : `<span class="dl good">on plan</span>`)
+    + tile(`Costs over ${cmp}`, compact(costOver), C(), "food, labour and operating costs over plan, summed by restaurant", costOver > 0 ? `<span class="dl bad">▲ over</span>` : "")
+    + tile(`Food cost over by > ${AU_TOL} pts`, String(foodBad.length), "", foodBad.map(r => r.name).slice(0, 3).join(", ") || "none", "")
+    + tile(`Labour over by > ${AU_TOL} pts`, String(labBad.length), "", labBad.map(r => r.name).slice(0, 3).join(", ") || "none", "")
+    + tile("Dearer purchase prices", S.pur && S.pur.savings ? compact(extra) : "–", S.pur && S.pur.savings ? C() : "", "against last year, by restaurant (Purchasing)", extra > 0 ? `<span class="dl bad">▲ margin lost</span>` : "") + `</div>`;
+  // what it says
+  const L = [];
+  if (worst && worst.gap < 0) L.push(`<b>${esc(worst.name)}</b> is furthest from its ${esc(cmp)}: EBITDA ${esc(compact(worst.a.ebitda))} against ${esc(compact(worst.c.ebitda))} (${esc(compact(worst.gap))} ${esc(C())})${worst.costOver > 0 ? `, of which ${esc(compact(worst.costOver))} costs over plan` : ""}${worst.salesGap != null && worst.salesGap < 0 ? ` and revenue ${esc(fmt(Math.abs(worst.salesGap), 1))}% under` : ""}.`);
+  const topAcc = rows.flatMap(r => r.accs.map(x => ({...x, r}))).sort((x, y) => y.v - x.v)[0];
+  if (topAcc) L.push(`The largest single overrun: <b>${esc(topAcc.r.name)}</b>, ${esc(topAcc.no)} ${esc(topAcc.name)}, ${esc(fmt(topAcc.v))} ${esc(C())} over ${esc(cmp)}.`);
+  const topItem = rows.flatMap(r => r.items.map(x => ({x, r}))).sort((p, q) => Math.abs(q.x[4]) - Math.abs(p.x[4]))[0];
+  if (topItem) L.push(`The item whose price hurt most: <b>${esc((S.pur.savings.names || {})[topItem.x[0]] || topItem.x[0])}</b> at ${esc(topItem.r.name)}, ${esc(fmt(topItem.x[2], 2))} → ${esc(fmt(topItem.x[1], 2))} a unit, ${esc(fmt(Math.abs(topItem.x[4])))} ${esc(C())} more than last year's price.`);
+  if (acts.length) L.push(`${acts.length} decision(s) below, largest first.`);
+  h += `<div class="card"><div class="chead"><div><h2>What it says</h2></div></div><ul class="au-say">${L.map(x => `<li>${x}</li>`).join("")}</ul></div>`;
+  // the restaurants against plan: a heat table
+  h += `<div class="card"><div class="chead"><div><h2>Restaurants against ${esc(cmp)}</h2><p class="hint">${esc(periodText(keys))}. Each cost line's actual minus ${esc(cmp)} (red over, green under; the shade grows past 2% and 10% of plan) and EBITDA's gap, worst first. Click a restaurant for its audit.</p></div></div><div class="scroll"><table class="au-heat"><tr><th>Restaurant</th><th class="num">Revenue vs ${esc(cmp)}</th>`
+    + AU_COST.map(([, l]) => `<th class="num">${esc(l)}</th>`).join("") + `<th class="num">Food % · pts</th><th class="num">Labour % · pts</th><th class="num">EBITDA gap</th><th class="num">Dearer prices</th></tr>`
+    + rows.map(r => `<tr class="click" data-pulse="exaudit|${esc(r.code)}" tabindex="0"><td><b>${esc(r.name)}</b></td>
+      <td class="num ${r.salesGap != null && r.salesGap < -2 ? "au-bad" : r.salesGap > 2 ? "au-good" : ""}">${r.salesGap == null ? "–" : (r.salesGap >= 0 ? "+" : "") + fmt(r.salesGap, 1) + "%"}</td>`
+      + AU_COST.map(([k]) => `<td class="num ${auHeat(r.over[k], r.c[k])}">${r.over[k] >= 0 ? "+" : ""}${compact(r.over[k])}</td>`).join("")
+      + `<td class="num ${r.foodPts > AU_TOL ? "au-bad2" : r.foodPts > 0.5 ? "au-bad" : r.foodPts < -0.5 ? "au-good" : ""}">${pct(r.a.foodPct)} <span class="meta">${r.foodPts == null ? "" : (r.foodPts >= 0 ? "+" : "") + fmt(r.foodPts, 1)}</span></td>
+      <td class="num ${r.laborPts > AU_TOL ? "au-bad2" : r.laborPts > 0.5 ? "au-bad" : r.laborPts < -0.5 ? "au-good" : ""}">${pct(r.a.laborPct)} <span class="meta">${r.laborPts == null ? "" : (r.laborPts >= 0 ? "+" : "") + fmt(r.laborPts, 1)}</span></td>
+      <td class="num ${r.gap < 0 ? "au-bad2" : "au-good"}"><b>${r.gap >= 0 ? "+" : ""}${compact(r.gap)}</b></td><td class="num">${r.extra ? compact(r.extra) : "–"}</td></tr>`).join("") + `</table></div></div>`;
+  // decisions
+  h += `<div class="card"><div class="chead"><div><h2>Decisions to take</h2><p class="hint">What the figures call for, largest first, with who owns it: CEO (revenue and the plan), COO (food, labour, operations), CFO (costs, prices, the budget). The rules: food or labour more than ${AU_TOL} points of revenue over ${esc(cmp)}; operating costs more than 10% over; revenue more than 10% under with costs on plan; spending on accounts with no budget; dearer purchase prices.</p></div></div>`
+    + (acts.length ? `<div class="scroll"><table><tr><th>Owner</th><th>Restaurant</th><th>Decision</th><th class="num">At stake</th></tr>` + acts.map(x => `<tr class="click" data-pulse="exaudit|${esc(x.r.code)}" tabindex="0"><td><span class="au-own au-${x.who.toLowerCase()}">${x.who}</span></td><td>${esc(x.r.name)}</td><td>${x.t}</td><td class="num"><b>${compact(x.w)}</b></td></tr>`).join("") + `</table></div>`
+      : `<p class="hint">Nothing calls for a decision: every restaurant is within the limits.</p>`) + `</div>`;
+  // overruns by account and items, group-wide
+  const accs = rows.flatMap(r => r.accs.map(x => ({...x, r}))).sort((x, y) => y.v - x.v).slice(0, 15);
+  const items = rows.flatMap(r => r.items.map(x => ({x, r}))).sort((p, q) => Math.abs(q.x[4]) - Math.abs(p.x[4])).slice(0, 15);
+  const names = (S.pur && S.pur.savings && S.pur.savings.names) || {};
+  h += `<div class="grid2"><div class="card"><div class="chead"><div><h2>Largest overruns by account</h2><p class="hint">Restaurant and G/L account, actual over ${esc(cmp)}</p></div></div><div class="scroll">`
+    + (accs.length ? `<table><tr><th>Restaurant</th><th>Account</th><th class="num">Actual</th><th class="num">${esc(cap(cmp))}</th><th class="num">Over</th></tr>` + accs.map(x => `<tr class="click" data-pulse="exaudit|${esc(x.r.code)}" tabindex="0"><td>${esc(x.r.name)}</td><td>${esc(x.no)} <span class="meta">${esc(x.name)}</span></td><td class="num">${fmt(x.a)}</td><td class="num">${fmt(x.c)}</td><td class="num"><span class="dl bad">+${fmt(x.v)}</span></td></tr>`).join("") + `</table>` : `<div class="empty">No account over ${esc(cmp)}.</div>`)
+    + `</div></div><div class="card"><div class="chead"><div><h2>Items that hurt the margin most</h2><p class="hint">Cost of goods bought dearer than the same dates last year, on this period's quantity (Purchasing's price savings, by stock location)</p></div></div><div class="scroll">`
+    + (items.length ? `<table><tr><th>Restaurant</th><th>Item</th><th class="num">Last year</th><th class="num">Now</th><th class="num">Change</th><th class="num">Extra cost</th></tr>` + items.map(({x, r}) => `<tr class="click" data-pulse="exaudit|${esc(r.code)}" tabindex="0"><td>${esc(r.name)}</td><td>${esc(names[x[0]] || x[0])} <span class="meta">${esc(x[0])}</span></td><td class="num">${fmt(x[2], 2)}</td><td class="num">${fmt(x[1], 2)}</td><td class="num"><span class="dl bad">${x[2] ? (x[1] >= x[2] ? "+" : "") + fmt((x[1] - x[2]) / x[2] * 100, 1) + "%" : "–"}</span></td><td class="num"><b>${fmt(Math.abs(x[4]))}</b></td></tr>`).join("") + `</table>`
+      : `<div class="empty">${S.pur && S.pur.savings ? "No item bought dearer in this period, or the period is not one Purchasing compares (a month, a quarter, the year to date)." : "Purchasing is not read for your role or not yet."}</div>`)
+    + `</div></div></div>`;
+  $("view").innerHTML = h;
+}
+// one restaurant's audit
+Pulse.on("exaudit", code => {
+  const keys = rangeKeys(), how = auHow(), cmp = how === "budget" ? "budget" : "last year", r = auRows(keys).find(x => x.code === code);
+  if (!r) { Pulse.open("exdept", code); return; }
+  const names = (S.pur && S.pur.savings && S.pur.savings.names) || {}, acts = auActions([r]), lbl = "vs " + cmp;
+  Pulse.pop({title: esc(r.name), sub: esc(`Audit · ${periodText(keys)} · against ${cmp}`),
+    actions: `<button class="close" type="button" data-pulse="exdept|${esc(code)}">Statement and months ›</button>`,
+    body: Pulse.tiles([{l: "Revenue", v: exMoney(r.a.sales), s: dl(delta(r.a.sales, r.c.sales), true, lbl)},
+      {l: "Food cost", v: pct(r.a.foodPct), s: dl(delta(r.a.foodPct, r.c.foodPct, "pts"), false, lbl)},
+      {l: "Labour", v: pct(r.a.laborPct), s: dl(delta(r.a.laborPct, r.c.laborPct, "pts"), false, lbl)},
+      {l: "Other operating costs", v: exMoney(r.a.opex), s: dl(delta(r.a.opex, r.c.opex), false, lbl)},
+      {l: "EBITDA", v: exMoney(r.a.ebitda), s: `${r.gap >= 0 ? "+" : ""}${compact(r.gap)} ${esc(C())} ${lbl}`, cls: r.gap < 0 ? "up" : ""}])
+      + Pulse.panel("Decisions", acts.length ? `<ul class="au-say">${acts.map(x => `<li><span class="au-own au-${x.who.toLowerCase()}">${x.who}</span> ${x.t} <b>${compact(x.w)}</b> ${esc(C())}</li>`).join("")}</ul>` : `<p class="meta">Within the limits: nothing calls for a decision.</p>`)
+      + Pulse.panel(`Accounts over ${cmp}`, Pulse.list([["Account"], ["Line"], ["Actual", 1], [cap(cmp), 1], ["Over", 1]],
+          r.accs.slice(0, 25).map(x => ({cells: [`${esc(x.no)} <span class="meta">${esc(x.name)}</span>`, esc({food: "Food cost", opex: "Operating costs"}[x.bucket] || (x.bucket.startsWith("labor") ? "Labour" : x.bucket)), fmt(x.a), fmt(x.c), `<span class="dl bad">+${fmt(x.v)}</span>`]})), {none: "No account over plan.", max: 360}))
+      + Pulse.panel("Items bought dearer than last year", Pulse.list([["Item"], ["Last year", 1], ["Now", 1], ["Change", 1], ["Quantity", 1], ["Extra cost", 1]],
+          r.items.map(x => ({cells: [`${esc(names[x[0]] || x[0])} <span class="meta">${esc(x[0])}</span>`, fmt(x[2], 2), fmt(x[1], 2), x[2] ? `<span class="dl bad">${(x[1] >= x[2] ? "+" : "") + fmt((x[1] - x[2]) / x[2] * 100, 1)}%</span>` : "–", fmt(x[3], 1), `<b>${fmt(Math.abs(x[4]))}</b>`]})), {none: "None in this period (Purchasing compares a month, a quarter or the year to date).", max: 360}))});
+});
+
 /* ------------------------------------------------------------ render */
 const DEF_LABEL = {sales: "Revenue", food: "Food cost", labor: "Labour", prime: "Prime cost", ebitda: "EBITDA", running: "Month in progress", budget: "Budget", simphony: "Simphony"};
-const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, balance: viewBalance, purchasing: viewPurchasing, locations: viewLocations};
+const VIEWS = {overview: viewOverview, sales: viewSales, labor: viewLabor, food: viewFood, budget: viewBudget, balance: viewBalance, purchasing: viewPurchasing, locations: viewLocations, audit: viewAudit};
 /* Location intelligence: every restaurant of the company from Simphony and Business Central, read by the
    Finance tower (/finance/api/locations) and drawn by the shared module locintel.js. It follows the
    Company and "Up to" filters (month to date of that month); the other filters do not apply. */
@@ -1242,7 +1365,7 @@ function render(){
   try { VIEWS[F.tab](); } catch (e) { console.error(e); $("view").innerHTML = `<div class="card"><p class="hint">This view could not be drawn: ${esc(e.message)}</p></div>`; }
   const defs = (S.fin && S.fin.definitions) || {}, pd = (S.pur && S.pur.definitions) || {};
   const show = {overview: ["sales","food","labor","prime","ebitda","running"], sales: ["sales","simphony","running"], labor: ["labor","running"],
-                food: ["food","running"], budget: ["budget","ebitda"], balance: [], purchasing: []}[F.tab];
+                food: ["food","running"], budget: ["budget","ebitda"], balance: [], purchasing: [], audit: ["budget","food","labor","running"]}[F.tab];
   $("foot").innerHTML = `<div class="defs">` + show.filter(k => defs[k]).map(k => `<b>${esc(DEF_LABEL[k] || cap(k))}.</b> ${esc(defs[k])}`).join(" ") +
     (F.tab === "purchasing" ? Object.values(pd).map(esc).join(" ") : "") + ` Every figure is read-only from Business Central${F.tab === "sales" ? " and Simphony" : ""}; the filters re-cut what is loaded and do not run another report.</div>`;
 }

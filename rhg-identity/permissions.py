@@ -272,7 +272,8 @@ DEFAULT_ROLES = {
                "permissions": _FIN_ALL + _PUR_ALL + ["finance.export", "purchasing.export"]},
 }
 # Screens added after the roles were stored: {new screen: the screen (or screens) whose holders get it once}.
-ADDED_SCREENS = {"purchasing.s.purchasers": "purchasing.s.users", "finance.s.sales.prices": "finance.s.sales.main",
+ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
+                 "purchasing.s.purchasers": "purchasing.s.users", "finance.s.sales.prices": "finance.s.sales.main",
                  "finance.s.inventory.discharge": "finance.s.inventory.recipes",
                  "finance.s.sales.menu": "finance.s.sales.prices",
                  "finance.s.sales.chanprofit": "finance.s.sales.main",

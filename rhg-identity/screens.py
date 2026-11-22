@@ -148,6 +148,9 @@ PLATFORM = [
         ("balance", "Balance & capital", "company", ["finance.view", "finance.bs.view"]),
         ("purchasing", "Purchasing", "company", ["purchasing.view"]),
         ("locations", "Location intelligence", "location", ["finance.view"]),
+        # Audit (Geri, 22 Nov 2026): each restaurant against its budget, the costs over it, the items whose dearer
+        # prices took the margin, and the decisions for the CEO, COO and CFO
+        ("audit", "Audit", "company", ["finance.view", "finance.pl.view"]),
         # Location intelligence in parts (Geri, 14 Nov 2026): the tab itself is the restaurants (squares, Compare, each
         # restaurant's operations from Simphony); each part below adds one layer. Not tabs of the page: the keys
         # "locations.<part>" only give the permissions platform.s.executive.locations.<part>.
