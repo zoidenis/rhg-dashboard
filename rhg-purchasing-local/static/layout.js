@@ -622,8 +622,9 @@ body.lay-edit main{padding-bottom:190px}
 
   // The screen the address asks for (#doccontrol, #transit…), when the person may open it: [menu, tab or null].
   function asked() {
-    const v = decodeURIComponent((location.hash || "").slice(1));
+    let v = decodeURIComponent((location.hash || "").slice(1));
     if (!v) return null;
+    if (v === "compliance") v = "doccontrol/nopo";      // Invoices without PO: a tab of Document control now
     if (v.includes("/")) {                 // #view/tab (the pulse home's links): that menu's tab
       const [mv, tv] = v.split("/");
       const x = S.cat.menus.find(y => y.view === mv && menuOk(y) && navBtn(y.view));

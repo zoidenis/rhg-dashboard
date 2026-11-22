@@ -815,6 +815,44 @@ def stock_overview(company, month):
 _compliance_cache = {}
 
 
+def nopo_screen(company, month):
+    """Document control → Invoices without PO: the month's reading (compliance_screen) with the follow-up each
+    invoice has in this tower's register."""
+    out = dict(compliance_screen(company, month))
+    if out.get("available"):
+        keys = {f"nopo-{company}-{i['invoice']}" for i in out.get("invoices") or []}
+        out["followup"] = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"]}
+                           for x in exreg.query("all", company=company, limit=100000)["items"]
+                           if x["subject"] in keys}
+    return out
+
+
+def transit_screen(company, refresh=False, scope=None):
+    """Document control → Transfers in transit, moved here from Finance (Geri, 22 Nov 2026). Read by the Finance
+    tower (transit.py, its BC reading and the in-transit threshold of its settings) over the internal network;
+    scope = the BC locations of a person limited to some (Finance cuts to the transfers leaving or reaching them).
+    The follow-up: the items tracked earlier in Finance's register and those tracked here since."""
+    import requests
+    params = {"company": company, "refresh": "1" if refresh else ""}
+    if scope is not None:
+        params["locations"] = ",".join(sorted(scope))
+    try:
+        r = requests.get(f"{config.FINANCE_URL.rstrip('/')}/internal/transit", params=params, timeout=180,
+                         headers={"X-Service-Token": auth.SERVICE_TOKEN})
+        out = r.json()
+    except (requests.RequestException, ValueError) as exc:
+        return {"available": False, "error": "The Finance tower could not be reached.", "reason": str(exc)[:200]}
+    if not r.ok:
+        return {"available": False, "error": out.get("error") or f"Finance answered {r.status_code}."}
+    if out.get("available"):
+        keys = {f"transit-{company}-{t['shipment']}" for t in out.get("transfers") or []}
+        here = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"], "id": x["id"]}
+                for x in exreg.query("all", company=company, limit=100000)["items"]
+                if x["subject"] in keys and x["status"] in exreg.ACTIVE}
+        out["followup"] = {**(out.get("followup") or {}), **here}
+    return out
+
+
 def compliance_screen(company, month, months_back=6):
     """Invoices posted without a purchase order, for one month and the months before it."""
     key = (company, month)
@@ -1427,7 +1465,7 @@ def drill(kind, key):
 
 
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
-WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions",
+WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/control/nopo/track": "actions",
                      "/api/register/settings": "settings", "/api/register/run": "settings", "/api/register/test": "settings",
                      "/api/notify/test": "settings", "/api/notify/smtp": "settings",
                      "/api/savings/send": "export", "/api/weekly/job": "settings", "/api/recipients": "settings",
@@ -1452,6 +1490,8 @@ ACCESS_ONE_LOCATION = {"/api/dashboard", "/api/streams", "/api/comparisons", "/a
 # only (the Location intelligence screens, Live operations, the Action center, Supplier performance)
 ACCESS_SCOPE_SET = {"/api/dashboard", "/api/streams", "/api/comparisons", "/api/report", "/api/suppliers/locations",
                     "/api/suppliers/summary", "/api/items/history"}
+# the handler cuts the answer to the locations in scope itself (Document control → Transfers in transit)
+ACCESS_SELF_CUT = {"/api/transit"}
 # answered cut to the locations in scope
 ACCESS_FILTERED = {"/api/today/locations", "/api/locations", "/api/recipients/locations"}
 
@@ -1916,25 +1956,6 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(200, report_catalog())
             return
-        if url.path == "/internal/compliance":
-            # Finance → Control → Document control: the same reading as Invoices without PO, with the follow-up
-            # each invoice has in this tower's register, so Finance shows one figure and tracks nothing twice
-            if not self._service_call():
-                self._send(403, {"error": "Forbidden."})
-                return
-            month = (q.get("month") or "")[:7]
-            if not re.match(r"^\d{4}-\d{2}$", month):
-                self._send(400, {"error": "Choose a month, e.g. 2026-10."})
-                return
-            company = q.get("company") or config.BC_COMPANY
-            out = dict(compliance_screen(company, month))
-            if out.get("available"):
-                keys = {f"nopo-{company}-{i['invoice']}" for i in out.get("invoices") or []}
-                out["followup"] = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"]}
-                                   for x in exreg.query("all", company=company, limit=100000)["items"]
-                                   if x["subject"] in keys}
-            self._send(200, out)
-            return
         if url.path == "/internal/sharepoint/navigation":
             # identity (Control center): the navigation register of RHG Home, read with the Graph app (sharepoint.py)
             if not self._service_call():
@@ -2209,9 +2230,24 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(body)
                     store.audit("export", "purchaser performance", user["username"], {},
                                 {"from": r["period"]["from"], "to": r["period"]["to"]}, company)
-            elif url.path == "/api/compliance":
-                self._send(200, compliance_screen(q.get("company") or config.BC_COMPANY,
-                                                  q.get("month") or date.today().strftime("%Y-%m")))
+            elif url.path == "/api/control/nopo":
+                # Control → Document control → Invoices without PO
+                if not auth.can(user, "purchasing.s.doccontrol.nopo"):
+                    self._send(403, {"error": "Your role does not include Invoices without PO."})
+                    return
+                month = (q.get("month") or "")[:7]
+                if not re.match(r"^\d{4}-\d{2}$", month):
+                    self._send(400, {"error": "Choose a month, e.g. 2026-10."})
+                    return
+                self._send(200, nopo_screen(q.get("company") or config.BC_COMPANY, month))
+            elif url.path == "/api/transit":
+                # Control → Document control → Transfers in transit (read by Finance, see transit_screen)
+                if not auth.can(user, "purchasing.s.doccontrol.transit"):
+                    self._send(403, {"error": "Your role does not include Transfers in transit."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                scope = access.locations(user, company) if access.limited(user) else None
+                self._send(200, transit_screen(company, q.get("refresh") == "1", scope))
             elif url.path == "/api/stock":
                 self._send(200, stock_screen(q.get("company") or config.BC_COMPANY, q.get("location"),
                                              q.get("month") or date.today().strftime("%Y-%m"),
@@ -2347,6 +2383,8 @@ class Handler(BaseHTTPRequestHandler):
         if not access.company_ok(user, company):
             return access.refuse_company(company)
         L = access.locations(user, company)
+        if L is not None and path in ACCESS_SELF_CUT:
+            return None                                 # the handler cuts to the locations itself
         if L is not None:
             if body is not None:
                 return access.refuse_company_wide(user, company)
@@ -2525,21 +2563,6 @@ class Handler(BaseHTTPRequestHandler):
                  "nopo": nopo_window, "currency_of": company_currency, "default_company": config.BC_COMPANY},
                 str(body.get("name") or ""), body.get("args") or {}))
             return
-        if url.path == "/internal/compliance/track":     # Finance tracking an invoice without a PO, for its user
-            # the item goes into this tower's register, where the daily notice reads it: one follow-up per invoice
-            if not self._service_call():
-                self._send(403, {"error": "Forbidden."})
-                return
-            p = body.get("payload") or {}
-            if not str(p.get("source_exception") or "").startswith("nopo-"):
-                self._send(400, {"error": "Only an invoice without a PO is tracked from Finance."})
-                return
-            try:
-                self._send(200, exreg.track(p, f"{str(body.get('actor') or 'finance')[:60]} (Finance)",
-                                            str(body.get("email") or "")[:200]))
-            except ValueError as exc:
-                self._send(400, {"error": str(exc)})
-            return
         if url.path == "/internal/recipients":           # Finance saving the directory for its user
             if not self._service_call():
                 self._send(403, {"error": "Forbidden."})
@@ -2600,6 +2623,19 @@ class Handler(BaseHTTPRequestHandler):
                 # Track: an item of the Exceptions register, tracked by hand (or the one already there)
                 try:
                     self._send(200, exreg.track(body or {}, actor, user.get("email") or ""))
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)})
+            elif url.path == "/api/control/nopo/track":
+                # Document control → Invoices without PO: Track puts the invoice in this register, where the daily
+                # notice reads the follow-up
+                if not auth.can(user, "purchasing.s.doccontrol.nopo"):
+                    self._send(403, {"error": "Your role does not include Invoices without PO."})
+                    return
+                if not str((body or {}).get("source_exception") or "").startswith("nopo-"):
+                    self._send(400, {"error": "Only an invoice without a PO is tracked here."})
+                    return
+                try:
+                    self._send(200, exreg.track(body, actor, user.get("email") or ""))
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
             elif url.path.startswith("/api/actions/"):

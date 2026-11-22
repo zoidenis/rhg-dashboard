@@ -123,7 +123,7 @@ def build(rows, settings, period_label=""):
         "covered_elsewhere": [
             {"control": "Goods received with no invoice yet", "where": "Live operations",
              "why": "Already measured there against the agreed time limit, with the same records."},
-            {"control": "Invoices posted without a purchase order", "where": "Invoices without PO",
+            {"control": "Invoices posted without a purchase order", "where": "Document control → Invoices without PO",
              "why": "That section proves the link from the order number BC records; repeating it here "
                     "would risk two different answers to the same question."},
             {"control": "Negative lines, zero cost, backdated postings", "where": "Data quality",

@@ -114,7 +114,6 @@ STATIC_FILES = {"brand.css": "text/css; charset=utf-8", "logo.svg": "image/svg+x
                 "login.html": "text/html; charset=utf-8"}
 PUBLIC_PATHS = {"/login", "/login.html", "/api/login", "/api/session", "/brand.css", "/logo.svg", "/logo.png", "/icon.svg", "/favicon.ico", "/manifest.webmanifest", "/sw.js"}
 WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/api/closing": "closing",
-                     "/api/control/nopo/track": "actions",
                      "/api/simphony/settings": "settings", "/api/simphony/test": "settings",
                      "/api/billy/settings": "settings", "/api/billy/test": "settings",
                      "/api/arap-notify/settings": "settings", "/api/arap-notify/test": "settings",
@@ -2283,8 +2282,6 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/locations", "/api/inventory/sku", "/api/inventory/sku/location",
                          "/api/inventory/sku/xlsx", "/api/inventory/items", "/api/inventory/items/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/locations/registry",
-                         # Control → Document control → Transfers in transit: the transfers leaving or reaching them
-                         "/api/transit",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
                          "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
                          "/api/sales/foodcost",
@@ -2316,7 +2313,7 @@ DEPT_SELF = {"/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sal
 LOCATION_CUTS = {
     "/api/discharge": lambda b, A: recipeuse.cut(b, A), "/api/discharge/xlsx": lambda b, A: recipeuse.cut(b, A),
     "/api/sales/stockstop": lambda b, A: salestop.cut(b, A), "/api/sales/stockstop/xlsx": lambda b, A: salestop.cut(b, A),
-    "/api/executive": lambda b, A: executive.cut(b, A), "/api/transit": lambda b, A: transit.cut(b, A),
+    "/api/executive": lambda b, A: executive.cut(b, A),
     "/api/billyrec": lambda b, A: billyrec.cut(b, A), "/api/receipts": lambda b, A: rcpt.cut(b, A)}
 SELF_CUT = {"/api/movement", "/api/movement/rows", "/api/movement/xlsx", "/api/typology", "/api/typology/xlsx", "/api/typology/family",
             "/api/stockcount", "/api/stockcount/xlsx", "/api/shrinkage", "/api/shrinkage/xlsx", "/api/shrinkage/overview",
@@ -2403,7 +2400,8 @@ _transit_cache, _transit_lock = {}, threading.Lock()
 
 
 def transit_screen(company, refresh=False):
-    """Control → Document control → Transfers in transit (transit.py): what is shipped and not yet received.
+    """Purchasing → Document control → Transfers in transit (transit.py), asked over /internal/transit: what is
+    shipped and not yet received.
     Read straight from BC, held five minutes: the open entries at the in-transit locations are a few dozen."""
     key = company.upper()
     with _transit_lock:
@@ -2465,22 +2463,6 @@ def transit_screen(company, refresh=False):
     with _transit_lock:
         _transit_cache[key] = (time.time(), out)
     return out
-
-
-def nopo_screen(company, month):
-    """Control → Document control → Invoices without PO: the Purchasing tower's reading (compliance.py), asked
-    over the internal network so the two towers show one figure. Purchasing's follow-up of each invoice comes
-    with it."""
-    try:
-        r = requests.get(f"{config.PURCHASING_URL}/internal/compliance", timeout=180,
-                         params={"company": company, "month": month},
-                         headers={"X-Service-Token": auth.SERVICE_TOKEN})
-        j = r.json()
-    except (requests.RequestException, ValueError) as exc:
-        return {"available": False, "error": "The Purchasing tower could not be reached.", "reason": str(exc)[:200]}
-    if not r.ok:
-        return {"available": False, "error": j.get("error") or f"Purchasing answered {r.status_code}."}
-    return j
 
 
 def scope_expand(company, codes):
@@ -2625,8 +2607,6 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = None                                   # cut by the handler
         elif path == "/api/executive":
             self._scope_filter = lambda b: executive.cut(b, self._allowed)
-        elif path == "/api/transit":
-            self._scope_filter = lambda b: transit.cut(b, self._allowed)
         elif path == "/api/salesrec":
             self._scope_filter = lambda b: salesrec.cut(b, self._allowed)
         elif path == "/api/billyrec":
@@ -2968,6 +2948,25 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(200, {"registry": [{k: r.get(k) or "" for k in ("ref", "name", "brand", "company", "bc", "dept")}
                                               for r in locintel.registry()]})
+            return
+        if url.path == "/internal/transit":
+            # Purchasing → Document control → Transfers in transit (moved from Finance, Geri 22 Nov 2026): read here,
+            # where the BC client, the thresholds and the earlier follow-ups of this register are. "locations" = the
+            # person's scope (BC codes), cut to the transfers leaving or reaching one of them.
+            if not self._service_call():
+                self._send(403, {"error": "Forbidden."})
+                return
+            company = q.get("company") or config.BC_COMPANY
+            out = dict(transit_screen(company, q.get("refresh") == "1"))
+            if out.get("available"):
+                keys = {f"transit-{company}-{t['shipment']}" for t in out.get("transfers") or []}
+                out["followup"] = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"], "id": x["id"]}
+                                   for x in exreg.query("all", company=company, limit=100000)["items"]
+                                   if x["subject"] in keys and x["status"] in exreg.ACTIVE}
+            if "locations" in q:
+                L = {c.strip().upper() for c in q["locations"].split(",") if c.strip()}
+                out = transit.cut(out, scope_expand(company, L) | L)
+            self._send(200, out)
             return
         if url.path == "/internal/register":
             # the Executive Action Center (identity): this tower's exceptions register, active and recently closed
@@ -4014,28 +4013,6 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
-            elif url.path == "/api/transit":
-                if not auth.can(user, "finance.inventory.view"):
-                    self._send(403, {"error": "Your role does not include Inventory."})
-                    return
-                company = q.get("company") or config.BC_COMPANY
-                out = dict(transit_screen(company, q.get("refresh") == "1"))
-                if out.get("available"):
-                    # the follow-up of each transfer in the register (Track on the screen), read fresh every time
-                    keys = {f"transit-{company}-{t['shipment']}" for t in out.get("transfers") or []}
-                    out["followup"] = {x["subject"]: {"status": x["status"], "owner": x["owner"], "due": x["due"], "id": x["id"]}
-                                       for x in exreg.query("all", company=company, limit=100000)["items"]
-                                       if x["subject"] in keys and x["status"] in exreg.ACTIVE}
-                self._send(200, out)
-            elif url.path == "/api/control/nopo":
-                if not auth.can(user, "finance.ap.view"):
-                    self._send(403, {"error": "Your role does not include Accounts payable."})
-                    return
-                month = (q.get("month") or "")[:7]
-                if not re.match(r"^\d{4}-\d{2}$", month):
-                    self._send(400, {"error": "Choose a month, e.g. 2026-10."})
-                    return
-                self._send(200, nopo_screen(q.get("company") or config.BC_COMPANY, month))
             elif url.path == "/api/inventory/locations":
                 if not auth.can(user, "finance.inventory.view"):
                     self._send(403, {"error": "Your role does not include Inventory."})
@@ -4361,20 +4338,6 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, exreg.track(body or {}, actor, user.get("email") or ""))
                 except ValueError as exc:
                     self._send(400, {"error": str(exc)})
-            elif url.path == "/api/control/nopo/track":
-                # Invoices without PO: tracked in Purchasing's register, where the daily notice reads the follow-up
-                if not auth.can(user, "finance.ap.view"):
-                    self._send(403, {"error": "Your role does not include Accounts payable."})
-                    return
-                try:
-                    r = requests.post(f"{config.PURCHASING_URL}/internal/compliance/track", timeout=30,
-                                      headers={"X-Service-Token": auth.SERVICE_TOKEN},
-                                      json={"payload": body or {}, "actor": actor, "email": user.get("email") or ""})
-                    j = r.json()
-                except (requests.RequestException, ValueError) as exc:
-                    self._send(502, {"error": "The Purchasing tower could not be reached: " + str(exc)[:160]})
-                    return
-                self._send(200 if r.ok else 400, j if r.ok else {"error": j.get("error") or f"Purchasing answered {r.status_code}."})
             elif url.path.startswith("/api/actions/"):
                 self._send(410, {"error": "The Action center is now the Exceptions register: change the item there."})
             elif url.path == "/api/settings":

@@ -88,10 +88,11 @@ a{ color: var(--rhg-primary); }
 
 /* ---------------------------------------------------------- navigation */
 aside{
-  width: 240px; padding: 20px; gap: var(--rhg-space-8);
+  width: 272px; padding: 20px; gap: var(--rhg-space-8); overflow-x: hidden;
   background: var(--rhg-nav); color: var(--rhg-blue);
 }
-.brand{ display: flex; gap: 10px; align-items: center; padding: 0; }
+.brand{ display: flex; gap: 10px; align-items: center; padding: 0; min-width: 0; }
+.brand > div:not(.logo){ min-width: 0; }
 .brand b, .brand small{
   display: block; font-family: var(--rhg-font); font-size: 12px; font-weight: 600; line-height: 1.35;
   color: var(--rhg-white); text-transform: uppercase; letter-spacing: 0;

@@ -86,11 +86,6 @@ FINANCE = [
         ("loc", "Location intelligence", "location", ["finance.assets.view"])]),
     ("closing", "Month-end close", "Control", None, [], "company", []),
     ("register", "Exceptions register", "Control", None, [], "location", []),
-    # documents left half-way: invoices posted without a purchase order (Purchasing's reading) and transfers
-    # shipped and not received
-    ("doccontrol", "Document control", "Control", "dkTabs", [
-        ("nopo", "Invoices without PO", "company", ["finance.ap.view"]),
-        ("transit", "Transfers in transit", "location", ["finance.inventory.view"])]),
     ("salesrec", "Simphony ↔ BC", "Control", None, [], "location", []),
     ("receipts", "Takings POS ↔ BC", "Control", None, [], "location", ["finance.cash.view"]),
     ("billyrec", "Simphony ↔ Billy", "Control", None, [], "location", []),
@@ -126,7 +121,11 @@ PURCHASING = [
         ("items", "Item history", "location", ["purchasing.prices.view"]),
         ("negotiations", "Negotiations", "company", ["purchasing.prices.view"])]),
     ("register", "Exceptions register", "Control", None, [], "location", []),
-    ("compliance", "Invoices without PO", "Control", None, [], "company", ["purchasing.invoices.view"]),
+    # documents left half-way: invoices posted without a purchase order and transfers shipped and not received.
+    # Moved here from Finance (Geri, 22 Nov 2026); Invoices without PO, a screen of its own before, is its first tab
+    ("doccontrol", "Document control", "Control", "dkTabs", [
+        ("nopo", "Invoices without PO", "company", ["purchasing.invoices.view"]),
+        ("transit", "Transfers in transit", "location", [])]),
     ("feed", "Posting follow-up", "Control", None, [], "location", ["purchasing.invoices.view"]),
     ("suppliers", "Supplier performance", "Performance", "spTabs", [
         ("suppliers", "Supplier performance", "location", ["purchasing.spend.view"]),

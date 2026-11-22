@@ -165,12 +165,13 @@ DEFAULT_ROLES = {
                                                                                 "unicorn.rules.manage", "layout.personal"]},
     "Finance director": {"department": "Finance", "system": False,
                          "description": "Finance in full, including closing and thresholds.",
-                         "permissions": _FIN_ALL + _EXEC + _FIN_ACT + ["layout.personal"]},
+                         "permissions": _FIN_ALL + _s("purchasing.s.doccontrol") + _EXEC + _FIN_ACT
+                                        + ["layout.personal"]},
     "Chief accountant": {"department": "Finance", "system": False,
                          "description": "Statements, working capital, fiscal, fixed assets and closing; no "
                                         "thresholds.",
                          "permissions": _s("finance.s", but=("finance.s.settings", "finance.s.emcpriv"))
-                                        + ["finance.export", "finance.actions.manage", "finance.closing.manage"]},
+                                        + _s("purchasing.s.doccontrol") + ["finance.export", "finance.actions.manage", "finance.closing.manage"]},
     "Accountant": {"department": "Finance", "system": False,
                    "description": "Statements, G/L, Kartela, fiscal and fixed assets; actions; no closing.",
                    "permissions": _s("finance.s.pl", "finance.s.gl", "finance.s.kartela", "finance.s.fiscal",
@@ -185,7 +186,7 @@ DEFAULT_ROLES = {
                                            "finance.s.fiscal.fiscal", "finance.s.fiscal.fsales",
                                            "finance.s.sales.main", "finance.s.sales.loc",
                                            "finance.s.salesrec", "finance.s.register",
-                                           "purchasing.s.compliance", "purchasing.s.reqs.invoices",
+                                           "purchasing.s.doccontrol.nopo", "purchasing.s.reqs.invoices",
                                            "finance.export", "finance.actions.manage"]},
     "Treasury": {"department": "Finance", "system": False,
                  "description": "Cash & bank, cash flow and treasury, payables and receivables to read.",
@@ -204,7 +205,7 @@ DEFAULT_ROLES = {
     "Purchasing coordinator": {"department": "Purchasing", "system": False,
                                "description": "Requisitions, orders, invoices without PO, exceptions.",
                                "permissions": _s("purchasing.s.overview", "purchasing.s.reqs",
-                                                 "purchasing.s.register", "purchasing.s.compliance",
+                                                 "purchasing.s.register", "purchasing.s.doccontrol",
                                                  "purchasing.s.feed")
                                               + ["purchasing.export", "purchasing.actions.manage"]},
     "Buyer": {"department": "Purchasing", "system": False,
@@ -214,19 +215,20 @@ DEFAULT_ROLES = {
                              + ["purchasing.export", "purchasing.actions.manage"]},
     "Cost controller": {"department": "Purchasing", "system": False,
                         "description": "Prices, savings, inventory, recipes, movement and SKU planning.",
-                        "permissions": _s("purchasing.s.compare", "purchasing.s.overview", "purchasing.s.register")
+                        "permissions": _s("purchasing.s.compare", "purchasing.s.overview", "purchasing.s.register",
+                                          "purchasing.s.doccontrol.transit")
                                        + _s("finance.s.inventory") + ["finance.s.budget.budget", "finance.s.register",
                                                                        "platform.s.executive.food"]
                                        + ["finance.export", "purchasing.export"]},
     "Stock manager": {"department": "Purchasing", "system": False,
                       "description": "Inventory, movement, SKU planning, requisitions and orders at the locations.",
                       "permissions": _s("finance.s.inventory", but=("finance.s.inventory.stockwc",))
-                                     + _s("purchasing.s.reqs.reqs", "purchasing.s.reqs.po")
+                                     + _s("purchasing.s.reqs.reqs", "purchasing.s.reqs.po", "purchasing.s.doccontrol.transit")
                                      + ["finance.s.register", "finance.export"]},
     "Inputer": {"department": "Purchasing", "system": False,
                 "description": "Invoice entry in BC: invoices, invoices without PO, posting follow-up, fiscal "
                                "purchases.",
-                "permissions": ["purchasing.s.reqs.invoices", "purchasing.s.compliance", "purchasing.s.feed",
+                "permissions": ["purchasing.s.reqs.invoices", "purchasing.s.doccontrol.nopo", "purchasing.s.feed",
                                 "finance.s.fiscal.fiscal"]},
     # --- sales
     "Sales & operations director": {"department": "Sales", "system": False,
@@ -281,11 +283,10 @@ ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
                  "finance.s.sales.chanprofit": "finance.s.sales.main",
                  # Control → Simphony ↔ Billy: whoever reads Simphony ↔ BC
                  "finance.s.billyrec": "finance.s.salesrec",
-                 # Control → Document control: invoices without PO for whoever reads them in Purchasing or reads
-                 # payables; transfers in transit for whoever reads stock
-                 "finance.s.doccontrol.nopo": ("purchasing.s.compliance", "finance.s.kartela.ap"),
-                 "finance.s.doccontrol.transit": ("finance.s.inventory.movement", "finance.s.inventory.overview",
-                                                  "finance.s.inventory.loc"),
+                 # Control → Document control moved from Finance to Purchasing (22 Nov 2026): whoever held a tab in
+                 # Finance holds it in Purchasing; Invoices without PO (Purchasing's screen of its own) is its first tab
+                 "purchasing.s.doccontrol.nopo": ("purchasing.s.compliance", "finance.s.doccontrol.nopo"),
+                 "purchasing.s.doccontrol.transit": ("finance.s.doccontrol.transit",),
                  # Control → EMC privileges (who can do what in Simphony): whoever holds Settings
                  "finance.s.emcpriv": "finance.s.settings",
                  # Sales → SevenRooms ↔ Simphony: whoever reads Sales
@@ -384,7 +385,8 @@ ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
 REMOVED_SCREENS = ("purchasing.s.live", "finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
                    "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",
                    "finance.s.pl.charts", "finance.s.actions", "finance.s.exceptions", "purchasing.s.actions",
-                   "purchasing.s.exceptions", "purchasing.s.exceptions.list", "purchasing.s.exceptions.loc")
+                   "purchasing.s.exceptions", "purchasing.s.exceptions.list", "purchasing.s.exceptions.loc",
+                   "finance.s.doccontrol.nopo", "finance.s.doccontrol.transit", "purchasing.s.compliance")
 
 DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
 

@@ -221,7 +221,7 @@ def render_email(d, recipients, test=False):
     """HTML (inline styles, for mail clients) and plain-text versions of one digest."""
     e = html.escape
     public_url = smtp_config.current()["public_url"]
-    link = f"{public_url.rstrip('/')}/purchasing/#compliance" if public_url else ""
+    link = f"{public_url.rstrip('/')}/purchasing/#doccontrol/nopo" if public_url else ""
     navy, primary, ink, muted, line, sky = "#08303f", "#0c475e", "#0e2733", "#5c7482", "#d9dcdd", "#e4f3f9"
     red, redbg = "#c0392b", "#fbecea"
     th = (f"text-align:left;padding:8px 10px;background:{sky};color:{ink};font-size:12px;"
