@@ -911,6 +911,8 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
   </section>
 
   <section class="view" id="v-live">
+    <div class="ov-tabs" id="lvTabs" role="tablist"><button class="on" data-t="carried" role="tab" aria-selected="true">Requisitions carried out</button><button data-t="poreco" role="tab" aria-selected="false">Orders vs recommendation</button></div>
+    <div id="lvCarried">
     <div class="kpis five">
       <div class="card kpi clickable" data-drill="documents"><div class="l">Documents posted</div><div class="v" id="lDocs">–</div><div class="s" id="lDocsS">Invoices, receipts and credit notes that carry item lines</div></div>
       <div class="card kpi clickable" data-drill="po"><div class="l">Open purchase orders</div><div class="v" id="lPo">–</div><div class="s" id="lPoS"></div></div>
@@ -926,6 +928,22 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     <div class="card" style="margin-top:16px"><h2>Events Business Central does not record here</h2>
       <p class="hint">Requisitions, approval steps, document modifications and reopened documents need the web services listed under Data availability. They are not estimated.</p>
       <div id="liveGaps"></div></div>
+    <div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Location intelligence</h2>
+      <p class="hint">Each location's requisitions and orders: requisition lines waiting and carried out into orders, open purchase orders and their age, goods received not yet invoiced, and the period's purchases. Click a location for its documents.</p></div></div>
+      <div class="scroll"><table id="lvLocTable"></table></div></div>
+    </div>
+    <div id="lvPoreco" style="display:none">
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Orders against the system's recommendation</h2>
+        <p class="hint" id="prcNote">Every purchase received in the period and every order still to receive, against the quantity the planning parameters called for: up to the Maximum Inventory of the item's SKU card in Business Central, less the stock on hand (and what is already on order). What was ordered above it, beyond the tolerance, is stock nobody asked for: the money tied up in it, what it costs to carry, and for fresh goods what is at risk of waste.</p></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp dark" id="prcXlsx">Export ▾</button><button class="mini" id="prcRead">Read again</button></div></div>
+        <div class="kpis five" id="prcKpis"></div><p class="meta" id="prcStatus" style="margin:6px 0 0"></p></div>
+      <div class="card" style="margin-bottom:16px"><h2>Decisions</h2><p class="hint">What the figures call for, with who owns it, and the practice that keeps it from coming back.</p><div id="prcActs"></div></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>By location</h2><p class="hint">Purchases and the part over the recommendation, the stock manager's view. Click a location for its lines.</p></div></div><div class="scroll"><table id="prcLoc"></table></div></div>
+      <div class="grid"><div class="card"><h2>By who ordered</h2><p class="hint">The purchaser or assigned user of the open orders; a received purchase shows its location.</p><div class="scroll"><table id="prcWho"></table></div></div>
+        <div class="card"><h2>By vendor</h2><p class="hint">Where the extra stock was bought.</p><div class="scroll"><table id="prcVen"></table></div></div></div>
+      <div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Order lines over the recommendation</h2><p class="hint">Largest extra value first. Basis: the SKU card in BC, or Pulse's estimate from the location's delivery rhythm where the card has no maximum.</p></div>
+        <input class="search" id="prcQ" placeholder="Search item, location, vendor or document"></div><div class="scroll" style="max-height:560px"><table id="prcLines"></table></div></div>
+    </div>
   </section>
 
   <section class="view" id="v-reqs">
@@ -2132,7 +2150,107 @@ function renderLive(){
       : `<tr><td colspan="9" class="empty">No activity in this period.</td></tr>`);
   document.querySelectorAll("#liveTable .ev").forEach(a => a.onclick = e => { e.preventDefault(); openDrill(a.dataset.kind, a.dataset.key); });
   $("liveGaps").innerHTML = (data.gaps||[]).slice(0,4).map(g => `<div class="gap"><b>${esc(g.kpi)}</b><span>${esc(g.missing)}</span></div>`).join("");
+  lvRenderLoc();
+  if (lvTab === "poreco") prcLoad(false);
 }
+
+// ---------- Live operations → Requisitions carried out: location intelligence ----------
+let lvTab = "carried";
+function lvLocRows(){
+  const ops = data.operations || {}, B = data.by_location || {}, R = data.requisitions || {}, L = {};
+  const at = c => L[c || "–"] = L[c || "–"] || {code: c || "–", req_open: 0, req_done: 0, req_risk: 0, oldest: null, po: 0, po_value: 0, stale: 0, rni: 0, receipts: 0, spend: 0, prev: 0, pct: null};
+  (R.locations || []).forEach(l => { const x = at(l.location); x.req_open += l.open || 0; x.req_done += l.converted || 0; x.req_risk += l.at_risk || 0; x.oldest = l.oldest ?? x.oldest; });
+  (ops.events || []).forEach(e => { if (e.kind === "Requisition carried out") at(e.location).req_done += 1; if (e.kind === "Goods receipt posted") String(e.location || "").split(", ").forEach(c => at(c).receipts += 1); });
+  (ops.purchase_orders || []).forEach(p => { const x = at(p.location); x.po += 1; x.po_value += p.amount || 0; x.rni += p.received_not_invoiced || 0; x.stale += p.flag === "stale" ? 1 : 0; });
+  Object.entries(B).forEach(([c, v]) => { if (c === "?") c = ""; const x = at(c); x.spend = v.cur || 0; x.prev = v.prev || 0; x.pct = v.pct; });
+  return Object.values(L).filter(x => x.req_open || x.req_done || x.po || x.spend).sort((a, b) => b.spend - a.spend);
+}
+function lvRenderLoc(){
+  const rows = lvLocRows();
+  $("lvLocTable").innerHTML = `<tr><th>Location</th><th class="num">Requisitions waiting</th><th class="num">Carried out</th><th class="num">At supply risk</th><th class="num">Open orders</th><th class="num">Open value</th><th class="num">Open too long</th><th class="num">Received, not invoiced</th><th class="num">Purchases (${CUR})</th><th class="num">vs before</th></tr>` +
+    (rows.map(x => `<tr class="click" data-pulse="lvloc|${esc(x.code)}" tabindex="0"><td class="name">${esc(x.code)}</td><td class="num">${fmt(x.req_open)}</td><td class="num">${fmt(x.req_done)}</td>
+      <td class="num ${x.req_risk ? "bad" : ""}">${fmt(x.req_risk)}</td><td class="num">${fmt(x.po)}</td><td class="num">${fmt(x.po_value)}</td><td class="num ${x.stale ? "bad" : ""}">${fmt(x.stale)}</td>
+      <td class="num">${fmt(x.rni)}</td><td class="num"><b>${fmt(x.spend)}</b></td><td class="num">${x.pct == null ? "–" : (x.pct >= 0 ? "+" : "") + fmt(x.pct, 1) + "%"}</td></tr>`).join("")
+     || `<tr><td colspan="10" class="empty">No requisition or order in this period.</td></tr>`);
+}
+Pulse.on("lvloc", code => {
+  const ops = data.operations || {}, ev = (ops.events || []).filter(e => String(e.location || "").split(", ").includes(code)), po = (ops.purchase_orders || []).filter(p => (p.location || "–") === code);
+  Pulse.pop({title: esc(code), sub: esc(`Requisitions and orders · ${data.meta.period_label || ""}`), body: Pulse.panel("Open purchase orders", Pulse.list([["Order"], ["Vendor"], ["Status"], ["Date"], ["Amount", 1], ["Received, not invoiced", 1], ["Age (days)", 1]],
+      po.map(p => ({cells: [esc(p.no), esc(p.supplier || ""), esc(p.status || ""), esc(p.document_date || ""), fmt(p.amount), fmt(p.received_not_invoiced), p.age_days == null ? "–" : fmt(p.age_days)]})), {none: "No open order."}))
+    + Pulse.panel("Activity", Pulse.list([["When"], ["Event"], ["Document"], ["Vendor"], ["User"], ["Value", 1], ["Status"]],
+      ev.map(e => ({cells: [esc(e.date || ""), esc(e.kind), esc(e.document || ""), esc(e.supplier || "–"), esc(e.user || "–"), fmt(e.amount), esc(e.status || "")]})), {none: "No activity in the feed for this location."}))});
+});
+function lvShowTab(t){
+  lvTab = t;
+  document.querySelectorAll("#lvTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
+  $("lvCarried").style.display = t === "carried" ? "" : "none"; $("lvPoreco").style.display = t === "poreco" ? "" : "none";
+  if (t === "poreco") prcLoad(false); else if (data) lvRenderLoc();
+}
+document.querySelectorAll("#lvTabs button").forEach(b => b.onclick = () => lvShowTab(b.dataset.t));
+// ---------- Live operations → Orders vs recommendation (poreco.py, /api/poreco) ----------
+let prcData = null, prcTimer = null, prcKey = "";
+const prcPeriod = () => (data && data.meta && data.meta.current) || [];
+async function prcLoad(refresh){
+  if (!data) return;
+  const [a, b] = prcPeriod(), key = `${$("company").value}|${a}|${b}`;
+  if (!refresh && prcData && prcKey === key && !prcData.pending) { prcRender(); return; }
+  clearTimeout(prcTimer); prcKey = key;
+  $("prcStatus").textContent = "Reading the purchases, the stock and the SKU cards from Business Central…";
+  try{
+    const r = await fetch("/api/poreco?" + new URLSearchParams({company: $("company").value || "", from: a || "", to: b || ""}) + (refresh ? "&refresh=1" : ""));
+    const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status));
+    prcData = j;
+    if (j.pending) { $("prcStatus").textContent = j.stage || "Reading…"; prcTimer = setTimeout(() => prcLoad(false), 5000); return; }
+    prcRender();
+  }catch(e){ $("prcStatus").textContent = "Could not read: " + e.message; }
+}
+const prcCur = () => (prcData && prcData.currency) || CUR;
+function prcRender(){
+  const d = prcData; if (!d || d.pending) return;
+  const k = d.kpis || {}, C2 = prcCur(), P = d.params || {};
+  const tile = (l, v, s2, cls) => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s2}</div></div>`;
+  $("prcKpis").innerHTML = tile("Lines over the recommendation", `${fmt(k.over_lines)} <small>/ ${fmt(k.lines)}</small>`, `more than ${fmt(P.tolerance_pct)}% above it`)
+    + tile("Extra stock bought", fmt(k.excess_value), `${C2} · ${k.excess_share == null ? "–" : fmt(k.excess_share, 1) + "%"} of ${fmt(k.value)} purchased`, k.excess_value ? "bad" : "")
+    + tile("Cost of carrying it", fmt(k.carry), `${C2} · at ${fmt(P.carry_pct)}% a year for the days of use it covers`)
+    + tile("Fresh at risk of waste", fmt(k.waste_risk), `${C2} · fresh goods beyond ${fmt(P.fresh_days)} days of use`, k.waste_risk ? "bad" : "")
+    + tile("Ordered early", fmt(k.early), "lines ordered while the stock was above the reorder point");
+  $("prcStatus").textContent = `${d.period.from} → ${d.period.to} · read ${d.read_at} · basis: ${fmt(k.with_card)} line(s) on the SKU card in BC, ${fmt(k.estimated)} on Pulse's estimate, ${fmt(k.no_basis)} without one (no maximum and no use) · open orders still to receive: ${fmt(k.open_excess)} ${C2} over the recommendation`;
+  $("prcActs").innerHTML = (d.actions || []).map(a => `<div class="gap"><b><span class="rhg-pill ${a.owner === "CFO" ? "warning" : "info"}">${esc(a.owner)}</span></b><span>${esc(a.text)}</span></div>`).join("") || `<p class="hint">Nothing calls for a decision.</p>`;
+  const grp = (id, rows, label, open) => $(id).innerHTML = `<tr><th>${esc(label)}</th><th class="num">Lines</th><th class="num">Purchases</th><th class="num">Over</th><th class="num">Extra stock</th><th class="num">% of purchases</th><th class="num">Carrying</th><th class="num">Waste risk</th><th>Most</th></tr>` +
+    (rows.map(x => `<tr${open ? ` class="click" data-pulse="${open}|${esc(x.key)}" tabindex="0"` : ""}><td class="name">${esc(x.key)}</td><td class="num">${fmt(x.lines)}</td><td class="num">${fmt(x.value)}</td><td class="num">${fmt(x.over_lines)}</td>
+      <td class="num ${x.excess_value ? "bad" : ""}"><b>${fmt(x.excess_value)}</b></td><td class="num">${x.over_share == null ? "–" : fmt(x.over_share, 1) + "%"}</td><td class="num">${fmt(x.carry)}</td><td class="num">${fmt(x.waste_risk)}</td><td class="meta">${esc((x.top || []).join(" · "))}</td></tr>`).join("")
+     || `<tr><td colspan="9" class="empty">None.</td></tr>`);
+  grp("prcLoc", d.locations || [], "Location", "prcloc"); grp("prcWho", d.who || [], "Who", ""); grp("prcVen", d.vendors || [], "Vendor", "");
+  prcLines();
+}
+const prcRow = x => `<tr><td>${esc(x.date)}<div class="meta">${x.kind === "open" ? "open order" : "received"}</div></td><td class="name">${esc(x.desc || x.item)}<div class="meta">${esc(x.item)}${x.fresh ? " · fresh" : ""}${x.early ? " · ordered early" : ""}</div></td>
+  <td>${esc(x.location)}</td><td>${esc(x.doc)}<div class="meta">${esc(x.vendor || "")}${x.who && x.who !== x.location ? " · " + esc(x.who) : ""}</div></td>
+  <td class="num">${fmt(x.on_hand, 1)}</td><td class="num">${fmt(x.max, 1)}<div class="meta">${esc(x.basis)}</div></td><td class="num">${fmt(x.rec, 1)}</td><td class="num"><b>${fmt(x.qty, 1)}</b> ${esc(x.uom)}</td>
+  <td class="num bad">+${fmt(x.over, 1)}${x.over_pct != null ? `<div class="meta">+${fmt(x.over_pct, 0)}%</div>` : ""}</td><td class="num"><b>${fmt(x.excess_value)}</b></td><td class="num">${x.cover_days == null ? "–" : fmt(x.cover_days, 0) + " d"}</td><td class="num">${fmt(x.carry)}</td></tr>`;
+const PRC_HEAD = `<tr><th>Date</th><th>Item</th><th>Location</th><th>Document</th><th class="num">On hand before</th><th class="num">Maximum</th><th class="num">Recommended</th><th class="num">Ordered</th><th class="num">Over</th><th class="num">Extra value</th><th class="num">Covers</th><th class="num">Carrying</th></tr>`;
+function prcLines(){
+  const q = ($("prcQ").value || "").toLowerCase(), rows = ((prcData || {}).lines || []).filter(x => !q || [x.item, x.desc, x.location, x.vendor, x.doc, x.who].join(" ").toLowerCase().includes(q));
+  $("prcLines").innerHTML = PRC_HEAD + (rows.map(prcRow).join("") || `<tr><td colspan="12" class="empty">No order line over the recommendation.</td></tr>`);
+}
+Pulse.on("prcloc", code => {
+  const rows = ((prcData || {}).lines || []).filter(x => x.location === code);
+  Pulse.pop({title: esc(code), sub: esc(`Orders over the recommendation · ${prcData.period.from} → ${prcData.period.to}`), body: `<div class="scroll"><table>${PRC_HEAD}${rows.map(prcRow).join("") || `<tr><td colspan="12" class="empty">None.</td></tr>`}</table></div>`});
+});
+$("prcQ").oninput = () => prcLines();
+$("prcRead").onclick = () => prcLoad(true);
+$("prcXlsx").onclick = () => {
+  const d = prcData; if (!d || d.pending) { alert("Wait for the report to finish reading."); return; }
+  const C2 = prcCur(), g = rows => rows.map(x => [x.key, x.lines, x.value, x.over_lines, x.excess_value, x.over_share == null ? null : x.over_share / 100, x.carry, x.waste_risk, (x.top || []).join(" · ")]);
+  const gh = l => ({header: [l, "Lines", `Purchases ${C2}`, "Lines over", `Extra stock ${C2}`, "% of purchases", `Carrying ${C2}`, `Waste risk ${C2}`, "Most"], formats: ["text", "int", "num", "int", "num", "pct", "num", "num", "text"]});
+  xlsxTable(`Orders vs recommendation ${$("company").value || ""} ${d.period.from} ${d.period.to}`, [
+    {title: "Lines over", header: ["Kind", "Date", "Item", "Description", "Location", "Document", "Vendor", "Who", "On hand before", "On order", "Maximum", "Reorder point", "Basis", "Recommended", "Ordered", "Over", "Over %", "Unit cost", `Extra value ${C2}`, "Use per day", "Covers (days)", `Carrying ${C2}`, `Waste risk ${C2}`, "Fresh", "Ordered early"],
+     formats: ["text", "text", "text", "text", "text", "text", "text", "text", "num", "num", "num", "num", "text", "num", "num", "num", "pct", "num", "num", "num", "num", "num", "num", "text", "text"],
+     rows: d.lines.map(x => [x.kind, x.date, x.item, x.desc, x.location, x.doc, x.vendor, x.who, x.on_hand, x.on_order, x.max, x.rop, x.basis, x.rec, x.qty, x.over, x.over_pct == null ? null : x.over_pct / 100, x.unit_cost, x.excess_value, x.daily, x.cover_days, x.carry, x.waste_risk, x.fresh ? "yes" : "", x.early ? "yes" : ""])},
+    Object.assign({title: "By location", rows: g(d.locations)}, gh("Location")), Object.assign({title: "By who", rows: g(d.who)}, gh("Who")), Object.assign({title: "By vendor", rows: g(d.vendors)}, gh("Vendor")),
+    {title: "Decisions", header: ["Owner", "Decision", `At stake ${C2}`], formats: ["text", "text", "num"], rows: (d.actions || []).map(a => [a.owner, a.text, a.value || null])}],
+    [`${d.period.from} to ${d.period.to}, read ${d.read_at}.`, "Recommended = the Maximum Inventory of the SKU card in Business Central (Pulse's estimate from the location's delivery rhythm where the card has no maximum) less the stock on hand before the order, and less what is already on order for an open order.",
+     `Over = ordered above the recommendation by more than ${d.params.tolerance_pct}%. Carrying = the extra value at ${d.params.carry_pct}% a year for the days of use it covers. Waste risk = fresh goods beyond ${d.params.fresh_days} days of use.`]);
+};
 
 // ---------- requisitions ----------
 function renderReqs(){
@@ -2741,6 +2859,9 @@ function renderSettings(){
     <label class="field" style="grid-column:1/-1">Item Category Group 2 to purchase type (fallback)<input id="cl-g2" value="${esc((s.classification||{}).group2||"")}" placeholder="LP=Food &amp; Beverage, II=Non-Food Inventory, PRODUKT PASTRIMI=Operating Supplies"></label>
     <label class="field" style="grid-column:1/-1">Item Category Code to purchase type (last fallback)<input id="cl-items" value="${esc((s.classification||{}).item_categories||"")}" placeholder="AMBALAZH=Non-Food Inventory"></label>
     <label class="field" style="grid-column:1/-1">Delivery rhythm per location (lead / cycle / safety, in days)<input id="st-cad" value="${esc((s.stock||{}).cadence||"")}" placeholder="*=2/3/2, MAGAZINE=45/30/10"></label>
+    <label class="field">Orders vs recommendation: tolerance over the recommended quantity (%)<input id="st-prtol" value="${esc((s.poreco||{}).tolerance_pct||"")}" placeholder="10"></label>
+    <label class="field">Orders vs recommendation: yearly cost of carrying stock (%)<input id="st-prcar" value="${esc((s.poreco||{}).carry_pct||"")}" placeholder="25"></label>
+    <label class="field">Orders vs recommendation: most days of use for fresh goods<input id="st-prfr" value="${esc((s.poreco||{}).fresh_days||"")}" placeholder="4"></label>
     <label class="field" style="grid-column:1/-1">Company currencies (label only, nothing is converted)<input id="cu-map" value="${esc((s.currencies||{}).map||"")}" placeholder="SALT=ALL, RKS Revo Hospitality Group=EUR"></label>
     <label class="field" style="grid-column:1/-1">CAPEX accounts<input id="cl-capex" value="${esc((s.classification||{}).capex_accounts||"")}" placeholder="203,208,213,2131,2134,2135,215,2181,2182,21822,2188"></label>
     <label class="field">Expense account prefix (services)<input id="cl-pref" value="${esc((s.classification||{}).service_prefix||"")}" placeholder="6"></label>
@@ -2765,6 +2886,7 @@ $("saveSettings").onclick = async () => {
         budget:{name: $("bg-name").value, cogs_accounts: $("bg-cogs").value},
         currencies:{map: $("cu-map").value},
         stock:{cadence: $("st-cad").value},
+        poreco:{tolerance_pct: $("st-prtol").value, carry_pct: $("st-prcar").value, fresh_days: $("st-prfr").value},
         classification:{group3: $("cl-g3").value, group2: $("cl-g2").value,
           item_categories: $("cl-items").value, service_accounts: $("cl-svc").value,
           capex_accounts: $("cl-capex").value, service_prefix: $("cl-pref").value,

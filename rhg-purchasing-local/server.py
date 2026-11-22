@@ -37,6 +37,7 @@ import executive
 import notify
 import savings
 import savings_report
+import poreco
 import negotiations
 import suppliers as supplier_view
 import itemhist
@@ -2099,6 +2100,27 @@ class Handler(BaseHTTPRequestHandler):
                 year = max(date.today().year - 3, min(year, date.today().year))
                 self._send(200, executive.request(client, company, year, company_currency(company),
                                                   q.get("refresh") == "1", cache))
+            elif url.path == "/api/poreco":
+                # Live operations → Orders vs recommendation (poreco.py)
+                if not auth.can(user, "purchasing.s.live.poreco"):
+                    self._send(403, {"error": "Your role does not include Orders vs recommendation."})
+                    return
+                company = q.get("company") or config.BC_COMPANY
+                today = date.today()
+                a = (q.get("from") or "")[:10] or (today - timedelta(days=30)).isoformat()
+                b = (q.get("to") or "")[:10] or (today - timedelta(days=1)).isoformat()
+                try:
+                    date.fromisoformat(a); date.fromisoformat(b)
+                except ValueError:
+                    self._send(400, {"error": "Give the period as YYYY-MM-DD."})
+                    return
+                if a > b or (date.fromisoformat(b) - date.fromisoformat(a)).days > 92:
+                    self._send(400, {"error": "The period is up to 93 days, the first day before the last."})
+                    return
+                r = poreco.request(client, company, a, b, store.get_settings(), q.get("refresh") == "1")
+                if not r.get("pending") and not r.get("error"):
+                    r = dict(r, currency=company_currency(company))     # whole company (refused to a limited scope)
+                self._send(200, r)
             elif url.path in ("/api/savings", "/api/savings/pdf", "/api/savings/xlsx"):
                 company = q.get("company") or config.BC_COMPANY
                 filters = {k: (q.get(k) or "")[:120] for k in ("location", "vendor", "category", "stream", "q")}

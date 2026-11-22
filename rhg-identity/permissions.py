@@ -273,6 +273,8 @@ DEFAULT_ROLES = {
 }
 # Screens added after the roles were stored: {new screen: the screen (or screens) whose holders get it once}.
 ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
+                 # Live operations became two tabs: whoever held the screen gets both
+                 "purchasing.s.live.carried": "purchasing.s.live", "purchasing.s.live.poreco": "purchasing.s.live",
                  "purchasing.s.purchasers": "purchasing.s.users", "finance.s.sales.prices": "finance.s.sales.main",
                  "finance.s.inventory.discharge": "finance.s.inventory.recipes",
                  "finance.s.sales.menu": "finance.s.sales.prices",
@@ -379,7 +381,7 @@ ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
                                                               "finance.s.inventory.overview"),
                  "finance.s.pl.pl": ("finance.s.pl.charts",)}
 # Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
-REMOVED_SCREENS = ("finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
+REMOVED_SCREENS = ("purchasing.s.live", "finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
                    "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",
                    "finance.s.pl.charts", "finance.s.actions", "finance.s.exceptions", "purchasing.s.actions",
                    "purchasing.s.exceptions", "purchasing.s.exceptions.list", "purchasing.s.exceptions.loc")

@@ -104,7 +104,11 @@ PURCHASING = [
         ("overview", "Overview", "location", ["purchasing.spend.view"]),
         ("loc", "Location intelligence", "location", ["purchasing.spend.view"]),
         ("today", "Today", "location", ["purchasing.spend.view"])]),
-    ("live", "Live operations", "Overview", None, [], "location", ["purchasing.spend.view"]),
+    # Live operations in two tabs (Geri, 22 Nov 2026): the requisitions and orders carried out, by location; the
+    # purchase orders against the quantities the system recommended (poreco.py)
+    ("live", "Live operations", "Overview", "lvTabs", [
+        ("carried", "Requisitions carried out", "location", ["purchasing.spend.view"]),
+        ("poreco", "Orders vs recommendation", "company", ["purchasing.spend.view"])]),
     ("reqs", "Buying", "Buying & prices", "byTabs", [
         ("reqs", "Requisitions", "location", ["purchasing.orders.view"]),
         ("po", "Purchase orders", "location", ["purchasing.orders.view"]),

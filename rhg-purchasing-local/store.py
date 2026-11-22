@@ -66,6 +66,9 @@ DEFAULT_SETTINGS = {
     # that is not named. MAGAZINE holds imported goods, so it carries a long lead time.
     "stock": {"cadence": "*=2/3/2, MAGAZINE=45/30/10",
               "owners": "Stock Manager=, Unit Manager=, Purchasing Coordinator=, Cost Controller="},
+    # Live operations → Orders vs recommendation: the tolerance over the recommended quantity before an order line
+    # counts as over (%), the yearly carrying cost of stock (%), the most days of use a fresh family may be bought for
+    "poreco": {"tolerance_pct": "10", "carry_pct": "25", "fresh_days": "4"},
     # Daily email of invoices posted without a purchase order. Off until someone turns it on,
     # so a new install never mails anyone by surprise. Emails are comma separated.
     "notifications": {"enabled": False, "time": "08:00", "companies": "",
@@ -147,6 +150,9 @@ def save_settings(patch, actor="director"):
         for k, v in (patch.get("currencies") or {}).items():
             if k in DEFAULT_SETTINGS["currencies"]:
                 current.setdefault("currencies", {})[k] = str(v)[:400]
+        for k, v in (patch.get("poreco") or {}).items():
+            if k in DEFAULT_SETTINGS["poreco"]:
+                current.setdefault("poreco", {})[k] = str(v)[:20]
         for k, v in (patch.get("stock") or {}).items():
             if k in DEFAULT_SETTINGS["stock"]:
                 current.setdefault("stock", {})[k] = str(v)[:600]

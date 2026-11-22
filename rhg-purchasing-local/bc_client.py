@@ -74,6 +74,7 @@ def order_from_card(r, vat):
             lines.append({"type": l.get("Type") or "", "no": l.get("No") or "", "description": l.get("Description") or "",
                           "location": l.get("Location_Code") or "", "uom": l.get("Unit_of_Measure_Code") or "",
                           "qty": qty, "received": rec, "invoiced": inv, "amount": round(excl, 2),
+                          "qty_per_uom": _num(l.get("Qty_per_Unit_of_Measure")) or 1.0,
                           "expected": _day(l.get("Expected_Receipt_Date"))})
     head_expected = _day(r.get("Expected_Receipt_Date")) or _day(r.get("Promised_Receipt_Date")) \
         or _day(r.get("Requested_Receipt_Date"))
@@ -646,6 +647,7 @@ class BCClient:
                 out[key] = {"reorder_point": reorder, "maximum": maximum,
                             "reorder_qty": float(r.get("Reorder_Quantity") or 0),
                             "variant": (r.get("Variant_Code") or "").strip(),
+                            "inventory": float(r.get("Inventory") or 0),
                             "replenishment": (r.get("Replenishment_System") or "").strip()}
             return out, {"available": True, "cards": len(rows), "with_maximum": with_max,
                          "with_reorder_point": with_point}
