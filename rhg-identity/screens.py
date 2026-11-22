@@ -170,6 +170,11 @@ PLATFORM = [
         ("contracts", "Contracts", "company", []),
         ("policies", "Policies & SOPs", "company", []),
         ("libraries", "Libraries", "company", [])]),
+    # Tenders & procurement (/tenders): the public tenders of APP that RHG could bid for (tenders.py)
+    ("tenders", "Tenders & procurement", "Platform", "tdTabs", [
+        ("tenders", "Tenders", "company", []),
+        ("winners", "Who wins", "company", []),
+        ("keywords", "Keywords (change them)", "company", [])]),
 ]
 # the parts of Location intelligence (Executive dashboard), as above
 LI_PARTS = ("company_sales", "company_pl", "pl", "bc_sales", "purch_inv")

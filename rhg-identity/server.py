@@ -21,6 +21,7 @@ import config
 import layouts
 import permissions
 import reports
+import tenders
 import reportcenter
 import screens
 import store
@@ -151,6 +152,12 @@ def rhghome(refresh=False):
 
 
 DOCS_TABS = ("contracts", "policies", "libraries")
+
+
+def tenders_allowed(user):
+    """Tenders & procurement: whoever holds one of its tabs (Roles & permissions → Platform)."""
+    held = set((user or {}).get("permissions") or [])
+    return bool(user) and not (user or {}).get("report") and any(p.startswith("platform.s.tenders.") for p in held)
 
 
 def docs_tabs(user):
@@ -319,6 +326,11 @@ class Handler(BaseHTTPRequestHandler):
                 page = "documents.html" if u and not u.get("must_change") else "login.html"
                 self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
                 return
+            if url.path in ("/tenders", "/tenders.html"):
+                u = self._user()
+                page = "tenders.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
             if url.path in ("/notifications", "/notifications.html"):
                 u = self._user()
                 page = "notifications.html" if u and not u.get("must_change") else "login.html"
@@ -358,7 +370,7 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/session":
                 u = self._user()
                 self._send(200, {"user": u, "permissions": permissions.PERMISSIONS, "m365_docs": docs_allowed(u),
-                                 "m365_docs_tabs": docs_tabs(u)})
+                                 "m365_docs_tabs": docs_tabs(u), "tenders": tenders_allowed(u)})
                 return
 
             user = self._user()
@@ -423,6 +435,19 @@ class Handler(BaseHTTPRequestHandler):
                     store.audit("m365 documents read again", user["username"], "Contracts & SOPs", {}, self._ip())
                 status, body = m365_documents(refresh)
                 self._send(status, docs_cut(body, tabs))
+            elif url.path == "/api/tenders":
+                # Tenders & procurement: APP's open data of the year, the procedures that match the keywords
+                if not tenders_allowed(user):
+                    self._send(403, {"error": "Tenders & procurement is not open to your role."}); return
+                refresh = parse_qs(url.query).get("refresh") == ["1"]
+                try:
+                    v = tenders.view(tenders.read(refresh))
+                except Exception as exc:                                    # noqa: BLE001
+                    self._send(502, {"error": f"Could not read APP's tenders: {str(exc)[:200]}"}); return
+                if not auth.can(user, "platform.s.tenders.winners"):
+                    v["winners"] = []
+                v["can_keywords"] = auth.can(user, "platform.s.tenders.keywords")
+                self._send(200, v)
             elif url.path == "/api/rhghome":
                 # RHG Home on SharePoint: its navigation register, read by Purchasing with the Graph app
                 if not auth.can(user, "m365.home.view"):
@@ -615,6 +640,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, {"error": "Missing or wrong CSRF token."}); return
             if user.get("report"):                  # a report session only reads
                 self._send(403, {"error": "A report session cannot change anything."}); return
+
+            if url.path == "/api/tenders/keywords":
+                if not auth.can(user, "platform.s.tenders.keywords"):
+                    self._send(403, {"error": "Your role cannot change the keywords of the tenders."}); return
+                try:
+                    rules = tenders.save_settings(str(body.get("rules") or "")[:8000], user["username"])
+                except ValueError as exc:
+                    self._send(400, {"error": str(exc)}); return
+                store.audit("tenders keywords changed", user["username"], "Tenders & procurement",
+                            {"categories": [r["name"] for r in rules]}, ip)
+                self._send(200, {"ok": True, "categories": [r["name"] for r in rules]})
+                return
 
             if url.path in ("/api/reports-center/toggle", "/api/reports-center/send"):
                 if not reportcenter.can_view(user):

@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 ROOT = sys.argv[1] if len(sys.argv) > 1 else str(__import__("pathlib").Path(__file__).resolve().parents[2])
 FILES = ["rhg-finance-local/static/index.html", "rhg-purchasing-local/static/index.html",
          "rhg-identity/static/admin.html", "rhg-identity/static/control.html", "rhg-identity/static/executive.html",
-         "rhg-identity/static/login.html", "rhg-identity/static/unicorn.html", "rhg-identity/static/actions.html", "rhg-identity/static/reports-center.html", "rhg-identity/static/settings.html", "rhg-identity/static/notifications.html", "rhg-identity/static/documents.html",
+         "rhg-identity/static/login.html", "rhg-identity/static/unicorn.html", "rhg-identity/static/actions.html", "rhg-identity/static/reports-center.html", "rhg-identity/static/settings.html", "rhg-identity/static/notifications.html", "rhg-identity/static/documents.html", "rhg-identity/static/tenders.html",
          "rhg-finance-local/static/layout.js", "rhg-finance-local/static/recipients.js",
          "rhg-identity/static/locintel.js", "rhg-finance-local/static/tables.js", "rhg-finance-local/static/pulse.js", "rhg-identity/static/reports.js", "rhg-identity/static/gear.js", "rhg-identity/static/export.js", "rhg-identity/static/notify.js"]
 

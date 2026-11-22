@@ -65,10 +65,20 @@
     const after = t.querySelector('a[href="/actions"], a[href="/executive"]');
     if (after && after.nextSibling) t.insertBefore(a, after.nextSibling); else t.appendChild(a);
   }
+  // Tenders & procurement in the side menu, for whoever holds one of its tabs
+  function tendersLink(s) {
+    const t = document.querySelector("aside .towers, aside #towers");
+    if (!t || !s.tenders || t.querySelector('a[href="/tenders"]')) return;
+    const a = document.createElement("a");
+    a.href = "/tenders"; a.textContent = "Tenders & procurement";
+    if (location.pathname.indexOf("/tenders") === 0) { a.className = "on"; a.setAttribute("aria-current", "page"); }
+    const after = t.querySelector('a[href="/documents"], a[href="/actions"], a[href="/executive"]');
+    if (after && after.nextSibling) t.insertBefore(a, after.nextSibling); else t.appendChild(a);
+  }
   async function start() {
     let u = null, s = {};
     try { const r = await fetch("/" + "api/session", {credentials: "same-origin"}); s = await r.json(); u = s.user; } catch (e) { return; }
-    if (u && !u.report) docsLink(s);
+    if (u && !u.report) { docsLink(s); tendersLink(s); }
     if (!u || u.report || u.must_change || !PERMS.some(p => (u.permissions || []).includes(p))) return;
     if (location.pathname.indexOf("/settings") === 0) return;
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
