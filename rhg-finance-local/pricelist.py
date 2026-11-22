@@ -131,8 +131,9 @@ def request(refs=None, location="", level="", group="", q="", limit=600, refresh
             "levels": sorted({r["level_name"] for r in rows if r["level_name"]}),
             "groups": sorted({r["major"] for r in rows if r["major"]})}
     ql = (q or "").strip().lower()
+    locs = {x.strip() for x in (location or "").split(",") if x.strip()}      # one location or several
     out = [r for r in rows
-           if (not location or r["ref"] == location) and (not level or r["level_name"] == level)
+           if (not locs or r["ref"] in locs) and (not level or r["level_name"] == level)
            and (not group or r["major"] == group)
            and (not ql or ql in r["name"].lower() or ql in r["name2"].lower() or ql == str(r["num"])
                 or ql in r["family"].lower())

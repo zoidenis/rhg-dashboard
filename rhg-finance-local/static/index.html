@@ -1550,7 +1550,10 @@ html:not(.embed-set) #rgSetCard{display:none!important}
           <p class="hint">The price of every menu item at every Simphony location, by revenue centre and price level (menu prices usually include VAT), with the tax rate Simphony charged on its sales of the last 31 days and the VAT % of the BC item it is posted to. One row per item: open it for its prices at every location.</p></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp dark" id="prxXlsx">Export ▾</button><button class="mini" id="prxRead">Read again</button></div></div>
         <div class="filters" style="margin:6px 0 8px">
-          <label>Location<select id="prxLoc"><option value="">All locations</option></select></label>
+          <div class="dimf" id="prxLocPick"><span>Location</span>
+            <button type="button" class="dimf-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-text">All locations</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
+            <div class="dimf-list" hidden></div>
+            <select id="prxLoc" multiple hidden></select></div>
           <label>Price level<select id="prxLvl"><option value="">All levels</option></select></label>
           <label>Major group<select id="prxGrp"><option value="">All groups</option></select></label>
           <label>Status<select id="prxSt"><option value="active">Active</option><option value="inactive">Inactive (prices ended)</option><option value="future">Not active yet</option><option value="all">All</option></select></label>
@@ -5767,9 +5770,54 @@ function chPanels(l){
   </div>`;
 }
 
+// ---------- a filter of several at once (Geri, 22 Nov 2026: locations in Menu prices): the dropdown of checkboxes of
+// Department, for any <div class="dimf"> holding a button, a list and a hidden <select multiple>; onApply(values)
+function msPick(pickId, all, onApply){
+  const P = $(pickId), sel = P.querySelector("select"), btn = P.querySelector(".dimf-btn"), L = P.querySelector(".dimf-list");
+  let work = null;
+  const vals = () => Array.from(sel.selectedOptions).map(o => o.value).filter(Boolean);
+  const sync = () => { const v = Array.from(sel.selectedOptions).filter(o => o.value);
+    P.querySelector(".ms-text").textContent = !v.length ? all : v.length === 1 ? v[0].text : `${v.length} chosen: ${v.map(o => o.value).join(", ")}`;
+    btn.title = v.length > 1 ? v.map(o => o.text).join("\n") : ""; };
+  const close = apply => {
+    if (L.hidden) return;
+    L.hidden = true; P.classList.remove("open"); btn.setAttribute("aria-expanded", "false");
+    if (apply && work && [...work].sort().join(",") !== vals().sort().join(",")) {
+      Array.from(sel.options).forEach(o => o.selected = !!o.value && work.has(o.value)); sync(); onApply(vals()); }
+    work = null;
+  };
+  const open = () => {
+    work = new Set(vals());
+    const opts = Array.from(sel.options).filter(o => o.value);
+    L.innerHTML = (opts.length > 8 ? `<input type="search" class="ms-q" placeholder="Search">` : "")
+      + `<label class="dimf-opt all"><input type="checkbox" data-all="1"> <span>${esc(all)}</span></label>`
+      + `<div class="dimf-opts" role="listbox" aria-multiselectable="true">` + opts.map(o => `<label class="dimf-opt" data-t="${esc((o.value + " " + o.text).toLowerCase())}"><input type="checkbox" value="${esc(o.value)}"> <span data-no-i18n>${esc(o.text)}</span></label>`).join("") + `</div>`
+      + `<div class="dimf-foot"><span class="meta ms-count"></span><span style="display:flex;gap:6px"><button type="button" class="mini ms-all">All</button><button type="button" class="mini dark ms-apply">Apply</button></span></div>`;
+    const paint = () => { L.querySelectorAll("input[value]").forEach(c => c.checked = work.has(c.value));
+      L.querySelector("[data-all]").checked = !work.size; L.querySelector(".ms-count").textContent = work.size ? `${work.size} chosen` : all; };
+    L.onchange = e => { const c = e.target; if (c.type !== "checkbox") return;
+      if (c.dataset.all) work.clear(); else if (c.checked) work.add(c.value); else work.delete(c.value); paint(); };
+    const q = L.querySelector(".ms-q");
+    if (q) q.oninput = () => { const t = q.value.trim().toLowerCase(); L.querySelectorAll(".dimf-opts .dimf-opt").forEach(l => l.style.display = !t || l.dataset.t.includes(t) ? "" : "none"); };
+    L.querySelector(".ms-all").onclick = () => { work.clear(); paint(); };
+    L.querySelector(".ms-apply").onclick = () => close(true);
+    paint();
+    L.hidden = false; P.classList.add("open"); btn.setAttribute("aria-expanded", "true");
+    L.style.left = ""; L.style.right = ""; if (L.getBoundingClientRect().right > innerWidth - 8) { L.style.left = "auto"; L.style.right = "0"; }
+    if (q) q.focus();
+  };
+  btn.onclick = e => { e.stopPropagation(); L.hidden ? open() : close(true); };
+  document.addEventListener("click", e => { if (!L.hidden && !e.target.closest("#" + pickId)) close(true); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !L.hidden) close(false); });
+  // options [{value, text}] and the values chosen
+  return {vals, sync, fill(options, chosen){ const keep = new Set(chosen || vals());
+    sel.innerHTML = options.map(o => `<option value="${esc(o.value)}"${keep.has(o.value) ? " selected" : ""}>${esc(o.text)}</option>`).join(""); sync(); },
+    clear(){ Array.from(sel.options).forEach(o => o.selected = false); sync(); }};
+}
 // ---------- Sales → Menu prices (pricelist.py, /api/sales/prices) ----------
 let prxData = null, prxBusy = false, prxTimer = null;
-const prxQs = () => scopeQs(new URLSearchParams({location: $("prxLoc").value, level: $("prxLvl").value, group: $("prxGrp").value, status: $("prxSt").value, q: $("prxQ").value.trim()})).toString();
+const prxLocMs = msPick("prxLocPick", "All locations", () => prxLoad());
+const prxQs = () => scopeQs(new URLSearchParams({location: prxLocMs.vals().join(","), level: $("prxLvl").value, group: $("prxGrp").value, status: $("prxSt").value, q: $("prxQ").value.trim()})).toString();
 async function prxLoad(refresh){
   if (prxBusy) return; prxBusy = true;
   $("prxNote").textContent = refresh || !prxData ? "Reading the prices and menu items of every location from Simphony…" : "Filtering…";
@@ -5792,7 +5840,7 @@ const prxRange = (lo, hi) => lo == null ? "–" : lo === hi ? fmt(lo, 2) : `${fm
 function prxRender(){
   const d = prxData; if (!d) return;
   const o = d.options || {}, f = d.filters || {};
-  prxFill($("prxLoc"), o.locations || [], "All locations", f.location); prxFill($("prxLvl"), o.levels || [], "All levels", f.level); prxFill($("prxGrp"), o.groups || [], "All groups", f.group);
+  prxLocMs.fill((o.locations || []).map(x => ({value: x.ref, text: `${x.name} (${x.ref})`})), (f.location || "").split(",").filter(Boolean)); prxFill($("prxLvl"), o.levels || [], "All levels", f.level); prxFill($("prxGrp"), o.groups || [], "All groups", f.group);
   if (f.status) $("prxSt").value = f.status;
   const sc = d.status_counts || {};
   $("prxNote").textContent = `${fmt(d.count)} prices of ${fmt(d.items)} items at ${fmt(d.locations_n)} location${d.locations_n === 1 ? "" : "s"} · active ${fmt(sc.active || 0)}, inactive ${fmt(sc.inactive || 0)}${sc.future ? `, not active yet ${fmt(sc.future)}` : ""} · read from Simphony ${d.read_at}` + (d.errors.length ? ` · not read: ${d.errors.join("; ")}` : "");
@@ -5852,10 +5900,10 @@ Pulse.on("prxgap", i => {
     body: Pulse.list([["Location"], ["Base price", 1], ["Above the lowest", 1]],
       (x.prices || []).map(([p, loc]) => ({cells: [`<span data-no-i18n>${esc(loc)}</span>`, `<b>${fmt(p, 2)}</b>`, p > lo ? "+" + fmt((p - lo) / lo * 100, 1) + "%" : "lowest"]})), {none: "None."})});
 });
-["prxLoc", "prxLvl", "prxGrp", "prxSt"].forEach(id => $(id).onchange = () => prxLoad());
+["prxLvl", "prxGrp", "prxSt"].forEach(id => $(id).onchange = () => prxLoad());
 $("prxQ").oninput = () => { clearTimeout(prxTimer); prxTimer = setTimeout(() => prxLoad(), 400); };
 $("prxRead").onclick = () => prxLoad(true);
-["company", "dimension"].forEach(id => $(id).addEventListener("change", () => { if (prxData) { prxData = null; $("prxLoc").value = ""; if ($("slPrView") && $("slPrView").style.display !== "none") prxLoad(); } }));
+["company", "dimension"].forEach(id => $(id).addEventListener("change", () => { if (prxData) { prxData = null; prxLocMs.clear(); if ($("slPrView") && $("slPrView").style.display !== "none") prxLoad(); } }));
 $("prxXlsx").onclick = () => { exportGo("/api/sales/prices/xlsx?" + prxQs()); };
 function slOpen(i){ $("slPop").dataset.i = i; slDraw(i); $("slBd").classList.add("show"); }
 function slDraw(i){

@@ -3221,7 +3221,7 @@ class Handler(BaseHTTPRequestHandler):
                 refs = sales_refs(user, q)                                # access, company and departments
                 xlsx = url.path.endswith("xlsx")
                 try:
-                    r = pricelist.request(refs, (q.get("location") or "")[:40], (q.get("level") or "")[:99],
+                    r = pricelist.request(refs, (q.get("location") or "")[:600], (q.get("level") or "")[:99],
                                           (q.get("group") or "")[:99], (q.get("q") or "")[:80],
                                           0 if xlsx else 600, q.get("refresh") == "1", (q.get("status") or "active")[:10],
                                           int(q["item"]) if (q.get("item") or "").isdigit() else None)

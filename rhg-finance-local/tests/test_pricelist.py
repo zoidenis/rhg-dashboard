@@ -123,3 +123,9 @@ def test_tax_rates_from_the_sales_held(tmp_path, monkeypatch):
                                                                  ("X", "2026-11-10", 0, 2, 1000.0, 1, 0, 0, 0)])
     db.commit()
     assert menueng.tax_rates("X", "2026-11-01", "2026-11-20") == {1: 20.0, 2: 6.0}
+
+
+def test_several_locations_at_once():
+    r = pricelist.request(None, location="OPA_B,SALT")
+    assert {x["ref"] for x in r["rows"]} == {"OPA_B", "SALT"}
+    assert {x["ref"] for x in pricelist.request(None, location="OPA_T")["rows"]} == {"OPA_T"}
