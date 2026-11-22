@@ -14,7 +14,9 @@ still to be received (page 50), at its location:
     of days of use, at risk of waste;
   * ordered early: the stock before it was still above the reorder point of the SKU card.
 Who: the purchaser or assigned user of an open order; for a received purchase the location (its stock manager) and
-the vendor (Source No.). Business Central is only read.
+the vendor: the posted purchase invoice's (PostedPurchaseInvoices) when the entry is the invoice itself; a purchase
+received on a receipt shows no vendor, since the published Item Ledger Entries carry no Source No. (BC answered
+400 for it, 22 Nov 2026) and the posted receipts are not published. Business Central is only read.
 """
 import threading
 import time
@@ -55,12 +57,32 @@ def _fresh(card):
 
 
 def purchases(client, company, a, b):
-    """The purchase receipts of the period: Entry Type Purchase with a positive quantity."""
+    """The purchase receipts of the period: Entry Type Purchase with a positive quantity, each with "Vendor" (see
+    vendors_of)."""
     rows = client._get_all(client._url(company, config.BC_ILE_ENTITY), {
         "$filter": f"Entry_Type eq 'Purchase' and Posting_Date ge {a} and Posting_Date le {b}",
-        "$select": "Entry_No,Item_No,Item_Description,Posting_Date,Document_No,Location_Code,Quantity,Source_No,"
+        "$select": "Entry_No,Item_No,Item_Description,Posting_Date,Document_No,Document_Type,Location_Code,Quantity,"
                    "Cost_Amount_Actual,Cost_Amount_Expected,Unit_of_Measure_Code"})
-    return [r for r in rows if _f(r.get("Quantity")) > 0 and r.get("Item_No")]
+    rows = [r for r in rows if _f(r.get("Quantity")) > 0 and r.get("Item_No")]
+    names = vendors_of(client, company, {str(r.get("Document_No")) for r in rows
+                                         if "invoice" in str(r.get("Document_Type") or "").lower() and r.get("Document_No")})
+    for r in rows:
+        r["Vendor"] = names.get(str(r.get("Document_No")), "")
+    return rows
+
+
+def vendors_of(client, company, docs):
+    """{posted purchase invoice number: vendor name}. Read 15 numbers at a time; a failed read leaves them blank."""
+    out, docs = {}, sorted(docs)
+    for i in range(0, len(docs), 15):
+        part = " or ".join("No eq '{}'".format(d.replace("'", "''")) for d in docs[i:i + 15])
+        try:
+            for r in client._get_all(client._url(company, config.BC_PINV_ENTITY),
+                                     {"$filter": part, "$select": "No,Buy_from_Vendor_No,Buy_from_Vendor_Name"}):
+                out[str(r.get("No"))] = r.get("Buy_from_Vendor_Name") or r.get("Buy_from_Vendor_No") or ""
+        except Exception:                                              # noqa: BLE001
+            traceback.print_exc()
+    return out
 
 
 def movements(client, company, location, items, a, b):
@@ -141,7 +163,7 @@ def analyse(receipts, open_lines, opening, moves, skus, catalog, P, a, b, today=
         oh = before.get(int(r.get("Entry_No") or 0))
         if oh is None:
             continue
-        line("received", it, loc, qty, cost, str(r.get("Posting_Date") or "")[:10], loc, str(r.get("Source_No") or ""),
+        line("received", it, loc, qty, cost, str(r.get("Posting_Date") or "")[:10], loc, str(r.get("Vendor") or ""),
              str(r.get("Document_No") or ""), oh)
     # open orders: against today's stock and the orders placed before them
     seen = defaultdict(float)

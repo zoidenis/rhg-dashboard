@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import config
 import poreco
 import stock
 
@@ -24,11 +25,11 @@ class PoReco(unittest.TestCase):
                                mv(4, "B2", "2026-11-12", 20, "Purchase"), mv(5, "B2", "2026-11-25", -15),
                                mv(6, "C3", "2026-11-15", 5, "Purchase")]}
         self.receipts = [{"Entry_No": 2, "Item_No": "A1", "Location_Code": "LIFT", "Posting_Date": "2026-11-10", "Quantity": 80,
-                          "Cost_Amount_Actual": 120000, "Document_No": "RCPT1", "Source_No": "V1"},
+                          "Cost_Amount_Actual": 120000, "Document_No": "RCPT1", "Vendor": "V1"},
                          {"Entry_No": 4, "Item_No": "B2", "Location_Code": "LIFT", "Posting_Date": "2026-11-12", "Quantity": 20,
-                          "Cost_Amount_Actual": 20000, "Document_No": "RCPT2", "Source_No": "V2"},
+                          "Cost_Amount_Actual": 20000, "Document_No": "RCPT2", "Vendor": "V2"},
                          {"Entry_No": 6, "Item_No": "C3", "Location_Code": "LIFT", "Posting_Date": "2026-11-15", "Quantity": 5,
-                          "Cost_Amount_Actual": 500, "Document_No": "RCPT3", "Source_No": "V3"}]
+                          "Cost_Amount_Actual": 500, "Document_No": "RCPT3", "Vendor": "V3"}]
         self.opening = {"LIFT": {"A1": 50, "B2": 0}}
         self.skus = {("A1", "LIFT"): {"maximum": 60, "reorder_point": 30}}
 
@@ -73,3 +74,25 @@ class PoReco(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Vendors(unittest.TestCase):
+    """The published Item Ledger Entries have no Source No. (BC 400, 22 Nov 2026): never asked for; the vendor comes
+    from the posted invoice when the entry is the invoice itself."""
+    def test_purchases_ask_no_source_no(self):
+        asked = []
+
+        class C:
+            def _url(self, co, ent):
+                return ent
+
+            def _get_all(self, url, params):
+                asked.append((url, params))
+                if url == config.BC_ILE_ENTITY:
+                    return [{"Entry_No": 1, "Item_No": "A1", "Quantity": 5, "Document_No": "PI1", "Document_Type": "Purchase Invoice"},
+                            {"Entry_No": 2, "Item_No": "A2", "Quantity": 3, "Document_No": "R7", "Document_Type": "Purchase Receipt"}]
+                return [{"No": "PI1", "Buy_from_Vendor_No": "F1", "Buy_from_Vendor_Name": "Agro"}]
+        rows = poreco.purchases(C(), "SALT", "2026-11-01", "2026-11-30")
+        self.assertNotIn("Source_No", asked[0][1]["$select"])
+        self.assertEqual([r["Vendor"] for r in rows], ["Agro", ""])
+        self.assertEqual(asked[1][1]["$filter"], "No eq 'PI1'")
