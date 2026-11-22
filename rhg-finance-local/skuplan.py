@@ -87,13 +87,22 @@ def params(settings=None):
                 lead_default = float(part)
             except ValueError:
                 pass
+    # minimum stock by decision: LOCATION:ITEM=quantity or ITEM=quantity (e.g. MAGAZINE:A6041=19760, one trailer)
+    mins = {}
+    for part in str(inv.get("sku_min_qty") or "").replace(";", ",").split(","):
+        k, _, v = part.partition("=")
+        try:
+            if k.strip():
+                mins[k.strip().upper()] = float(v)
+        except ValueError:
+            pass
     service = num("sku_service_level", 95)
     z = min(Z, key=lambda t: abs(t[0] - service))[1]
 
     def lst(k, d):
         return {p.strip().upper() for p in str(inv.get(k) if inv.get(k) is not None else d).split(",") if p.strip()}
     return {"window": int(num("sku_window_days", 60)), "service": service, "z": z, "lead_default": lead_default,
-            "lead_by": lead_by, "review_default": num("sku_review_days", 3), "fresh_max_days": num("sku_fresh_max_days", 4),
+            "lead_by": lead_by, "mins": mins, "review_default": num("sku_review_days", 3), "fresh_max_days": num("sku_fresh_max_days", 4),
             "tolerance": num("sku_tolerance_pct", 50), "min_days": int(num("sku_min_use_days", 5)),
             "lead_text": lead_text,
             "distribution": lst("distribution_locations", "MAGAZINE, CENTRAL"),
@@ -289,12 +298,22 @@ def build(client, company, progress, force=False):
             repl = (c or {}).get("repl") or ("Purchase" if loc.upper() in dist else "Transfer")
             src = (c or {}).get("from") or ""
         fresh = fam in P["fresh"]
+        # a lead time set for the item (LOCATION:ITEM=days or ITEM=days) wins, and the item is then not planned as
+        # fresh: e.g. A6041 frozen fries, family PERIME&FRUTE but imported by the trailer (Geri, 22 Nov 2026)
+        own = P["lead_by"].get(f"{loc.upper()}:{str(it).upper()}", P["lead_by"].get(str(it).upper()))
+        if own is not None:
+            fresh = False
         # fresh food is bought locally and often: the location's import lead time (MAGAZINE=45) is not its lead time
-        lead = P["lead_default"] if fresh else P["lead_by"].get(loc.upper(), P["lead_default"])
+        lead = own if own is not None else P["lead_default"] if fresh else P["lead_by"].get(loc.upper(), P["lead_default"])
         cycle = round(W / deliveries, 1) if deliveries else P["review_default"]
         cycle = max(1.0, min(cycle, 30.0))
         ss = P["z"] * sd * math.sqrt(lead)
         rop = d * lead + ss
+        # a minimum stock decided for the item (Settings): the reorder point never below it
+        floor = P["mins"].get(f"{loc.upper()}:{str(it).upper()}", P["mins"].get(str(it).upper()))
+        if floor and floor > rop:
+            ss += floor - rop
+            rop = floor
         # fresh families: never more than the fresh limit in days of use above the reorder point
         mx = rop + d * (min(cycle, P["fresh_max_days"]) if fresh else cycle)
         # one policy everywhere: Maximum Qty. (Geri, 22 Nov 2026); a location that buys keeps room for the usual

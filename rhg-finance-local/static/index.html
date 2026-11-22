@@ -3799,7 +3799,8 @@ function renderSettings(){
     <label class="field">Turnover: count when fresh cover exceeds (days)<input id="inv-tyfd" value="${esc((s.inventory||{}).turnover_fresh_check_days||"")}" placeholder="30"></label>
     <label class="field">SKU planning: window of use (days)<input id="inv-skw" value="${esc((s.inventory||{}).sku_window_days||"")}" placeholder="60"></label>
     <label class="field">SKU planning: service level of the safety stock (%)<input id="inv-sksl" value="${esc((s.inventory||{}).sku_service_level||"")}" placeholder="95"></label>
-    <label class="field">SKU planning: lead time in days (default, then LOCATION=days)<input id="inv-sklt" value="${esc((s.inventory||{}).sku_lead_days||"")}" placeholder="2, MAGAZINE=45"></label>
+    <label class="field">SKU planning: lead time in days (default, then LOCATION=days, ITEM=days or LOCATION:ITEM=days; an item named here is not planned as fresh)<input id="inv-sklt" value="${esc((s.inventory||{}).sku_lead_days||"")}" placeholder="2, MAGAZINE=45, MAGAZINE:A6041=45"></label>
+    <label class="field">SKU planning: minimum stock by decision (LOCATION:ITEM=quantity, the reorder point never below it)<input id="inv-skminq" value="${esc((s.inventory||{}).sku_min_qty||"")}" placeholder="MAGAZINE:A6041=19760"></label>
     <label class="field">SKU planning: delivery cycle when none is seen (days)<input id="inv-skrv" value="${esc((s.inventory||{}).sku_review_days||"")}" placeholder="3"></label>
     <label class="field">SKU planning: most days of use for fresh families<input id="inv-skfr" value="${esc((s.inventory||{}).sku_fresh_max_days||"")}" placeholder="4"></label>
     <label class="field">SKU planning: tolerance before a card is off (%)<input id="inv-sktol" value="${esc((s.inventory||{}).sku_tolerance_pct||"")}" placeholder="50"></label>
@@ -3841,7 +3842,7 @@ $("saveSettings").onclick = async ()=>{
                    turnover_safety_days:$("inv-tysafe").value, turnover_supplies_adjustments:$("inv-tyadj").value,
                    turnover_fresh_families:$("inv-tyfresh").value, turnover_fresh_check_days:$("inv-tyfd").value,
                    sku_window_days:$("inv-skw").value, sku_service_level:$("inv-sksl").value, sku_lead_days:$("inv-sklt").value,
-                   sku_review_days:$("inv-skrv").value, sku_fresh_max_days:$("inv-skfr").value,
+                   sku_review_days:$("inv-skrv").value, sku_fresh_max_days:$("inv-skfr").value, sku_min_qty:$("inv-skminq").value,
                    sku_tolerance_pct:$("inv-sktol").value, sku_min_use_days:$("inv-skmin").value,
                    discharge_low_ratio:$("inv-dclow").value, discharge_high_ratio:$("inv-dchigh").value,
                    discharge_cover_days:$("inv-dccov").value, discharge_min_value:$("inv-dcmin").value,

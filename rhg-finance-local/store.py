@@ -91,6 +91,8 @@ DEFAULT_SETTINGS = {
                   "sku_window_days": "60", "sku_service_level": "95", "sku_lead_days": "2, MAGAZINE=45",
                   "sku_review_days": "3", "sku_fresh_max_days": "4", "sku_tolerance_pct": "50",
                   "sku_min_use_days": "5",
+                  # minimum stock by decision, LOCATION:ITEM=quantity (e.g. a trailer of imported fries at MAGAZINE)
+                  "sku_min_qty": "",
                   # received vs discharged: discharged / in below the low ratio with more days of cover than the cover
                   # limit, or above the high ratio with the stock run down, is a recipe signal when worth min_value
                   "discharge_low_ratio": "0.5", "discharge_high_ratio": "1.5", "discharge_cover_days": "30",

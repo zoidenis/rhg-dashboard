@@ -5959,6 +5959,8 @@
  "SKU planning": "Planifikimi i SKU-ve",
  "SKU planning: delivery cycle when none is seen (days)": "Planifikimi i SKU-ve: cikli i furnizimit kur nuk shihet asnjë (ditë)",
  "SKU planning: fewest days of use worth planning": "Planifikimi i SKU-ve: ditët më të pakta të përdorimit që ia vlen të planifikohen",
+ "SKU planning: lead time in days (default, then LOCATION=days, ITEM=days or LOCATION:ITEM=days; an item named here is not planned as fresh)": "SKU planning: lead time në ditë (default, pastaj LOKACION=ditë, ARTIKULL=ditë ose LOKACION:ARTIKULL=ditë; një artikull i përmendur këtu nuk planifikohet si fresh)",
+ "SKU planning: minimum stock by decision (LOCATION:ITEM=quantity, the reorder point never below it)": "SKU planning: stok minimal me vendim (LOKACION:ARTIKULL=sasi, pika e ri-porositjes kurrë nën të)",
  "SKU planning: most days of use for fresh families": "Planifikimi i SKU-ve: ditët maksimale të përdorimit për familjet e freskëta",
  "SKU planning: service level of the safety stock (%)": "Planifikimi i SKU-ve: niveli i shërbimit i stokut të sigurisë (%)",
  "SKU planning: tolerance before a card is off (%)": "Planifikimi i SKU-ve: toleranca para se një kartelë të dalë jashtë (%)",
