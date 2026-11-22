@@ -678,6 +678,38 @@ html.embed-set body{background:transparent}
 html.embed-set #v-embed > .card{margin-bottom:15px}
 /* settings live in Settings now: the owners' email of the register is set there */
 html:not(.embed-set) #rgSetCard{display:none!important}
+/* Sales → Bonus management (CEO and Administrator) */
+.bn-s{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;border-radius:5px;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums}
+.bn-s.s1,.bn-s.s2{background:var(--up-bg);color:var(--up)}
+.bn-s.s3{background:var(--warn-bg);color:var(--warn)}
+.bn-s.s4,.bn-s.s5,.bn-s.s6{background:var(--down-bg);color:var(--down)}
+.bn-s.s6{outline:1.5px solid var(--down);outline-offset:-1.5px}
+.bn-s.none{color:var(--sub)}
+.bn-tot{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+table.bn-t td,table.bn-t th{white-space:nowrap}
+table.bn-t td.c,table.bn-t th.c{text-align:center}
+table.bn-t tr.bn-row{cursor:pointer}
+table.bn-t tr.bn-row:hover td{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+table.bn-t tr.off td{opacity:.55}
+.bn-src{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.bn-src span{font-size:11.5px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub)}
+.bn-src span.ok{color:var(--down);border-color:color-mix(in srgb,var(--down) 40%,var(--line))}
+.bn-src span.run{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.bn-src span.err{color:var(--up);border-color:color-mix(in srgb,var(--up) 40%,var(--line))}
+.bn-lock{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--sub)}
+.bn-lock.on{color:var(--accent)}
+.bn-cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.bn-cats div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--sub)}
+.bn-cats b{display:block;font-size:18px;color:var(--ink);margin-top:2px}
+.bn-ed{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:8px 0}
+.bn-ed input{width:120px}.bn-ed input.note{width:260px}
+table.bn-plan input{width:72px;padding:4px 6px}table.bn-plan input.lb{width:170px}table.bn-plan select{padding:4px}
+table.bn-plan td{padding:3px 4px}
+.bn-sum{font-weight:700}.bn-sum.bad{color:var(--up)}
+.bn-star{color:var(--warn);font-weight:800}
+.bn-q{font-size:11.5px;color:var(--sub);line-height:1.35}
+.bn-q b{color:var(--ink);font-size:12.5px}
+@media (max-width:640px){#slBnView .card-head{flex-direction:column;align-items:stretch}.bn-ed input,.bn-ed input.note{width:100%}}
 </style>
 <link rel="stylesheet" href="/brand.css">
 <script>if (/[?&]embed=settings(&|$)/.test(location.search)) document.documentElement.classList.add("embed-set");</script><!-- inside Settings: no flash of the whole page -->
@@ -1541,7 +1573,7 @@ html:not(.embed-set) #rgSetCard{display:none!important}
   </section>
 
   <section class="view" id="v-sales">
-    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="menucost" role="tab" aria-selected="false">Menu &amp; food cost</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button><button data-t="stockstop" role="tab" aria-selected="false">Blocked by stock</button><button data-t="sevenrooms" role="tab" aria-selected="false">SevenRooms ↔ Simphony</button></div>
+    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="menucost" role="tab" aria-selected="false">Menu &amp; food cost</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button><button data-t="stockstop" role="tab" aria-selected="false">Blocked by stock</button><button data-t="sevenrooms" role="tab" aria-selected="false">SevenRooms ↔ Simphony</button><button data-t="bonus" role="tab" aria-selected="false">Bonus management</button></div>
     <div id="slPrView" style="display:none">
       <!-- one card: filters, the three views as tabs, a row per item; the prices of an item in a pop-up (Geri, 22 Nov 2026) -->
       <div class="card">
@@ -1791,6 +1823,54 @@ html:not(.embed-set) #rgSetCard{display:none!important}
         <div class="scroll"><table id="avMx" data-nosort></table></div>
       </div>
       <div id="slGrid"></div>
+    </div>
+    <div id="slBnView" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>Bonus management</h2>
+          <p class="hint"><span>The monthly bonus scorecard of every unit: each KPI scored 1 to 6 against its plan, weighted into the unit's score, and the bonus of the range the score falls in.</span> <span>Sales and costs from Simphony and Business Central, turnover from Odoo, Zenput reporting and food safety from Crunchtime, reviews from SevenRooms; what a source does not give is entered by hand. Only the CEO and the Administrator see this screen.</span></p></div>
+          <div class="sh-ctl"><button class="mini dark" id="bnRead" type="button">Read again</button></div></div>
+        <div class="filters" style="margin:12px 0 0;align-items:flex-end"><label>Month<input type="month" id="bnMonth"></label>
+          <label>Year<input type="number" id="bnYear" min="2024" max="2100" style="width:90px"></label>
+          <label>Brand<select id="bnBrand"><option value="">All brands</option></select></label></div>
+        <div class="fc-seg bi-seg" id="bnSeg" role="tablist" style="margin-top:12px"><button data-b="card" class="on" type="button">Scorecard</button><button data-b="pay" type="button">Payout &amp; super bonus</button><button data-b="plan" type="button">Plans &amp; ranges</button></div>
+        <p class="meta" id="bnStatus">Reading…</p>
+        <div class="bn-src" id="bnSrc"></div></div>
+      <div class="bn-p" data-p="card">
+        <div class="kpis" id="bnKpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"></div>
+        <div class="card"><div class="card-head"><div><h2>Units this month</h2>
+          <p class="hint"><span>Each KPI's score, the weighted score, the range and the bonus of the month. Click a unit for its figures, to enter what a source does not give, and to lock the month.</span> <span>Coverage: the share of the weights that has a figure; a KPI without one is left out and its weight shared by the others.</span></p></div></div>
+          <div class="scroll"><table class="bn-t" id="bnTable"></table></div></div></div>
+      <div class="bn-p" data-p="pay" hidden>
+        <div class="kpis" id="bnPayKpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Payout of the year</h2>
+          <p class="hint"><span>Each quarter: the average score of its months, the bonus earned and the share paid at the quarter end; the rest is paid at the year end. A super bonus is paid in full with its quarter.</span> <span>★ marks a quarter whose average reaches the plan's super-bonus score. Months are counted once scored (opened on the scorecard) or locked.</span></p></div>
+          <div class="sh-ctl"><button class="mini" id="bnScoreYear" type="button">Score every month of the year</button></div></div>
+          <div class="scroll"><table class="bn-t" id="bnPay"></table></div></div>
+        <div class="card"><div class="card-head"><div><h2>Super bonus</h2>
+          <p class="hint"><span>An amount management grants a unit for an outstanding quarter, beyond its range, with the reason; it goes in the audit trail.</span></p></div></div>
+          <div class="formgrid" style="align-items:end"><label class="field">Unit<select id="bnSupUnit"></select></label><label class="field">Quarter<select id="bnSupQ"><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select></label>
+            <label class="field">Amount<input type="number" id="bnSupAmt" min="0" step="1000"></label><label class="field">Reason<input id="bnSupWhy" maxlength="500"></label></div>
+          <div style="display:flex;gap:8px;align-items:center"><button class="btn dark" id="bnSupAdd" type="button">Grant the super bonus</button><span class="meta" id="bnSupMsg"></span></div>
+          <div class="scroll" style="margin-top:12px"><table class="bn-t" id="bnSupList"></table></div></div></div>
+      <div class="bn-p" data-p="plan" hidden>
+        <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Plans by brand</h2>
+          <p class="hint"><span>A plan is the KPIs with their weight, the five cut points that give scores 2 to 6, the bonus range and the payout. Each brand uses its own plan, else the default one; a unit can set apart its weights, range and targets below.</span> <span>Ratio: actual ÷ target in %. Points: actual − target in percentage points. Value: the actual itself.</span></p></div></div>
+          <div class="filters" style="margin:0 0 10px;align-items:flex-end"><label>Plan<select id="bnPlanSel"></select></label>
+            <label>New plan for<select id="bnPlanNew"></select></label><button class="mini" id="bnPlanCopy" type="button">Create from this plan</button>
+            <button class="mini" id="bnPlanDel" type="button">Delete this plan</button></div>
+          <div class="scroll"><table class="bn-t bn-plan" id="bnPlanKpis"></table></div>
+          <p class="meta">Weights: <span class="bn-sum" id="bnPlanSum"></span></p>
+          <div class="formgrid" style="margin-top:12px"><label class="field">Bonus from score<input type="number" id="bnPlMin" step="0.01" min="1" max="6"></label>
+            <label class="field">Paid at the quarter end (%)<input type="number" id="bnPlQ" min="0" max="100"></label>
+            <label class="field">Super bonus from quarter score<input type="number" id="bnPlSup" step="0.01" min="1" max="6"></label>
+            <label class="field">Currency <span class="meta">blank: the company's</span><input id="bnPlCur" maxlength="6"></label>
+            <label class="field">Positions that qualify<input id="bnPlPos" maxlength="200"></label></div>
+          <h3 style="font-size:14px;margin:6px 0">Bonus range</h3>
+          <div class="scroll"><table class="bn-t bn-plan" id="bnPlanRanges"></table></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="mini" id="bnRangeAdd" type="button">Add a line</button><button class="btn dark" id="bnPlanSave" type="button">Save the plan</button><span class="meta" id="bnPlanMsg"></span></div></div>
+        <div class="card"><div class="card-head"><div><h2>Units</h2>
+          <p class="hint"><span>The plan each unit uses and what it sets apart. A franchise does not qualify unless set so.</span></p></div></div>
+          <div class="scroll"><table class="bn-t" id="bnUnits"></table></div></div></div>
     </div>
     <div id="slMain">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Sales from Simphony</h2>
@@ -2456,6 +2536,25 @@ html:not(.embed-set) #rgSetCard{display:none!important}
 <div class="pl-bd" id="ilBd"><div class="pl-pop" id="ilPop" role="dialog" aria-modal="true" aria-label="Location stock in detail"></div></div>
 </div>
 
+<div class="modal-bg" id="bnPop" role="dialog" aria-modal="true" aria-labelledby="bnPopT"><div class="modal" style="max-width:1200px">
+  <div class="mhead"><div><h2 id="bnPopT">Unit</h2><p class="hint" id="bnPopNote" style="margin:0"></p></div>
+    <div style="display:flex;gap:8px"><button class="mini dark" id="bnPopClose" type="button">Close</button></div></div>
+  <div class="bn-cats" id="bnPopCats"></div>
+  <div class="scroll"><table class="bn-t" id="bnPopKpis"></table></div>
+  <div class="bn-ed" id="bnPopLock"></div>
+</div></div>
+<div class="modal-bg" id="bnUnitPop" role="dialog" aria-modal="true" aria-labelledby="bnUnitT"><div class="modal" style="max-width:900px">
+  <div class="mhead"><div><h2 id="bnUnitT">Unit plan</h2><p class="hint" style="margin:0">Blank fields follow the plan.</p></div>
+    <div style="display:flex;gap:8px"><button class="mini dark" id="bnUnitClose" type="button">Close</button></div></div>
+  <div class="formgrid" style="margin-top:12px"><label class="field">Plan<select id="bnUnPlan"></select></label>
+    <label class="field">Qualifies for bonus<select id="bnUnElig"><option value="">As its ownership (RHG yes, franchise no)</option><option value="1">Yes</option><option value="0">No</option></select></label>
+    <label class="field">Note<input id="bnUnNote" maxlength="300"></label></div>
+  <div class="scroll"><table class="bn-t bn-plan" id="bnUnKpis"></table></div>
+  <p class="meta">Weights of the unit: <span class="bn-sum" id="bnUnSum"></span></p>
+  <label style="display:flex;gap:6px;align-items:center;margin:10px 0 6px;font-size:13px"><input type="checkbox" id="bnUnOwnR"> Its own bonus range</label>
+  <div class="scroll"><table class="bn-t bn-plan" id="bnUnRanges"></table></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button class="mini" id="bnUnRAdd" type="button">Add a line</button><button class="btn dark" id="bnUnSave" type="button">Save</button><span class="meta" id="bnUnMsg"></span></div>
+</div></div>
 <div class="modal-bg" id="shPop" role="dialog" aria-modal="true" aria-labelledby="shPopT"><div class="modal" style="max-width:1400px">
   <div class="mhead"><div><h2 id="shPopT">Items</h2><p class="hint" id="shPopNote" style="margin:0"></p></div>
     <div style="display:flex;gap:8px"><button class="mini exp" type="button" data-shx="pop" hidden>Export ▾</button><button class="mini dark" id="shPopClose" type="button">Close</button></div></div>
@@ -5465,10 +5564,12 @@ var slTab = "main", slSort = "net";
 function slShowTab(tab){
   slTab = tab;
   document.querySelectorAll("#slTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" || tab === "menucost" || tab === "stockstop" || tab === "sevenrooms" ? "none" : "";
+  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" || tab === "menucost" || tab === "stockstop" || tab === "sevenrooms" || tab === "bonus" ? "none" : "";
+  $("slBnView").style.display = tab === "bonus" ? "" : "none";
+  if (tab === "bonus") bnEnter(); else clearTimeout(bnTimer);
   $("slStView").style.display = tab === "stockstop" ? "" : "none";
   $("slSrView").style.display = tab === "sevenrooms" ? "" : "none";
-  $("slHow").style.display = tab === "stockstop" || tab === "sevenrooms" ? "none" : "";
+  $("slHow").style.display = tab === "stockstop" || tab === "sevenrooms" || tab === "bonus" ? "none" : "";
   if (tab === "sevenrooms") { if (applyTopRange("sevenrooms", false) || !svData || svData.company !== ($("company").value || svData.company)) svLoad(false); } else clearTimeout(svTimer);
   if (tab === "stockstop") stLoad(false); else clearTimeout(stTimer);
   $("slMcView").style.display = tab === "menucost" ? "" : "none";
@@ -5484,6 +5585,295 @@ function slShowTab(tab){
   if (tab === "loc") { if (!salesData || salesData._q !== params()) loadSales(); else slRender(); if (!chData || chData._q !== chQuery()) loadCh(); else chRender(); }
 }
 document.querySelectorAll("#slTabs button").forEach(b => b.onclick = () => slShowTab(b.dataset.t));
+// ---------------------------------------------------------------- Sales → Bonus management (bonus.py): the CEO and the
+// Administrator only (screen finance.s.sales.bonus). The scorecard of a month, the payout of the year, the plans.
+let bnData = null, bnYearData = null, bnCfg = null, bnPart = "card", bnTimer = null, bnOpen = null, bnPlanKey = null, bnUnitRef = null;
+const BN_METHOD = {ratio: "Ratio (% of target)", delta: "Points vs target", value: "Value"};
+function bnPrevMonth(){ const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+function bnCo(){ return $("company").value || ""; }
+async function bnPost(path, body){
+  const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"},
+    body: JSON.stringify(Object.assign({company: bnCo()}, body || {}))});
+  const j = await readJSON(r); if (!r.ok) throw new Error(j.error || r.status); return j;
+}
+const bnS = s => s == null ? `<span class="bn-s none">–</span>` : `<span class="bn-s s${s}">${s}</span>`;
+const bnScore = v => v == null ? "–" : fmt(v, 2);
+function bnVal(r, v){ if (v == null) return "–"; return r.unit === "money" ? fmt(v, 0) : r.unit === "rating" ? fmt(v, 2) : fmt(v, 1) + "%"; }
+function bnX(r){
+  if (r.x == null) return "";
+  return r.method === "ratio" ? fmt(r.x, 1) + "% of target" : r.method === "delta" ? (r.x > 0 ? "+" : "") + fmt(r.x, 2) + " pts" : "";
+}
+function bnCurOf(u){ return (u && u.currency) || (bnData && bnData.currency) || ""; }
+function bnBrandOk(u){ const b = $("bnBrand").value; return !b || u.brand === b; }
+function bnBrands(list){
+  const cur = $("bnBrand").value, B = [...new Set((list || []).map(u => u.brand).filter(Boolean))].sort();
+  $("bnBrand").innerHTML = `<option value="">All brands</option>` + B.map(b => `<option${b === cur ? " selected" : ""}>${esc(b)}</option>`).join("");
+}
+function bnShowPart(p){
+  bnPart = p;
+  document.querySelectorAll("#bnSeg button").forEach(b => b.classList.toggle("on", b.dataset.b === p));
+  document.querySelectorAll("#slBnView .bn-p").forEach(x => x.hidden = x.dataset.p !== p);
+  $("bnMonth").parentElement.style.display = p === "card" ? "" : "none";
+  $("bnYear").parentElement.style.display = p === "pay" ? "" : "none";
+  $("bnBrand").parentElement.style.display = p === "plan" ? "none" : "";
+  if (p === "card") bnLoad(false); else if (p === "pay") bnLoadYear(); else bnLoadCfg();
+}
+document.querySelectorAll("#bnSeg button").forEach(b => b.onclick = () => bnShowPart(b.dataset.b));
+function bnEnter(){
+  if (!$("bnMonth").value) $("bnMonth").value = bnPrevMonth();
+  if (!$("bnYear").value) $("bnYear").value = $("bnMonth").value.slice(0, 4);
+  bnShowPart(bnPart);
+}
+$("bnMonth").onchange = () => { $("bnYear").value = $("bnMonth").value.slice(0, 4); bnLoad(false); };
+$("bnYear").onchange = () => bnLoadYear();
+$("bnBrand").onchange = () => { if (bnPart === "card") bnRender(); else if (bnPart === "pay") bnRenderYear(); };
+$("bnRead").onclick = () => bnPart === "card" ? bnLoad(true) : bnPart === "pay" ? bnLoadYear() : bnLoadCfg();
+function bnSources(state){
+  $("bnSrc").innerHTML = Object.entries(state || {}).map(([k, v]) => {
+    const c = v === "ok" ? "ok" : v === "reading" ? "run" : /^error/.test(v) ? "err" : "";
+    const t = v === "ok" ? "read" : v === "reading" ? "reading…" : v;
+    return `<span class="${c}" title="${esc(v)}">${esc(k)} · ${esc(t)}</span>`;
+  }).join("");
+}
+
+// ---- the scorecard
+async function bnLoad(refresh){
+  clearTimeout(bnTimer);
+  const ym = $("bnMonth").value || bnPrevMonth();
+  $("bnStatus").textContent = `Reading ${ym}…`;
+  try{
+    const p = new URLSearchParams({company: bnCo(), month: ym}); if (refresh) p.set("refresh", "1");
+    const j = await readJSON(await fetch("/api/bonus?" + p.toString()));
+    if (j.error) throw new Error(j.error);
+    bnData = j; bnBrands(j.units); bnRender();
+    if (bnOpen) bnDetail(bnOpen, true);
+    if (j.reading && j.reading.length && slTab === "bonus" && bnPart === "card") bnTimer = setTimeout(() => bnLoad(false), 6000);
+  }catch(e){ $("bnStatus").innerHTML = `<span class="warn">${fcSp("Could not read: " + e.message)}</span>`; }
+}
+function bnRender(){
+  const d = bnData; if (!d) return;
+  bnSources(d.sources);
+  const U = d.units.filter(bnBrandOk), el = U.filter(u => u.eligible), sc = el.filter(u => u.score != null);
+  const tot = el.reduce((s, u) => s + (u.amount || 0), 0), avg = sc.length ? sc.reduce((s, u) => s + u.score, 0) / sc.length : null;
+  const cur = d.currency || "";
+  $("bnStatus").innerHTML = `${fcSp(`${d.month}${d.running ? " · month in progress: the figures move until it closes" : ""}`)}`
+    + (d.reading && d.reading.length ? ` · <span class="warn">${fcSp("still reading: " + d.reading.join(", "))}</span>` : "");
+  $("bnKpis").innerHTML = [["Units scored", `${sc.length} / ${el.length}`, "qualifying units with a score"],
+    ["Average score", bnScore(avg), "of the units scored"],
+    ["Bonus of the month", `${fmt(tot, 0)} ${esc(cur)}`, "the ranges' amounts, before the payout split"],
+    ["In a bonus range", `${el.filter(u => u.amount > 0).length}`, `of ${el.length} qualifying units`],
+    ["Locked", `${U.filter(u => u.locked).length} / ${U.length}`, "months frozen for payout"]]
+    .map(([l, v, s]) => `<div class="card kpi"><div class="lbl">${fcSp(l)}</div><div class="v">${v}</div><div class="meta">${fcSp(s)}</div></div>`).join("");
+  const keys = [], lab = {};
+  U.forEach(u => u.kpis.forEach(k => { if (k.weight > 0 && !keys.includes(k.key)) { keys.push(k.key); lab[k.key] = k.label; } }));
+  $("bnTable").innerHTML = `<thead><tr><th>Unit</th><th>Plan</th>${keys.map(k => `<th class="c" title="${esc(lab[k])}">${esc(lab[k])}</th>`).join("")}
+    <th class="c">Score</th><th>Range</th><th class="num">Bonus</th><th class="num">Coverage</th><th>Month</th></tr></thead><tbody>`
+    + U.map(u => {
+      const by = Object.fromEntries(u.kpis.map(k => [k.key, k]));
+      return `<tr class="bn-row${u.eligible ? "" : " off"}" data-ref="${esc(u.ref)}"><td><b>${esc(u.name)}</b>${u.eligible ? "" : ` <span class="tag">${fcSp("does not qualify")}</span>`}</td>
+        <td class="meta">${esc(u.template === "*" ? "Default" : u.template || "")}${(u.overridden || []).length ? " · " + esc(u.overridden.join(", ")) : ""}</td>
+        ${keys.map(k => { const r = by[k]; if (!r) return `<td class="c">${bnS(null)}</td>`;
+          return `<td class="c" title="${esc(`${r.label}: ${bnVal(r, r.value)} against ${bnVal(r, r.target)}${r.status ? " · " + r.status : ""}`)}">${bnS(r.score)}${r.manual ? "<sup>✎</sup>" : ""}</td>`; }).join("")}
+        <td class="c bn-tot">${bnScore(u.score)}</td><td>${esc(u.band || "–")}</td>
+        <td class="num"><b>${u.eligible ? fmt(u.amount, 0) : "–"}</b></td><td class="num">${fmt(u.coverage, 0)}%</td>
+        <td><span class="bn-lock${u.locked ? " on" : ""}">${u.locked ? "Locked" : "Open"}</span></td></tr>`;
+    }).join("") + `</tbody>`;
+  $("bnTable").querySelectorAll("tr.bn-row").forEach(tr => tr.onclick = () => bnDetail(tr.dataset.ref));
+}
+function bnDetail(ref, keep){
+  const u = bnData && bnData.units.find(x => x.ref === ref); if (!u) return;
+  bnOpen = ref;
+  $("bnPopT").textContent = `${u.name} · ${bnData.month}`;
+  $("bnPopNote").textContent = `${u.locked ? `Locked by ${u.locked.by} on ${u.locked.at.replace("T", " ")}` : "Open: the figures follow the sources"} · score ${bnScore(u.score)} · ${u.band ? "range " + u.band : "no range"} · bonus ${u.eligible ? fmt(u.amount, 0) + " " + bnCurOf(u) : "does not qualify"} · coverage ${fmt(u.coverage, 0)}%`;
+  $("bnPopCats").innerHTML = (u.categories || []).map(c => `<div>${esc(c.name)} · ${fmt(c.weight, 0)}%<b>${bnScore(c.score)}</b></div>`).join("");
+  $("bnPopKpis").innerHTML = `<thead><tr><th>KPI</th><th class="num">Weight</th><th class="num">Actual</th><th class="num">Target</th><th class="num">Compared</th><th class="c">Score</th><th>Bands (scores 2→6)</th><th>Source</th><th></th></tr></thead><tbody>`
+    + u.kpis.map(r => `<tr><td><b>${esc(r.label)}</b><div class="meta">${esc(r.category)}</div></td><td class="num">${fmt(r.weight, 0)}%</td>
+      <td class="num">${bnVal(r, r.value)}${r.provisional ? ` <span class="tag">${fcSp("provisional")}</span>` : ""}</td><td class="num">${bnVal(r, r.target)}</td>
+      <td class="num">${esc(bnX(r))}</td><td class="c">${bnS(r.score)}</td>
+      <td class="meta">${esc(r.cuts.map(c => r.method === "delta" ? (c > 0 ? "+" : "") + c : c).join(" / "))}${r.method === "ratio" ? " %" : r.method === "delta" ? " pts" : ""} · ${r.better === "lower" ? "lower is better" : "higher is better"}</td>
+      <td class="meta" style="white-space:normal;min-width:220px">${esc(r.status || "")}${r.status ? "<br>" : ""}${esc(r.manual ? `Entered by ${r.manual.by} on ${String(r.manual.at || "").replace("T", " ")}${r.manual.note ? ": " + r.manual.note : ""}${r.auto && r.auto.value != null ? ` (automatic: ${bnVal(r, r.auto.value)})` : ""}` : (r.auto && r.auto.detail) || r.source)}</td>
+      <td>${u.locked ? "" : `<button class="mini" type="button" data-ed="${esc(r.key)}">Enter</button>`}</td></tr>
+      <tr class="bn-edrow" data-for="${esc(r.key)}" hidden><td colspan="9"><div class="bn-ed">
+        <label class="field">Actual${r.unit === "pct" ? " (%)" : ""}<input type="number" step="any" data-f="value" value="${r.manual && r.manual.value != null ? r.manual.value : ""}" placeholder="${r.auto && r.auto.value != null ? r.auto.value : ""}"></label>
+        <label class="field">Target<input type="number" step="any" data-f="target" value="${r.manual && r.manual.target != null ? r.manual.target : ""}" placeholder="${r.target != null ? r.target : ""}"></label>
+        <label class="field">Note<input class="note" data-f="note" maxlength="300" value="${esc(r.manual && r.manual.note || "")}"></label>
+        <button class="btn dark" type="button" data-save="${esc(r.key)}">Save</button><button class="btn" type="button" data-clear="${esc(r.key)}">Back to automatic</button><span class="meta" data-msg="${esc(r.key)}"></span></div></td></tr>`).join("") + `</tbody>`;
+  const T = $("bnPopKpis");
+  T.querySelectorAll("[data-ed]").forEach(b => b.onclick = () => { const row = T.querySelector(`tr[data-for="${b.dataset.ed}"]`); row.hidden = !row.hidden; });
+  const send = async (key, clear) => {
+    const row = T.querySelector(`tr[data-for="${key}"]`), f = n => row.querySelector(`[data-f="${n}"]`).value;
+    const msg = T.querySelector(`[data-msg="${key}"]`); msg.textContent = "Saving…";
+    try { await bnPost("/api/bonus/value", {ref, month: bnData.month, kpi: key, value: clear ? null : f("value"), target: clear ? null : f("target"), note: f("note")});
+      msg.textContent = "Saved."; bnLoad(false); } catch (e) { msg.textContent = "Not saved: " + e.message; }
+  };
+  T.querySelectorAll("[data-save]").forEach(b => b.onclick = () => send(b.dataset.save, false));
+  T.querySelectorAll("[data-clear]").forEach(b => b.onclick = () => send(b.dataset.clear, true));
+  $("bnPopLock").innerHTML = u.locked
+    ? `<label class="field">Reason to unlock<input class="note" id="bnUnlockWhy" maxlength="300"></label><button class="btn" id="bnUnlock" type="button">Unlock the month</button><span class="meta" id="bnLockMsg"></span>`
+    : `<button class="btn dark" id="bnLock" type="button">Lock the month</button><span class="meta" id="bnLockMsg">${fcSp("Locking freezes the figures, the score and the bonus as they are now: later corrections in the sources no longer change them.")}</span>`;
+  const lk = $("bnLock"), ul = $("bnUnlock");
+  if (lk) lk.onclick = async () => { $("bnLockMsg").textContent = "Locking…";
+    try { await bnPost("/api/bonus/lock", {ref, month: bnData.month}); $("bnLockMsg").textContent = "Locked."; bnLoad(false); } catch (e) { $("bnLockMsg").textContent = "Not locked: " + e.message; } };
+  if (ul) ul.onclick = async () => { const why = $("bnUnlockWhy").value.trim(); if (why.length < 5) { $("bnLockMsg").textContent = "Say why (it goes in the audit trail)."; return; }
+    try { await bnPost("/api/bonus/unlock", {ref, month: bnData.month, reason: why}); bnLoad(false); } catch (e) { $("bnLockMsg").textContent = "Not unlocked: " + e.message; } };
+  if (!keep) $("bnPop").classList.add("on");
+}
+$("bnPopClose").onclick = () => { $("bnPop").classList.remove("on"); bnOpen = null; };
+
+// ---- the payout of the year and the super bonus
+async function bnLoadYear(){
+  $("bnStatus").textContent = "Reading the year…"; $("bnSrc").innerHTML = "";
+  try{
+    const y = $("bnYear").value || String(new Date().getFullYear());
+    const j = await readJSON(await fetch("/api/bonus/year?" + new URLSearchParams({company: bnCo(), year: y})));
+    if (j.error) throw new Error(j.error);
+    bnYearData = j; bnBrands(j.units); bnRenderYear();
+  }catch(e){ $("bnStatus").innerHTML = `<span class="warn">${fcSp("Could not read: " + e.message)}</span>`; }
+}
+function bnRenderYear(){
+  const d = bnYearData; if (!d) return;
+  const U = d.units.filter(bnBrandOk), cur = d.currency || "";
+  $("bnStatus").textContent = `${d.year} · payout of the bonus earned`;
+  const sum = f => U.filter(u => u.eligible).reduce((s, u) => s + (u[f] || 0), 0);
+  $("bnPayKpis").innerHTML = [["Earned", sum("earned")], ["Paid at the quarter ends", sum("paid_quarters")], ["Due at the year end", sum("year_end")], ["Super bonus", sum("super")], ["Total", sum("total")]]
+    .map(([l, v]) => `<div class="card kpi"><div class="lbl">${fcSp(l)}</div><div class="v">${fmt(v, 0)}</div><div class="meta">${esc(cur)}</div></div>`).join("");
+  $("bnPay").innerHTML = `<thead><tr><th>Unit</th>${[1, 2, 3, 4].map(q => `<th>Q${q}</th>`).join("")}<th class="num">Paid at quarter ends</th><th class="num">Year end</th><th class="num">Super bonus</th><th class="num">Total</th></tr></thead><tbody>`
+    + U.map(u => `<tr class="${u.eligible ? "" : "off"}"><td><b>${esc(u.name)}</b><div class="meta">${esc(u.brand)} · ${fmt(u.quarter_pct, 0)}% at the quarter end</div></td>`
+      + u.quarters.map(q => `<td class="bn-q">${q.months ? `<b>${bnScore(q.avg)}</b>${q.super_eligible ? ` <span class="bn-star" title="${esc("reaches the super-bonus score " + (u.super_min || ""))}">★</span>` : ""} · ${fcSp(`${q.months}/3 months scored`)}${q.locked ? ` · ${fcSp(`${q.locked} locked`)}` : ""}<br>${fcSp(`earned ${fmt(q.earned, 0)}`)} · ${fcSp(`paid ${fmt(q.paid, 0)}`)}${q.super ? `<br>${fcSp(`super bonus ${fmt(q.super, 0)}`)}` : ""}` : "–"}</td>`).join("")
+      + `<td class="num">${fmt(u.paid_quarters, 0)}</td><td class="num">${fmt(u.year_end, 0)}</td><td class="num">${fmt(u.super, 0)}</td><td class="num"><b>${fmt(u.total, 0)}</b></td></tr>`).join("") + `</tbody>`;
+  const cu = $("bnSupUnit").value;
+  $("bnSupUnit").innerHTML = U.map(u => `<option value="${esc(u.ref)}"${u.ref === cu ? " selected" : ""}>${esc(u.name)}</option>`).join("");
+  const items = U.flatMap(u => u.quarters.flatMap(q => q.super_items.map(s => Object.assign({name: u.name}, s))));
+  $("bnSupList").innerHTML = items.length ? `<thead><tr><th>Unit</th><th>Quarter</th><th class="num">Amount</th><th>Reason</th><th>Granted</th><th></th></tr></thead><tbody>`
+    + items.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.period)}</td><td class="num">${fmt(s.amount, 0)}</td><td style="white-space:normal">${esc(s.reason)}</td><td class="meta">${esc(s.by)} · ${esc(s.at.replace("T", " "))}</td><td><button class="mini" type="button" data-rm="${esc(s.id)}">Remove</button></td></tr>`).join("") + `</tbody>`
+    : `<tbody><tr><td class="meta">${fcSp("No super bonus granted this year.")}</td></tr></tbody>`;
+  $("bnSupList").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { try { await bnPost("/api/bonus/super/delete", {id: b.dataset.rm}); bnLoadYear(); } catch (e) { $("bnSupMsg").textContent = e.message; } });
+}
+$("bnSupAdd").onclick = async () => {
+  $("bnSupMsg").textContent = "Saving…";
+  try { await bnPost("/api/bonus/super", {ref: $("bnSupUnit").value, period: `${$("bnYear").value}-Q${$("bnSupQ").value}`, amount: Number($("bnSupAmt").value), reason: $("bnSupWhy").value});
+    $("bnSupAmt").value = ""; $("bnSupWhy").value = ""; $("bnSupMsg").textContent = "Granted."; bnLoadYear(); } catch (e) { $("bnSupMsg").textContent = "Not granted: " + e.message; }
+};
+$("bnScoreYear").onclick = async () => {
+  const y = Number($("bnYear").value), now = new Date(), last = y < now.getFullYear() ? 12 : y === now.getFullYear() ? now.getMonth() + 1 : 0;
+  const b = $("bnScoreYear"); b.disabled = true;
+  try { for (let m = 1; m <= last; m++) { b.textContent = `Scoring ${m}/${last}…`;
+      await readJSON(await fetch("/api/bonus?" + new URLSearchParams({company: bnCo(), month: `${y}-${String(m).padStart(2, "0")}`}))); } }
+  catch (e) { $("bnStatus").textContent = "Stopped: " + e.message; }
+  b.disabled = false; b.textContent = "Score every month of the year"; bnLoadYear();
+};
+
+// ---- plans and the units' plans
+async function bnLoadCfg(){
+  $("bnStatus").textContent = "Reading the plans…"; $("bnSrc").innerHTML = "";
+  try{
+    const j = await readJSON(await fetch("/api/bonus/config?" + new URLSearchParams({company: bnCo()})));
+    if (j.error) throw new Error(j.error);
+    bnCfg = j; if (!bnPlanKey || !j.templates[bnPlanKey]) bnPlanKey = j.templates.OPA ? "OPA" : "*";
+    $("bnStatus").textContent = `${Object.keys(j.templates).length} plan(s) · ${j.units.length} unit(s) of ${j.company}`;
+    bnRenderCfg();
+  }catch(e){ $("bnStatus").innerHTML = `<span class="warn">${fcSp("Could not read: " + e.message)}</span>`; }
+}
+const bnPlName = k => k === "*" ? "Default (every other brand)" : k;
+function bnRenderCfg(){
+  const c = bnCfg, P = c.templates[bnPlanKey];
+  $("bnPlanSel").innerHTML = Object.keys(c.templates).sort((a, b) => a === "*" ? 1 : b === "*" ? -1 : a.localeCompare(b))
+    .map(k => `<option value="${esc(k)}"${k === bnPlanKey ? " selected" : ""}>${esc(bnPlName(k))}</option>`).join("");
+  const free = c.brands.filter(b => !c.templates[b]);
+  $("bnPlanNew").innerHTML = free.length ? free.map(b => `<option>${esc(b)}</option>`).join("") : `<option value="">${esc("every brand has a plan")}</option>`;
+  $("bnPlanCopy").disabled = !free.length; $("bnPlanDel").disabled = bnPlanKey === "*";
+  const cats = Object.fromEntries(c.catalog.map(k => [k.key, k]));
+  $("bnPlanKpis").innerHTML = `<thead><tr><th>KPI</th><th>Category</th><th class="num">Weight %</th><th>Compared as</th><th>Better</th><th class="c" colspan="5">Cut points: the least for score 2 · 3 · 4 · 5 · 6</th><th class="num">Target</th><th class="num">Min. count</th><th>Source</th></tr></thead><tbody>`
+    + P.kpis.map(k => `<tr data-k="${esc(k.key)}"><td><input class="lb" data-f="label" value="${esc(k.label)}"></td><td class="meta">${esc(k.category)}</td>
+      <td><input type="number" step="any" data-f="weight" value="${k.weight}"></td>
+      <td><select data-f="method">${Object.entries(BN_METHOD).map(([m, l]) => `<option value="${m}"${m === k.method ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></td>
+      <td><select data-f="better"><option value="higher"${k.better === "higher" ? " selected" : ""}>Higher</option><option value="lower"${k.better === "lower" ? " selected" : ""}>Lower</option></select></td>
+      ${[0, 1, 2, 3, 4].map(i => `<td><input type="number" step="any" data-c="${i}" value="${k.cuts[i]}"></td>`).join("")}
+      <td><input type="number" step="any" data-f="target" value="${k.target == null ? "" : k.target}"></td><td><input type="number" min="0" data-f="min_count" value="${k.min_count || 0}"></td>
+      <td class="meta" style="white-space:normal;min-width:200px">${esc((cats[k.key] || {}).source || "")}</td></tr>`).join("") + `</tbody>`;
+  const sumW = () => { const s = [...$("bnPlanKpis").querySelectorAll('[data-f="weight"]')].reduce((a, i) => a + (Number(i.value) || 0), 0);
+    $("bnPlanSum").textContent = fmt(s, 1) + "%" + (Math.abs(s - 100) > 0.01 ? " · must be 100%" : ""); $("bnPlanSum").classList.toggle("bad", Math.abs(s - 100) > 0.01); };
+  $("bnPlanKpis").querySelectorAll('[data-f="weight"]').forEach(i => i.oninput = sumW); sumW();
+  $("bnPlMin").value = P.min_score; $("bnPlQ").value = (P.payout || {}).quarter_pct ?? 50; $("bnPlSup").value = (P.super || {}).min_score ?? "";
+  $("bnPlCur").value = P.currency || ""; $("bnPlPos").value = P.positions || "";
+  bnRangeTable("bnPlanRanges", P.ranges);
+  bnRenderUnits();
+}
+function bnRangeTable(id, R){
+  const rs = [...(R || [])].sort((a, b) => a.min - b.min);
+  $(id).innerHTML = `<thead><tr><th class="num">Score from</th><th class="num">to</th><th class="num">Bonus</th><th></th></tr></thead><tbody>`
+    + rs.map((r, i) => `<tr><td><input type="number" step="0.01" min="1" max="6" data-r="min" value="${r.min}"></td><td class="meta num">${rs[i + 1] ? fmt(rs[i + 1].min - 0.01, 2) : "6.00"}</td>
+      <td><input type="number" step="1000" min="0" data-r="amount" value="${r.amount}" style="width:110px"></td><td><button class="mini" type="button" data-rmr>Remove</button></td></tr>`).join("") + `</tbody>`;
+  $(id).querySelectorAll("[data-rmr]").forEach(b => b.onclick = () => b.closest("tr").remove());
+}
+function bnRangesOf(id){ return [...$(id).querySelectorAll("tbody tr")].map(tr => ({min: tr.querySelector('[data-r="min"]').value, amount: tr.querySelector('[data-r="amount"]').value})).filter(r => r.min !== ""); }
+function bnRangeAdd(id){ const R = bnRangesOf(id).map(r => ({min: Number(r.min), amount: Number(r.amount)})); const top = R.length ? Math.max(...R.map(r => r.min)) : 2.5; R.push({min: Math.min(6, top + 0.5), amount: 0}); bnRangeTable(id, R); }
+$("bnRangeAdd").onclick = () => bnRangeAdd("bnPlanRanges");
+$("bnPlanSel").onchange = () => { bnPlanKey = $("bnPlanSel").value; bnRenderCfg(); };
+function bnPlanFromForm(){
+  return {kpis: [...$("bnPlanKpis").querySelectorAll("tbody tr")].map(tr => { const g = f => tr.querySelector(`[data-f="${f}"]`).value;
+      return {key: tr.dataset.k, label: g("label"), weight: g("weight"), method: g("method"), better: g("better"), target: g("target"), min_count: g("min_count"),
+        cuts: [0, 1, 2, 3, 4].map(i => tr.querySelector(`[data-c="${i}"]`).value)}; }),
+    ranges: bnRangesOf("bnPlanRanges"), min_score: $("bnPlMin").value, payout: {quarter_pct: $("bnPlQ").value}, super: {min_score: $("bnPlSup").value},
+    currency: $("bnPlCur").value, positions: $("bnPlPos").value};
+}
+$("bnPlanSave").onclick = async () => {
+  $("bnPlanMsg").textContent = "Saving…";
+  try { await bnPost("/api/bonus/plan", {name: bnPlanKey, plan: bnPlanFromForm()}); $("bnPlanMsg").textContent = "Saved."; bnData = null; bnLoadCfg(); }
+  catch (e) { $("bnPlanMsg").textContent = "Not saved: " + e.message; }
+};
+$("bnPlanCopy").onclick = async () => {
+  const name = $("bnPlanNew").value; if (!name) return;
+  $("bnPlanMsg").textContent = "Creating…";
+  try { await bnPost("/api/bonus/plan", {name, plan: bnPlanFromForm()}); bnPlanKey = name; $("bnPlanMsg").textContent = `The plan of ${name} is created: change it and save.`; bnLoadCfg(); }
+  catch (e) { $("bnPlanMsg").textContent = "Not created: " + e.message; }
+};
+$("bnPlanDel").onclick = async () => {
+  if ($("bnPlanDel").dataset.sure !== bnPlanKey) { $("bnPlanDel").dataset.sure = bnPlanKey; $("bnPlanMsg").textContent = `Click again to delete the plan of ${bnPlanKey}: its units go back to the default plan.`; return; }
+  try { await bnPost("/api/bonus/plan/delete", {name: bnPlanKey}); $("bnPlanDel").dataset.sure = ""; bnPlanKey = null; $("bnPlanMsg").textContent = "Deleted."; bnLoadCfg(); }
+  catch (e) { $("bnPlanMsg").textContent = "Not deleted: " + e.message; }
+};
+function bnRenderUnits(){
+  $("bnUnits").innerHTML = `<thead><tr><th>Unit</th><th>Brand</th><th>Ownership</th><th>Plan used</th><th>Qualifies</th><th>Set apart</th><th></th></tr></thead><tbody>`
+    + bnCfg.units.map(u => { const o = u.override || {}, apart = [o.weights && Object.keys(o.weights).length ? "weights" : "", o.ranges ? "range" : "", o.targets && Object.keys(o.targets).length ? "targets" : "", o.note ? "“" + o.note + "”" : ""].filter(Boolean);
+      return `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.brand)}</td><td>${esc(u.ownership)}</td><td>${esc(bnPlName(u.template))}${o.template ? "" : ` <span class="meta">${fcSp("(by brand)")}</span>`}</td>
+        <td>${u.eligible ? "Yes" : "No"}</td><td class="meta">${esc(apart.join(" · ") || "–")}</td><td><button class="mini" type="button" data-un="${esc(u.ref)}">Change</button></td></tr>`; }).join("") + `</tbody>`;
+  $("bnUnits").querySelectorAll("[data-un]").forEach(b => b.onclick = () => bnUnitOpen(b.dataset.un));
+}
+function bnUnitOpen(ref){
+  const u = bnCfg.units.find(x => x.ref === ref); if (!u) return;
+  bnUnitRef = ref; const o = u.override || {}, base = bnCfg.templates[o.template || (bnCfg.templates[u.brand] ? u.brand : "*")];
+  $("bnUnitT").textContent = `${u.name} · its plan`; $("bnUnMsg").textContent = "";
+  $("bnUnPlan").innerHTML = `<option value="">${esc("The brand's plan" + (bnCfg.templates[u.brand] ? ` (${u.brand})` : " (the default)"))}</option>`
+    + Object.keys(bnCfg.templates).map(k => `<option value="${esc(k)}"${o.template === k ? " selected" : ""}>${esc(bnPlName(k))}</option>`).join("");
+  $("bnUnElig").value = o.eligible == null ? "" : o.eligible ? "1" : "0";
+  $("bnUnNote").value = o.note || "";
+  $("bnUnKpis").innerHTML = `<thead><tr><th>KPI</th><th class="num">Plan's weight</th><th class="num">Unit's weight</th><th class="num">Plan's target</th><th class="num">Unit's target (every month)</th></tr></thead><tbody>`
+    + base.kpis.map(k => `<tr data-k="${esc(k.key)}"><td>${esc(k.label)}</td><td class="num meta">${fmt(k.weight, 1)}%</td>
+      <td><input type="number" step="any" data-f="w" value="${(o.weights || {})[k.key] ?? ""}" placeholder="${k.weight}"></td>
+      <td class="num meta">${k.method === "ratio" ? esc("from the source") : k.target ?? "–"}</td>
+      <td><input type="number" step="any" data-f="t" value="${((o.targets || {})[k.key] || {})["*"] ?? ""}" placeholder="${k.method === "ratio" ? "" : (k.target ?? "")}"></td></tr>`).join("") + `</tbody>`;
+  const sumW = () => { let s = 0; $("bnUnKpis").querySelectorAll("tbody tr").forEach(tr => { const i = tr.querySelector('[data-f="w"]'); s += Number(i.value !== "" ? i.value : i.placeholder) || 0; });
+    $("bnUnSum").textContent = fmt(s, 1) + "%" + (Math.abs(s - 100) > 0.01 ? " · must be 100%" : ""); $("bnUnSum").classList.toggle("bad", Math.abs(s - 100) > 0.01); };
+  $("bnUnKpis").querySelectorAll('[data-f="w"]').forEach(i => i.oninput = sumW); sumW();
+  $("bnUnOwnR").checked = !!o.ranges;
+  bnRangeTable("bnUnRanges", o.ranges || base.ranges);
+  const sync = () => { $("bnUnRanges").style.opacity = $("bnUnOwnR").checked ? "" : ".45"; $("bnUnRAdd").disabled = !$("bnUnOwnR").checked; };
+  $("bnUnOwnR").onchange = sync; sync();
+  $("bnUnitPop").classList.add("on");
+}
+$("bnUnRAdd").onclick = () => bnRangeAdd("bnUnRanges");
+$("bnUnitClose").onclick = () => $("bnUnitPop").classList.remove("on");
+$("bnUnSave").onclick = async () => {
+  const weights = {}, targets = {};
+  $("bnUnKpis").querySelectorAll("tbody tr").forEach(tr => { const w = tr.querySelector('[data-f="w"]').value, t = tr.querySelector('[data-f="t"]').value;
+    if (w !== "") weights[tr.dataset.k] = w; if (t !== "") targets[tr.dataset.k] = {"*": t}; });
+  $("bnUnMsg").textContent = "Saving…";
+  try { await bnPost("/api/bonus/unit", {ref: bnUnitRef, template: $("bnUnPlan").value || null, eligible: $("bnUnElig").value === "" ? null : $("bnUnElig").value === "1",
+      weights, targets, ranges: $("bnUnOwnR").checked ? bnRangesOf("bnUnRanges") : null, note: $("bnUnNote").value});
+    $("bnUnMsg").textContent = "Saved."; bnData = null; $("bnUnitPop").classList.remove("on"); bnLoadCfg(); }
+  catch (e) { $("bnUnMsg").textContent = "Not saved: " + e.message; }
+};
 $("slSort").onchange = () => { slSort = $("slSort").value; slRender(); };
 $("slRead").onclick = () => { loadSales(true); loadCh(true); };
 const slPctOf = (a, b) => b ? a / b * 100 : null;
@@ -10432,8 +10822,10 @@ function setHeader(){
     return;
   }
   if (v.id === "sales"){
-    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : typeof slTab !== "undefined" && slTab === "stockstop" ? "Sales · Blocked by stock" : typeof slTab !== "undefined" && slTab === "sevenrooms" ? "Sales · SevenRooms ↔ Simphony" : "Sales") + " · " + ($("company").value || "all restaurants") + (dimValues().length ? " · " + dimValues().join(" + ") : "");
-    $("period").textContent = typeof slTab !== "undefined" && slTab === "stockstop"
+    $("title").textContent = (typeof slTab !== "undefined" && slTab === "loc" ? "Sales · Location intelligence" : typeof slTab !== "undefined" && slTab === "menu" ? "Sales · Menu engineering" : typeof slTab !== "undefined" && slTab === "chanprofit" ? "Sales · Channel profitability" : typeof slTab !== "undefined" && slTab === "stockstop" ? "Sales · Blocked by stock" : typeof slTab !== "undefined" && slTab === "sevenrooms" ? "Sales · SevenRooms ↔ Simphony" : typeof slTab !== "undefined" && slTab === "bonus" ? "Sales · Bonus management" : "Sales") + " · " + ($("company").value || "all restaurants") + (dimValues().length ? " · " + dimValues().join(" + ") : "");
+    $("period").textContent = typeof slTab !== "undefined" && slTab === "bonus"
+      ? "Monthly bonus scorecard · Simphony, Business Central, Odoo, Crunchtime (Zenput) and SevenRooms, read only · CEO and Administrator"
+      : typeof slTab !== "undefined" && slTab === "stockstop"
       ? "Open assembly orders in Business Central and today's sales in Simphony · read every few minutes"
       : typeof slTab !== "undefined" && slTab === "sevenrooms"
       ? (svData && svData.range ? `Reservations ${svData.range.from} → ${svData.range.to} · SevenRooms and Simphony, read only` : "Reservations from SevenRooms, checks from Simphony · read only")
@@ -10478,6 +10870,7 @@ function openFromHash(){
   // Document control moved to the Purchasing tower (22 Nov 2026): links of before go there
   if (/^(doccontrol|transit|nopo)(\/|$)/.test(v)) { location.replace("/purchasing/#doccontrol/" + (/transit/.test(v) ? "transit" : "nopo")); return; }
   if (v === "sevenrooms") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("sevenrooms"); return; }
+  if (v === "bonus") { const sb = document.querySelector(`#nav button[data-view="sales"]`); if (sb && !sb.classList.contains("on")) sb.click(); slShowTab("bonus"); return; }
   const b = v && document.querySelector(`#nav button[data-view="${CSS.escape(v)}"]`);
   if (b && !b.classList.contains("on")) b.click();
 }

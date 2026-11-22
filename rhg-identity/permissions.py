@@ -97,6 +97,12 @@ for _p, (_label, _kind, _g) in screens.SCREENS.items():
 # they are ticked for it in Roles & permissions; the accounts named in M365_DOCS_USERS keep them as before.
 CONFIDENTIAL = ("platform.s.documents.",)          # never given by a default role or a migration either
 NOT_FOR_ADMIN = {p for p in PERMISSIONS if p.startswith(CONFIDENTIAL)}
+# Screens the Administrator holds but no other default role does, except the roles named for them (Geri, 22 Nov 2026:
+# Bonus management only for the CEO and the Administrator). Left out of every bundle (_s), of the screens a legacy role
+# gets from its data rights, and given once to the stored roles named here (ROLE_SCREENS, store.py); another role
+# gets them only when an administrator ticks them in Roles & permissions.
+RESTRICTED = ("finance.s.sales.bonus",)
+ROLE_SCREENS = {"finance.s.sales.bonus": ("CEO",)}
 
 
 def effective(perms):
@@ -118,7 +124,7 @@ def screens_for_rights(rights):
             continue
         if app == "platform":
             need = set(g) or {"finance.view"}
-        if need and need <= rights and not p.startswith(CONFIDENTIAL):
+        if need and need <= rights and not p.startswith(CONFIDENTIAL) and not p.startswith(RESTRICTED):
             out.append(p)
     return out
 
@@ -126,7 +132,8 @@ def screens_for_rights(rights):
 def _s(*prefixes, but=()):
     """The screens under the given prefixes (finance.s.kartela, purchasing.s ...), less those listed in but."""
     return [p for p in screens.SCREENS if any(p == x or p.startswith(x + ".") for x in prefixes)
-            and not any(p == y or p.startswith(y + ".") for y in but) and not p.startswith(CONFIDENTIAL)]
+            and not any(p == y or p.startswith(y + ".") for y in but) and not p.startswith(CONFIDENTIAL)
+            and not p.startswith(RESTRICTED)]
 
 
 _FIN_ALL = _s("finance.s")
@@ -149,7 +156,8 @@ DEFAULT_ROLES = {
             "description": "Every screen of both towers and the executive dashboard; Unicorn; read only.",
             "permissions": _FIN_ALL + _PUR_ALL + _s("platform.s") + ["finance.export", "purchasing.export",
                                                                      "unicorn.use", "unicorn.decisions.approve",
-                                                                     "unicorn.rules.manage", "layout.personal"]},
+                                                                     "unicorn.rules.manage", "layout.personal"]
+                           + [p for p, roles in ROLE_SCREENS.items() if "CEO" in roles]},
     "COO": {"department": "Management", "system": False,
             "description": "Operations: sales, inventory, purchasing, the executive dashboard; Unicorn.",
             "permissions": _s("finance.s.overview", "finance.s.sales", "finance.s.inventory", "finance.s.budget")

@@ -31,7 +31,11 @@ FINANCE = [
         # the sales BC cannot post for want of stock (open assembly orders), and what today's Simphony sales will block
         ("stockstop", "Blocked by stock", "location", []),
         # SevenRooms reservations, covers and feedback against Simphony's checks
-        ("sevenrooms", "SevenRooms ↔ Simphony", "location", [])]),
+        ("sevenrooms", "SevenRooms ↔ Simphony", "location", []),
+        # Bonus management (Geri, 22 Nov 2026): every unit's monthly bonus scorecard, plans and payout. Restricted: the
+        # CEO and the Administrator only (permissions.RESTRICTED); a company screen, refused to a person limited to
+        # some locations
+        ("bonus", "Bonus management", "company", [])]),
     # People & Productivity: Odoo HR (workforce, attendances, planning) against Simphony's sales and BC's personnel cost
     ("people", "People & Productivity", "People & Productivity", "ppTabs", [
         ("workforce", "Workforce", "location", []),

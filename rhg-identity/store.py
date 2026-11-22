@@ -153,6 +153,17 @@ def _seed_roles(conn):
                 conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + [screen]), r["name"]))
         given.append(new)
         _added_write(given)
+    # restricted screens (permissions.ROLE_SCREENS): given once to the stored roles named for them, by name
+    for new, names in permissions.ROLE_SCREENS.items():
+        mark = new + "@roles"
+        if mark in given:
+            continue
+        for r in conn.execute("SELECT name, permissions FROM roles WHERE system=0").fetchall():
+            held = json.loads(r["permissions"] or "[]")
+            if r["name"] in names and new not in held:
+                conn.execute("UPDATE roles SET permissions=? WHERE name=?", (json.dumps(held + [new]), r["name"]))
+        given.append(mark)
+        _added_write(given)
     # screens taken out of the catalogue (after ADDED_SCREENS gave their holders the screen that replaces them)
     gone = set(permissions.REMOVED_SCREENS)
     for r in conn.execute("SELECT name, permissions FROM roles").fetchall():

@@ -60,6 +60,8 @@ import people
 import crunchtime
 import opsexec
 import srsim
+import bonus
+import reviews
 import sevenrooms_report
 import requests
 import cost_report
@@ -2661,6 +2663,112 @@ class Handler(BaseHTTPRequestHandler):
             prev = self._scope_filter
             self._scope_filter = lambda b: filter_codes(prev(b) if prev else b, self._allowed)
 
+    # ---------------------------------------------------------------- Sales → Bonus management (bonus.py)
+    BONUS_SCREEN = "finance.s.sales.bonus"
+
+    def _bonus_month(self, v):
+        ym = str(v or date.today().strftime("%Y-%m"))[:7]
+        datetime.strptime(ym, "%Y-%m")
+        return ym
+
+    def _bonus_get(self, path, q, user):
+        """The scorecard of a month, the year's payout, the plans: the CEO and the Administrator only."""
+        if not auth.can(user, self.BONUS_SCREEN):
+            self._send(403, {"error": "Bonus management is open to the CEO and the Administrator only."})
+            return
+        company = q.get("company") or config.BC_COMPANY
+        reg = locintel.registry()
+        try:
+            if path == "/api/bonus":
+                ym = self._bonus_month(q.get("month"))
+                units = bonus.units_of(company, reg)
+                auto, state = bonus.collect(client, company, company_currency(company), ym, units, q.get("refresh") == "1")
+                self._send(200, dict(bonus.scorecard(company, ym, reg, auto, state), currency=company_currency(company)))
+            elif path == "/api/bonus/year":
+                year = int(str(q.get("year") or date.today().year)[:4])
+                self._send(200, dict(bonus.year_view(company, year, reg), currency=company_currency(company)))
+            elif path == "/api/bonus/reviews":
+                self._send(200, reviews.info())
+            elif path == "/api/bonus/reviews/locations":
+                try:
+                    self._send(200, {"locations": reviews.gbp_locations()})
+                except Exception as exc:                            # noqa: BLE001
+                    self._send(200, {"locations": [], "error": str(exc)[:300]})
+            elif path == "/api/bonus/comments":
+                ym = self._bonus_month(q.get("month"))
+                a, b, _r = bonus.month_range(ym)
+                self._send(200, {"comments": reviews.recent(str(q.get("ref") or ""), a, b)})
+            elif path == "/api/bonus/config":
+                self._send(200, dict(bonus.config_view(company, reg), company=company, currency=company_currency(company)))
+            else:
+                self._send(404, {"error": "Not found."})
+        except ValueError as exc:
+            self._send(400, {"error": str(exc) or "Bad request."})
+
+    def _bonus_post(self, path, body, user, actor):
+        """Changes of Bonus management: plans, a unit's plan, values entered by hand, locks, super bonuses."""
+        if not auth.can(user, self.BONUS_SCREEN):
+            self._send(403, {"error": "Bonus management is open to the CEO and the Administrator only."})
+            return
+        if self.headers.get("X-Requested-With") != "RHG-Finance":
+            self._send(403, {"error": "This request must come from the Finance tower."})
+            return
+        company = body.get("company") or config.BC_COMPANY
+        reg = locintel.registry()
+        unit = next((u for u in bonus.units_of(company, reg) if u["ref"] == body.get("ref")), None)
+        needs_unit = path in ("/api/bonus/unit", "/api/bonus/value", "/api/bonus/lock", "/api/bonus/unlock", "/api/bonus/super")
+        if needs_unit and not unit:
+            self._send(400, {"error": "Choose a unit of the company."})
+            return
+        try:
+            if path == "/api/bonus/plan":
+                self._send(200, {"plan": bonus.save_template(body.get("name"), body.get("plan"), actor)})
+            elif path == "/api/bonus/plan/delete":
+                bonus.delete_template(str(body.get("name") or ""), actor)
+                self._send(200, {"ok": True})
+            elif path == "/api/bonus/unit":
+                patch = {k: body[k] for k in ("template", "eligible", "weights", "ranges", "targets", "note") if k in body}
+                self._send(200, {"override": bonus.save_override(company, unit, patch, actor)})
+            elif path == "/api/bonus/value":
+                ym = self._bonus_month(body.get("month"))
+                bonus.set_manual(company, unit["ref"], ym, str(body.get("kpi") or ""), body.get("value"), body.get("target"),
+                                 body.get("note"), actor)
+                self._send(200, {"ok": True})
+            elif path == "/api/bonus/lock":
+                ym = self._bonus_month(body.get("month"))
+                auto, state = bonus.collect(client, company, company_currency(company), ym, [unit])
+                if any(s == "reading" for s in state.values()) and not body.get("force"):
+                    self._send(409, {"error": "Some sources are still being read; lock again in a moment.", "sources": state})
+                    return
+                card = bonus.scorecard(company, ym, [unit], auto, state, save_history=True)
+                r = card["units"][0]
+                if r.get("locked"):
+                    self._send(400, {"error": "The month is already locked."})
+                    return
+                bonus.lock(company, unit["ref"], ym, r, actor)
+                self._send(200, {"ok": True})
+            elif path == "/api/bonus/unlock":
+                bonus.unlock(company, unit["ref"], self._bonus_month(body.get("month")), actor, str(body.get("reason") or ""))
+                self._send(200, {"ok": True})
+            elif path == "/api/bonus/super":
+                self._send(200, {"item": bonus.add_super(company, unit["ref"], str(body.get("period") or ""),
+                                                          body.get("amount") or 0, body.get("reason"), actor)})
+            elif path == "/api/bonus/reviews":
+                out = reviews.save(body, actor)
+                if (body.get("wolt") or {}).get("new_secret"):
+                    out["wolt_secret_once"] = reviews.wolt_secret()      # to give to Wolt; never shown again
+                self._send(200, out)
+            elif path == "/api/bonus/reviews/sync":
+                threading.Thread(target=reviews.run_once, daemon=True, name="reviews-now").start()
+                self._send(200, {"ok": True})
+            elif path == "/api/bonus/super/delete":
+                bonus.remove_super(str(body.get("id") or ""), actor)
+                self._send(200, {"ok": True})
+            else:
+                self._send(404, {"error": "Not found."})
+        except (ValueError, TypeError) as exc:
+            self._send(400, {"error": str(exc) or "Bad request."})
+
     def _stockcount(self, q, user, xlsx):
         """Inventory → Stock count analysis: the month's valuation of a location against its count."""
         company = q.get("company") or config.BC_COMPANY
@@ -3297,6 +3405,9 @@ class Handler(BaseHTTPRequestHandler):
                     except odoo.Error as exc:
                         out["error"] = str(exc)[:300]
                 self._send(200, out)
+            elif url.path.startswith("/api/bonus"):
+                # Sales → Bonus management: the CEO and the Administrator only (bonus.py)
+                self._bonus_get(url.path, q, user)
             elif url.path == "/api/people":
                 # People & Productivity (people.py): Odoo HR against Simphony's sales and BC's personnel cost
                 part = q.get("part") or "workforce"
@@ -4154,6 +4265,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         url = urlparse(self.path)
+        if url.path == "/hooks/wolt/reviews":
+            # Wolt's consumer reviews (reviews.py): no session, the body signed with HMAC-SHA256 of our secret
+            n = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(n) if 0 < n <= 200_000 else b""
+            if not reviews.wolt_verify(raw, self.headers.get("WOLT-SIGNATURE") or ""):
+                self._send(401, {"error": "Bad signature."})
+                return
+            try:
+                reviews.wolt_receive(raw)
+            except (ValueError, KeyError, TypeError):
+                pass
+            self._send(200, {"ok": True})
+            return
         body = self._body()
         if url.path == "/internal/unicorn/facts":
             # Unicorn (identity) asks for the figures of its morning brief; answered from a background read.
@@ -4251,6 +4375,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(403, {"error": f"Your role ({user['role']}) cannot change this."})
             return
         actor = user["username"]
+        if url.path.startswith("/api/bonus/"):
+            self._bonus_post(url.path, body, user, actor)
+            return
         try:
             if url.path == "/api/exceptions/email":
                 self._send(*send_exception_email(body, user))
@@ -4899,6 +5026,7 @@ def main():
     negrep.start()
     ssrep.start()
     srrep.start()
+    reviews.start()
     exreg.configure(mailer=lambda to, cc, subject, body, text: arap_notify.send_mail(
         to, cc, subject, body, text, source="Finance · exceptions register"))
     try:
