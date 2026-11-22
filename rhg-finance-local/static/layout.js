@@ -624,6 +624,12 @@ body.lay-edit main{padding-bottom:190px}
   function asked() {
     const v = decodeURIComponent((location.hash || "").slice(1));
     if (!v) return null;
+    if (v.includes("/")) {                 // #view/tab (the pulse home's links): that menu's tab
+      const [mv, tv] = v.split("/");
+      const x = S.cat.menus.find(y => y.view === mv && menuOk(y) && navBtn(y.view));
+      const t = x && x.tabs.find(y => y.tab === tv && keyOk(y.key, y.kind));
+      if (x) return [x, t || null];
+    }
     const m = S.cat.menus.find(x => x.view === v && menuOk(x) && navBtn(x.view));
     if (m) return [m, null];
     for (const x of S.cat.menus) {

@@ -58,7 +58,7 @@ table.nt-pref .nt-k{display:flex;align-items:center;gap:10px}
   <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
   <div class="towers" aria-label="Control towers" id="towers">
     <span class="lbl">Control towers</span>
-    <a href="/">Control center</a>
+    <a href="/control">Control center</a>
     <a href="/actions">Executive Action Center</a>
     <a href="/executive">Executive dashboard</a>
   </div>
@@ -175,7 +175,7 @@ $("logoutBtn").onclick = async () => {
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   const held = p => (me.permissions || []).some(x => x.startsWith(p));
   const t = $("towers");
-  if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  if (!held("platform.s.control")) { const cc = t.querySelector('a[href="/control"]'); if (cc) cc.remove(); }
   if (!held("platform.s.actions.")) { const ac = t.querySelector('a[href="/actions"]'); if (ac) ac.remove(); }
   if (!held("platform.s.executive.")) { const ex = t.querySelector('a[href="/executive"]'); if (ex) ex.remove(); }
   [["purchasing.s.", "/purchasing/", "Purchasing"], ["finance.s.", "/finance/", "Finance"], ["finance.s.inventory.", "/finance/#inventory", "Inventory"], ["finance.s.sales.", "/finance/#sales", "Sales"], ["finance.s.people.", "/finance/#people", "People &amp; Productivity"], ["finance.s.opsexec.", "/finance/#opsexec", "Operations &amp; Food Safety"]]

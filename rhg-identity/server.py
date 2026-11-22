@@ -283,8 +283,13 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         try:
             if url.path == "/":
-                # Signed in: the control center. Otherwise, or while a new password is
-                # still owed, the sign-in page.
+                # Signed in: the pulse home, every section as a tree (Geri, 22 Nov 2026). Otherwise, or while a new
+                # password is still owed, the sign-in page.
+                u = self._user()
+                page = "hub.html" if u and not u.get("must_change") else "login.html"
+                self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")
+                return
+            if url.path in ("/control", "/control.html"):
                 u = self._user()
                 page = "control.html" if u and not u.get("must_change") else "login.html"
                 self._send(200, (STATIC / page).read_bytes(), "text/html; charset=utf-8")

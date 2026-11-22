@@ -156,7 +156,7 @@ a.fh-c:hover{border-color:var(--accent)}
   <div class="brand"><div class="logo" role="img" aria-label="Revo Hospitality Group"></div><div><b>Revo</b><small>Hospitality Group</small></div></div>
   <div class="towers" aria-label="Control towers" id="towers">
     <span class="lbl">Control towers</span>
-    <a href="/">Control center</a>
+    <a href="/control">Control center</a>
     <a href="/actions">Executive Action Center</a>
     <a href="/executive" class="on" aria-current="page">Executive dashboard</a>
   </div>
@@ -1468,7 +1468,7 @@ $("logoutBtn").onclick = async () => {
   if (!can("finance.view")) $("tabLocations").style.display = "none";
   $("whoami").textContent = `${me.name || me.username} · ${me.role}`;
   const t = $("towers");
-  if (!holds("platform.s.control")) { const cc = t.querySelector('a[href="/"]'); if (cc) cc.remove(); }
+  if (!holds("platform.s.control")) { const cc = t.querySelector('a[href="/control"]'); if (cc) cc.remove(); }
   if (!holds("platform.s.actions.")) { const ac = t.querySelector('a[href="/actions"]'); if (ac) ac.remove(); }
   [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Sales"],["finance.s.people.","/finance/#people","People &amp; Productivity"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]]
     .filter(([p]) => holds(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));

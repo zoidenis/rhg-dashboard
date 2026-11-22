@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script src="/i18n.js"></script><!-- pulse in Albanian or English (identity) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>pulse · RHG</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&display=swap">
+<style>
+/* pulse home (Geri, 22 Nov 2026): every section of pulse as a constellation, a tree each; its branches are the
+   screens the person may open, the twigs their tabs. A click opens the section: its screens and tabs as links.
+   Built from the catalogue of screens (/api/screens) and the person's permissions: nothing else is read. */
+:root{--hb-bg:#0b0f14;--hb-bg2:#141019;--hb-ink:#f4efe6;--hb-sub:#a59f95;--hb-mute:#6f6a63;--hb-line:rgba(244,239,230,.10);
+  --hb-card:rgba(20,22,28,.78);--hb-gold:#d9a85b}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--hb-bg);color:var(--hb-ink)}
+body.hub{font-family:var(--rhg-font);background:
+  radial-gradient(1200px 800px at 50% 42%,rgba(217,168,91,.08),transparent 60%),
+  radial-gradient(900px 700px at 15% 90%,rgba(124,45,62,.18),transparent 60%),
+  radial-gradient(900px 700px at 90% 10%,rgba(46,92,110,.20),transparent 60%),
+  linear-gradient(180deg,var(--hb-bg),var(--hb-bg2));min-height:100vh;overflow-x:hidden}
+/* a table cloth's weave, barely there */
+body.hub::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(244,239,230,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(244,239,230,.025) 1px,transparent 1px);
+  background-size:44px 44px}
+a{color:inherit}
+.hb-top{position:relative;z-index:2;display:flex;align-items:center;gap:16px;padding:16px 24px;flex-wrap:wrap}
+.hb-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--hb-ink)}
+.hb-brand .logo{width:30px;height:30px;color:#fff}
+.hb-brand b{font-family:var(--rhg-font-display);font-size:13px;letter-spacing:.06em;text-transform:uppercase;line-height:1.1}
+.hb-brand small{display:block;font-size:10.5px;color:var(--hb-sub);letter-spacing:.08em;text-transform:uppercase}
+.hb-hello{flex:1;min-width:200px}
+.hb-hello h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:600;font-size:28px;letter-spacing:.01em;color:var(--hb-ink);margin:0;line-height:1.1}
+.hb-hello div{font-size:12.5px;color:var(--hb-sub);margin-top:2px}
+.hb-search{position:relative}
+.hb-search input{width:260px;max-width:62vw;border:1px solid var(--hb-line);background:rgba(255,255,255,.04);color:var(--hb-ink);border-radius:999px;padding:9px 14px 9px 34px;font:inherit;font-size:13px}
+.hb-search input::placeholder{color:var(--hb-mute)}
+.hb-search input:focus-visible{outline:2px solid var(--hb-gold);outline-offset:1px}
+.hb-search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--hb-sub)}
+.hb-found{position:absolute;right:0;top:calc(100% + 6px);width:min(420px,92vw);max-height:60vh;overflow:auto;background:#15181f;border:1px solid var(--hb-line);border-radius:14px;padding:6px;z-index:20;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.hb-found a{color:var(--hb-ink);display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:9px;text-decoration:none;font-size:13px}
+.hb-found a:hover,.hb-found a:focus-visible{background:rgba(217,168,91,.12);outline:none}
+.hb-found small{color:var(--hb-sub);font-size:11px;text-align:right}
+.hb-icon{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--hb-line);background:rgba(255,255,255,.04);text-decoration:none;position:relative}
+.hb-icon svg{width:17px;height:17px;stroke:var(--hb-ink);fill:none;stroke-width:1.8}
+.hb-icon .n{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:#c2563f;color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 4px}
+.hb-user{font-size:12px;color:var(--hb-sub);display:flex;align-items:center;gap:10px}
+.hb-user button{all:unset;cursor:pointer;color:var(--hb-ink);text-decoration:underline;text-underline-offset:3px}
+.hb-main{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;padding:0 16px 28px}
+.hb-stage{position:relative;width:min(980px,100%);aspect-ratio:1/0.86}
+#hbSky{width:100%;height:100%;display:block;overflow:visible}
+#hbSky .lbl{font-family:"Cormorant Garamond",Georgia,serif;font-weight:600;font-size:30px;letter-spacing:.22em;fill:var(--hb-ink);text-transform:uppercase;cursor:pointer}
+#hbSky .ring-t{font-size:12px;fill:var(--hb-sub);letter-spacing:.03em;opacity:.8}
+#hbSky .num{font-family:var(--rhg-font-display);font-size:15px;font-weight:700}
+#hbSky .tree{cursor:pointer;transition:opacity .25s}
+#hbSky.dim .tree:not(.hot){opacity:.28}
+#hbSky .tree:focus-visible{outline:none}
+#hbSky .tree:focus-visible .node-ring,#hbSky .tree.hot .node-ring{stroke-width:3.5}
+#hbSky .br{stroke:rgba(244,239,230,.55);stroke-width:1.1;fill:none}
+#hbSky .tw{stroke:rgba(244,239,230,.32);stroke-width:.8;fill:none}
+#hbSky .dot{fill:#f4efe6}
+#hbSky .tip{fill:#0b0f14;stroke:rgba(244,239,230,.75);stroke-width:1.1}
+#hbSky .core i{display:none}
+#hbSky .sp{animation:tw 4s ease-in-out infinite}
+@keyframes tw{0%,100%{opacity:.25}50%{opacity:.95}}
+#hbSky .orb{animation:orb 140s linear infinite;transform-origin:0 0}
+@keyframes orb{to{transform:rotate(360deg)}}
+#hbSky .pulse{animation:pl 3.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pl{0%{opacity:.55;transform:scale(1)}100%{opacity:0;transform:scale(2.1)}}
+@media (prefers-reduced-motion: reduce){#hbSky .sp,#hbSky .orb,#hbSky .pulse{animation:none}}
+.hb-hint{position:absolute;left:50%;bottom:2%;transform:translateX(-50%);font-size:12px;color:var(--hb-mute);letter-spacing:.14em;text-transform:uppercase}
+/* the section's card, as the image's REVIEWS box */
+.hb-panel{position:fixed;z-index:30;top:84px;right:20px;width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 104px);overflow:auto;
+  background:var(--hb-card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--hb-line);border-radius:18px;padding:18px 18px 16px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.hb-panel[hidden]{display:none}
+.hb-ph{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.hb-ph .dotc{width:11px;height:11px;border-radius:50%}
+.hb-ph h2{font-family:var(--rhg-font-display);font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--hb-ink);margin:0;flex:1}
+.hb-ph .cnt{font-size:12px;font-weight:700}
+.hb-ph button{all:unset;cursor:pointer;color:var(--hb-sub);font-size:13px;padding:4px 8px;border-radius:8px;border:1px solid var(--hb-line)}
+.hb-ph button:focus-visible{outline:2px solid var(--hb-gold)}
+.hb-desc{font-size:12.5px;color:var(--hb-sub);margin:0 0 12px;line-height:1.5}
+.hb-sub{border:1px solid var(--hb-line);border-radius:13px;padding:10px 12px;margin:0 0 8px;background:rgba(255,255,255,.025)}
+.hb-sub>a{color:var(--hb-ink);display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;font-weight:600;font-size:13.5px}
+.hb-sub>a:hover span:last-child,.hb-sub>a:focus-visible span:last-child{color:var(--hb-gold)}
+.hb-sub>a span:last-child{color:var(--hb-sub);font-size:12px;font-weight:500}
+.hb-sub small{display:block;color:var(--hb-mute);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 4px}
+.hb-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.hb-tabs a{font-size:12px;text-decoration:none;padding:5px 10px;border-radius:9px;border:1px solid var(--hb-line);background:rgba(255,255,255,.04);color:var(--hb-ink)}
+.hb-tabs a:hover,.hb-tabs a:focus-visible{border-color:var(--hb-gold);color:var(--hb-gold);outline:none}
+.hb-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;width:min(980px,100%);margin-top:4px}
+.hb-card{display:flex;align-items:center;gap:12px;border:1px solid var(--hb-line);background:var(--hb-card);border-radius:14px;padding:12px 14px;text-decoration:none}
+.hb-card .no{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.08);font-size:11px;font-weight:700;flex:none}
+.hb-card{color:var(--hb-ink)}.hb-card b{font-family:var(--rhg-font-display);font-size:15px;color:var(--hb-ink)}
+.hb-card span{font-size:12px;color:var(--hb-sub)}
+a.hb-card:hover,a.hb-card:focus-visible{border-color:var(--hb-gold);outline:none}
+.hb-empty{max-width:520px;text-align:center;color:var(--hb-sub);margin:80px auto}
+@media (max-width:700px){
+  .hb-top{padding:12px 14px;gap:10px}.hb-brand small{display:none}.hb-hello{order:4;flex:1 1 100%}.hb-hello h1{font-size:22px}
+  .hb-search input{width:100%;max-width:none}.hb-search{flex:1 1 100%;order:5}.hb-user span{display:none}.hb-top .hb-icon,.hb-user{margin-left:auto}
+  #hbSky .lbl{font-size:34px;letter-spacing:.14em}#hbSky .ring-t{display:none}
+  .hb-stage{aspect-ratio:1/1}
+  .hb-panel{top:auto;bottom:0;right:0;left:0;width:100%;max-height:78vh;border-radius:18px 18px 0 0}
+}
+</style>
+</head>
+<body class="hub">
+<div class="hb-top">
+  <a class="hb-brand" href="/" aria-label="pulse home"><span class="logo" aria-hidden="true"></span><span><b>Revo Hospitality</b><small>powered by <span class="pulse-mark">pulse</span></small></span></a>
+  <div class="hb-hello"><h1 id="hbHello">Welcome</h1><div id="hbDate"></div></div>
+  <div class="hb-search"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="hbQ" type="search" placeholder="Find a screen or a tab" aria-label="Find a screen or a tab" autocomplete="off"><div class="hb-found" id="hbFound" hidden></div></div>
+  <a class="hb-icon" href="/notifications" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="n" id="hbBell" hidden></span></a>
+  <a class="hb-icon" href="/settings" title="Settings" aria-label="Settings" id="hbGear" hidden><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
+  <div class="hb-user"><span id="hbWho"></span><button type="button" id="hbOut">Sign out</button></div>
+</div>
+<main class="hb-main">
+  <div class="hb-stage" id="hbStage"><svg id="hbSky" viewBox="-560 -500 1120 1000" role="group" aria-label="The sections of pulse"></svg></div>
+  <section class="hb-strip" id="hbStrip" aria-label="For you"></section>
+</main>
+<aside class="hb-panel" id="hbPanel" hidden aria-live="polite"></aside>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SVGNS = "http://www.w3.org/2000/svg";
+let me = null, CSRF = null, CAT = [], HELD = new Set(), TREES = [];
+async function get(u){ const r = await fetch(u, {credentials: "same-origin"}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }
+const can = p => !!me && (me.permissions || []).includes(p);
+const holds = pre => [...HELD].some(p => p === pre || p.startsWith(pre + "."));
+// the sections: each a tree; its screens come from the catalogue, cut to what the person holds
+const SECTIONS = [
+  {id: "exec", name: "Executive", color: "#d9a85b", desc: "The group at a glance: the control center, the executive dashboard with its audit, the action center and Unicorn, the analyst.",
+   pick: m => m.app === "platform" && ["control", "executive", "actions"].includes(m.view)},
+  {id: "sales", name: "Sales", color: "#e07a5f", desc: "Every restaurant's sales from Simphony: location intelligence, menu prices, menu engineering, food cost, channels and SevenRooms.",
+   pick: m => m.app === "finance" && m.view === "sales"},
+  {id: "purchasing", name: "Purchasing", color: "#7fb7a4", desc: "Requisitions and orders, prices and contracts, savings, suppliers and purchasers, and the controls on invoices.",
+   pick: m => m.app === "purchasing"},
+  {id: "inventory", name: "Inventory", color: "#9b8cd9", desc: "Stock by location, transfers in transit, counts and shrinkage, recipes, SKU planning and turnover.",
+   pick: m => m.app === "finance" && m.view === "inventory"},
+  {id: "finance", name: "Finance", color: "#6aa9d8", desc: "Statements, cash and bank, kartela, fiscal against BC, budget, fixed assets, month-end close and the reconciliations.",
+   pick: m => m.app === "finance" && !["sales", "inventory", "people", "opsexec"].includes(m.view)},
+  {id: "people", name: "People", color: "#c9a0dc", desc: "Workforce, labour productivity, scheduling and personnel cost by restaurant.",
+   pick: m => m.app === "finance" && m.view === "people"},
+  {id: "ops", name: "Operations", color: "#c8b273", desc: "Operations and food safety: checklists, temperatures, inspections and what the kitchens and floors report.",
+   pick: m => m.app === "finance" && m.view === "opsexec"},
+  {id: "knowledge", name: "Knowledge", color: "#b9b4ab", desc: "Contracts and SOPs, and the public tenders RHG could bid for.",
+   pick: m => m.app === "platform" && ["documents", "tenders"].includes(m.view)},
+];
+const BASE = {finance: "/finance/", purchasing: "/purchasing/"};
+function hrefOf(m, t){
+  if (m.app === "platform") {
+    if (m.view === "control") return "/control";
+    if (m.view === "executive") return "/executive" + (t ? "?tab=" + encodeURIComponent(t.tab) : "");
+    return "/" + m.view + (t ? "#" + encodeURIComponent(t.tab) : "");
+  }
+  return BASE[m.app] + "#" + encodeURIComponent(m.view) + (t ? "/" + encodeURIComponent(t.tab) : "");
+}
+function build(){
+  const menus = CAT.flatMap(a => a.menus.map(m => ({...m, app: a.app})));
+  TREES = SECTIONS.map(s => {
+    const items = menus.filter(s.pick).map(m => {
+      const tabs = (m.tabs || []).filter(t => !t.tab.includes(".") && HELD.has(t.key));
+      const ok = m.tabs && m.tabs.length ? tabs.length > 0 : HELD.has(m.key);
+      return ok ? {label: m.label, group: m.group, href: hrefOf(m, null), tabs: tabs.map(t => ({label: t.label, href: hrefOf(m, t)}))} : null;
+    }).filter(Boolean);
+    if (s.id === "exec" && can("unicorn.use")) items.push({label: "Unicorn", group: "Analyst", href: "/unicorn", tabs: []});
+    return {...s, items};
+  }).filter(s => s.items.length);
+}
+// a seeded random, so a tree keeps its shape from one visit to the next
+function rnd(seed){ let x = 0; for (const c of seed) x = (x * 31 + c.charCodeAt(0)) >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; }
+const el = (tag, attrs, parent) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const P = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+function draw(){
+  const svg = $("hbSky"); svg.innerHTML = "";
+  svg.setAttribute("viewBox", innerWidth < 700 ? "-660 -560 1320 1120" : "-560 -500 1120 1000");   // room for the names on a phone
+  const defs = el("defs", {}, svg), glow = el("filter", {id: "glow", x: "-50%", y: "-50%", width: "200%", height: "200%"}, defs);
+  el("feGaussianBlur", {stdDeviation: "6", result: "b"}, glow); const mg = el("feMerge", {}, glow); el("feMergeNode", {in: "b"}, mg); el("feMergeNode", {in: "SourceGraphic"}, mg);
+  // the plates: rings of a table setting
+  [455, 300, 128].forEach((r, i) => el("circle", {cx: 0, cy: 0, r, fill: "none", stroke: "rgba(244,239,230," + [0.06, 0.05, 0.07][i] + ")", "stroke-dasharray": i === 0 ? "2 7" : ""}, svg));
+  // the core: the group's light, warm specks drifting
+  const core = el("g", {class: "orb"}, svg), R = rnd("rhg"), warm = ["#d9a85b", "#e07a5f", "#f4efe6", "#7fb7a4", "#9b8cd9", "#c9a0dc"];
+  for (let i = 0; i < 260; i++) { const a = R() * Math.PI * 2, r = Math.sqrt(R()) * 108, [x, y] = P(r, a);
+    el("circle", {cx: x.toFixed(1), cy: y.toFixed(1), r: (0.6 + R() * 1.4).toFixed(2), fill: warm[Math.floor(R() * warm.length)], class: "sp", style: `animation-delay:${(R() * 4).toFixed(2)}s`}, core); }
+  const N = TREES.length, r0 = 182;
+  TREES.forEach((t, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / N, [nx, ny] = P(r0, a), g = el("g", {class: "tree", tabindex: "0", role: "button", "aria-label": `${t.name}: ${t.items.length} screens`, "data-i": i}, svg);
+    const rr = rnd(t.id);
+    // the branches: the section's screens; a section of one screen spreads its tabs instead. Each branch carries its
+    // tabs as twigs (a few small twigs where it has none), so every tree reads as one
+    const single = t.items.length === 1 && t.items[0].tabs.length > 1;
+    const brs = single ? t.items[0].tabs.map(x => ({n: 0})) : t.items.map(x => ({n: x.tabs.length}));
+    const n = brs.length, spread = Math.min(0.74, 0.16 + n * 0.055);
+    brs.forEach((b, k) => {
+      const off = n > 1 ? (k / (n - 1) - 0.5) * spread : 0, ca = a + off + (rr() - 0.5) * 0.06, cr = r0 + 58 + rr() * 40 + (k % 3) * 16, [cx, cy] = P(cr, ca);
+      el("path", {d: `M${nx.toFixed(1)},${ny.toFixed(1)} Q${P(r0 + 30, ca)[0].toFixed(1)},${P(r0 + 30, ca)[1].toFixed(1)} ${cx.toFixed(1)},${cy.toFixed(1)}`, class: "br"}, g);
+      const m = b.n || (2 + Math.floor(rr() * 3)), real = b.n > 0;
+      for (let j = 0; j < m; j++) {
+        const ta = ca + (m > 1 ? (j / (m - 1) - 0.5) * Math.min(0.42, 0.1 + m * 0.045) : 0) + (rr() - 0.5) * 0.05, tr = cr + 22 + rr() * (real ? 30 : 18), [tx, ty] = P(tr, ta);
+        el("line", {x1: cx.toFixed(1), y1: cy.toFixed(1), x2: tx.toFixed(1), y2: ty.toFixed(1), class: "tw"}, g);
+        el("circle", {cx: tx.toFixed(1), cy: ty.toFixed(1), r: (real ? 2 + rr() * 1.4 : 1.4 + rr()).toFixed(2), class: j % 3 === 2 ? "tip" : "dot"}, g);
+      }
+      el("circle", {cx: cx.toFixed(1), cy: cy.toFixed(1), r: 4.4, class: "dot"}, g);
+    });
+    // a few small dots on the branch near the node, in the section's colour
+    for (let k = 0; k < Math.min(8, n * 2); k++) { const [x, y] = P(r0 + 18 + rr() * 26, a + (rr() - 0.5) * spread * 0.7); el("circle", {cx: x.toFixed(1), cy: y.toFixed(1), r: 1.8, fill: t.color}, g); }
+    el("circle", {cx: nx, cy: ny, r: 26, fill: t.color, class: "pulse", opacity: 0.4}, g);
+    el("circle", {cx: nx, cy: ny, r: 24, fill: "#0b0f14", stroke: t.color, "stroke-width": 2.2, class: "node-ring", filter: "url(#glow)"}, g);
+    const num = el("text", {x: nx, y: ny + 5, "text-anchor": "middle", class: "num", fill: t.color}, g); num.textContent = String(i + 1).padStart(2, "0");
+    // the section's name past its branches, its screens' names faint under it
+    const [lx, ly] = P(398, a), anchor = Math.abs(Math.cos(a)) < 0.3 ? "middle" : Math.cos(a) > 0 ? "start" : "end";
+    const x0 = lx + (anchor === "start" ? -30 : anchor === "end" ? 30 : 0), y0 = ly + (Math.sin(a) < -0.3 ? -14 : Math.sin(a) > 0.3 ? 30 : 10);
+    const lb = el("text", {x: x0.toFixed(1), y: y0.toFixed(1), "text-anchor": anchor, class: "lbl"}, g); lb.textContent = t.name.toUpperCase();
+    const names = (single ? t.items[0].tabs : t.items).map(x => x.label), cap = names.slice(0, 3).join(" · ") + (names.length > 3 ? ` · +${names.length - 3}` : "");
+    const sub = el("text", {x: x0.toFixed(1), y: (y0 + 22).toFixed(1), "text-anchor": anchor, class: "ring-t"}, g); sub.textContent = cap;
+    g.addEventListener("mouseenter", () => { svg.classList.add("dim"); g.classList.add("hot"); });
+    g.addEventListener("mouseleave", () => { if (!$("hbPanel").dataset.i || +$("hbPanel").dataset.i !== i) { g.classList.remove("hot"); if (!svg.querySelector(".tree.hot")) svg.classList.remove("dim"); } });
+    g.addEventListener("click", () => open(i));
+    g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(i); } });
+  });
+  const cl = el("text", {x: 0, y: 6, "text-anchor": "middle", style: "font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;letter-spacing:.3em;fill:rgba(244,239,230,.85)"}, svg); cl.textContent = "RHG";
+}
+function open(i){
+  const t = TREES[i], p = $("hbPanel"), svg = $("hbSky"); if (!t) return;
+  svg.querySelectorAll(".tree").forEach(g => g.classList.toggle("hot", +g.dataset.i === i)); svg.classList.add("dim");
+  const tabs = t.items.reduce((s, x) => s + x.tabs.length, 0);
+  p.dataset.i = i; p.hidden = false;
+  p.innerHTML = `<div class="hb-ph"><span class="dotc" style="background:${t.color}"></span><h2>${esc(t.name)}</h2><span class="cnt" style="color:${t.color}">${t.items.length} screen${t.items.length === 1 ? "" : "s"}${tabs ? ` · ${tabs} tabs` : ""}</span><button type="button" id="hbClose" aria-label="Close">✕</button></div>
+    <p class="hb-desc">${esc(t.desc)}</p>`
+    + t.items.map(it => `<div class="hb-sub"><small>${esc(it.group || "")}</small><a href="${esc(it.href)}"><span>${esc(it.label)}</span><span>Open ›</span></a>`
+      + (it.tabs.length ? `<div class="hb-tabs">${it.tabs.map(x => `<a href="${esc(x.href)}">${esc(x.label)}</a>`).join("")}</div>` : "") + `</div>`).join("");
+  $("hbClose").onclick = close; $("hbClose").focus({preventScroll: true});
+}
+function close(){
+  const p = $("hbPanel"); p.hidden = true; delete p.dataset.i;
+  $("hbSky").classList.remove("dim"); $("hbSky").querySelectorAll(".tree.hot").forEach(g => g.classList.remove("hot"));
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("hbFound").hidden) { $("hbFound").hidden = true; return; } close(); } });
+document.addEventListener("click", e => { if (!$("hbPanel").hidden && !e.target.closest("#hbPanel") && !e.target.closest(".tree")) close();
+  if (!e.target.closest(".hb-search")) $("hbFound").hidden = true; });
+// find a screen or a tab
+$("hbQ").oninput = () => {
+  const q = $("hbQ").value.trim().toLowerCase(), f = $("hbFound");
+  if (q.length < 2) { f.hidden = true; return; }
+  const hits = [];
+  TREES.forEach(t => t.items.forEach(it => {
+    if (it.label.toLowerCase().includes(q)) hits.push([it.label, t.name, it.href]);
+    it.tabs.forEach(x => { if (x.label.toLowerCase().includes(q)) hits.push([x.label, `${t.name} › ${it.label}`, x.href]); });
+  }));
+  f.innerHTML = hits.slice(0, 30).map(([l, w, h]) => `<a href="${esc(h)}"><span>${esc(l)}</span><small>${esc(w)}</small></a>`).join("") || `<div style="padding:10px;color:var(--hb-sub);font-size:13px">Nothing found.</div>`;
+  f.hidden = false;
+};
+$("hbQ").onkeydown = e => { if (e.key === "Enter") { const a = $("hbFound").querySelector("a"); if (a) location.href = a.href; } };
+$("hbOut").onclick = async () => {
+  try { await fetch("/" + "api/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": CSRF || ""}, body: "{}"}); } catch (e) {}
+  location.href = "/login?signedout=1";
+};
+function strip(){
+  const screens = TREES.reduce((s, t) => s + t.items.length, 0);
+  const cards = [`<div class="hb-card"><span class="no">01</span><div><b>${TREES.length} sections</b><br><span>${screens} screens open to you</span></div></div>`,
+    `<a class="hb-card" href="/notifications"><span class="no">02</span><div><b id="hbWait">Waits for you</b><br><span id="hbWaitS">your notifications and tasks</span></div></a>`];
+  if (can("unicorn.use")) cards.push(`<a class="hb-card" href="/unicorn"><span class="no">03</span><div><b>Unicorn</b><br><span id="hbUni">the morning brief</span></div></a>`);
+  else if (holds("platform.s.actions")) cards.push(`<a class="hb-card" href="/actions"><span class="no">03</span><div><b>Executive Action Center</b><br><span>the items with their owner and deadline</span></div></a>`);
+  $("hbStrip").innerHTML = cards.join("");
+  fetch("/" + "api/notifications/count", {credentials: "same-origin"}).then(r => r.json()).then(j => { const n = j.unread ?? j.count ?? 0;
+    $("hbWait").textContent = n ? `${n} wait for you` : "Nothing waits for you"; if (n) { $("hbBell").hidden = false; $("hbBell").textContent = n > 99 ? "99+" : n; } }).catch(() => {});
+  if (can("unicorn.use")) fetch("/" + "api/unicorn/status", {credentials: "same-origin"}).then(r => r.json()).then(u => { if (u.unread) $("hbUni").textContent = `${u.unread} unread brief(s)`; }).catch(() => {});
+}
+(async () => {
+  let s;
+  try { s = await get("/" + "api/session"); } catch (e) { location.href = "/login"; return; }
+  if (!s.user || s.user.must_change) { location.href = "/login"; return; }
+  me = s.user; CSRF = s.user.csrf;
+  const h = new Date().getHours();
+  $("hbHello").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${String(me.name || me.username).split(" ")[0]}`;
+  $("hbDate").textContent = new Date().toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long", year: "numeric"});
+  $("hbWho").textContent = `${me.name || me.username} · ${me.role}`;
+  $("hbGear").hidden = !(me.permissions || []).some(p => /settings|admin\.|reports\.manage/.test(p));
+  try { const j = await get("/" + "api/screens"); CAT = j.catalogue || []; HELD = new Set(j.held || []); } catch (e) { CAT = []; }
+  build();
+  if (!TREES.length) { $("hbStage").outerHTML = `<p class="hb-empty">Your role does not hold any screen of pulse yet. Ask the administrator (Administration → Roles &amp; permissions).</p>`; return; }
+  draw(); strip();
+  let rw = innerWidth < 700; addEventListener("resize", () => { if ((innerWidth < 700) !== rw) { rw = innerWidth < 700; const i = $("hbPanel").dataset.i; draw(); if (i != null) open(+i); } });
+})();
+</script>
+</body>
+</html>

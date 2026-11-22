@@ -75,10 +75,19 @@
     const after = t.querySelector('a[href="/documents"], a[href="/actions"], a[href="/executive"]');
     if (after && after.nextSibling) t.insertBefore(a, after.nextSibling); else t.appendChild(a);
   }
+  // the pulse home (every section as a tree) at the top of every side menu
+  function homeLink() {
+    const t = document.querySelector("aside .towers, aside #towers");
+    if (!t || t.querySelector('a[href="/"]')) return;
+    const a = document.createElement("a");
+    a.href = "/"; a.textContent = "Pulse home";
+    const lbl = t.querySelector(".lbl");
+    if (lbl && lbl.nextSibling) t.insertBefore(a, lbl.nextSibling); else t.prepend(a);
+  }
   async function start() {
     let u = null, s = {};
     try { const r = await fetch("/" + "api/session", {credentials: "same-origin"}); s = await r.json(); u = s.user; } catch (e) { return; }
-    if (u && !u.report) { docsLink(s); tendersLink(s); }
+    if (u && !u.report) { homeLink(); docsLink(s); tendersLink(s); }
     if (!u || u.report || u.must_change || !PERMS.some(p => (u.permissions || []).includes(p))) return;
     if (location.pathname.indexOf("/settings") === 0) return;
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
