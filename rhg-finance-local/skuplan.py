@@ -19,10 +19,10 @@ Recommendation (statistical):
   * delivery cycle R = the days between deliveries seen in the window (Settings default when none were seen);
   * safety stock = z × s × √L for the service level (Settings, default 95% → z 1.645);
   * reorder point = d × L + safety stock;
-  * restaurants and other locations supplied by transfer: Reordering Policy "Maximum Qty.",
-    Maximum Inventory = reorder point + d × R, Replenishment "Transfer" from the location that ships it;
-  * distribution locations that buy: "Fixed Reorder Qty.", Reorder Quantity = the larger of d × R and the usual
-    receipt seen (the supplier's pack), Replenishment "Purchase";
+  * every location: Reordering Policy "Maximum Qty." (Geri, 22 Nov 2026: as for KR4113E, at every location),
+    Maximum Inventory = reorder point + d × R; restaurants supplied by transfer: Replenishment "Transfer" from the
+    location that ships it; distribution locations that buy: Replenishment "Purchase", and the maximum leaves room
+    for at least the usual receipt seen (the supplier's pack) above the reorder point;
   * items made at the location (output): Replenishment "Assembly", "Maximum Qty.";
   * fresh families (Settings → typology, fresh families): the maximum never covers more than the fresh limit.
 Statuses: missing card (the item moves, no SKU at the location), empty card, incomplete card (a policy without
@@ -297,14 +297,11 @@ def build(client, company, progress, force=False):
         rop = d * lead + ss
         # fresh families: never more than the fresh limit in days of use above the reorder point
         mx = rop + d * (min(cycle, P["fresh_max_days"]) if fresh else cycle)
-        rq = 0.0
-        if repl == "Purchase" and loc.upper() in dist:
-            policy = "Fixed Reorder Qty."
-            usual = median(rec.values()) if rec else 0
-            rq = max(d * cycle, usual)
-            mx = 0.0
-        else:
-            policy = "Maximum Qty."
+        # one policy everywhere: Maximum Qty. (Geri, 22 Nov 2026); a location that buys keeps room for the usual
+        # receipt (the supplier's pack) above the reorder point
+        rq, policy = 0.0, "Maximum Qty."
+        if repl == "Purchase" and loc.upper() in dist and rec and not fresh:
+            mx = max(mx, rop + median(rec.values()))
         R = {"policy": policy, "rop": _round(rop, uom), "ss": _round(ss, uom), "max": _round(mx, uom),
              "rq": _round(rq, uom), "repl": repl, "from": src if repl == "Transfer" else "",
              "lead": f"{int(lead) if lead == int(lead) else lead}D"}
@@ -320,7 +317,7 @@ def build(client, company, progress, force=False):
         elif (c["policy"] == "Fixed Reorder Qty." and (not c["rq"] or not c["rop"])) or \
                 (c["policy"] == "Maximum Qty." and not c["max"]) or (not c["policy"]):
             status = "incomplete"
-        elif _far(c["rop"], R["rop"], P["tolerance"]) or \
+        elif c["policy"] != R["policy"] or _far(c["rop"], R["rop"], P["tolerance"]) or \
                 (R["max"] and c["policy"] == "Maximum Qty." and _far(c["max"], R["max"], P["tolerance"])) or \
                 (R["rq"] and c["policy"] == "Fixed Reorder Qty." and _far(c["rq"], R["rq"], P["tolerance"])):
             status = "off"
@@ -505,10 +502,10 @@ DEFINITIONS = {
               "safety stock; maximum = reorder point + d × delivery cycle (the days between deliveries seen in the "
               "window); for fresh families the maximum holds at most the fresh limit in days of use above the reorder "
               "point, and their lead time is the default (bought locally).",
-    "policy": "Policy: locations supplied by transfer (restaurants) and items made at the location get 'Maximum Qty.' "
-              "(top up to the maximum when stock falls to the reorder point), with the location that shipped them as "
-              "Transfer-from; distribution locations that buy get 'Fixed Reorder Qty.' with the reorder quantity = the "
-              "larger of d × cycle and the usual receipt (the supplier's pack).",
+    "policy": "Policy: every location gets 'Maximum Qty.' (top up to the maximum when stock falls to the reorder point). "
+              "Restaurants supplied by transfer take the location that shipped them as Transfer-from; distribution "
+              "locations that buy get Replenishment 'Purchase', and their maximum leaves room for at least the usual "
+              "receipt (the supplier's pack) above the reorder point. A card with another policy shows as off the use.",
     "status": "Status: No SKU card = the item is used at the location and has no card; Empty card = a card without a "
               "policy or quantities; Incomplete = a policy without the quantity it needs; Off the use = reorder point, "
               "maximum or reorder quantity away from the recommendation by more than the tolerance in Settings; Set but "
