@@ -373,6 +373,7 @@ td.num,th.num{text-align:right}
 .pl-sq .al span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-sq .al.crit{background:var(--up-bg)} .pl-sq .al.crit i{background:var(--up)}
 .pl-sq .al.warn{background:var(--warn-bg)} .pl-sq .al.warn i{background:var(--warn)}
+.prc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 12px} .prc-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--bg)} .prc-bar span{display:block;height:100%}
 .pl-sq .al.info i{background:var(--sub)}
 .td-host.td-on>:not(.ov-tabs):not(.td-view){display:none!important}
 .td-view{display:none}.td-host.td-on>.td-view{display:block}
@@ -973,15 +974,31 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
     </div>
     <div id="lvPoreco" style="display:none">
       <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Orders against the system's recommendation</h2>
-        <p class="hint" id="prcNote">Every purchase received in the period and every order still to receive, against the quantity the planning parameters called for: up to the Maximum Inventory of the item's SKU card in Business Central, less the stock on hand (and what is already on order). What was ordered above it, beyond the tolerance, is stock nobody asked for: the money tied up in it, what it costs to carry, and for fresh goods what is at risk of waste.</p></div>
+        <p class="hint" id="prcNote"><span>Every purchase received in the period and every order still to receive, against the quantity the planning parameters called for: up to the Maximum Inventory of the item's SKU card in Business Central, less the stock on hand (and what is already on order).</span> <span>What was ordered above it, beyond the tolerance, is stock nobody asked for: the money tied up in it, what it costs to carry, and for fresh goods what is at risk of waste.</span> <span>Click any location, figure, bar or line for the detail.</span></p></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini exp dark" id="prcXlsx">Export ▾</button><button class="mini" id="prcRead">Read again</button></div></div>
         <div class="kpis five" id="prcKpis"></div><p class="meta" id="prcStatus" style="margin:6px 0 0"></p></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Location intelligence</h2><p class="hint" id="prcLiNote">Each location's purchases against the recommendation. Click a location for its drill-down: the categories and items bought over, again and again, the vendors, the weeks, the orders and what to do.</p></div>
+        <label class="meta" style="display:flex;gap:6px;align-items:center">Sort<select id="prcSort"><option value="excess">Extra stock</option><option value="share">% of purchases over</option><option value="lines">Lines over</option><option value="repeat">Items bought over again</option><option value="name">Name</option></select></label></div>
+        <div id="prcGrid"></div></div>
+      <div class="grid">
+        <div class="card"><h2>Where the extra stock is</h2><p class="hint">By location: received over the recommendation, and on open orders still to receive. Click a location for its drill-down.</p><div id="prcLocBars"></div>
+          <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="prcLoc"></table></div></details></div>
+        <div class="card"><h2>What is bought over</h2><p class="hint">By item category, every location: the extra stock and its share of what the category bought. Click a category for its lines.</p><div id="prcCatBars"></div></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>By who ordered</h2><p class="hint">The purchaser or assigned user of the open orders; a received purchase shows its location (its stock manager). Click a row for its lines.</p><div id="prcWhoBars"></div>
+          <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="prcWho"></table></div></details></div>
+        <div class="card"><h2>By vendor</h2><p class="hint">Where the extra stock was bought; a purchase received on a receipt shows no vendor. Click a row for its lines.</p><div id="prcVenBars"></div>
+          <details class="pz-fold"><summary>Table</summary><div class="scroll"><table id="prcVen"></table></div></details></div>
+      </div>
       <div class="card" style="margin-bottom:16px"><h2>Decisions</h2><p class="hint">What the figures call for, with who owns it, and the practice that keeps it from coming back.</p><div id="prcActs"></div></div>
-      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>By location</h2><p class="hint">Purchases and the part over the recommendation, the stock manager's view. Click a location for its lines.</p></div></div><div class="scroll"><table id="prcLoc"></table></div></div>
-      <div class="grid"><div class="card"><h2>By who ordered</h2><p class="hint">The purchaser or assigned user of the open orders; a received purchase shows its location.</p><div class="scroll"><table id="prcWho"></table></div></div>
-        <div class="card"><h2>By vendor</h2><p class="hint">Where the extra stock was bought.</p><div class="scroll"><table id="prcVen"></table></div></div></div>
-      <div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Order lines over the recommendation</h2><p class="hint">Largest extra value first. Basis: the SKU card in BC, or Pulse's estimate from the location's delivery rhythm where the card has no maximum.</p></div>
-        <input class="search" id="prcQ" placeholder="Search item, location, vendor or document"></div><div class="scroll" style="max-height:560px"><table id="prcLines"></table></div></div>
+      <div class="card"><div class="card-head"><div><h2>Order lines over the recommendation</h2><p class="hint" id="prcLinesNote">Largest extra value first. Basis: the SKU card in BC, or Pulse's estimate from the location's delivery rhythm where the card has no maximum.</p></div></div>
+        <div class="filters" style="margin:0 0 10px">
+          <label>Search<input id="prcQ" placeholder="item, document, vendor"></label>
+          <label>Location<select id="prcLocF"><option value="">All</option></select></label>
+          <label>Kind<select id="prcKindF"><option value="">All</option><option value="received">Received</option><option value="open">Open orders</option></select></label>
+          <label>Show<select id="prcShowF"><option value="">All</option><option value="repeat">Items bought over again</option><option value="fresh">Fresh goods</option><option value="early">Ordered early</option><option value="estimate">No maximum on the SKU card</option></select></label></div>
+        <div class="scroll" style="max-height:560px"><table id="prcLines"></table></div></div>
     </div>
   </section>
 
@@ -2277,39 +2294,184 @@ async function prcLoad(refresh){
   }catch(e){ $("prcStatus").textContent = "Could not read: " + e.message; }
 }
 const prcCur = () => (prcData && prcData.currency) || CUR;
+// Location intelligence (Geri, 22 Nov 2026): every location as a square, its drill-down in a pop-up: where the stock
+// managers buy more than the recommendation, in what, from whom, how often and when
+var prcSort = "excess";
+const prcLocOf = code => ((prcData || {}).locations || []).find(x => x.key === code);
+const prcShare = v => v == null ? "–" : fmt(v, 1) + "%";
+const prcNm = code => plName(code) || code;
+const PRC_OVER = "var(--ch-1)", PRC_OPEN = "var(--ch-2)", PRC_IN = "var(--ch-4)";
+function prcFlag(x){
+  const s = x.over_share || 0, n = (x.detail || {}).repeat_n || 0;
+  if (!x.excess_value) return ["good", "Nothing over the recommendation"];
+  if (s >= 15) return ["crit", `${fmt(s, 1)}% of its purchases over`];
+  if (n) return ["warn", `${fmt(n)} item(s) bought over again and again`];
+  return [s >= 5 ? "warn" : "info", `${fmt(s, 1)}% of its purchases over`];
+}
 function prcRender(){
   const d = prcData; if (!d || d.pending) return;
   const k = d.kpis || {}, C2 = prcCur(), P = d.params || {};
-  const tile = (l, v, s2, cls) => `<div class="card kpi"><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s2}</div></div>`;
-  $("prcKpis").innerHTML = tile("Lines over the recommendation", `${fmt(k.over_lines)} <small>/ ${fmt(k.lines)}</small>`, `more than ${fmt(P.tolerance_pct)}% above it`)
-    + tile("Extra stock bought", fmt(k.excess_value), `${C2} · ${k.excess_share == null ? "–" : fmt(k.excess_share, 1) + "%"} of ${fmt(k.value)} purchased`, k.excess_value ? "bad" : "")
+  const tile = (l, v, s2, cls, open) => `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-pulse="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s2}</div></div>`;
+  $("prcKpis").innerHTML = tile("Lines over the recommendation", `${fmt(k.over_lines)} <small>/ ${fmt(k.lines)}</small>`, `more than ${fmt(P.tolerance_pct)}% above it`, "", k.over_lines ? "prclist|" : "")
+    + tile("Extra stock bought", fmt(k.excess_value), `${C2} · ${prcShare(k.excess_share)} of ${fmt(k.value)} purchased`, k.excess_value ? "up" : "", k.over_lines ? "prclist|" : "")
     + tile("Cost of carrying it", fmt(k.carry), `${C2} · at ${fmt(P.carry_pct)}% a year for the days of use it covers`)
-    + tile("Fresh at risk of waste", fmt(k.waste_risk), `${C2} · fresh goods beyond ${fmt(P.fresh_days)} days of use`, k.waste_risk ? "bad" : "")
-    + tile("Ordered early", fmt(k.early), "lines ordered while the stock was above the reorder point");
+    + tile("Fresh at risk of waste", fmt(k.waste_risk), `${C2} · fresh goods beyond ${fmt(P.fresh_days)} days of use`, k.waste_risk ? "up" : "", k.waste_risk ? "prclist|show=fresh" : "")
+    + tile("Ordered early", fmt(k.early), "lines ordered while the stock was above the reorder point", "", k.early ? "prclist|show=early" : "");
   $("prcStatus").textContent = `${d.period.from} → ${d.period.to} · read ${d.read_at} · basis: ${fmt(k.with_card)} line(s) on the SKU card in BC, ${fmt(k.estimated)} on Pulse's estimate, ${fmt(k.no_basis)} without one (no maximum and no use) · open orders still to receive: ${fmt(k.open_excess)} ${C2} over the recommendation`;
   $("prcActs").innerHTML = (d.actions || []).map(a => `<div class="gap"><b><span class="rhg-pill ${a.owner === "CFO" ? "warning" : "info"}">${esc(a.owner)}</span></b><span>${esc(a.text)}</span></div>`).join("") || `<p class="hint">Nothing calls for a decision.</p>`;
+  const locs = (d.locations || []).filter(x => x.key);
+  prcSquares();
+  $("prcLocBars").innerHTML = Pulse.bars(locs.filter(x => x.excess_value).slice(0, 15).map(x => ({key: x.key, label: prcNm(x.key),
+    segs: [[(x.detail || {}).received_excess || 0, PRC_OVER, "received over"], [(x.detail || {}).open_excess || 0, PRC_OPEN, "on open orders"]],
+    text: `<b>${plM(x.excess_value)}</b> <span class="meta">${prcShare(x.over_share)}</span>`, open: `prcloc|${x.key}`})),
+    [[PRC_OVER, "received over the recommendation"], [PRC_OPEN, "over on open orders"]], {none: "No location bought over the recommendation."});
+  $("prcCatBars").innerHTML = Pulse.bars((d.categories || []).filter(c => c.excess_value).slice(0, 12).map(c => ({key: c.key,
+    segs: [[c.excess_value, PRC_OVER, "over"]], text: `<b>${plM(c.excess_value)}</b> <span class="meta">${prcShare(c.over_share)} of ${plM(c.value)}</span>`,
+    open: "prclist|" + new URLSearchParams({cat: c.key})})), null, {none: "No category bought over the recommendation."});
+  const gbars = (rows, key) => Pulse.bars(rows.filter(x => x.excess_value).slice(0, 12).map(x => ({key: x.key, segs: [[x.excess_value, PRC_OVER, "over"]],
+    text: `<b>${plM(x.excess_value)}</b> <span class="meta">${fmt(x.over_lines)} lines · ${prcShare(x.over_share)}</span>`, open: "prclist|" + new URLSearchParams({[key]: x.key})})), null, {none: "None over the recommendation."});
+  $("prcWhoBars").innerHTML = gbars(d.who || [], "who"); $("prcVenBars").innerHTML = gbars(d.vendors || [], "ven");
   const grp = (id, rows, label, open) => $(id).innerHTML = `<tr><th>${esc(label)}</th><th class="num">Lines</th><th class="num">Purchases</th><th class="num">Over</th><th class="num">Extra stock</th><th class="num">% of purchases</th><th class="num">Carrying</th><th class="num">Waste risk</th><th>Most</th></tr>` +
-    (rows.map(x => `<tr${open ? ` class="click" data-pulse="${open}|${esc(x.key)}" tabindex="0"` : ""}><td class="name">${esc(x.key)}</td><td class="num">${fmt(x.lines)}</td><td class="num">${fmt(x.value)}</td><td class="num">${fmt(x.over_lines)}</td>
-      <td class="num ${x.excess_value ? "bad" : ""}"><b>${fmt(x.excess_value)}</b></td><td class="num">${x.over_share == null ? "–" : fmt(x.over_share, 1) + "%"}</td><td class="num">${fmt(x.carry)}</td><td class="num">${fmt(x.waste_risk)}</td><td class="meta">${esc((x.top || []).join(" · "))}</td></tr>`).join("")
+    (rows.map(x => `<tr class="click" data-pulse="${esc(open(x))}" tabindex="0"><td class="name">${esc(x.key)}</td><td class="num">${fmt(x.lines)}</td><td class="num">${fmt(x.value)}</td><td class="num">${fmt(x.over_lines)}</td>
+      <td class="num ${x.excess_value ? "up" : ""}"><b>${fmt(x.excess_value)}</b></td><td class="num">${prcShare(x.over_share)}</td><td class="num">${fmt(x.carry)}</td><td class="num">${fmt(x.waste_risk)}</td><td class="meta">${esc((x.top || []).join(" · "))}</td></tr>`).join("")
      || `<tr><td colspan="9" class="empty">None.</td></tr>`);
-  grp("prcLoc", d.locations || [], "Location", "prcloc"); grp("prcWho", d.who || [], "Who", ""); grp("prcVen", d.vendors || [], "Vendor", "");
+  grp("prcLoc", locs, "Location", x => `prcloc|${x.key}`); grp("prcWho", d.who || [], "Who", x => "prclist|" + new URLSearchParams({who: x.key}));
+  grp("prcVen", d.vendors || [], "Vendor", x => "prclist|" + new URLSearchParams({ven: x.key}));
+  const keep = $("prcLocF").value;
+  $("prcLocF").innerHTML = `<option value="">All</option>` + locs.map(x => `<option value="${esc(x.key)}" data-no-i18n>${esc(prcNm(x.key))}</option>`).join("");
+  $("prcLocF").value = locs.some(x => x.key === keep) ? keep : "";
   prcLines();
 }
-const prcRow = x => `<tr><td>${esc(x.date)}<div class="meta">${x.kind === "open" ? "open order" : "received"}</div></td><td class="name">${esc(x.desc || x.item)}<div class="meta">${esc(x.item)}${x.fresh ? " · fresh" : ""}${x.early ? " · ordered early" : ""}</div></td>
+function prcSquares(){
+  const d = prcData; if (!d || d.pending) return;
+  if (!plNames && !prcSquares.asked) { prcSquares.asked = true; plLoadNames().then(() => prcData && !prcData.pending && prcSquares()); }
+  const S = {excess: (a, b) => b.excess_value - a.excess_value, share: (a, b) => (b.over_share || 0) - (a.over_share || 0) || b.excess_value - a.excess_value,
+    lines: (a, b) => b.over_lines - a.over_lines, repeat: (a, b) => ((b.detail || {}).repeat_n || 0) - ((a.detail || {}).repeat_n || 0) || b.excess_value - a.excess_value,
+    name: (a, b) => prcNm(a.key).localeCompare(prcNm(b.key))};
+  const rows = (d.locations || []).filter(x => x.key).sort(S[prcSort] || S.excess);
+  const stat = (l, v, cls) => `<div><span>${esc(l)}</span><b class="${cls || ""}">${v}</b></div>`;
+  $("prcGrid").innerHTML = rows.length ? `<div class="pl-grid">` + rows.map(x => {
+    const D = x.detail || {}, f = prcFlag(x), name = plName(x.key), rec = D.received_excess || 0, op = D.open_excess || 0, rest = Math.max(0, x.value - rec - op);
+    const bar = x.value > 0 ? `<div class="prc-bar" aria-hidden="true">${[[rec, PRC_OVER], [op, PRC_OPEN], [rest, PRC_IN]].map(([v, c]) => v > 0 ? `<span style="width:${(v / x.value * 100).toFixed(2)}%;background:${c}"></span>` : "").join("")}</div>` : "";
+    return `<div class="pl-sq" role="button" tabindex="0" data-pulse="prcloc|${esc(x.key)}" aria-label="${esc(x.key)}: orders against the recommendation">
+      <div class="hd"><div class="ic">${plGlyph(x.key)}</div><div class="nm"><b data-no-i18n>${esc(name || x.key)}</b><span data-no-i18n>${esc(name ? x.key : "")}</span></div></div>
+      <div class="big"><span class="v ${x.excess_value ? "up" : ""}">${plM(x.excess_value)}</span><span class="cmp">extra stock · ${prcShare(x.over_share)} of ${plM(x.value)}</span></div>${bar}
+      <div class="st">${stat("Lines over", `${fmt(x.over_lines)} / ${fmt(x.lines)}`)}${stat("Bought over again", D.repeat_n ? fmt(D.repeat_n) : "–", D.repeat_n ? "up" : "")}
+        ${stat("Carrying", plM(x.carry))}${stat("Fresh at risk", x.waste_risk ? plM(x.waste_risk) : "–", x.waste_risk ? "up" : "")}</div>
+      <div class="al ${f[0]}"><i></i><span>${esc(f[1])}</span></div></div>`; }).join("") + `</div>`
+    + `<div class="pz-lg" style="margin-top:10px"><span><span class="pz-sw" style="background:${PRC_OVER}"></span>received over</span><span><span class="pz-sw" style="background:${PRC_OPEN}"></span>over on open orders</span><span><span class="pz-sw" style="background:${PRC_IN}"></span>within the recommendation</span></div>`
+    : `<p class="hint">No purchase in this period.</p>`;
+}
+$("prcSort").onchange = () => { prcSort = $("prcSort").value; prcSquares(); };
+// the lines over, by a filter: loc, cat, who, ven, kind (received | open), show (repeat | fresh | early | estimate), q
+function prcFilter(f){
+  const d = prcData || {}, q = (f.q || "").toLowerCase();
+  const rep = new Set((d.locations || []).flatMap(L => ((L.detail || {}).repeat || []).filter(r => r.times_over >= 2).map(r => L.key + "|" + r.item)));
+  return (d.lines || []).filter(x => (!f.loc || x.location === f.loc) && (!f.cat || (x.category || "–") === f.cat) && (!f.who || (x.who || "–") === f.who)
+    && (!f.ven || (x.vendor || "–") === f.ven) && (!f.kind || (f.kind === "open" ? x.kind === "open" : x.kind !== "open"))
+    && (!f.show || (f.show === "fresh" ? x.fresh : f.show === "early" ? x.early : f.show === "estimate" ? x.basis !== "SKU card in BC" : rep.has(x.location + "|" + x.item)))
+    && (!q || [x.item, x.desc, x.location, x.vendor, x.doc, x.who].join(" ").toLowerCase().includes(q)));
+}
+const prcRow = x => `<tr class="click" data-pulse="prcitem|${esc(x.location)}|${esc(x.item)}" tabindex="0"><td>${esc(x.date)}<div class="meta">${x.kind === "open" ? "open order" : "received"}</div></td><td class="name">${esc(x.desc || x.item)}<div class="meta">${esc(x.item)}${x.fresh ? " · fresh" : ""}${x.early ? " · ordered early" : ""}</div></td>
   <td>${esc(x.location)}</td><td>${esc(x.doc)}<div class="meta">${esc(x.vendor || "")}${x.who && x.who !== x.location ? " · " + esc(x.who) : ""}</div></td>
   <td class="num">${fmt(x.on_hand, 1)}</td><td class="num">${fmt(x.max, 1)}<div class="meta">${esc(x.basis)}</div></td><td class="num">${fmt(x.rec, 1)}</td><td class="num"><b>${fmt(x.qty, 1)}</b> ${esc(x.uom)}</td>
-  <td class="num bad">+${fmt(x.over, 1)}${x.over_pct != null ? `<div class="meta">+${fmt(x.over_pct, 0)}%</div>` : ""}</td><td class="num"><b>${fmt(x.excess_value)}</b></td><td class="num">${x.cover_days == null ? "–" : fmt(x.cover_days, 0) + " d"}</td><td class="num">${fmt(x.carry)}</td></tr>`;
+  <td class="num up">+${fmt(x.over, 1)}${x.over_pct != null ? `<div class="meta">+${fmt(x.over_pct, 0)}%</div>` : ""}</td><td class="num"><b>${fmt(x.excess_value)}</b></td><td class="num">${x.cover_days == null ? "–" : fmt(x.cover_days, 0) + " d"}</td><td class="num">${fmt(x.carry)}</td></tr>`;
 const PRC_HEAD = `<tr><th>Date</th><th>Item</th><th>Location</th><th>Document</th><th class="num">On hand before</th><th class="num">Maximum</th><th class="num">Recommended</th><th class="num">Ordered</th><th class="num">Over</th><th class="num">Extra value</th><th class="num">Covers</th><th class="num">Carrying</th></tr>`;
 function prcLines(){
-  const q = ($("prcQ").value || "").toLowerCase(), rows = ((prcData || {}).lines || []).filter(x => !q || [x.item, x.desc, x.location, x.vendor, x.doc, x.who].join(" ").toLowerCase().includes(q));
+  const all = (prcData || {}).lines || [], rows = prcFilter({q: $("prcQ").value, loc: $("prcLocF").value, kind: $("prcKindF").value, show: $("prcShowF").value});
+  $("prcLinesNote").textContent = `${fmt(rows.length)} of ${fmt(all.length)} line(s) over the recommendation, the largest extra value first. Click a line for the item's orders at its location.`;
   $("prcLines").innerHTML = PRC_HEAD + (rows.map(prcRow).join("") || `<tr><td colspan="12" class="empty">No order line over the recommendation.</td></tr>`);
 }
-Pulse.on("prcloc", code => {
-  const rows = ((prcData || {}).lines || []).filter(x => x.location === code);
-  Pulse.pop({title: esc(code), sub: esc(`Orders over the recommendation · ${prcData.period.from} → ${prcData.period.to}`), body: `<div class="scroll"><table>${PRC_HEAD}${rows.map(prcRow).join("") || `<tr><td colspan="12" class="empty">None.</td></tr>`}</table></div>`});
-});
 $("prcQ").oninput = () => prcLines();
+["prcLocF", "prcKindF", "prcShowF"].forEach(id => $(id).onchange = () => prcLines());
 $("prcRead").onclick = () => prcLoad(true);
+// the lines of a filter, in a pop-up
+function prcListPop(qs){
+  const d = prcData; if (!d || d.pending) return;
+  const f = Object.fromEntries(new URLSearchParams(qs || "")), R = prcFilter(f);
+  const SH = {fresh: "Fresh goods over the recommendation", early: "Ordered while the stock was above the reorder point", estimate: "Without a maximum on the SKU card", repeat: "Items bought over again and again"};
+  const title = [f.loc && prcNm(f.loc), f.cat, f.who, f.ven, f.kind === "open" ? "Open orders" : f.kind ? "Received" : "", SH[f.show]].filter(Boolean).join(" · ") || "Every line over the recommendation";
+  const sum = (k) => R.reduce((a, x) => a + (x[k] || 0), 0);
+  Pulse.pop({title: esc(title), sub: esc(`Orders vs recommendation · ${d.period.from} → ${d.period.to}`), body:
+    Pulse.tiles([{l: "Lines over", v: fmt(R.length)}, {l: "Extra stock", v: plM(sum("excess_value")), s: prcCur(), cls: "up"}, {l: "Carrying", v: plM(sum("carry"))},
+      {l: "Items", v: fmt(new Set(R.map(x => x.item)).size)}, {l: "Locations", v: fmt(new Set(R.map(x => x.location)).size)}])
+    + Pulse.list([["Date"], ["Item"], ["Location"], ["Document"], ["Recommended", 1], ["Ordered", 1], ["Over", 1], ["Extra value", 1]],
+      R.map(x => ({cells: [esc(x.date), `<b>${esc(x.desc || x.item)}</b><div class="meta">${esc(x.item)}${x.fresh ? " · fresh" : ""}</div>`, esc(x.location), `${esc(x.doc)}<div class="meta">${esc(x.vendor || "")}</div>`,
+        fmt(x.rec, 1), `<b>${fmt(x.qty, 1)}</b> ${esc(x.uom)}`, `<span class="up">+${fmt(x.over, 1)}</span>`, `<b>${fmt(x.excess_value)}</b>`], open: `prcitem|${x.location}|${x.item}`})), {max: 480, none: "No line."})});
+}
+// what to do at one location, from its figures
+function prcLocActs(L){
+  const D = L.detail || {}, P = (prcData || {}).params || {}, out = [];
+  const c0 = (D.categories || [])[0];
+  if (c0 && c0.excess_value && L.excess_value) out.push(["Stock manager", `${c0.key} is ${fmt(c0.excess_value / L.excess_value * 100, 0)}% of the extra stock here (${plM(c0.excess_value)}): go through its par levels and order quantities with the stock manager.`]);
+  if (D.repeat_n) out.push(["Stock manager", `${fmt(D.repeat_n)} item(s) bought over the recommendation more than once (most: ${(D.repeat || []).filter(r => r.times_over >= 2).slice(0, 3).map(r => r.desc || r.item).join(", ")}): order the card's maximum less what is on hand; if the use has grown, raise the maximum on the SKU card instead of ordering over it.`]);
+  if (D.open_excess) out.push(["Purchasing", `${plM(D.open_excess)} over the recommendation on open orders still to receive: reduce them with the vendors before they are delivered.`]);
+  if (L.waste_risk) out.push(["Stock manager", `${plM(L.waste_risk)} of fresh goods beyond ${fmt(P.fresh_days)} days of use: smaller, more frequent deliveries.`]);
+  if (L.early > Math.max(2, 0.2 * L.lines)) out.push(["Stock manager", `${fmt(L.early)} line(s) ordered while the stock was still above the reorder point: order when it reaches it, from the requisition worksheet.`]);
+  const nb = ((D.basis || {}).estimate || 0) + ((D.basis || {}).none || 0);
+  if (nb > Math.max(2, 0.2 * L.lines)) out.push(["Cost control", `${fmt(nb)} line(s) on items without a maximum on their SKU card: set the cards (Finance → Inventory → SKU planning), so the recommendation is BC's and the worksheet proposes the quantities.`]);
+  return out;
+}
+function prcLocPop(code){
+  const d = prcData, L = prcLocOf(code); if (!d || !L) return;
+  const D = L.detail || {}, C2 = prcCur(), name = plName(code), rows = d.lines.filter(x => x.location === code), B = D.basis || {};
+  const lq = o => "prclist|" + new URLSearchParams(Object.assign({loc: code}, o));
+  const wk = k => k ? new Date(k + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : "–";
+  const acts = prcLocActs(L);
+  Pulse.pop({title: esc(name || code), sub: esc(`${name ? code + " · " : ""}Orders vs recommendation · ${d.period.from} → ${d.period.to}`), icon: plGlyph(code), body:
+    Pulse.tiles([{l: "Purchases", v: plM(L.value), s: `${C2} · ${fmt(L.lines)} lines · ${fmt(D.items)} items`},
+      {l: "Extra stock", v: plM(L.excess_value), s: `${prcShare(L.over_share)} of the purchases · carrying ${plM(L.carry)} a year`, cls: L.excess_value ? "up" : "", open: L.over_lines ? lq({}) : ""},
+      {l: "Lines over", v: `${fmt(L.over_lines)} / ${fmt(L.lines)}`, s: `largest ${plM(D.max_line)}`, open: L.over_lines ? lq({}) : ""},
+      {l: "Bought over again", v: fmt(D.repeat_n), s: `items over more than once · ${fmt(D.items_over)} over at least once`, cls: D.repeat_n ? "warn" : "", open: D.repeat_n ? lq({show: "repeat"}) : ""},
+      {l: "Fresh at risk", v: plM(L.waste_risk), s: `${fmt(D.fresh_over)} fresh line(s) over`, cls: L.waste_risk ? "up" : "", open: D.fresh_over ? lq({show: "fresh"}) : ""},
+      {l: "Ordered early", v: fmt(L.early), s: "with the stock above the reorder point", open: L.early ? lq({show: "early"}) : ""},
+      {l: "On open orders", v: plM(D.open_excess), s: `over, on ${fmt(D.open_lines)} open line(s)`, cls: D.open_excess ? "warn" : "", open: D.open_excess ? lq({kind: "open"}) : ""}])
+    + (acts.length ? Pulse.panel("What to do", acts.map(([o, t]) => `<div class="gap"><b><span class="rhg-pill info">${esc(o)}</span></b><span>${esc(t)}</span></div>`).join(""))
+       : Pulse.panel("What to do", `<p class="meta">Buying within the recommendation: nothing to change.</p>`))
+    + Pulse.panel("What is bought over", Pulse.bars((D.categories || []).map(c => ({key: c.key, segs: [[c.excess_value, PRC_OVER, "over"], [Math.max(0, c.value - c.excess_value), PRC_IN, "within"]],
+        text: `<b>${plM(c.excess_value)}</b> <span class="meta">${prcShare(c.over_share)} of ${plM(c.value)}</span>`, open: c.excess_value ? lq({cat: c.key}) : ""})),
+        [[PRC_OVER, "over the recommendation"], [PRC_IN, "within it"]], {none: "No purchase."}), "by item category")
+    + Pulse.panel("Items bought over again and again", Pulse.list([["Item"], ["Category"], ["Times over", 1], ["Over on average", 1], ["Maximum", 1], ["Extra stock", 1]],
+        (D.repeat || []).map(r => ({cells: [`<b>${esc(r.desc || r.item)}</b><div class="meta">${esc(r.item)}${r.fresh ? " · fresh" : ""}${r.early ? " · ordered early" : ""}</div>`, `<span class="meta">${esc(r.category || "–")}</span>`,
+          `<b class="${r.times_over >= 2 ? "up" : ""}">${fmt(r.times_over)}</b> <span class="meta">of ${fmt(r.lines)}</span>`, r.avg_over_pct == null ? "–" : "+" + fmt(r.avg_over_pct, 0) + "%",
+          `${fmt(r.max, 1)} ${esc(r.uom)}<div class="meta">${esc(r.basis)}</div>`, `<b>${fmt(r.excess_value)}</b>`], open: `prcitem|${code}|${r.item}`})), {max: 340, none: "No item over the recommendation."}),
+        "the habit, not a one-off: most times over first")
+    + Pulse.panel("Week by week", Pulse.cols((D.weeks || []).map(w => ({label: wk(w.key), segs: [[w.excess_value, PRC_OVER, "over"], [Math.max(0, w.value - w.excess_value), PRC_IN, "within the recommendation"]],
+        tip: `Week of ${wk(w.key)}: ${plM(w.excess_value)} over of ${plM(w.value)} bought (${prcShare(w.over_share)}) · ${fmt(w.over_lines)} of ${fmt(w.lines)} lines`})),
+        [[PRC_OVER, "over the recommendation"], [PRC_IN, "within it"]], {w: 900, h: 170, aria: "Purchases by week", maxLabel: m => plM(m)}), "purchases by the week they were received or ordered")
+    + `<div class="prc-two">` + Pulse.panel("Vendors", Pulse.bars((D.vendors || []).filter(v => v.excess_value).map(v => ({key: v.key, segs: [[v.excess_value, PRC_OVER, "over"]],
+        text: `<b>${plM(v.excess_value)}</b> <span class="meta">${fmt(v.over_lines)} lines</span>`, open: lq({ven: v.key})})), null, {none: "None over the recommendation."}), "a receipt shows no vendor")
+    + Pulse.panel("Who ordered", Pulse.bars((D.who || []).filter(v => v.excess_value).map(v => ({key: v.key, segs: [[v.excess_value, PRC_OVER, "over"]],
+        text: `<b>${plM(v.excess_value)}</b> <span class="meta">${fmt(v.over_lines)} lines</span>`, open: lq({who: v.key})})), null, {none: "None over the recommendation."}), "the purchaser of an open order; the location for a receipt") + `</div>`
+    + Pulse.panel("The basis of the recommendation", `<p class="meta">${fmt(B.card)} line(s) against the Maximum Inventory of the SKU card in BC, ${fmt(B.estimate)} against Pulse's estimate from the location's delivery rhythm, ${fmt(B.none)} without either (no maximum and no use).${(B.estimate || 0) + (B.none || 0) ? " Setting the cards makes the recommendation BC's own." : ""}</p>`)
+    + Pulse.panel("The order lines over", Pulse.list([["Date"], ["Item"], ["Document"], ["On hand before", 1], ["Recommended", 1], ["Ordered", 1], ["Over", 1], ["Extra value", 1]],
+        rows.map(x => ({cells: [`${esc(x.date)}<div class="meta">${x.kind === "open" ? "open order" : "received"}</div>`, `<b>${esc(x.desc || x.item)}</b><div class="meta">${esc(x.item)}</div>`, `${esc(x.doc)}<div class="meta">${esc(x.vendor || "")}</div>`,
+          fmt(x.on_hand, 1), fmt(x.rec, 1), `<b>${fmt(x.qty, 1)}</b> ${esc(x.uom)}`, `<span class="up">+${fmt(x.over, 1)}</span>`, `<b>${fmt(x.excess_value)}</b>`], open: `prcitem|${code}|${x.item}`})), {max: 420, limit: 80, none: "No line over the recommendation."}), `${fmt(rows.length)} line(s), the largest first`)});
+}
+// one item at one location: each order against what the card called for
+function prcItemPop(id){
+  const d = prcData; if (!d) return;
+  const i = id.lastIndexOf("|"), code = id.slice(0, i), item = id.slice(i + 1), L = prcLocOf(code) || {};
+  const r = ((L.detail || {}).repeat || []).find(x => x.item === item) || {};
+  const rows = d.lines.filter(x => x.location === code && x.item === item).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const x0 = rows[rows.length - 1] || {};
+  Pulse.pop({title: esc(x0.desc || r.desc || item), sub: esc(`${item} · ${prcNm(code)} · orders against the recommendation`), body:
+    Pulse.tiles([{l: "Times over", v: fmt(r.times_over || rows.length), s: r.lines ? `of ${fmt(r.lines)} orders in the period` : "", cls: (r.times_over || 0) >= 2 ? "up" : ""},
+      {l: "Over the recommendation", v: `${fmt(r.over_qty != null ? r.over_qty : rows.reduce((a, x) => a + x.over, 0), 1)} ${esc(x0.uom || "")}`, s: r.avg_over_pct != null ? `+${fmt(r.avg_over_pct, 0)}% on average` : ""},
+      {l: "Extra stock", v: plM(r.excess_value != null ? r.excess_value : rows.reduce((a, x) => a + x.excess_value, 0)), s: prcCur(), cls: "up"},
+      {l: "Maximum", v: `${fmt(x0.max, 1)} ${esc(x0.uom || "")}`, s: esc(x0.basis || "")}, {l: "Reorder point", v: fmt(x0.rop, 1)},
+      {l: "Use per day", v: fmt(x0.daily, 2), s: x0.fresh ? "fresh: at most " + fmt((d.params || {}).fresh_days) + " days of use" : ""}])
+    + Pulse.panel("Each order against the recommendation", Pulse.cols(rows.map(x => ({label: x.date.slice(5), segs: [[x.rec, PRC_IN, "recommended"], [x.over, PRC_OVER, "over"]], line: x.max,
+        tip: `${x.date} ${x.doc}: ordered ${fmt(x.qty, 1)}, recommended ${fmt(x.rec, 1)} (maximum ${fmt(x.max, 1)} less ${fmt(x.on_hand, 1)} on hand${x.on_order ? ", " + fmt(x.on_order, 1) + " on order" : ""})`})),
+        [[PRC_IN, "recommended"], [PRC_OVER, "ordered over it"], ["var(--ink)", "maximum (dashed)"]], {w: 900, h: 170, aria: "Orders against the recommendation", maxLabel: m => fmt(m, 1)}))
+    + Pulse.list([["Date"], ["Document"], ["On hand before", 1], ["On order", 1], ["Recommended", 1], ["Ordered", 1], ["Over", 1], ["Extra value", 1], ["Covers", 1]],
+        rows.map(x => ({cells: [`${esc(x.date)}<div class="meta">${x.kind === "open" ? "open order" : "received"}${x.early ? " · early" : ""}</div>`, `${esc(x.doc)}<div class="meta">${esc(x.vendor || "")}${x.who && x.who !== x.location ? " · " + esc(x.who) : ""}</div>`,
+          fmt(x.on_hand, 1), fmt(x.on_order, 1), fmt(x.rec, 1), `<b>${fmt(x.qty, 1)}</b>`, `<span class="up">+${fmt(x.over, 1)}</span>`, `<b>${fmt(x.excess_value)}</b>`, x.cover_days == null ? "–" : fmt(x.cover_days, 0) + " d"]})), {max: 360})
+    + `<p class="meta">Recommended = the maximum less the stock on hand before the order (less what is already on order, for an open order). ${(r.times_over || 0) >= 2 ? "Bought over more than once: a habit above the card. Order up to the maximum, or raise the maximum on the SKU card if the use has grown." : "Order up to the maximum, not by habit."}</p>`});
+}
+Pulse.on("prcloc", code => prcLocPop(code));
+Pulse.on("prclist", qs => prcListPop(qs));
+Pulse.on("prcitem", id => prcItemPop(id));
 $("prcXlsx").onclick = () => {
   const d = prcData; if (!d || d.pending) { alert("Wait for the report to finish reading."); return; }
   const C2 = prcCur(), g = rows => rows.map(x => [x.key, x.lines, x.value, x.over_lines, x.excess_value, x.over_share == null ? null : x.over_share / 100, x.carry, x.waste_risk, (x.top || []).join(" · ")]);

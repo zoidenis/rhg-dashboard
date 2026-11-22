@@ -76,6 +76,28 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class LocationIntelligence(unittest.TestCase):
+    def line(self, item, day, over, ex, loc="LIFT", vendor="V1", cat="MISH", kind="received", basis="SKU card in BC"):
+        return {"kind": kind, "item": item, "desc": item, "uom": "KG", "category": cat, "fresh": cat == "MISH", "location": loc,
+                "date": day, "doc": "D", "who": loc, "vendor": vendor, "qty": 10.0, "rec": 10.0 - over, "over": over,
+                "over_pct": over * 10.0 if over else None, "unit_cost": 100.0, "value": 1000.0, "excess_value": ex,
+                "carry": 0.0, "waste_risk": 0.0, "cover_days": 5.0, "on_hand": 0.0, "on_order": 0.0, "max": 10.0,
+                "rop": 2.0, "daily": 1.0, "basis": basis, "early": False}
+
+    def test_each_location_has_its_drill_down(self):
+        L = [self.line("A1", "2026-11-03", 4, 400), self.line("A1", "2026-11-12", 5, 500), self.line("B2", "2026-11-12", 0, 0, cat="PIJE"),
+             self.line("C3", "2026-11-13", 2, 200, loc="SALT", vendor="V2", basis="Pulse estimate", kind="open")]
+        r = poreco.summarise(L, P)
+        lift = next(x for x in r["locations"] if x["key"] == "LIFT")["detail"]
+        self.assertEqual([(c["key"], c["excess_value"]) for c in lift["categories"]], [("MISH", 900.0), ("PIJE", 0.0)])
+        self.assertEqual((lift["repeat"][0]["item"], lift["repeat"][0]["times_over"], lift["repeat_n"]), ("A1", 2, 1))
+        self.assertEqual([w["key"] for w in lift["weeks"]], ["2026-11-02", "2026-11-09"])
+        salt = next(x for x in r["locations"] if x["key"] == "SALT")["detail"]
+        self.assertEqual((salt["basis"]["estimate"], salt["open_excess"]), (1, 200.0))
+        self.assertEqual({x["location"] for x in r["lines"]}, {"LIFT", "SALT"})
+        self.assertEqual(r["categories"][0]["key"], "MISH")
+
+
 class Vendors(unittest.TestCase):
     """The published Item Ledger Entries have no Source No. (BC 400, 22 Nov 2026): never asked for; the vendor comes
     from the posted invoice when the entry is the invoice itself."""

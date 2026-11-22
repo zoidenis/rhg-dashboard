@@ -177,8 +177,78 @@ def analyse(receipts, open_lines, opening, moves, skus, catalog, P, a, b, today=
     return out
 
 
+def _week(day):
+    """The Monday of the week of a YYYY-MM-DD day ('' when there is none)."""
+    try:
+        d = date.fromisoformat(str(day)[:10])
+    except ValueError:
+        return ""
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+def detail(rows):
+    """Location intelligence of one location's lines (Geri, 22 Nov 2026): where its stock manager buys over the
+    recommendation. By item category, vendor, who and week; the items bought over again and again; the basis of the
+    recommendation; fresh, early and open orders."""
+    def grp(keyf, top=12):
+        g = {}
+        for x in rows:
+            k = keyf(x) or "–"
+            s = g.setdefault(k, {"key": k, "lines": 0, "value": 0.0, "over_lines": 0, "excess_value": 0.0})
+            s["lines"] += 1
+            s["value"] += x["value"]
+            if x["over"] > 0:
+                s["over_lines"] += 1
+                s["excess_value"] += x["excess_value"]
+        out = sorted(g.values(), key=lambda s: (-s["excess_value"], -s["value"]))
+        for s in out:
+            s["value"], s["excess_value"] = round(s["value"], 2), round(s["excess_value"], 2)
+            s["over_share"] = round(s["excess_value"] / s["value"] * 100, 1) if s["value"] else None
+        return out[:top] if top else out
+    items = {}
+    for x in rows:
+        s = items.setdefault(x["item"], {"item": x["item"], "desc": x["desc"], "uom": x["uom"], "category": x["category"],
+                                         "fresh": x["fresh"], "lines": 0, "times_over": 0, "qty": 0.0, "over_qty": 0.0,
+                                         "excess_value": 0.0, "max": x["max"], "basis": x["basis"], "early": 0,
+                                         "last": "", "over_pct": []})
+        s["lines"] += 1
+        s["qty"] += x["qty"]
+        s["early"] += x["early"]
+        s["last"] = max(s["last"], x["date"] or "")
+        if x["over"] > 0:
+            s["times_over"] += 1
+            s["over_qty"] += x["over"]
+            s["excess_value"] += x["excess_value"]
+            if x["over_pct"] is not None:
+                s["over_pct"].append(x["over_pct"])
+    rep = []
+    for s in items.values():
+        if not s["times_over"]:
+            continue
+        pcts = s.pop("over_pct")
+        s.update(qty=round(s["qty"], 3), over_qty=round(s["over_qty"], 3), excess_value=round(s["excess_value"], 2),
+                 avg_over_pct=round(sum(pcts) / len(pcts), 1) if pcts else None)
+        rep.append(s)
+    rep.sort(key=lambda s: (-s["times_over"], -s["excess_value"]))
+    over = [x for x in rows if x["over"] > 0]
+    basis = defaultdict(int)
+    for x in rows:
+        basis[x["basis"]] += 1
+    return {"categories": grp(lambda x: x["category"]), "vendors": grp(lambda x: x["vendor"]),
+            "who": grp(lambda x: x["who"]), "weeks": sorted(grp(lambda x: _week(x["date"]), 0), key=lambda s: s["key"]),
+            "repeat": rep[:25], "repeat_n": sum(1 for s in rep if s["times_over"] >= 2),
+            "items_over": len(rep), "items": len(items),
+            "basis": {"card": basis.get("SKU card in BC", 0), "estimate": basis.get("Pulse estimate", 0),
+                      "none": basis.get("no basis", 0)},
+            "fresh_over": sum(1 for x in over if x["fresh"]),
+            "open_lines": sum(1 for x in rows if x["kind"] == "open"),
+            "open_excess": round(sum(x["excess_value"] for x in over if x["kind"] == "open"), 2),
+            "received_excess": round(sum(x["excess_value"] for x in over if x["kind"] != "open"), 2),
+            "max_line": round(max((x["excess_value"] for x in over), default=0.0), 2)}
+
+
 def summarise(lines, P):
-    """KPIs, by location, by who and by vendor, the decisions."""
+    """KPIs, by location (with its location intelligence: detail), by who and by vendor, the decisions."""
     def agg(keyf):
         g = {}
         for x in lines:
@@ -215,8 +285,13 @@ def summarise(lines, P):
             "estimated": by_basis.get("Pulse estimate", 0), "no_basis": by_basis.get("no basis", 0),
             "open_excess": round(sum(x["excess_value"] for x in over if x["kind"] == "open"), 2)}
     locs, who, vendors = agg(lambda x: x["location"]), agg(lambda x: x["who"]), agg(lambda x: x["vendor"] or "–")
+    by_loc = defaultdict(list)
+    for x in lines:
+        by_loc[x["location"]].append(x)
+    for L in locs:
+        L["detail"] = detail(by_loc[L["key"]])
     acts = []
-    for L in locs[:6]:
+    for L in locs[:3]:                  # the others: their squares in Location intelligence
         if L["excess_value"] > 0:
             acts.append({"owner": "COO", "value": L["excess_value"],
                          "text": f"{L['key']}: {L['over_lines']} order line(s) over the recommendation, "
@@ -243,8 +318,13 @@ def summarise(lines, P):
     acts.append({"owner": "CFO", "value": 0.0,
                  "text": f"Set an approval for purchase orders more than {P['tolerance_pct']:g}% over the recommended "
                          f"quantity (BC purchase approval workflow), and review this report weekly with each stock manager."})
+    # the lines over: the largest of each location (up to 150 each), so every location's pop-up has its own
+    keep = []
+    for L in locs:
+        keep += sorted((x for x in by_loc[L["key"]] if x["over"] > 0), key=lambda x: -x["excess_value"])[:150]
     return {"kpis": kpis, "locations": locs, "who": who[:40], "vendors": vendors[:30],
-            "lines": sorted(over, key=lambda x: -x["excess_value"])[:400], "actions": acts}
+            "categories": detail(lines)["categories"],
+            "lines": sorted(keep, key=lambda x: -x["excess_value"]), "actions": acts}
 
 
 def build(client, company, a, b, settings, today=None):
