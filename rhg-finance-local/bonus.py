@@ -349,7 +349,7 @@ def _sum_bucket(cells, accounts, bucket):
     return tot if have else None
 
 
-def from_exec(ex, unit, ym, running=False, a=None, b=None, ly_net_same_days=None):
+def from_exec(ex, unit, ym, running=False, a=None, b=None, ly_net_same_days=None, sim=None):
     """Sales, food cost and labour cost of a unit from the Executive dashboard's read (BC actuals and budget, Simphony
     months)."""
     out = {}
@@ -364,11 +364,16 @@ def from_exec(ex, unit, ym, running=False, a=None, b=None, ly_net_same_days=None
     bud = bud_cells.get(ym)
     prov = ym in (ex.get("provisional") or [])
     # Simphony
-    sim = ((ex.get("simphony") or {}).get("locations") or {})
-    loc = sim.get(unit["ref"]) or next((v for v in sim.values() if (v.get("dept") or "").upper() == dept and dept), None)
+    held = ((ex.get("simphony") or {}).get("locations") or {})
+    loc = held.get(unit["ref"]) or next((v for v in held.values() if (v.get("dept") or "").upper() == dept and dept), None)
     net = ((loc or {}).get("months") or {}).get(ym) or {}
     y, mm = int(ym[:4]), ym[5:7]
     ly = ((loc or {}).get("months") or {}).get(f"{y - 1}-{mm}") or {}
+    if sim is not None:                  # read by the unit's own Simphony reference (sim_month), not the dashboard's ties
+        net, ly, ly_net_same_days = {"net": sim.get("cur")}, {"net": sim.get("ly")}, sim.get("ly")
+        if sim.get("reading"):
+            for k in ("sales_budget", "sales_ly"):
+                out[k] = {"value": None, "status": "reading the month's days from Simphony"}
     days_in = monthrange(y, int(mm))[1]
     if net.get("net"):
         bs = _sum_bucket(bud, acc, "sales") if bud else None
@@ -472,6 +477,81 @@ def combine_reviews(channels, allowed=REVIEW_CHANNELS):
 
 
 _fb_reading = set()
+_sim_jobs = {}
+
+
+def _days_of(a, b):
+    return [(a + timedelta(days=i)).isoformat() for i in range((b - a).days + 1)]
+
+
+def sim_month(refs, a, b, refresh=False):
+    """{ref: {cur, ly, missing}}: Simphony net sales of each unit by its own reference (as Location intelligence reads
+    them), the month a..b and the same days of last year, from the days already read; the days not read yet are
+    read behind (one job per month), so the screen says it is still reading. ({}, reading)"""
+    import simphony
+    if not simphony.info().get("configured"):
+        return {}, False
+    try:
+        known = {l["locRef"] for l in simphony.locations()}
+    except Exception:                                               # noqa: BLE001
+        known = set()
+    cur_days = _days_of(a, b)
+    ly_days = []
+    for d in cur_days:
+        try:
+            ly_days.append(date.fromisoformat(d).replace(year=a.year - 1).isoformat())
+        except ValueError:                                          # 29 February
+            pass
+    today = date.today().isoformat()
+    out, need = {}, {}
+    for ref in refs:
+        if known and ref not in known:
+            continue
+        tot, miss = {"cur": 0.0, "ly": 0.0}, []
+        for part, ds in (("cur", cur_days), ("ly", ly_days)):
+            for d in ds:
+                if d >= today:
+                    continue
+                h = simphony.held_day(ref, d)
+                if h is None or (refresh and not h.get("final")):
+                    miss.append(d)
+                if h:
+                    tot[part] += simphony.day_figures(h.get("rvcs") or [])["net"]
+        out[ref] = {"cur": round(tot["cur"], 2) or None, "ly": round(tot["ly"], 2) or None, "missing": len(miss)}
+        if miss:
+            need[ref] = miss
+    key = (a, b)
+    job = _sim_jobs.get(key)
+    running = bool(job and job.get("running"))
+    if need and not running and (not job or time.time() - job.get("at", 0) > 300 or refresh):
+        _sim_jobs[key] = {"running": True, "at": time.time()}
+
+        def go(need=need, key=key):
+            from concurrent.futures import ThreadPoolExecutor
+            try:
+                def one(ref, ds):
+                    try:
+                        latest = simphony.latest_business_date(ref)
+                    except Exception:                               # noqa: BLE001
+                        return
+                    for d in ds:
+                        if latest and d > latest:
+                            continue
+                        try:
+                            simphony.daily_totals(ref, d, latest)
+                        except Exception:                           # noqa: BLE001
+                            pass
+                with ThreadPoolExecutor(4) as ex:
+                    list(ex.map(lambda kv: one(*kv), need.items()))
+                simphony.flush_days()
+            finally:
+                _sim_jobs[key] = {"running": False, "at": time.time()}
+        threading.Thread(target=go, daemon=True, name="bonus-simphony").start()
+        running = True
+    if running:                          # a partial month would score low: no figure until the days are read
+        for ref in need:
+            out[ref].update(cur=None, ly=None, reading=True)
+    return out, running
 
 
 def collect(client, company, currency, ym, units, refresh=False, today=None):
@@ -488,8 +568,17 @@ def collect(client, company, currency, ym, units, refresh=False, today=None):
     # BC + Simphony (one read for the year, the Executive dashboard's)
     try:
         ex = executive.request(client, company, a.year, currency, refresh=refresh)
-        state["Business Central & Simphony"] = "reading" if ex.get("pending") else "ok"
+        state["Business Central"] = "reading" if ex.get("pending") else "ok"
+        try:
+            sims, sim_reading = sim_month([u["ref"] for u in units], a, b, refresh)
+            state["Simphony sales"] = "reading" if sim_reading else ("ok" if sims else "not connected")
+        except Exception as exc:                                    # noqa: BLE001
+            sims = {}
+            state["Simphony sales"] = "error: " + str(exc)[:160]
         for u in units:
+            if u["ref"] in sims:
+                auto[u["ref"]].update(from_exec(ex, u, ym, running, a, b, None, sims[u["ref"]]))
+                continue
             lysd = None
             if running:
                 try:
@@ -508,7 +597,7 @@ def collect(client, company, currency, ym, units, refresh=False, today=None):
                     lysd = None
             auto[u["ref"]].update(from_exec(ex, u, ym, running, a, b, lysd))
     except Exception as exc:                                        # noqa: BLE001
-        state["Business Central & Simphony"] = "error: " + str(exc)[:160]
+        state["Business Central"] = "error: " + str(exc)[:160]
     # Crunchtime Ops Execution (Zenput)
     try:
         if not crunchtime.info()["configured"]:

@@ -201,3 +201,33 @@ class Flow(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SimphonyByReference(Base):
+    """Bllok, Arena, 9 Katëshet: Simphony read by the unit's own reference, not the Executive dashboard's ties."""
+    def test_month_and_last_year_from_the_days_held(self):
+        import simphony
+        held = {("OPA_B", "2026-09-01"): 100.0, ("OPA_B", "2026-09-02"): 50.0, ("OPA_B", "2025-09-01"): 80.0, ("OPA_B", "2025-09-02"): 40.0}
+        fake = {"info": lambda: {"configured": True}, "locations": lambda: [{"locRef": "OPA_B"}, {"locRef": "OPA_TE"}],
+                "held_day": lambda r, d: {"rvcs": [held[(r, d)]], "final": True} if (r, d) in held else None,
+                "day_figures": lambda rv: {"net": sum(rv)}}
+        with patch.multiple(simphony, **fake):
+            out, reading = bonus.sim_month(["OPA_B", "NOT_IN_SIMPHONY"], date(2026, 9, 1), date(2026, 9, 2))
+        self.assertEqual(out, {"OPA_B": {"cur": 150.0, "ly": 120.0, "missing": 0}})
+        self.assertFalse(reading)
+        a = bonus.from_exec(EX, dict(UNIT, ref="OPA_B"), "2026-09", sim=out["OPA_B"])
+        self.assertEqual((a["sales_budget"]["value"], a["sales_ly"]["target"]), (150.0, 120.0))
+
+    def test_days_missing_are_read_behind_and_no_partial_figure(self):
+        import simphony
+        started = []
+        fake = {"info": lambda: {"configured": True}, "locations": lambda: [{"locRef": "OPA_A"}],
+                "held_day": lambda r, d: None, "day_figures": lambda rv: {"net": 0}}
+        with patch.multiple(simphony, **fake), patch.object(bonus.threading, "Thread",
+                                                            lambda **k: type("T", (), {"start": lambda self: started.append(1)})()):
+            bonus._sim_jobs.clear()
+            out, reading = bonus.sim_month(["OPA_A"], date(2026, 9, 1), date(2026, 9, 3))
+        self.assertTrue(reading and started)
+        self.assertEqual((out["OPA_A"]["cur"], out["OPA_A"]["reading"]), (None, True))
+        a = bonus.from_exec(EX, dict(UNIT, ref="OPA_A"), "2026-09", sim=out["OPA_A"])
+        self.assertEqual(a["sales_budget"]["status"], "reading the month's days from Simphony")
