@@ -144,7 +144,8 @@ a.fh-c:hover{border-color:var(--accent)}
 .au-heat td.au-good{background:color-mix(in srgb,var(--down,#1e8e5a) 14%,transparent)}
 .au-say{margin:4px 0 0;padding-left:18px;line-height:1.6;font-size:13.5px}.au-say li{margin:3px 0}
 .au-own{display:inline-block;min-width:38px;text-align:center;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;color:#fff;background:#08303f}
-.au-own.au-coo{background:#2c7a7b}.au-own.au-cfo{background:#8a5a00}
+.au-own.au-coo{background:#2c7a7b}
+.au-mode{display:flex;align-items:center;gap:10px;margin:0 0 12px}.au-mode .tabs button[disabled]{opacity:.45;cursor:not-allowed}.au-own.au-cfo{background:#8a5a00}
 </style>
 <link rel="stylesheet" href="/brand.css">
 <link rel="stylesheet" href="/locintel.css">
@@ -1052,7 +1053,9 @@ function drawSavings(keys){
    decisions it calls for, with who owns them. Built from what the page has read: nothing more is asked of BC. */
 const AU_TOL = 2;                         // points of revenue (food, labour) over the comparison that call for action
 const AU_COST = [["food", "Food cost"], ["labor", "Labour"], ["opex", "Other operating costs"]];
-function auHow(){ return hasBudget() ? "budget" : "ly"; }
+// against the budget or the same period last year (Geri, 22 Nov 2026: both); the budget when there is one
+let auMode = "budget";
+function auHow(){ return auMode === "ly" || !hasBudget() ? "ly" : "budget"; }
 function auRows(keys){
   const how = auHow();
   return depts().map(d => {
@@ -1102,10 +1105,11 @@ function viewAudit(){
   const below = rows.filter(r => r.gap < 0), costOver = rows.reduce((s_, r) => s_ + r.costOver, 0), extra = rows.reduce((s_, r) => s_ + r.extra, 0);
   const foodBad = rows.filter(r => r.foodPts != null && r.foodPts > AU_TOL), labBad = rows.filter(r => r.laborPts != null && r.laborPts > AU_TOL);
   const gapSum = below.reduce((s_, r) => s_ + r.gap, 0), worst = rows[0];
-  let h = (how === "budget" ? "" : `<div class="card"><p class="hint" style="margin:0">No budget for ${esc(String(F.year))} in Business Central: every restaurant is set against the same period last year.</p></div>`)
+  let h = `<div class="au-mode"><span class="meta">Against</span><div class="tabs" id="auMode" style="margin:0"><button data-au="budget" class="${how === "budget" ? "on" : ""}"${hasBudget() ? "" : " disabled title=\"No budget in Business Central for this year\""}>Budget</button><button data-au="ly" class="${how === "ly" ? "on" : ""}">Last year</button></div></div>`
+    + (hasBudget() || how === "ly" && auMode === "ly" ? "" : `<div class="card"><p class="hint" style="margin:0">No budget for ${esc(String(F.year))} in Business Central: every restaurant is set against the same period last year.</p></div>`)
     + `<div class="kpis">`
-    + tile(`EBITDA under ${cmp}`, `${below.length} <small class="meta">/ ${rows.length}</small>`, "", `restaurants · ${compact(gapSum)} ${C()} in all`, below.length ? `<span class="dl bad">▼ to act on</span>` : `<span class="dl good">on plan</span>`)
-    + tile(`Costs over ${cmp}`, compact(costOver), C(), "food, labour and operating costs over plan, summed by restaurant", costOver > 0 ? `<span class="dl bad">▲ over</span>` : "")
+    + tile(`EBITDA under ${cmp}`, `${below.length} <small class="meta">/ ${rows.length}</small>`, "", `restaurants · ${compact(gapSum)} ${C()} in all`, below.length ? `<span class="dl bad">▼ to act on</span>` : `<span class="dl good">none under</span>`)
+    + tile(`Costs over ${cmp}`, compact(costOver), C(), `food, labour and operating costs over ${cmp}, summed by restaurant`, costOver > 0 ? `<span class="dl bad">▲ over</span>` : "")
     + tile(`Food cost over by > ${AU_TOL} pts`, String(foodBad.length), "", foodBad.map(r => r.name).slice(0, 3).join(", ") || "none", "")
     + tile(`Labour over by > ${AU_TOL} pts`, String(labBad.length), "", labBad.map(r => r.name).slice(0, 3).join(", ") || "none", "")
     + tile("Dearer purchase prices", S.pur && S.pur.savings ? compact(extra) : "–", S.pur && S.pur.savings ? C() : "", "against last year, by restaurant (Purchasing)", extra > 0 ? `<span class="dl bad">▲ margin lost</span>` : "") + `</div>`;
@@ -1119,7 +1123,7 @@ function viewAudit(){
   if (acts.length) L.push(`${acts.length} decision(s) below, largest first.`);
   h += `<div class="card"><div class="chead"><div><h2>What it says</h2></div></div><ul class="au-say">${L.map(x => `<li>${x}</li>`).join("")}</ul></div>`;
   // the restaurants against plan: a heat table
-  h += `<div class="card"><div class="chead"><div><h2>Restaurants against ${esc(cmp)}</h2><p class="hint">${esc(periodText(keys))}. Each cost line's actual minus ${esc(cmp)} (red over, green under; the shade grows past 2% and 10% of plan) and EBITDA's gap, worst first. Click a restaurant for its audit.</p></div></div><div class="scroll"><table class="au-heat"><tr><th>Restaurant</th><th class="num">Revenue vs ${esc(cmp)}</th>`
+  h += `<div class="card"><div class="chead"><div><h2>Restaurants against ${esc(cmp)}</h2><p class="hint">${esc(periodText(keys))}. Each cost line's actual minus ${esc(cmp)} (red over, green under; the shade grows past 2% and 10% of the comparison) and EBITDA's gap, worst first. Click a restaurant for its audit.</p></div></div><div class="scroll"><table class="au-heat"><tr><th>Restaurant</th><th class="num">Revenue vs ${esc(cmp)}</th>`
     + AU_COST.map(([, l]) => `<th class="num">${esc(l)}</th>`).join("") + `<th class="num">Food % · pts</th><th class="num">Labour % · pts</th><th class="num">EBITDA gap</th><th class="num">Dearer prices</th></tr>`
     + rows.map(r => `<tr class="click" data-pulse="exaudit|${esc(r.code)}" tabindex="0"><td><b>${esc(r.name)}</b></td>
       <td class="num ${r.salesGap != null && r.salesGap < -2 ? "au-bad" : r.salesGap > 2 ? "au-good" : ""}">${r.salesGap == null ? "–" : (r.salesGap >= 0 ? "+" : "") + fmt(r.salesGap, 1) + "%"}</td>`
@@ -1142,6 +1146,7 @@ function viewAudit(){
       : `<div class="empty">${S.pur && S.pur.savings ? "No item bought dearer in this period, or the period is not one Purchasing compares (a month, a quarter, the year to date)." : "Purchasing is not read for your role or not yet."}</div>`)
     + `</div></div></div>`;
   $("view").innerHTML = h;
+  document.querySelectorAll("#auMode [data-au]").forEach(b => b.onclick = () => { if (b.disabled) return; auMode = b.dataset.au; viewAudit(); });
 }
 // one restaurant's audit
 Pulse.on("exaudit", code => {
@@ -1155,6 +1160,13 @@ Pulse.on("exaudit", code => {
       {l: "Labour", v: pct(r.a.laborPct), s: dl(delta(r.a.laborPct, r.c.laborPct, "pts"), false, lbl)},
       {l: "Other operating costs", v: exMoney(r.a.opex), s: dl(delta(r.a.opex, r.c.opex), false, lbl)},
       {l: "EBITDA", v: exMoney(r.a.ebitda), s: `${r.gap >= 0 ? "+" : ""}${compact(r.gap)} ${esc(C())} ${lbl}`, cls: r.gap < 0 ? "up" : ""}])
+      + (() => { const o = how === "budget" ? "ly" : (hasBudget() ? "budget" : null); if (!o) return "";
+          const c2 = comparison(code, keys, o), L2 = o === "budget" ? "vs budget" : "vs last year"; if (!c2) return "";
+          return Pulse.panel(`Also ${L2}`, Pulse.tiles([{l: "Revenue", v: exMoney(c2.sales), s: dl(delta(r.a.sales, c2.sales), true, L2)},
+            {l: "Food cost", v: pct(c2.foodPct), s: dl(delta(r.a.foodPct, c2.foodPct, "pts"), false, L2)}, {l: "Labour", v: pct(c2.laborPct), s: dl(delta(r.a.laborPct, c2.laborPct, "pts"), false, L2)},
+            {l: "Other operating costs", v: exMoney(c2.opex), s: dl(delta(r.a.opex, c2.opex), false, L2)},
+            {l: "EBITDA", v: exMoney(c2.ebitda), s: `${r.a.ebitda - c2.ebitda >= 0 ? "+" : ""}${compact(r.a.ebitda - c2.ebitda)} ${esc(C())} ${L2}`, cls: r.a.ebitda < c2.ebitda ? "up" : ""}]),
+            "the other comparison, the figures of the comparison and the actual's change"); })()
       + Pulse.panel("Decisions", acts.length ? `<ul class="au-say">${acts.map(x => `<li><span class="au-own au-${x.who.toLowerCase()}">${x.who}</span> ${x.t} <b>${compact(x.w)}</b> ${esc(C())}</li>`).join("")}</ul>` : `<p class="meta">Within the limits: nothing calls for a decision.</p>`)
       + Pulse.panel(`Accounts over ${cmp}`, Pulse.list([["Account"], ["Line"], ["Actual", 1], [cap(cmp), 1], ["Over", 1]],
           r.accs.slice(0, 25).map(x => ({cells: [`${esc(x.no)} <span class="meta">${esc(x.name)}</span>`, esc({food: "Food cost", opex: "Operating costs"}[x.bucket] || (x.bucket.startsWith("labor") ? "Labour" : x.bucket)), fmt(x.a), fmt(x.c), `<span class="dl bad">+${fmt(x.v)}</span>`]})), {none: "No account over plan.", max: 360}))
