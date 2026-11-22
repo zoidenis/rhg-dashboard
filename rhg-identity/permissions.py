@@ -101,8 +101,10 @@ NOT_FOR_ADMIN = {p for p in PERMISSIONS if p.startswith(CONFIDENTIAL)}
 # Bonus management only for the CEO and the Administrator). Left out of every bundle (_s), of the screens a legacy role
 # gets from its data rights, and given once to the stored roles named here (ROLE_SCREENS, store.py); another role
 # gets them only when an administrator ticks them in Roles & permissions.
-RESTRICTED = ("finance.s.sales.bonus",)
-ROLE_SCREENS = {"finance.s.sales.bonus": ("CEO",)}
+RESTRICTED = ("finance.s.sales.bonus", "finance.s.marketing.data")
+ROLE_SCREENS = {"finance.s.sales.bonus": ("CEO",),
+                # Marketing → Data & connection (nl360's token, uploads): not for the read-only roles
+                "finance.s.marketing.data": ("CEO", "CFO", "Finance director", "Marketing manager")}
 
 
 def effective(perms):
@@ -259,6 +261,10 @@ DEFAULT_ROLES = {
                                      + ["platform.s.executive.sales", "platform.s.executive.locations",
                                         "platform.s.executive.locations.company_sales",
                                         "platform.s.executive.locations.bc_sales", "finance.export"]},
+    "Marketing manager": {"department": "Marketing", "system": False,
+                          "description": "Marketing: ads, Google Business Profile and social media of every brand (nl360's "
+                                         "dashboard), and its connection.",
+                          "permissions": _s("finance.s.marketing") + ["finance.export", "layout.personal"]},
     # --- HR
     "Food safety manager": {"department": "Sales", "system": False,
                             "description": "Food safety, waste and yield, checklists and forms of every restaurant "
@@ -281,6 +287,10 @@ DEFAULT_ROLES = {
                "description": "Read only, both towers, including exports.",
                "permissions": _FIN_ALL + _PUR_ALL + ["finance.export", "purchasing.export"]},
 }
+for _name, _spec in DEFAULT_ROLES.items():               # the restricted screens of the roles named for them
+    for _p, _roles in ROLE_SCREENS.items():
+        if _name in _roles and _p not in _spec["permissions"]:
+            _spec["permissions"].append(_p)
 # Screens added after the roles were stored: {new screen: the screen (or screens) whose holders get it once}.
 ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
                  # Live operations became two tabs: whoever held the screen gets both
@@ -388,7 +398,13 @@ ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
                  "platform.s.executive.locations.purch_inv": ("platform.s.executive.overview",
                                                               "platform.s.executive.purchasing",
                                                               "finance.s.inventory.overview"),
-                 "finance.s.pl.pl": ("finance.s.pl.charts",)}
+                 "finance.s.pl.pl": ("finance.s.pl.charts",),
+                 # Marketing (23 Nov 2026): management and whoever reads the sales or the Executive dashboard's sales; its
+                 # connection (nl360's token, uploads): the roles of ROLE_SCREENS
+                 "finance.s.marketing.overview": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
+                 "finance.s.marketing.ads": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
+                 "finance.s.marketing.gbp": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
+                 "finance.s.marketing.social": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main")}
 # Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
 REMOVED_SCREENS = ("purchasing.s.live", "finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
                    "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",
@@ -396,7 +412,7 @@ REMOVED_SCREENS = ("purchasing.s.live", "finance.s.sales.today", "finance.s.cash
                    "purchasing.s.exceptions", "purchasing.s.exceptions.list", "purchasing.s.exceptions.loc",
                    "finance.s.doccontrol.nopo", "finance.s.doccontrol.transit", "purchasing.s.compliance")
 
-DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "HR", "IT", "Other"]
+DEPARTMENTS = ["Management", "Finance", "Purchasing", "Sales", "Marketing", "HR", "IT", "Other"]
 
 # Old per-app role names -> the merged role they become on import.
 LEGACY_ROLE_MAP = {

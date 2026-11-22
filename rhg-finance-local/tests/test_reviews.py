@@ -73,3 +73,20 @@ class Reviews(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BeforeTheSnapshots(Reviews):  # noqa
+    def test_a_month_before_the_first_snapshot_takes_the_nearest_after(self):
+        pid = "ChIJS4oQUEkxUBMRv8S5DQsJ7Uw"
+        db = reviews._db()
+        db.execute("INSERT INTO snap VALUES ('places',?,?,?,?)", (pid, "2026-11-23", 4.6, 3064))
+        db.commit()
+        db.close()
+        m = reviews.monthly("OPA_B", date(2026, 10, 1), date(2026, 10, 31))
+        self.assertEqual((m["google"]["value"], m["google"]["count"], m["google"]["approximate"]), (4.6, None, True))
+        self.assertNotIn("google", reviews.monthly("OPA_B", date(2026, 8, 1), date(2026, 8, 31)))   # too far
+        m = reviews.monthly("OPA_B", date(2026, 11, 1), date(2026, 11, 30))
+        self.assertEqual((m["google"]["value"], m["google"]["count"], m["google"]["partial"]), (4.6, 0, True))
+        import bonus
+        r = bonus.combine_reviews(m, ("google",))
+        self.assertEqual((r["value"], r["count"]), (4.6, None))      # incomplete count: no minimum applied

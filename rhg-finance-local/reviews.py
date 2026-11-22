@@ -352,9 +352,19 @@ def monthly(ref, a, b, sources=("google", "wolt")):
                         if e and e[1] >= a.isoformat():
                             cnt = (e[3] or 0) - (s[3] or 0) if s else None
                             since = "" if start else f" (counted from {s[1]}, the first snapshot)"
-                            out["google"] = {"value": e[2], "count": cnt, "approximate": True,
+                            out["google"] = {"value": e[2], "count": cnt, "approximate": True, "partial": not start,
                                              "detail": f"Google overall rating {e[2]} on {e[1]} (Places API, not only this month's); "
                                                        f"{cnt if cnt is not None else '?'} new review(s){since}"}
+                        else:
+                            # a month before the snapshots began: the nearest snapshot after it (within two months),
+                            # the rating only; the month's number of reviews is not known
+                            after = db.execute(f"SELECT key, day, rating, n FROM snap WHERE src='places' AND key IN ({q2}) AND day>? AND day<=? ORDER BY day",
+                                               pids + [b.isoformat(), (b + timedelta(days=62)).isoformat()]).fetchall()
+                            if after and after[0][2] is not None:
+                                x = after[0]
+                                out["google"] = {"value": x[2], "count": None, "approximate": True,
+                                                 "detail": f"Google overall rating {x[2]} on {x[1]}, the nearest snapshot after the month "
+                                                           f"(Places API began then): the month's own reviews and their number are not known"}
             if "wolt" in sources and wkeys:
                 q = ",".join("?" * len(wkeys))
                 n, avg = db.execute(f"SELECT COUNT(*), AVG(rating) FROM rv WHERE src='wolt' AND key IN ({q}) AND day>=? AND day<=?",

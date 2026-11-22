@@ -36,6 +36,14 @@ FINANCE = [
         # CEO and the Administrator only (permissions.RESTRICTED); a company screen, refused to a person limited to
         # some locations
         ("bonus", "Bonus management", "company", [])]),
+    # Marketing (Geri, 23 Nov 2026): nl360's RHG Performance dashboard read into pulse: ads, Google Business Profile, organic
+    # social, by brand and month (marketing.py)
+    ("marketing", "Marketing", "Overview", "mkTabs", [
+        ("overview", "Overview", "company", []),
+        ("ads", "Ads", "company", []),
+        ("gbp", "Google Business Profile", "company", []),
+        ("social", "Social media", "company", []),
+        ("data", "Data & connection", "company", [])]),
     # People & Productivity: Odoo HR (workforce, attendances, planning) against Simphony's sales and BC's personnel cost
     ("people", "People & Productivity", "People & Productivity", "ppTabs", [
         ("workforce", "Workforce", "location", []),

@@ -21,6 +21,7 @@ received on a receipt shows no vendor, since the published Item Ledger Entries c
 import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -29,7 +30,10 @@ import stock
 
 DEFAULTS = {"tolerance_pct": 10.0, "carry_pct": 25.0, "fresh_days": 4.0}
 FRESH = stock.FRESH_HINTS
-_jobs, _results, _lock = {}, {}, threading.Lock()
+_jobs, _results, _stage, _lock = {}, {}, {}, threading.Lock()
+# the locations read at the same time (their stock the day before and their movements): one after another, a month
+# of twenty locations took minutes (Geri, 23 Nov 2026)
+WORKERS = 5
 KEEP = 3600
 
 
@@ -327,10 +331,17 @@ def summarise(lines, P):
             "lines": sorted(keep, key=lambda x: -x["excess_value"]), "actions": acts}
 
 
-def build(client, company, a, b, settings, today=None):
+def build(client, company, a, b, settings, today=None, progress=None):
     P = params(settings)
-    receipts = purchases(client, company, a, b)
-    orders = client.purchase_order_cards(company)
+    say = progress or (lambda text: None)
+    say("Reading the purchases, the purchase orders, the SKU cards and the item cards from Business Central…")
+    # the four company-wide reads at the same time
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_rec = pool.submit(purchases, client, company, a, b)
+        f_ord = pool.submit(client.purchase_order_cards, company)
+        f_sku = pool.submit(client.stockkeeping_units, company)
+        f_cat = pool.submit(client.item_catalog, company)
+        receipts, orders, (skus, _st), catalog = f_rec.result(), f_ord.result(), f_sku.result(), f_cat.result()
     open_lines = []
     for o in orders:
         for i, l in enumerate(o.get("lines") or []):
@@ -351,14 +362,17 @@ def build(client, company, a, b, settings, today=None):
     day_before = (date.fromisoformat(a) - timedelta(days=1)).isoformat()
     to = (today or date.today()).isoformat()
     opening, moves = {}, {}
-    for loc, items in items_by_loc.items():
-        if not loc:
-            continue
+
+    def one(loc, items):
         bal, _cards = client.inventory_at(company, loc, day_before)
-        opening[loc] = {k: v for k, v in bal.items() if k in items}
-        moves[loc] = movements(client, company, loc, items, a, max(b, to))
-    skus, _st = client.stockkeeping_units(company)
-    catalog = client.item_catalog(company)
+        return {k: v for k, v in bal.items() if k in items}, movements(client, company, loc, items, a, max(b, to))
+    todo = {loc: items for loc, items in items_by_loc.items() if loc}
+    say(f"Reading the stock and the movements of {len(todo)} locations…")
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        futs = {loc: pool.submit(one, loc, items) for loc, items in todo.items()}
+        for n, (loc, f) in enumerate(futs.items(), 1):
+            opening[loc], moves[loc] = f.result()
+            say(f"Reading the stock and the movements: {n} of {len(todo)} locations…")
     lines = analyse(receipts, open_lines, opening, moves, skus, catalog, P, a, b, today)
     lines = [x for x in lines if x["kind"] == "open" or a <= x["date"] <= b]
     out = summarise(lines, P)
@@ -375,16 +389,20 @@ def request(client, company, a, b, settings, refresh=False):
             return hit[1]
         job = _jobs.get(key)
         if job and job.is_alive():
-            return {"pending": True, "stage": "Reading the purchases, the stock and the SKU cards from Business Central…"}
+            return {"pending": True, "stage": _stage.get(key) or "Reading the purchases, the stock and the SKU cards from Business Central…"}
+
+        def say(text):
+            _stage[key] = text
 
         def run():
             try:
-                r = build(client, company, a, b, settings)
+                r = build(client, company, a, b, settings, progress=say)
             except Exception as exc:                                   # noqa: BLE001
                 traceback.print_exc()
                 r = {"error": f"Could not build the report: {str(exc)[:300]}"}
             with _lock:
                 _results[key] = (time.time(), r)
+                _stage.pop(key, None)
         t = threading.Thread(target=run, daemon=True)
         _jobs[key] = t
         t.start()

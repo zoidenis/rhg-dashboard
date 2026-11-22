@@ -456,10 +456,12 @@ def combine_reviews(channels, allowed=REVIEW_CHANNELS):
     if not ch:
         return None
     num = den = 0.0
-    total, approx = 0, False
+    total, approx, known = 0, False, False
     for v in ch.values():
         n = v.get("count") or 0
-        total += max(n, 0)
+        if v.get("count") is not None and not v.get("partial"):     # a count that covers the whole month
+            total += max(n, 0)
+            known = True
         if v.get("value") is not None and n > 0:
             num += v["value"] * n
             den += n
@@ -470,7 +472,9 @@ def combine_reviews(channels, allowed=REVIEW_CHANNELS):
         if g.get("value") is not None:              # Places only, no new review counted yet: the overall rating
             value, approx = g["value"], True
     detail = "; ".join(v.get("detail") or "" for v in ch.values() if v.get("detail"))
-    return {"value": value, "count": total, "approximate": approx,
+    if not known:
+        detail += "; the month's number of reviews is not complete: the minimum is not applied"
+    return {"value": value, "count": total if known else None, "approximate": approx,
             "status": "" if value is not None else "no review in the month",
             "detail": detail + ("; approximate: Google's overall rating" if approx else ""),
             "channels": {k: {kk: v.get(kk) for kk in ("value", "count", "approximate")} for k, v in ch.items()}}
@@ -641,8 +645,20 @@ def collect(client, company, currency, ym, units, refresh=False, today=None):
                                    else "error: " + (ri["state"].get("google_error") or ri["state"].get("places_error"))[:160]
                                    if (g["business_profile"] or g["places"]) else "not connected")
         state["Wolt reviews"] = "ok" if w["secret_set"] else "not connected"
+        import marketing
         for u in units:
             channels[u["ref"]].update(reviews.monthly(u["ref"], a, b))
+            # Google, by unit: the Business Profile read by pulse first; else nl360's (exact, by unit), before Places
+            g = channels[u["ref"]].get("google")
+            if not g or g.get("approximate"):
+                try:
+                    n3 = marketing.opa_reviews(u["ref"], ym)
+                except Exception:                                   # noqa: BLE001
+                    n3 = None
+                if n3:
+                    channels[u["ref"]]["google"] = n3
+                    if not str(state.get("Google reviews", "")).startswith("ok"):
+                        state["Google reviews"] = "ok"
     except Exception as exc:                                        # noqa: BLE001
         state["Google reviews"] = "error: " + str(exc)[:160]
     try:

@@ -736,6 +736,7 @@ table.bn-plan td{padding:3px 4px}
     <button data-view="sales">Sales</button>
     <button data-view="people">People &amp; Productivity</button>
     <button data-view="opsexec">Operations &amp; Food Safety</button>
+    <button data-view="marketing">Marketing</button>
 
     <div class="grp">Statements</div>
     <button data-view="pl" data-tab="Profit &amp; loss" data-group="Statements">Financial statements</button>
@@ -2203,6 +2204,56 @@ table.bn-plan td{padding:3px 4px}
       <div class="hint" id="tkDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
   </section>
 
+  <section class="view" id="v-marketing">
+    <div class="ov-tabs" id="mkTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="ads" role="tab" aria-selected="false">Ads</button><button data-t="gbp" role="tab" aria-selected="false">Google Business Profile</button><button data-t="social" role="tab" aria-selected="false">Social media</button><button data-t="data" role="tab" aria-selected="false">Data &amp; connection</button></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><div><h2>Marketing</h2>
+        <p class="hint"><span>Ads on Meta and Google, the Google Business Profile listings and organic social media of every brand, month by month, against the same month last year.</span> <span>Read from the RHG Performance dashboard that nl360, RHG's campaign manager, builds; the figures and their definitions are nl360's. Amounts in euros.</span></p></div>
+        <div class="sh-ctl"><button class="mini dark" id="mkRead" type="button">Read again</button></div></div>
+      <div class="filters" style="margin:12px 0 0;align-items:flex-end"><label>Month<select id="mkMonth"></select></label>
+        <label>Brand<select id="mkBrand"><option value="">All brands</option></select></label></div>
+      <p class="meta" id="mkStatus">Reading…</p></div>
+    <div class="mk-p" data-p="overview">
+      <div class="kpis" id="mkKpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
+      <div class="card"><div class="card-head"><div><h2>By brand</h2>
+        <p class="hint"><span>The month of each brand: its sales, what its ads cost and brought, its Google listing and its Instagram, with the change against the same month last year.</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkBrands"></table></div></div></div>
+    <div class="mk-p" data-p="ads" hidden>
+      <div class="kpis" id="mkAdK" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Ads by brand</h2>
+        <p class="hint"><span>Meta and Google Ads: spend, clicks and cost per click, the reservations (SevenRooms venues) and direction requests they brought, and nl360's estimate of the revenue they brought.</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkAds"></table></div></div>
+      <div class="card"><div class="card-head"><div><h2>The last 12 months</h2>
+        <p class="hint"><span>The brand chosen above, or every brand together.</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkAdTrend"></table></div></div></div>
+    <div class="mk-p" data-p="gbp" hidden>
+      <div class="kpis" id="mkGbK" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Google listing by brand</h2>
+        <p class="hint"><span>Every action on the listing (directions, calls, website clicks, menu views), the rating of all reviews at the month end, and the reviews written in the month.</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkGbp"></table></div></div>
+      <div class="card" id="mkGbLocCard"><div class="card-head"><div><h2>OPA by unit</h2>
+        <p class="hint"><span>Each OPA unit's own listing. These reviews also feed the Reviews KPI of Bonus management.</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkGbLoc"></table></div></div></div>
+    <div class="mk-p" data-p="social" hidden>
+      <div class="kpis" id="mkSoK" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
+      <div class="card"><div class="card-head"><div><h2>Social media by brand</h2>
+        <p class="hint"><span>Organic only, no ads: Instagram posts that went out in the month and their numbers to date, followers at the month end; Facebook the same.</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkSoc"></table></div></div></div>
+    <div class="mk-p" data-p="data" hidden>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Where the figures come from</h2>
+        <p class="hint"><span>nl360 regenerates its dashboard every morning from three files: data.js (every brand by month), loc.js (the OPA units) and checks.js (nl360's own checks of the figures).</span></p></div></div>
+        <div class="scroll"><table class="bn-t" id="mkSrc"></table></div></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Automatic: Cloudflare Access service token</h2>
+        <p class="hint"><span>The dashboard is behind Cloudflare Access. Ask nl360 for a service token for pulse (Client ID and Client Secret) allowed in the dashboard's access policy (Service Auth); pulse then reads the files every six hours.</span> <span>The secret is typed here, stays on the server and is never shown again.</span></p></div></div>
+        <div class="formgrid"><label class="field">Dashboard address<input id="mkUrl" spellcheck="false"></label>
+          <label class="field">Client ID<input id="mkCid" autocomplete="off" spellcheck="false"></label>
+          <label class="field">Client Secret<input id="mkSec" type="password" autocomplete="new-password"></label></div>
+        <div style="display:flex;gap:8px;align-items:center"><button class="btn dark" id="mkSave" type="button">Save</button><button class="btn" id="mkFetch" type="button">Read from nl360 now</button><span class="meta" id="mkMsg"></span></div></div>
+      <div class="card"><div class="card-head"><div><h2>Until then: upload the files</h2>
+        <p class="hint"><span>Signed in to nl360's dashboard, open rhg.nl360.co/dashboard/data.js and rhg.nl360.co/dashboard/loc.js, save each page (Ctrl+S) and upload them here.</span></p></div></div>
+        <div style="display:flex;gap:8px;align-items:center"><label class="mini" style="cursor:pointer">Choose the files<input type="file" id="mkFile" accept=".js" multiple hidden></label><span class="meta" id="mkUpMsg"></span></div></div></div>
+    <details class="card" id="mkHow" style="margin-top:15px"><summary><b>How these figures are built</b></summary><div class="hint" id="mkDefs" style="margin-top:8px"></div></details>
+  </section>
   <section class="view" id="v-gaps">
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Data quality &amp; reconciliation</h2><p class="hint" id="dqNote">Choose a company and a month above, then Check.</p></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="dqFreeze" hidden>Freeze this month</button><button class="mini dark" id="dqLoad">Check</button></div></div>
@@ -5608,6 +5659,166 @@ function slShowTab(tab){
   if (tab === "loc") { if (!salesData || salesData._q !== params()) loadSales(); else slRender(); if (!chData || chData._q !== chQuery()) loadCh(); else chRender(); }
 }
 document.querySelectorAll("#slTabs button").forEach(b => b.onclick = () => slShowTab(b.dataset.t));
+// ---------------------------------------------------------------- Marketing (marketing.py): nl360's RHG Performance dashboard
+let mkData = null, mkTab = "overview";
+const MK_TITLE = {overview: "Overview", ads: "Ads", gbp: "Google Business Profile", social: "Social media", data: "Data & connection"};
+const mkAt = (arr, k) => arr == null || k < 0 ? null : (Array.isArray(arr) ? (arr[k] ?? null) : (arr[String(k)] ?? null));
+const mkEur = (v, d = 0) => v == null ? "–" : "€" + fmt(v, d);
+const mkNum = v => v == null ? "–" : fmt(v, 0);
+function mkSum(list, f){ let s = 0, any = false; list.forEach(x => { const v = f(x); if (v != null && !isNaN(v)) { s += v; any = true; } }); return any ? s : null; }
+function mkChg(cur, ly, opts){
+  if (cur == null || ly == null) return `<span class="meta">${ly == null && cur != null ? fcSp("no data last year") : ""}</span>`;
+  if (opts && opts.diff) { const d = cur - ly; return `<span class="${d >= 0 ? "down" : "up"}">${d >= 0 ? "▲" : "▼"} ${fmt(Math.abs(d), 2)}</span>`; }
+  if (!ly) return `<span class="meta">${fcSp("0 last year")}</span>`;
+  const p = (cur - ly) / Math.abs(ly) * 100, good = opts && opts.cost ? p <= 0 : p >= 0;
+  return `<span class="${opts && opts.neutral ? "meta" : good ? "down" : "up"}">${p >= 0 ? "▲" : "▼"} ${fmt(Math.abs(p), 0)}%</span>`;
+}
+// one brand's (or unit's) figures in month k
+const MK = {
+  sales: (b, k) => mkAt(b.sales, k),
+  spend: (b, k) => { const a = mkAt(b.ads, k); return a ? (a.metaSpend || 0) + (a.gSpend || 0) : null; },
+  est: (b, k) => { const a = mkAt(b.ads, k); return a ? (a.estRev ?? null) : null; },
+  clicks: (b, k) => { const a = mkAt(b.ads, k); return a ? (a.metaClicks || 0) + (a.gClicks || 0) : null; },
+  mSpend: (b, k) => (mkAt(b.ads, k) || {}).metaSpend ?? null, mClicks: (b, k) => (mkAt(b.ads, k) || {}).metaClicks ?? null,
+  gSpend: (b, k) => (mkAt(b.ads, k) || {}).gSpend ?? null, gClicks: (b, k) => (mkAt(b.ads, k) || {}).gClicks ?? null,
+  res: (b, k) => (mkAt(b.ads, k) || {}).res ?? null, dirsAd: (b, k) => (mkAt(b.ads, k) || {}).gDirs ?? null,
+  inter: (b, k) => b.gbp ? mkAt(b.gbp.total, k) : null, dirs: (b, k) => b.gbp ? mkAt(b.gbp.dirs, k) : null,
+  calls: (b, k) => b.gbp ? mkAt(b.gbp.calls, k) : null, web: (b, k) => b.gbp ? mkAt(b.gbp.web, k) : null, menu: (b, k) => b.gbp ? mkAt(b.gbp.menu, k) : null,
+  cn: (b, k) => b.gbp && b.gbp.reviews ? mkAt(b.gbp.reviews.cn, k) : null, cs: (b, k) => b.gbp && b.gbp.reviews ? mkAt(b.gbp.reviews.cs, k) : null,
+  n: (b, k) => b.gbp && b.gbp.reviews ? mkAt(b.gbp.reviews.n, k) : null, s: (b, k) => b.gbp && b.gbp.reviews ? mkAt(b.gbp.reviews.s, k) : null,
+  igF: (b, k) => b.social ? mkAt(b.social.igFollowersEnd, k) : null, igNew: (b, k) => b.social ? mkAt(b.social.igFollows, k) : null,
+  igPosts: (b, k) => b.social ? mkAt(b.social.igPosts, k) : null, igViews: (b, k) => b.social ? mkAt(b.social.igViews, k) : null,
+  igInter: (b, k) => b.social ? mkAt(b.social.igInter, k) : null, fbF: (b, k) => b.social ? mkAt(b.social.fbFollowersEnd, k) : null,
+  fbPosts: (b, k) => b.social ? mkAt(b.social.fbPosts, k) : null, fbViews: (b, k) => b.social ? mkAt(b.social.fbViews, k) : null,
+};
+const mkRatio = (list, k, a, b) => { const x = mkSum(list, z => MK[a](z, k)), y = mkSum(list, z => MK[b](z, k)); return x != null && y ? x / y : null; };
+function mkK(){ return Number($("mkMonth").value || (mkData && mkData.months ? mkData.months.length - 1 : 0)); }
+function mkBrands(){ const id = $("mkBrand").value; return (mkData.brands || []).filter(b => !id || b.id === id); }
+function mkShow(t){
+  mkTab = t;
+  document.querySelectorAll("#mkTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
+  document.querySelectorAll("#v-marketing .mk-p").forEach(x => x.hidden = x.dataset.p !== t);
+  if (!mkData) mkLoad(); else mkRender();
+  if (currentView().id === "marketing") setHeader();
+}
+document.querySelectorAll("#mkTabs button").forEach(b => b.onclick = () => mkShow(b.dataset.t));
+$("mkRead").onclick = () => mkLoad();
+$("mkMonth").onchange = () => mkRender();
+$("mkBrand").onchange = () => mkRender();
+async function mkLoad(){
+  $("mkStatus").textContent = "Reading…";
+  try { const j = await readJSON(await fetch("/api/marketing")); if (j.error && j.available !== false) throw new Error(j.error); mkData = j; mkFill(); mkRender(); }
+  catch (e) { $("mkStatus").innerHTML = `<span class="warn">${fcSp("Could not read: " + e.message)}</span>`; }
+}
+function mkFill(){
+  const d = mkData;
+  if (!d.available) return;
+  const cur = $("mkMonth").value, last = d.months.length - 1;
+  $("mkMonth").innerHTML = d.months.map((m, i) => [m, i]).reverse().map(([m, i]) => `<option value="${i}"${String(i) === cur || (!cur && i === last) ? " selected" : ""}>${esc(m)}</option>`).join("");
+  const bc = $("mkBrand").value;
+  $("mkBrand").innerHTML = `<option value="">All brands</option>` + d.brands.map(b => `<option value="${esc(b.id)}"${b.id === bc ? " selected" : ""}>${esc(b.name)}</option>`).join("");
+}
+function mkTiles(id, rows){ $(id).innerHTML = rows.map(([l, v, c, s]) => `<div class="card kpi"><div class="lbl">${fcSp(l)}</div><div class="v">${v}</div><div class="meta">${c || ""}${s ? " " + fcSp(s) : ""}</div></div>`).join(""); }
+function mkRender(){
+  const d = mkData; if (!d) return;
+  mkSrc();
+  $("mkDefs").innerHTML = Object.values(d.definitions || {}).map(x => `<p>${fcSp(x)}</p>`).join("");
+  ["mkSave", "mkFetch", "mkFile"].forEach(id => { $(id).disabled = !d.can_manage; });
+  if (!d.available) { $("mkStatus").innerHTML = `<span class="warn">${fcSp(d.error || "No marketing data yet.")}</span>`; ["mkKpis", "mkBrands", "mkAdK", "mkAds", "mkAdTrend", "mkGbK", "mkGbp", "mkGbLoc", "mkSoK", "mkSoc"].forEach(i => $(i).innerHTML = ""); return; }
+  const k = mkK(), ly = k - 12, B = mkBrands(), m = d.months[k];
+  $("mkStatus").textContent = `${m} · against ${ly >= 0 ? d.months[ly] : "no month last year"} · nl360 dashboard generated ${String(d.generated || "").replace("T", " ").slice(0, 16)}`
+    + (d.checks ? ` · nl360's checks: ${fmt(d.checks.total)} figures, ${d.checks.mismatches} mismatches` : "");
+  const S = (f, kk) => mkSum(B, b => MK[f](b, kk));
+  const cpc = kk => { const s = S("spend", kk), c = S("clicks", kk); return s != null && c ? s / c : null; };
+  const nr = kk => mkRatio(B, kk, "s", "n"), rt = kk => mkRatio(B, kk, "cs", "cn");
+  if (mkTab === "overview") {
+    mkTiles("mkKpis", [["Ad spend", mkEur(S("spend", k)), mkChg(S("spend", k), S("spend", ly), {neutral: true}), "Meta + Google"],
+      ["Est. ads revenue", mkEur(S("est", k)), mkChg(S("est", k), S("est", ly)), "nl360's estimate"],
+      ["Ad clicks", mkNum(S("clicks", k)), mkChg(S("clicks", k), S("clicks", ly))],
+      ["Google interactions", mkNum(S("inter", k)), mkChg(S("inter", k), S("inter", ly))],
+      ["New Google reviews", mkNum(S("n", k)), mkChg(S("n", k), S("n", ly)), nr(k) != null ? `rated ${fmt(nr(k), 2)}` : ""],
+      ["Instagram followers", mkNum(S("igF", k)), mkChg(S("igF", k), S("igF", ly))]]);
+    $("mkBrands").innerHTML = `<thead><tr><th>Brand</th><th class="num">Net sales</th><th class="num">Ad spend</th><th class="num">Spend % of sales</th><th class="num">Est. ads revenue</th><th class="num">Ad clicks</th><th class="num">Google interactions</th><th class="num">New reviews</th><th class="num">Their rating</th><th class="num">IG followers</th><th class="num">IG interactions</th></tr></thead><tbody>`
+      + B.map(b => { const sp = MK.spend(b, k), sa = MK.sales(b, k), n = MK.n(b, k), s = MK.s(b, k), nl = MK.n(b, ly), sl = MK.s(b, ly);
+        return `<tr><td><b>${esc(b.name)}</b><div class="meta">${esc(b.sub || (b.group === "season" ? "Seasonal" : ""))}</div></td>
+          <td class="num">${mkEur(sa)}<div>${mkChg(sa, MK.sales(b, ly))}</div></td><td class="num">${mkEur(sp)}<div>${mkChg(sp, MK.spend(b, ly), {neutral: true})}</div></td>
+          <td class="num">${sp != null && sa ? fmt(sp / sa * 100, 2) + "%" : "–"}</td><td class="num">${mkEur(MK.est(b, k))}<div>${mkChg(MK.est(b, k), MK.est(b, ly))}</div></td>
+          <td class="num">${mkNum(MK.clicks(b, k))}</td><td class="num">${mkNum(MK.inter(b, k))}<div>${mkChg(MK.inter(b, k), MK.inter(b, ly))}</div></td>
+          <td class="num">${mkNum(n)}</td><td class="num">${n ? fmt(s / n, 2) : "–"}<div>${n && nl ? mkChg(s / n, sl / nl, {diff: true}) : ""}</div></td>
+          <td class="num">${mkNum(MK.igF(b, k))}</td><td class="num">${mkNum(MK.igInter(b, k))}<div>${mkChg(MK.igInter(b, k), MK.igInter(b, ly))}</div></td></tr>`; }).join("") + `</tbody>`;
+  }
+  if (mkTab === "ads") {
+    mkTiles("mkAdK", [["Ad spend", mkEur(S("spend", k)), mkChg(S("spend", k), S("spend", ly), {neutral: true})],
+      ["Est. ads revenue", mkEur(S("est", k)), mkChg(S("est", k), S("est", ly))],
+      ["Ad clicks", mkNum(S("clicks", k)), mkChg(S("clicks", k), S("clicks", ly))],
+      ["Cost per click", cpc(k) == null ? "–" : mkEur(cpc(k), 2), mkChg(cpc(k), cpc(ly), {cost: true})],
+      ["Reservations from Meta", mkNum(S("res", k)), mkChg(S("res", k), S("res", ly))],
+      ["Directions from Google ads", mkNum(S("dirsAd", k)), mkChg(S("dirsAd", k), S("dirsAd", ly))]]);
+    $("mkAds").innerHTML = `<thead><tr><th>Brand</th><th class="num">Meta spend</th><th class="num">Meta clicks</th><th class="num">Meta CPC</th><th class="num">Reservations</th><th class="num">Google spend</th><th class="num">Google clicks</th><th class="num">Directions</th><th class="num">Total spend</th><th class="num">Est. ads revenue</th></tr></thead><tbody>`
+      + B.map(b => { const ms = MK.mSpend(b, k), mc = MK.mClicks(b, k);
+        return `<tr><td><b>${esc(b.name)}</b></td><td class="num">${mkEur(ms)}</td><td class="num">${mkNum(mc)}</td><td class="num">${ms != null && mc ? mkEur(ms / mc, 2) : "–"}</td>
+          <td class="num">${mkNum(MK.res(b, k))}</td><td class="num">${mkEur(MK.gSpend(b, k))}</td><td class="num">${mkNum(MK.gClicks(b, k))}</td><td class="num">${mkNum(MK.dirsAd(b, k))}</td>
+          <td class="num"><b>${mkEur(MK.spend(b, k))}</b><div>${mkChg(MK.spend(b, k), MK.spend(b, ly), {neutral: true})}</div></td><td class="num">${mkEur(MK.est(b, k))}<div>${mkChg(MK.est(b, k), MK.est(b, ly))}</div></td></tr>`; }).join("") + `</tbody>`;
+    const ks = []; for (let i = Math.max(0, k - 11); i <= k; i++) ks.push(i);
+    const row = (l, f, fm) => `<tr><td><b>${esc(l)}</b></td>${ks.map(i => `<td class="num">${fm(f(i))}</td>`).join("")}</tr>`;
+    $("mkAdTrend").innerHTML = `<thead><tr><th></th>${ks.map(i => `<th class="num">${esc(d.months[i])}</th>`).join("")}</tr></thead><tbody>`
+      + row("Ad spend", i => S("spend", i), mkEur) + row("Est. ads revenue", i => S("est", i), mkEur) + row("Ad clicks", i => S("clicks", i), mkNum)
+      + row("Cost per click", cpc, v => v == null ? "–" : mkEur(v, 2)) + row("Net sales", i => S("sales", i), mkEur) + `</tbody>`;
+  }
+  if (mkTab === "gbp") {
+    mkTiles("mkGbK", [["Total interactions", mkNum(S("inter", k)), mkChg(S("inter", k), S("inter", ly))],
+      ["Directions", mkNum(S("dirs", k)), mkChg(S("dirs", k), S("dirs", ly))], ["Calls", mkNum(S("calls", k)), mkChg(S("calls", k), S("calls", ly))],
+      ["Google rating", rt(k) == null ? "–" : fmt(rt(k), 2), mkChg(rt(k), rt(ly), {diff: true}), "all reviews"],
+      ["New reviews", mkNum(S("n", k)), mkChg(S("n", k), S("n", ly))], ["Rating of new reviews", nr(k) == null ? "–" : fmt(nr(k), 2), mkChg(nr(k), nr(ly), {diff: true})]]);
+    const gRow = (x, name, sub) => { const n = MK.n(x, k), s = MK.s(x, k), cn = MK.cn(x, k), cs = MK.cs(x, k);
+      return `<tr><td><b>${esc(name)}</b>${sub ? `<div class="meta">${esc(sub)}</div>` : ""}</td><td class="num">${mkNum(MK.inter(x, k))}<div>${mkChg(MK.inter(x, k), MK.inter(x, ly))}</div></td>
+        <td class="num">${mkNum(MK.dirs(x, k))}</td><td class="num">${mkNum(MK.calls(x, k))}</td><td class="num">${mkNum(MK.web(x, k))}</td><td class="num">${mkNum(MK.menu(x, k))}</td>
+        <td class="num">${cn ? fmt(cs / cn, 2) : "–"}</td><td class="num">${mkNum(cn)}</td><td class="num">${mkNum(n)}<div>${mkChg(n, MK.n(x, ly))}</div></td>
+        <td class="num">${n ? bnS(Math.round(s / n)) + " " + fmt(s / n, 2) : "–"}</td></tr>`; };
+    const head = `<thead><tr><th></th><th class="num">Interactions</th><th class="num">Directions</th><th class="num">Calls</th><th class="num">Website</th><th class="num">Menu views</th><th class="num">Rating</th><th class="num">Total reviews</th><th class="num">New reviews</th><th class="num">Their rating</th></tr></thead>`;
+    $("mkGbp").innerHTML = head + `<tbody>` + B.map(b => b.gbp ? gRow(b, b.name, b.sub) : `<tr><td><b>${esc(b.name)}</b></td><td colspan="9" class="meta">${fcSp("No Google Business Profile")}</td></tr>`).join("") + `</tbody>`;
+    const opa = B.find(b => (b.locs || []).length);
+    $("mkGbLocCard").hidden = !opa;
+    if (opa) $("mkGbLoc").innerHTML = head + `<tbody>` + opa.locs.map(l => l.gbp ? gRow(l, l.name, l.till ? "Simphony " + l.till : "") : `<tr><td><b>${esc(l.name)}</b></td><td colspan="9" class="meta">${fcSp("No Google Business Profile")}</td></tr>`).join("") + `</tbody>`;
+  }
+  if (mkTab === "social") {
+    mkTiles("mkSoK", [["Instagram followers", mkNum(S("igF", k)), mkChg(S("igF", k), S("igF", ly))], ["New followers", mkNum(S("igNew", k)), mkChg(S("igNew", k), S("igNew", ly))],
+      ["Posts", mkNum(S("igPosts", k)), mkChg(S("igPosts", k), S("igPosts", ly))], ["Views", mkNum(S("igViews", k)), mkChg(S("igViews", k), S("igViews", ly))],
+      ["Interactions", mkNum(S("igInter", k)), mkChg(S("igInter", k), S("igInter", ly)), "likes, comments, shares, saves"], ["Facebook followers", mkNum(S("fbF", k)), mkChg(S("fbF", k), S("fbF", ly))]]);
+    $("mkSoc").innerHTML = `<thead><tr><th>Brand</th><th class="num">IG followers</th><th class="num">New followers</th><th class="num">Posts</th><th class="num">Views</th><th class="num">Interactions</th><th class="num">FB followers</th><th class="num">FB posts</th><th class="num">FB views</th></tr></thead><tbody>`
+      + B.map(b => `<tr><td><b>${esc(b.name)}</b></td><td class="num">${mkNum(MK.igF(b, k))}<div>${mkChg(MK.igF(b, k), MK.igF(b, ly))}</div></td><td class="num">${mkNum(MK.igNew(b, k))}</td>
+        <td class="num">${mkNum(MK.igPosts(b, k))}</td><td class="num">${mkNum(MK.igViews(b, k))}<div>${mkChg(MK.igViews(b, k), MK.igViews(b, ly))}</div></td>
+        <td class="num">${mkNum(MK.igInter(b, k))}<div>${mkChg(MK.igInter(b, k), MK.igInter(b, ly))}</div></td><td class="num">${mkNum(MK.fbF(b, k))}</td><td class="num">${mkNum(MK.fbPosts(b, k))}</td><td class="num">${mkNum(MK.fbViews(b, k))}</td></tr>`).join("") + `</tbody>`;
+  }
+}
+function mkSrc(){
+  const d = mkData, meta = d.meta || {}, st = d.state || {}, se = d.settings || {};
+  $("mkSrc").innerHTML = `<thead><tr><th>File</th><th>Read</th><th>How</th><th>Generated by nl360</th></tr></thead><tbody>`
+    + [["data", "data.js"], ["loc", "loc.js"], ["checks", "checks.js"]].map(([k, f]) => { const x = meta[k] || {};
+      return `<tr><td><code>${f}</code></td><td>${esc(x.at ? x.at.replace("T", " ") : "not yet")}</td><td>${esc(x.how ? x.how + (x.by ? " · " + x.by : "") : "–")}</td><td>${esc(x.generated ? String(x.generated).replace("T", " ").slice(0, 16) : "–")}</td></tr>`; }).join("") + `</tbody>`
+    + (st.error ? `<tbody><tr><td colspan="4" class="up">${esc(st.error)}</td></tr></tbody>` : "");
+  if (document.activeElement !== $("mkUrl")) $("mkUrl").value = se.url || "";
+  if (document.activeElement !== $("mkCid")) $("mkCid").value = se.client_id || "";
+  $("mkSec").placeholder = se.client_secret_set ? "saved · type to replace" : "";
+}
+async function mkPost(path, body){
+  const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "RHG-Finance"}, body: JSON.stringify(body || {})});
+  const j = await readJSON(r); if (!r.ok) throw new Error(j.error || r.status); return j;
+}
+$("mkSave").onclick = async () => { $("mkMsg").textContent = "Saving…";
+  try { mkData = await mkPost("/api/marketing/settings", {url: $("mkUrl").value, client_id: $("mkCid").value, client_secret: $("mkSec").value}); $("mkSec").value = ""; $("mkMsg").textContent = "Saved."; mkFill(); mkRender(); }
+  catch (e) { $("mkMsg").textContent = "Not saved: " + e.message; } };
+$("mkFetch").onclick = async () => { $("mkMsg").textContent = "Reading from nl360…";
+  try { mkData = await mkPost("/api/marketing/fetch", {}); $("mkMsg").textContent = (mkData.state || {}).error ? "Not read: " + mkData.state.error : "Read."; mkFill(); mkRender(); }
+  catch (e) { $("mkMsg").textContent = "Not read: " + e.message; } };
+$("mkFile").onchange = async () => {
+  const files = [...$("mkFile").files]; $("mkUpMsg").textContent = "Uploading…";
+  const done = [];
+  try { for (const f of files) { const text = await f.text(); mkData = await mkPost("/api/marketing/upload", {name: f.name, text}); done.push(f.name); }
+    $("mkUpMsg").textContent = "Uploaded: " + done.join(", "); mkFill(); mkRender(); }
+  catch (e) { $("mkUpMsg").textContent = (done.length ? "Uploaded " + done.join(", ") + "; " : "") + "not uploaded: " + e.message; }
+  $("mkFile").value = "";
+};
 // ---------------------------------------------------------------- Sales → Bonus management (bonus.py): the CEO and the
 // Administrator only (screen finance.s.sales.bonus). The scorecard of a month, the payout of the year, the plans.
 let bnData = null, bnYearData = null, bnCfg = null, bnPart = "card", bnTimer = null, bnOpen = null, bnPlanKey = null, bnUnitRef = null;
@@ -10823,6 +11034,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   if(b.dataset.view==="sales" && (!salesData || salesData._q !== params())) loadSales();
   if(b.dataset.view==="people") ppShow(ppTab);
   if(b.dataset.view==="opsexec") oxShow(oxTab);
+  if(b.dataset.view==="marketing") mkShow(mkTab);
   if(b.dataset.view==="closing" && data && !data.closing) loadClosing();
   if(b.dataset.view==="bs" || b.dataset.view==="liquidity") loadCap(false);
   if(b.dataset.view==="gaps") loadDq(false);
@@ -10879,6 +11091,12 @@ function setHeader(){
   $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower); $("towerOps").classList.toggle("on", opsTower); $("towerPeople").classList.toggle("on", pplTower);
   $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower); $("towerOps").toggleAttribute("aria-current", opsTower); $("towerPeople").toggleAttribute("aria-current", pplTower);
   if (pplTower) { oxTower(false); ppTower(true); } else { ppTower(false); oxTower(opsTower); }
+  if (v.id === "marketing") {
+    $("title").textContent = `Marketing · ${MK_TITLE[mkTab]}`;
+    $("period").textContent = mkData && mkData.available ? `nl360's RHG Performance dashboard · generated ${String(mkData.generated || "").replace("T", " ").slice(0, 16)} · euros · read only`
+      : "nl360's RHG Performance dashboard · read only";
+    return;
+  }
   if (!data) { $("title").textContent = v.label; return; }
   const m = data.meta;
   if (v.id === "opsexec"){

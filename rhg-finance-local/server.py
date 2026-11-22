@@ -62,6 +62,7 @@ import opsexec
 import srsim
 import bonus
 import reviews
+import marketing
 import sevenrooms_report
 import requests
 import cost_report
@@ -3405,6 +3406,12 @@ class Handler(BaseHTTPRequestHandler):
                     except odoo.Error as exc:
                         out["error"] = str(exc)[:300]
                 self._send(200, out)
+            elif url.path == "/api/marketing":
+                # Marketing (marketing.py): nl360's RHG Performance dashboard, read into pulse
+                if not any(auth.can(user, f"finance.s.marketing.{t}") for t in ("overview", "ads", "gbp", "social", "data")):
+                    self._send(403, {"error": "Your role does not include Marketing."})
+                    return
+                self._send(200, dict(marketing.public(), can_manage=auth.can(user, "finance.s.marketing.data")))
             elif url.path.startswith("/api/bonus"):
                 # Sales → Bonus management: the CEO and the Administrator only (bonus.py)
                 self._bonus_get(url.path, q, user)
@@ -4378,6 +4385,24 @@ class Handler(BaseHTTPRequestHandler):
         if url.path.startswith("/api/bonus/"):
             self._bonus_post(url.path, body, user, actor)
             return
+        if url.path in ("/api/marketing/settings", "/api/marketing/upload", "/api/marketing/fetch"):
+            if not auth.can(user, "finance.s.marketing.data"):
+                self._send(403, {"error": "Your role does not include Marketing → Data & connection."})
+                return
+            if self.headers.get("X-Requested-With") != "RHG-Finance":
+                self._send(403, {"error": "This request must come from the Finance tower."})
+                return
+            try:
+                if url.path.endswith("/settings"):
+                    marketing.save_settings(body, actor)
+                elif url.path.endswith("/upload"):
+                    marketing.upload(body.get("name"), body.get("text"), actor)
+                else:
+                    marketing.fetch_now(actor)
+                self._send(200, dict(marketing.public(), can_manage=True))
+            except (ValueError, TypeError) as exc:
+                self._send(400, {"error": str(exc)})
+            return
         try:
             if url.path == "/api/exceptions/email":
                 self._send(*send_exception_email(body, user))
@@ -5027,6 +5052,7 @@ def main():
     ssrep.start()
     srrep.start()
     reviews.start()
+    marketing.start()
     exreg.configure(mailer=lambda to, cc, subject, body, text: arap_notify.send_mail(
         to, cc, subject, body, text, source="Finance · exceptions register"))
     try:

@@ -118,3 +118,38 @@ class Vendors(unittest.TestCase):
         self.assertNotIn("Source_No", asked[0][1]["$select"])
         self.assertEqual([r["Vendor"] for r in rows], ["Agro", ""])
         self.assertEqual(asked[1][1]["$filter"], "No eq 'PI1'")
+
+
+class Build(unittest.TestCase):
+    """build(): the company-wide reads and the locations read at the same time, with the progress said."""
+    def test_locations_in_parallel_with_progress(self):
+        import threading
+        seen, said = set(), []
+
+        class C:
+            def _url(self, co, ent):
+                return ent
+
+            def _get_all(self, url, params):
+                if "Entry_Type eq 'Purchase'" in params.get("$filter", ""):
+                    return [{"Entry_No": i, "Item_No": "A1", "Location_Code": f"L{i}", "Posting_Date": "2026-11-10", "Quantity": 50,
+                             "Cost_Amount_Actual": 5000, "Document_No": f"R{i}", "Document_Type": "Purchase Receipt"} for i in range(1, 8)]
+                return [{"Entry_No": int(params["$filter"].split("'")[1][1:]), "Entry_Type": "Purchase", "Item_No": "A1",
+                         "Posting_Date": "2026-11-10", "Quantity": 50}]
+
+            def purchase_order_cards(self, company):
+                return []
+
+            def stockkeeping_units(self, company):
+                return {("A1", "L1"): {"maximum": 20, "reorder_point": 5}}, {}
+
+            def item_catalog(self, company):
+                return {"A1": {"desc": "Fileto", "code": "MISH", "uom": "KG"}}
+
+            def inventory_at(self, company, loc, day):
+                seen.add(threading.current_thread().name)
+                return {"A1": 0.0}, {}
+        r = poreco.build(C(), "SALT", "2026-11-01", "2026-11-30", {}, date(2026, 12, 1), progress=said.append)
+        self.assertEqual(len({x["key"] for x in r["locations"]}), 7)
+        self.assertTrue(said[-1].endswith("7 of 7 locations…"))
+        self.assertTrue(all(n != threading.main_thread().name for n in seen))
