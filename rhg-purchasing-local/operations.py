@@ -242,7 +242,7 @@ def purchase_orders(po_rows, settings, today=None):
     return out
 
 
-def events(docs, pos, limit=120, reqs=None, closed_reqs=None, order_hist=None):
+def events(docs, pos, limit=600, reqs=None, closed_reqs=None, order_hist=None):
     """Live operations feed from the events BC actually records, plus what the app has tracked itself."""
     ev = []
     for r in (reqs or []):
@@ -254,7 +254,7 @@ def events(docs, pos, limit=120, reqs=None, closed_reqs=None, order_hist=None):
             "age_days": round((r.get("hours_open") or 0) / 24, 1) if r.get("hours_open") is not None else None,
             "next_action": "Convert into a purchase order.",
         })
-    for c in (closed_reqs or [])[:20]:
+    for c in (closed_reqs or [])[:500]:            # every requisition carried out, for Live operations by location
         ev.append({
             "kind": "Requisition carried out", "date": (c.get("closed_at") or "")[:10], "user": c.get("user", ""),
             "document": c.get("item") or c.get("key"), "document_type": "Requisition", "supplier": c.get("vendor", ""),

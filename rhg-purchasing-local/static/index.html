@@ -340,6 +340,15 @@ td.num,th.num{text-align:right}
 .pl-grp{display:flex;align-items:baseline;gap:10px;margin:14px 0 8px;font-size:13px}
 .pl-grp span{font-size:11.5px;color:var(--sub)}
 .pl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.lv-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.lv-chips button{all:unset;cursor:pointer;font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--sub)}
+.lv-chips button.on{border-color:var(--accent);color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--accent)}
+.lv-chips button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lv-flt{margin:0 0 8px}
+.pl-sq.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.lv-ev{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--ink)}
+.lv-ev.req{background:color-mix(in srgb,var(--accent) 14%,transparent)}.lv-ev.rcpt{background:color-mix(in srgb,#1e8e5a 16%,transparent)}
+.lv-ev.inv{background:color-mix(in srgb,#8a5a00 16%,transparent)}.lv-ev.po{background:color-mix(in srgb,#6b4fa0 15%,transparent)}.lv-ev.cm{background:color-mix(in srgb,#c0392b 14%,transparent)}
 .pl-sq{box-sizing:border-box;display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;cursor:pointer;min-width:0}
 .pl-sq:hover,.pl-sq:focus-visible{border-color:var(--accent);box-shadow:0 4px 14px rgba(8,48,63,.12);outline:none}
 .pl-sq .hd{display:flex;align-items:center;gap:8px}
@@ -920,17 +929,25 @@ tr.pr-late td:first-child{box-shadow:inset 3px 0 0 var(--up)}
       <div class="card kpi clickable" data-drill="sla"><div class="l">Open exceptions</div><div class="v" id="lExc">–</div><div class="s" id="lExcS"></div></div>
       <div class="card kpi"><div class="l">Data updated at</div><div class="v" id="lTime" style="font-size:20px">–</div><div class="s" id="lTimeS"></div></div>
     </div>
-    <div class="card">
-      <div class="card-head"><div><h2>Activity feed</h2><p class="hint" id="liveHint"></p></div>
-        <input class="search" id="liveSearch" placeholder="Search document, supplier, user"></div>
-      <div class="scroll"><table id="liveTable"></table></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Location intelligence</h2>
+      <p class="hint">Each location's requisitions carried out into orders and those still waiting, its open purchase orders, goods received not yet invoiced and the period's purchases. Click a location to see its activity in the feed below; again to show every location.</p></div></div>
+      <div id="lvGrid"></div></div>
+    <div class="card" id="lvFeedCard">
+      <div class="card-head"><div><h2>Activity feed</h2><p class="hint" id="liveHint"></p></div></div>
+      <div class="lv-chips" id="lvChips" role="group" aria-label="Event"></div>
+      <div class="filters lv-flt">
+        <label>Location<select id="lvLoc"><option value="">All locations</option></select></label>
+        <label>User<select id="lvUser"><option value="">All users</option></select></label>
+        <label>Vendor<select id="lvVen"><option value="">All vendors</option></select></label>
+        <label>Search<input id="liveSearch" placeholder="Document, item, vendor or user"></label>
+        <button class="mini" type="button" id="lvClear">Clear filters</button>
+      </div>
+      <p class="meta" id="lvCount" style="margin:0 0 6px"></p>
+      <div class="scroll" style="max-height:620px"><table id="liveTable"></table></div>
     </div>
     <div class="card" style="margin-top:16px"><h2>Events Business Central does not record here</h2>
-      <p class="hint">Requisitions, approval steps, document modifications and reopened documents need the web services listed under Data availability. They are not estimated.</p>
+      <p class="hint">Approval steps, document modifications and reopened documents need the web services listed under Data availability. They are not estimated.</p>
       <div id="liveGaps"></div></div>
-    <div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Location intelligence</h2>
-      <p class="hint">Each location's requisitions and orders: requisition lines waiting and carried out into orders, open purchase orders and their age, goods received not yet invoiced, and the period's purchases. Click a location for its documents.</p></div></div>
-      <div class="scroll"><table id="lvLocTable"></table></div></div>
     </div>
     <div id="lvPoreco" style="display:none">
       <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Orders against the system's recommendation</h2>
@@ -2138,17 +2155,8 @@ function renderLive(){
   const t = new Date(data.meta.checked_at);
   $("lTime").textContent = t.toLocaleTimeString("en-GB");
   $("lTimeS").textContent = `Refreshes every ${data.meta.refresh_seconds}s · BC is polled, so events appear at the next poll`;
-  $("liveHint").textContent = "Posted documents and open orders, newest first. Time in status is counted from the document date.";
-  const q = ($("liveSearch").value||"").toLowerCase();
-  const rows = (ops.events||[]).filter(e => !q || [e.document,e.supplier,e.user,e.location,e.kind].join(" ").toLowerCase().includes(q));
-  $("liveTable").innerHTML = `<tr><th>When</th><th>Event</th><th>Document</th><th>Supplier</th><th>Location</th><th>User</th><th class="num">Value (${CUR})</th><th>Status</th><th>Next action</th></tr>` +
-    (rows.length ? rows.map(e => `<tr><td>${esc(e.date||"")}</td><td class="name">${esc(e.kind)}</td>
-      <td><a href="#" class="ev" data-kind="${e.document_type==="Purchase Order"?"po":"document"}" data-key="${esc(e.document)}">${esc(e.document)}</a></td>
-      <td>${esc(e.supplier||"–")}</td><td>${esc(e.location||"–")}</td><td>${esc(e.user||"–")}</td>
-      <td class="num">${fmt(e.amount)}</td><td>${esc(e.status)}${e.age_days!=null?` · ${e.age_days}d`:""}</td>
-      <td class="meta">${esc(e.next_action||"")}</td></tr>`).join("")
-      : `<tr><td colspan="9" class="empty">No activity in this period.</td></tr>`);
-  document.querySelectorAll("#liveTable .ev").forEach(a => a.onclick = e => { e.preventDefault(); openDrill(a.dataset.kind, a.dataset.key); });
+  $("liveHint").textContent = "Requisitions carried out and waiting, posted documents and open orders, newest first. Time in status is counted from the document date.";
+  lvFeed();
   $("liveGaps").innerHTML = (data.gaps||[]).slice(0,4).map(g => `<div class="gap"><b>${esc(g.kpi)}</b><span>${esc(g.missing)}</span></div>`).join("");
   lvRenderLoc();
   if (lvTab === "poreco") prcLoad(false);
@@ -2165,21 +2173,63 @@ function lvLocRows(){
   Object.entries(B).forEach(([c, v]) => { if (c === "?") c = ""; const x = at(c); x.spend = v.cur || 0; x.prev = v.prev || 0; x.pct = v.pct; });
   return Object.values(L).filter(x => x.req_open || x.req_done || x.po || x.spend).sort((a, b) => b.spend - a.spend);
 }
+let lvSel = "", lvKind = "";
+const LV_KINDS = [["req_done", "Requisitions carried out", e => e.kind === "Requisition carried out", "req"], ["req_open", "Requisitions waiting", e => e.kind === "Requisition open", "req"],
+  ["po", "Purchase orders", e => e.document_type === "Purchase Order", "po"], ["rcpt", "Goods receipts", e => e.kind === "Goods receipt posted", "rcpt"],
+  ["inv", "Invoices", e => e.kind === "Purchase invoice posted", "inv"], ["cm", "Credit notes", e => e.kind === "Credit note posted", "cm"]];
+const lvKindOf = e => (LV_KINDS.find(k => k[2](e)) || [])[3] || "";
+const lvLocsOf = e => String(e.location || "").split(", ").filter(Boolean);
 function lvRenderLoc(){
+  if (!plNames && !lvRenderLoc.asked) { lvRenderLoc.asked = true; plLoadNames().then(() => data && lvRenderLoc()); }   // the locations' names
   const rows = lvLocRows();
-  $("lvLocTable").innerHTML = `<tr><th>Location</th><th class="num">Requisitions waiting</th><th class="num">Carried out</th><th class="num">At supply risk</th><th class="num">Open orders</th><th class="num">Open value</th><th class="num">Open too long</th><th class="num">Received, not invoiced</th><th class="num">Purchases (${CUR})</th><th class="num">vs before</th></tr>` +
-    (rows.map(x => `<tr class="click" data-pulse="lvloc|${esc(x.code)}" tabindex="0"><td class="name">${esc(x.code)}</td><td class="num">${fmt(x.req_open)}</td><td class="num">${fmt(x.req_done)}</td>
-      <td class="num ${x.req_risk ? "bad" : ""}">${fmt(x.req_risk)}</td><td class="num">${fmt(x.po)}</td><td class="num">${fmt(x.po_value)}</td><td class="num ${x.stale ? "bad" : ""}">${fmt(x.stale)}</td>
-      <td class="num">${fmt(x.rni)}</td><td class="num"><b>${fmt(x.spend)}</b></td><td class="num">${x.pct == null ? "–" : (x.pct >= 0 ? "+" : "") + fmt(x.pct, 1) + "%"}</td></tr>`).join("")
-     || `<tr><td colspan="10" class="empty">No requisition or order in this period.</td></tr>`);
+  const stat = (l, v, cls) => `<div><span>${l}</span><b class="${cls || ""}">${v}</b></div>`;
+  $("lvGrid").innerHTML = rows.length ? `<div class="pl-grid">` + rows.map(x => {
+    const flag = x.req_risk ? ["crit", `${x.req_risk} requisition${x.req_risk > 1 ? "s" : ""} at supply risk`] : x.stale ? ["warn", `${x.stale} order${x.stale > 1 ? "s" : ""} open too long`]
+      : x.rni > 0 ? ["info", `${plM(x.rni)} received, not invoiced`] : ["good", "Nothing waiting"];
+    const name = typeof plName === "function" ? plName(x.code) : "";
+    return `<div class="pl-sq${lvSel === x.code ? " on" : ""}" role="button" tabindex="0" data-lvloc="${esc(x.code)}" aria-label="${esc(x.code)}: its activity">
+      <div class="hd"><div class="ic">${typeof plGlyph === "function" ? plGlyph(x.code) : ""}</div><div class="nm"><b>${esc(name || x.code)}</b><span>${esc(name ? x.code : "")}</span></div></div>
+      <div class="big"><span class="v">${fmt(x.req_done)}</span><span class="cmp">requisitions carried out${x.req_open ? ` · <b>${fmt(x.req_open)}</b> waiting` : ""}</span></div>
+      <div class="st">${stat("Open orders", x.po ? `${fmt(x.po)} · ${plM(x.po_value)}` : "–")}${stat("Receipts", fmt(x.receipts))}
+        ${stat("Not invoiced", x.rni ? plM(x.rni) : "–", x.rni ? "up" : "")}${stat("Purchases", x.spend ? plM(x.spend) : "–")}</div>
+      <div class="al ${flag[0]}"><i></i><span>${esc(flag[1])}</span></div></div>`; }).join("") + `</div>`
+    : `<p class="hint">No requisition or order in this period.</p>`;
 }
-Pulse.on("lvloc", code => {
-  const ops = data.operations || {}, ev = (ops.events || []).filter(e => String(e.location || "").split(", ").includes(code)), po = (ops.purchase_orders || []).filter(p => (p.location || "–") === code);
-  Pulse.pop({title: esc(code), sub: esc(`Requisitions and orders · ${data.meta.period_label || ""}`), body: Pulse.panel("Open purchase orders", Pulse.list([["Order"], ["Vendor"], ["Status"], ["Date"], ["Amount", 1], ["Received, not invoiced", 1], ["Age (days)", 1]],
-      po.map(p => ({cells: [esc(p.no), esc(p.supplier || ""), esc(p.status || ""), esc(p.document_date || ""), fmt(p.amount), fmt(p.received_not_invoiced), p.age_days == null ? "–" : fmt(p.age_days)]})), {none: "No open order."}))
-    + Pulse.panel("Activity", Pulse.list([["When"], ["Event"], ["Document"], ["Vendor"], ["User"], ["Value", 1], ["Status"]],
-      ev.map(e => ({cells: [esc(e.date || ""), esc(e.kind), esc(e.document || ""), esc(e.supplier || "–"), esc(e.user || "–"), fmt(e.amount), esc(e.status || "")]})), {none: "No activity in the feed for this location."}))});
+function lvFill(sel, values, all){
+  const keep = sel.value;
+  sel.innerHTML = `<option value="">${esc(all)}</option>` + [...new Set(values.filter(Boolean))].sort().map(v => `<option value="${esc(v)}" data-no-i18n>${esc(v)}</option>`).join("");
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+}
+function lvFeed(){
+  const ops = data.operations || {}, all = ops.events || [];
+  lvFill($("lvLoc"), all.flatMap(lvLocsOf), "All locations"); lvFill($("lvUser"), all.map(e => e.user), "All users"); lvFill($("lvVen"), all.map(e => e.supplier), "All vendors");
+  if (lvSel && $("lvLoc").value !== lvSel && [...$("lvLoc").options].some(o => o.value === lvSel)) $("lvLoc").value = lvSel;
+  const loc = $("lvLoc").value, us = $("lvUser").value, ve = $("lvVen").value, q = ($("liveSearch").value || "").toLowerCase();
+  const base = all.filter(e => (!loc || lvLocsOf(e).includes(loc)) && (!us || e.user === us) && (!ve || e.supplier === ve)
+    && (!q || [e.document, e.supplier, e.user, e.location, e.kind].join(" ").toLowerCase().includes(q)));
+  $("lvChips").innerHTML = [["", "Every event", base.length]].concat(LV_KINDS.map(k => [k[0], k[1], base.filter(k[2]).length]).filter(k => k[2]))
+    .map(([k, l, n]) => `<button type="button" data-lvk="${k}" class="${lvKind === k ? "on" : ""}">${esc(l)} · ${fmt(n)}</button>`).join("");
+  const kf = (LV_KINDS.find(k => k[0] === lvKind) || [])[2];
+  const rows = base.filter(e => !kf || kf(e));
+  $("lvCount").textContent = `${fmt(rows.length)} of ${fmt(all.length)} events${loc ? " · " + loc : ""}${us ? " · " + us : ""}${ve ? " · " + ve : ""}`;
+  $("liveTable").innerHTML = `<tr><th>When</th><th>Event</th><th>Document</th><th>Vendor</th><th>Location</th><th>User</th><th class="num">Value (${CUR})</th><th>Status</th><th>Next action</th></tr>` +
+    (rows.length ? rows.map(e => `<tr><td>${esc(e.date||"")}</td><td><span class="lv-ev ${lvKindOf(e)}">${esc(e.kind)}</span></td>
+      <td><a href="#" class="ev" data-kind="${e.document_type==="Purchase Order"?"po":e.document_type==="Requisition"?"item":"document"}" data-key="${esc(e.document)}">${esc(e.document)}</a></td>
+      <td>${esc(e.supplier||"–")}</td><td>${esc(e.location||"–")}</td><td>${esc(e.user||"–")}</td>
+      <td class="num">${e.amount ? fmt(e.amount) : "–"}</td><td>${esc(e.status)}${e.age_days!=null?` · ${e.age_days}d`:""}</td>
+      <td class="meta">${esc(e.next_action && e.next_action !== "None" ? e.next_action : "")}</td></tr>`).join("")
+      : `<tr><td colspan="9" class="empty">No activity with these filters.</td></tr>`);
+  document.querySelectorAll("#liveTable .ev").forEach(a => a.onclick = ev => { ev.preventDefault(); openDrill(a.dataset.kind, a.dataset.key); });
+}
+document.addEventListener("click", e => {
+  const sq = e.target.closest("[data-lvloc]");
+  if (sq) { lvSel = lvSel === sq.dataset.lvloc ? "" : sq.dataset.lvloc; $("lvLoc").value = lvSel; lvRenderLoc(); lvFeed(); if (lvSel) $("lvFeedCard").scrollIntoView({behavior: "smooth", block: "start"}); return; }
+  const k = e.target.closest("[data-lvk]"); if (k) { lvKind = k.dataset.lvk; lvFeed(); }
 });
+document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.lvloc != null) { e.preventDefault(); e.target.click(); } });
+["lvUser", "lvVen"].forEach(id => $(id).onchange = () => lvFeed());
+$("lvLoc").onchange = () => { lvSel = $("lvLoc").value; lvRenderLoc(); lvFeed(); };
+$("lvClear").onclick = () => { lvSel = lvKind = ""; ["lvLoc", "lvUser", "lvVen", "liveSearch"].forEach(id => $(id).value = ""); lvRenderLoc(); lvFeed(); };
 function lvShowTab(t){
   lvTab = t;
   document.querySelectorAll("#lvTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
@@ -4009,7 +4059,7 @@ $("repCsv").onclick = () => {
 };
 
 $("cmpReload").onclick = () => loadComparisons(true);
-$("liveSearch").oninput = () => data && renderLive();
+$("liveSearch").oninput = () => data && lvFeed();
 $("poSearch").oninput = () => data && renderPOs();
 
 function exportCsv(){
