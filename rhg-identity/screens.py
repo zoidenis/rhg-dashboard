@@ -21,7 +21,7 @@ FINANCE = [
         ("loc", "Location intelligence", "location", ["finance.pl.view"]),
         ("today", "Today", "location", [])]),
     ("group", "Group view", "Overview", None, [], "company", ["finance.pl.view", "finance.bs.view"]),
-    ("sales", "Sales", "Overview", "slTabs", [
+    ("sales", "Sales", "Marketing & Sales", "slTabs", [
         ("main", "Sales", "location", []),
         ("loc", "Location intelligence", "location", []),
         ("prices", "Menu prices", "location", []),
@@ -38,7 +38,7 @@ FINANCE = [
         ("bonus", "Bonus management", "company", [])]),
     # Marketing (Geri, 23 Nov 2026): nl360's RHG Performance dashboard read into pulse: ads, Google Business Profile, organic
     # social, by brand and month (marketing.py)
-    ("marketing", "Marketing", "Overview", "mkTabs", [
+    ("marketing", "Marketing", "Marketing & Sales", "mkTabs", [
         ("overview", "Overview", "company", []),
         ("ads", "Ads", "company", []),
         ("gbp", "Google Business Profile", "company", []),

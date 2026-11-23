@@ -78,6 +78,11 @@ body.tw-ops #oxNav{display:flex;flex-direction:column;gap:var(--rhg-space-8,8px)
 body.tw-ppl #nav{display:none}
 body.tw-ppl #ppNav{display:flex;flex-direction:column;gap:var(--rhg-space-8,8px)}
 #nav button[data-view="people"]{display:none!important}
+/* Marketing & Sales: a tower of its own (Geri, 23 Nov 2026): Sales and Marketing leave Finance's menu */
+#msNav{display:none}
+body.tw-ms #nav{display:none}
+body.tw-ms #msNav{display:flex;flex-direction:column;gap:var(--rhg-space-8,8px)}
+#nav button[data-view="sales"],#nav button[data-view="marketing"]{display:none!important}
 body.tw-ppl #dimPick,body.tw-ppl #foot,body.tw-ppl #sourceBanner{display:none!important}
 body.tw-ops #dimPick,body.tw-ops #cmpLabel,body.tw-ops #foot,body.tw-ops #sourceBanner{display:none!important}
 @media (max-width:640px){#v-people .card-head,#v-opsexec .card-head{flex-direction:column;align-items:stretch}#v-people .card-head .sh-ctl,#v-opsexec .card-head .sh-ctl{display:flex;flex-wrap:wrap;gap:6px}}.fc-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -725,7 +730,7 @@ table.bn-plan td{padding:3px 4px}
     <a href="/purchasing/">Purchasing</a>
     <a href="/finance/" class="on" id="towerFinance" aria-current="page">Finance</a>
     <a href="/finance/#inventory" id="towerInventory">Inventory</a>
-    <a href="/finance/#sales" id="towerSales">Sales</a>
+    <a href="/finance/#sales" id="towerSales">Marketing &amp; Sales</a>
     <a href="/finance/#people" id="towerPeople">People &amp; Productivity</a>
     <a href="/finance/#opsexec" id="towerOps">Operations &amp; Food Safety</a>
   </div>
@@ -778,6 +783,24 @@ table.bn-plan td{padding:3px 4px}
     <button data-view="gaps">Data quality &amp; reconciliation</button>
     <button data-view="settings">Settings</button>
     <button data-view="accounts" id="usersNav" style="display:none">Users</button>
+  </nav>
+  <nav id="msNav" aria-label="Marketing &amp; Sales">
+    <div class="grp">Sales</div>
+    <button type="button" data-v="sales" data-t="main">Sales</button>
+    <button type="button" data-v="sales" data-t="loc">Location intelligence</button>
+    <button type="button" data-v="sales" data-t="prices">Menu prices</button>
+    <button type="button" data-v="sales" data-t="menu">Menu engineering</button>
+    <button type="button" data-v="sales" data-t="menucost">Menu &amp; food cost</button>
+    <button type="button" data-v="sales" data-t="chanprofit">Channel profitability</button>
+    <button type="button" data-v="sales" data-t="stockstop">Blocked by stock</button>
+    <button type="button" data-v="sales" data-t="sevenrooms">SevenRooms ↔ Simphony</button>
+    <button type="button" data-v="sales" data-t="bonus">Bonus management</button>
+    <div class="grp">Marketing</div>
+    <button type="button" data-v="marketing" data-t="overview">Overview</button>
+    <button type="button" data-v="marketing" data-t="ads">Ads</button>
+    <button type="button" data-v="marketing" data-t="gbp">Google Business Profile</button>
+    <button type="button" data-v="marketing" data-t="social">Social media</button>
+    <button type="button" data-v="marketing" data-t="data">Data &amp; connection</button>
   </nav>
   <nav id="ppNav" aria-label="People &amp; Productivity">
     <div class="grp">People &amp; Productivity</div>
@@ -4931,6 +4954,36 @@ function ppTower(on){                // may run before this script part: everyth
   });
 }
 function ppNavSync(){ ppTower(document.body.classList.contains("tw-ppl")); }
+// Marketing & Sales: a tower of its own, its side menu mirrors the tab bars of Sales and Marketing (scr-off included)
+function msTower(on){
+  const eb = document.getElementById("eyebrow"), sf = document.getElementById("sideFoot");
+  if (!eb.dataset.fin) { eb.dataset.fin = eb.textContent; sf.dataset.fin = sf.textContent; }
+  const was = document.body.classList.contains("tw-ms");
+  document.body.classList.toggle("tw-ms", on);
+  if (on) {
+    eb.textContent = "RHG Marketing & Sales / Simphony, SevenRooms and nl360, read-only";
+    sf.textContent = "Sales from Simphony and SevenRooms; marketing from nl360's dashboard (Meta, Google, Instagram, Facebook); the bonus of every unit. Read only.";
+  } else if (was && !document.body.classList.contains("tw-ppl") && !document.body.classList.contains("tw-ops")) { eb.textContent = eb.dataset.fin; sf.textContent = sf.dataset.fin; }
+  const v = (document.querySelector("#nav button.on") || {dataset: {}}).dataset.view;
+  document.querySelectorAll("#msNav button").forEach(b => {
+    const bar = b.dataset.v === "sales" ? "slTabs" : "mkTabs", t = document.querySelector(`#${bar} button[data-t="${b.dataset.t}"]`);
+    const cur = b.dataset.v === "sales" ? (typeof slTab === "undefined" ? "main" : slTab) : (typeof mkTab === "undefined" ? "overview" : mkTab);
+    b.classList.toggle("on", v === b.dataset.v && b.dataset.t === cur);
+    b.classList.toggle("scr-off", !!t && t.classList.contains("scr-off"));
+  });
+  document.querySelectorAll("#msNav .grp").forEach(g => {             // a group whose screens are all off is hidden
+    let n = g.nextElementSibling, any = false;
+    while (n && n.tagName === "BUTTON") { if (!n.classList.contains("scr-off")) any = true; n = n.nextElementSibling; }
+    g.style.display = any ? "" : "none";
+  });
+}
+function msNavSync(){ msTower(document.body.classList.contains("tw-ms")); }
+document.querySelectorAll("#msNav button").forEach(b => b.onclick = () => {
+  if (b.dataset.v === "sales") { if (currentView().id !== "sales") navTo("sales"); slShowTab(b.dataset.t); }
+  else { mkTab = b.dataset.t; if (currentView().id !== "marketing") navTo("marketing"); else mkShow(b.dataset.t); }
+  msNavSync();
+});
+[["slTabs"], ["mkTabs"]].forEach(([id]) => new MutationObserver(msNavSync).observe($(id), {subtree: true, attributes: true, attributeFilter: ["class"]}));
 document.querySelectorAll("#ppNav button").forEach(b => b.onclick = () => {
   ppTab = b.dataset.t;
   if (currentView().id !== "people") navTo("people"); else ppShow(b.dataset.t);
@@ -11087,10 +11140,10 @@ function setHeader(){
   dimNaSync();
   const v = currentView();
   const inv = v.id === "inventory", invTower = inv || INV_TABS.has(v.id);
-  const salesTower = v.id === "sales", opsTower = v.id === "opsexec", pplTower = v.id === "people", finTower = !invTower && !salesTower && !opsTower && !pplTower;
+  const salesTower = v.id === "sales" || v.id === "marketing", opsTower = v.id === "opsexec", pplTower = v.id === "people", finTower = !invTower && !salesTower && !opsTower && !pplTower;
   $("towerFinance").classList.toggle("on", finTower); $("towerInventory").classList.toggle("on", invTower); $("towerSales").classList.toggle("on", salesTower); $("towerOps").classList.toggle("on", opsTower); $("towerPeople").classList.toggle("on", pplTower);
   $("towerFinance").toggleAttribute("aria-current", finTower); $("towerInventory").toggleAttribute("aria-current", invTower); $("towerSales").toggleAttribute("aria-current", salesTower); $("towerOps").toggleAttribute("aria-current", opsTower); $("towerPeople").toggleAttribute("aria-current", pplTower);
-  if (pplTower) { oxTower(false); ppTower(true); } else { ppTower(false); oxTower(opsTower); }
+  if (pplTower) { oxTower(false); msTower(false); ppTower(true); } else if (salesTower) { oxTower(false); ppTower(false); msTower(true); } else { msTower(false); ppTower(false); oxTower(opsTower); }
   if (v.id === "marketing") {
     $("title").textContent = `Marketing · ${MK_TITLE[mkTab]}`;
     $("period").textContent = mkData && mkData.available ? `nl360's RHG Performance dashboard · generated ${String(mkData.generated || "").replace("T", " ").slice(0, 16)} · euros · read only`
@@ -11153,6 +11206,15 @@ function urlFilters(){
 }
 function openFromHash(){
   let v = (location.hash || "").slice(1);
+  if (v.includes("/")) {                     // "#view/tab" (pulse home): the view, then its tab
+    const [view, tab] = v.split("/").map(decodeURIComponent);
+    if (view === "sales") { if (currentView().id !== "sales") navTo("sales"); slShowTab(tab); return; }
+    if (view === "marketing") { mkTab = tab; if (currentView().id !== "marketing") navTo("marketing"); else mkShow(tab); return; }
+    navTo(view);
+    const tb = document.querySelector(`#v-${CSS.escape(view)} .ov-tabs button[data-t="${CSS.escape(tab)}"]`); if (tb) tb.click();
+    return;
+  }
+  if (v === "sales" && ![...document.querySelectorAll("#slTabs button")].some(b => !b.classList.contains("scr-off"))) v = "marketing";
   if ((v === "settings" || v === "accounts") && typeof SET_EMBED !== "undefined" && !SET_EMBED) { toSettings(v === "accounts" ? "accounts" : ""); return; }
   if (v === "exceptions" || v === "actions") v = "register";           // links of before: one register now
   if (v === "ap" || v === "ar") { if (!($("v-kartela").classList.contains("on") && kaTab === v)) navTo(v); return; }

@@ -1470,7 +1470,7 @@ $("logoutBtn").onclick = async () => {
   const t = $("towers");
   if (!holds("platform.s.control")) { const cc = t.querySelector('a[href="/control"]'); if (cc) cc.remove(); }
   if (!holds("platform.s.actions.")) { const ac = t.querySelector('a[href="/actions"]'); if (ac) ac.remove(); }
-  [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Sales"],["finance.s.people.","/finance/#people","People &amp; Productivity"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]]
+  [["purchasing.s.","/purchasing/","Purchasing"],["finance.s.","/finance/","Finance"],["finance.s.inventory.","/finance/#inventory","Inventory"],["finance.s.sales.","/finance/#sales","Marketing &amp; Sales"],["finance.s.people.","/finance/#people","People &amp; Productivity"],["finance.s.opsexec.","/finance/#opsexec","Operations &amp; Food Safety"]]
     .filter(([p]) => holds(p)).forEach(([, h, l]) => t.insertAdjacentHTML("beforeend", `<a href="${h}">${l}</a>`));
   if (can("unicorn.use")) {   // Unicorn, the business analyst, with the count of unread morning briefs
     t.insertAdjacentHTML("beforeend", `<a href="/unicorn" id="uniLink">Unicorn</a>`);
