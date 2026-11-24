@@ -88,7 +88,7 @@ Nëse serveri rritet, ngriji kufijtë te `docker-compose.yml`.
 ## Backup
 State-i i aplikacionit është në volumet `finance-data`, `purchasing-data` dhe `identity-data`. Arkivat përmbajnë edhe kredenciale; `backup.sh` i kufizon për root.
 ```bash
-/opt/rhg/deploy/backup.sh                 # → /opt/rhg/backups, mban 30 ditë
+/opt/rhg/deploy/backup.sh                 # → /opt/rhg/backups, mban 7 ditë (~3 GB)
 echo "15 2 * * * /opt/rhg/deploy/backup.sh" | crontab -   # çdo natë 02:15
 ```
 

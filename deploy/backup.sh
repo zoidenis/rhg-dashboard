@@ -12,4 +12,6 @@ for v in deploy_finance-data deploy_purchasing-data deploy_identity-data; do
     sh -c 'umask 077; tar czf "$1" -C /data .' sh "/out/${v}-${STAMP}.tar.gz"
   echo "  $DEST/${v}-${STAMP}.tar.gz"
 done
-find "$DEST" -name '*.tar.gz' -mtime +30 -delete
+# 7 days: Finance's archive is ~400 MB a day, and with 30 days the 25 GB disk filled up on 24 Nov 2026
+# (identity could not open its database and pulse went down).
+find "$DEST" -name '*.tar.gz' -mtime +6 -delete
