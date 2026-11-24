@@ -771,6 +771,22 @@ def send_digests(test_to=None, owner=None, actor="scheduler"):
 
 _state = {"done": None, "controls": None, "job": None}
 _job_lock = threading.Lock()
+# the day of the last daily run, on disk: kept in memory only, every restart of the tower (a deploy, a crash) within
+# the eight hours after the time sent the digests again
+DAY_FILE = store.DATA_DIR / "exreg_daily.json"
+
+
+def _day_done():
+    try:
+        return json.loads(DAY_FILE.read_text(encoding="utf-8")).get("day")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def _mark_day(day):
+    tmp = DAY_FILE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({"day": day}), encoding="utf-8")
+    tmp.replace(DAY_FILE)
 
 
 def run_controls(actor="scheduler", force=False):
@@ -814,8 +830,9 @@ def loop():
             hh, _, mm = s["time"].partition(":")
             start = now.replace(hour=int(hh or 8), minute=int(mm or 0), second=0, microsecond=0)
             if (s["controls"] or s["enabled"]) and start <= now <= start + timedelta(hours=8) \
-                    and _state["done"] != now.date():
+                    and _state["done"] != now.date() and _day_done() != now.date().isoformat():
                 _state["done"] = now.date()
+                _mark_day(now.date().isoformat())          # before the run: a crash in it does not send twice
                 if s["controls"]:
                     run_controls()
                 if s["enabled"] and not (policy() or {}).get("combined_digest"):

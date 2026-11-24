@@ -969,10 +969,18 @@ def loop():
                 now = datetime.now()
                 hh, mm = (int(v) for v in s["digest"]["time"].split(":"))
                 start = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                today = now.date().isoformat()
                 last = (s.get("last_digest") or {})
-                done_today = (last.get("at") or "")[:10] == now.date().isoformat() and not last.get("test")
+                # digest_day is written before the send and only here: a test sent later the same day replaces
+                # last_digest, and a restart after it sent the day's emails again
+                done_today = _read().get("digest_day") == today or \
+                    ((last.get("at") or "")[:10] == today and not last.get("test"))
                 if start <= now <= start + timedelta(hours=6) and not done_today and _state["done"] != now.date():
                     _state["done"] = now.date()
+                    with _lock:
+                        d = _read()
+                        d["digest_day"] = today
+                        _write(d)
                     send_digests()
         except Exception:                                           # noqa: BLE001
             traceback.print_exc()

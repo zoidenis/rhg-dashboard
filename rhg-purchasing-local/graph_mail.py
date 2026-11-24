@@ -188,15 +188,18 @@ def _graph_error(r):
     return RuntimeError(f"Microsoft Graph refused the email: {text[:240]}{hint}")
 
 
-def _call(method, url, headers=None, **kwargs):
-    """One Graph request with the app token: retries once on an expired token and twice when throttled."""
+def _call(method, url, headers=None, sends=False, **kwargs):
+    """One Graph request with the app token: retries once on an expired token and twice when throttled.
+    sends: the request sends the email (sendMail, a draft's send). A 503 or 504 there is not tried again: Exchange
+    may have taken the message before the gateway gave up, and a second request sent it twice. 429 (throttled) is
+    refused before anything is done, so it is safe to repeat."""
     for attempt in range(3):
         h = dict(headers or {}, Authorization="Bearer " + _access_token())
         r = requests.request(method, url, headers=h, timeout=TIMEOUT, **kwargs)
         if r.status_code == 401 and attempt == 0:
             _forget_token()
             continue
-        if r.status_code in (429, 503, 504) and attempt < 2:
+        if (r.status_code == 429 or (r.status_code in (503, 504) and not sends)) and attempt < 2:
             try:
                 wait = min(float(r.headers.get("Retry-After") or 2), 10.0)
             except ValueError:
@@ -217,7 +220,7 @@ def send(msg, sender):
     # soft break "=\n" wrongly and the HTML of the email shows "=" in place of a letter every ~76 characters.
     raw = base64.b64encode(msg.as_bytes(policy=msg.policy.clone(linesep="\r\n")))
     if len(raw) <= MIME_LIMIT:
-        r = _call("POST", _mailbox(sender) + "/sendMail", data=raw, headers={"Content-Type": "text/plain"})
+        r = _call("POST", _mailbox(sender) + "/sendMail", data=raw, headers={"Content-Type": "text/plain"}, sends=True)
         if r.status_code != 202:
             raise _graph_error(r)
         return
@@ -271,7 +274,7 @@ def _send_large(msg, sender):
                     raise _graph_error(r)
             else:
                 _upload(draft, name, ctype, data, inline, cid)
-        r = _call("POST", draft + "/send")
+        r = _call("POST", draft + "/send", sends=True)
         if r.status_code != 202:
             raise _graph_error(r)
     except Exception:

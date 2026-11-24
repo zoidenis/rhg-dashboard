@@ -443,12 +443,14 @@ def _send_emails():
                     f"<p style='color:#5f636b;font-size:12px'>Choose what reaches you by email in pulse → Notifications → My choices.</p></div>")
             text = "\n".join(f"- {sentence(_row(r))}: {r['title']}" for r in mine)
             subject = f"[pulse] {sentence(_row(mine[0]))}: {mine[0]['title']}"[:180] if len(mine) == 1 else f"[pulse] {len(mine)} updates on your tasks"
+            # one try only: an error may come after the email went out (Purchasing answering after the 90 s
+            # timeout, Graph sending a large message slowly), and trying again every EMAIL_MINUTES for a day sent
+            # the same email over and over. The notifications stay in the app either way.
             try:
                 actioncenter._send_mail([rs[0]["email"]], [], subject, body, text)
                 sent += 1
             except Exception:                                       # noqa: BLE001
                 traceback.print_exc()
-                continue
         store.run(f"UPDATE notifications SET emailed_at=? WHERE id IN ({','.join('?' * len(ids))})", (store.now(), *ids))
     return sent
 
