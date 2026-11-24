@@ -149,3 +149,15 @@ def test_units_at_no_price_are_left_out(base, monkeypatch):
     w = pricesim.build(base, "brand", "OPA")["items"][0]["channels"]["DE-WOLT"]
     assert w["price"] == 400.0 and round(w["qty"]) == 92 and round(w["unpriced"]) == 2354    # 30,575 × 1.2 / 400
     assert "at no price" in w["why"][0]
+
+
+def test_the_channel_price_from_its_emc_level(base, monkeypatch):
+    # every Wolt order is on DE - WOLT; EMC has a price level "Wolt" (480): the units at a price are counted at it
+    monkeypatch.setattr(menueng, "items_by_order_type", lambda ref, a, b: [("2026-11-02", 1, 1, 33333.3, 80, 0),
+                                                                          ("2026-11-02", 2, 1, 30575, 2446, 0)])
+    monkeypatch.setattr(simphony, "menu_item_prices", lambda ref, max_age=3600, history=False: [
+        {"num": 1, "rvc": 1, "level": 1, "level_name": "Base", "price": 400.0}, {"num": 1, "rvc": 1, "level": 3, "level_name": "Wolt", "price": 480.0}])
+    monkeypatch.setattr(simphony, "rvc_dims", lambda ref: {1: "Restaurant"})
+    w = pricesim.build(base, "brand", "OPA")["items"][0]["channels"]["DE-WOLT"]
+    assert w["price"] == 480.0 and round(w["qty"]) == 76 and w["menu_source"] == "EMC level Wolt"
+    assert pricesim.channel_words("DE - WOLT") == {"WOLT"} and pricesim.channel_words("EAT IN") == set()

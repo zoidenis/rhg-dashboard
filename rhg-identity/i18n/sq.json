@@ -2884,6 +2884,8 @@
  "EMC # incl. VAT": "EMC # me TVSH",
  "EMC # incl. VAT · received #": "EMC # me TVSH · marrë #",
  "EMC audit: read the whole configuration": "Auditi i EMC: lexo gjithë konfigurimin",
+ "EMC level #": "Niveli EMC #",
+ "EMC level #: #": "Niveli EMC #: #",
  "EMC module": "Modul EMC",
  "EMC privileges": "Privilegjet në EMC",
  "EMC user": "Përdorues EMC",

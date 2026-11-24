@@ -5193,7 +5193,7 @@ function psItemPop(mi){
       {l: "Competitors", v: it.competitors.length ? fmt(it.competitors.length) : "–", s: it.competitors.length ? `median ${fmt(Pulse_median(it.competitors.map(x => x.price)), 0)}` : "no price matched"}])
     + Pulse.panel("By channel", Pulse.list([["Channel"], ["Items sold", 1], ["Price today", 1], ["Suggested", 1], ["New price", 1], ["Competitors", 1], ["Margin per item", 1], ["Change of margin", 1]],
         chs.map(ch => { const x = it.channels[ch], p1 = psPrice(it, ch), e = psEff(it, ch, p1);
-          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, `${fmt(x.qty, 0)}${x.unpriced >= 1 ? `<div class="meta">+${fmt(x.unpriced, 0)} at no price</div>` : ""}`, fmt(x.price, 0),
+          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, `${fmt(x.qty, 0)}${x.unpriced >= 1 ? `<div class="meta">+${fmt(x.unpriced, 0)} at no price</div>` : ""}`, `${fmt(x.price, 0)}${x.menu_source && x.menu_source !== "EMC" ? `<div class="meta">${esc(x.menu_source)}: ${fmt(x.menu_price, 0)}</div>` : ""}`,
             x.suggested && x.suggested !== x.price ? `<button type="button" class="ps-sug ${x.suggested > x.price ? "up" : "dn"}" data-psuse="${esc(psK(it, ch))}">${fmt(x.suggested, 0)}</button>` : `<span class="meta">hold</span>`,
             p1 !== x.price ? `<b>${fmt(p1, 0)}</b>` : "–", x.comp_median ? fmt(x.comp_median, 0) : "–",
             it.cost == null ? "–" : `${fmt(e.cm_unit, 0)}${p1 !== x.price ? ` → <b>${fmt(e.new_cm_unit, 0)}</b>` : ""}`,
