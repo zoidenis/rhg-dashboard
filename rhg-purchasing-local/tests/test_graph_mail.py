@@ -166,6 +166,18 @@ class GraphMail(unittest.TestCase):
         self.assertEqual(sent["Subject"], "Fatura pa PO")
         self.assertEqual(sent["Cc"], "c@rhg.al")
 
+    def test_a_gateway_timeout_on_send_is_not_sent_again(self):
+        # Exchange may have taken the message before the 504: a second sendMail delivered it twice
+        self.request.return_value = response(504)
+        with self.assertRaises(RuntimeError):
+            graph_mail.send(self.message(), SENDER)
+        self.assertEqual(self.request.call_count, 1)
+
+    def test_throttled_send_is_tried_again(self):
+        self.request.side_effect = [response(429, headers={"Retry-After": "0"}), response(202)]
+        graph_mail.send(self.message(), SENDER)
+        self.assertEqual(self.request.call_count, 2)
+
     def test_mime_lines_end_in_crlf(self):
         # bare LF made Exchange show "=" in place of letters in quoted-printable bodies (pulse@rhg.al, 19 Nov 2026)
         self.request.return_value = response(202)

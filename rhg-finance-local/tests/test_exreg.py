@@ -93,3 +93,26 @@ def test_a_tracked_exception_closes_when_the_data_no_longer_has_it():
     again = exreg.track({"title": "Paid", "company": "SALT", "source_exception": "ar-old-3"}, "geri", "geri@rhg.al")
     exreg.sync("ap_ar", "SALT", [], locations=["OPA1"], tracks=tracks)
     assert {x["id"]: x["status"] for x in exreg.query("all")["items"]}[again["id"]] == "Open"
+
+
+def test_the_daily_run_is_not_repeated_after_a_restart(tmp_path, monkeypatch):
+    # the day was held in memory only: every restart of the tower (a deploy) within the window sent the digests again
+    from datetime import datetime
+    monkeypatch.setattr(exreg, "DAY_FILE", tmp_path / "exreg_daily.json")
+    at = datetime.now().strftime("%H:%M")
+    monkeypatch.setattr(exreg, "settings", lambda: {"controls": False, "enabled": True, "time": at})
+    monkeypatch.setattr(exreg, "policy", lambda: {})
+    sent = []
+    monkeypatch.setattr(exreg, "send_digests", lambda: sent.append(1))
+
+    class Stop(Exception):
+        pass
+
+    def sleep(_s):
+        raise Stop
+    monkeypatch.setattr(exreg.time, "sleep", sleep)
+    for _restart in range(2):
+        monkeypatch.setattr(exreg, "_state", {"done": None, "controls": None, "job": None})
+        with pytest.raises(Stop):
+            exreg.loop()
+    assert sent == [1]

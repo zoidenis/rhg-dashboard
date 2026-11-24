@@ -136,6 +136,13 @@ Auditi i Gerit (`integration.md`) u shqyrtua dhe u gjykua i drejtë: Pulse mbete
 
 **Rinovo certifikatën:** hapat te `deploy/README-DEPLOY.md`, seksioni "Email me Microsoft Graph". Pulse e lexon skedarin e ri pa rinisje.
 
+**I njëjti email vjen disa herë (24.11.2026, rregulluar):**
+- Digest-i i regjistrit të përjashtimeve ("Your exceptions: …", Purchasing dhe Finance) e mbante ditën e dërgimit vetëm në memorie: çdo deploy ose rinisje brenda 8 orëve pas orës së caktuar e dërgonte përsëri. Tani dita ruhet te `data/exreg_daily.json`.
+- Njoftimet e pulse me email (identity) provoheshin sërish çdo 10 minuta për 24 orë kur dërgimi kthente gabim, edhe kur email-i kishte dalë. Tani provohen një herë; njoftimi mbetet te zilja në pulse.
+- Digest-i i Action Center: një "Send a test" pas dërgimit të ditës fshinte shenjën "u dërgua sot". Tani mbahet më vete (`digest_day`).
+- Graph: `sendMail` nuk provohet më pas 503/504, sepse Exchange mund ta ketë marrë tashmë mesazhin. Pas 429 provohet sërish.
+- Nëse vazhdon edhe pas këtyre: te Exchange admin center → `pulse@rhg.al`, kontrollo *Automatic replies*, *Mail flow / forwarding* dhe rregullat e Inbox-it. Një përgjigje automatike ose forward nga kutia e Pulse te një kuti që kthen përgjigje krijon loop jashtë kodit.
+
 **Kthim te SMTP (vetëm deri sa Microsoft ta mbyllë):** `MAIL_TRANSPORT=smtp` te `.env` i Purchasing, From përsëri adresa e vjetër, pastaj `docker compose up -d purchasing`.
 
 ## Commit-et
