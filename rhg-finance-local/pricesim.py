@@ -381,11 +381,26 @@ def build(ds, level="all", key="", section="family", settings=None):
             n = ots.get(int(ot)) if str(ot).lstrip("-").isdigit() and int(ot) else None
             ch = chanprof.channel_key(n or ("No order type" if not ot or str(ot) == "0" else f"Order type {ot}"))
             x = per.setdefault((mi, ch), [0.0, 0.0])
-            x[0] += (qty or 0) * share[mi]
+            x[0] += qty or 0
             x[1] += (net or 0) * f
+
+    def vat_of(mi):
+        v = vat.get(mi)
+        return float(cfg.get("vat_pct") or 20) if v is None else v
+
+    # the items sold AT A PRICE on each channel (Geri, 25 Nov 2026: Chicken Gyros on DE - WOLT showed 15 lek). Units
+    # rung at no price (inside combo meals, or the platform's own lines) do not move with the item's price: the units at
+    # a price are the channel's sales with VAT / the item's menu price in EMC (as Menu engineering counts them), at
+    # most the units rung; without an EMC price, the item's share of units sold at a price
+    def priced(mi, q, n):
+        emc = items[mi].get("emc_incl")
+        if emc and emc > 0:
+            return min(q, n * (1 + vat_of(mi) / 100) / emc)
+        return q * share[mi]
+    per = {k: (priced(k[0], q, n), n, q) for k, (q, n) in per.items()}
     chans = {}
-    for (mi, ch), (q, n) in per.items():
-        if q <= 0:
+    for (mi, ch), (q, n, _raw) in per.items():
+        if q <= 0.5:
             continue
         c = chans.setdefault(ch, {"channel": ch, "qty": 0.0, "net": 0.0, "items": 0})
         c["qty"] += q
@@ -402,14 +417,12 @@ def build(ds, level="all", key="", section="family", settings=None):
     cmap, unmatched = match(comp_rows, list(items.values()), brands)
     out = []
     for mi, it in items.items():
-        v = vat.get(mi)
-        if v is None:
-            v = float(cfg.get("vat_pct") or 20)
+        v = vat_of(mi)
         comps = cmap.get(mi, [])
         chs = {}
         for ch, c in chans.items():
-            q, n = per.get((mi, ch), (0.0, 0.0))
-            if q <= 0:
+            q, n, raw = per.get((mi, ch), (0.0, 0.0, 0.0))
+            if q <= 0.5:
                 continue
             p_ex = n / q
             price = round(p_ex * (1 + v / 100), 2)
@@ -418,16 +431,21 @@ def build(ds, level="all", key="", section="family", settings=None):
                     ([] if c["delivery"] else [r["price"] for r in comps if not r["channel"] or not DELIVERY_HINT.search(r["channel"])])
             eat_ex = None
             if eat and ch != eat["channel"]:
-                eq, en = per.get((mi, eat["channel"]), (0.0, 0.0))
+                eq, en, _r = per.get((mi, eat["channel"]), (0.0, 0.0, 0.0))
                 eat_ex = en / eq if eq > 0 else None
             el = P.get(f"el_{it['cls']}", -1.0) * (P["el_delivery"] if c["delivery"] else 1.0)
             sug, why = suggest(it["cls"], price, it["cost"], v, k, c["commission_base"], S["target"], ccomp, eat_ex, P, step, el)
+            unpriced = max(0.0, raw - q)
+            if unpriced >= 1 and unpriced >= 0.1 * raw:
+                why = [f"{unpriced:,.0f} of the {raw:,.0f} rung on this channel were at no price (inside combo meals or the "
+                       f"platform's own lines): left out; the price and the change are of the {q:,.0f} sold at a price."] + why
             chs[ch] = {"qty": round(q, 2), "net": round(n, 0), "price": price, "price_ex": round(p_ex, 4),
+                       "rung": round(raw, 2), "unpriced": round(unpriced, 2),
                        "comp_median": round(statistics.median(ccomp), 2) if ccomp else None, "comp_n": len(ccomp),
                        "suggested": sug, "why": why}
         if not chs:
             continue
-        out.append({"mi": mi, "name": it["name"], "section": it["section"], "family": it["family"], "major": it["major"],
+        out.append({"mi": mi, "bc_item": it.get("bc_item") or "", "name": it["name"], "section": it["section"], "family": it["family"], "major": it["major"],
                     "cls": it["cls"], "cost": it["cost"], "vat": v, "emc_incl": it.get("emc_incl"), "qty": it["qty"],
                     "net": it["net"], "channels": chs,
                     "competitors": [{k: r.get(k) for k in ("competitor", "item", "price", "channel", "date", "source", "matched")}

@@ -4812,6 +4812,8 @@ $("cpParSave").onclick = async () => {
 // the moves (a % per category, a % per item, Pulse's suggestions, prices typed); the new prices follow from it on the
 // channels chosen, so changing the channels or the period keeps the moves.
 const psLbl = k => (psData && psData.labels && psData.labels[k]) || k;
+// the item's numbers: Simphony's menu item number, and the BC item the POS import posts it to (MIDSimphonyArchive)
+const psCodes = it => `Simphony ${it.mi}${it.bc_item && it.bc_item !== String(it.mi) ? ` · BC ${it.bc_item}` : it.bc_item ? "" : " · no BC item"}`;
 const psSt = k => `<span class="me-st me-c-${k}"><i></i>${esc(psLbl(k))}</span>`;
 let psData = null, psKey = "", psTimer = null, psNew = {}, psP = null, psCls = "", psScns = [], psMe = "";
 let psCat = {}, psItem = {}, psSug = {}, psManual = {}, psChSel = new Set(), psHist = [], psOpen = "", psShown = 0, psAnim = null;
@@ -5118,8 +5120,8 @@ function psRowHtml(r){
   const sugD = c.suggested && c.suggested !== c.price ? (c.suggested - c.price) / c.price * 100 : 0;
   const cp0 = it.cost != null && c.price ? it.cost / (c.price / (1 + it.vat / 100)) * 100 : null, cp1 = it.cost != null && p1 ? it.cost / (p1 / (1 + it.vat / 100)) * 100 : null;
   const dm = e.new_cm - e.cm;
-  return `<tr data-pulse="psitem|${it.mi}" tabindex="0" class="${chg ? "ps-chg" : ""}"><td class="name">${esc(it.name)}<div class="meta">${esc(it.mi)} · ${esc(it.section)}</div></td><td>${psSt(it.cls)}</td>
-    <td><span class="ps-ch${psChan(r.ch).delivery ? " del" : ""}" data-no-i18n>${esc(r.ch)}</span></td><td class="num">${fmt(c.qty, 0)}</td><td class="num">${fmt(c.price, 0)}</td>
+  return `<tr data-pulse="psitem|${it.mi}" tabindex="0" class="${chg ? "ps-chg" : ""}"><td class="name">${esc(it.name)}<div class="meta">${esc(psCodes(it))} · ${esc(it.section)}</div></td><td>${psSt(it.cls)}</td>
+    <td><span class="ps-ch${psChan(r.ch).delivery ? " del" : ""}" data-no-i18n>${esc(r.ch)}</span></td><td class="num">${fmt(c.qty, 0)}${c.unpriced >= 1 ? `<div class="meta" title="rung at no price (combo meals or the platform's own lines): left out">+${fmt(c.unpriced, 0)} at no price</div>` : ""}</td><td class="num">${fmt(c.price, 0)}</td>
     <td class="num">${c.suggested && c.suggested !== c.price ? `<button type="button" class="ps-sug ${sugD > 0 ? "up" : "dn"}" data-psuse="${esc(k)}" title="${esc((c.why || []).join(" "))}">${fmt(c.suggested, 0)} <small>${psPctT(sugD)}</small></button>` : `<span class="meta">hold</span>`}</td>
     <td class="num"><input class="ps-in" type="number" min="0" step="${psData.round_step || 1}" data-psk="${esc(k)}" value="${p1}" aria-label="New price"></td>
     <td class="num" data-psc="d">${chg ? psPctT((p1 - c.price) / c.price * 100) : "–"}</td>
@@ -5185,13 +5187,13 @@ function psItemPop(mi){
   steps.sort((a, b) => a.price - b.price);
   const L = steps.map(s => Object.assign(s, psEff(it, main, s.price)));
   const best = it.cost != null ? L.reduce((a, b) => b.new_cm > a.new_cm ? b : a, L[0]) : null;
-  Pulse.pop({title: esc(it.name), sub: esc(`${it.mi} · ${it.section} · ${d.title} · ${d.period.from} → ${d.period.to}`), body:
-    Pulse.tiles([{l: "Class", v: psSt(it.cls)}, {l: "Portion cost", v: it.cost == null ? "–" : fmt(it.cost, 0), s: it.cost == null ? "no recipe or cost in BC" : `${C} · from BC`},
+  Pulse.pop({title: esc(it.name), sub: esc(`${psCodes(it)} · ${it.section} · ${d.title} · ${d.period.from} → ${d.period.to}`), body:
+    Pulse.tiles([{l: "Class", v: psSt(it.cls)}, {l: "Portion cost", v: it.cost == null ? "–" : fmt(it.cost, 0), s: it.cost == null ? (it.bc_item ? `BC item ${it.bc_item}: no recipe or cost` : "no BC item found for it") : `${C} · BC item ${it.bc_item || it.mi}`},
       {l: "VAT", v: fmt(it.vat, 0) + "%"}, {l: "Items sold", v: fmt(it.qty, 0), s: `sales ${flM(it.net)} ${C}`},
       {l: "Competitors", v: it.competitors.length ? fmt(it.competitors.length) : "–", s: it.competitors.length ? `median ${fmt(Pulse_median(it.competitors.map(x => x.price)), 0)}` : "no price matched"}])
     + Pulse.panel("By channel", Pulse.list([["Channel"], ["Items sold", 1], ["Price today", 1], ["Suggested", 1], ["New price", 1], ["Competitors", 1], ["Margin per item", 1], ["Change of margin", 1]],
         chs.map(ch => { const x = it.channels[ch], p1 = psPrice(it, ch), e = psEff(it, ch, p1);
-          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, fmt(x.qty, 0), fmt(x.price, 0),
+          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, `${fmt(x.qty, 0)}${x.unpriced >= 1 ? `<div class="meta">+${fmt(x.unpriced, 0)} at no price</div>` : ""}`, fmt(x.price, 0),
             x.suggested && x.suggested !== x.price ? `<button type="button" class="ps-sug ${x.suggested > x.price ? "up" : "dn"}" data-psuse="${esc(psK(it, ch))}">${fmt(x.suggested, 0)}</button>` : `<span class="meta">hold</span>`,
             p1 !== x.price ? `<b>${fmt(p1, 0)}</b>` : "–", x.comp_median ? fmt(x.comp_median, 0) : "–",
             it.cost == null ? "–" : `${fmt(e.cm_unit, 0)}${p1 !== x.price ? ` → <b>${fmt(e.new_cm_unit, 0)}</b>` : ""}`,
@@ -5336,7 +5338,7 @@ function pdPick(it, ch){
   $("pdCh").value = pdCh;
   $("pdPrice").step = psData.round_step || 1;
   ["price", "cost", "target", "units", "el"].forEach(k => $("pd" + k[0].toUpperCase() + k.slice(1)).value = pdIn[k] == null ? "" : pdIn[k]);
-  $("pdCostNote").textContent = it.cost == null ? "(no cost in BC: type one)" : `(BC: ${fmt(it.cost, 0)})`;
+  $("pdCostNote").textContent = it.cost == null ? "(no cost in BC: type one)" : `(BC item ${it.bc_item || it.mi}: ${fmt(it.cost, 0)})`;
   $("pdUnitsNote").textContent = `(the period: ${fmt(c.qty, 0)} in ${fmt(psData.period.days)} days)`;
   $("pdElNote").textContent = `(${psLbl(it.cls)}${psChan(pdCh).delivery ? ", delivery" : ""})`;
   $("pdMsg").textContent = "";

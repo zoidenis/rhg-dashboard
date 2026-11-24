@@ -75,7 +75,7 @@ def base(tmp_path, monkeypatch):
           "selection": [{"ref": "OPA_B", "name": "OPA Bllok", "currency": "ALL"}], "brands": ["OPA"], "locations": [],
           "labels": menueng.LABEL, "period": {"from": "2026-11-01", "to": "2026-11-30", "days": 30}, "read_at": "x",
           "items": [{"mi": 1, "name": "Pita Gyros Pule", "section": "PITA", "family": "PITA", "major": "FOOD", "cls": "star",
-                     "cost": 120.0, "qty": 100, "combo_qty": 0, "net": 41667, "emc_incl": 500.0}]}
+                     "cost": 120.0, "qty": 100, "combo_qty": 0, "net": 41667, "emc_incl": 400.0}]}
     calls = []
     monkeypatch.setattr(menueng, "analyse", lambda *a, **k: calls.append(a[1:3]) or an)
     monkeypatch.setattr(pricesim.locintel, "registry", lambda settings=None: [
@@ -140,3 +140,12 @@ def test_menu_engineering_reads_several_locations():
           "rows": {}, "period": {"from": "2026-11-01", "to": "2026-11-02", "days": 2}, "read_at": "", "errors": []}
     r = menueng.analyse(ds, "locations", "A,C", settings={})
     assert [x["ref"] for x in r["selection"]] == ["A", "C"] and r["title"] == "One, Three"
+
+
+def test_units_at_no_price_are_left_out(base, monkeypatch):
+    # Wolt rang 2,446 Chicken Gyros for 30,575 without VAT (15 lek each with VAT): most inside combo meals at no price
+    monkeypatch.setattr(menueng, "items_by_order_type", lambda ref, a, b: [("2026-11-02", 1, 1, 33333.3, 80, 0),
+                                                                          ("2026-11-02", 2, 1, 30575, 2446, 0)])
+    w = pricesim.build(base, "brand", "OPA")["items"][0]["channels"]["DE-WOLT"]
+    assert w["price"] == 400.0 and round(w["qty"]) == 92 and round(w["unpriced"]) == 2354    # 30,575 × 1.2 / 400
+    assert "at no price" in w["why"][0]
