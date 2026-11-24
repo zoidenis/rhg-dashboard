@@ -28,6 +28,9 @@ FINANCE = [
         ("menu", "Menu engineering", "location", []),
         ("menucost", "Menu & food cost", "location", []),
         ("chanprofit", "Channel profitability", "location", []),
+        # Price simulator (Geri, 24 Nov 2026): a new price on one channel or more, its sales and margin, and the price
+        # Pulse suggests per item and channel from the class, the cost target, the commission and the competitors
+        ("pricing", "Price simulator", "location", []),
         # the sales BC cannot post for want of stock (open assembly orders), and what today's Simphony sales will block
         ("stockstop", "Blocked by stock", "location", []),
         # SevenRooms reservations, covers and feedback against Simphony's checks

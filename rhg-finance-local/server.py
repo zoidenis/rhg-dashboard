@@ -44,6 +44,7 @@ import unicorn_tools
 import faloc
 import faregister
 import transit
+import pricesim
 import ocdiag
 import emcaudit
 import recipients
@@ -135,6 +136,7 @@ WRITE_PERMISSIONS = {"/api/settings": "settings", "/api/actions": "actions", "/a
                      "/api/receipts/config": "settings",
                      "/api/stockcount/upload": "actions", "/api/stockcount/delete": "actions",
                      "/api/sales/channel-profit/params": "settings",
+                     "/api/sales/pricesim/params": "settings",
                      "/api/brand-report/settings": "settings", "/api/brand-report/job": "settings",
                      "/api/sales-report/settings": "settings", "/api/sales-report/job": "settings",
                      "/api/pl-memo/settings": "settings", "/api/pl-memo/job": "settings",
@@ -2286,7 +2288,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
                          "/api/inventory/sku/xlsx", "/api/inventory/items", "/api/inventory/items/xlsx", "/api/today/locations", "/api/assets/locations", "/api/locations",
                          "/api/locations/registry",
                          "/api/sales", "/api/sales/channels", "/api/sales/prices",
-                         "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx",
+                         "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/menu/xlsx", "/api/sales/pricesim",
                          "/api/sales/foodcost",
                          "/api/discharge", "/api/discharge/xlsx",
                          # Inventory: Movement & dead stock, Typology & turnover, Stock count analysis
@@ -2310,7 +2312,7 @@ ACCESS_LOCATION_PATHS = {"/api/finance/locations", "/api/cash/locations", "/api/
 
 # the departments chosen above: the screens that read them themselves, the cuts of the location screens (the same as for a
 # person limited to some locations), and the screens whose handler cuts by self._allowed
-DEPT_SELF = {"/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
+DEPT_SELF = {"/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu", "/api/sales/pricesim",
              "/api/sales/menu/xlsx", "/api/sales/foodcost", "/api/salesrec", "/api/locations/registry",
              "/api/inventory/items", "/api/inventory/items/xlsx", "/api/inventory/sku/location", "/api/inventory/sku/xlsx"}
 LOCATION_CUTS = {
@@ -2566,6 +2568,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scope_filter = _companies_cut
             return None
         multi = path in ("/api/sales", "/api/sales/channels", "/api/sales/prices", "/api/sales/prices/xlsx", "/api/sales/menu",
+                        "/api/sales/pricesim", "/api/sales/pricesim/template", "/api/sales/pricesim/scenarios",
+                        "/api/sales/pricesim/competitors", "/api/sales/pricesim/params",
                         "/api/sales/menu/xlsx", "/api/sales/foodcost", "/api/sales/channel-profit", "/api/sales/channel-profit/xlsx",
                         "/api/sales/channel-profit/params") or (path == "/api/today/locations" and q.get("scope") == "all")
         if not multi and not access.company_ok(user, company):
@@ -2663,6 +2667,84 @@ class Handler(BaseHTTPRequestHandler):
         elif path not in SELF_CUT:
             prev = self._scope_filter
             self._scope_filter = lambda b: filter_codes(prev(b) if prev else b, self._allowed)
+
+    # ---------------------------------------------------------------- Sales → Price simulator (pricesim.py)
+    PRICESIM_SCREEN = "finance.s.sales.pricing"
+
+    def _pricesim_get(self, path, q, user):
+        """The simulator's base (Menu engineering's read of the period, by channel), the template of the competitors'
+        price file, the saved scenarios."""
+        if not auth.can(user, self.PRICESIM_SCREEN):
+            self._send(403, {"error": "Your role does not include the Price simulator."})
+            return
+        if path == "/api/sales/pricesim/template":
+            body = pricesim.template_xlsx()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", 'attachment; filename="RHG_competitor_prices_template.xlsx"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/api/sales/pricesim/scenarios":
+            co = q.get("company") or ""
+            self._send(200, {"items": [s for s in pricesim.load_scenarios() if not co or not s.get("company") or s["company"] == co],
+                             "me": user["username"]})
+            return
+        if path != "/api/sales/pricesim":
+            self._send(404, {"error": "Not found."})
+            return
+        if not simphony.info()["configured"]:
+            self._send(200, {"error": "The Simphony connection is not set."})
+            return
+        try:
+            per = periods(q.get("period"), q.get("mode", "month"))
+        except ValueError as exc:
+            self._send(400, {"error": str(exc)})
+            return
+        refs = sales_refs(user, q)
+        key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
+        ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1")     # the same read as Menu engineering
+        if ds.get("pending") or ds.get("available") is False:
+            self._send(200, ds)
+            return
+        level = q.get("level") if q.get("level") in ("brand", "location", "all") else "all"
+        try:
+            self._send(200, pricesim.build(ds, level, (q.get("key") or "")[:60], q.get("section") or "family"))
+        except Exception as exc:                                       # noqa: BLE001
+            traceback.print_exc()
+            self._send(200, {"error": f"The simulator could not be built: {str(exc)[:240]}"})
+
+    def _pricesim_post(self, path, body, user):
+        if not auth.can(user, self.PRICESIM_SCREEN):
+            self._send(403, {"error": "Your role does not include the Price simulator."})
+            return
+        actor = user["username"]
+        admin = auth.can(user, "settings")
+        try:
+            if path == "/api/sales/pricesim/params":
+                self._send(200, {"params": pricesim.save_params(body or {}, actor)})
+            elif path == "/api/sales/pricesim/competitors":
+                if body.get("action") == "delete":
+                    self._send(200, {"ok": pricesim.delete_competitors(str(body.get("id") or ""), actor)})
+                else:
+                    try:
+                        data = base64.b64decode(body.get("data") or "", validate=True)
+                    except (ValueError, TypeError):
+                        raise ValueError("The file could not be read.") from None
+                    if len(data) > 8_000_000:
+                        raise ValueError("The file is larger than 8 MB.")
+                    self._send(200, pricesim.import_competitors(str(body.get("filename") or "")[:120], data, actor))
+            elif path == "/api/sales/pricesim/scenarios":
+                if body.get("action") == "delete":
+                    self._send(200, {"ok": pricesim.delete_scenario(str(body.get("id") or ""), actor, admin)})
+                else:
+                    self._send(200, {"scenario": pricesim.save_scenario(dict(body, admin=admin), actor)})
+            else:
+                self._send(404, {"error": "Not found."})
+        except ValueError as exc:
+            self._send(400, {"error": str(exc)})
 
     # ---------------------------------------------------------------- Sales → Bonus management (bonus.py)
     BONUS_SCREEN = "finance.s.sales.bonus"
@@ -3257,6 +3339,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 store.audit("export", f"channel profitability · {r['title']}", user["username"], {}, {}, r["period"]["from"])
+            elif url.path.startswith("/api/sales/pricesim"):
+                self._pricesim_get(url.path, q, user)
             elif url.path in ("/api/sales/menu", "/api/sales/menu/xlsx"):
                 # Sales → Menu engineering: popularity and margin of every menu item (Simphony + BC recipes)
                 if not simphony.info()["configured"]:
@@ -4494,6 +4578,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(410, {"error": "The Action center is now the Exceptions register: change the item there."})
             elif url.path == "/api/settings":
                 self._send(200, store.save_settings(body, actor))
+            elif url.path.startswith("/api/sales/pricesim/"):
+                if self.headers.get("X-Requested-With") != "RHG-Finance":
+                    self._send(403, {"error": "This request must come from the Finance tower."})
+                    return
+                self._pricesim_post(url.path, body or {}, user)
             elif url.path == "/api/sales/channel-profit/params":
                 self._send(200, {"config": chanprof.save_config(body or {}, actor),
                                  "fields": [{"key": k, "label": lb, "unit": u} for k, lb, u in chanprof.CHANNEL_FIELDS]})

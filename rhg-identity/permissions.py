@@ -250,7 +250,7 @@ DEFAULT_ROLES = {
     "Unit manager": {"department": "Sales", "system": False,
                      "description": "One restaurant: its sales, today, stock and SKU planning (give the account "
                                     "its locations).",
-                     "permissions": ["finance.s.sales.loc", "finance.s.overview.today",
+                     "permissions": ["finance.s.sales.loc", "finance.s.sales.pricing", "finance.s.overview.today",
                                      "finance.s.inventory.loc", "finance.s.inventory.sku", "purchasing.s.overview.overview",
                                      "purchasing.s.reqs.reqs", "purchasing.s.reqs.po"]},
     "Sales analyst": {"department": "Sales", "system": False,
@@ -293,6 +293,8 @@ for _name, _spec in DEFAULT_ROLES.items():               # the restricted screen
             _spec["permissions"].append(_p)
 # Screens added after the roles were stored: {new screen: the screen (or screens) whose holders get it once}.
 ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
+                 # Sales → Price simulator: whoever reads Menu engineering, and the unit managers (their restaurants)
+                 "finance.s.sales.pricing": ("finance.s.sales.menu", "finance.s.sales.loc"),
                  # Live operations became two tabs: whoever held the screen gets both
                  "purchasing.s.live.carried": "purchasing.s.live", "purchasing.s.live.poreco": "purchasing.s.live",
                  "purchasing.s.purchasers": "purchasing.s.users", "finance.s.sales.prices": "finance.s.sales.main",

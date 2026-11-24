@@ -366,6 +366,16 @@ td.num,th.num{text-align:right}
 .me-st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;white-space:nowrap;color:var(--ink)}
 .me-st i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
 .me-par{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:14px 16px;margin:10px 0 6px}
+.ps-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ps-pct{display:inline-flex;align-items:center;gap:6px}.ps-pct input{width:72px;font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.ps-scn{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.ps-scn select,.ps-scn input{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:240px}
+.ps-in{width:84px;text-align:right;font:inherit;font-variant-numeric:tabular-nums;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink)}
+.ps-in:focus{outline:2px solid var(--accent);outline-offset:1px}
+tr.ps-chg td{background:color-mix(in srgb,var(--accent) 6%,transparent)} tr.ps-chg .ps-in{border-color:var(--accent);font-weight:700}
+.ps-sug{all:unset;cursor:pointer;font-variant-numeric:tabular-nums;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.ps-sug.up{background:var(--down-bg);color:var(--down)}.ps-sug.dn{background:var(--up-bg);color:var(--up)}.ps-sug small{font-weight:500;opacity:.85}
+.ps-sug:focus-visible{outline:2px solid var(--accent)}
+.ps-ch{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bg);white-space:nowrap}.ps-ch.del{background:color-mix(in srgb,#6b4fa0 15%,transparent)}
 .me-par h3{margin:0;font-size:14px}
 .me-par .field .meta{font-weight:400;white-space:normal}
 .cp-bars{display:grid;gap:8px}
@@ -1597,7 +1607,7 @@ table.bn-plan td{padding:3px 4px}
   </section>
 
   <section class="view" id="v-sales">
-    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="menucost" role="tab" aria-selected="false">Menu &amp; food cost</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button><button data-t="stockstop" role="tab" aria-selected="false">Blocked by stock</button><button data-t="sevenrooms" role="tab" aria-selected="false">SevenRooms ↔ Simphony</button><button data-t="bonus" role="tab" aria-selected="false">Bonus management</button></div>
+    <div class="ov-tabs" id="slTabs" role="tablist"><button data-t="main" class="on" role="tab" aria-selected="true">Sales</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="prices" role="tab" aria-selected="false">Menu prices</button><button data-t="menu" role="tab" aria-selected="false">Menu engineering</button><button data-t="menucost" role="tab" aria-selected="false">Menu &amp; food cost</button><button data-t="chanprofit" role="tab" aria-selected="false">Channel profitability</button><button data-t="pricing" role="tab" aria-selected="false">Price simulator</button><button data-t="stockstop" role="tab" aria-selected="false">Blocked by stock</button><button data-t="sevenrooms" role="tab" aria-selected="false">SevenRooms ↔ Simphony</button><button data-t="bonus" role="tab" aria-selected="false">Bonus management</button></div>
     <div id="slPrView" style="display:none">
       <!-- one card: filters, the three views as tabs, a row per item; the prices of an item in a pop-up (Geri, 22 Nov 2026) -->
       <div class="card">
@@ -1669,6 +1679,81 @@ table.bn-plan td{padding:3px 4px}
         <div class="scroll"><table id="meAcross"></table></div></div>
       <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
         <div class="hint" id="meDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
+    <div id="slPsView" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>Price simulator</h2>
+          <p class="hint"><span>What a new price does to the items sold, the sales and the margin, on one channel or more, before it goes on the menu.</span> <span>The base is the period chosen above: items sold, the price received and the portion cost by channel, as Menu engineering reads them.</span> <span>The suggested price comes from the item's class, the portion cost target, the channel's commission and the competitors' prices. Nothing is changed in Simphony.</span></p></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="psCompBtn" aria-expanded="false" aria-controls="psComp">Competitors</button><button class="mini" id="psParBtn" aria-expanded="false" aria-controls="psPar">Parameters</button><button class="mini exp dark" id="psXlsx">Export ▾</button><button class="mini" id="psRead">Read again</button></div></div>
+        <div class="me-par" id="psComp" hidden>
+          <h3>Competitors' prices</h3>
+          <p class="hint" style="margin:2px 0 10px"><span>Excel or CSV files with the competitors' prices (VAT included): competitor, our brand, channel, item, price, our item, date.</span> <span>An item is matched to ours by the number or name in "Our item", else by the words of its name.</span> <span>A file with the same name replaces the one before.</span></p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            <label class="btn dark" style="cursor:pointer">Upload a file<input type="file" id="psFile" accept=".xlsx,.csv" hidden></label>
+            <a class="btn" href="/api/sales/pricesim/template">Download the template</a><button class="btn" id="psCompClose" type="button">Close</button>
+            <span class="meta" id="psCompMsg"></span></div>
+          <div class="scroll"><table id="psSources"></table></div>
+          <details class="pz-fold" id="psUnmBox"><summary id="psUnmSum">Rows matched to none of our items</summary><div class="scroll" style="max-height:260px"><table id="psUnm"></table></div></details>
+        </div>
+        <div class="me-par" id="psPar" hidden>
+          <h3>Parameters</h3>
+          <p class="hint" style="margin:2px 0 10px"><span>Elasticity: how much the items sold move when the price moves (−1: 10% dearer, about 10% fewer sold).</span> <span>"Apply here" changes this simulation only; "Save for everyone" (Settings) also changes the suggested prices.</span></p>
+          <div class="formgrid">
+            <label class="field">Elasticity · Star<input id="psElStar" type="number" step="0.1" max="0"></label>
+            <label class="field">Elasticity · Plowhorse<input id="psElPlowhorse" type="number" step="0.1" max="0"></label>
+            <label class="field">Elasticity · Puzzle<input id="psElPuzzle" type="number" step="0.1" max="0"></label>
+            <label class="field">Elasticity · Dog<input id="psElDog" type="number" step="0.1" max="0"></label>
+            <label class="field">Elasticity · No cost<input id="psElNocost" type="number" step="0.1" max="0"></label>
+            <label class="field">Delivery channels: elasticity ×<input id="psElDel" type="number" step="0.1" min="1" max="3"><span class="meta">Delivery customers compare prices more.</span></label>
+            <label class="field">Star: rise (%)<input id="psStar" type="number" step="0.5" min="0" max="50"></label>
+            <label class="field">Largest step at once (%)<input id="psMax" type="number" step="0.5" min="0" max="50"></label>
+            <label class="field">Above the competitors' median, at most (%)<input id="psBand" type="number" step="0.5" min="0" max="50"></label>
+            <label class="field">Cheaper than the competitors by more than (%)<input id="psLow" type="number" step="0.5" min="0" max="50"><span class="meta">An item without a cost is raised then.</span></label>
+            <label class="field">Round prices to (lek)<input id="psRoundAll" type="number" step="1" min="0"></label>
+            <label class="field">Round prices to (EUR)<input id="psRoundEur" type="number" step="0.05" min="0"></label>
+            <label class="field">Delivery keeps the margin of eating in<select id="psParity"><option value="1">Yes</option><option value="0">No</option></select></label>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            <button class="btn dark" id="psParApply" type="button">Apply here</button><button class="btn" id="psParSave" type="button">Save for everyone</button><button class="btn" id="psParClose" type="button">Close</button>
+            <span class="meta" id="psParMsg"></span></div>
+        </div>
+        <div class="filters" style="margin:6px 0 8px">
+          <label>Level<select id="psLevel"><option value="all">All RHG</option><option value="brand">Brand</option><option value="location">Location</option></select></label>
+          <label id="psKeyL" style="display:none"><span id="psKeyT">Brand</span><select id="psKey"></select></label>
+          <label>Menu section<select id="psSec"><option value="family">Family group</option><option value="major">Major group</option></select></label>
+          <div class="dimf" id="psChPick"><span>Channel</span>
+            <button type="button" class="dimf-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-text">Every channel</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
+            <div class="dimf-list" hidden></div>
+            <select id="psCh" multiple hidden></select></div>
+        </div>
+        <p class="meta" id="psStatus" style="margin:0"></p>
+      </div>
+      <div class="card ps-build" style="margin-bottom:16px">
+        <div class="card-head"><div><h2>The scenario</h2><p class="hint" id="psScnHint">Prices change on the channels chosen above only. Start from the suggested prices, change by a percentage, or type a price on a row.</p></div>
+          <div class="ps-scn"><select id="psScn" aria-label="Saved scenarios"><option value="">New scenario</option></select><input id="psScnName" placeholder="Scenario name" maxlength="80"><button class="mini dark" id="psScnSave" type="button">Save</button><button class="mini" id="psScnDel" type="button">Delete</button></div></div>
+        <div class="ps-acts">
+          <button class="btn dark" id="psSuggest" type="button">Use the suggested prices</button>
+          <span class="ps-pct"><input id="psPct" type="number" step="0.5" value="5" aria-label="Change by %"><span>%</span><button class="btn" id="psPctGo" type="button">Change the prices shown</button></span>
+          <button class="btn" id="psReset" type="button">Back to today's prices</button>
+          <span class="meta" id="psScnMsg"></span>
+        </div>
+      </div>
+      <div class="kpis six" id="psKpis"></div>
+      <div class="grid">
+        <div class="card"><h2>By channel</h2><p class="hint">The change of the margin on each channel, for the period. Click a channel to see only its rows.</p><div id="psChBars"></div></div>
+        <div class="card"><h2>By menu section</h2><p class="hint">Where the change comes from. Click a section to see only its rows.</p><div id="psSecBars"></div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Items and prices</h2><p class="hint" id="psItemsNote"></p></div></div>
+        <div class="sk-chips" id="psChips"></div>
+        <div class="filters" style="margin:0 0 10px">
+          <label>Item<input id="psQ" placeholder="name or number"></label>
+          <label>Section<select id="psSecF"><option value="">All sections</option></select></label>
+          <label>Show<select id="psShow"><option value="">Every row</option><option value="changed">Prices changed</option><option value="suggested">A different price suggested</option><option value="comp">With competitors' prices</option></select></label>
+          <label>Sort<select id="psSort"><option value="net">Sales</option><option value="dcm">Change of margin</option><option value="sug">Suggested change</option><option value="name">Name</option></select></label>
+        </div>
+        <div class="scroll" style="max-height:640px"><table id="psTable"></table></div></div>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
+        <div class="hint" id="psDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
     <div id="slMcView" class="fc-viz" style="display:none">
       <div class="card" style="margin-bottom:16px">
@@ -4518,6 +4603,329 @@ $("cpParSave").onclick = async () => {
     $("cpParMsg").textContent = "Saved and applied.";
   }catch(e){ $("cpParMsg").textContent = "Could not save: " + e.message; }
 };
+// ---------- Sales → Price simulator (pricesim.py, /api/sales/pricesim) ----------
+const psLbl = k => (psData && psData.labels && psData.labels[k]) || k;
+const psSt = k => `<span class="me-st me-c-${k}"><i></i>${esc(psLbl(k))}</span>`;
+// a new price on one channel or more: items sold, sales and margin, live; the suggested price per item and channel
+let psData = null, psKey = "", psTimer = null, psNew = {}, psP = null, psCls = "", psScns = [], psMe = "";
+const PS_EL = {star: "psElStar", plowhorse: "psElPlowhorse", puzzle: "psElPuzzle", dog: "psElDog", nocost: "psElNocost"};
+const psChMs = msPick("psChPick", "Every channel", () => psRender());
+function psQs(){
+  const p = new URLSearchParams(params()), o = scopeQs(new URLSearchParams());
+  o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
+  o.set("level", $("psLevel").value); if ($("psLevel").value !== "all") o.set("key", $("psKey").value || "");
+  o.set("section", $("psSec").value);
+  return o.toString();
+}
+async function psLoad(refresh){
+  clearTimeout(psTimer);
+  const q = psQs(); psKey = q;
+  readBanner("psStatus", {src: "Simphony", reading: true});
+  try{
+    const j = await readJSON(await fetch("/api/sales/pricesim?" + q + (refresh ? "&refresh=1" : "")));
+    if (psKey !== q) return;
+    if (j.error) throw new Error(j.error);
+    if (j.pending) {
+      readBanner("psStatus", {src: "Simphony", reading: true, text: `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} The same read as Menu engineering; closed days are kept.`});
+      psTimer = setTimeout(() => psLoad(false), 4000); return;
+    }
+    if (j.available === false) throw new Error(j.error || "not available");
+    const keepCh = psChMs.vals();
+    psData = j; psP = Object.assign({}, j.params);
+    psChMs.fill(j.channels.map(c => ({value: c.channel, text: `${c.channel}${c.commission_pct ? ` · ${fmt(c.commission_pct)}% commission` : ""}`})), keepCh.filter(c => j.channels.some(x => x.channel === c)));
+    psFillKeys(); psParFill(); psComp(); psScnLoad(); psRender();
+  }catch(e){ readBanner("psStatus", {src: "Simphony", error: e.message}); }
+}
+function psFillKeys(){
+  const d = psData, lv = $("psLevel").value, keep = $("psKey").value || d.key;
+  $("psKeyL").style.display = lv === "all" ? "none" : "";
+  $("psKeyT").textContent = lv === "brand" ? "Brand" : "Location";
+  const opts = lv === "brand" ? d.brands.map(b => [b, b]) : d.locations.map(L => [L.ref, L.name]);
+  $("psKey").innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" data-no-i18n>${esc(t)}</option>`).join("");
+  if (opts.some(o => o[0] === keep)) $("psKey").value = keep;
+}
+$("psLevel").onchange = () => { if (psData) psFillKeys(); $("psKeyL").style.display = $("psLevel").value === "all" ? "none" : ""; if ($("psLevel").value !== "all" && !$("psKey").value) return; psNew = {}; psLoad(); };
+$("psKey").onchange = () => { psNew = {}; psLoad(); };
+$("psSec").onchange = () => psLoad();
+$("psRead").onclick = () => psLoad(true);
+// ---- the arithmetic (pricesim.effect, the same formulas)
+const psChan = ch => (psData.channels || []).find(c => c.channel === ch) || {commission_pct: 0, commission_base: "vat", delivery: false};
+const psEl = (cls, ch) => (psP["el_" + cls] ?? -1) * (psChan(ch).delivery ? psP.el_delivery || 1 : 1);
+function psFactor(vat, ch){ const c = psChan(ch), k = (c.commission_pct || 0) / 100, v = (vat || 0) / 100; return c.commission_base === "net" ? (1 - k) / (1 + v) : 1 / (1 + v) - k; }
+function psEff(it, ch, price){
+  const c = it.channels[ch], q = c.qty, p0 = c.price, p1 = price || p0, a = psFactor(it.vat, ch), v = 1 + (it.vat || 0) / 100, cost = it.cost || 0;
+  const nq = p0 && p1 ? q * Math.pow(p1 / p0, psEl(it.cls, ch)) : q, cmu = p0 * a - cost, ncmu = p1 * a - cost;
+  return {qty: q, new_qty: nq, net: p0 / v * q, new_net: p1 / v * nq, cm: cmu * q, new_cm: ncmu * nq, cm_unit: cmu, new_cm_unit: ncmu,
+    be: ncmu > 0 && q ? (cmu * q / ncmu - q) / q * 100 : null, cost: it.cost == null ? null : cost * q, new_cost: it.cost == null ? null : cost * nq};
+}
+const psK = (it, ch) => `${it.mi}|${ch}`;
+const psPrice = (it, ch) => psNew[psK(it, ch)] || it.channels[ch].price;
+const psRound = (p, up) => { const s = psData.round_step || 0; return s ? Math.round((up ? Math.ceil(p / s - 1e-9) : Math.floor(p / s + 1e-9)) * s * 100) / 100 : Math.round(p * 100) / 100; };
+const psChs = () => { const v = psChMs.vals(); return v.length ? v : psData.channels.map(c => c.channel); };
+// every item × channel of the channels chosen
+function psRows(){
+  const C = new Set(psChs()), out = [];
+  for (const it of psData.items) for (const ch of Object.keys(it.channels)) if (C.has(ch)) out.push({it, ch, c: it.channels[ch]});
+  return out;
+}
+function psFiltered(){
+  const q = ($("psQ").value || "").trim().toLowerCase(), sec = $("psSecF").value, sh = $("psShow").value;
+  return psRows().filter(r => (!psCls || r.it.cls === psCls) && (!sec || r.it.section === sec)
+    && (!q || `${r.it.mi} ${r.it.name}`.toLowerCase().includes(q))
+    && (!sh || (sh === "changed" ? psNew[psK(r.it, r.ch)] && psNew[psK(r.it, r.ch)] !== r.c.price : sh === "suggested" ? r.c.suggested && r.c.suggested !== r.c.price : r.c.comp_n > 0)));
+}
+function psTotals(rows){
+  const t = {net: 0, new_net: 0, cm: 0, new_cm: 0, qty: 0, new_qty: 0, cost: 0, new_cost: 0, cnet: 0, new_cnet: 0, changed: 0, nocost: 0};
+  for (const r of rows) {
+    const e = psEff(r.it, r.ch, psPrice(r.it, r.ch));
+    t.net += e.net; t.new_net += e.new_net; t.qty += e.qty; t.new_qty += e.new_qty;
+    if (psPrice(r.it, r.ch) !== r.c.price) t.changed++;
+    if (r.it.cost == null) { t.nocost++; continue; }
+    t.cm += e.cm; t.new_cm += e.new_cm; t.cost += e.cost; t.new_cost += e.new_cost; t.cnet += e.net; t.new_cnet += e.new_net;
+  }
+  return t;
+}
+const psSign = v => (v > 0 ? "+" : v < 0 ? "−" : "") + flM(Math.abs(v));
+const psPct = (a, b) => b ? ((a - b) / Math.abs(b) * 100) : null;
+const psPctT = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1) + "%";
+function psRender(){
+  const d = psData; if (!d) return;
+  readBanner("psStatus", {src: "Simphony", at: d.read_at, lines: [`${d.title} · ${d.period.from} → ${d.period.to} (${fmt(d.period.days)} days) · ${d.currency}${d.converted ? " (converted at the group rates)" : ""} · ${fmt(d.items.length)} items on ${fmt(d.channels.length)} channels · eating in: ${d.eat_in || "–"}`], warns: d.errors});
+  const secs = [...new Set(d.items.map(i => i.section))].sort(), keepS = $("psSecF").value;
+  $("psSecF").innerHTML = `<option value="">All sections</option>` + secs.map(s => `<option value="${esc(s)}" data-no-i18n>${esc(s)}</option>`).join("");
+  $("psSecF").value = secs.includes(keepS) ? keepS : "";
+  $("psScnHint").textContent = `Prices change on ${psChMs.vals().length ? psChMs.vals().join(", ") : "every channel"} only (Channel, above). Start from the suggested prices, change by a percentage, or type a price on a row.`;
+  $("psDefs").innerHTML = [
+    "The base: the period chosen above, read as Menu engineering reads it: items sold at a price and net sales (less VAT) by menu item and Simphony order type (the channel); the price received = net sales / items sold, with the VAT % of the BC item = the price on the menu.",
+    "New items sold = items sold × (new price / price) ^ elasticity; the elasticity by class (Parameters), raised on delivery channels.",
+    "Margin per item = price without VAT − the channel's commission (Channel profitability: % on the sales with VAT or without) − the portion cost from BC. Items without a cost count in the sales, not in the margin.",
+    "Break-even: how many fewer items the new price may sell before the margin falls below today's.",
+    "The suggested price: Star a small rise; Plowhorse and Dog towards the portion cost target, one step at a time; Puzzle no rise, lower when dearer than the competitors; a delivery channel at least the margin of eating in after the commission; capped by the competitors' median plus the band; never below the portion cost; rounded to the step.",
+    "A year: the change of the period at the same pace for 365 days. Nothing is changed in Simphony: a new price is set in EMC."].map(x => `<p><span>${esc(x)}</span></p>`).join("");
+  psSummary(); psTable();
+}
+function psSummary(){
+  const d = psData, rows = psRows(), t = psTotals(rows), yr = 365 / Math.max(1, d.period.days), C = d.currency;
+  const fc0 = t.cnet ? t.cost / t.cnet * 100 : null, fc1 = t.new_cnet ? t.new_cost / t.new_cnet * 100 : null;
+  const dn = t.new_net - t.net, dm = t.new_cm - t.cm;
+  const tile = (l, v, s, cls, open) => `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-pulse="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  $("psKpis").innerHTML = tile("Sales without VAT", flM(t.new_net), `${C} · today ${flM(t.net)} · <b class="${dn >= 0 ? "down" : "up"}">${psSign(dn)} (${psPctT(psPct(t.new_net, t.net))})</b>`)
+    + tile("Margin after commission", flM(t.new_cm), `today ${flM(t.cm)} · <b class="${dm >= 0 ? "down" : "up"}">${psSign(dm)} (${psPctT(psPct(t.new_cm, t.cm))})</b>`, dm > 0 ? "down" : dm < 0 ? "up" : "")
+    + tile("Margin in a year", psSign(dm * yr), `${C} · at the pace of the period`, dm > 0 ? "down" : dm < 0 ? "up" : "")
+    + tile("Food cost %", fc1 == null ? "–" : fmt(fc1, 1) + "%", `today ${fc0 == null ? "–" : fmt(fc0, 1) + "%"} · on the items with a cost`, fc1 != null && fc1 > (d.settings.target || 32) ? "warn" : "")
+    + tile("Items sold", psPctT(psPct(t.new_qty, t.qty)), `${fmt(t.new_qty, 0)} against ${fmt(t.qty, 0)}`)
+    + tile("Prices changed", fmt(t.changed), `of ${fmt(rows.length)} item × channel · ${fmt(t.nocost)} without a cost`, "", t.changed ? "pslist|changed" : "");
+  const grp = (keyf) => { const g = {}; for (const r of rows) { const k = keyf(r), e = psEff(r.it, r.ch, psPrice(r.it, r.ch)), x = g[k] = g[k] || {key: k, dm: 0, dn: 0, n: 0};
+    if (r.it.cost != null) x.dm += e.new_cm - e.cm; x.dn += e.new_net - e.net; if (psPrice(r.it, r.ch) !== r.c.price) x.n++; }
+    return Object.values(g).sort((a, b) => Math.abs(b.dm) - Math.abs(a.dm)); };
+  const bars = (list, kind) => Pulse.bars(list.slice(0, 14).map(x => ({key: x.key, segs: [[Math.abs(x.dm), x.dm >= 0 ? "var(--down)" : "var(--up)", x.dm >= 0 ? "margin gained" : "margin lost"]],
+    text: `<b class="${x.dm >= 0 ? "down" : "up"}">${psSign(x.dm)}</b> <span class="meta">sales ${psSign(x.dn)} · ${fmt(x.n)} changed</span>`, open: `psfocus|${kind}:${x.key}`})),
+    [["var(--down)", "margin gained"], ["var(--up)", "margin lost"]], {none: "No change yet: use the suggested prices or type a price."});
+  const any = rows.some(r => psPrice(r.it, r.ch) !== r.c.price);
+  $("psChBars").innerHTML = any ? bars(grp(r => r.ch), "ch") : `<p class="meta">No change yet: use the suggested prices, change by a percentage or type a price.</p>`;
+  $("psSecBars").innerHTML = any ? bars(grp(r => r.it.section), "sec") : `<p class="meta">No change yet.</p>`;
+}
+function psRowHtml(r){
+  const it = r.it, c = r.c, k = psK(it, r.ch), p1 = psPrice(it, r.ch), e = psEff(it, r.ch, p1), chg = p1 !== c.price;
+  const sugD = c.suggested && c.suggested !== c.price ? (c.suggested - c.price) / c.price * 100 : 0;
+  const cp0 = it.cost != null && c.price ? it.cost / (c.price / (1 + it.vat / 100)) * 100 : null, cp1 = it.cost != null && p1 ? it.cost / (p1 / (1 + it.vat / 100)) * 100 : null;
+  const dm = e.new_cm - e.cm;
+  return `<tr data-pulse="psitem|${it.mi}" tabindex="0" class="${chg ? "ps-chg" : ""}"><td class="name">${esc(it.name)}<div class="meta">${esc(it.mi)} · ${esc(it.section)}</div></td><td>${psSt(it.cls)}</td>
+    <td><span class="ps-ch${psChan(r.ch).delivery ? " del" : ""}" data-no-i18n>${esc(r.ch)}</span></td><td class="num">${fmt(c.qty, 0)}</td><td class="num">${fmt(c.price, 0)}</td>
+    <td class="num">${c.suggested && c.suggested !== c.price ? `<button type="button" class="ps-sug ${sugD > 0 ? "up" : "dn"}" data-psuse="${esc(k)}" title="${esc((c.why || []).join(" "))}">${fmt(c.suggested, 0)} <small>${psPctT(sugD)}</small></button>` : `<span class="meta">hold</span>`}</td>
+    <td class="num"><input class="ps-in" type="number" min="0" step="${psData.round_step || 1}" data-psk="${esc(k)}" value="${p1}" aria-label="New price"></td>
+    <td class="num" data-psc="d">${chg ? psPctT((p1 - c.price) / c.price * 100) : "–"}</td>
+    <td class="num">${c.comp_median ? `${fmt(c.comp_median, 0)}<div class="meta">${fmt(c.comp_n)} price(s)</div>` : `<span class="meta">–</span>`}</td>
+    <td class="num" data-psc="fc">${cp0 == null ? "–" : `${fmt(cp0, 0)}%${chg ? ` → <b>${fmt(cp1, 0)}%</b>` : ""}`}</td>
+    <td class="num" data-psc="q">${chg ? psPctT((e.new_qty - e.qty) / (e.qty || 1) * 100) : "–"}</td>
+    <td class="num" data-psc="m">${it.cost == null ? `<span class="meta">no cost</span>` : `<b class="${dm > 0 ? "down" : dm < 0 ? "up" : ""}">${chg ? psSign(dm) : "–"}</b>`}</td>
+    <td class="num" data-psc="be">${chg && e.be != null && it.cost != null ? psPctT(e.be) : "–"}</td></tr>`;
+}
+const PS_HEAD = `<tr><th>Item</th><th>Class</th><th>Channel</th><th class="num">Items sold</th><th class="num">Price today</th><th class="num">Suggested</th><th class="num">New price</th><th class="num">Change</th><th class="num">Competitors</th><th class="num">Food cost</th><th class="num">Items sold</th><th class="num">Margin</th><th class="num">Break-even</th></tr>`;
+function psTable(){
+  const d = psData, all = psRows(), R = psFiltered(), srt = $("psSort").value;
+  const dm = r => { const e = psEff(r.it, r.ch, psPrice(r.it, r.ch)); return r.it.cost == null ? 0 : e.new_cm - e.cm; };
+  R.sort(srt === "name" ? (a, b) => a.it.name.localeCompare(b.it.name) : srt === "dcm" ? (a, b) => Math.abs(dm(b)) - Math.abs(dm(a))
+    : srt === "sug" ? (a, b) => Math.abs((b.c.suggested || b.c.price) / b.c.price - 1) - Math.abs((a.c.suggested || a.c.price) / a.c.price - 1) : (a, b) => b.c.net - a.c.net);
+  const cnt = {}; all.forEach(r => cnt[r.it.cls] = (cnt[r.it.cls] || 0) + 1);
+  $("psChips").innerHTML = [["", "Every class", all.length]].concat(["star", "plowhorse", "puzzle", "dog", "nocost"].filter(c => cnt[c]).map(c => [c, psLbl(c), cnt[c]]))
+    .map(([k, l, n]) => `<button type="button" data-pscls="${k}" class="${psCls === k ? "on" : ""}">${k ? psSt(k) : esc(l)} · ${fmt(n)}</button>`).join("");
+  const shown = R.slice(0, 400);
+  $("psItemsNote").textContent = `${fmt(R.length)} of ${fmt(all.length)} item × channel rows${R.length > 400 ? ", the first 400 shown" : ""}. Type a new price, or click a suggested price to use it; click a row for the item's detail, its price ladder and the competitors.`;
+  $("psTable").innerHTML = PS_HEAD + (shown.map(psRowHtml).join("") || `<tr><td colspan="13" class="empty">No row for these filters.</td></tr>`);
+}
+// one row's figures again after a price is typed (the input keeps the focus)
+function psRowUpdate(k){
+  const [mi, ...rest] = k.split("|"), ch = rest.join("|"), it = psData.items.find(x => String(x.mi) === mi);
+  const inp = document.querySelector(`#psTable [data-psk="${CSS.escape(k)}"]`); if (!it || !inp) return;
+  const tmp = document.createElement("tbody"); tmp.innerHTML = psRowHtml({it, ch, c: it.channels[ch]});
+  const tr = inp.closest("tr"), nt = tmp.firstElementChild;
+  ["d", "fc", "q", "m", "be"].forEach(c => { tr.querySelector(`[data-psc="${c}"]`).innerHTML = nt.querySelector(`[data-psc="${c}"]`).innerHTML; });
+  tr.classList.toggle("ps-chg", nt.classList.contains("ps-chg"));
+}
+let psSumT = null;
+document.addEventListener("input", e => {
+  const k = e.target.dataset && e.target.dataset.psk; if (!k || !psData) return;
+  const [mi, ...rest] = k.split("|"), ch = rest.join("|"), it = psData.items.find(x => String(x.mi) === mi), v = parseFloat(e.target.value);
+  if (!it) return;
+  if (v > 0 && Math.abs(v - it.channels[ch].price) > 0.004) psNew[k] = v; else delete psNew[k];
+  psRowUpdate(k); clearTimeout(psSumT); psSumT = setTimeout(psSummary, 200);
+});
+document.addEventListener("click", e => {
+  const u = e.target.closest("[data-psuse]");
+  if (u) { e.preventDefault(); e.stopPropagation(); psUse(u.dataset.psuse); return; }
+  const c = e.target.closest("[data-pscls]"); if (c) { psCls = c.dataset.pscls; psTable(); }
+}, true);
+function psUse(k){
+  const [mi, ...rest] = k.split("|"), ch = rest.join("|"), it = psData.items.find(x => String(x.mi) === mi); if (!it) return;
+  const s = it.channels[ch].suggested; if (s && s !== it.channels[ch].price) psNew[k] = s;
+  document.querySelectorAll(`.pl-bd.show [data-psuse="${CSS.escape(k)}"]`).forEach(b => b.outerHTML = `<b>${fmt(s, 0)}</b> <span class="meta">used</span>`);
+  psTable(); psSummary();
+}
+["psQ"].forEach(id => $(id).oninput = () => psData && psTable());
+["psSecF", "psShow", "psSort"].forEach(id => $(id).onchange = () => psData && psTable());
+$("psSuggest").onclick = () => { if (!psData) return; let n = 0; psFiltered().forEach(r => { if (r.c.suggested && r.c.suggested !== r.c.price) { psNew[psK(r.it, r.ch)] = r.c.suggested; n++; } });
+  $("psScnMsg").textContent = `${fmt(n)} suggested price(s) used on the rows shown.`; psTable(); psSummary(); };
+$("psPctGo").onclick = () => { if (!psData) return; const p = parseFloat($("psPct").value); if (!isFinite(p) || !p) return; let n = 0;
+  psFiltered().forEach(r => { psNew[psK(r.it, r.ch)] = psRound(r.c.price * (1 + p / 100), p > 0); n++; });
+  $("psScnMsg").textContent = `${fmt(n)} price(s) changed by ${psPctT(p)} (rounded to ${fmt(psData.round_step)}).`; psTable(); psSummary(); };
+$("psReset").onclick = () => { if (!psData) return; psFiltered().forEach(r => delete psNew[psK(r.it, r.ch)]); $("psScnMsg").textContent = "The rows shown are back to today's prices."; psTable(); psSummary(); };
+Pulse.on("psfocus", v => { const i = v.indexOf(":"), kind = v.slice(0, i), key = v.slice(i + 1);
+  if (kind === "ch") { psChMs.fill(psData.channels.map(c => ({value: c.channel, text: c.channel})), [key]); psRender(); }
+  else { $("psSecF").value = key; psTable(); }
+  $("psTable").scrollIntoView({behavior: "smooth", block: "start"}); });
+Pulse.on("pslist", () => { $("psShow").value = "changed"; psTable(); $("psTable").scrollIntoView({behavior: "smooth", block: "start"}); });
+// ---- the item: its channels, the price ladder, the reasons and the competitors
+function psItemPop(mi){
+  const d = psData, it = d.items.find(x => String(x.mi) === String(mi)); if (!it) return;
+  const C = d.currency, chs = Object.keys(it.channels).sort((a, b) => it.channels[b].qty - it.channels[a].qty);
+  const main = chs.find(ch => psChs().includes(ch)) || chs[0], c = it.channels[main];
+  const steps = [-10, -5, 0, 5, 10, 15, 20].map(p => ({p, price: p ? psRound(c.price * (1 + p / 100), p > 0) : c.price}));
+  if (c.suggested && !steps.some(s => s.price === c.suggested)) steps.push({p: (c.suggested / c.price - 1) * 100, price: c.suggested, sug: true});
+  steps.sort((a, b) => a.price - b.price);
+  const L = steps.map(s => Object.assign(s, psEff(it, main, s.price)));
+  const best = it.cost != null ? L.reduce((a, b) => b.new_cm > a.new_cm ? b : a, L[0]) : null;
+  Pulse.pop({title: esc(it.name), sub: esc(`${it.mi} · ${it.section} · ${d.title} · ${d.period.from} → ${d.period.to}`), body:
+    Pulse.tiles([{l: "Class", v: psSt(it.cls)}, {l: "Portion cost", v: it.cost == null ? "–" : fmt(it.cost, 0), s: it.cost == null ? "no recipe or cost in BC" : `${C} · from BC`},
+      {l: "VAT", v: fmt(it.vat, 0) + "%"}, {l: "Items sold", v: fmt(it.qty, 0), s: `sales ${flM(it.net)} ${C}`},
+      {l: "Competitors", v: it.competitors.length ? fmt(it.competitors.length) : "–", s: it.competitors.length ? `median ${fmt(Pulse_median(it.competitors.map(x => x.price)), 0)}` : "no price matched"}])
+    + Pulse.panel("By channel", Pulse.list([["Channel"], ["Items sold", 1], ["Price today", 1], ["Suggested", 1], ["New price", 1], ["Competitors", 1], ["Margin per item", 1], ["Change of margin", 1]],
+        chs.map(ch => { const x = it.channels[ch], p1 = psPrice(it, ch), e = psEff(it, ch, p1);
+          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, fmt(x.qty, 0), fmt(x.price, 0),
+            x.suggested && x.suggested !== x.price ? `<button type="button" class="ps-sug ${x.suggested > x.price ? "up" : "dn"}" data-psuse="${esc(psK(it, ch))}">${fmt(x.suggested, 0)}</button>` : `<span class="meta">hold</span>`,
+            p1 !== x.price ? `<b>${fmt(p1, 0)}</b>` : "–", x.comp_median ? fmt(x.comp_median, 0) : "–",
+            it.cost == null ? "–" : `${fmt(e.cm_unit, 0)}${p1 !== x.price ? ` → <b>${fmt(e.new_cm_unit, 0)}</b>` : ""}`,
+            it.cost == null || p1 === x.price ? "–" : `<b class="${e.new_cm >= e.cm ? "down" : "up"}">${psSign(e.new_cm - e.cm)}</b>`]}; })), "click a suggested price to use it")
+    + Pulse.panel(`Price ladder · ${main}`, Pulse.bars(L.map(s => { const dv = it.cost != null ? s.new_cm - s.cm : s.new_net - s.net;
+          return {key: String(s.price), label: `${fmt(s.price, 0)} (${psPctT(s.p)})`, segs: [[Math.abs(dv), dv >= 0 ? "var(--down)" : "var(--up)", dv >= 0 ? "gained" : "lost"]],
+            text: `<b class="${dv >= 0 ? "down" : "up"}">${psSign(dv)}</b> <span class="meta">${fmt(s.new_qty, 0)} sold${s.sug ? " · suggested" : ""}${s === best ? " · highest margin" : ""}</span>`}; }),
+          [["var(--down)", it.cost != null ? "margin gained against today" : "sales gained against today"], ["var(--up)", "lost"]])
+        + Pulse.list([["Price", 1], ["Change", 1], ["Items sold", 1], ["Sales", 1], ["Margin", 1], ["Change of margin", 1]],
+          L.map(s => ({cells: [`<b>${fmt(s.price, 0)}</b>${s.sug ? ` <span class="meta">suggested</span>` : ""}${s === best ? ` <span class="meta">highest margin</span>` : ""}`, psPctT(s.p), fmt(s.new_qty, 0), flM(s.new_net),
+            it.cost == null ? "–" : flM(s.new_cm), it.cost == null ? "–" : `<b class="${s.new_cm >= s.cm ? "down" : "up"}">${psSign(s.new_cm - s.cm)}</b>`]}))),
+        `elasticity ${fmt(psEl(it.cls, main), 2)} (${psLbl(it.cls)}${psChan(main).delivery ? ", delivery" : ""}) · the period`)
+    + Pulse.panel("Why this price", chs.map(ch => `<p style="margin:0 0 8px"><b data-no-i18n>${esc(ch)}</b>: ${(it.channels[ch].why || []).map(w => `<span>${esc(w)}</span>`).join(" ")}</p>`).join(""))
+    + Pulse.panel("Competitors' prices", Pulse.list([["Competitor"], ["Their item"], ["Channel"], ["Price", 1], ["Date"], ["Matched"]],
+        it.competitors.map(x => ({cells: [esc(x.competitor), esc(x.item), esc(x.channel || "menu"), `<b>${fmt(x.price, 0)}</b>`, esc(x.date || "–"), `<span class="meta">${esc(x.matched || "")}</span>`]})),
+        {none: "No competitor price matched this item: upload a file (Competitors' prices, above)."}))});
+}
+const Pulse_median = a => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
+Pulse.on("psitem", mi => psItemPop(mi));
+// ---- parameters
+function psParFill(){
+  const p = psP || {};
+  Object.entries(PS_EL).forEach(([c, id]) => $(id).value = p["el_" + c]);
+  $("psElDel").value = p.el_delivery; $("psStar").value = p.star_step_pct; $("psMax").value = p.max_step_pct; $("psBand").value = p.comp_band_pct; $("psLow").value = p.comp_low_pct;
+  $("psRoundAll").value = p.round_all; $("psRoundEur").value = p.round_eur; $("psParity").value = p.parity ? "1" : "0";
+  $("psParSave").disabled = !can("settings");
+}
+function psParRead(){
+  const o = {}; Object.entries(PS_EL).forEach(([c, id]) => o["el_" + c] = -Math.abs(parseFloat($(id).value) || 0));
+  return Object.assign(o, {el_delivery: parseFloat($("psElDel").value) || 1, star_step_pct: parseFloat($("psStar").value) || 0, max_step_pct: parseFloat($("psMax").value) || 0,
+    comp_band_pct: parseFloat($("psBand").value) || 0, comp_low_pct: parseFloat($("psLow").value) || 0, round_all: parseFloat($("psRoundAll").value) || 0,
+    round_eur: parseFloat($("psRoundEur").value) || 0, parity: $("psParity").value === "1"});
+}
+const psParShow = on => { $("psPar").hidden = !on; $("psParBtn").setAttribute("aria-expanded", on); if (on && psData) psParFill(); };
+$("psParBtn").onclick = () => psParShow($("psPar").hidden);
+$("psParClose").onclick = () => psParShow(false);
+$("psParApply").onclick = () => { if (!psData) return; Object.assign(psP, psParRead()); psRender(); $("psParMsg").textContent = "Applied to this simulation (the suggested prices change when saved for everyone)."; };
+$("psParSave").onclick = async () => {
+  $("psParMsg").textContent = "Saving…";
+  try { await simphonyPost("/api/sales/pricesim/params", psParRead()); $("psParMsg").textContent = "Saved. Working the suggested prices out again…"; await psLoad(); $("psParMsg").textContent = "Saved and applied."; }
+  catch(e){ $("psParMsg").textContent = "Could not save: " + e.message; }
+};
+// ---- competitors' prices
+function psComp(){
+  const c = psData.competitors || {sources: []};
+  $("psCompBtn").textContent = c.sources.length ? `Competitors · ${fmt(c.matched)} matched` : "Competitors";
+  $("psSources").innerHTML = `<tr><th>File</th><th class="num">Rows</th><th>Uploaded by</th><th>On</th><th></th></tr>` + (c.sources.map(s => `<tr><td class="name" data-no-i18n>${esc(s.file)}</td><td class="num">${fmt(s.rows)}</td><td data-no-i18n>${esc(s.by)}</td><td class="meta">${esc((s.at || "").replace("T", " ").slice(0, 16))}</td>
+    <td><button class="mini" type="button" data-psdel="${esc(s.id)}">Remove</button></td></tr>`).join("") || `<tr><td colspan="5" class="empty">No file yet: download the template, fill it in and upload it.</td></tr>`);
+  $("psUnmBox").hidden = !c.unmatched_n;
+  $("psUnmSum").textContent = `Rows matched to none of our items in this selection: ${fmt(c.unmatched_n)}. Give them "Our item" (our menu item number or name) in the file.`;
+  $("psUnm").innerHTML = `<tr><th>Competitor</th><th>Their item</th><th>Our brand</th><th>Channel</th><th class="num">Price</th></tr>` + (c.unmatched || []).slice(0, 100).map(r => `<tr><td>${esc(r.competitor)}</td><td>${esc(r.item)}</td><td>${esc(r.brand || "–")}</td><td>${esc(r.channel || "menu")}</td><td class="num">${fmt(r.price, 0)}</td></tr>`).join("");
+}
+const psCompShow = on => { $("psComp").hidden = !on; $("psCompBtn").setAttribute("aria-expanded", on); };
+$("psCompBtn").onclick = () => psCompShow($("psComp").hidden);
+$("psCompClose").onclick = () => psCompShow(false);
+$("psFile").onchange = async () => {
+  const f = $("psFile").files[0]; if (!f) return;
+  $("psCompMsg").textContent = `Reading ${f.name}…`;
+  try {
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+    const j = await simphonyPost("/api/sales/pricesim/competitors", {filename: f.name, data});
+    $("psCompMsg").textContent = `${fmt(j.rows)} price(s) read from ${f.name}. Matching them…`;
+    await psLoad(); $("psCompMsg").textContent = `${fmt(j.rows)} price(s) read from ${f.name}; ${fmt(psData.competitors.matched)} matched to our items.`;
+  } catch(e){ $("psCompMsg").textContent = "Could not read the file: " + e.message; }
+  $("psFile").value = "";
+};
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-psdel]"); if (!b) return;
+  if (!confirm("Remove this file of competitors' prices?")) return;
+  try { await simphonyPost("/api/sales/pricesim/competitors", {action: "delete", id: b.dataset.psdel}); await psLoad(); } catch(err){ $("psCompMsg").textContent = "Could not remove it: " + err.message; }
+});
+// ---- scenarios (saved in pulse; nothing goes to Simphony)
+async function psScnLoad(){
+  try { const j = await readJSON(await fetch("/api/sales/pricesim/scenarios?" + new URLSearchParams({company: $("company").value || ""}))); psScns = j.items || []; psMe = j.me || ""; } catch(e){ psScns = []; }
+  const keep = $("psScn").value;
+  $("psScn").innerHTML = `<option value="">New scenario</option>` + psScns.slice().reverse().map(s => `<option value="${esc(s.id)}" data-no-i18n>${esc(s.name)} · ${esc(s.by)} · ${esc((s.at || "").slice(0, 10))}</option>`).join("");
+  $("psScn").value = psScns.some(s => s.id === keep) ? keep : "";
+}
+$("psScn").onchange = () => {
+  const s = psScns.find(x => x.id === $("psScn").value);
+  if (!s) { $("psScnName").value = ""; return; }
+  psNew = {}; let n = 0, miss = 0;
+  Object.entries(s.changes || {}).forEach(([k, v]) => { const [mi, ...rest] = k.split("|"), it = psData.items.find(x => String(x.mi) === mi);
+    if (it && it.channels[rest.join("|")]) { psNew[k] = v; n++; } else miss++; });
+  $("psScnName").value = s.name;
+  $("psScnMsg").textContent = `${s.name}: ${fmt(n)} price(s)${miss ? `, ${fmt(miss)} not in this selection or period` : ""}.${s.note ? " " + s.note : ""}`;
+  psTable(); psSummary();
+};
+$("psScnSave").onclick = async () => {
+  const name = $("psScnName").value.trim(); if (!name) { $("psScnMsg").textContent = "Give the scenario a name."; $("psScnName").focus(); return; }
+  const t = psTotals(psRows()), cur = psScns.find(x => x.id === $("psScn").value);
+  try {
+    const j = await simphonyPost("/api/sales/pricesim/scenarios", {id: cur && cur.name === name ? cur.id : "", name, level: $("psLevel").value, key: $("psKey").value,
+      company: $("company").value || "", changes: psNew, summary: {net: Math.round(t.new_net - t.net), cm: Math.round(t.new_cm - t.cm), items: t.changed}});
+    await psScnLoad(); $("psScn").value = j.scenario.id; $("psScnMsg").textContent = `Saved: ${name}. It changes nothing in Simphony; share it with whoever sets the prices in EMC.`;
+  } catch(e){ $("psScnMsg").textContent = "Could not save: " + e.message; }
+};
+$("psScnDel").onclick = async () => {
+  const id = $("psScn").value; if (!id || !confirm("Delete this scenario?")) return;
+  try { await simphonyPost("/api/sales/pricesim/scenarios", {action: "delete", id}); await psScnLoad(); $("psScnMsg").textContent = "Deleted."; } catch(e){ $("psScnMsg").textContent = "Could not delete: " + e.message; }
+};
+$("psXlsx").onclick = () => {
+  const d = psData; if (!d) { alert("Read the simulator first."); return; }
+  const rows = psRows().map(r => { const p1 = psPrice(r.it, r.ch), e = psEff(r.it, r.ch, p1);
+    return [r.it.mi, r.it.name, r.it.section, psLbl(r.it.cls), r.ch, r.c.qty, r.c.price, r.c.suggested, p1, p1 / r.c.price - 1, r.c.comp_median, r.it.cost, e.new_qty, e.net, e.new_net, r.it.cost == null ? null : e.cm, r.it.cost == null ? null : e.new_cm, r.it.cost == null ? null : e.new_cm - e.cm, e.be == null ? null : e.be / 100, (r.c.why || []).join(" ")]; });
+  const t = psTotals(psRows());
+  xlsxTable(`Price simulator ${d.title} ${d.period.from} ${d.period.to}`, [
+    {title: "Prices", header: ["Item no.", "Item", "Section", "Class", "Channel", "Items sold", "Price today", "Suggested", "New price", "Change", "Competitors' median", "Portion cost", "Items sold, new", "Sales", "Sales, new", "Margin", "Margin, new", "Change of margin", "Break-even", "Why"],
+     formats: ["text", "text", "text", "text", "text", "num", "num", "num", "num", "pct", "num", "num", "num", "num", "num", "num", "num", "num", "pct", "text"], rows},
+    {title: "Summary", header: ["", "Today", "New", "Change"], formats: ["text", "num", "num", "num"],
+     rows: [["Sales without VAT", t.net, t.new_net, t.new_net - t.net], ["Margin after commission", t.cm, t.new_cm, t.new_cm - t.cm], ["Items sold", t.qty, t.new_qty, t.new_qty - t.qty], ["Prices changed", null, t.changed, null]]}],
+    [`${d.title} · ${d.period.from} to ${d.period.to} · ${d.currency}`, `Channels: ${psChMs.vals().join(", ") || "every channel"}`, $("psScnName").value ? `Scenario: ${$("psScnName").value}` : "Scenario not saved",
+     "New items sold = items sold × (new price / price) ^ elasticity. Margin = price without VAT − commission − portion cost. Nothing is changed in Simphony."]);
+};
 // ---------- Sales → Menu engineering ----------
 let meData = null, meKey = "", meTimer = null, meCls = "", meHl = null;
 const ME_ORDER = ["star", "plowhorse", "puzzle", "dog", "nocost"];
@@ -5691,17 +6099,19 @@ var slTab = "main", slSort = "net";
 function slShowTab(tab){
   slTab = tab;
   document.querySelectorAll("#slTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" || tab === "menucost" || tab === "stockstop" || tab === "sevenrooms" || tab === "bonus" ? "none" : "";
+  $("slMain").style.display = tab === "loc" || tab === "prices" || tab === "menu" || tab === "chanprofit" || tab === "pricing" || tab === "menucost" || tab === "stockstop" || tab === "sevenrooms" || tab === "bonus" ? "none" : "";
   $("slBnView").style.display = tab === "bonus" ? "" : "none";
   if (tab === "bonus") bnEnter(); else clearTimeout(bnTimer);
   $("slStView").style.display = tab === "stockstop" ? "" : "none";
   $("slSrView").style.display = tab === "sevenrooms" ? "" : "none";
-  $("slHow").style.display = tab === "stockstop" || tab === "sevenrooms" || tab === "bonus" ? "none" : "";
+  $("slHow").style.display = tab === "stockstop" || tab === "sevenrooms" || tab === "bonus" || tab === "pricing" ? "none" : "";
   if (tab === "sevenrooms") { if (applyTopRange("sevenrooms", false) || !svData || svData.company !== ($("company").value || svData.company)) svLoad(false); } else clearTimeout(svTimer);
   if (tab === "stockstop") stLoad(false); else clearTimeout(stTimer);
   $("slMcView").style.display = tab === "menucost" ? "" : "none";
   if (tab === "menucost") mcLoad();
   $("slCpView").style.display = tab === "chanprofit" ? "" : "none";
+  $("slPsView").style.display = tab === "pricing" ? "" : "none";
+  if (tab === "pricing" && (!psData || psKey !== psQs())) psLoad(); else if (tab !== "pricing") clearTimeout(psTimer);
   if (tab === "chanprofit" && (!cpData || cpKey !== cpQs())) cpLoad();
   $("slLocView").style.display = tab === "loc" ? "" : "none";
   $("slPrView").style.display = tab === "prices" ? "" : "none";
