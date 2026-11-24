@@ -471,6 +471,41 @@ td.num,th.num{text-align:right}
 .pg-rank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#062634;background:linear-gradient(135deg,#ffd27a,#ffe9b8)}
 .pg-win.warn .pg-rank{background:color-mix(in srgb,var(--pg-dn) 20%,transparent);color:var(--pg-dn)}
 .pg-tools{display:flex;flex-wrap:wrap;gap:6px}
+.pg-locs .dimf-btn{font-size:12.5px;padding:6px 9px;border-radius:9px;background:var(--bg)}
+.pg-mode{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--card);border:1px solid var(--line);margin:0 0 12px}
+.pg-mode button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;font-size:13px;font-weight:700;color:var(--sub)}
+.pg-mode button.on{background:var(--accent);color:#fff}.pg-mode button:focus-visible{outline:2px solid var(--accent)}
+.pd-grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:14px;align-items:start}
+.pd-in{position:sticky;top:12px;display:flex;flex-direction:column;gap:10px}
+.pd-grid>*,.pd-two>*,.pd-kpis>*,.pd-out>*,.pg-main>*{min-width:0}
+.pd-f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--sub)}.pd-f small{font-weight:500}
+.pd-f input,.pd-f select{font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:#fff8e6}
+.pd-f select{background:var(--bg)}
+.pd-price{display:flex;align-items:center;gap:8px;min-width:0}.pd-price input{flex:1;min-width:0;width:100%;box-sizing:border-box;font-size:18px;font-weight:800}
+.pd-f input,.pd-f select{box-sizing:border-box;width:100%}
+.pd-acts{display:flex;flex-direction:column;gap:6px}
+.pd-main{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pd-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.pd-k{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;min-width:0}
+.pd-k span{display:block;font-size:10.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.03em}
+.pd-k b{display:block;font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:4px}
+.pd-k small{font-size:10.5px;color:var(--sub)}.pd-k b.up{color:var(--pg-up)}.pd-k b.dn{color:var(--pg-dn)}
+.pd-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pd-two svg{width:100%;height:auto;display:block}.pd-two svg text{fill:var(--sub);font-size:11px}
+.pd-lg{display:flex;flex-direction:column;gap:6px;font-size:12px}.pd-lg div{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center}
+.pd-lg i{width:12px;height:12px;border-radius:3px}.pd-lg b{font-variant-numeric:tabular-nums}.pd-lg span.meta{text-align:right;min-width:40px}
+.pd-donut{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center}
+.pd-scn table{width:100%;border-collapse:collapse;font-size:12.5px}.pd-scn th{font-size:11px;color:var(--sub);text-align:right;font-weight:600;padding:4px 6px}
+.pd-scn td{padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid var(--line)}.pd-scn td:first-child,.pd-scn th:first-child{text-align:left}
+.pd-scn tr.best td{background:color-mix(in srgb,var(--pg-up) 12%,transparent);font-weight:700}.pd-scn tr.now td:first-child{font-weight:700}
+.pd-scn button{all:unset;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent)}
+.pd-out{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pd-o{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.pd-o span{display:block;font-size:10.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.03em}
+.pd-o b{display:block;font-size:20px;font-weight:900;margin:6px 0 2px}.pd-o small{font-size:11px;color:var(--sub);line-height:1.4;display:block}
+.pd-meter{height:8px;border-radius:5px;background:var(--bg);overflow:hidden;margin:6px 0}.pd-meter i{display:block;height:100%;background:var(--pg-up)}
+@media (max-width:1180px){.pd-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.pd-out{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){.pd-grid{grid-template-columns:1fr}.pd-in{position:static}.pd-two{grid-template-columns:1fr}.pd-donut{grid-template-columns:140px 1fr}}
 .pg-all{margin-top:14px}.pg-all>summary{cursor:pointer;list-style:none}.pg-all>summary::before{content:"▸ ";color:var(--sub)}.pg-all[open]>summary::before{content:"▾ "}
 @media (max-width:1100px){.pg-main{grid-template-columns:1fr}.pg-side{position:static}}
 @media (max-width:820px){.pg-hero{grid-template-columns:1fr;padding:20px}.pg-steps{grid-template-columns:1fr}
@@ -1810,15 +1845,51 @@ table.bn-plan td{padding:3px 4px}
       </section>
       <section class="pg-steps">
         <div class="pg-step"><span class="pg-n">1</span><div class="pg-sb"><b>Where</b>
-          <div class="pg-row"><select id="psLevel" aria-label="Level"><option value="all">All RHG</option><option value="brand">A brand</option><option value="location">A location</option></select>
-            <span id="psKeyL" style="display:none"><span id="psKeyT" hidden>Brand</span><select id="psKey" aria-label="Brand or location"></select></span>
+          <div class="pg-row"><select id="psLevel" aria-label="Level"><option value="all">All RHG</option><option value="brand">A brand</option><option value="locations">Locations</option></select>
+            <span id="psKeyL" style="display:none"><span id="psKeyT" hidden>Brand</span><select id="psKey" aria-label="Brand"></select></span>
+            <div class="dimf pg-locs" id="psLocPick" style="display:none"><span hidden>Locations</span>
+              <button type="button" class="dimf-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-text">Choose locations</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
+              <div class="dimf-list" hidden></div>
+              <select id="psLocs" multiple hidden></select></div>
             <select id="psSec" aria-label="Categories"><option value="family">Categories: family groups</option><option value="major">Categories: major groups</option></select></div></div></div>
         <div class="pg-step"><span class="pg-n">2</span><div class="pg-sb"><b>On which channel</b><div class="pg-pills" id="pgCh"></div></div></div>
         <div class="pg-step"><span class="pg-n">3</span><div class="pg-sb"><b>What to change</b>
           <div class="pg-row"><input id="pgFind" list="pgItems" placeholder="Find an item…" autocomplete="off"><datalist id="pgItems"></datalist><span class="meta">or move a category below</span></div></div></div>
       </section>
       <p class="meta" id="psStatus" style="margin:0 0 12px"></p>
-      <div class="pg-main">
+      <div class="pg-mode" role="tablist" aria-label="View"><button type="button" class="on" data-pgmode="cats" role="tab" aria-selected="true">Categories &amp; items</button><button type="button" data-pgmode="prod" role="tab" aria-selected="false">One product</button></div>
+      <section class="pd" id="pgProd" hidden>
+        <div class="pd-grid">
+          <div class="pg-card pd-in">
+            <h3>Your inputs</h3>
+            <label class="pd-f">Product<input id="pdItem" list="pgItems" placeholder="Find an item…" autocomplete="off"></label>
+            <label class="pd-f">Channel<select id="pdCh"></select></label>
+            <div class="pd-f"><span>New price <small id="pdPriceNote"></small></span>
+              <div class="pd-price"><input id="pdPrice" type="number" min="0" step="10"><span id="pdPricePct" class="pg-tag"></span></div>
+              <input id="pdRange" type="range" class="pg-range" min="-30" max="50" step="1" value="0" style="--h:var(--accent);--v:37.5%" aria-label="New price, % against today"></div>
+            <label class="pd-f">Portion cost <small id="pdCostNote"></small><input id="pdCost" type="number" min="0" step="1"></label>
+            <label class="pd-f">Food cost target (%)<input id="pdTarget" type="number" min="1" max="100" step="0.5"></label>
+            <label class="pd-f">Items sold a month <small id="pdUnitsNote"></small><input id="pdUnits" type="number" min="0" step="1"></label>
+            <label class="pd-f">Elasticity <small id="pdElNote"></small><input id="pdEl" type="number" max="0" step="0.1"></label>
+            <label class="pd-f">Lower and higher by (%)<input id="pdStep" type="number" min="1" max="50" step="1" value="10"></label>
+            <div class="pd-acts"><button class="btn dark" id="pdAdd" type="button">Put this price in the scenario</button><button class="btn" id="pdBack" type="button">Back to today</button></div>
+            <p class="meta" id="pdMsg"></p>
+          </div>
+          <div class="pd-main">
+            <div class="pd-kpis" id="pdKpis"></div>
+            <div class="pd-two">
+              <div class="pg-card"><h3>Where the new price goes</h3><div id="pdDonut"></div></div>
+              <div class="pg-card"><h3>Price comparison</h3><div id="pdBars"></div></div>
+            </div>
+            <div class="pd-two">
+              <div class="pg-card"><h3>Scenario comparison</h3><div id="pdScn"></div></div>
+              <div class="pg-card"><h3>Margin a month by items sold</h3><div id="pdLine"></div></div>
+            </div>
+            <div class="pd-out" id="pdOut"></div>
+          </div>
+        </div>
+      </section>
+      <div class="pg-main" id="pgCatsView">
         <div>
           <div class="pg-cats" id="pgCats"></div>
           <section class="pg-drawer" id="pgDrawer" hidden></section>
@@ -4750,10 +4821,12 @@ const PG_MIN = -20, PG_MAX = 30;
 function psQs(){
   const p = new URLSearchParams(params()), o = scopeQs(new URLSearchParams());
   o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
-  o.set("level", $("psLevel").value); if ($("psLevel").value !== "all") o.set("key", $("psKey").value || "");
+  const lv = $("psLevel").value;
+  o.set("level", lv); if (lv === "brand") o.set("key", $("psKey").value || ""); else if (lv === "locations") o.set("key", psLocMs.vals().join(","));
   o.set("section", $("psSec").value);
   return o.toString();
 }
+const psLocMs = msPick("psLocPick", "Choose locations", () => { if ($("psLevel").value === "locations" && psLocMs.vals().length) psLoad(); });
 async function psLoad(refresh){
   clearTimeout(psTimer);
   const q = psQs(); psKey = q;
@@ -4773,16 +4846,26 @@ async function psLoad(refresh){
     psSug = {}; psManual = Object.fromEntries(Object.entries(psManual).filter(([k]) => psItemOf(k)));
     $("pgHero").classList.remove("pg-loading");
     psFillKeys(); psParFill(); psComp(); psScnLoad(); psRebuild(); psRender();
+    if (!$("pgProd").hidden) { const it = pdItem(); if (it) pdPick(it, pdCh); else { pdMi = null; pdPick(psData.items[0]); } }
   }catch(e){ readBanner("psStatus", {src: "Simphony", error: e.message}); }
 }
+// Where: all RHG, a brand (its price group: OPA without OPA · TIA Airport), or the locations ticked in the box
 function psFillKeys(){
-  const d = psData, lv = $("psLevel").value, keep = $("psKey").value || d.key;
-  $("psKeyL").style.display = lv === "all" ? "none" : "";
-  const opts = lv === "brand" ? d.brands.map(b => [b, b]) : d.locations.map(L => [L.ref, L.name]);
-  $("psKey").innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" data-no-i18n>${esc(t)}</option>`).join("");
-  if (opts.some(o => o[0] === keep)) $("psKey").value = keep;
+  const d = psData, lv = $("psLevel").value, keep = $("psKey").value || (d.level === "brand" ? d.key : "");
+  $("psKeyL").style.display = lv === "brand" ? "" : "none";
+  $("psLocPick").style.display = lv === "locations" ? "" : "none";
+  $("psKey").innerHTML = d.brands.map(b => `<option value="${esc(b)}" data-no-i18n>${esc(b)}</option>`).join("");
+  if (d.brands.includes(keep)) $("psKey").value = keep;
+  psLocMs.fill(d.locations.map(L => ({value: L.ref, text: L.name})));
 }
-$("psLevel").onchange = () => { if (psData) psFillKeys(); $("psKeyL").style.display = $("psLevel").value === "all" ? "none" : ""; if ($("psLevel").value !== "all" && !$("psKey").value) return; psLoad(); };
+$("psLevel").onchange = () => {
+  const lv = $("psLevel").value;
+  if (psData) psFillKeys();
+  $("psKeyL").style.display = lv === "brand" ? "" : "none"; $("psLocPick").style.display = lv === "locations" ? "" : "none";
+  if (lv === "locations" && !psLocMs.vals().length) { readBanner("psStatus", {src: "Simphony", lines: ["Tick one location or more in the box."]}); return; }
+  if (lv === "brand" && !$("psKey").value) return;
+  psLoad();
+};
 $("psKey").onchange = () => psLoad();
 $("psSec").onchange = () => { psCat = {}; psLoad(); };
 $("psRead").onclick = () => psLoad(true);
@@ -5229,6 +5312,131 @@ $("psXlsx").onclick = () => {
      "New items sold = items sold × (new price / price) ^ elasticity. Margin = price without VAT − commission − portion cost. Nothing is changed in Simphony."]);
 };
 
+// ---- One product (Geri, 25 Nov 2026): a pricing sheet for one item on one channel: break-even, the price at the cost
+// target, where the price goes, against the competitors, lower / today / new / higher, the margin by items sold
+let pdMi = null, pdCh = "", pdIn = {};
+document.addEventListener("click", e => {
+  const m = e.target.closest("[data-pgmode]"); if (!m) return;
+  const prod = m.dataset.pgmode === "prod";
+  document.querySelectorAll("[data-pgmode]").forEach(b => { b.classList.toggle("on", b === m); b.setAttribute("aria-selected", b === m); });
+  $("pgProd").hidden = !prod; $("pgCatsView").hidden = prod; $("pgAll").hidden = prod;
+  if (prod && psData) { if (!pdMi) pdPick(psData.items[0]); else pdRender(); }
+});
+const pdItem = () => psData && psData.items.find(i => String(i.mi) === String(pdMi));
+function pdPick(it, ch){
+  if (!it) return;
+  pdMi = it.mi;
+  const chs = Object.keys(it.channels).sort((a, b) => it.channels[b].qty - it.channels[a].qty);
+  pdCh = ch && it.channels[ch] ? ch : (chs.find(psOn) || chs[0]);
+  const c = it.channels[pdCh];
+  pdIn = {price: psPrice(it, pdCh), cost: it.cost, target: psData.settings.target || 32, units: Math.round(c.qty * 30 / Math.max(1, psData.period.days)),
+          el: Math.round(psEl(it.cls, pdCh) * 100) / 100, step: +$("pdStep").value || 10};
+  $("pdItem").value = it.name;
+  $("pdCh").innerHTML = chs.map(x => `<option value="${esc(x)}" data-no-i18n>${esc(x)}${psChan(x).commission_pct ? ` · ${fmt(psChan(x).commission_pct)}%` : ""}</option>`).join("");
+  $("pdCh").value = pdCh;
+  $("pdPrice").step = psData.round_step || 1;
+  ["price", "cost", "target", "units", "el"].forEach(k => $("pd" + k[0].toUpperCase() + k.slice(1)).value = pdIn[k] == null ? "" : pdIn[k]);
+  $("pdCostNote").textContent = it.cost == null ? "(no cost in BC: type one)" : `(BC: ${fmt(it.cost, 0)})`;
+  $("pdUnitsNote").textContent = `(the period: ${fmt(c.qty, 0)} in ${fmt(psData.period.days)} days)`;
+  $("pdElNote").textContent = `(${psLbl(it.cls)}${psChan(pdCh).delivery ? ", delivery" : ""})`;
+  $("pdMsg").textContent = "";
+  pdRender();
+}
+// the figures of one price on the item and channel chosen, with the inputs
+function pdAt(p){
+  const it = pdItem(), c = it.channels[pdCh], v = (it.vat || 0) / 100, ch = psChan(pdCh), k = (ch.commission_pct || 0) / 100;
+  const cost = pdIn.cost == null || pdIn.cost === "" ? null : +pdIn.cost, net = p / (1 + v), comm = ch.commission_base === "net" ? k * net : k * p;
+  const units = (+pdIn.units || 0) * (c.price && p ? Math.pow(p / c.price, +pdIn.el || 0) : 1);
+  const cmu = cost == null ? null : net - comm - cost;
+  return {p, net, vat: p - net, comm, cost, cmu, cmp: cmu == null || !net ? null : cmu / net * 100, fc: cost == null || !net ? null : cost / net * 100,
+          units, sales: net * units, cm: cmu == null ? null : cmu * units};
+}
+function pdRender(){
+  const it = pdItem(); if (!it || !it.channels[pdCh]) return;
+  const c = it.channels[pdCh], C = psData.currency, a = psFactor(it.vat, pdCh), cost = pdIn.cost == null || pdIn.cost === "" ? null : +pdIn.cost;
+  const now = pdAt(c.price), nw = pdAt(+pdIn.price || c.price);
+  const be = cost != null && a > 0 ? cost / a : null, tgt = cost != null && a > 0 && pdIn.target ? cost / (pdIn.target / 100) / a : null;
+  const comps = it.competitors.filter(x => (x.channel || "") === pdCh || (!psChan(pdCh).delivery && !x.channel)).map(x => x.price);
+  const cAvg = comps.length ? comps.reduce((s, x) => s + x, 0) / comps.length : null;
+  const pct = c.price ? (nw.p / c.price - 1) * 100 : 0;
+  $("pdPricePct").textContent = Math.abs(pct) >= 0.05 ? psPctT(pct) : "today";
+  $("pdPriceNote").textContent = `(today ${fmt(c.price, 0)})`;
+  const r = $("pdRange"); r.value = Math.max(-30, Math.min(50, Math.round(pct))); r.style.setProperty("--v", `${(+r.value + 30) / 80 * 100}%`);
+  const K = (l, v, sub, cls) => `<div class="pd-k"><span>${esc(l)}</span><b class="${cls || ""}">${v}</b><small>${sub}</small></div>`;
+  $("pdKpis").innerHTML = K("Break-even price", be == null ? "–" : fmt(be, 0), "VAT, commission and the portion cost covered")
+    + K("At the cost target", tgt == null ? "–" : fmt(tgt, 0), `portion cost ${fmt(pdIn.target, 0)}% of the price without VAT`)
+    + K("Margin per item", nw.cmu == null ? "–" : fmt(nw.cmu, 0), now.cmu == null ? C : `today ${fmt(now.cmu, 0)} ${C}`, nw.cmu == null ? "" : nw.cmu >= (now.cmu || 0) ? "up" : "dn")
+    + K("Margin %", nw.cmp == null ? "–" : fmt(nw.cmp, 1) + "%", "of the price without VAT")
+    + K("Sales a month", flM(nw.sales), `${fmt(nw.units, 0)} items · today ${flM(now.sales)}`)
+    + K("Margin a month", nw.cm == null ? "–" : flM(nw.cm), now.cm == null ? "" : `<b class="${nw.cm >= now.cm ? "up" : "dn"}" style="display:inline;font-size:11px">${psSign(nw.cm - now.cm)}</b> against today`, nw.cm == null ? "" : nw.cm >= now.cm ? "up" : "dn");
+  // where the new price goes
+  const parts = [["VAT", nw.vat, "var(--ch-4)"], ["Commission", nw.comm, "var(--ch-2)"], ["Portion cost", nw.cost || 0, "var(--ch-1)"], ["Margin", Math.max(0, nw.cmu || 0), "var(--pg-up)"]].filter(x => x[1] > 0);
+  const tot = parts.reduce((s, x) => s + x[1], 0) || 1, R = 70, CX = 85, CY = 85, SW = 26, L2 = 2 * Math.PI * R;
+  let off = 0;
+  const arcs = parts.map(([l, v, col]) => { const len = v / tot * L2, g = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${col}" stroke-width="${SW}" stroke-dasharray="${Math.max(0, len - 2)} ${L2}" stroke-dashoffset="${-off}" transform="rotate(-90 ${CX} ${CY})"><title>${esc(l)}: ${fmt(v, 0)}</title></circle>`; off += len; return g; }).join("");
+  $("pdDonut").innerHTML = `<div class="pd-donut"><svg viewBox="0 0 170 170" role="img" aria-label="Where the new price goes">${arcs}
+      <text x="85" y="80" text-anchor="middle" style="font-size:22px;font-weight:900;fill:var(--ink)">${fmt(nw.p, 0)}</text><text x="85" y="100" text-anchor="middle">${esc(C)} with VAT</text></svg>
+    <div class="pd-lg">${parts.map(([l, v, col]) => `<div><i style="background:${col}"></i><span>${esc(l)}</span><b>${fmt(v, 0)}</b><span class="meta">${fmt(v / tot * 100, 0)}%</span></div>`).join("")}
+      ${nw.cmu != null && nw.cmu < 0 ? `<p class="meta" style="color:var(--pg-dn)">The price does not cover its cost: ${fmt(nw.cmu, 0)} a item.</p>` : ""}${cost == null ? `<p class="meta">No portion cost: type one to see the margin.</p>` : ""}</div></div>`;
+  // the price against the break-even and the competitors
+  const B = [["Break-even", be, "var(--ch-4)"], comps.length ? ["Competitors, low", Math.min(...comps), "var(--ch-0)"] : null, cAvg != null ? ["Competitors, average", cAvg, "var(--ch-0)"] : null,
+    comps.length ? ["Competitors, high", Math.max(...comps), "var(--ch-0)"] : null, ["Today", c.price, "var(--sub)"], c.suggested && c.suggested !== c.price ? ["Pulse", c.suggested, "#c47f1f"] : null,
+    tgt != null ? ["At the cost target", tgt, "var(--ch-2)"] : null, ["New", nw.p, "var(--pg-up)"]].filter(x => x && x[1] != null);
+  const mx = Math.max(...B.map(x => x[1])) * 1.12 || 1, W = 520, H = 220, top = 18, bot = 46, bw = W / B.length, h = H - top - bot, y = v => top + h - v / mx * h;
+  $("pdBars").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price comparison">
+    <line x1="0" x2="${W}" y1="${top + h}" y2="${top + h}" stroke="var(--line)"/>
+    ${B.map(([l, v, col], i) => `<g><title>${esc(l)}: ${fmt(v, 0)}</title><rect x="${i * bw + bw * 0.18}" y="${y(v)}" width="${bw * 0.64}" height="${top + h - y(v)}" rx="5" fill="${col}"/>
+      <text x="${i * bw + bw / 2}" y="${y(v) - 5}" text-anchor="middle" style="font-weight:800;fill:var(--ink)">${fmt(v, 0)}</text>
+      <text x="${i * bw + bw / 2}" y="${H - 28}" text-anchor="middle">${esc(l.split(", ")[0])}</text>${l.includes(", ") ? `<text x="${i * bw + bw / 2}" y="${H - 14}" text-anchor="middle">${esc(l.split(", ")[1])}</text>` : ""}</g>`).join("")}
+    ${be != null ? `<line x1="0" x2="${W}" y1="${y(be)}" y2="${y(be)}" stroke="var(--pg-dn)" stroke-width="1.5" stroke-dasharray="5 4"/>` : ""}</svg>`
+    + (be != null ? `<div class="pz-lg"><span><span class="pz-sw" style="background:var(--pg-dn)"></span>dashed: the break-even price</span></div>` : "")
+    + (comps.length ? "" : `<p class="meta">No competitor price for this item on this channel: upload a file (Competitors).</p>`);
+  // lower / today / new / higher / Pulse
+  const st = +pdIn.step || 10, rows = [["Lower", psRound(c.price * (1 - st / 100), false)], ["Today", c.price], ["New", nw.p], ["Higher", psRound(c.price * (1 + st / 100), true)]];
+  if (c.suggested && c.suggested !== c.price) rows.push(["Pulse", c.suggested]);
+  const R2 = rows.filter((x, i, A) => A.findIndex(y => y[1] === x[1] && y[0] !== "New") === i || x[0] === "New").map(([l, p]) => Object.assign({l}, pdAt(p)));
+  const best = R2.reduce((b, x) => x.cm != null && (b == null || x.cm > b.cm) ? x : b, null);
+  $("pdScn").innerHTML = `<div class="pd-scn scroll"><table data-nosort><tr><th></th><th>Price</th><th>Margin / item</th><th>Margin %</th><th>Items / month</th><th>Margin / month</th><th></th></tr>`
+    + R2.map(x => `<tr class="${x === best ? "best" : ""} ${x.l === "Today" ? "now" : ""}"><td>${esc(x.l)}${x.l !== "Today" ? ` <span class="meta">${psPctT((x.p / c.price - 1) * 100)}</span>` : ""}</td><td>${fmt(x.p, 0)}</td>
+      <td>${x.cmu == null ? "–" : fmt(x.cmu, 0)}</td><td>${x.cmp == null ? "–" : fmt(x.cmp, 1) + "%"}</td><td>${fmt(x.units, 0)}</td><td><b>${x.cm == null ? flM(x.sales) : flM(x.cm)}</b></td>
+      <td>${x.l === "New" ? "" : `<button type="button" data-pduse="${x.p}">Use</button>`}</td></tr>`).join("") + `</table>
+      <p class="meta">Items a month move with the price at the elasticity (${fmt(+pdIn.el, 2)}); the highest margin a month is marked.${cost == null ? " Without a portion cost the last column is sales." : ""}</p></div>`;
+  // margin a month by items sold: today's price and the new one
+  const u0 = Math.max(1, +pdIn.units || 1), xs = 2 * u0, W2 = 520, H2 = 220, l = 46, b2 = 30, t2 = 14;
+  const m1 = nw.cmu == null ? nw.net : nw.cmu, m0 = now.cmu == null ? now.net : now.cmu, ymax = Math.max(m1, m0, 0.0001) * xs * 1.08;
+  const X = q => l + q / xs * (W2 - l - 10), Y = v => t2 + (H2 - t2 - b2) * (1 - Math.max(0, v) / ymax);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => f * xs);
+  $("pdLine").innerHTML = `<svg viewBox="0 0 ${W2} ${H2}" role="img" aria-label="Margin a month by items sold">
+    ${[0, 0.5, 1].map(f => `<line x1="${l}" x2="${W2 - 10}" y1="${Y(f * ymax)}" y2="${Y(f * ymax)}" stroke="var(--line)" stroke-dasharray="${f ? "2 4" : ""}"/><text x="${l - 6}" y="${Y(f * ymax) + 4}" text-anchor="end">${flM(f * ymax)}</text>`).join("")}
+    ${ticks.map(q => `<text x="${X(q)}" y="${H2 - 10}" text-anchor="middle">${fmt(q, 0)}</text>`).join("")}
+    <line x1="${X(0)}" y1="${Y(0)}" x2="${X(xs)}" y2="${Y(m0 * xs)}" stroke="var(--sub)" stroke-width="2" stroke-dasharray="5 4"/>
+    <line x1="${X(0)}" y1="${Y(0)}" x2="${X(xs)}" y2="${Y(m1 * xs)}" stroke="var(--pg-up)" stroke-width="2.5"/>
+    <circle cx="${X(u0)}" cy="${Y(m0 * u0)}" r="5" fill="var(--sub)"><title>Today: ${fmt(u0, 0)} items, ${flM(m0 * u0)}</title></circle>
+    <circle cx="${X(nw.units)}" cy="${Y(m1 * nw.units)}" r="6" fill="var(--pg-up)" stroke="#fff" stroke-width="2"><title>New: ${fmt(nw.units, 0)} items, ${flM(m1 * nw.units)}</title></circle></svg>
+    <div class="pz-lg"><span><span class="pz-sw" style="background:var(--pg-up)"></span>new price (the dot: the items expected)</span><span><span class="pz-sw" style="background:var(--sub)"></span>today's price</span></div>`;
+  // the outlook
+  const pos = cAvg ? (nw.p / cAvg - 1) * 100 : null, shares = [["Portion cost", nw.cost || 0], ["VAT", nw.vat], ["Commission", nw.comm]].sort((x, y2) => y2[1] - x[1]);
+  const O = (l, v, sub, extra) => `<div class="pd-o"><span>${esc(l)}</span><b>${v}</b>${extra || ""}<small>${sub}</small></div>`;
+  $("pdOut").innerHTML = O("Profitability", nw.cmp == null ? "–" : fmt(nw.cmp, 0) + "%", nw.cmp == null ? "no portion cost" : nw.cmp >= 55 ? "Strong" : nw.cmp >= 40 ? "Healthy" : nw.cmp >= 25 ? "Thin" : "Weak",
+      nw.cmp == null ? "" : `<div class="pd-meter"><i style="width:${Math.max(0, Math.min(100, nw.cmp))}%;background:${nw.cmp >= 40 ? "var(--pg-up)" : nw.cmp >= 25 ? "#c47f1f" : "var(--pg-dn)"}"></i></div>`)
+    + O("Against the competitors", pos == null ? "–" : psPctT(pos), pos == null ? "no competitor price" : `${pos > 0 ? "above" : "below"} their average (${fmt(cAvg, 0)}, ${fmt(comps.length)} price(s))`)
+    + O("Largest part of the price", shares[0][0], `${fmt(shares[0][1], 0)} ${C} · ${fmt(shares[0][1] / nw.p * 100, 0)}% of the price`)
+    + O("Pulse says", c.suggested && c.suggested !== c.price ? fmt(c.suggested, 0) : "Hold", (c.why || []).slice(-2).map(esc).join(" "));
+}
+$("pdItem").onchange = () => { const q = $("pdItem").value.trim().toLowerCase(); const it = psData && (psData.items.find(i => i.name.toLowerCase() === q) || psData.items.find(i => i.name.toLowerCase().includes(q) || String(i.mi) === q)); if (it && it.mi !== pdMi) pdPick(it); };
+$("pdCh").onchange = () => pdPick(pdItem(), $("pdCh").value);
+["pdPrice", "pdCost", "pdTarget", "pdUnits", "pdEl", "pdStep"].forEach(id => $(id).oninput = () => { const k = id.slice(2).toLowerCase(); pdIn[k] = $(id).value === "" ? (k === "cost" ? null : 0) : +$(id).value; if (k === "el") pdIn.el = -Math.abs(pdIn.el); pdRender(); });
+$("pdRange").oninput = () => { const it = pdItem(); if (!it) return; const p0 = it.channels[pdCh].price, v = +$("pdRange").value; pdIn.price = v ? psRound(p0 * (1 + v / 100), v > 0) : p0; $("pdPrice").value = pdIn.price; pdRender(); };
+document.addEventListener("click", e => { const u = e.target.closest("[data-pduse]"); if (!u) return; pdIn.price = +u.dataset.pduse; $("pdPrice").value = pdIn.price; pdRender(); });
+$("pdBack").onclick = () => { const it = pdItem(); if (!it) return; pdIn.price = it.channels[pdCh].price; $("pdPrice").value = pdIn.price; pdRender(); };
+$("pdAdd").onclick = () => {
+  const it = pdItem(); if (!it) return; const k = psK(it, pdCh), p = +pdIn.price;
+  psSnap();
+  if (p && Math.abs(p - it.channels[pdCh].price) > 0.004) psManual[k] = p; else delete psManual[k];
+  if (!psOn(pdCh)) psChSel.add(pdCh);
+  psRebuild(); psRender();
+  $("pdMsg").textContent = `${it.name} on ${pdCh} at ${fmt(p, 0)} is in the scenario (Categories & items, Your changes).`;
+};
 // ---------- Sales → Menu engineering ----------
 let meData = null, meKey = "", meTimer = null, meCls = "", meHl = null;
 const ME_ORDER = ["star", "plowhorse", "puzzle", "dog", "nocost"];

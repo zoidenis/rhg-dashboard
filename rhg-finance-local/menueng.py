@@ -559,6 +559,10 @@ def analyse(ds, level="all", key="", section="family", settings=None):
     elif level == "location":
         sel = [L for L in locs if L["ref"] == key]
         title = sel[0]["name"] if sel else key
+    elif level == "locations":                  # several locations ("REF1,REF2"; the Price simulator's location box)
+        want = {k.strip() for k in (key or "").split(",") if k.strip()}
+        sel = [L for L in locs if L["ref"] in want]
+        title = ", ".join(L["name"] for L in sel) if 0 < len(sel) <= 3 else f"{len(sel)} locations"
     else:
         sel, title, level = list(locs), "All RHG", "all"
     curs = {L["currency"] for L in sel}

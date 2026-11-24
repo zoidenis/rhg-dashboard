@@ -76,11 +76,15 @@ def base(tmp_path, monkeypatch):
           "labels": menueng.LABEL, "period": {"from": "2026-11-01", "to": "2026-11-30", "days": 30}, "read_at": "x",
           "items": [{"mi": 1, "name": "Pita Gyros Pule", "section": "PITA", "family": "PITA", "major": "FOOD", "cls": "star",
                      "cost": 120.0, "qty": 100, "combo_qty": 0, "net": 41667, "emc_incl": 500.0}]}
-    monkeypatch.setattr(menueng, "analyse", lambda *a, **k: an)
+    calls = []
+    monkeypatch.setattr(menueng, "analyse", lambda *a, **k: calls.append(a[1:3]) or an)
+    monkeypatch.setattr(pricesim.locintel, "registry", lambda settings=None: [
+        {"ref": "OPA_B", "brand": "OPA", "price_group": "OPA"}, {"ref": "OPA_TI", "brand": "OPA", "price_group": "OPA · AIRPORT"}])
     monkeypatch.setattr(menueng, "items_by_order_type", lambda ref, a, b: [("2026-11-02", 1, 1, 33333.3, 80, 0), ("2026-11-02", 2, 1, 7000, 20, 0)])
     monkeypatch.setattr(simphony, "order_type_dims", lambda ref: {1: "Eat in", 2: "DE-Wolt"})
     monkeypatch.setattr(chanprof, "load_config", lambda: {"vat_pct": 20, "channels": {"DE-WOLT": {"commission_pct": 30, "commission_base": "vat"}}})
-    ds = {"locations": [{"ref": "OPA_B", "name": "OPA Bllok", "brand": "OPA", "currency": "ALL"}],
+    ds = {"locations": [{"ref": "OPA_B", "name": "OPA Bllok", "brand": "OPA", "currency": "ALL"},
+                        {"ref": "OPA_TI", "name": "OPA · TIA Airport", "brand": "OPA", "currency": "ALL"}], "_calls": calls,
           "rows": {"OPA_B": [{"mi": 1, "vat": 20.0}]}, "period": an["period"], "errors": []}
     return ds
 
@@ -120,3 +124,19 @@ def test_a_scenario_keeps_its_moves(base):
     s = pricesim.save_scenario({"name": "Pita +5%", "changes": {"1|EAT IN": 530},
                                 "state": {"cat": {"PITA": 5, "X": "bad"}, "item": {}, "sug": {}, "manual": {}, "channels": ["EAT IN"]}}, "geri")
     assert s["state"]["cat"] == {"PITA": 5.0} and s["state"]["channels"] == ["EAT IN"]
+
+
+def test_brand_is_its_price_group_and_locations_can_be_chosen(base):
+    r = pricesim.build(base, "brand", "OPA")
+    assert base["_calls"][-1] == ("locations", "OPA_B") and r["title"] == "OPA (brand)"   # OPA · TIA Airport stays out
+    assert r["brands"] == ["OPA", "OPA · AIRPORT"]
+    pricesim.build(base, "locations", "OPA_B,OPA_TI")
+    assert base["_calls"][-1] == ("locations", "OPA_B,OPA_TI")
+
+
+def test_menu_engineering_reads_several_locations():
+    ds = {"locations": [{"ref": "A", "name": "One", "brand": "X", "currency": "ALL"}, {"ref": "B", "name": "Two", "brand": "X", "currency": "ALL"},
+                        {"ref": "C", "name": "Three", "brand": "Y", "currency": "ALL"}],
+          "rows": {}, "period": {"from": "2026-11-01", "to": "2026-11-02", "days": 2}, "read_at": "", "errors": []}
+    r = menueng.analyse(ds, "locations", "A,C", settings={})
+    assert [x["ref"] for x in r["selection"]] == ["A", "C"] and r["title"] == "One, Three"

@@ -2709,9 +2709,9 @@ class Handler(BaseHTTPRequestHandler):
         if ds.get("pending") or ds.get("available") is False:
             self._send(200, ds)
             return
-        level = q.get("level") if q.get("level") in ("brand", "location", "all") else "all"
+        level = q.get("level") if q.get("level") in ("brand", "location", "locations", "all") else "all"
         try:
-            self._send(200, pricesim.build(ds, level, (q.get("key") or "")[:60], q.get("section") or "family"))
+            self._send(200, pricesim.build(ds, level, (q.get("key") or "")[:1200], q.get("section") or "family"))
         except Exception as exc:                                       # noqa: BLE001
             traceback.print_exc()
             self._send(200, {"error": f"The simulator could not be built: {str(exc)[:240]}"})

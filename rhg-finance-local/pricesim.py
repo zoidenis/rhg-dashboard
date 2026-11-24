@@ -40,6 +40,7 @@ import unicodedata
 import uuid
 
 import chanprof
+import locintel
 import menueng
 import simphony
 import store
@@ -335,7 +336,19 @@ def build(ds, level="all", key="", section="family", settings=None):
     """The items of the selection with their price, items sold and net sales on every channel, the class, the cost,
     the competitors and the suggested price per channel."""
     settings = settings or store.get_settings()
+    # a brand is its price group (locintel.price_group): OPA without OPA · TIA Airport, which has prices of its own
+    # (Geri, 25 Nov 2026); the simulator asks Menu engineering for those locations
+    reg = {r["ref"]: r for r in locintel.registry(settings)}
+    group = {L["ref"]: (reg.get(L["ref"]) or {}).get("price_group") or locintel.price_group(dict(L, **(reg.get(L["ref"]) or {})))
+             for L in ds["locations"]}
+    groups = sorted({g for g in group.values() if g})
+    title = None
+    if level == "brand":
+        title = f"{key} (brand)"
+        level, key = "locations", ",".join(r for r, g in group.items() if g == (key or "").upper())
     an = menueng.analyse(ds, level, key, section, settings)
+    if title:
+        an = dict(an, title=title, level="brand", key=title[:-8])
     S, P, cfg = an["settings"], load_params(), chanprof.load_config()
     reporting, rates = menueng._rates(settings)
     sel_refs = {x["ref"] for x in an["selection"]}
@@ -424,7 +437,7 @@ def build(ds, level="all", key="", section="family", settings=None):
             "period": an["period"], "read_at": an["read_at"], "errors": errors[:12], "settings": S, "params": P,
             "round_step": step, "eat_in": eat["channel"] if eat else None,
             "channels": sorted(chans.values(), key=lambda c: -c["net"]), "items": out,
-            "brands": an["brands"], "locations": an["locations"], "selection": an["selection"],
+            "brands": groups, "locations": an["locations"], "selection": an["selection"],
             "labels": an["labels"],
             "competitors": {"sources": [{k: s.get(k) for k in ("id", "file", "by", "at")} | {"rows": len(s["rows"])}
                                         for s in load_competitors()["sources"]],
