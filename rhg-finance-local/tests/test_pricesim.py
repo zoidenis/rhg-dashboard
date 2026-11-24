@@ -114,3 +114,9 @@ def test_no_suggestion_that_earns_less_at_the_elasticity():
     assert e1["new_cm"] < e0["new_cm"] and p == 800 and "elasticity" in why[-1]
     # a Star at −0.6: +4% earns more, kept
     assert pricesim.suggest("star", 500, 120, 20, P=P, step=10, el=-0.6)[0] == 520
+
+
+def test_a_scenario_keeps_its_moves(base):
+    s = pricesim.save_scenario({"name": "Pita +5%", "changes": {"1|EAT IN": 530},
+                                "state": {"cat": {"PITA": 5, "X": "bad"}, "item": {}, "sug": {}, "manual": {}, "channels": ["EAT IN"]}}, "geri")
+    assert s["state"]["cat"] == {"PITA": 5.0} and s["state"]["channels"] == ["EAT IN"]

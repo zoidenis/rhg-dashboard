@@ -457,12 +457,24 @@ def save_scenario(body, actor):
         s = {"id": sid, "name": name, "note": str(body.get("note") or "")[:500], "by": actor,
              "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "level": str(body.get("level") or "all")[:20],
              "key": str(body.get("key") or "")[:60], "company": str(body.get("company") or "")[:60],
-             "changes": changes, "summary": {k: body.get("summary", {}).get(k) for k in ("net", "cm", "items")}
+             "changes": changes, "state": _state(body.get("state")), "summary": {k: body.get("summary", {}).get(k) for k in ("net", "cm", "items")}
              if isinstance(body.get("summary"), dict) else {}}
         items = [x for x in items if x["id"] != sid] + [s]
         _atomic(SCEN_FILE, {"items": items[-300:]})
     store.audit("save", "price scenario", actor, {}, {"changes": len(changes)}, name)
     return s
+
+
+def _state(st):
+    """The moves of the playground, to open the scenario as it was made: a % per category and per item, Pulse's
+    prices, the prices typed, the channels."""
+    st = st if isinstance(st, dict) else {}
+    pct = lambda d: {str(k)[:80]: round(_num(v, 0, -90, 300), 1) for k, v in list((d or {}).items())[:500]    # noqa: E731
+                     if isinstance(d, dict) and _num(v, 0, -90, 300)}
+    price = lambda d: {str(k)[:140]: round(_num(v, 0, 0, 1e9), 2) for k, v in list((d or {}).items())[:3000]    # noqa: E731
+                       if isinstance(d, dict) and _num(v, 0, 0, 1e9) > 0}
+    return {"cat": pct(st.get("cat")), "item": pct(st.get("item")), "sug": price(st.get("sug")),
+            "manual": price(st.get("manual")), "channels": [str(c)[:60] for c in (st.get("channels") or [])[:20]]}
 
 
 def delete_scenario(sid, actor, admin=False):

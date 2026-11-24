@@ -367,6 +367,115 @@ td.num,th.num{text-align:right}
 .me-st i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
 .me-par{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:14px 16px;margin:10px 0 6px}
 .ps-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* Price simulator: a playground (its own look, not a report) */
+.pg{--pg-up:#11a36a;--pg-dn:#e0533d;--pg-ink:#062634}
+.pg-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:1.25fr 1fr;gap:22px;align-items:center;padding:26px 28px;border-radius:22px;margin-bottom:14px;color:#eaf6fa;
+  background:radial-gradient(120% 140% at 0% 0%,#0f5b77 0%,#08303f 55%,#041c27 100%);box-shadow:0 14px 40px rgba(4,28,39,.25);transition:background .6s}
+.pg-hero::after{content:"";position:absolute;inset:auto -60px -80px auto;width:260px;height:260px;border-radius:50%;background:radial-gradient(closest-side,rgba(160,216,234,.22),transparent);pointer-events:none}
+.pg-hero.up{background:radial-gradient(120% 140% at 0% 0%,#138a63 0%,#08303f 58%,#041c27 100%)}
+.pg-hero.dn{background:radial-gradient(120% 140% at 0% 0%,#a2462f 0%,#08303f 58%,#041c27 100%)}
+.pg-hero.pg-loading .pg-num{opacity:.35}
+.pg-eyebrow{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#a0d8ea;font-weight:700}
+.pg-q{margin:6px 0 2px;font-size:20px;font-weight:700;color:#fff}
+.pg-big{display:flex;align-items:baseline;gap:8px;margin:4px 0 2px}
+.pg-num{font-size:clamp(40px,6vw,64px);font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;color:#fff;transition:opacity .3s}
+.pg-hero.up .pg-num{color:#9ff0c9}.pg-hero.dn .pg-num{color:#ffc2b5}
+.pg-cur{font-size:15px;font-weight:700;color:#a0d8ea}
+.pg-sub{font-size:13px;color:#cfe8f0}.pg-sub b{color:#fff}
+.pg-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.pg-chips span{display:flex;flex-direction:column;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:7px 11px;min-width:96px}
+.pg-chips i{font-style:normal;font-size:10.5px;color:#a0d8ea}.pg-chips b{font-size:14px;color:#fff;font-variant-numeric:tabular-nums}
+.pg-meter{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:14px 16px}
+.pg-mrow{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center;font-size:12px;margin:3px 0}
+.pg-mrow span{color:#cfe8f0}.pg-mrow b{text-align:right;color:#fff;font-variant-numeric:tabular-nums}
+.pg-mbar{height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.pg-mbar i{display:block;height:100%;border-radius:6px;background:#a0d8ea;transition:width .45s cubic-bezier(.2,.8,.2,1)}
+.pg-mrow.new{margin-bottom:10px}.pg-mrow.new span{color:#9ff0c9;padding-left:12px}.pg-mrow.new i{background:linear-gradient(90deg,#45d39a,#9ff0c9)}
+.pg-hero.dn .pg-mrow.new i{background:linear-gradient(90deg,#ff8a70,#ffc2b5)}
+.pg-mnote{margin:2px 0 0;font-size:10.5px;color:#a0d8ea}
+.pg-hero-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pg-magic{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;font-weight:800;font-size:14px;color:#062634;
+  background:linear-gradient(90deg,#ffd27a,#ffe9b8 50%,#ffd27a);background-size:200% 100%;box-shadow:0 6px 18px rgba(255,210,122,.35);transition:transform .15s}
+.pg-magic:hover{transform:translateY(-1px);background-position:100% 0}.pg-magic:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.pg-magic.pg-pop{animation:pgPop .5s}
+@keyframes pgPop{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+.pg-spark{width:14px;height:14px;background:radial-gradient(circle,#062634 0 2px,transparent 3px),conic-gradient(from 45deg,#062634 0 8%,transparent 8% 25%,#062634 25% 33%,transparent 33% 50%,#062634 50% 58%,transparent 58% 75%,#062634 75% 83%,transparent 83%);border-radius:50%;opacity:.85}
+.pg-ghost{all:unset;cursor:pointer;padding:10px 15px;border-radius:999px;font-weight:700;font-size:13px;color:#eaf6fa;border:1px solid rgba(255,255,255,.28)}
+.pg-ghost:hover{background:rgba(255,255,255,.08)}.pg-ghost:disabled{opacity:.4;cursor:default}.pg-ghost:focus-visible{outline:2px solid #fff}
+.pg-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.pg-step{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;min-width:0}
+.pg-n{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;background:var(--accent)}
+.pg-sb{min-width:0;flex:1}.pg-sb>b{font-size:13px}
+.pg-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.pg-row select,.pg-row input{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);max-width:100%;min-width:0}
+.pg-row input#pgFind{flex:1;min-width:140px}
+.pg-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.pg-pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.pg-pill small{font-size:10px;color:var(--sub)}
+.pg-pill.on{background:var(--accent);border-color:var(--accent);color:#fff}.pg-pill.on small{color:#cfe8f0}
+.pg-pill.del:not(.on){border-color:color-mix(in srgb,#7a5bbf 45%,var(--line))}
+.pg-pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pg-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.pg-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.pg-cat{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 14px 10px;border-top:5px solid var(--h);transition:transform .15s,box-shadow .2s}
+.pg-cat:hover{box-shadow:0 8px 22px rgba(8,48,63,.10)}
+.pg-cat.moved{box-shadow:0 0 0 2px color-mix(in srgb,var(--h) 55%,transparent),0 8px 22px rgba(8,48,63,.10)}
+.pg-cat.open{box-shadow:0 0 0 2px var(--h)}
+.pg-cat-h{display:flex;flex-direction:column;gap:2px}.pg-cat-h b{font-size:14px;overflow-wrap:anywhere}.pg-cat-h span{font-size:11px;color:var(--sub)}
+.pg-cat-v{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:10px 0 4px;min-height:30px}
+.pg-pct{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--h)}
+.pg-delta{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.pg-delta.up{color:var(--pg-up)}.pg-delta.dn{color:var(--pg-dn)}
+.pg-range{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:999px;margin:6px 0 2px;cursor:pointer;
+  background:linear-gradient(90deg,var(--h,var(--accent)) 0 var(--v,40%),color-mix(in srgb,var(--h,var(--accent)) 16%,var(--bg)) var(--v,40%) 100%)}
+.pg-range::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--h,var(--accent));box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .1s}
+.pg-range::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--h,var(--accent));box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.pg-range:active::-webkit-slider-thumb{transform:scale(1.15)}
+.pg-range:focus-visible{outline:2px solid var(--h,var(--accent));outline-offset:4px}
+.pg-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-bottom:6px}
+.pg-cat-f{display:flex;justify-content:space-between;align-items:center;gap:6px;border-top:1px dashed var(--line);padding-top:8px}
+.pg-link{all:unset;cursor:pointer;font-size:12px;font-weight:700;color:var(--accent)}.pg-link:focus-visible{outline:2px solid var(--accent)}
+.pg-sugb{all:unset;cursor:pointer;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;color:#7a4b00;background:linear-gradient(90deg,#ffe2a3,#fff1cf)}
+.pg-sugb:hover{filter:brightness(.97)}.pg-sugb:focus-visible{outline:2px solid #c47f1f}
+.pg-sugb.sm{font-size:11px;padding:2px 8px}
+.pg-drawer{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;animation:pgIn .25s ease-out}
+@keyframes pgIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.pg-dh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}.pg-dh h3{margin:0;font-size:16px}.pg-dh p{margin:2px 0 0}
+.pg-x{all:unset;cursor:pointer;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--sub);font-size:13px}
+.pg-x.sm{width:22px;height:22px;font-size:10px}.pg-x:hover{color:var(--ink);border-color:var(--ink)}.pg-x:focus-visible{outline:2px solid var(--accent)}
+.pg-items{display:flex;flex-direction:column}
+.pg-it{display:grid;grid-template-columns:minmax(0,1.4fr) 96px minmax(120px,1fr) 52px 76px 86px;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);border-radius:10px;transition:background .3s}
+.pg-it:last-child{border-bottom:0}.pg-it.moved{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.pg-it.flash{background:color-mix(in srgb,#ffd27a 40%,transparent)}
+.pg-itn{all:unset;cursor:pointer;display:flex;flex-direction:column;min-width:0}.pg-itn b{font-size:13px;overflow-wrap:anywhere}.pg-itn span{font-size:11px;color:var(--sub)}
+.pg-itn:hover b{text-decoration:underline dotted}.pg-itn:focus-visible{outline:2px solid var(--accent)}
+.pg-itp{display:flex;flex-direction:column;text-align:right;font-variant-numeric:tabular-nums}.pg-itp b{font-size:14px}.pg-itp s{color:var(--sub);font-weight:500;margin-right:4px}.pg-itp .meta{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-range.sm{height:6px;margin:0}
+.pg-pct.sm{font-size:14px;color:var(--ink);text-align:right}.pg-delta.sm{font-size:12px}
+.pg-hold{text-align:center}
+.pg-side{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px}
+.pg-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.pg-card h3{margin:0 0 8px;font-size:14px}
+.pg-bk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pg-bk li{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:7px 9px;border-radius:12px;background:var(--bg);font-size:12.5px}
+.pg-bk li div{display:flex;flex-direction:column;min-width:0}.pg-bk li b.up{color:var(--pg-up)}.pg-bk li b.dn{color:var(--pg-dn)}
+.pg-bk .meta{font-size:10.5px}.pg-bkt{display:block;overflow-wrap:anywhere}
+.pg-tag{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);margin-left:4px}
+.pg-empty{font-size:12.5px;color:var(--sub);margin:0;line-height:1.5}
+.pg-scn{border-top:1px dashed var(--line);margin-top:10px;padding-top:10px}.pg-scn select{width:100%;font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+.pg-scn .pg-row input{flex:1}.pg-scn p{margin:6px 0 0}
+.pg-win{all:unset;cursor:pointer;display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;width:100%;box-sizing:border-box;padding:7px 8px;border-radius:12px;font-size:12.5px}
+.pg-win:hover{background:var(--bg)}.pg-win:focus-visible{outline:2px solid var(--accent)}
+.pg-win span:nth-child(2){display:flex;flex-direction:column;min-width:0}.pg-win small{font-size:10.5px;color:var(--sub)}
+.pg-win b.up{color:var(--pg-up)}.pg-win b.dn{color:var(--pg-dn)}
+.pg-rank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#062634;background:linear-gradient(135deg,#ffd27a,#ffe9b8)}
+.pg-win.warn .pg-rank{background:color-mix(in srgb,var(--pg-dn) 20%,transparent);color:var(--pg-dn)}
+.pg-tools{display:flex;flex-wrap:wrap;gap:6px}
+.pg-all{margin-top:14px}.pg-all>summary{cursor:pointer;list-style:none}.pg-all>summary::before{content:"▸ ";color:var(--sub)}.pg-all[open]>summary::before{content:"▾ "}
+@media (max-width:1100px){.pg-main{grid-template-columns:1fr}.pg-side{position:static}}
+@media (max-width:820px){.pg-hero{grid-template-columns:1fr;padding:20px}.pg-steps{grid-template-columns:1fr}
+  .pg-it{grid-template-columns:1fr auto;grid-auto-rows:auto}.pg-it .pg-range{grid-column:1/-1}.pg-it .pg-hold,.pg-it .pg-sugb{justify-self:start}}
+@media (prefers-reduced-motion: reduce){.pg-mbar i,.pg-cat,.pg-drawer,.pg-magic{transition:none;animation:none}}
 .ps-pct{display:inline-flex;align-items:center;gap:6px}.ps-pct input{width:72px;font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
 .ps-scn{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.ps-scn select,.ps-scn input{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:240px}
 .ps-in{width:84px;text-align:right;font:inherit;font-variant-numeric:tabular-nums;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink)}
@@ -1680,80 +1789,104 @@ table.bn-plan td{padding:3px 4px}
       <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
         <div class="hint" id="meDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
     </div>
-    <div id="slPsView" style="display:none">
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-head"><div><h2>Price simulator</h2>
-          <p class="hint"><span>What a new price does to the items sold, the sales and the margin, on one channel or more, before it goes on the menu.</span> <span>The base is the period chosen above: items sold, the price received and the portion cost by channel, as Menu engineering reads them.</span> <span>The suggested price comes from the item's class, the portion cost target, the channel's commission and the competitors' prices. Nothing is changed in Simphony.</span></p></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mini" id="psCompBtn" aria-expanded="false" aria-controls="psComp">Competitors</button><button class="mini" id="psParBtn" aria-expanded="false" aria-controls="psPar">Parameters</button><button class="mini exp dark" id="psXlsx">Export ▾</button><button class="mini" id="psRead">Read again</button></div></div>
-        <div class="me-par" id="psComp" hidden>
-          <h3>Competitors' prices</h3>
-          <p class="hint" style="margin:2px 0 10px"><span>Excel or CSV files with the competitors' prices (VAT included): competitor, our brand, channel, item, price, our item, date.</span> <span>An item is matched to ours by the number or name in "Our item", else by the words of its name.</span> <span>A file with the same name replaces the one before.</span></p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-            <label class="btn dark" style="cursor:pointer">Upload a file<input type="file" id="psFile" accept=".xlsx,.csv" hidden></label>
-            <a class="btn" href="/api/sales/pricesim/template">Download the template</a><button class="btn" id="psCompClose" type="button">Close</button>
-            <span class="meta" id="psCompMsg"></span></div>
-          <div class="scroll"><table id="psSources"></table></div>
-          <details class="pz-fold" id="psUnmBox"><summary id="psUnmSum">Rows matched to none of our items</summary><div class="scroll" style="max-height:260px"><table id="psUnm"></table></div></details>
+    <div id="slPsView" class="pg" style="display:none">
+      <!-- Price simulator (Geri, 25 Nov 2026): a playground, not a report: move a category or an item, see the money -->
+      <section class="pg-hero" id="pgHero">
+        <div class="pg-hero-l">
+          <div class="pg-eyebrow"><span>Price simulator</span> · <span id="pgScope" data-no-i18n></span> · <span id="pgPeriod"></span></div>
+          <h2 class="pg-q">What if you changed your prices?</h2>
+          <div class="pg-big" aria-live="polite"><span class="pg-num" id="pgBig">0</span> <span class="pg-cur" id="pgCur">ALL</span></div>
+          <div class="pg-sub" id="pgSub">extra sales a year</div>
+          <div class="pg-chips" id="pgChips"></div>
         </div>
-        <div class="me-par" id="psPar" hidden>
-          <h3>Parameters</h3>
-          <p class="hint" style="margin:2px 0 10px"><span>Elasticity: how much the items sold move when the price moves (−1: 10% dearer, about 10% fewer sold).</span> <span>"Apply here" changes this simulation only; "Save for everyone" (Settings) also changes the suggested prices.</span></p>
-          <div class="formgrid">
-            <label class="field">Elasticity · Star<input id="psElStar" type="number" step="0.1" max="0"></label>
-            <label class="field">Elasticity · Plowhorse<input id="psElPlowhorse" type="number" step="0.1" max="0"></label>
-            <label class="field">Elasticity · Puzzle<input id="psElPuzzle" type="number" step="0.1" max="0"></label>
-            <label class="field">Elasticity · Dog<input id="psElDog" type="number" step="0.1" max="0"></label>
-            <label class="field">Elasticity · No cost<input id="psElNocost" type="number" step="0.1" max="0"></label>
-            <label class="field">Delivery channels: elasticity ×<input id="psElDel" type="number" step="0.1" min="1" max="3"><span class="meta">Delivery customers compare prices more.</span></label>
-            <label class="field">Star: rise (%)<input id="psStar" type="number" step="0.5" min="0" max="50"></label>
-            <label class="field">Largest step at once (%)<input id="psMax" type="number" step="0.5" min="0" max="50"></label>
-            <label class="field">Above the competitors' median, at most (%)<input id="psBand" type="number" step="0.5" min="0" max="50"></label>
-            <label class="field">Cheaper than the competitors by more than (%)<input id="psLow" type="number" step="0.5" min="0" max="50"><span class="meta">An item without a cost is raised then.</span></label>
-            <label class="field">Round prices to (lek)<input id="psRoundAll" type="number" step="1" min="0"></label>
-            <label class="field">Round prices to (EUR)<input id="psRoundEur" type="number" step="0.05" min="0"></label>
-            <label class="field">Delivery keeps the margin of eating in<select id="psParity"><option value="1">Yes</option><option value="0">No</option></select></label>
+        <div class="pg-hero-r">
+          <div class="pg-meter" id="pgMeter"></div>
+          <div class="pg-hero-btns">
+            <button class="pg-magic" id="pgMagic" type="button"><span class="pg-spark" aria-hidden="true"></span>Let Pulse suggest</button>
+            <button class="pg-ghost" id="pgUndo" type="button" disabled>Undo</button>
+            <button class="pg-ghost" id="pgReset" type="button">Start again</button>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
-            <button class="btn dark" id="psParApply" type="button">Apply here</button><button class="btn" id="psParSave" type="button">Save for everyone</button><button class="btn" id="psParClose" type="button">Close</button>
-            <span class="meta" id="psParMsg"></span></div>
         </div>
-        <div class="filters" style="margin:6px 0 8px">
-          <label>Level<select id="psLevel"><option value="all">All RHG</option><option value="brand">Brand</option><option value="location">Location</option></select></label>
-          <label id="psKeyL" style="display:none"><span id="psKeyT">Brand</span><select id="psKey"></select></label>
-          <label>Menu section<select id="psSec"><option value="family">Family group</option><option value="major">Major group</option></select></label>
-          <div class="dimf" id="psChPick"><span>Channel</span>
-            <button type="button" class="dimf-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-text">Every channel</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
-            <div class="dimf-list" hidden></div>
-            <select id="psCh" multiple hidden></select></div>
+      </section>
+      <section class="pg-steps">
+        <div class="pg-step"><span class="pg-n">1</span><div class="pg-sb"><b>Where</b>
+          <div class="pg-row"><select id="psLevel" aria-label="Level"><option value="all">All RHG</option><option value="brand">A brand</option><option value="location">A location</option></select>
+            <span id="psKeyL" style="display:none"><span id="psKeyT" hidden>Brand</span><select id="psKey" aria-label="Brand or location"></select></span>
+            <select id="psSec" aria-label="Categories"><option value="family">Categories: family groups</option><option value="major">Categories: major groups</option></select></div></div></div>
+        <div class="pg-step"><span class="pg-n">2</span><div class="pg-sb"><b>On which channel</b><div class="pg-pills" id="pgCh"></div></div></div>
+        <div class="pg-step"><span class="pg-n">3</span><div class="pg-sb"><b>What to change</b>
+          <div class="pg-row"><input id="pgFind" list="pgItems" placeholder="Find an item…" autocomplete="off"><datalist id="pgItems"></datalist><span class="meta">or move a category below</span></div></div></div>
+      </section>
+      <p class="meta" id="psStatus" style="margin:0 0 12px"></p>
+      <div class="pg-main">
+        <div>
+          <div class="pg-cats" id="pgCats"></div>
+          <section class="pg-drawer" id="pgDrawer" hidden></section>
         </div>
-        <p class="meta" id="psStatus" style="margin:0"></p>
-      </div>
-      <div class="card ps-build" style="margin-bottom:16px">
-        <div class="card-head"><div><h2>The scenario</h2><p class="hint" id="psScnHint">Prices change on the channels chosen above only. Start from the suggested prices, change by a percentage, or type a price on a row.</p></div>
-          <div class="ps-scn"><select id="psScn" aria-label="Saved scenarios"><option value="">New scenario</option></select><input id="psScnName" placeholder="Scenario name" maxlength="80"><button class="mini dark" id="psScnSave" type="button">Save</button><button class="mini" id="psScnDel" type="button">Delete</button></div></div>
-        <div class="ps-acts">
-          <button class="btn dark" id="psSuggest" type="button">Use the suggested prices</button>
-          <span class="ps-pct"><input id="psPct" type="number" step="0.5" value="5" aria-label="Change by %"><span>%</span><button class="btn" id="psPctGo" type="button">Change the prices shown</button></span>
-          <button class="btn" id="psReset" type="button">Back to today's prices</button>
-          <span class="meta" id="psScnMsg"></span>
+        <div class="pg-side">
+          <div class="pg-card">
+            <h3>Your changes</h3>
+            <div id="pgBasket"></div>
+            <div class="pg-scn">
+              <select id="psScn" aria-label="Saved scenarios"><option value="">New scenario</option></select>
+              <div class="pg-row"><input id="psScnName" placeholder="Name it to save it" maxlength="80"><button class="mini dark" id="psScnSave" type="button">Save</button><button class="mini" id="psScnDel" type="button" title="Delete the scenario">✕</button></div>
+              <p class="meta" id="psScnMsg"></p>
+            </div>
+          </div>
+          <div class="pg-card"><h3>Biggest wins</h3><div id="pgWins"></div></div>
+          <div class="pg-card pg-tools">
+            <button class="mini" id="psCompBtn" type="button" aria-expanded="false" aria-controls="psComp">Competitors</button>
+            <button class="mini" id="psParBtn" type="button" aria-expanded="false" aria-controls="psPar">Parameters</button>
+            <button class="mini exp dark" id="psXlsx" type="button">Export ▾</button>
+            <button class="mini" id="psRead" type="button">Read again</button>
+          </div>
         </div>
       </div>
-      <div class="kpis six" id="psKpis"></div>
-      <div class="grid">
-        <div class="card"><h2>By channel</h2><p class="hint">The change of the margin on each channel, for the period. Click a channel to see only its rows.</p><div id="psChBars"></div></div>
-        <div class="card"><h2>By menu section</h2><p class="hint">Where the change comes from. Click a section to see only its rows.</p><div id="psSecBars"></div></div>
+      <div class="me-par" id="psComp" hidden>
+        <h3>Competitors' prices</h3>
+        <p class="hint" style="margin:2px 0 10px"><span>Excel or CSV files with the competitors' prices (VAT included): competitor, our brand, channel, item, price, our item, date.</span> <span>An item is matched to ours by the number or name in "Our item", else by the words of its name.</span> <span>A file with the same name replaces the one before.</span></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+          <label class="btn dark" style="cursor:pointer">Upload a file<input type="file" id="psFile" accept=".xlsx,.csv" hidden></label>
+          <a class="btn" href="/api/sales/pricesim/template">Download the template</a><button class="btn" id="psCompClose" type="button">Close</button>
+          <span class="meta" id="psCompMsg"></span></div>
+        <div class="scroll"><table id="psSources"></table></div>
+        <details class="pz-fold" id="psUnmBox"><summary id="psUnmSum">Rows matched to none of our items</summary><div class="scroll" style="max-height:260px"><table id="psUnm"></table></div></details>
       </div>
-      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Items and prices</h2><p class="hint" id="psItemsNote"></p></div></div>
-        <div class="sk-chips" id="psChips"></div>
+      <div class="me-par" id="psPar" hidden>
+        <h3>Parameters</h3>
+        <p class="hint" style="margin:2px 0 10px"><span>Elasticity: how much the items sold move when the price moves (−1: 10% dearer, about 10% fewer sold).</span> <span>"Apply here" changes this simulation only; "Save for everyone" (Settings) also changes the suggested prices.</span></p>
+        <div class="formgrid">
+          <label class="field">Elasticity · Star<input id="psElStar" type="number" step="0.1" max="0"></label>
+          <label class="field">Elasticity · Plowhorse<input id="psElPlowhorse" type="number" step="0.1" max="0"></label>
+          <label class="field">Elasticity · Puzzle<input id="psElPuzzle" type="number" step="0.1" max="0"></label>
+          <label class="field">Elasticity · Dog<input id="psElDog" type="number" step="0.1" max="0"></label>
+          <label class="field">Elasticity · No cost<input id="psElNocost" type="number" step="0.1" max="0"></label>
+          <label class="field">Delivery channels: elasticity ×<input id="psElDel" type="number" step="0.1" min="1" max="3"><span class="meta">Delivery customers compare prices more.</span></label>
+          <label class="field">Star: rise (%)<input id="psStar" type="number" step="0.5" min="0" max="50"></label>
+          <label class="field">Largest step at once (%)<input id="psMax" type="number" step="0.5" min="0" max="50"></label>
+          <label class="field">Above the competitors' median, at most (%)<input id="psBand" type="number" step="0.5" min="0" max="50"></label>
+          <label class="field">Cheaper than the competitors by more than (%)<input id="psLow" type="number" step="0.5" min="0" max="50"><span class="meta">An item without a cost is raised then.</span></label>
+          <label class="field">Round prices to (lek)<input id="psRoundAll" type="number" step="1" min="0"></label>
+          <label class="field">Round prices to (EUR)<input id="psRoundEur" type="number" step="0.05" min="0"></label>
+          <label class="field">Delivery keeps the margin of eating in<select id="psParity"><option value="1">Yes</option><option value="0">No</option></select></label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+          <button class="btn dark" id="psParApply" type="button">Apply here</button><button class="btn" id="psParSave" type="button">Save for everyone</button><button class="btn" id="psParClose" type="button">Close</button>
+          <span class="meta" id="psParMsg"></span></div>
+      </div>
+      <details class="card pg-all" id="pgAll"><summary><b>Every item and channel</b> <span class="meta">the full table: type any price, filter, sort</span></summary>
+        <div class="sk-chips" id="psChips" style="margin-top:12px"></div>
         <div class="filters" style="margin:0 0 10px">
           <label>Item<input id="psQ" placeholder="name or number"></label>
-          <label>Section<select id="psSecF"><option value="">All sections</option></select></label>
+          <label>Category<select id="psSecF"><option value="">All categories</option></select></label>
           <label>Show<select id="psShow"><option value="">Every row</option><option value="changed">Prices changed</option><option value="suggested">A different price suggested</option><option value="comp">With competitors' prices</option></select></label>
           <label>Sort<select id="psSort"><option value="net">Sales</option><option value="dcm">Change of margin</option><option value="sug">Suggested change</option><option value="name">Name</option></select></label>
         </div>
-        <div class="scroll" style="max-height:640px"><table id="psTable"></table></div></div>
-      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How these figures are built</summary>
-        <div class="hint" id="psDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+        <p class="hint" id="psItemsNote"></p>
+        <div class="scroll" style="max-height:600px"><table id="psTable"></table></div>
+      </details>
+      <details class="card" style="margin-top:12px"><summary style="cursor:pointer;font-size:15px;font-weight:600">How it works</summary>
+        <div class="hint" id="psDefs" style="margin-top:12px;line-height:1.55"></div></details>
     </div>
     <div id="slMcView" class="fc-viz" style="display:none">
       <div class="card" style="margin-bottom:16px">
@@ -4604,12 +4737,16 @@ $("cpParSave").onclick = async () => {
   }catch(e){ $("cpParMsg").textContent = "Could not save: " + e.message; }
 };
 // ---------- Sales → Price simulator (pricesim.py, /api/sales/pricesim) ----------
+// A playground (Geri, 25 Nov 2026): move a category or an item and see the extra sales and margin at once. The state is
+// the moves (a % per category, a % per item, Pulse's suggestions, prices typed); the new prices follow from it on the
+// channels chosen, so changing the channels or the period keeps the moves.
 const psLbl = k => (psData && psData.labels && psData.labels[k]) || k;
 const psSt = k => `<span class="me-st me-c-${k}"><i></i>${esc(psLbl(k))}</span>`;
-// a new price on one channel or more: items sold, sales and margin, live; the suggested price per item and channel
 let psData = null, psKey = "", psTimer = null, psNew = {}, psP = null, psCls = "", psScns = [], psMe = "";
+let psCat = {}, psItem = {}, psSug = {}, psManual = {}, psChSel = new Set(), psHist = [], psOpen = "", psShown = 0, psAnim = null;
 const PS_EL = {star: "psElStar", plowhorse: "psElPlowhorse", puzzle: "psElPuzzle", dog: "psElDog", nocost: "psElNocost"};
-const psChMs = msPick("psChPick", "Every channel", () => psRender());
+const PG_HUES = ["#3b6fd8", "#c47f1f", "#7a5bbf", "#00978b", "#d1495b", "#2f8f5b", "#b5651d", "#5c6bc0", "#8e44ad", "#16a085"];
+const PG_MIN = -20, PG_MAX = 30;
 function psQs(){
   const p = new URLSearchParams(params()), o = scopeQs(new URLSearchParams());
   o.set("period", p.get("period") || ""); o.set("mode", p.get("mode") || "month");
@@ -4621,6 +4758,7 @@ async function psLoad(refresh){
   clearTimeout(psTimer);
   const q = psQs(); psKey = q;
   readBanner("psStatus", {src: "Simphony", reading: true});
+  $("pgHero").classList.add("pg-loading");
   try{
     const j = await readJSON(await fetch("/api/sales/pricesim?" + q + (refresh ? "&refresh=1" : "")));
     if (psKey !== q) return;
@@ -4630,23 +4768,23 @@ async function psLoad(refresh){
       psTimer = setTimeout(() => psLoad(false), 4000); return;
     }
     if (j.available === false) throw new Error(j.error || "not available");
-    const keepCh = psChMs.vals();
     psData = j; psP = Object.assign({}, j.params);
-    psChMs.fill(j.channels.map(c => ({value: c.channel, text: `${c.channel}${c.commission_pct ? ` · ${fmt(c.commission_pct)}% commission` : ""}`})), keepCh.filter(c => j.channels.some(x => x.channel === c)));
-    psFillKeys(); psParFill(); psComp(); psScnLoad(); psRender();
+    psChSel = new Set([...psChSel].filter(c => j.channels.some(x => x.channel === c)));
+    psSug = {}; psManual = Object.fromEntries(Object.entries(psManual).filter(([k]) => psItemOf(k)));
+    $("pgHero").classList.remove("pg-loading");
+    psFillKeys(); psParFill(); psComp(); psScnLoad(); psRebuild(); psRender();
   }catch(e){ readBanner("psStatus", {src: "Simphony", error: e.message}); }
 }
 function psFillKeys(){
   const d = psData, lv = $("psLevel").value, keep = $("psKey").value || d.key;
   $("psKeyL").style.display = lv === "all" ? "none" : "";
-  $("psKeyT").textContent = lv === "brand" ? "Brand" : "Location";
   const opts = lv === "brand" ? d.brands.map(b => [b, b]) : d.locations.map(L => [L.ref, L.name]);
   $("psKey").innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" data-no-i18n>${esc(t)}</option>`).join("");
   if (opts.some(o => o[0] === keep)) $("psKey").value = keep;
 }
-$("psLevel").onchange = () => { if (psData) psFillKeys(); $("psKeyL").style.display = $("psLevel").value === "all" ? "none" : ""; if ($("psLevel").value !== "all" && !$("psKey").value) return; psNew = {}; psLoad(); };
-$("psKey").onchange = () => { psNew = {}; psLoad(); };
-$("psSec").onchange = () => psLoad();
+$("psLevel").onchange = () => { if (psData) psFillKeys(); $("psKeyL").style.display = $("psLevel").value === "all" ? "none" : ""; if ($("psLevel").value !== "all" && !$("psKey").value) return; psLoad(); };
+$("psKey").onchange = () => psLoad();
+$("psSec").onchange = () => { psCat = {}; psLoad(); };
 $("psRead").onclick = () => psLoad(true);
 // ---- the arithmetic (pricesim.effect, the same formulas)
 const psChan = ch => (psData.channels || []).find(c => c.channel === ch) || {commission_pct: 0, commission_base: "vat", delivery: false};
@@ -4659,20 +4797,49 @@ function psEff(it, ch, price){
     be: ncmu > 0 && q ? (cmu * q / ncmu - q) / q * 100 : null, cost: it.cost == null ? null : cost * q, new_cost: it.cost == null ? null : cost * nq};
 }
 const psK = (it, ch) => `${it.mi}|${ch}`;
+const psItemOf = k => { const i = k.indexOf("|"); return psData && psData.items.find(x => String(x.mi) === k.slice(0, i)); };
 const psPrice = (it, ch) => psNew[psK(it, ch)] || it.channels[ch].price;
 const psRound = (p, up) => { const s = psData.round_step || 0; return s ? Math.round((up ? Math.ceil(p / s - 1e-9) : Math.floor(p / s + 1e-9)) * s * 100) / 100 : Math.round(p * 100) / 100; };
-const psChs = () => { const v = psChMs.vals(); return v.length ? v : psData.channels.map(c => c.channel); };
+const psChs = () => psChSel.size ? [...psChSel] : psData.channels.map(c => c.channel);
+const psOn = ch => !psChSel.size || psChSel.has(ch);
+const psSign = v => (v > 0 ? "+" : v < 0 ? "−" : "") + flM(Math.abs(v));
+const psPct = (a, b) => b ? ((a - b) / Math.abs(b) * 100) : null;
+const psPctT = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1) + "%";
+const psPctS = v => (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 0) + "%";
+const psYear = () => 365 / Math.max(1, psData.period.days);
+// the new prices, from the moves: a price typed, else the item's %, else Pulse's suggestion, else the category's %
+function psRebuild(){
+  psNew = {};
+  if (!psData) return;
+  for (const it of psData.items) {
+    const ip = psItem[it.mi], cp = psCat[it.section];
+    for (const ch of Object.keys(it.channels)) {
+      if (!psOn(ch)) continue;
+      const k = psK(it, ch), p0 = it.channels[ch].price;
+      let p = psManual[k] || (ip ? psRound(p0 * (1 + ip / 100), ip > 0) : 0) || psSug[k] || (cp ? psRound(p0 * (1 + cp / 100), cp > 0) : 0);
+      if (p && Math.abs(p - p0) > 0.004) psNew[k] = p;
+    }
+  }
+}
+function psSnap(){ psHist.push(JSON.stringify({c: psCat, i: psItem, s: psSug, m: psManual})); if (psHist.length > 40) psHist.shift(); $("pgUndo").disabled = false; }
+$("pgUndo").onclick = () => { const s = psHist.pop(); if (!s) return; const o = JSON.parse(s); psCat = o.c; psItem = o.i; psSug = o.s; psManual = o.m; $("pgUndo").disabled = !psHist.length; psRebuild(); psRender(); };
+$("pgReset").onclick = () => { if (!psData) return; psSnap(); psCat = {}; psItem = {}; psSug = {}; psManual = {}; psRebuild(); psRender(); };
+$("pgMagic").onclick = () => { if (!psData) return; psSnap(); psSugApply(() => true); $("pgMagic").classList.remove("pg-pop"); void $("pgMagic").offsetWidth; $("pgMagic").classList.add("pg-pop"); };
+function psSugApply(keep){
+  for (const it of psData.items) {
+    if (!keep(it)) continue;
+    delete psItem[it.mi];
+    for (const ch of Object.keys(it.channels)) { const c = it.channels[ch], k = psK(it, ch); delete psManual[k];
+      if (psOn(ch) && c.suggested && c.suggested !== c.price) psSug[k] = c.suggested; else delete psSug[k]; }
+  }
+  for (const s of new Set(psData.items.filter(keep).map(i => i.section))) delete psCat[s];
+  psRebuild(); psRender();
+}
 // every item × channel of the channels chosen
 function psRows(){
-  const C = new Set(psChs()), out = [];
-  for (const it of psData.items) for (const ch of Object.keys(it.channels)) if (C.has(ch)) out.push({it, ch, c: it.channels[ch]});
+  const out = [];
+  for (const it of psData.items) for (const ch of Object.keys(it.channels)) if (psOn(ch)) out.push({it, ch, c: it.channels[ch]});
   return out;
-}
-function psFiltered(){
-  const q = ($("psQ").value || "").trim().toLowerCase(), sec = $("psSecF").value, sh = $("psShow").value;
-  return psRows().filter(r => (!psCls || r.it.cls === psCls) && (!sec || r.it.section === sec)
-    && (!q || `${r.it.mi} ${r.it.name}`.toLowerCase().includes(q))
-    && (!sh || (sh === "changed" ? psNew[psK(r.it, r.ch)] && psNew[psK(r.it, r.ch)] !== r.c.price : sh === "suggested" ? r.c.suggested && r.c.suggested !== r.c.price : r.c.comp_n > 0)));
 }
 function psTotals(rows){
   const t = {net: 0, new_net: 0, cm: 0, new_cm: 0, qty: 0, new_qty: 0, cost: 0, new_cost: 0, cnet: 0, new_cnet: 0, changed: 0, nocost: 0};
@@ -4685,45 +4852,183 @@ function psTotals(rows){
   }
   return t;
 }
-const psSign = v => (v > 0 ? "+" : v < 0 ? "−" : "") + flM(Math.abs(v));
-const psPct = (a, b) => b ? ((a - b) / Math.abs(b) * 100) : null;
-const psPctT = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1) + "%";
+// the categories (menu sections) of the channels chosen, the biggest sales first
+function psSections(){
+  const g = {};
+  for (const r of psRows()) {
+    const s = g[r.it.section] = g[r.it.section] || {sec: r.it.section, rows: [], items: new Set()};
+    s.rows.push(r); s.items.add(r.it.mi);
+  }
+  return Object.values(g).map(s => { const t = psTotals(s.rows);
+    const sugW = s.rows.reduce((a, r) => a + (r.c.suggested ? (r.c.suggested / r.c.price - 1) * r.c.net : 0), 0), w = s.rows.reduce((a, r) => a + r.c.net, 0);
+    return Object.assign(s, {t, sug: w ? sugW / w * 100 : 0, n: s.items.size}); }).sort((a, b) => b.t.net - a.t.net);
+}
+// ---- drawing
 function psRender(){
   const d = psData; if (!d) return;
-  readBanner("psStatus", {src: "Simphony", at: d.read_at, lines: [`${d.title} · ${d.period.from} → ${d.period.to} (${fmt(d.period.days)} days) · ${d.currency}${d.converted ? " (converted at the group rates)" : ""} · ${fmt(d.items.length)} items on ${fmt(d.channels.length)} channels · eating in: ${d.eat_in || "–"}`], warns: d.errors});
-  const secs = [...new Set(d.items.map(i => i.section))].sort(), keepS = $("psSecF").value;
-  $("psSecF").innerHTML = `<option value="">All sections</option>` + secs.map(s => `<option value="${esc(s)}" data-no-i18n>${esc(s)}</option>`).join("");
-  $("psSecF").value = secs.includes(keepS) ? keepS : "";
-  $("psScnHint").textContent = `Prices change on ${psChMs.vals().length ? psChMs.vals().join(", ") : "every channel"} only (Channel, above). Start from the suggested prices, change by a percentage, or type a price on a row.`;
+  readBanner("psStatus", {src: "Simphony", at: d.read_at, lines: [`${d.title} · ${d.period.from} → ${d.period.to} (${fmt(d.period.days)} days) · ${d.currency}${d.converted ? " (converted at the group rates)" : ""} · ${fmt(d.items.length)} items on ${fmt(d.channels.length)} channels`], warns: d.errors});
+  $("pgScope").textContent = d.title; $("pgPeriod").textContent = `${d.period.from} → ${d.period.to}`; $("pgCur").textContent = d.currency;
+  $("pgCh").innerHTML = `<button type="button" class="pg-pill${psChSel.size ? "" : " on"}" data-pgch="">All channels</button>` + d.channels.map(c =>
+    `<button type="button" class="pg-pill${psChSel.has(c.channel) ? " on" : ""}${c.delivery ? " del" : ""}" data-pgch="${esc(c.channel)}"><span data-no-i18n>${esc(c.channel)}</span>${c.commission_pct ? `<small>${fmt(c.commission_pct)}%</small>` : ""}</button>`).join("");
+  $("pgItems").innerHTML = d.items.map(i => `<option value="${esc(i.name)}">${esc(i.section)}</option>`).join("");
+  psCats(); psDrawer(); psLive();
+  if ($("pgAll").open) psTable();
   $("psDefs").innerHTML = [
-    "The base: the period chosen above, read as Menu engineering reads it: items sold at a price and net sales (less VAT) by menu item and Simphony order type (the channel); the price received = net sales / items sold, with the VAT % of the BC item = the price on the menu.",
-    "New items sold = items sold × (new price / price) ^ elasticity; the elasticity by class (Parameters), raised on delivery channels.",
-    "Margin per item = price without VAT − the channel's commission (Channel profitability: % on the sales with VAT or without) − the portion cost from BC. Items without a cost count in the sales, not in the margin.",
-    "Break-even: how many fewer items the new price may sell before the margin falls below today's.",
-    "The suggested price: Star a small rise; Plowhorse and Dog towards the portion cost target, one step at a time; Puzzle no rise, lower when dearer than the competitors; a delivery channel at least the margin of eating in after the commission; capped by the competitors' median plus the band; never below the portion cost; rounded to the step.",
-    "A year: the change of the period at the same pace for 365 days. Nothing is changed in Simphony: a new price is set in EMC."].map(x => `<p><span>${esc(x)}</span></p>`).join("");
-  psSummary(); psTable();
+    "Move a category: every item in it on the channels chosen gets that % (rounded to the step). Move an item: it overrides its category. Pulse's suggestions and the prices typed in the table come before both.",
+    "The base: the period chosen above, read as Menu engineering reads it: items sold at a price and sales without VAT by menu item and Simphony order type (the channel); the price = sales / items sold, with the VAT of the BC item.",
+    "New items sold = items sold × (new price / price) ^ elasticity; the elasticity by class (Parameters), raised on delivery channels: a dearer price sells a little less.",
+    "Extra sales a year = the change of the period's sales without VAT, at the same pace for 365 days. Margin = price without VAT − the channel's commission − the portion cost from BC; items without a cost count in the sales only.",
+    "Pulse suggests per item and channel: Star a small rise; Plowhorse and Dog towards the portion cost target, one step at a time; Puzzle no rise; delivery at least the margin of eating in after the commission; never above the competitors' median plus the band, never below the cost, never a price that earns less. Nothing is changed in Simphony."].map(x => `<p><span>${esc(x)}</span></p>`).join("");
 }
-function psSummary(){
-  const d = psData, rows = psRows(), t = psTotals(rows), yr = 365 / Math.max(1, d.period.days), C = d.currency;
+function psCats(){
+  const S = psSections();
+  $("pgCats").innerHTML = S.length ? S.map((s, i) => {
+    const v = psCat[s.sec] || 0, bySug = s.rows.some(r => psSug[psK(r.it, r.ch)]), byHand = s.rows.some(r => psManual[psK(r.it, r.ch)]) || [...s.items].some(mi => psItem[mi]);
+    const mixed = bySug || byHand ? (bySug && !byHand ? "Pulse" : "mixed") : "";
+    return `<div class="pg-cat${psOpen === s.sec ? " open" : ""}" style="--h:${PG_HUES[i % PG_HUES.length]}" data-pgsec="${esc(s.sec)}">
+      <div class="pg-cat-h"><b data-no-i18n>${esc(s.sec)}</b><span>${fmt(s.n)} items · ${flM(s.t.net)} sales</span></div>
+      <div class="pg-cat-v"><span class="pg-pct" data-pgv>${v ? psPctS(v) : mixed || "0%"}</span><span class="pg-delta" data-pgd></span></div>
+      <input type="range" class="pg-range" min="${PG_MIN}" max="${PG_MAX}" step="1" value="${v}" data-pgcat="${esc(s.sec)}" aria-label="Price change of ${esc(s.sec)}" style="--v:${(v - PG_MIN) / (PG_MAX - PG_MIN) * 100}%">
+      <div class="pg-ticks"><span>${PG_MIN}%</span><span>0</span><span>+${PG_MAX}%</span></div>
+      <div class="pg-cat-f"><button type="button" class="pg-link" data-pgopen="${esc(s.sec)}">${psOpen === s.sec ? "Close the items" : "The items ›"}</button>
+        ${Math.abs(s.sug) >= 0.5 ? `<button type="button" class="pg-sugb" data-pgsugsec="${esc(s.sec)}" title="Use Pulse's prices for this category">Pulse ${psPctT(s.sug)}</button>` : `<span class="meta">Pulse: hold</span>`}</div></div>`; }).join("")
+    : `<p class="hint">No item sold on these channels in the period.</p>`;
+}
+function psDrawer(){
+  const box = $("pgDrawer");
+  if (!psOpen) { box.hidden = true; return; }
+  const s = psSections().find(x => x.sec === psOpen); if (!s) { psOpen = ""; box.hidden = true; return; }
+  const items = [...s.items].map(mi => psData.items.find(i => i.mi === mi)).sort((a, b) => b.net - a.net);
+  box.hidden = false;
+  box.innerHTML = `<div class="pg-dh"><div><h3 data-no-i18n>${esc(s.sec)}</h3><p class="meta">Move one item: it overrides the category. Click a name for its channels, its price ladder and the competitors.</p></div><button type="button" class="pg-x" data-pgopen="${esc(s.sec)}" aria-label="Close">✕</button></div>`
+    + `<div class="pg-items">` + items.map(it => {
+      const chs = Object.keys(it.channels).filter(psOn), main = chs.sort((a, b) => it.channels[b].qty - it.channels[a].qty)[0], c = it.channels[main];
+      const v = psItem[it.mi] || 0, sw = chs.reduce((a, ch) => a + (it.channels[ch].suggested ? (it.channels[ch].suggested / it.channels[ch].price - 1) * it.channels[ch].net : 0), 0), w = chs.reduce((a, ch) => a + it.channels[ch].net, 0);
+      const sug = w ? sw / w * 100 : 0;
+      return `<div class="pg-it" data-pgit="${it.mi}"><button type="button" class="pg-itn" data-pulse="psitem|${it.mi}"><b>${esc(it.name)}</b><span>${psSt(it.cls)} · ${fmt(it.qty, 0)} sold</span></button>
+        <div class="pg-itp"><span class="meta">${esc(main)}</span><b data-pgp>${fmt(c.price, 0)}</b></div>
+        <input type="range" class="pg-range sm" min="${PG_MIN}" max="${PG_MAX}" step="1" value="${v}" data-pgitem="${it.mi}" aria-label="Price change of ${esc(it.name)}" style="--v:${(v - PG_MIN) / (PG_MAX - PG_MIN) * 100}%">
+        <span class="pg-pct sm" data-pgv>${v ? psPctS(v) : "–"}</span><span class="pg-delta sm" data-pgd></span>
+        ${Math.abs(sug) >= 0.5 ? `<button type="button" class="pg-sugb sm" data-pgsugit="${it.mi}">Pulse ${psPctT(sug)}</button>` : `<span class="meta pg-hold">hold</span>`}</div>`; }).join("") + `</div>`;
+}
+// the figures only (the sliders keep their place while dragged)
+function psLive(){
+  const d = psData; if (!d) return;
+  const rows = psRows(), t = psTotals(rows), yr = psYear(), dn = t.new_net - t.net, dm = t.new_cm - t.cm;
+  psTween(dn * yr);
+  const hero = $("pgHero"); hero.classList.toggle("up", dn > 0.5); hero.classList.toggle("dn", dn < -0.5);
+  $("pgSub").innerHTML = t.changed ? `extra sales a year, without VAT · <b>${psSign(dn)}</b> in the ${fmt(d.period.days)} days · margin <b>${psSign(dm * yr)}</b> a year`
+    : "extra sales a year · move a category, an item, or let Pulse suggest";
   const fc0 = t.cnet ? t.cost / t.cnet * 100 : null, fc1 = t.new_cnet ? t.new_cost / t.new_cnet * 100 : null;
-  const dn = t.new_net - t.net, dm = t.new_cm - t.cm;
-  const tile = (l, v, s, cls, open) => `<div class="card kpi${open ? " clickable" : ""}"${open ? ` data-pulse="${esc(open)}" role="button" tabindex="0"` : ""}><div class="l">${esc(l)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
-  $("psKpis").innerHTML = tile("Sales without VAT", flM(t.new_net), `${C} · today ${flM(t.net)} · <b class="${dn >= 0 ? "down" : "up"}">${psSign(dn)} (${psPctT(psPct(t.new_net, t.net))})</b>`)
-    + tile("Margin after commission", flM(t.new_cm), `today ${flM(t.cm)} · <b class="${dm >= 0 ? "down" : "up"}">${psSign(dm)} (${psPctT(psPct(t.new_cm, t.cm))})</b>`, dm > 0 ? "down" : dm < 0 ? "up" : "")
-    + tile("Margin in a year", psSign(dm * yr), `${C} · at the pace of the period`, dm > 0 ? "down" : dm < 0 ? "up" : "")
-    + tile("Food cost %", fc1 == null ? "–" : fmt(fc1, 1) + "%", `today ${fc0 == null ? "–" : fmt(fc0, 1) + "%"} · on the items with a cost`, fc1 != null && fc1 > (d.settings.target || 32) ? "warn" : "")
-    + tile("Items sold", psPctT(psPct(t.new_qty, t.qty)), `${fmt(t.new_qty, 0)} against ${fmt(t.qty, 0)}`)
-    + tile("Prices changed", fmt(t.changed), `of ${fmt(rows.length)} item × channel · ${fmt(t.nocost)} without a cost`, "", t.changed ? "pslist|changed" : "");
-  const grp = (keyf) => { const g = {}; for (const r of rows) { const k = keyf(r), e = psEff(r.it, r.ch, psPrice(r.it, r.ch)), x = g[k] = g[k] || {key: k, dm: 0, dn: 0, n: 0};
-    if (r.it.cost != null) x.dm += e.new_cm - e.cm; x.dn += e.new_net - e.net; if (psPrice(r.it, r.ch) !== r.c.price) x.n++; }
-    return Object.values(g).sort((a, b) => Math.abs(b.dm) - Math.abs(a.dm)); };
-  const bars = (list, kind) => Pulse.bars(list.slice(0, 14).map(x => ({key: x.key, segs: [[Math.abs(x.dm), x.dm >= 0 ? "var(--down)" : "var(--up)", x.dm >= 0 ? "margin gained" : "margin lost"]],
-    text: `<b class="${x.dm >= 0 ? "down" : "up"}">${psSign(x.dm)}</b> <span class="meta">sales ${psSign(x.dn)} · ${fmt(x.n)} changed</span>`, open: `psfocus|${kind}:${x.key}`})),
-    [["var(--down)", "margin gained"], ["var(--up)", "margin lost"]], {none: "No change yet: use the suggested prices or type a price."});
-  const any = rows.some(r => psPrice(r.it, r.ch) !== r.c.price);
-  $("psChBars").innerHTML = any ? bars(grp(r => r.ch), "ch") : `<p class="meta">No change yet: use the suggested prices, change by a percentage or type a price.</p>`;
-  $("psSecBars").innerHTML = any ? bars(grp(r => r.it.section), "sec") : `<p class="meta">No change yet.</p>`;
+  $("pgChips").innerHTML = [`<span><i>Prices changed</i><b>${fmt(t.changed)}</b></span>`, `<span><i>Items sold</i><b>${psPctT(psPct(t.new_qty, t.qty))}</b></span>`,
+    `<span><i>Food cost</i><b>${fc0 == null ? "–" : `${fmt(fc0, 1)}% → ${fmt(fc1, 1)}%`}</b></span>`, `<span><i>Margin in the period</i><b>${psSign(dm)}</b></span>`].join("");
+  const mx = Math.max(t.net, t.new_net, 1), bar = (l, a, b) => `<div class="pg-mrow"><span>${esc(l)}</span><div class="pg-mbar"><i style="width:${(a / mx * 100).toFixed(1)}%"></i></div><b>${flM(a)}</b></div>
+    <div class="pg-mrow new"><span>new</span><div class="pg-mbar"><i style="width:${(b / mx * 100).toFixed(1)}%"></i></div><b>${flM(b)}</b></div>`;
+  $("pgMeter").innerHTML = bar("Sales today", t.net, t.new_net) + bar("Margin today", t.cm, t.new_cm) + `<p class="pg-mnote">in the ${fmt(d.period.days)} days, ${esc(d.currency)} without VAT${t.nocost ? ` · ${fmt(t.nocost)} item × channel without a cost: sales only` : ""}</p>`;
+  // the tiles and the drawer
+  const S = psSections();
+  for (const s of S) {
+    const el = document.querySelector(`.pg-cat[data-pgsec="${CSS.escape(s.sec)}"]`); if (!el) continue;
+    const dd = (s.t.new_net - s.t.net) * yr, dk = el.querySelector("[data-pgd]");
+    dk.textContent = Math.abs(dd) >= 1 ? `${psSign(dd)} a year` : ""; dk.className = "pg-delta " + (dd > 0 ? "up" : dd < 0 ? "dn" : "");
+    el.classList.toggle("moved", Math.abs(dd) >= 1);
+  }
+  document.querySelectorAll("#pgDrawer [data-pgit]").forEach(row => {
+    const it = psData.items.find(i => String(i.mi) === row.dataset.pgit); if (!it) return;
+    let a = 0, b = 0; const chs = Object.keys(it.channels).filter(psOn);
+    chs.forEach(ch => { const e = psEff(it, ch, psPrice(it, ch)); a += e.net; b += e.new_net; });
+    const dd = (b - a) * yr, dk = row.querySelector("[data-pgd]"), main = chs.sort((x, y) => it.channels[y].qty - it.channels[x].qty)[0];
+    dk.textContent = Math.abs(dd) >= 1 ? psSign(dd) : ""; dk.className = "pg-delta sm " + (dd > 0 ? "up" : dd < 0 ? "dn" : "");
+    const p0 = it.channels[main].price, p1 = psPrice(it, main);
+    row.querySelector("[data-pgp]").innerHTML = p1 !== p0 ? `<s>${fmt(p0, 0)}</s> ${fmt(p1, 0)}` : fmt(p0, 0);
+    row.classList.toggle("moved", p1 !== p0);
+  });
+  psBasket(S); psWins();
+}
+// the big number counts to its new value
+function psTween(to){
+  const el = $("pgBig"), from = psShown, t0 = performance.now(), dur = 450;
+  cancelAnimationFrame(psAnim);
+  const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3), v = from + (to - from) * e;
+    el.textContent = (v > 0.5 ? "+" : v < -0.5 ? "−" : "") + fmt(Math.abs(Math.round(v))); psShown = v;
+    if (k < 1) psAnim = requestAnimationFrame(step); };
+  psAnim = requestAnimationFrame(step);
+}
+function psBasket(S){
+  const yr = psYear(), out = [];
+  for (const s of S) {
+    if (psCat[s.sec]) out.push({t: `<b data-no-i18n>${esc(s.sec)}</b> <span class="pg-tag">${psPctS(psCat[s.sec])}</span>`, sub: "category", d: (s.t.new_net - s.t.net) * yr, x: `cat|${s.sec}`});
+  }
+  for (const [mi, p] of Object.entries(psItem)) { const it = psData.items.find(i => String(i.mi) === mi); if (!it) continue;
+    let a = 0, b = 0; Object.keys(it.channels).filter(psOn).forEach(ch => { const e = psEff(it, ch, psPrice(it, ch)); a += e.net; b += e.new_net; });
+    out.push({t: `${esc(it.name)} <span class="pg-tag">${psPctS(p)}</span>`, sub: "item", d: (b - a) * yr, x: `item|${mi}`}); }
+  const sum = obj => { let a = 0, b = 0, n = 0; for (const k of Object.keys(obj)) { const it = psItemOf(k), ch = k.slice(k.indexOf("|") + 1); if (!it || !it.channels[ch] || !psOn(ch) || psNew[k] !== obj[k]) continue;
+    const e = psEff(it, ch, obj[k]); a += e.net; b += e.new_net; n++; } return {d: (b - a) * yr, n}; };
+  const sg = sum(psSug), mn = sum(psManual);
+  if (sg.n) out.push({t: `<b>Pulse's suggestions</b> <span class="pg-tag">${fmt(sg.n)} prices</span>`, sub: "suggested", d: sg.d, x: "sug|"});
+  if (mn.n) out.push({t: `<b>Prices typed</b> <span class="pg-tag">${fmt(mn.n)}</span>`, sub: "in the table", d: mn.d, x: "man|"});
+  $("pgBasket").innerHTML = out.length ? `<ul class="pg-bk">` + out.map(o => `<li><div><span class="pg-bkt">${o.t}</span><span class="meta">${esc(o.sub)}</span></div><b class="${o.d >= 0 ? "up" : "dn"}">${psSign(o.d)}</b><button type="button" class="pg-x sm" data-pgdrop="${esc(o.x)}" aria-label="Undo this change">✕</button></li>`).join("") + `</ul><p class="meta">extra sales a year, without VAT</p>`
+    : `<p class="pg-empty">Nothing changed yet. Drag a category, open its items, or press <b>Let Pulse suggest</b>.</p>`;
+}
+function psWins(){
+  const yr = psYear(), L = [];
+  for (const it of psData.items) { let dm = 0, dn = 0, ok = false, up = 0;
+    for (const ch of Object.keys(it.channels)) { if (!psOn(ch)) continue; const p = psPrice(it, ch); if (p === it.channels[ch].price) continue; ok = true;
+      up += p > it.channels[ch].price ? 1 : -1; const e = psEff(it, ch, p); dm += e.new_cm - e.cm; dn += e.new_net - e.net; }
+    if (ok) L.push({it, up: up >= 0, dm: it.cost == null ? null : dm * yr, dn: dn * yr}); }
+  const key = x => x.dm == null ? x.dn : x.dm;
+  L.sort((a, b) => key(b) - key(a));
+  const top = L.filter(x => key(x) > 0).slice(0, 4), worst = L.filter(x => key(x) < 0).slice(-2).reverse();
+  $("pgWins").innerHTML = !L.length ? `<p class="pg-empty">The items that gain the most show here.</p>`
+    : top.map((x, i) => `<button type="button" class="pg-win" data-pulse="psitem|${x.it.mi}"><span class="pg-rank">${i + 1}</span><span><b>${esc(x.it.name)}</b><small>${x.dm == null ? "sales" : "margin"} a year</small></span><b class="up">${psSign(key(x))}</b></button>`).join("")
+      + worst.map(x => `<button type="button" class="pg-win warn" data-pulse="psitem|${x.it.mi}"><span class="pg-rank">!</span><span><b>${esc(x.it.name)}</b><small>loses ${x.dm == null ? "sales" : "margin"}: ${x.up ? "dearer, sells too much less" : "cheaper, does not sell enough more"}</small></span><b class="dn">${psSign(key(x))}</b></button>`).join("");
+}
+// ---- the controls
+document.addEventListener("pointerdown", e => { if (e.target.matches && e.target.matches(".pg-range")) psSnap(); });
+document.addEventListener("keydown", e => { if (e.target.matches && e.target.matches(".pg-range") && /Arrow|Page|Home|End/.test(e.key)) psSnap(); });
+let psRaf = 0;
+document.addEventListener("input", e => {
+  const t = e.target; if (!t.matches || !t.matches(".pg-range") || !psData) return;
+  const v = +t.value; t.style.setProperty("--v", `${(v - PG_MIN) / (PG_MAX - PG_MIN) * 100}%`);
+  if (t.dataset.pgcat != null) {
+    const sec = t.dataset.pgcat; if (v) psCat[sec] = v; else delete psCat[sec];
+    for (const it of psData.items) if (it.section === sec) { delete psItem[it.mi]; for (const ch of Object.keys(it.channels)) if (psOn(ch)) { delete psSug[psK(it, ch)]; delete psManual[psK(it, ch)]; } }
+    t.closest(".pg-cat").querySelector("[data-pgv]").textContent = v ? psPctS(v) : "0%";
+    document.querySelectorAll(`#pgDrawer .pg-range[data-pgitem]`).forEach(r => { if (psOpen === sec) { r.value = 0; r.style.setProperty("--v", `${-PG_MIN / (PG_MAX - PG_MIN) * 100}%`); r.parentElement.querySelector("[data-pgv]").textContent = "–"; } });
+  } else if (t.dataset.pgitem != null) {
+    const mi = t.dataset.pgitem, it = psData.items.find(i => String(i.mi) === mi); if (v) psItem[mi] = v; else delete psItem[mi];
+    if (it) for (const ch of Object.keys(it.channels)) { delete psSug[psK(it, ch)]; delete psManual[psK(it, ch)]; }
+    t.parentElement.querySelector("[data-pgv]").textContent = v ? psPctS(v) : "–";
+  } else return;
+  psRebuild(); cancelAnimationFrame(psRaf); psRaf = requestAnimationFrame(psLive);
+});
+document.addEventListener("click", e => {
+  const ch = e.target.closest("[data-pgch]");
+  if (ch && psData) { const c = ch.dataset.pgch; if (!c) psChSel.clear(); else if (psChSel.has(c)) psChSel.delete(c); else psChSel.add(c);
+    if (psChSel.size === psData.channels.length) psChSel.clear(); psRebuild(); psRender(); return; }
+  const op = e.target.closest("[data-pgopen]");
+  if (op) { psOpen = psOpen === op.dataset.pgopen ? "" : op.dataset.pgopen; psCats(); psDrawer(); psLive(); if (psOpen) $("pgDrawer").scrollIntoView({behavior: "smooth", block: "nearest"}); return; }
+  const ss = e.target.closest("[data-pgsugsec]"); if (ss) { psSnap(); const sec = ss.dataset.pgsugsec; psSugApply(it => it.section === sec); return; }
+  const si = e.target.closest("[data-pgsugit]"); if (si) { psSnap(); const mi = si.dataset.pgsugit; psSugApply(it => String(it.mi) === mi); return; }
+  const dr = e.target.closest("[data-pgdrop]");
+  if (dr) { psSnap(); const [kind, ...r] = dr.dataset.pgdrop.split("|"), key = r.join("|");
+    if (kind === "cat") delete psCat[key]; else if (kind === "item") delete psItem[key]; else if (kind === "sug") psSug = {}; else if (kind === "man") psManual = {};
+    psRebuild(); psRender(); }
+});
+$("pgFind").onchange = () => {
+  const q = $("pgFind").value.trim().toLowerCase(); if (!q || !psData) return;
+  const it = psData.items.find(i => i.name.toLowerCase() === q) || psData.items.find(i => i.name.toLowerCase().includes(q) || String(i.mi) === q);
+  if (!it) return;
+  psOpen = it.section; psCats(); psDrawer(); psLive(); $("pgFind").value = "";
+  const row = document.querySelector(`#pgDrawer [data-pgit="${it.mi}"]`);
+  if (row) { row.scrollIntoView({behavior: "smooth", block: "center"}); row.classList.add("flash"); setTimeout(() => row.classList.remove("flash"), 1600); const r = row.querySelector(".pg-range"); if (r) r.focus({preventScroll: true}); }
+};
+// ---- the full table (Every item and channel): any price typed by hand
+function psFiltered(){
+  const q = ($("psQ").value || "").trim().toLowerCase(), sec = $("psSecF").value, sh = $("psShow").value;
+  return psRows().filter(r => (!psCls || r.it.cls === psCls) && (!sec || r.it.section === sec)
+    && (!q || `${r.it.mi} ${r.it.name}`.toLowerCase().includes(q))
+    && (!sh || (sh === "changed" ? psPrice(r.it, r.ch) !== r.c.price : sh === "suggested" ? r.c.suggested && r.c.suggested !== r.c.price : r.c.comp_n > 0)));
 }
 function psRowHtml(r){
   const it = r.it, c = r.c, k = psK(it, r.ch), p1 = psPrice(it, r.ch), e = psEff(it, r.ch, p1), chg = p1 !== c.price;
@@ -4737,65 +5042,57 @@ function psRowHtml(r){
     <td class="num" data-psc="d">${chg ? psPctT((p1 - c.price) / c.price * 100) : "–"}</td>
     <td class="num">${c.comp_median ? `${fmt(c.comp_median, 0)}<div class="meta">${fmt(c.comp_n)} price(s)</div>` : `<span class="meta">–</span>`}</td>
     <td class="num" data-psc="fc">${cp0 == null ? "–" : `${fmt(cp0, 0)}%${chg ? ` → <b>${fmt(cp1, 0)}%</b>` : ""}`}</td>
-    <td class="num" data-psc="q">${chg ? psPctT((e.new_qty - e.qty) / (e.qty || 1) * 100) : "–"}</td>
     <td class="num" data-psc="m">${it.cost == null ? `<span class="meta">no cost</span>` : `<b class="${dm > 0 ? "down" : dm < 0 ? "up" : ""}">${chg ? psSign(dm) : "–"}</b>`}</td>
     <td class="num" data-psc="be">${chg && e.be != null && it.cost != null ? psPctT(e.be) : "–"}</td></tr>`;
 }
-const PS_HEAD = `<tr><th>Item</th><th>Class</th><th>Channel</th><th class="num">Items sold</th><th class="num">Price today</th><th class="num">Suggested</th><th class="num">New price</th><th class="num">Change</th><th class="num">Competitors</th><th class="num">Food cost</th><th class="num">Items sold</th><th class="num">Margin</th><th class="num">Break-even</th></tr>`;
+const PS_HEAD = `<tr><th>Item</th><th>Class</th><th>Channel</th><th class="num">Items sold</th><th class="num">Price today</th><th class="num">Suggested</th><th class="num">New price</th><th class="num">Change</th><th class="num">Competitors</th><th class="num">Food cost</th><th class="num">Margin</th><th class="num">Break-even</th></tr>`;
 function psTable(){
-  const d = psData, all = psRows(), R = psFiltered(), srt = $("psSort").value;
+  if (!psData) return;
+  const all = psRows(), R = psFiltered(), srt = $("psSort").value;
   const dm = r => { const e = psEff(r.it, r.ch, psPrice(r.it, r.ch)); return r.it.cost == null ? 0 : e.new_cm - e.cm; };
   R.sort(srt === "name" ? (a, b) => a.it.name.localeCompare(b.it.name) : srt === "dcm" ? (a, b) => Math.abs(dm(b)) - Math.abs(dm(a))
     : srt === "sug" ? (a, b) => Math.abs((b.c.suggested || b.c.price) / b.c.price - 1) - Math.abs((a.c.suggested || a.c.price) / a.c.price - 1) : (a, b) => b.c.net - a.c.net);
+  const secs = [...new Set(psData.items.map(i => i.section))].sort(), keepS = $("psSecF").value;
+  $("psSecF").innerHTML = `<option value="">All categories</option>` + secs.map(s => `<option value="${esc(s)}" data-no-i18n>${esc(s)}</option>`).join("");
+  $("psSecF").value = secs.includes(keepS) ? keepS : "";
   const cnt = {}; all.forEach(r => cnt[r.it.cls] = (cnt[r.it.cls] || 0) + 1);
   $("psChips").innerHTML = [["", "Every class", all.length]].concat(["star", "plowhorse", "puzzle", "dog", "nocost"].filter(c => cnt[c]).map(c => [c, psLbl(c), cnt[c]]))
     .map(([k, l, n]) => `<button type="button" data-pscls="${k}" class="${psCls === k ? "on" : ""}">${k ? psSt(k) : esc(l)} · ${fmt(n)}</button>`).join("");
-  const shown = R.slice(0, 400);
-  $("psItemsNote").textContent = `${fmt(R.length)} of ${fmt(all.length)} item × channel rows${R.length > 400 ? ", the first 400 shown" : ""}. Type a new price, or click a suggested price to use it; click a row for the item's detail, its price ladder and the competitors.`;
-  $("psTable").innerHTML = PS_HEAD + (shown.map(psRowHtml).join("") || `<tr><td colspan="13" class="empty">No row for these filters.</td></tr>`);
+  $("psItemsNote").textContent = `${fmt(R.length)} of ${fmt(all.length)} item × channel rows${R.length > 400 ? ", the first 400 shown" : ""}. A price typed here comes before the sliders.`;
+  $("psTable").innerHTML = PS_HEAD + (R.slice(0, 400).map(psRowHtml).join("") || `<tr><td colspan="12" class="empty">No row for these filters.</td></tr>`);
 }
-// one row's figures again after a price is typed (the input keeps the focus)
+$("pgAll").addEventListener("toggle", () => { if ($("pgAll").open) psTable(); });
 function psRowUpdate(k){
-  const [mi, ...rest] = k.split("|"), ch = rest.join("|"), it = psData.items.find(x => String(x.mi) === mi);
-  const inp = document.querySelector(`#psTable [data-psk="${CSS.escape(k)}"]`); if (!it || !inp) return;
+  const it = psItemOf(k), ch = k.slice(k.indexOf("|") + 1), inp = document.querySelector(`#psTable [data-psk="${CSS.escape(k)}"]`); if (!it || !inp) return;
   const tmp = document.createElement("tbody"); tmp.innerHTML = psRowHtml({it, ch, c: it.channels[ch]});
   const tr = inp.closest("tr"), nt = tmp.firstElementChild;
-  ["d", "fc", "q", "m", "be"].forEach(c => { tr.querySelector(`[data-psc="${c}"]`).innerHTML = nt.querySelector(`[data-psc="${c}"]`).innerHTML; });
+  ["d", "fc", "m", "be"].forEach(c => { tr.querySelector(`[data-psc="${c}"]`).innerHTML = nt.querySelector(`[data-psc="${c}"]`).innerHTML; });
   tr.classList.toggle("ps-chg", nt.classList.contains("ps-chg"));
 }
 let psSumT = null;
 document.addEventListener("input", e => {
   const k = e.target.dataset && e.target.dataset.psk; if (!k || !psData) return;
-  const [mi, ...rest] = k.split("|"), ch = rest.join("|"), it = psData.items.find(x => String(x.mi) === mi), v = parseFloat(e.target.value);
-  if (!it) return;
-  if (v > 0 && Math.abs(v - it.channels[ch].price) > 0.004) psNew[k] = v; else delete psNew[k];
-  psRowUpdate(k); clearTimeout(psSumT); psSumT = setTimeout(psSummary, 200);
+  const it = psItemOf(k), ch = k.slice(k.indexOf("|") + 1), v = parseFloat(e.target.value); if (!it) return;
+  if (v > 0 && Math.abs(v - it.channels[ch].price) > 0.004) psManual[k] = v; else delete psManual[k];
+  psRebuild(); psRowUpdate(k); clearTimeout(psSumT); psSumT = setTimeout(psLive, 200);
 });
+document.addEventListener("focusin", e => { if (e.target.dataset && e.target.dataset.psk) psSnap(); });
 document.addEventListener("click", e => {
   const u = e.target.closest("[data-psuse]");
   if (u) { e.preventDefault(); e.stopPropagation(); psUse(u.dataset.psuse); return; }
   const c = e.target.closest("[data-pscls]"); if (c) { psCls = c.dataset.pscls; psTable(); }
 }, true);
 function psUse(k){
-  const [mi, ...rest] = k.split("|"), ch = rest.join("|"), it = psData.items.find(x => String(x.mi) === mi); if (!it) return;
-  const s = it.channels[ch].suggested; if (s && s !== it.channels[ch].price) psNew[k] = s;
+  const it = psItemOf(k), ch = k.slice(k.indexOf("|") + 1); if (!it) return;
+  psSnap();
+  const s = it.channels[ch].suggested; if (s && s !== it.channels[ch].price) { psSug[k] = s; delete psManual[k]; delete psItem[it.mi]; }
+  psRebuild();
   document.querySelectorAll(`.pl-bd.show [data-psuse="${CSS.escape(k)}"]`).forEach(b => b.outerHTML = `<b>${fmt(s, 0)}</b> <span class="meta">used</span>`);
-  psTable(); psSummary();
+  if ($("pgAll").open) psTable();
+  psCats(); psDrawer(); psLive();
 }
 ["psQ"].forEach(id => $(id).oninput = () => psData && psTable());
 ["psSecF", "psShow", "psSort"].forEach(id => $(id).onchange = () => psData && psTable());
-$("psSuggest").onclick = () => { if (!psData) return; let n = 0; psFiltered().forEach(r => { if (r.c.suggested && r.c.suggested !== r.c.price) { psNew[psK(r.it, r.ch)] = r.c.suggested; n++; } });
-  $("psScnMsg").textContent = `${fmt(n)} suggested price(s) used on the rows shown.`; psTable(); psSummary(); };
-$("psPctGo").onclick = () => { if (!psData) return; const p = parseFloat($("psPct").value); if (!isFinite(p) || !p) return; let n = 0;
-  psFiltered().forEach(r => { psNew[psK(r.it, r.ch)] = psRound(r.c.price * (1 + p / 100), p > 0); n++; });
-  $("psScnMsg").textContent = `${fmt(n)} price(s) changed by ${psPctT(p)} (rounded to ${fmt(psData.round_step)}).`; psTable(); psSummary(); };
-$("psReset").onclick = () => { if (!psData) return; psFiltered().forEach(r => delete psNew[psK(r.it, r.ch)]); $("psScnMsg").textContent = "The rows shown are back to today's prices."; psTable(); psSummary(); };
-Pulse.on("psfocus", v => { const i = v.indexOf(":"), kind = v.slice(0, i), key = v.slice(i + 1);
-  if (kind === "ch") { psChMs.fill(psData.channels.map(c => ({value: c.channel, text: c.channel})), [key]); psRender(); }
-  else { $("psSecF").value = key; psTable(); }
-  $("psTable").scrollIntoView({behavior: "smooth", block: "start"}); });
-Pulse.on("pslist", () => { $("psShow").value = "changed"; psTable(); $("psTable").scrollIntoView({behavior: "smooth", block: "start"}); });
-// ---- the item: its channels, the price ladder, the reasons and the competitors
 function psItemPop(mi){
   const d = psData, it = d.items.find(x => String(x.mi) === String(mi)); if (!it) return;
   const C = d.currency, chs = Object.keys(it.channels).sort((a, b) => it.channels[b].qty - it.channels[a].qty);
@@ -4831,6 +5128,7 @@ function psItemPop(mi){
 }
 const Pulse_median = a => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
 Pulse.on("psitem", mi => psItemPop(mi));
+
 // ---- parameters
 function psParFill(){
   const p = psP || {};
@@ -4848,7 +5146,7 @@ function psParRead(){
 const psParShow = on => { $("psPar").hidden = !on; $("psParBtn").setAttribute("aria-expanded", on); if (on && psData) psParFill(); };
 $("psParBtn").onclick = () => psParShow($("psPar").hidden);
 $("psParClose").onclick = () => psParShow(false);
-$("psParApply").onclick = () => { if (!psData) return; Object.assign(psP, psParRead()); psRender(); $("psParMsg").textContent = "Applied to this simulation (the suggested prices change when saved for everyone)."; };
+$("psParApply").onclick = () => { if (!psData) return; Object.assign(psP, psParRead()); psRebuild(); psRender(); $("psParMsg").textContent = "Applied to this simulation (the suggested prices change when saved for everyone)."; };
 $("psParSave").onclick = async () => {
   $("psParMsg").textContent = "Saving…";
   try { await simphonyPost("/api/sales/pricesim/params", psParRead()); $("psParMsg").textContent = "Saved. Working the suggested prices out again…"; await psLoad(); $("psParMsg").textContent = "Saved and applied."; }
@@ -4893,19 +5191,23 @@ async function psScnLoad(){
 $("psScn").onchange = () => {
   const s = psScns.find(x => x.id === $("psScn").value);
   if (!s) { $("psScnName").value = ""; return; }
-  psNew = {}; let n = 0, miss = 0;
-  Object.entries(s.changes || {}).forEach(([k, v]) => { const [mi, ...rest] = k.split("|"), it = psData.items.find(x => String(x.mi) === mi);
-    if (it && it.channels[rest.join("|")]) { psNew[k] = v; n++; } else miss++; });
+  psSnap();
+  const st = s.state || {};
+  psCat = Object.assign({}, st.cat || {}); psItem = Object.assign({}, st.item || {}); psSug = Object.assign({}, st.sug || {});
+  psManual = st.cat || st.item || st.sug ? Object.assign({}, st.manual || {}) : Object.assign({}, s.changes || {});
+  psChSel = new Set((st.channels || []).filter(c => psData.channels.some(x => x.channel === c)));
+  psRebuild(); psRender();
+  const miss = Object.keys(s.changes || {}).filter(k => !psItemOf(k)).length;
   $("psScnName").value = s.name;
-  $("psScnMsg").textContent = `${s.name}: ${fmt(n)} price(s)${miss ? `, ${fmt(miss)} not in this selection or period` : ""}.${s.note ? " " + s.note : ""}`;
-  psTable(); psSummary();
+  $("psScnMsg").textContent = `${s.name}: ${fmt(Object.keys(psNew).length)} price(s)${miss ? `, ${fmt(miss)} not in this selection or period` : ""}.${s.note ? " " + s.note : ""}`;
 };
 $("psScnSave").onclick = async () => {
   const name = $("psScnName").value.trim(); if (!name) { $("psScnMsg").textContent = "Give the scenario a name."; $("psScnName").focus(); return; }
   const t = psTotals(psRows()), cur = psScns.find(x => x.id === $("psScn").value);
+  if (!Object.keys(psNew).length) { $("psScnMsg").textContent = "Change a price first."; return; }
   try {
     const j = await simphonyPost("/api/sales/pricesim/scenarios", {id: cur && cur.name === name ? cur.id : "", name, level: $("psLevel").value, key: $("psKey").value,
-      company: $("company").value || "", changes: psNew, summary: {net: Math.round(t.new_net - t.net), cm: Math.round(t.new_cm - t.cm), items: t.changed}});
+      company: $("company").value || "", changes: psNew, state: {cat: psCat, item: psItem, sug: psSug, manual: psManual, channels: [...psChSel]}, summary: {net: Math.round(t.new_net - t.net), cm: Math.round(t.new_cm - t.cm), items: t.changed}});
     await psScnLoad(); $("psScn").value = j.scenario.id; $("psScnMsg").textContent = `Saved: ${name}. It changes nothing in Simphony; share it with whoever sets the prices in EMC.`;
   } catch(e){ $("psScnMsg").textContent = "Could not save: " + e.message; }
 };
@@ -4923,9 +5225,10 @@ $("psXlsx").onclick = () => {
      formats: ["text", "text", "text", "text", "text", "num", "num", "num", "num", "pct", "num", "num", "num", "num", "num", "num", "num", "num", "pct", "text"], rows},
     {title: "Summary", header: ["", "Today", "New", "Change"], formats: ["text", "num", "num", "num"],
      rows: [["Sales without VAT", t.net, t.new_net, t.new_net - t.net], ["Margin after commission", t.cm, t.new_cm, t.new_cm - t.cm], ["Items sold", t.qty, t.new_qty, t.new_qty - t.qty], ["Prices changed", null, t.changed, null]]}],
-    [`${d.title} · ${d.period.from} to ${d.period.to} · ${d.currency}`, `Channels: ${psChMs.vals().join(", ") || "every channel"}`, $("psScnName").value ? `Scenario: ${$("psScnName").value}` : "Scenario not saved",
+    [`${d.title} · ${d.period.from} to ${d.period.to} · ${d.currency}`, `Channels: ${[...psChSel].join(", ") || "every channel"}`, $("psScnName").value ? `Scenario: ${$("psScnName").value}` : "Scenario not saved",
      "New items sold = items sold × (new price / price) ^ elasticity. Margin = price without VAT − commission − portion cost. Nothing is changed in Simphony."]);
 };
+
 // ---------- Sales → Menu engineering ----------
 let meData = null, meKey = "", meTimer = null, meCls = "", meHl = null;
 const ME_ORDER = ["star", "plowhorse", "puzzle", "dog", "nocost"];
