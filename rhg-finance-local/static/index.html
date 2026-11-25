@@ -475,6 +475,27 @@ td.num,th.num{text-align:right}
 .pg-rank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#062634;background:linear-gradient(135deg,#ffd27a,#ffe9b8)}
 .pg-win.warn .pg-rank{background:color-mix(in srgb,var(--pg-dn) 20%,transparent);color:var(--pg-dn)}
 .pg-tools{display:flex;flex-wrap:wrap;gap:6px}
+/* Financial statements: the executive summary on top of each tab */
+.ex-sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:stretch;padding:20px 22px;border-radius:20px;margin:0 0 15px;color:#e8f3f7;background:radial-gradient(120% 140% at 0% 0%,#0f5a73 0%,#0b3a4d 55%,#08283a 100%)}
+.ex-sum:empty{display:none}
+.ex-eye{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9fd6e8;font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ex-h h2{margin:8px 0 8px;font-size:22px;line-height:1.2;color:#fff}
+.ex-story{margin:0;padding-left:18px;font-size:13px;line-height:1.5;color:#d6ebf2}.ex-story li{margin:2px 0}.ex-story b.up{color:#ffb4a8}
+.ex-lg{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:10.5px;color:#9fc3d0}.ex-lg span{display:inline-flex;align-items:center;gap:4px}
+.ex-lg i,.ex-tl i{width:9px;height:9px;border-radius:50%;display:inline-block;background:#7b8f98;flex:none}
+.ex-g i{background:#3fc58a}.ex-a i{background:#e0a44a}.ex-r i{background:#e8705c}
+.ex-ts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-content:start}
+.ex-t{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:14px;padding:10px 12px;min-width:0;border-top:3px solid #7b8f98}
+.ex-t.ex-g{border-top-color:#3fc58a}.ex-t.ex-a{border-top-color:#e0a44a}.ex-t.ex-r{border-top-color:#e8705c}
+.ex-tl{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:10.5px;color:#9fd6e8;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.ex-t b{display:block;font-size:21px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;margin:3px 0 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-u{font-size:11px;font-weight:600;color:#9fc3d0}
+.ex-t small{display:block;font-size:11px;color:#d6ebf2;font-variant-numeric:tabular-nums}.ex-t small.ex-b{color:#9fc3d0}
+.ex-seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;background:var(--bg)}
+.ex-seg button{border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;color:var(--sub);cursor:pointer}
+.ex-seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+@media (max-width:1000px){.ex-sum{grid-template-columns:1fr}}
+@media (max-width:560px){.ex-ts{grid-template-columns:repeat(2,minmax(0,1fr))}.ex-sum{padding:16px}}
 /* Marketing → Campaigns */
 .cg-hero{display:grid;grid-template-columns:1.1fr 1.4fr;gap:18px;align-items:center;padding:20px 22px;border-radius:20px;margin-bottom:14px;color:#eaf6fa;background:radial-gradient(120% 140% at 0% 0%,#3a2a6b 0%,#1b1f4a 55%,#0d1330 100%)}
 .cg-eye{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#c9b8ff;font-weight:700}
@@ -1096,8 +1117,9 @@ table.bn-plan td{padding:3px 4px}
 
   <section class="view" id="v-pl">
     <div class="ov-tabs" id="stTabs" role="tablist"><button data-t="pl" class="on" role="tab" aria-selected="true">Profit &amp; loss</button><button data-t="bs" role="tab" aria-selected="false">Balance sheet</button><button data-t="liquidity" role="tab" aria-selected="false">Liquidity &amp; capital</button><button data-t="treasury" role="tab" aria-selected="false">Cash flow &amp; treasury</button></div>
+    <section class="ex-sum" id="exSum_pl" aria-label="Summary"></section>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Profit and loss</h2><p class="hint" id="plNote"></p></div>
-      <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini" data-drill="pl">Open by account</button><button class="mini exp" id="plExp" type="button">Export ▾</button></div></div>
+      <div style="display:flex;gap:6px;flex:none;white-space:nowrap;align-items:center"><div class="ex-seg" id="plMode" role="group" aria-label="Show"><button type="button" data-m="amt" class="on" aria-pressed="true">Amounts</button><button type="button" data-m="pct" aria-pressed="false">% of revenue</button></div><button class="mini" data-drill="pl">Open by account</button><button class="mini exp" id="plExp" type="button">Export ▾</button></div></div>
       <div class="scroll"><table id="plTable"></table></div></div>
     <div class="card fc-viz" style="margin-bottom:15px"><div class="card-head"><div><h2>From revenue to EBITDA</h2>
       <p class="hint"><span>The period chosen above, as the P&amp;L reads it: each bar adds or takes away from the revenue, the dark bars are the subtotals.</span></p></div></div>
@@ -1114,6 +1136,7 @@ table.bn-plan td{padding:3px 4px}
 
 
   <section class="view" id="v-bs">
+    <section class="ex-sum" id="exSum_bs" aria-label="Summary"></section>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Balance sheet</h2><p class="hint" id="bsNote"></p></div>
       <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini dark" id="bsLoad">Read again</button><button class="mini exp" id="bsExp" type="button">Export ▾</button></div></div>
       <div class="money" id="bsTotals"></div><p class="meta" id="bsCheck" style="margin:6px 0 0"></p></div>
@@ -1124,6 +1147,7 @@ table.bn-plan td{padding:3px 4px}
   </section>
 
   <section class="view" id="v-liquidity">
+    <section class="ex-sum" id="exSum_liquidity" aria-label="Summary"></section>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Liquidity and capital</h2><p class="hint" id="lqNote"></p></div>
       <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini dark" id="lqLoad">Read again</button><button class="mini exp" id="lqExp" type="button">Export ▾</button></div></div>
       <div class="lq-grid" id="lqKpis"></div></div>
@@ -1684,6 +1708,7 @@ table.bn-plan td{padding:3px 4px}
   </section>
 
   <section class="view" id="v-treasury">
+    <section class="ex-sum" id="exSum_treasury" aria-label="Summary"></section>
     <div class="money" id="trsKpis"></div>
     <div class="card" style="margin-bottom:15px"><div class="card-head"><div><h2>Cash flow, indirect</h2><p class="hint" id="trsNote"></p></div>
       <div style="display:flex;gap:6px;flex:none;white-space:nowrap"><button class="mini dark" id="trsLoad">Read</button><button class="mini exp" id="trsExp" type="button">Export ▾</button></div></div>
@@ -3335,7 +3360,164 @@ function renderBrief(){
   });
 }
 
-function statementRows(lines){
+// ---------- Financial statements: the executive summary on top of each tab (Geri, 25 Nov 2026, approved: the story in a
+// few sentences and six headline figures, green / amber / red against last year first, the budget beside it).
+// Lights: an amount ±2% on last year, a share of revenue or a margin ±1 point; good is up for revenue, margins and
+// profit, down for the cost shares. Nothing is a light without its comparison: grey "no comparison".
+const EX_TH = {amt: 2, pts: 1};
+const exM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + fcM(Math.abs(v));
+const exPct = (a, b) => a == null || b == null || !b ? null : (a - b) / Math.abs(b) * 100;
+const exSg = (v, d = 1, u = "%") => { if (v == null || !isFinite(v)) return "–"; const r = Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v; return (r > 0 ? "+" : r < 0 ? "−" : "") + fmt(Math.abs(r), d) + u; };
+const exPts = v => exSg(v, 1, " pts");
+function exLight(d, good, th){ if (d == null || !isFinite(d)) return "na"; const x = good > 0 ? d : -d; return x >= th ? "g" : x <= -th ? "r" : "a"; }
+const EX_L = {g: "Better", a: "In line", r: "Worse", na: "No comparison"};
+// tile: {l, v, s (the main comparison), b (the budget beside it), light, open}
+function exTile(t){
+  return `<div class="ex-t ex-${t.light || "na"}"${t.open ? ` data-pulse="${esc(t.open)}" role="button" tabindex="0"` : ""}><div class="ex-tl"><span>${fcSp(t.l)}</span><i title="${esc(EX_L[t.light || "na"])}" aria-label="${esc(EX_L[t.light || "na"])}"></i></div>
+    <b>${t.v}</b><small>${t.s || ""}</small>${t.b ? `<small class="ex-b">${t.b}</small>` : ""}</div>`;
+}
+function exBox(id, o){
+  const el = $(id); if (!el) return;
+  if (!o) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="ex-h"><div class="ex-eye">${fcSp(o.eye)}${o.status ? ` · ${stChip(o.status)}` : ""}</div><h2>${fcSp(o.head)}</h2>
+      <ul class="ex-story">${o.story.filter(Boolean).map(s => `<li>${s}</li>`).join("")}</ul>
+      <div class="ex-lg">${["g", "a", "r"].map(k => `<span class="ex-${k}"><i></i>${fcSp(EX_L[k])}</span>`).join("")}<span>${fcSp(o.rule)}</span></div></div>
+    <div class="ex-ts">${o.tiles.map(exTile).join("")}</div>`;
+}
+// the P&L: by key (the KPI library), else by the label of the statement without a mapping
+function exPL(){
+  const pl = data && data.pl; if (!pl) { exBox("exSum_pl", null); return; }
+  const rows = pl.summary || pl.statement || [], LBL = {revenue: "Revenue", cogs: "Cost of goods sold", gross_profit: "Gross profit", opex: "Operating expenses", ebitda: "EBITDA", ebit: "EBIT"};
+  const L = k => rows.find(l => l.key === k) || (!pl.summary ? rows.find(l => l.label === LBL[k]) : null) || null;
+  const hidden = new Set((pl.validation || []).flatMap(x => x.suppressed || []));
+  const credit = (pl.validation || []).some(x => x.figure === "Cost of goods sold");
+  const C = data.meta.currency || "", rv = L("revenue");
+  if (!rv || rv.current == null) { exBox("exSum_pl", null); return; }
+  // last year first; without it, the period before
+  const ly = rv.last_year != null && rv.last_year !== 0, F = ly ? "last_year" : "previous", vsW = ly ? "on last year" : "on the period before";
+  const at = (k, f) => { const x = L(k); return x ? x[f] : null; };
+  const share = (k, f) => { const r = at("revenue", f), v = k === "prime" ? (at("cogs", f) == null ? null : (at("cogs", f) || 0) + (at("labour", f) || 0)) : at(k, f); return v == null || !r ? null : v / r * 100; };
+  const bud = rv.budget ? "budget" : null;
+  const amtT = (l, k, good) => { const v = at(k, "current"), d = exPct(v, at(k, F)), db = bud ? exPct(v, at(k, "budget")) : null;
+    return {l, v: `${exM(v)} <span class="ex-u">${esc(C)}</span>`, s: `${exSg(d)} ${fcSp(vsW)}`, b: db == null ? "" : `${exSg(db)} ${fcSp("against budget")}`, light: exLight(d, good, EX_TH.amt)}; };
+  const shrT = (l, k, good, rev) => { const v = share(k, "current"), d = v == null || share(k, F) == null ? null : v - share(k, F), db = bud && share(k, "budget") != null && v != null ? v - share(k, "budget") : null;
+    const rvw = (credit && (k === "cogs" || k === "prime" || k === "gross_profit")) || hidden.has(k === "ebitda" ? "EBITDA margin" : k === "gross_profit" ? "Gross margin" : "");
+    return {l, v: rvw ? fcSp("Review pending") : v == null ? "–" : fmt(v, 1) + "%", s: rvw ? "" : `${exPts(d)} ${fcSp(vsW)}`, b: rvw || db == null ? "" : `${exPts(db)} ${fcSp("against budget")}`,
+      light: rvw ? "na" : exLight(d, good, EX_TH.pts), rev}; };
+  const eb = at("ebitda", "current"), ebm = share("ebitda", "current"), ebmL = share("ebitda", F), np = at("net_profit", "current");
+  const tiles = [amtT("Net revenue", "revenue", 1), shrT("Gross margin", "gross_profit", 1), shrT("Prime cost", "prime", -1),
+    Object.assign(amtT("EBITDA", "ebitda", 1), {s: ebm == null ? exSg(exPct(eb, at("ebitda", F))) + " " + fcSp(vsW) : `${fmt(ebm, 1)}% ${fcSp("of revenue")} · ${exPts(ebmL == null ? null : ebm - ebmL)}`}),
+    shrT("Labour", "labour", -1), pl.summary ? amtT("Net profit", "net_profit", 1) : amtT("EBIT", "ebit", 1)]
+    .filter(t => !/^–/.test(t.v));
+  // what moved: each cost as a share of revenue against the comparison, the largest worse and the largest better
+  const COST = [["cogs", "Food & beverage cost"], ["labour", "Labour"], ["occupancy", "Occupancy"], ["opex", "Other operating costs"]];
+  const mv = COST.map(([k, l]) => { const a = share(k, "current"), b = share(k, F); return a == null || b == null || (credit && k === "cogs") ? null : {l, p: a - b, d: (at(k, "current") || 0) - (at(k, F) || 0)}; }).filter(Boolean);
+  const worse = mv.filter(x => x.p >= 0.3).sort((a, b) => b.p - a.p)[0], better = mv.filter(x => x.p <= -0.3).sort((a, b) => a.p - b.p)[0];
+  const dR = exPct(rv.current, rv[F]), dE = exPct(eb, at("ebitda", F));
+  const word = d => d == null ? "" : d >= 0.05 ? "up" : d <= -0.05 ? "down" : "flat";
+  const head = dR == null ? `Net revenue ${exM(rv.current)} ${C}`
+    : dE == null || eb == null ? `Net revenue ${word(dR)} ${fmt(Math.abs(dR), 1)}% ${vsW}`
+    : `Revenue ${word(dR)} ${fmt(Math.abs(dR), 1)}%, EBITDA ${word(dE)} ${fmt(Math.abs(dE), 1)}% ${vsW}`;
+  const story = [
+    fcSp(`Net revenue ${exM(rv.current)} ${C}, ${exSg(dR)} ${vsW}${bud ? `, ${exSg(exPct(rv.current, rv.budget))} against budget` : ""}.`),
+    eb == null ? "" : fcSp(`EBITDA ${exM(eb)} ${C}${ebm == null ? "" : `, ${fmt(ebm, 1)}% of revenue (${fmt(ebmL == null ? 0 : ebmL, 1)}% ${ly ? "last year" : "the period before"})`}.`),
+    worse ? fcSp(`${worse.l} took ${fmt(worse.p, 1)} pts more of revenue ${vsW} (${exSg(worse.d, 0, "")} ${C}).`) : "",
+    better ? fcSp(`${better.l} took ${fmt(Math.abs(better.p), 1)} pts less of revenue (${exSg(better.d, 0, "")} ${C}).`) : "",
+    np != null && pl.summary ? fcSp(`Net profit ${exM(np)} ${C}, ${exSg(exPct(np, at("net_profit", F)))} ${vsW}.`) : "",
+    credit ? fcSp("The cost of goods sold nets to a credit this period (stock not yet moved to cost): margins wait for the close.") : ""];
+  const st = pl.mapping ? (pl.mapping.status === "Approved" ? "Approved" : pl.mapping.status === "Content required" ? "Content required" : "Pilot") : null;
+  exBox("exSum_pl", {eye: `Profit & loss · ${data.meta.company} · ${data.meta.period_label}`, status: st, head, story, tiles,
+    rule: `Lights: amounts ±${EX_TH.amt}% ${ly ? "on last year" : "on the period before"}, shares of revenue ±${EX_TH.pts} pt.`});
+}
+// the balance sheet: the position against the end of last year
+function exBS(){
+  const c = capData; if (!c || !c.totals || c.totals.assets == null) { exBox("exSum_bs", null); return; }
+  const t = c.totals, Y = t.year_end || {}, D = c.dates, C = data.meta.currency || "", since = `since ${dmy(D.year_end)}`;
+  const K = Object.fromEntries((c.liquidity || []).map(k => [k.key, k]));
+  const kv = k => K[k] && K[k].value != null ? K[k] : null;
+  const amt = (l, v, y, good, open) => { const d = exPct(v, y); return {l, v: `${exM(v)} <span class="ex-u">${esc(C)}</span>`, s: y == null ? fcSp("no year-end figure") : `${exSg(d)} ${fcSp(since)}`, light: good ? exLight(d, good, EX_TH.amt) : "na", open}; };
+  const lk = (l, k, good) => { const x = kv(k); if (!x) return null; const ratio = x.unit === "ratio";
+    const d = x.year_end == null ? null : ratio ? (x.value - x.year_end) * 100 : exPct(x.value, x.year_end);
+    return {l, v: ratio ? fmt(x.value, 2) + "×" : `${exM(x.value)} <span class="ex-u">${esc(C)}</span>`, s: x.year_end == null ? "" : ratio ? `${fmt(x.year_end, 2)}× ${fcSp(`at ${dmy(D.year_end)}`)}` : `${exSg(d)} ${fcSp(since)}`,
+      light: good ? exLight(d, good, ratio ? 5 : EX_TH.amt) : "na"}; };
+  const tiles = [amt("Total assets", t.assets, Y.assets, 0), amt("Equity", t.equity, Y.equity, 1), lk("Cash and bank", "cash_bank", 1),
+    lk("Net debt", "net_debt", -1), lk("Operating working capital", "owc", 0), lk("Debt to equity", "debt_equity", -1)].filter(Boolean);
+  // the lines that moved most since the end of last year
+  const mv = c.statement.flatMap(s => s.lines.map(l => ({l: l.label, sec: s.section, d: l.vs_year}))).filter(x => x.d != null && Math.abs(x.d) >= 1).sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 3);
+  const bal = t.difference != null && Math.abs(t.difference) <= 1;
+  const eqD = Y.equity == null ? null : t.equity - Y.equity;
+  const head = eqD == null ? `Equity ${exM(t.equity)} ${C}` : `Equity ${eqD >= 0 ? "up" : "down"} ${exM(Math.abs(eqD))} ${C} ${since}`;
+  const story = [fcSp(`Assets ${exM(t.assets)}, liabilities ${exM(t.liabilities)}, equity ${exM(t.equity)} ${C} at ${dmy(D.current)}.`),
+    bal ? fcSp("Assets equal liabilities and equity.") : `<b class="up">${fcSp(`The balance sheet is off by ${fmt(t.difference)} ${C}: accounts with a balance are not in the KPI mapping.`)}</b>`,
+    mv.length ? fcSp(`Moved most ${since}: `) + mv.map(x => `<span data-no-i18n>${esc(x.l)}</span> ${esc(exSg(x.d, 0, ""))}`).join(" · ") + "." : ""];
+  exBox("exSum_bs", {eye: `Balance sheet · ${c.company} · ${dmy(D.current)}`, status: c.status, head, story, tiles,
+    rule: `Lights: ±${EX_TH.amt}% ${since}; debt to equity ±0.05×. Working capital and total assets carry no light.`});
+}
+// liquidity and capital: what the cash covers, what is owed and when
+function exLQ(){
+  const c = capData; if (!c || !c.liquidity) { exBox("exSum_liquidity", null); return; }
+  const D = c.dates, C = data.meta.currency || "", K = Object.fromEntries(c.liquidity.map(k => [k.key, k])), M = c.maturity || {buckets: []};
+  const cash = K.cash_bank && K.cash_bank.value, od = (M.buckets.find(b => b.label === "Overdue") || {}).value || 0, n30 = M.next_30 || 0;
+  const cover = cash != null && n30 > 0 ? cash / n30 * 100 : null;
+  const top = (M.vendors || []).filter(v => (v["Overdue"] || 0) > 0.5).sort((a, b) => b["Overdue"] - a["Overdue"])[0];
+  const E = c.equity_bridge;
+  const tiles = [
+    {l: "Cash and bank", v: `${exM(cash)} <span class="ex-u">${esc(C)}</span>`, s: K.cash_bank && K.cash_bank.year_end != null ? `${exSg(exPct(cash, K.cash_bank.year_end))} ${fcSp(`since ${dmy(D.year_end)}`)}` : "", light: exLight(K.cash_bank ? exPct(cash, K.cash_bank.year_end) : null, 1, EX_TH.amt)},
+    {l: "Overdue to suppliers", v: `${exM(od)} <span class="ex-u">${esc(C)}</span>`, s: M.total ? `${fmt(od / M.total * 100, 0)}% ${fcSp("of what is owed")}` : "", light: !M.total ? "na" : od / M.total > 0.25 ? "r" : od / M.total > 0.1 ? "a" : "g"},
+    {l: "Cash against the next 30 days", v: cover == null ? "–" : fmt(cover, 0) + "%", s: `${fcSp("overdue and due in 30 days")}: ${exM(n30)}`, light: cover == null ? "na" : cover >= 100 ? "g" : cover >= 50 ? "a" : "r"},
+    K.net_debt && K.net_debt.value != null ? {l: "Net debt", v: `${exM(K.net_debt.value)} <span class="ex-u">${esc(C)}</span>`, s: K.net_debt.year_end == null ? "" : `${exSg(exPct(K.net_debt.value, K.net_debt.year_end))} ${fcSp(`since ${dmy(D.year_end)}`)}`, light: exLight(exPct(K.net_debt.value, K.net_debt.year_end), -1, EX_TH.amt)} : null,
+    K.net_debt_ebitda && K.net_debt_ebitda.value != null ? {l: "Net debt to EBITDA", v: fmt(K.net_debt_ebitda.value, 2) + "×", s: fcSp("EBITDA of the last 12 months"), light: K.net_debt_ebitda.value <= 2 ? "g" : K.net_debt_ebitda.value <= 3.5 ? "a" : "r"}
+      : {l: "Net debt to EBITDA", v: fcSp(K.net_debt_ebitda ? K.net_debt_ebitda.status : "Content required"), s: fcSp("shown once the mapping is approved"), light: "na"},
+    E && E.closing != null ? {l: "Equity", v: `${exM(E.closing)} <span class="ex-u">${esc(C)}</span>`, s: `${exSg(E.closing - E.opening, 0, "")} ${fcSp(`since ${dmy(D.year_end)}`)}`, light: exLight(exPct(E.closing, E.opening), 1, EX_TH.amt)} : null].filter(Boolean);
+  const head = cover == null ? `Cash ${exM(cash)} ${C}` : cover >= 100 ? `The cash covers what falls due in 30 days` : `The cash covers ${fmt(cover, 0)}% of what falls due in 30 days`;
+  const story = [cash == null ? "" : fcSp(`Cash and bank ${exM(cash)} ${C}; overdue and due within 30 days to suppliers ${exM(n30)} ${C}.`),
+    od > 0.5 ? fcSp(`Overdue ${exM(od)} ${C}`) + (top ? ` · ${fcSp("the largest")}: <span data-no-i18n>${esc(top.vendor)}</span> ${esc(exM(top["Overdue"]))}` : "") + "." : fcSp("Nothing is overdue to suppliers."),
+    E && E.closing != null ? fcSp(`Equity ${exM(E.opening)} → ${exM(E.closing)} ${C}: the result of the year ${exSg(E.profit, 0, "")}, other movements ${exSg(E.other, 0, "")}.`) : ""];
+  exBox("exSum_liquidity", {eye: `Liquidity & capital · ${c.company} · ${dmy(D.current)}`, status: c.status, head, story, tiles,
+    rule: "Lights: cash and debt ±2%; overdue above 10% amber, 25% red; cover 100% green, 50% amber; net debt to EBITDA 2× and 3.5×."});
+}
+// cash flow and treasury: the next seven and thirty days
+function exTR(){
+  const t = data && data.treasury; if (!t || !t.loaded) { exBox("exSum_treasury", null); return; }
+  const o = t.obligations, C = data.meta.currency || "", f = t.flow || {};
+  const tiles = [
+    {l: "Cash and bank", v: `${exM(o.cash)} <span class="ex-u">${esc(C)}</span>`, s: fcSp("today"), light: o.cash > 0 ? "g" : "r"},
+    {l: "Due in 7 days", v: `${exM(o.due_7)} <span class="ex-u">${esc(C)}</span>`, s: fcSp("to suppliers, oldest first"), light: "na"},
+    {l: "Expected in 7 days", v: `${exM(o.expected_7)} <span class="ex-u">${esc(C)}</span>`, s: fcSp("from customers"), light: "na"},
+    {l: "Net after 7 days", v: `${exM(o.net_7)} <span class="ex-u">${esc(C)}</span>`, s: fcSp("cash + expected − due"), light: o.net_7 < 0 ? "r" : o.cash && o.net_7 < o.cash * 0.25 ? "a" : "g"},
+    {l: "Net after 30 days", v: `${exM(o.net_30)} <span class="ex-u">${esc(C)}</span>`, s: fcSp("the same, 30 days"), light: o.net_30 < 0 ? "r" : o.cash && o.net_30 < o.cash * 0.25 ? "a" : "g"},
+    {l: "Operating cash flow", v: `${exM(f.operating)} <span class="ex-u">${esc(C)}</span>`, s: fcSp("the period, indirect"), light: f.operating == null ? "na" : f.operating >= 0 ? "g" : "r"}];
+  const late = (o.payments || []).filter(p => p.days > 0), lateAmt = late.reduce((s, p) => s + p.amount, 0);
+  const head = o.net_30 < 0 ? `Cash runs short within 30 days by ${exM(-o.net_30)} ${C}` : o.net_7 < 0 ? `Cash runs short within 7 days by ${exM(-o.net_7)} ${C}` : `The cash covers the next 30 days`;
+  const story = [fcSp(`Cash ${exM(o.cash)} ${C}; in 7 days ${exM(o.due_7)} falls due and ${exM(o.expected_7)} is expected: ${exM(o.net_7)} left.`),
+    fcSp(`After 30 days: ${exM(o.net_30)} ${C}.`),
+    late.length ? fcSp(`${late.length} supplier payments are already late, ${exM(lateAmt)} ${C}.`) : "",
+    f.operating != null ? fcSp(`Operating cash flow of the period ${exSg(f.operating, 0, "")} ${C}.`) : "",
+    o.unapplied_ap ? fcSp(`Supplier payments not applied to invoices: ${exM(o.unapplied_ap)} ${C}.`) : ""];
+  exBox("exSum_treasury", {eye: `Cash flow & treasury · ${data.meta.company} · ${data.meta.period_label}`, head, story, tiles,
+    rule: "Lights: what is left after 7 and 30 days, below zero red, under a quarter of today's cash amber; operating cash flow by its sign."});
+}
+// the statement in amounts, or every line as % of its period's net revenue (common-size) with the changes in points
+// (Geri, 25 Nov 2026)
+let plMode = "amt";
+function statementRows(lines, rev){
+  if (plMode === "pct" && rev) {
+    const p = (l, f) => l[f] == null || !rev[f] ? null : l[f] / rev[f] * 100;
+    const pc = v => v == null ? "–" : fmt(v, 1) + "%";
+    // good up: income, margins and profits; good down: the costs (a cost taking more of revenue is red)
+    const UP = new Set(["revenue", "other_income", "gross_profit", "ebitda", "ebit", "net_profit", "revenue_total", "profit_before_tax", "c:service_revenue", "c:other_income_pack", "c:fx_gain"]);
+    const UPL = new Set(["Revenue", "Gross profit", "EBITDA", "EBIT"]);
+    let up = false;
+    const dp = (a, b2) => { if (a == null || b2 == null) return "–"; const d = a - b2, x = up ? d : -d;
+      return `<span class="chip ${Math.abs(d) < 0.05 ? "" : x > 0 ? "down" : "up"}">${exPts(d)}</span>`; };
+    return lines.map(l => { up = UP.has(l.key) || (!l.key && UPL.has(l.label)); const c = p(l, "current"), pv = p(l, "previous"), ly = p(l, "last_year"), bu = l.budget ? p(l, "budget") : null;
+      return `<tr class="${l.total || ["Gross profit","EBITDA","EBIT"].includes(l.label)?"total":""}">
+      <td class="name">${esc(l.label)}</td><td class="num"><b>${pc(c)}</b></td>
+      <td class="num">${pc(pv)}</td><td class="num">${dp(c, pv)}</td>
+      <td class="num">${pc(ly)}</td><td class="num">${dp(c, ly)}</td>
+      <td class="num">${pc(bu)}</td><td class="num">${bu == null ? "–" : exPts(c - bu)}</td>
+      <td class="num">${fmt(l.current)}</td></tr>`; }).join("");
+  }
   return lines.map(l=>`<tr class="${l.total || ["Gross profit","EBITDA","EBIT"].includes(l.label)?"total":""}">
     <td class="name">${esc(l.label)}</td><td class="num">${fmt(l.current)}</td>
     <td class="num">${l.previous==null?"–":fmt(l.previous)}</td><td class="num">${pctChip(l.vs_previous_pct)}</td>
@@ -3343,11 +3525,21 @@ function statementRows(lines){
     <td class="num">${l.budget?fmt(l.budget):"–"}</td><td class="num">${l.vs_budget==null?"–":sign(l.vs_budget)}</td>
     <td class="num">${l.of_revenue==null?"–":fmt(l.of_revenue,1)+"%"}</td></tr>`).join("");
 }
+function plRev(pl){ const rows = pl.summary || pl.statement || []; return rows.find(l => l.key === "revenue") || rows.find(l => l.label === "Revenue") || null; }
+function plTableDraw(){
+  const pl = data.pl, pct = plMode === "pct";
+  const head = `<tr><th>Line</th><th class="num">Current${pct ? " %" : ""}</th>${priorTh()}<th class="num">Change</th>
+    <th class="num">Last year</th><th class="num">Change</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">${pct ? "Current amount" : "% of revenue"}</th></tr>`;
+  $("plTable").innerHTML = head + statementRows(pl.statement, pct ? plRev(pl) : null);
+}
+document.querySelectorAll("#plMode button").forEach(b => b.onclick = () => {
+  plMode = b.dataset.m;
+  document.querySelectorAll("#plMode button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
+  if (data && data.pl) plTableDraw();
+});
 function renderPL(){
   const pl = data.pl;
-  const head = `<tr><th>Line</th><th class="num">Current</th>${priorTh()}<th class="num">Change</th>
-    <th class="num">Last year</th><th class="num">Change</th><th class="num">Budget</th><th class="num">vs budget</th><th class="num">% of revenue</th></tr>`;
-  $("plTable").innerHTML = head + statementRows(pl.statement);
+  plTableDraw();
   const hidden = new Set((pl.validation||[]).flatMap(x => x.suppressed || []));
   const credit = (pl.validation||[]).some(x => x.figure === "Cost of goods sold");
   const anyBudget = (pl.summary || pl.statement).some(l => l.budget);
@@ -3377,6 +3569,7 @@ function renderPL(){
   document.querySelectorAll(".acc").forEach(a=>a.onclick=e=>{e.preventDefault();openDrill("account",a.dataset.acc);});
   renderPLRatios(pl, hidden, credit);
   renderPLWaterfall(pl);
+  exPL();
 }
 // ---------- Financial statements → Profit & loss: from revenue to EBITDA (was its own P&L charts tab)
 const fcM = v => v == null || !isFinite(v) ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("en-US", {maximumFractionDigits: 1}) + " M" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + " k" : fmt(Math.round(v));
@@ -3582,6 +3775,7 @@ function renderBSLines(){
   });
   document.querySelectorAll("#bsTable .acc").forEach(a => a.onclick = e => { e.preventDefault(); openDrill("account", a.dataset.acc); });
   bsViz();
+  exBS();
 }
 // ---- Statements: the balance sheet by line, liquidity, cash, treasury, G/L and close as bars with pop-ups
 const ST_SEC = ["var(--ch-0)", "var(--ch-1)", "var(--ch-2)", "var(--ch-3)"];
@@ -3693,6 +3887,7 @@ function renderLiquidity(){
   $("lqCcy").innerHTML = tbl(M.currencies || [], "Currency", "currency");
   $("lqIc").innerHTML = tbl(M.intercompany || [], "Group company", "vendor");
   lqViz();
+  exLQ();
 }
 
 function renderCash(){
@@ -8731,6 +8926,7 @@ function renderTreasury(){
       <td class="num down">${fmt(a.in)}</td><td class="num up">${fmt(a.out)}</td><td class="num"><b>${sign(a.net)}</b></td></tr>`).join("")
       : `<tr><td colspan="5" class="empty">No bank movement in this period.</td></tr>`);
   trsViz();
+  exTR();
 }
 
 // ---------- Financial statements: Export ▾ of each tab (Excel, PDF, email), the figures it shows, unformatted
