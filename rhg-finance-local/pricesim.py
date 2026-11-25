@@ -405,6 +405,11 @@ def build(ds, level="all", key="", section="family", settings=None):
     # a brand is its price group (locintel.price_group): OPA without OPA · TIA Airport, which has prices of its own
     # (Geri, 25 Nov 2026); the simulator asks Menu engineering for those locations
     reg = {r["ref"]: r for r in locintel.registry(settings)}
+    # franchises are not RHG's to price (Geri, 25 Nov 2026: OPA Shkodër): left out of every level and the location box
+    fr = [L for L in ds["locations"] if locintel.is_franchise(reg.get(L["ref"]) or {})]
+    if fr:
+        frefs = {L["ref"] for L in fr}
+        ds = dict(ds, locations=[L for L in ds["locations"] if L["ref"] not in frefs])
     group = {L["ref"]: (reg.get(L["ref"]) or {}).get("price_group") or locintel.price_group(dict(L, **(reg.get(L["ref"]) or {})))
              for L in ds["locations"]}
     groups = sorted({g for g in group.values() if g})
@@ -574,6 +579,7 @@ def build(ds, level="all", key="", section="family", settings=None):
             "round_step": step, "eat_in": eat["channel"] if eat else None,
             "channels": sorted(chans.values(), key=lambda c: -c["net"]), "items": out,
             "brands": groups, "locations": an["locations"], "selection": an["selection"],
+            "franchises": sorted(L["name"] for L in fr),
             "labels": an["labels"],
             "competitors": {"sources": [{k: s.get(k) for k in ("id", "file", "by", "at")} | {"rows": len(s["rows"])}
                                         for s in load_competitors()["sources"]],

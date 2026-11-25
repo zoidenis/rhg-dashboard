@@ -946,6 +946,7 @@
  "# — share of the invoiced spend with a named supplier": "# — pjesa e shpenzimit të faturuar me furnitor të emërtuar",
  "# → #": "# → #",
  "# → # (# days)": "# → # (# ditë)",
+ "# → # · franchise left out: #": "# → # · pa franshizën: #",
  "#% a year ago": "#% një vit më parë",
  "#% against # received": "#% kundrejt # të marrë",
  "#% depreciated": "#% e amortizuar",

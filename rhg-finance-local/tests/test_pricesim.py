@@ -200,3 +200,12 @@ def test_each_location_at_its_own_price(base, monkeypatch):
     assert ch["DE-WOLT"]["price"] == 590.0 and round(ch["DE-WOLT"]["qty"]) == 39 and ch["DE-WOLT"]["menu_price"] == 590.0
     assert [(x["name"], x["price"]) for x in ch["DE-WOLT"]["locs"]] == [("OPA Arena", 590.0)]
     assert ch["EAT IN"]["price"] == 552.5 and ch["EAT IN"]["menu_price"] == 552.5              # 50 at 530 and 30 at 590
+
+
+def test_a_franchise_is_left_out(base, monkeypatch):
+    # OPA Shkodër is a franchise: not in the brand, not in the location box, named in the answer
+    base["locations"].append({"ref": "OPA_SK", "name": "OPA Shkodër", "brand": "OPA", "currency": "ALL"})
+    monkeypatch.setattr(pricesim.locintel, "registry", lambda settings=None: [
+        {"ref": "OPA_B", "brand": "OPA", "price_group": "OPA"}, {"ref": "OPA_SK", "brand": "OPA", "price_group": "OPA", "ownership": "Franchise"}])
+    r = pricesim.build(base, "brand", "OPA")
+    assert base["_calls"][-1] == ("locations", "OPA_B") and r["franchises"] == ["OPA Shkodër"]

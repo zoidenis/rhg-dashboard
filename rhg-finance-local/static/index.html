@@ -5200,7 +5200,7 @@ function psSections(){
 function psRender(){
   const d = psData; if (!d) return;
   readBanner("psStatus", {src: "Simphony", at: d.read_at, lines: [`${d.title} · ${d.period.from} → ${d.period.to} (${fmt(d.period.days)} days) · ${d.currency}${d.converted ? " (converted at the group rates)" : ""} · ${fmt(d.items.length)} items on ${fmt(d.channels.length)} channels`], warns: d.errors});
-  $("pgScope").textContent = d.title; $("pgPeriod").textContent = `${d.period.from} → ${d.period.to}`; $("pgCur").textContent = d.currency;
+  $("pgScope").textContent = d.title; $("pgPeriod").textContent = `${d.period.from} → ${d.period.to}` + ((d.franchises || []).length ? ` · franchise left out: ${d.franchises.join(", ")}` : ""); $("pgCur").textContent = d.currency;
   $("pgCh").innerHTML = `<button type="button" class="pg-pill${psChSel.size ? "" : " on"}" data-pgch="">All channels</button>` + d.channels.map(c =>
     `<button type="button" class="pg-pill${psChSel.has(c.channel) ? " on" : ""}${c.delivery ? " del" : ""}" data-pgch="${esc(c.channel)}"><span data-no-i18n>${esc(c.channel)}</span>${c.commission_pct ? `<small>${fmt(c.commission_pct)}%</small>` : ""}</button>`).join("");
   $("pgItems").innerHTML = d.items.map(i => `<option value="${esc(i.name)}">${esc(i.section)}</option>`).join("");
