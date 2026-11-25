@@ -12092,7 +12092,7 @@ function renderKm(){
     card("Accounts not mapped", fmt(d.unmapped.length), `of ${fmt(d.accounts.length)} posting accounts`, d.unmapped.length ? "warn" : "down") +
     card("On the wrong statement", fmt(d.wrong_side.length), "a balance-sheet account in a P&L line or the reverse", d.wrong_side.length ? "up" : "down");
   $("kmMeta").textContent = !m ? `${d.company} has no mapping and no proposal (its chart differs from SALT's): every KPI shows Content required until the lines are filled in and saved.`
-    : `${d.company} · ${m.proposal ? "the proposal of the SALT chart model, not yet reviewed" : `saved by ${m.updated_by} on ${String(m.updated_at).replace("T", " ")}`}${m.approved_by ? ` · approved by ${m.approved_by} on ${String(m.approved_at).slice(0, 10)}` : ""} · year to date ${d.period[0]} to ${d.period[1]}`;
+    : `${d.company} · ${m.proposal ? `the proposal of ${m.proposal_of || "the SALT chart model"}, not yet reviewed` : `saved by ${m.updated_by} on ${String(m.updated_at).replace("T", " ")}`}${m.approved_by ? ` · approved by ${m.approved_by} on ${String(m.approved_at).slice(0, 10)}` : ""} · year to date ${d.period[0]} to ${d.period[1]}`;
   const inp = k => `<input data-km="${k}" value="${esc(rules[k] || "")}" placeholder="${kmPlace(k)}" style="width:100%;min-width:220px">`;
   const lines = st => defs.lines.filter(l => l.statement === st);
   const pack = (defs.clusters || []).some(c => String(rules[c.key] || "").trim());

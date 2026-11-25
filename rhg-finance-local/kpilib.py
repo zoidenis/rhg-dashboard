@@ -100,7 +100,7 @@ EQUITY_LINES = ("share_capital", "equity")
 BS_LINES = [k for k, _, st, _ in LINES if st == "bs"]
 
 # The chart model of SALT (TBM and Zoi Greece were opened from it). A proposal from the chart as read on
-# 3 November 2026, to be reviewed by Finance; RKS has its own chart and no proposal.
+# 3 November 2026, to be reviewed by Finance; RKS has its own chart and its own proposal (RKS_MODEL).
 # The P&L by the lines of the management pack (P&L GL Category, every account of the chart named); the KPI lines
 # of the P&L stay empty: they are the sums of their lines (CLUSTERS).
 PACK_PL = {
@@ -154,7 +154,67 @@ SALT_MODEL = {
     "share_capital": "101*",
     "equity": "1*, 8*",
 }
-PROPOSALS = {"SALT": SALT_MODEL, "TBM": SALT_MODEL, "ZOI GREECE": SALT_MODEL}
+# RKS Revo Hospitality Group (SALT Prishtina, EUR): its own chart, read from Business Central on 25 November 2026 (189
+# posting accounts, Geri's export "Chart of Accounts - SALT PRISHTINA"). The same numbering as SALT's where the names
+# agree; where RKS names an account otherwise, by its RKS name: 624 Marketing Publicitet in Marketing, 654 Shpenzime te
+# tjera SALT Prishtine and 6361 Royalty Fee SALT in Other Expenses, 68188 (under 681, depreciation) in D&A, 6036
+# Diferenca stoku in COGS, 6034 bad debt and 65802 stationery in Other Expenses, 76 financial income in Net Interest,
+# 761 supplier discounts in COGS, 231 assets in progress in fixed assets, 40102 suppliers in trade payables, 46802 and
+# 46803 loans received in loans, 461 finance lease in leases, 432 rent owed in other liabilities, 467 / 467011
+# (shareholders' subscribed capital) with the related parties. Every account of the chart is in one line.
+RKS_PACK = {
+    "service_revenue": "704, 705, 707, 70711, 707126",
+    "other_income_pack": "75, 751, 77, 707123, 7072, 708, 7903",
+    "fx_gain": "769, 76901",
+    "cogs_pack": "6011, 60111, 6012, 60121, 60122, 60123, 601231, 6013, 602, 6027, 60271, 605, 6051, 6036, 6581, 761",
+    "payroll_exp": "641, 64102, 64103, 6411, 6412, 64122, 6413, 64131, 6414, 644, 648",
+    "employees": "622",
+    "recruiting": "6276",
+    "health": "",
+    "uniforms": "61501",
+    "travel": "625",
+    "marketing": "624, 62401, 649, 650, 65803",
+    "energy": "604, 60401, 60402, 60403, 60124, 601241",
+    "maintenance": "615, 6151, 65801, 60125",
+    "transport": "627, 6271",
+    "telecom": "626",
+    "rent": "636",
+    "other_exp": "6361, 6362, 654, 618, 666, 668, 687, 6034, 65802, 658",
+    "call_centre": "",
+    "insurance": "616",
+    "consulting": "6152, 6153, 65804, 67205",
+    "customs": "632, 6321, 6322",
+    "local_taxes": "634, 638",
+    "bank": "628",
+    "penalties": "657",
+    "fx_loss": "669, 66901",
+    "da_pack": "681*",
+    "interest": "667, 76",
+    "income_tax": "69*",
+}
+RKS_MODEL = {
+    **{k: "" for k in ("revenue", "other_income", "cogs", "labour", "occupancy", "opex", "da", "finance", "nonop",
+                       "tax")},
+    **RKS_PACK,
+    "cash": "51*, 53*, 58*",
+    "receivables": "411*",
+    "inventory": "3*",
+    "fixed_assets": "20*, 21*, 23*, 28*",
+    "investments": "26*",
+    "related_assets": "467*",
+    "other_assets": "418*, 54*",
+    "payables": "401*",
+    "tax_liabilities": "44*",
+    "payroll": "421*, 431*",
+    "loans": "468*",
+    "leases": "461*",
+    "ic_liabilities": "",
+    "other_liabilities": "432",
+    "share_capital": "101*",
+    "equity": "1*, 8*",
+}
+PROPOSALS = {"SALT": SALT_MODEL, "TBM": SALT_MODEL, "ZOI GREECE": SALT_MODEL, "RKS REVO HOSPITALITY GROUP": RKS_MODEL}
+PROPOSAL_OF = {"RKS REVO HOSPITALITY GROUP": "its own chart (RKS)"}
 STATUSES = ("Proposed", "Reviewed", "Approved")
 
 # KPI definitions: one formula per indicator for every screen. kind "period" = measured over a period (P&L),
@@ -249,7 +309,7 @@ def mapping(company):
         if saved and key in PROPOSALS and not any(str((saved.get("rules") or {}).get(c) or "").strip() for c in CLUSTER):
             # saved before the P&L had the lines of the management pack: its P&L rules give way to the pack's
             # (P&L GL Category), the balance sheet stays as saved; reviewed again, approved again
-            saved = _to_pack(saved)
+            saved = _to_pack(saved, PROPOSALS[key])
             d[key] = saved
             _write(d)
     if saved:
@@ -259,7 +319,7 @@ def mapping(company):
     if not model:
         return None
     return {"company": company, "status": "Proposed", "rules": {k: model.get(k, "") for k in RULE_KEYS},
-            "groups": groups_of(None), "proposal": True,
+            "groups": groups_of(None), "proposal": True, "proposal_of": PROPOSAL_OF.get(key, "the SALT chart model"),
             "approved_by": "", "approved_at": "", "updated_by": "", "updated_at": "", "history": []}
 
 
@@ -272,13 +332,14 @@ def groups_of(m):
     return {k: g.get(k) if g.get(k) in PL_LINES else CLUSTER[k]["group"] for k in CLUSTER}
 
 
-def _to_pack(saved):
+def _to_pack(saved, model=None):
+    model = model or SALT_MODEL
     now = datetime.now().isoformat(timespec="seconds")
     rules = dict(saved.get("rules") or {})
     rules.update({k: "" for k in PL_LINES})
-    rules.update(PACK_PL)
+    rules.update({k: model.get(k, "") for k in CLUSTER})
     hist = list(saved.get("history") or []) + [{
-        "ts": now, "by": "pulse", "status": "Reviewed", "changed": sorted(PACK_PL) + sorted(PL_LINES),
+        "ts": now, "by": "pulse", "status": "Reviewed", "changed": sorted(CLUSTER) + sorted(PL_LINES),
         "note": "P&L to the lines of the management pack (Chart of Account MNG Pack, P&L GL Category, P&L Cluster 2);"
                 f" was {saved.get('status') or 'Proposed'}. Approve it again."}]
     return dict(saved, rules=rules, status="Reviewed", approved_by="", approved_at="", updated_by="pulse",
