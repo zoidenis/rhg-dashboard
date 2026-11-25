@@ -56,7 +56,8 @@ _lock = threading.Lock()
 DEFAULTS = {"el_star": -0.6, "el_plowhorse": -0.8, "el_puzzle": -1.2, "el_dog": -1.4, "el_nocost": -1.0,
             "el_delivery": 1.2,                      # delivery customers compare more: the elasticity × this
             "star_step_pct": 4.0, "max_step_pct": 8.0, "comp_band_pct": 5.0, "comp_low_pct": 10.0,
-            "round_all": 10.0, "round_eur": 0.1, "parity": True, "el_measured": True}
+            "round_all": 10.0, "round_eur": 0.1, "parity": True, "el_measured": True,
+            "lost_checks_pct": 50.0}                 # of the items no longer sold after a rise, the share that are lost checks
 CLASSES = ("star", "plowhorse", "puzzle", "dog", "nocost")
 DELIVERY_HINT = re.compile(r"WOLT|GLOVO|BOLT|DELIVER|DORËZIM|DOREZIM|\bDE\b|DE-|UBER|FOODPANDA|BAJA|TAKEAWAY ONLINE", re.I)
 EAT_IN_HINT = re.compile(r"EAT|DINE|SALL|IN ?HOUSE|LOKAL|TABLE|TAVOL", re.I)
@@ -401,7 +402,7 @@ def is_delivery(ch, cfg):
     return float(c.get("commission_pct") or 0) > 0 or bool(DELIVERY_HINT.search(ch))
 
 
-def build(ds, level="all", key="", section="family", settings=None):
+def build(ds, level="all", key="", section="family", settings=None, infl=None):
     """The items of the selection with their price, items sold and net sales on every channel, the class, the cost,
     the competitors and the suggested price per channel."""
     settings = settings or store.get_settings()
@@ -564,7 +565,10 @@ def build(ds, level="all", key="", section="family", settings=None):
                 eat_ex = en / eq if eq > 0 else None
             em = meas["items"].get(mi)
             el = em["value"] if em else P.get(f"el_{it['cls']}", -1.0) * (P["el_delivery"] if c["delivery"] else 1.0)
-            sug, why = suggest(it["cls"], price, it["cost"], v, k, c["commission_base"], S["target"], ccomp, eat_ex, P, step, el)
+            # a plan's cost inflation (by category, else for all): the suggestions on the cost of the plan
+            ip = (infl or {}).get(it["section"], (infl or {}).get("*", 0)) or 0
+            cost_p = it["cost"] * (1 + ip / 100) if it["cost"] is not None else None
+            sug, why = suggest(it["cls"], price, cost_p, v, k, c["commission_base"], S["target"], ccomp, eat_ex, P, step, el)
             unpriced = max(0.0, raw - q)
             if unpriced >= 1 and unpriced >= 0.1 * raw:
                 why = [f"{unpriced:,.0f} of the {raw:,.0f} rung on this channel were at no price (inside combo meals or the "
@@ -612,7 +616,8 @@ def save_scenario(body, actor):
         raise ValueError("Give the scenario a name.")
     changes = {str(k)[:140]: round(_num(v, 0, 0, 1e9), 2) for k, v in (body.get("changes") or {}).items()
                if _num(v, 0, 0, 1e9) > 0}
-    if not changes:
+    st = _state(body.get("state"))
+    if not changes and not st.get("plan"):
         raise ValueError("No price was changed.")
     with _lock:
         items = load_scenarios()
@@ -623,7 +628,7 @@ def save_scenario(body, actor):
         s = {"id": sid, "name": name, "note": str(body.get("note") or "")[:500], "by": actor,
              "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "level": str(body.get("level") or "all")[:20],
              "key": str(body.get("key") or "")[:60], "company": str(body.get("company") or "")[:60],
-             "changes": changes, "state": _state(body.get("state")), "summary": {k: body.get("summary", {}).get(k) for k in ("net", "cm", "items")}
+             "changes": changes, "state": st, "summary": {k: body.get("summary", {}).get(k) for k in ("net", "cm", "items", "checks", "avg_check")}
              if isinstance(body.get("summary"), dict) else {}}
         items = [x for x in items if x["id"] != sid] + [s]
         _atomic(SCEN_FILE, {"items": items[-300:]})
@@ -639,8 +644,31 @@ def _state(st):
                      if isinstance(d, dict) and _num(v, 0, -90, 300)}
     price = lambda d: {str(k)[:140]: round(_num(v, 0, 0, 1e9), 2) for k, v in list((d or {}).items())[:3000]    # noqa: E731
                        if isinstance(d, dict) and _num(v, 0, 0, 1e9) > 0}
-    return {"cat": pct(st.get("cat")), "item": pct(st.get("item")), "sug": price(st.get("sug")),
-            "manual": price(st.get("manual")), "channels": [str(c)[:60] for c in (st.get("channels") or [])[:20]]}
+    out = {"cat": pct(st.get("cat")), "item": pct(st.get("item")), "sug": price(st.get("sug")),
+           "manual": price(st.get("manual")), "channels": [str(c)[:60] for c in (st.get("channels") or [])[:20]]}
+    pl = st.get("plan") if isinstance(st.get("plan"), dict) else None
+    if pl and pl.get("code"):
+        # a plan: its period, volume growth, the date the prices start, cost inflation, the targets by restaurant
+        num = lambda v, lo, hi: round(_num(v, 0, lo, hi), 2)                                          # noqa: E731
+        tg = {}
+        for ref, chs in list((pl.get("targets") or {}).items())[:200]:
+            if not isinstance(chs, dict):
+                continue
+            t = {}
+            for ch, x in list(chs.items())[:30]:
+                if isinstance(x, dict):
+                    y = {k: num(x.get(k), 0, 1e9) for k in ("ac", "chk") if _num(x.get(k), 0, 0, 1e9) > 0}
+                    if y:
+                        t[str(ch)[:60]] = y
+            if t:
+                tg[str(ref)[:30]] = t
+        frm = str(pl.get("from") or "")[:10]
+        out["plan"] = {"code": str(pl["code"])[:10], "growth": num(pl.get("growth"), -90, 300),
+                       "from": frm if re.fullmatch(r"\d{4}-\d{2}-\d{2}", frm) else "",
+                       "infl": {str(k)[:80]: num(v, -50, 300) for k, v in list((pl.get("infl") or {}).items())[:200]
+                                if isinstance(pl.get("infl"), dict)},
+                       "targets": tg}
+    return out
 
 
 def delete_scenario(sid, actor, admin=False):

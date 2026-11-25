@@ -221,3 +221,19 @@ def test_the_measured_elasticity_is_used_unless_switched_off(base, monkeypatch):
     pricesim.save_params({"el_measured": False}, "geri")
     r = pricesim.build(base, "brand", "OPA")
     assert len(calls) == 1 and r["items"][0]["el_m"] is None and pricesim.DEFAULTS["el_plowhorse"] == -0.8
+
+
+def test_a_plan_is_saved_with_its_targets(base):
+    st = {"plan": {"code": "2027-Q1", "growth": 3, "from": "2027-02-01", "infl": {"*": 4, "PITA": 6},
+                   "targets": {"OPA_B": {"*": {"ac": 1700, "chk": 5000}, "EAT IN": {"ac": 1650, "bad": 1}}, "X": "no"}}}
+    s = pricesim.save_scenario({"name": "Q1 plan", "changes": {}, "state": st}, "geri")
+    assert s["state"]["plan"] == {"code": "2027-Q1", "growth": 3.0, "from": "2027-02-01", "infl": {"*": 4.0, "PITA": 6.0},
+                                  "targets": {"OPA_B": {"*": {"ac": 1700.0, "chk": 5000.0}, "EAT IN": {"ac": 1650.0}}}}
+    with pytest.raises(ValueError):
+        pricesim.save_scenario({"name": "empty", "changes": {}, "state": {}}, "geri")
+
+
+def test_plan_inflation_raises_the_suggestion(base):
+    a = pricesim.build(base, "brand", "OPA")["items"][0]["channels"]["EAT IN"]["suggested"]
+    b = pricesim.build(base, "brand", "OPA", infl={"*": 50})["items"][0]["channels"]["EAT IN"]["suggested"]
+    assert b >= a

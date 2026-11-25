@@ -479,6 +479,12 @@ td.num,th.num{text-align:right}
 .ps-lg-p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--sub)}
 .ps-lg-ex{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--bg);font-size:12.5px;line-height:1.6}
 .ps-lg-btn{border:1px solid var(--line);background:var(--card);border-radius:999px;font:inherit;font-size:11px;font-weight:700;padding:1px 9px;cursor:pointer;color:var(--accent)}
+.pg-plan{margin:0 0 14px}.pg-plan-h{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.pg-plan-h h3{margin:0}
+.pg-plan-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.pg-plan-in label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--sub)}.pg-plan-in input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink);min-width:0}
+.pg-plan-ts{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:6px 0 10px}
+.pg-plan-ts .ex-t{background:var(--bg);border-color:var(--line)}.pg-plan-ts .ex-tl{color:var(--sub)}.pg-plan-ts .ex-t b{color:var(--ink)}.pg-plan-ts .ex-t small{color:var(--sub)}.pg-plan-ts .ex-u{color:var(--sub)}
+.pg-plan-gap{margin:0 0 10px;font-size:13px;line-height:1.5}
 /* Financial statements: the executive summary on top of each tab */
 .ex-sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:stretch;padding:20px 22px;border-radius:20px;margin:0 0 15px;color:#e8f3f7;background:radial-gradient(120% 140% at 0% 0%,#0f5a73 0%,#0b3a4d 55%,#08283a 100%)}
 .ex-sum:empty{display:none}
@@ -1917,12 +1923,29 @@ table.bn-plan td{padding:3px 4px}
               <button type="button" class="dimf-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-text">Choose locations</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
               <div class="dimf-list" hidden></div>
               <select id="psLocs" multiple hidden></select></div>
-            <select id="psSec" aria-label="Categories"><option value="family">Categories: family groups</option><option value="major">Categories: major groups</option></select></div></div></div>
+            <select id="psSec" aria-label="Categories"><option value="family">Categories: family groups</option><option value="major">Categories: major groups</option></select>
+            <select id="psPlanSel" aria-label="Plan for"><option value="">The period above (no plan)</option></select></div></div></div>
         <div class="pg-step"><span class="pg-n">2</span><div class="pg-sb"><b>On which channel</b><div class="pg-pills" id="pgCh"></div></div></div>
         <div class="pg-step"><span class="pg-n">3</span><div class="pg-sb"><b>What to change</b>
           <div class="pg-row"><input id="pgFind" list="pgItems" placeholder="Find an item…" autocomplete="off"><datalist id="pgItems"></datalist><span class="meta">or move a category below</span></div></div></div>
       </section>
       <p class="meta" id="psStatus" style="margin:0 0 12px"></p>
+      <section class="pg-card pg-plan" id="pgPlan" hidden>
+        <div class="pg-plan-h"><div><h3 id="pgPlanT">Plan</h3><p class="meta" id="pgPlanMeta"></p></div>
+          <div class="pg-tools"><button class="mini dark" type="button" id="pgPlanTg">Targets</button><button class="mini" type="button" id="pgPlanReachAll">Reach every target</button>
+            <button class="mini" type="button" id="pgPlanCmp">Plans side by side</button><button class="mini" type="button" id="pgPlanActBtn" hidden>Actual vs plan</button></div></div>
+        <div class="pg-plan-in">
+          <label>Volume growth (% checks)<input id="pgPlanGrowth" type="number" step="0.5" value="0"></label>
+          <label>New prices from<input id="pgPlanFrom" type="date"></label>
+          <label>Cost inflation (%)<span class="pg-row"><input id="pgPlanInfl" type="number" step="0.5" value="0"><button class="mini" type="button" id="pgPlanInflCat">By category</button></span></label>
+          <label>Items no longer sold that are lost checks (%)<input id="pgPlanLost" type="number" min="0" max="100" step="5"></label>
+        </div>
+        <div class="ex-ts pg-plan-ts" id="pgPlanTiles"></div>
+        <p class="pg-plan-gap" id="pgPlanGap"></p>
+        <div class="scroll"><table id="pgPlanCh" data-nosort></table></div>
+        <p class="meta" id="pgPlanMsg"></p>
+        <details class="pz-fold"><summary>By restaurant (click one for its targets)</summary><div class="scroll"><table id="pgPlanLoc" data-nosort></table></div></details>
+      </section>
       <div class="pg-mode" role="tablist" aria-label="View"><button type="button" class="on" data-pgmode="cats" role="tab" aria-selected="true">Categories &amp; items</button><button type="button" data-pgmode="prod" role="tab" aria-selected="false">One product</button></div>
       <section class="pd" id="pgProd" hidden>
         <div class="pd-grid">
@@ -5081,6 +5104,7 @@ function psQs(){
   const lv = $("psLevel").value;
   o.set("level", lv); if (lv === "brand") o.set("key", $("psKey").value || ""); else if (lv === "locations") o.set("key", psLocMs.vals().join(","));
   o.set("section", $("psSec").value);
+  if (psPlan.code) { o.set("plan", psPlan.code); if (Object.keys(psPlan.infl || {}).length) o.set("infl", JSON.stringify(psPlan.infl)); }
   return o.toString();
 }
 const psLocMs = msPick("psLocPick", "Choose locations", () => { if ($("psLevel").value === "locations" && psLocMs.vals().length) psLoad(); });
@@ -5102,7 +5126,7 @@ async function psLoad(refresh){
     psChSel = new Set([...psChSel].filter(c => j.channels.some(x => x.channel === c)));
     psSug = {}; psManual = Object.fromEntries(Object.entries(psManual).filter(([k]) => psItemOf(k)));
     $("pgHero").classList.remove("pg-loading");
-    psFillKeys(); psParFill(); psComp(); psScnLoad(); psRebuild(); psRender();
+    psFillKeys(); psParFill(); psComp(); psScnLoad(); psPlanOptions(); psPlanInputs(); psRebuild(); psRender();
     if (!$("pgProd").hidden) { const it = pdItem(); if (it) pdPick(it, pdCh); else { pdMi = null; pdPick(psData.items[0]); } }
   }catch(e){ readBanner("psStatus", {src: "Simphony", error: e.message}); }
 }
@@ -5141,7 +5165,7 @@ const psEl = (cls, ch, it) => { const m = psElM(it); return m ? m.value : (psP["
 const psElSrc = (it, ch) => { const m = psElM(it); return m ? (m.source === "item" ? `measured: ${m.events} price change${m.events === 1 ? "" : "s"}` : "measured: its family") : `${psLbl(it.cls)}${psChan(ch).delivery ? ", delivery" : ""}`; };
 function psFactor(vat, ch){ const c = psChan(ch), k = (c.commission_pct || 0) / 100, v = (vat || 0) / 100; return c.commission_base === "net" ? (1 - k) / (1 + v) : 1 / (1 + v) - k; }
 function psEff(it, ch, price){
-  const c = it.channels[ch], q = c.qty, p0 = c.price, p1 = price || p0, a = psFactor(it.vat, ch), v = 1 + (it.vat || 0) / 100, cost = it.cost || 0;
+  const c = it.channels[ch], q = c.qty, p0 = c.price, p1 = price || p0, a = psFactor(it.vat, ch), v = 1 + (it.vat || 0) / 100, cost = psCost(it) || 0;
   const nq = p0 && p1 ? q * Math.pow(p1 / p0, psEl(it.cls, ch, it)) : q, cmu = p0 * a - cost, ncmu = p1 * a - cost;
   return {qty: q, new_qty: nq, net: p0 / v * q, new_net: p1 / v * nq, cm: cmu * q, new_cm: ncmu * nq, cm_unit: cmu, new_cm_unit: ncmu,
     be: ncmu > 0 && q ? (cmu * q / ncmu - q) / q * 100 : null, cost: it.cost == null ? null : cost * q, new_cost: it.cost == null ? null : cost * nq};
@@ -5156,7 +5180,9 @@ const psSign = v => (v > 0 ? "+" : v < 0 ? "−" : "") + flM(Math.abs(v));
 const psPct = (a, b) => b ? ((a - b) / Math.abs(b) * 100) : null;
 const psPctT = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1) + "%";
 const psPctS = v => (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 0) + "%";
-const psYear = () => 365 / Math.max(1, psData.period.days);
+// a year (365 days at the period's pace), or in a plan: the plan's volume (each restaurant's base completed, the
+// growth) for the share of the period the new prices are in force
+const psYear = () => psData && psData.plan ? psKw() * psG() * psPhi() : 365 / Math.max(1, psData.period.days);
 // the new prices, from the moves: a price typed, else the item's %, else Pulse's suggestion, else the category's %
 function psRebuild(){
   psNew = {};
@@ -5264,11 +5290,12 @@ function psDrawer(){
 // the figures only (the sliders keep their place while dragged)
 function psLive(){
   const d = psData; if (!d) return;
+  psPlanRender();
   const rows = psRows(), t = psTotals(rows), yr = psYear(), dn = t.new_net - t.net, dm = t.new_cm - t.cm;
   psTween(dn * yr);
   const hero = $("pgHero"); hero.classList.toggle("up", dn > 0.5); hero.classList.toggle("dn", dn < -0.5);
-  $("pgSub").innerHTML = t.changed ? `extra sales a year, without VAT · <b>${psSign(dn)}</b> in the ${fmt(d.period.days)} days · margin <b>${psSign(dm * yr)}</b> a year`
-    : "extra sales a year · move a category, an item, or let Pulse suggest";
+  $("pgSub").innerHTML = t.changed ? `extra sales ${psPer()}, without VAT · <b>${psSign(dn)}</b> in the ${fmt(d.period.days)} days${d.plan ? " of the base" : ""} · margin <b>${psSign(dm * yr)}</b> ${psPer()}`
+    : `extra sales ${psPer()} · move a category, an item, or let Pulse suggest`;
   const fc0 = t.cnet ? t.cost / t.cnet * 100 : null, fc1 = t.new_cnet ? t.new_cost / t.new_cnet * 100 : null;
   $("pgChips").innerHTML = [`<span><i>Prices changed</i><b>${fmt(t.changed)}</b></span>`, `<span><i>Items sold</i><b>${psPctT(psPct(t.new_qty, t.qty))}</b></span>`,
     `<span><i>Food cost</i><b>${fc0 == null ? "–" : `${fmt(fc0, 1)}% → ${fmt(fc1, 1)}%`}</b></span>`, `<span><i>Margin in the period</i><b>${psSign(dm)}</b></span>`].join("");
@@ -5280,7 +5307,7 @@ function psLive(){
   for (const s of S) {
     const el = document.querySelector(`.pg-cat[data-pgsec="${CSS.escape(s.sec)}"]`); if (!el) continue;
     const dd = (s.t.new_net - s.t.net) * yr, dk = el.querySelector("[data-pgd]");
-    dk.textContent = Math.abs(dd) >= 1 ? `${psSign(dd)} a year` : ""; dk.className = "pg-delta " + (dd > 0 ? "up" : dd < 0 ? "dn" : "");
+    dk.textContent = Math.abs(dd) >= 1 ? `${psSign(dd)} ${psPer()}` : ""; dk.className = "pg-delta " + (dd > 0 ? "up" : dd < 0 ? "dn" : "");
     el.classList.toggle("moved", Math.abs(dd) >= 1);
   }
   document.querySelectorAll("#pgDrawer [data-pgit]").forEach(row => {
@@ -5338,6 +5365,17 @@ function psLegend(){
       + CL.map(k => `<tr><td>${psSt(k)}</td><td>${fcSp(MEAN[k])}</td><td class="num"><b>${fmt(e(k, false), 2)}</b></td><td class="num"><b>${fmt(e(k, true), 2)}</b></td><td class="meta">${fcSp(RULE[k])}</td></tr>`).join("") + `</table></div>`
       + `<div class="ps-lg-ex">${fcSp("10% dearer on delivery:")}<br>· ${fcSp(`Star (${fmt(e("star", true), 2)}): ${psPctT(a.q)} items sold, sales ${psPctT(a.s)}.`)}<br>· ${fcSp(`Plowhorse (${fmt(e("plowhorse", true), 2)}): ${psPctT(b.q)} items sold, sales ${psPctT(b.s)}.`)}</div>`
       + `<p class="ps-lg-p">${fcSp("Beyond −1 a rise sells so many fewer items that sales fall, though the margin can still rise: each item earns more and the items no longer sold cost no food and no commission. Pulse never suggests a price that earns less margin than today's at the elasticity.")}</p>`)
+    + Pulse.panel("A plan for a future period", tbl([
+      row("Plan for", "Whole year, a half or a quarter. The plan starts from the same period last year as Simphony sold it (the season is right); a period not over yet is completed with the season of the year before."),
+      row("Volume growth", "The checks expected more (or fewer) than the base, before any price change; sales grow with them."),
+      row("New prices from", "The day the new prices start: the price effects count only from then to the end of the period."),
+      row("Cost inflation", "The expected rise of the portion cost (for all, or by category): the margin and Pulse's suggestions use the plan's cost."),
+      row("Lost checks", `The share of the items no longer sold after a rise that are lost checks (${fmt((psP && psP.lost_checks_pct) ?? 50, 0)}%): checks in the plan = base × (1 + growth) × (1 + share × the change of items sold).`),
+      row("Targets", "Average check (without VAT) and checks, per restaurant: the whole restaurant and each channel. A brand or all RHG adds the checks and weights the average check by the checks."),
+      row("To close the gap", "Average check = items per check × average price per item: the gap as every item dearer by a %, or as more items per check at today's prices."),
+      row("Reach it", "Pulse raises, one rounding step at a time, the price that adds the most sales for the fewest items lost, within the rules (largest step, competitors' median + band, Puzzles held), until the target; Undo takes it back."),
+      row("Plans side by side", "Today's prices, the plan on screen and the saved scenarios of the same period: sales, margin, checks, average check and the gap."),
+      row("Actual vs plan", "Once the period starts: Simphony's sales and checks of each month against the plan, spread by the days of the month, and the target.")]))
     + Pulse.panel("How Pulse suggests a price", tbl([
       row("By class", "The rule of the item's class, in the table above."),
       row("Delivery", `On a channel with a commission, towards the price that keeps the margin of eating in, no more than ${fmt(P.max_step_pct ?? 8, 0)}% at once.`),
@@ -5350,6 +5388,239 @@ function psLegend(){
       row("Parameters", "Elasticities, steps, rounding and competitor bands: \"Apply here\" for this simulation, \"Save for everyone\" with the Settings permission.")]))});
 }
 Pulse.on("pslegend", () => psLegend());
+// ---------- Price simulator → a plan for a future period with targets (Geri, 25 Nov 2026, approved): the base is the
+// same period last year (plan.py), volume growth, the date the new prices start, cost inflation, targets of average
+// check and checks per restaurant and channel, the gap decomposed (price or items per check), "reach the target",
+// plans side by side, actual against plan once the period starts, and the checks lost by a price rise.
+let psPlan = {code: "", growth: 0, from: "", infl: {}, targets: {}};
+const psPlanOn = () => !!(psData && psData.plan);
+const psInfl = it => { const f = psPlan.infl || {}; return psPlanOn() ? +(f[it.section] ?? f["*"] ?? 0) || 0 : 0; };
+const psCost = it => it.cost == null ? null : it.cost * (1 + psInfl(it) / 100);
+// the share of the plan the new prices are in force: from the day chosen to the end of the period
+function psPhi(){
+  const p = psData.plan; if (!p || !psPlan.from) return 1;
+  const a = new Date(p.from + "T00:00:00"), b = new Date(p.to + "T00:00:00"), f = new Date(psPlan.from + "T00:00:00");
+  if (f <= a) return 1; if (f > b) return 0;
+  return ((b - f) / 864e5 + 1) / ((b - a) / 864e5 + 1);
+}
+const psG = () => 1 + (+psPlan.growth || 0) / 100;
+// the volume factor of the selection: each restaurant's completion of the base, by its items' sales
+function psKw(){
+  const p = psData.plan; if (!p) return 1;
+  let w = 0, s = 0;
+  p.locs.forEach(L => { const n = Object.values(L.channels).reduce((a, c) => a + c.net, 0); w += n * (L.factor.net || 1); s += n; });
+  return s ? w / s : 1;
+}
+const psPer = () => psPlanOn() ? `in ${psData.plan.label}` : "a year";
+// the plan by restaurant and channel: {locs: {ref: {name, ch: {ch: m}, all: m}}, ch: {ch: m}, all: m}
+// m: {checks0, net0, checks, net, units0, units, inet0, inet, ac0, ac, dnet}
+function psPlanCalc(){
+  const p = psData.plan; if (!p) return null;
+  const G = psG(), phi = psPhi(), s = ((psP && psP.lost_checks_pct) ?? 50) / 100;
+  const out = {locs: {}, ch: {}, all: null};
+  const blank = () => ({checks0: 0, net0: 0, checks: 0, net: 0, units0: 0, units: 0, inet0: 0, inet: 0, dnet: 0});
+  const add = (a, b) => { for (const k in b) if (typeof b[k] === "number") a[k] = (a[k] || 0) + b[k]; return a; };
+  // the items of each restaurant and channel: units and sales at a price, and what the new prices change
+  const IT = {};
+  for (const it of psData.items) for (const [ch, c] of Object.entries(it.channels)) {
+    const p1 = psPrice(it, ch), r = c.price ? p1 / c.price : 1, el = psEl(it.cls, ch, it), v = 1 + (it.vat || 0) / 100;
+    for (const x of c.locs || []) {
+      const k = x.ref + "|" + ch, y = IT[k] = IT[k] || {u: 0, n: 0, du: 0, dn: 0};
+      const n = (x.price || c.price) / v * x.qty;
+      y.u += x.qty; y.n += n;
+      if (r !== 1) { y.du += x.qty * (Math.pow(r, el) - 1); y.dn += n * (Math.pow(r, 1 + el) - 1); }
+    }
+  }
+  for (const L of p.locs) {
+    const R = out.locs[L.ref] = {name: L.name, ch: {}, all: blank()}, kn = L.factor.net || 1, kc = L.factor.checks || 1;
+    for (const [ch, b] of Object.entries(L.channels)) {
+      if (!psOn(ch) && psChSel.size) { /* a channel not chosen: as today */ }
+      const y = IT[L.ref + "|" + ch] || {u: 0, n: 0, du: 0, dn: 0};
+      const items = y.u ? y.du / y.u : 0;                         // the change of the items sold at a price
+      const m = {checks0: b.checks, net0: b.net, units0: y.u, inet0: y.n,
+        checks: b.checks * kc * G * (1 + s * items * phi), net: (b.net + y.dn * phi) * kn * G,
+        units: (y.u + y.du * phi) * kn * G, inet: (y.n + y.dn * phi) * kn * G, dnet: y.dn * phi * kn * G};
+      R.ch[ch] = m; add(R.all, m); add(out.ch[ch] = out.ch[ch] || blank(), m);
+    }
+    out.all = add(out.all || blank(), R.all);
+  }
+  out.all = out.all || blank();
+  return out;
+}
+const psAc = m => m && m.checks ? m.net / m.checks : null;
+const psAc0 = m => m && m.checks0 ? m.net0 / m.checks0 : null;
+// a target of the selection: checks summed, the average check weighted by the target checks (else the plan's)
+function psTarget(ch, calc){
+  const T = psPlan.targets || {}; let chk = 0, w = 0, acw = 0, nChk = 0, nAc = 0, n = 0;
+  for (const L of psData.plan.locs) {
+    if (ch !== "*" && !L.channels[ch]) continue;
+    n++;
+    const t = (T[L.ref] || {})[ch]; if (!t) continue;
+    const m = ch === "*" ? calc.locs[L.ref].all : calc.locs[L.ref].ch[ch];
+    if (t.chk) { chk += t.chk; nChk++; }
+    if (t.ac) { const ww = t.chk || (m ? m.checks : 0) || 1; acw += t.ac * ww; w += ww; nAc++; }
+  }
+  return {chk: nChk ? chk : null, ac: nAc ? acw / w : null, part: (nChk && nChk < n) || (nAc && nAc < n)};
+}
+// the gap of the average check: by price (every item dearer, items per check as planned) or by items per check
+function psGap(m, ac){
+  const a = psAc(m); if (!a || !ac) return null;
+  const ipc = m.checks ? m.units / m.checks : null, d = ac / a - 1;
+  return {d, price: d * 100, upsell: ipc == null ? null : ipc * d, ipc, aip: m.units ? m.inet / m.units : null};
+}
+function psPlanRender(){
+  const box = $("pgPlan");
+  if (!psPlanOn()) { box.hidden = true; return; }
+  box.hidden = false;
+  const p = psData.plan, calc = psPlanCalc(), C = psData.currency, A = calc.all, TA = psTarget("*", calc);
+  $("pgPlanT").textContent = `Plan · ${p.label}`;
+  const b = p.base, rd = p.reading;
+  $("pgPlanMeta").innerHTML = `${fcSp(`${p.from} → ${p.to}`)} · ${fcSp(`base: ${b.from} → ${b.to}, as Simphony sold it`)}`
+    + (b.cut ? ` · ${fcSp(`completed to the whole period with the season of ${b.season[0].slice(0, 4)}`)}` : "")
+    + (rd && (rd.running || rd.missing) ? ` · <b>${fcSp(`reading the checks by channel from Simphony: ${fmt(rd.done)} of ${fmt(rd.total || rd.missing)} days (Read again when done)`)}</b>` : "");
+  const gA = psGap(A, TA.ac);
+  const dot = (v, t, good) => t == null || v == null ? "na" : (good * (v - t) >= 0 ? "g" : Math.abs(v / t - 1) <= 0.02 ? "a" : "r");
+  const T = (l, v, s, light) => `<div class="ex-t ex-${light || "na"}"><div class="ex-tl"><span>${fcSp(l)}</span><i></i></div><b>${v}</b><small>${s}</small></div>`;
+  const t = psTotals(psRows());
+  $("pgPlanTiles").innerHTML = [
+    T("Sales in the plan", `${flM(A.net)} <span class="ex-u">${esc(C)}</span>`, `${fcSp("base")} ${flM(A.net0)} · ${fcSp("prices")} ${psSign(A.dnet)}`, A.dnet >= 0 ? "g" : "r"),
+    T("Checks", fmt(A.checks), TA.chk ? `${fcSp("target")} ${fmt(TA.chk)} · ${psPctT((A.checks / TA.chk - 1) * 100)}` : `${fcSp("base")} ${fmt(A.checks0)}`, dot(A.checks, TA.chk, 1)),
+    T("Average check", fmt(psAc(A), 0), TA.ac ? `${fcSp("target")} ${fmt(TA.ac, 0)} · ${psPctT((psAc(A) / TA.ac - 1) * 100)}` : `${fcSp("base")} ${fmt(psAc0(A), 0)}`, dot(psAc(A), TA.ac, 1)),
+    T("Items per check", A.checks ? fmt(A.units / A.checks, 2) : "–", `${fcSp("base")} ${A.checks0 ? fmt(A.units0 / A.checks0, 2) : "–"}`, "na"),
+    T("Average price per item", A.units ? fmt(A.inet / A.units, 0) : "–", `${fcSp("without VAT; base")} ${A.units0 ? fmt(A.inet0 / A.units0, 0) : "–"}`, "na"),
+    T("Margin change", psSign((t.new_cm - t.cm) * psYear()), fcSp(`items with a portion cost${Object.keys(psPlan.infl || {}).length ? ", the plan's costs" : ""}`), (t.new_cm - t.cm) >= 0 ? "g" : "r")].join("");
+  $("pgPlanGap").innerHTML = !TA.ac ? fcSp("Set the targets (Targets) to see the gap and how to close it.")
+    : gA.d <= 0 ? `<b class="down">${fcSp("The plan reaches the average check target.")}</b>`
+    : `${fcSp(`To reach the average check target (${fmt(TA.ac, 0)}):`)} <b>${fcSp(`every item ${psPctT(gA.price)} dearer`)}</b> ${fcSp("at the items per check of the plan, or")} <b>${fcSp(`${fmt(gA.upsell, 2)} more items per check`)}</b> ${fcSp(`at today's prices (${fmt(gA.ipc, 2)} → ${fmt(gA.ipc + gA.upsell, 2)})`)}, ${fcSp("or a mix of both.")}`;
+  const chs = Object.keys(calc.ch).sort((a, b2) => calc.ch[b2].net - calc.ch[a].net);
+  $("pgPlanCh").innerHTML = `<tr><th>Channel</th><th class="num">Checks, base</th><th class="num">Checks, plan</th><th class="num">Target</th><th class="num">Gap</th><th class="num">Avg check, base</th><th class="num">Avg check, plan</th><th class="num">Target</th><th class="num">Gap</th><th>To close it</th><th></th></tr>`
+    + chs.concat(["*"]).map(ch => { const m = ch === "*" ? A : calc.ch[ch], tg = psTarget(ch, calc), g = psGap(m, tg.ac), ac = psAc(m);
+      return `<tr class="${ch === "*" ? "total" : ""}"><td>${ch === "*" ? `<b>${fcSp("Every channel")}</b>` : `<b data-no-i18n>${esc(ch)}</b>`}</td>
+        <td class="num">${fmt(m.checks0)}</td><td class="num"><b>${fmt(m.checks)}</b></td><td class="num">${tg.chk ? fmt(tg.chk) + (tg.part ? "*" : "") : "–"}</td>
+        <td class="num">${tg.chk ? `<b class="${m.checks >= tg.chk ? "down" : "up"}">${psSign(m.checks - tg.chk)}</b>` : "–"}</td>
+        <td class="num">${fmt(psAc0(m), 0)}</td><td class="num"><b>${fmt(ac, 0)}</b></td><td class="num">${tg.ac ? fmt(tg.ac, 0) + (tg.part ? "*" : "") : "–"}</td>
+        <td class="num">${tg.ac ? `<b class="${ac >= tg.ac ? "down" : "up"}">${psSign(ac - tg.ac)}</b>` : "–"}</td>
+        <td class="meta">${!g ? "" : g.d <= 0 ? fcSp("reached") : `${fcSp(`price ${psPctT(g.price)} or +${fmt(g.upsell, 2)} items per check`)}`}</td>
+        <td>${g && g.d > 0 ? `<button type="button" class="mini" data-psreach="${esc(ch)}">${fcSp("Reach it")}</button>` : ""}</td></tr>`; }).join("");
+  $("pgPlanCh").querySelectorAll("[data-psreach]").forEach(x => x.onclick = () => psReach(x.dataset.psreach));
+  // by restaurant
+  $("pgPlanLoc").innerHTML = `<tr><th>Restaurant</th><th class="num">Sales, plan</th><th class="num">Checks, plan</th><th class="num">Target</th><th class="num">Avg check, base</th><th class="num">Avg check, plan</th><th class="num">Target</th><th class="num">Gap</th></tr>`
+    + p.locs.map(L => { const m = calc.locs[L.ref].all, t2 = (psPlan.targets[L.ref] || {})["*"] || {}, ac = psAc(m);
+      return `<tr data-pulse="pstarget|${esc(L.ref)}" tabindex="0" style="cursor:pointer"><td><b data-no-i18n>${esc(L.name)}</b>${L.factor.source !== "complete" ? `<div class="meta">${fcSp(`base ×${fmt(L.factor.net, 2)} (${L.factor.source})`)}</div>` : ""}</td>
+        <td class="num">${flM(m.net)}</td><td class="num">${fmt(m.checks)}</td><td class="num">${t2.chk ? fmt(t2.chk) : "–"}</td><td class="num">${fmt(psAc0(m), 0)}</td><td class="num"><b>${fmt(ac, 0)}</b></td>
+        <td class="num">${t2.ac ? fmt(t2.ac, 0) : "–"}</td><td class="num">${t2.ac ? `<b class="${ac >= t2.ac ? "down" : "up"}">${psSign(ac - t2.ac)}</b>` : "–"}</td></tr>`; }).join("");
+  $("pgPlanActBtn").hidden = !p.started;
+}
+// the inputs of the plan
+function psPlanInputs(){
+  const p = psData && psData.plan; if (!p) return;
+  $("pgPlanGrowth").value = psPlan.growth || 0; $("pgPlanFrom").min = p.from; $("pgPlanFrom").max = p.to; $("pgPlanFrom").value = psPlan.from || p.from;
+  $("pgPlanInfl").value = (psPlan.infl || {})["*"] || 0; $("pgPlanLost").value = (psP && psP.lost_checks_pct) ?? 50;
+}
+["pgPlanGrowth", "pgPlanFrom", "pgPlanLost"].forEach(id => $(id).addEventListener("input", () => {
+  psPlan.growth = +$("pgPlanGrowth").value || 0; psPlan.from = $("pgPlanFrom").value || "";
+  if (psP) psP.lost_checks_pct = Math.max(0, Math.min(100, +$("pgPlanLost").value || 0));
+  psRender();
+}));
+$("pgPlanInfl").addEventListener("change", () => { psPlan.infl = Object.assign({}, psPlan.infl, {"*": +$("pgPlanInfl").value || 0}); psLoad(); });
+$("psPlanSel").onchange = () => { psPlan.code = $("psPlanSel").value; psLoad(); };
+// cost inflation by category
+$("pgPlanInflCat").onclick = () => {
+  const secs = [...new Set(psData.items.map(i => i.section))].sort(), f = psPlan.infl || {};
+  const body = Pulse.pop({title: fcSp("Cost inflation by category"), sub: fcSp(`The expected rise of the portion cost in ${psData.plan.label}, %; empty: the one for all (${fmt(f["*"] || 0, 1)}%).`), wide: false,
+    body: `<div class="scroll"><table class="ps-lg" data-nosort><tr><th>${fcSp("Category")}</th><th class="num">%</th></tr>${secs.map(s => `<tr><td data-no-i18n>${esc(s)}</td><td class="num"><input type="number" step="0.5" data-infl="${esc(s)}" value="${f[s] ?? ""}" style="width:90px"></td></tr>`).join("")}</table></div>
+      <div style="margin-top:10px"><button class="btn dark" type="button" id="pgInflUse">${fcSp("Use these")}</button></div>`});
+  body.querySelector("#pgInflUse").onclick = () => {
+    const o = {"*": f["*"] || 0}; body.querySelectorAll("[data-infl]").forEach(x => { if (x.value !== "") o[x.dataset.infl] = +x.value; });
+    psPlan.infl = o; document.querySelector(".pl-bd.show [data-pzclose]").click(); psLoad();
+  };
+};
+// the targets of one restaurant: the whole restaurant and each channel
+function psTargetPop(ref){
+  const p = psData.plan, calc = psPlanCalc(), refs = p.locs.map(L => L.ref);
+  ref = refs.includes(ref) ? ref : refs[0];
+  const L = p.locs.find(x => x.ref === ref), T = (psPlan.targets[ref] = psPlan.targets[ref] || {});
+  const rows = ["*"].concat(Object.keys(L.channels).sort((a, b) => L.channels[b].net - L.channels[a].net));
+  const body = Pulse.pop({title: fcSp(`Targets · ${p.label}`), sub: fcSp("Average check (without VAT) and number of checks for the whole period; the base and the plan beside them."),
+    body: `<div class="pg-row" style="margin-bottom:10px"><label class="meta">${fcSp("Restaurant")} <select id="pgTgRef">${p.locs.map(x => `<option value="${esc(x.ref)}"${x.ref === ref ? " selected" : ""} data-no-i18n>${esc(x.name)}</option>`).join("")}</select></label></div>
+      <div class="scroll"><table class="ps-lg" data-nosort><tr><th>${fcSp("Channel")}</th><th class="num">${fcSp("Checks, base")}</th><th class="num">${fcSp("Checks, plan")}</th><th class="num">${fcSp("Target checks")}</th><th class="num">${fcSp("Avg check, base")}</th><th class="num">${fcSp("Avg check, plan")}</th><th class="num">${fcSp("Target avg check")}</th></tr>`
+      + rows.map(ch => { const m = ch === "*" ? calc.locs[ref].all : calc.locs[ref].ch[ch], t = T[ch] || {};
+        return `<tr class="${ch === "*" ? "total" : ""}"><td>${ch === "*" ? `<b>${fcSp("Whole restaurant")}</b>` : `<span data-no-i18n>${esc(ch)}</span>`}</td><td class="num">${fmt(m.checks0)}</td><td class="num">${fmt(m.checks)}</td>
+          <td class="num"><input type="number" min="0" step="1" data-tg="${esc(ch)}|chk" value="${t.chk || ""}" style="width:100px"></td><td class="num">${fmt(psAc0(m), 0)}</td><td class="num">${fmt(psAc(m), 0)}</td>
+          <td class="num"><input type="number" min="0" step="any" data-tg="${esc(ch)}|ac" value="${t.ac || ""}" style="width:100px"></td></tr>`; }).join("")
+      + `</table></div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px"><button class="btn dark" type="button" id="pgTgUse">${fcSp("Use these targets")}</button>
+        <button class="btn" type="button" id="pgTgFill">${fcSp("Fill with the plan")}</button><span class="meta">${fcSp("Saved with the scenario (Save, on the right).")}</span></div>`});
+  body.querySelector("#pgTgRef").onchange = e => { read(); psTargetPop(e.target.value); };
+  const read = () => { const o = {}; body.querySelectorAll("[data-tg]").forEach(x => { const [ch, f] = x.dataset.tg.split("|"); if (+x.value > 0) (o[ch] = o[ch] || {})[f] = +x.value; }); psPlan.targets[ref] = o; };
+  body.querySelector("#pgTgFill").onclick = () => body.querySelectorAll("[data-tg]").forEach(x => { if (x.value) return; const [ch, f] = x.dataset.tg.split("|"), m = ch === "*" ? calc.locs[ref].all : calc.locs[ref].ch[ch]; x.value = f === "chk" ? Math.round(m.checks) : Math.round(psAc(m) || 0); });
+  body.querySelector("#pgTgUse").onclick = () => { read(); document.querySelector(".pl-bd.show [data-pzclose]").click(); psRender(); };
+}
+Pulse.on("pstarget", ref => psTargetPop(ref));
+$("pgPlanTg").onclick = () => psTargetPop(psData.plan.locs[0] && psData.plan.locs[0].ref);
+// "Reach it": Pulse raises, one rounding step at a time, the price that adds the most sales for the fewest items lost,
+// within the rules (no more than the largest step at once, the competitors' median + band, no Puzzle rises), until
+// the average check of the channel (every channel: the whole) reaches its target
+function psReach(ch){
+  const calc0 = psPlanCalc(), tg = psTarget(ch, calc0); if (!tg.ac) return;
+  psSnap();
+  const P = psP, step = psData.round_step || 10, mx = (P.max_step_pct ?? 8) / 100, band = (P.comp_band_pct ?? 5) / 100;
+  const rows = psRows().filter(r => (ch === "*" || r.ch === ch) && r.it.cls !== "puzzle" && r.c.qty > 0.5);
+  let n = 0, calc = calc0;
+  const acOf = c => psAc(ch === "*" ? c.all : c.ch[ch]);
+  while (acOf(calc) < tg.ac && n++ < 400) {
+    let best = null;
+    for (const r of rows) {
+      const p = psPrice(r.it, r.ch), nx = psRound(p + step, true), cap = Math.min(r.c.price * (1 + mx), r.c.comp_median ? r.c.comp_median * (1 + band) : Infinity);
+      if (nx > cap + 0.001) continue;
+      const e0 = psEff(r.it, r.ch, p), e1 = psEff(r.it, r.ch, nx), dn = e1.new_net - e0.new_net, dl = e0.new_qty - e1.new_qty;
+      if (dn <= 0) continue;
+      const sc = dn / (dl + 0.01);
+      if (!best || sc > best.sc) best = {r, nx, sc};
+    }
+    if (!best) break;
+    psManual[psK(best.r.it, best.r.ch)] = best.nx; psRebuild(); calc = psPlanCalc();
+  }
+  psRender();
+  const got = acOf(calc);
+  $("pgPlanMsg").textContent = got >= tg.ac ? `${ch === "*" ? "Every channel" : ch}: the average check reaches ${fmt(got, 0)} (target ${fmt(tg.ac, 0)}), ${fmt(n)} price step(s). Undo takes them back.`
+    : `${ch === "*" ? "Every channel" : ch}: ${fmt(got, 0)} against ${fmt(tg.ac, 0)}: no more room within the rules (largest step, competitors, Puzzles held). The rest is items per check.`;
+}
+$("pgPlanReachAll").onclick = () => psReach("*");
+// plans side by side: today, the plan on screen and the saved scenarios of the same plan period
+$("pgPlanCmp").onclick = () => {
+  const p = psData.plan, keep = {c: psCat, i: psItem, s: psSug, m: psManual, pl: psPlan};
+  const metr = () => { const c = psPlanCalc(), t = psTotals(psRows()), tg = psTarget("*", c); return {net: c.all.net, dm: (t.new_cm - t.cm) * psYear(), checks: c.all.checks, ac: psAc(c.all), tg}; };
+  const cols = [];
+  psCat = {}; psItem = {}; psSug = {}; psManual = {}; psRebuild(); cols.push(["Today's prices", metr()]);
+  for (const s of psScns.filter(x => x.state && x.state.plan && x.state.plan.code === p.code)) {
+    const st = s.state; psCat = Object.assign({}, st.cat || {}); psItem = Object.assign({}, st.item || {}); psSug = Object.assign({}, st.sug || {}); psManual = Object.assign({}, st.manual || {});
+    psPlan = Object.assign({targets: {}, infl: {}}, st.plan); psRebuild(); cols.push([s.name, metr()]);
+  }
+  psCat = keep.c; psItem = keep.i; psSug = keep.s; psManual = keep.m; psPlan = keep.pl; psRebuild(); cols.splice(1, 0, ["On screen", metr()]);
+  const R = [["Sales in the plan", x => flM(x.net)], ["Margin change", x => psSign(x.dm)], ["Checks", x => fmt(x.checks)], ["Target checks", x => x.tg.chk ? fmt(x.tg.chk) : "–"],
+    ["Average check", x => fmt(x.ac, 0)], ["Target average check", x => x.tg.ac ? fmt(x.tg.ac, 0) : "–"], ["Gap to the target", x => x.tg.ac ? psSign(x.ac - x.tg.ac) : "–"]];
+  Pulse.pop({title: fcSp(`Plans side by side · ${p.label}`), sub: fcSp("Today's prices, the plan on screen and every saved scenario of this plan period (with its own growth, start date, costs and targets)."),
+    body: `<div class="scroll"><table class="ps-lg" data-nosort><tr><th></th>${cols.map(c => `<th class="num" data-no-i18n>${esc(c[0])}</th>`).join("")}</tr>`
+      + R.map(([l, f]) => `<tr><td><b>${fcSp(l)}</b></td>${cols.map(c => `<td class="num">${f(c[1])}</td>`).join("")}</tr>`).join("") + `</table></div>`
+      + (cols.length < 4 ? `<p class="meta">${fcSp("Save a scenario with this plan period to compare it here.")}</p>` : "")});
+};
+// actual against the plan, month by month, once the period has started
+$("pgPlanActBtn").onclick = () => {
+  const p = psData.plan, calc = psPlanCalc(), A = calc.all, tg = psTarget("*", calc), refs = new Set(p.locs.map(L => L.ref));
+  const md = m => { const [y, mo] = m.split("-").map(Number); return new Date(y, mo, 0).getDate(); };
+  const share = m => md(m) / p.days;                                        // the plan spread by the days of each month
+  const rows = p.actual.map(a => { let net = 0, chk = 0; for (const [ref, chs] of Object.entries(a.locs)) if (refs.has(ref)) for (const c of Object.values(chs)) { net += c.net; chk += c.checks; }
+    const sh = share(a.month), pn = A.net * sh, pc = A.checks * sh;
+    return {cells: [esc(a.month) + (a.to.slice(8) !== String(md(a.month)) ? ` <span class="meta">${fcSp(`to ${a.to}`)}</span>` : ""), flM(pn), flM(net), `<b class="${net >= pn ? "down" : "up"}">${psPctT((net / pn - 1) * 100)}</b>`,
+      fmt(pc), fmt(chk), `<b class="${chk >= pc ? "down" : "up"}">${psPctT((chk / pc - 1) * 100)}</b>`, fmt(pn / pc, 0), fmt(chk ? net / chk : null, 0), tg.ac ? fmt(tg.ac, 0) : "–"]}; });
+  Pulse.pop({title: fcSp(`Actual against the plan · ${p.label}`), sub: fcSp("Simphony's sales and checks of the months begun, against the plan on screen (spread by the days of each month) and the target."),
+    body: Pulse.list([["Month"], ["Sales, plan", 1], ["Sales, actual", 1], ["vs plan", 1], ["Checks, plan", 1], ["Checks, actual", 1], ["vs plan", 1], ["Avg check, plan", 1], ["Avg check, actual", 1], ["Target", 1]], rows, {none: "The plan period has not started."})});
+};
+function psPlanOptions(){
+  const sel = $("psPlanSel"), keep = psPlan.code || sel.value;
+  sel.innerHTML = `<option value="">The period above (no plan)</option>` + (psData.plan_options || []).map(o => `<option value="${esc(o.code)}">${esc(o.label)}</option>`).join("");
+  sel.value = (psData.plan_options || []).some(o => o.code === keep) ? keep : "";
+}
 // How the big number is worked out (Geri, 25 Nov 2026: to check the calculation): every price changed, step by step
 function psExplain(){
   const d = psData; if (!d) return;
@@ -5642,6 +5913,12 @@ $("psScn").onchange = () => {
   psCat = Object.assign({}, st.cat || {}); psItem = Object.assign({}, st.item || {}); psSug = Object.assign({}, st.sug || {});
   psManual = st.cat || st.item || st.sug ? Object.assign({}, st.manual || {}) : Object.assign({}, s.changes || {});
   psChSel = new Set((st.channels || []).filter(c => psData.channels.some(x => x.channel === c)));
+  if (st.plan && st.plan.code) {
+    const reload = st.plan.code !== psPlan.code || JSON.stringify(st.plan.infl || {}) !== JSON.stringify(psPlan.infl || {});
+    psPlan = Object.assign({growth: 0, from: "", infl: {}, targets: {}}, st.plan);
+    if (reload) { $("psPlanSel").value = psPlan.code; psLoad(); return; }
+    psPlanInputs();
+  }
   psRebuild(); psRender();
   const miss = Object.keys(s.changes || {}).filter(k => !psItemOf(k)).length;
   $("psScnName").value = s.name;
@@ -5650,10 +5927,12 @@ $("psScn").onchange = () => {
 $("psScnSave").onclick = async () => {
   const name = $("psScnName").value.trim(); if (!name) { $("psScnMsg").textContent = "Give the scenario a name."; $("psScnName").focus(); return; }
   const t = psTotals(psRows()), cur = psScns.find(x => x.id === $("psScn").value);
-  if (!Object.keys(psNew).length) { $("psScnMsg").textContent = "Change a price first."; return; }
+  if (!Object.keys(psNew).length && !psPlanOn()) { $("psScnMsg").textContent = "Change a price first."; return; }
+  const pc = psPlanOn() ? psPlanCalc() : null;
   try {
     const j = await simphonyPost("/api/sales/pricesim/scenarios", {id: cur && cur.name === name ? cur.id : "", name, level: $("psLevel").value, key: $("psKey").value,
-      company: $("company").value || "", changes: psNew, state: {cat: psCat, item: psItem, sug: psSug, manual: psManual, channels: [...psChSel]}, summary: {net: Math.round(t.new_net - t.net), cm: Math.round(t.new_cm - t.cm), items: t.changed}});
+      company: $("company").value || "", changes: psNew, state: {cat: psCat, item: psItem, sug: psSug, manual: psManual, channels: [...psChSel], plan: psPlanOn() ? psPlan : null},
+      summary: {net: Math.round(t.new_net - t.net), cm: Math.round(t.new_cm - t.cm), items: t.changed, checks: pc ? Math.round(pc.all.checks) : null, avg_check: pc ? Math.round(psAc(pc.all)) : null}});
     await psScnLoad(); $("psScn").value = j.scenario.id; $("psScnMsg").textContent = `Saved: ${name}. It changes nothing in Simphony; share it with whoever sets the prices in EMC.`;
   } catch(e){ $("psScnMsg").textContent = "Could not save: " + e.message; }
 };

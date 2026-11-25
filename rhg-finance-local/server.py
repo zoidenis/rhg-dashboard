@@ -46,6 +46,7 @@ import faregister
 import transit
 import pricesim
 import mkkpi
+import plan
 import ocdiag
 import emcaudit
 import recipients
@@ -2705,6 +2706,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": str(exc)})
             return
         refs = sales_refs(user, q)
+        # a plan for a future period (Geri, 25 Nov 2026): the simulator reads the same period last year (plan.py)
+        pw = None
+        if q.get("plan"):
+            try:
+                in_scope = [l["locRef"] for l in simphony.locations() if locintel.in_use(l) and (refs is None or l["locRef"].upper() in refs)]
+                pw = plan.window(q["plan"], in_scope)
+            except ValueError as exc:
+                self._send(400, {"error": str(exc)})
+                return
+            per = (pw["b0"], pw["b1"], pw["b0"], pw["b1"], pw["b0"], pw["b1"], False, f"base of {pw['label']}", "")
         key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
         ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1")     # the same read as Menu engineering
         if ds.get("pending") or ds.get("available") is False:
@@ -2712,7 +2723,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         level = q.get("level") if q.get("level") in ("brand", "location", "locations", "all") else "all"
         try:
-            self._send(200, pricesim.build(ds, level, (q.get("key") or "")[:1200], q.get("section") or "family"))
+            infl = json.loads(q.get("infl") or "{}")
+            infl = {str(k)[:80]: float(v) for k, v in infl.items()} if isinstance(infl, dict) else {}
+        except (ValueError, TypeError):
+            infl = {}
+        try:
+            r = pricesim.build(ds, level, (q.get("key") or "")[:1200], q.get("section") or "family", infl=infl)
+            r["plan_options"] = plan.options()
+            if pw:
+                names = {x["ref"]: x["name"] for x in r.get("selection") or []}
+                r["plan"] = plan.build(q["plan"], list(names), names, w=pw)
+            self._send(200, r)
         except Exception as exc:                                       # noqa: BLE001
             traceback.print_exc()
             self._send(200, {"error": f"The simulator could not be built: {str(exc)[:240]}"})
