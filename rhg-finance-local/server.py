@@ -45,6 +45,7 @@ import faloc
 import faregister
 import transit
 import pricesim
+import mkkpi
 import ocdiag
 import emcaudit
 import recipients
@@ -3490,9 +3491,19 @@ class Handler(BaseHTTPRequestHandler):
                     except odoo.Error as exc:
                         out["error"] = str(exc)[:300]
                 self._send(200, out)
+            elif url.path == "/api/marketing/campaigns":
+                # Marketing → Campaigns (mkkpi.py): nl360 against Simphony's sales, by brand and OPA unit
+                if not auth.can(user, "finance.s.marketing.campaigns"):
+                    self._send(403, {"error": "Your role does not include Marketing → Campaigns."})
+                    return
+                try:
+                    self._send(200, mkkpi.build(marketing.public()))
+                except Exception as exc:                               # noqa: BLE001
+                    traceback.print_exc()
+                    self._send(200, {"available": False, "error": f"The campaigns could not be worked out: {str(exc)[:240]}"})
             elif url.path == "/api/marketing":
                 # Marketing (marketing.py): nl360's RHG Performance dashboard, read into pulse
-                if not any(auth.can(user, f"finance.s.marketing.{t}") for t in ("overview", "ads", "gbp", "social", "data")):
+                if not any(auth.can(user, f"finance.s.marketing.{t}") for t in ("campaigns", "overview", "ads", "gbp", "social", "data")):
                     self._send(403, {"error": "Your role does not include Marketing."})
                     return
                 self._send(200, dict(marketing.public(), can_manage=auth.can(user, "finance.s.marketing.data")))

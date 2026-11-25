@@ -475,6 +475,37 @@ td.num,th.num{text-align:right}
 .pg-rank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#062634;background:linear-gradient(135deg,#ffd27a,#ffe9b8)}
 .pg-win.warn .pg-rank{background:color-mix(in srgb,var(--pg-dn) 20%,transparent);color:var(--pg-dn)}
 .pg-tools{display:flex;flex-wrap:wrap;gap:6px}
+/* Marketing → Campaigns */
+.cg-hero{display:grid;grid-template-columns:1.1fr 1.4fr;gap:18px;align-items:center;padding:20px 22px;border-radius:20px;margin-bottom:14px;color:#eaf6fa;background:radial-gradient(120% 140% at 0% 0%,#3a2a6b 0%,#1b1f4a 55%,#0d1330 100%)}
+.cg-eye{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#c9b8ff;font-weight:700}
+.cg-h1 h2{margin:6px 0 4px;font-size:22px;color:#fff;line-height:1.2}.cg-h1 p{margin:0;font-size:12.5px;color:#d8d2f2}
+.cg-read{display:inline-block;margin-top:6px;font-size:11px;padding:2px 9px;border-radius:999px;background:rgba(255,255,255,.12)}
+.cg-ts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cg-t{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px 12px;min-width:0}
+.cg-t span{display:block;font-size:10.5px;color:#c9b8ff;font-weight:700;text-transform:uppercase;letter-spacing:.03em}.cg-t b{display:block;font-size:22px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums}
+.cg-t small{font-size:11px;color:#d8d2f2}
+.cg-lg{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.cg-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--ink);white-space:nowrap}
+.cg-chip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.cg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.cg-sub{margin:16px 0 8px;font-size:13px}
+.cg-sq{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:14px;padding:11px 12px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-width:0}
+.cg-sq:hover,.cg-sq:focus-visible{box-shadow:0 6px 18px rgba(8,48,63,.12);outline:none}
+.cg-sq-h{display:flex;justify-content:space-between;align-items:center;gap:6px}.cg-sq-h b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cg-big b{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--c)}.cg-big span{display:block;font-size:10.5px;color:var(--sub)}
+.cg-st{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px}.cg-st div{display:flex;flex-direction:column;font-size:10px;color:var(--sub)}.cg-st b{font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.cg-spark{width:100%;height:30px}
+.cg-svg{width:100%;height:auto}.cg-svg text{fill:var(--sub);font-size:11px}
+.cg-fun{display:flex;flex-direction:column;gap:8px}
+.cg-fr{display:grid;grid-template-columns:130px 1fr 80px;grid-template-rows:auto auto;gap:2px 10px;align-items:center;font-size:12.5px}
+.cg-fr small{grid-column:2/4;font-size:11px;color:var(--sub)}.cg-fr b{text-align:right;font-variant-numeric:tabular-nums}
+.cg-fb{height:12px;border-radius:6px;background:var(--bg);overflow:hidden}.cg-fb i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#7a5bbf,#3b6fd8)}
+.cg-snap{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:0 0 12px}
+.cg-snap:empty{display:none}
+.cg-snap-t{align-self:center;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#7a5bbf;padding-right:4px}
+.cg-c{background:linear-gradient(135deg,color-mix(in srgb,#7a5bbf 10%,var(--card)),var(--card));border:1px solid color-mix(in srgb,#7a5bbf 30%,var(--line));border-radius:12px;padding:8px 12px;min-width:150px;flex:1}
+.cg-c span{display:block;font-size:10.5px;font-weight:700;color:var(--sub)}.cg-c b{display:block;font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}.cg-c small{font-size:10.5px;color:var(--sub)}
+@media (max-width:900px){.cg-hero{grid-template-columns:1fr}}
 .pg-locs .dimf-btn{font-size:12.5px;padding:6px 9px;border-radius:9px;background:var(--bg)}
 .pg-mode{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--card);border:1px solid var(--line);margin:0 0 12px}
 .pg-mode button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;font-size:13px;font-weight:700;color:var(--sub)}
@@ -954,6 +985,7 @@ table.bn-plan td{padding:3px 4px}
     <button type="button" data-v="sales" data-t="sevenrooms">SevenRooms ↔ Simphony</button>
     <button type="button" data-v="sales" data-t="bonus">Bonus management</button>
     <div class="grp">Marketing</div>
+    <button type="button" data-v="marketing" data-t="campaigns">Campaigns</button>
     <button type="button" data-v="marketing" data-t="overview">Overview</button>
     <button type="button" data-v="marketing" data-t="ads">Ads</button>
     <button type="button" data-v="marketing" data-t="gbp">Google Business Profile</button>
@@ -2521,7 +2553,7 @@ table.bn-plan td{padding:3px 4px}
   </section>
 
   <section class="view" id="v-marketing">
-    <div class="ov-tabs" id="mkTabs" role="tablist"><button data-t="overview" class="on" role="tab" aria-selected="true">Overview</button><button data-t="ads" role="tab" aria-selected="false">Ads</button><button data-t="gbp" role="tab" aria-selected="false">Google Business Profile</button><button data-t="social" role="tab" aria-selected="false">Social media</button><button data-t="data" role="tab" aria-selected="false">Data &amp; connection</button></div>
+    <div class="ov-tabs" id="mkTabs" role="tablist"><button data-t="campaigns" class="on" role="tab" aria-selected="true">Campaigns</button><button data-t="overview" role="tab" aria-selected="false">Overview</button><button data-t="ads" role="tab" aria-selected="false">Ads</button><button data-t="gbp" role="tab" aria-selected="false">Google Business Profile</button><button data-t="social" role="tab" aria-selected="false">Social media</button><button data-t="data" role="tab" aria-selected="false">Data &amp; connection</button></div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-head"><div><h2>Marketing</h2>
         <p class="hint"><span>Ads on Meta and Google, the Google Business Profile listings and organic social media of every brand, month by month, against the same month last year.</span> <span>Read from the RHG Performance dashboard that nl360, RHG's campaign manager, builds; the figures and their definitions are nl360's. Amounts in euros.</span></p></div>
@@ -2529,12 +2561,27 @@ table.bn-plan td{padding:3px 4px}
       <div class="filters" style="margin:12px 0 0;align-items:flex-end"><label>Month<select id="mkMonth"></select></label>
         <label>Brand<select id="mkBrand"><option value="">All brands</option></select></label></div>
       <p class="meta" id="mkStatus">Reading…</p></div>
-    <div class="mk-p" data-p="overview">
+    <div class="mk-p" data-p="campaigns">
+      <section class="cg-hero" id="cgHero"></section>
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Did the campaigns work?</h2>
+        <p class="hint"><span>Each brand and OPA unit in the month chosen: its sales growth against last year beside the rest of RHG's (the lift), what its ads cost against its sales, and per guest.</span> <span>Working: 5 points or more above the rest of RHG in a month with ads.</span> <span>Click a square for its months, its ads funnel and its Google listing.</span></p></div></div>
+        <div class="cg-lg" id="cgLegend"></div>
+        <div id="cgGrid"></div></div>
+      <div class="grid">
+        <div class="card"><h2>Spend against lift</h2><p class="hint">Each brand with ads: to the right, more of its sales spent on ads; up, more growth than the rest of RHG. Up-left is efficient; down-right is spending without a return.</p><div id="cgScatter"></div></div>
+        <div class="card"><h2>The ads funnel</h2><p class="hint">Every brand chosen together in the month: from the clicks to the guests at the tills, with what each step cost.</p><div id="cgFunnel"></div></div>
+      </div>
+      <details class="card" style="margin-top:4px"><summary><b>Every brand and unit</b> <span class="meta">the month's figures in one table</span></summary><div class="scroll" style="margin-top:10px"><table class="bn-t" id="cgTable"></table></div></details>
+      <p class="meta" id="cgNote" style="margin-top:10px"></p>
+    </div>
+    <div class="mk-p" data-p="overview" hidden>
+      <div class="cg-snap" id="cgSnap_overview"></div>
       <div class="kpis" id="mkKpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
       <div class="card"><div class="card-head"><div><h2>By brand</h2>
         <p class="hint"><span>The month of each brand: its sales, what its ads cost and brought, its Google listing and its Instagram, with the change against the same month last year.</span></p></div></div>
         <div class="scroll"><table class="bn-t" id="mkBrands"></table></div></div></div>
     <div class="mk-p" data-p="ads" hidden>
+      <div class="cg-snap" id="cgSnap_ads"></div>
       <div class="kpis" id="mkAdK" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Ads by brand</h2>
         <p class="hint"><span>Meta and Google Ads: spend, clicks and cost per click, the reservations (SevenRooms venues) and direction requests they brought, and nl360's estimate of the revenue they brought.</span></p></div></div>
@@ -2543,6 +2590,7 @@ table.bn-plan td{padding:3px 4px}
         <p class="hint"><span>The brand chosen above, or every brand together.</span></p></div></div>
         <div class="scroll"><table class="bn-t" id="mkAdTrend"></table></div></div></div>
     <div class="mk-p" data-p="gbp" hidden>
+      <div class="cg-snap" id="cgSnap_gbp"></div>
       <div class="kpis" id="mkGbK" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Google listing by brand</h2>
         <p class="hint"><span>Every action on the listing (directions, calls, website clicks, menu views), the rating of all reviews at the month end, and the reviews written in the month.</span></p></div></div>
@@ -2551,6 +2599,7 @@ table.bn-plan td{padding:3px 4px}
         <p class="hint"><span>Each OPA unit's own listing. These reviews also feed the Reviews KPI of Bonus management.</span></p></div></div>
         <div class="scroll"><table class="bn-t" id="mkGbLoc"></table></div></div></div>
     <div class="mk-p" data-p="social" hidden>
+      <div class="cg-snap" id="cgSnap_social"></div>
       <div class="kpis" id="mkSoK" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"></div>
       <div class="card"><div class="card-head"><div><h2>Social media by brand</h2>
         <p class="hint"><span>Organic only, no ads: Instagram posts that went out in the month and their numbers to date, followers at the month end; Facebook the same.</span></p></div></div>
@@ -6683,8 +6732,8 @@ function slShowTab(tab){
 }
 document.querySelectorAll("#slTabs button").forEach(b => b.onclick = () => slShowTab(b.dataset.t));
 // ---------------------------------------------------------------- Marketing (marketing.py): nl360's RHG Performance dashboard
-let mkData = null, mkTab = "overview";
-const MK_TITLE = {overview: "Overview", ads: "Ads", gbp: "Google Business Profile", social: "Social media", data: "Data & connection"};
+let mkData = null, mkTab = "campaigns";
+const MK_TITLE = {campaigns: "Campaigns", overview: "Overview", ads: "Ads", gbp: "Google Business Profile", social: "Social media", data: "Data & connection"};
 const mkAt = (arr, k) => arr == null || k < 0 ? null : (Array.isArray(arr) ? (arr[k] ?? null) : (arr[String(k)] ?? null));
 const mkEur = (v, d = 0) => v == null ? "–" : "€" + fmt(v, d);
 const mkNum = v => v == null ? "–" : fmt(v, 0);
@@ -6717,17 +6766,155 @@ const MK = {
 const mkRatio = (list, k, a, b) => { const x = mkSum(list, z => MK[a](z, k)), y = mkSum(list, z => MK[b](z, k)); return x != null && y ? x / y : null; };
 function mkK(){ return Number($("mkMonth").value || (mkData && mkData.months ? mkData.months.length - 1 : 0)); }
 function mkBrands(){ const id = $("mkBrand").value; return (mkData.brands || []).filter(b => !id || b.id === id); }
+// ---------- Marketing → Campaigns (mkkpi.py, /api/marketing/campaigns): did the campaigns work? ----------
+// nl360's ads and listing against Simphony's sales, by brand and OPA unit (Geri, 25 Nov 2026)
+let cgData = null, cgTimer = null;
+const CG_V = {working: ["Working", "var(--down)"], neutral: ["Neutral", "#c47f1f"], not_working: ["Not working", "var(--up)"], no_ads: ["No ads", "var(--line)"], no_ly: ["Not judged", "var(--sub)"]};
+const cgL = v => v == null ? "–" : flM(v);
+const cgPts = v => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1) + " pts";
+const cgPct = (v, d = 1) => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), d) + "%";
+const cgChip = v => `<span class="cg-chip" style="--c:${CG_V[v][1]}"><i></i>${esc(CG_V[v][0])}</span>`;
+async function cgLoad(){
+  clearTimeout(cgTimer);
+  try {
+    const j = await readJSON(await fetch("/api/marketing/campaigns"));
+    if (j.error && j.available !== false) throw new Error(j.error);
+    cgData = j; cgRender();
+    if (j.reading && (j.reading.running || j.reading.missing)) cgTimer = setTimeout(cgLoad, 8000);
+  } catch (e) { $("cgHero").innerHTML = `<p class="warn">${esc("Could not read: " + e.message)}</p>`; }
+}
+// the entities of the brand chosen above (the brand and its units), the month index of the page
+function cgSel(){
+  const id = $("mkBrand").value, E = (cgData.entities || []);
+  return id ? E.filter(e => e.id === id || e.parent === id) : E;
+}
+const cgM = (e, k) => e.months[k] || {};
+function cgRender(){
+  const d = cgData; if (!d) return;
+  if (!d.available) { $("cgHero").innerHTML = `<p class="warn">${esc(d.error || "No marketing data yet.")}</p>`; ["cgGrid", "cgScatter", "cgFunnel", "cgTable"].forEach(i => $(i).innerHTML = ""); cgSnaps(); return; }
+  const k = mkK(), E = cgSel(), brands = E.filter(e => e.kind === "brand"), ym = d.months[k];
+  const B = brands.map(e => cgM(e, k)), sum = f => B.reduce((s, m) => s + (m[f] || 0), 0);
+  const withAds = brands.filter(e => cgM(e, k).spend), work = withAds.filter(e => cgM(e, k).verdict === "working"), bad = withAds.filter(e => cgM(e, k).verdict === "not_working");
+  const spend = sum("spend"), sales = sum("sales"), guests = sum("guests"), res = sum("res"), dirs = sum("dirs");
+  const reading = d.reading && (d.reading.running || d.reading.missing) ? `<span class="cg-read">Reading Simphony: ${fmt(d.reading.done)} of ${fmt(d.reading.total || d.reading.missing)} days</span>` : "";
+  const T = (l, v, s, cls) => `<div class="cg-t"><span>${esc(l)}</span><b class="${cls || ""}">${v}</b><small>${s}</small></div>`;
+  $("cgHero").innerHTML = `<div class="cg-h1"><div class="cg-eye">Campaigns · ${esc(ym)}${$("mkBrand").value ? " · " + esc(brands[0] ? brands[0].name : "") : " · every brand"}</div>
+      <h2>${withAds.length ? `${work.length} of ${withAds.length} brands with ads beat the rest of RHG` : "No brand had ads this month"}</h2>
+      <p>${work.length ? `Working: ${work.map(e => esc(e.name)).join(", ")}.` : ""} ${bad.length ? `Not working: ${bad.map(e => esc(e.name)).join(", ")}.` : ""} ${reading}</p></div>
+    <div class="cg-ts">${T("Ad spend", cgL(spend), `lek · ${sales ? fmt(spend / sales * 100, 2) + "% of sales" : "–"}`)}
+      ${T("Cost per guest", guests ? fmt(spend / guests, 0) : "–", `lek of ads per guest at the tills`)}
+      ${T("Sales per lek of ads", spend ? fmt(sales / spend, 1) : "–", "Simphony net sales ÷ ad spend")}
+      ${T("From the ads", `${fmt(res)} · ${fmt(dirs)}`, `reservations · direction requests${res ? ` · ${fmt(spend / res, 0)} lek each reservation` : ""}`)}</div>`;
+  $("cgLegend").innerHTML = Object.keys(CG_V).map(cgChip).join("");
+  // the squares: brands, then the OPA units
+  const sq = e => { const m = cgM(e, k), v = m.verdict || "no_ly", hist = e.months.slice(Math.max(0, k - 11), k + 1);
+    const mx = Math.max(10, ...hist.map(h => Math.abs(h.lift || 0)));
+    const spark = `<svg viewBox="0 0 120 34" class="cg-spark" aria-hidden="true"><line x1="0" x2="120" y1="17" y2="17" stroke="var(--line)"/>${hist.map((h, i) => h.lift == null ? "" :
+      `<rect x="${i * 10 + 1}" width="8" y="${h.lift >= 0 ? 17 - h.lift / mx * 16 : 17}" height="${Math.max(1, Math.abs(h.lift) / mx * 16)}" rx="1.5" fill="${CG_V[h.verdict || "no_ly"][1]}"/>`).join("")}</svg>`;
+    return `<div class="cg-sq" style="--c:${CG_V[v][1]}" role="button" tabindex="0" data-pulse="cgent|${esc(e.id)}">
+      <div class="cg-sq-h"><b data-no-i18n>${esc(e.name)}</b>${cgChip(v)}</div>
+      <div class="cg-big"><b>${cgPts(m.lift)}</b><span>against the rest of RHG</span></div>
+      <div class="cg-st"><div><span>Sales vs LY</span><b>${cgPct(m.growth)}</b></div><div><span>Ad spend</span><b>${cgL(m.spend)}</b></div>
+        <div><span>% of sales</span><b>${m.mkt_pct == null ? "–" : fmt(m.mkt_pct, 2) + "%"}</b></div><div><span>Per guest</span><b>${m.cost_guest == null ? "–" : fmt(m.cost_guest, 0)}</b></div></div>
+      ${spark}<small class="meta">lift, the last 12 months</small></div>`; };
+  const units = E.filter(e => e.kind === "unit");
+  $("cgGrid").innerHTML = `<div class="cg-grid">${brands.map(sq).join("")}</div>` + (units.length ? `<h3 class="cg-sub">OPA by unit</h3><div class="cg-grid">${units.map(sq).join("")}</div>` : "")
+    + (d.unmatched && d.unmatched.length ? `<p class="meta">Not found in the restaurants of the registry (Settings → Location intelligence), so no Simphony sales: ${esc(d.unmatched.join(", "))}.</p>` : "");
+  // spend against lift
+  const P = withAds.map(e => ({e, m: cgM(e, k)})).filter(x => x.m.mkt_pct != null && x.m.lift != null);
+  if (P.length) {
+    const W = 520, H = 260, l = 66, b = 32, t = 12, xm = Math.max(...P.map(x => x.m.mkt_pct)) * 1.15 || 1, ym2 = Math.max(10, ...P.map(x => Math.abs(x.m.lift))) * 1.15;
+    const X = v => l + v / xm * (W - l - 14), Y = v => t + (H - t - b) / 2 * (1 - v / ym2);
+    $("cgScatter").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Spend against lift" class="cg-svg">
+      <line x1="${l}" x2="${W - 10}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><line x1="${l}" x2="${l}" y1="${t}" y2="${H - b}" stroke="var(--line)"/>
+      <line x1="${l}" x2="${W - 10}" y1="${Y(5)}" y2="${Y(5)}" stroke="var(--down)" stroke-dasharray="4 4" opacity=".6"/><line x1="${l}" x2="${W - 10}" y1="${Y(-5)}" y2="${Y(-5)}" stroke="var(--up)" stroke-dasharray="4 4" opacity=".6"/>
+      <text x="${l - 6}" y="${Y(ym2 / 1.15) + 4}" text-anchor="end">${cgPts(ym2 / 1.15)}</text><text x="${l - 6}" y="${Y(0) + 4}" text-anchor="end">0</text><text x="${l - 6}" y="${Y(-ym2 / 1.15) + 4}" text-anchor="end">${cgPts(-ym2 / 1.15)}</text>
+      <text x="${W - 10}" y="${H - 8}" text-anchor="end">${fmt(xm / 1.15, 1)}% of sales on ads →</text><text x="${l}" y="${H - 8}">0%</text>
+      ${P.map(x => `<g data-pulse="cgent|${esc(x.e.id)}" role="button" tabindex="0" style="cursor:pointer"><title>${esc(x.e.name)}: ${fmt(x.m.mkt_pct, 2)}% of sales, ${cgPts(x.m.lift)}</title>
+        <circle cx="${X(x.m.mkt_pct)}" cy="${Y(x.m.lift)}" r="${6 + Math.min(10, Math.sqrt(x.m.spend || 0) / 60)}" fill="${CG_V[x.m.verdict][1]}" fill-opacity=".85" stroke="#fff" stroke-width="2"/>
+        <text x="${X(x.m.mkt_pct) + 12}" y="${Y(x.m.lift) + 4}" style="fill:var(--ink);font-weight:700">${esc(x.e.name)}</text></g>`).join("")}</svg>`;
+  } else $("cgScatter").innerHTML = `<p class="meta">No brand with ads and sales last year in this month.</p>`;
+  $("cgFunnel").innerHTML = cgFunnelHtml(B);
+  // the table
+  $("cgTable").innerHTML = `<thead><tr><th>Brand / unit</th><th>Verdict</th><th class="num">Sales</th><th class="num">vs LY</th><th class="num">Rest of RHG</th><th class="num">Lift</th><th class="num">Ad spend</th><th class="num">% of sales</th><th class="num">Per guest</th><th class="num">Per check</th><th class="num">Checks vs LY</th><th class="num">Per click</th><th class="num">Per reservation</th><th class="num">Sales per lek</th><th class="num">nl360 est. return</th><th class="num">Listing / 100 checks</th><th class="num">Reviews / 1,000 checks</th></tr></thead><tbody>`
+    + E.map(e => { const m = cgM(e, k); return `<tr data-pulse="cgent|${esc(e.id)}" tabindex="0" style="cursor:pointer"><td><b>${esc(e.name)}</b>${e.kind === "unit" ? `<div class="meta">OPA unit</div>` : ""}</td><td>${cgChip(m.verdict || "no_ly")}</td>
+      <td class="num">${cgL(m.sales)}</td><td class="num">${cgPct(m.growth)}</td><td class="num">${cgPct(m.group_growth)}</td><td class="num"><b>${cgPts(m.lift)}</b></td><td class="num">${cgL(m.spend)}</td>
+      <td class="num">${m.mkt_pct == null ? "–" : fmt(m.mkt_pct, 2) + "%"}</td><td class="num">${m.cost_guest == null ? "–" : fmt(m.cost_guest, 0)}</td><td class="num">${m.cost_check == null ? "–" : fmt(m.cost_check, 0)}</td>
+      <td class="num">${cgPct(m.checks_growth)}</td><td class="num">${m.cpc == null ? "–" : fmt(m.cpc, 0)}</td><td class="num">${m.cost_res == null ? "–" : fmt(m.cost_res, 0)}</td><td class="num">${m.mer == null ? "–" : fmt(m.mer, 1)}</td>
+      <td class="num">${m.est_roas == null ? "–" : fmt(m.est_roas, 1) + "×"}</td><td class="num">${m.inter_100 == null ? "–" : fmt(m.inter_100, 1)}</td><td class="num">${m.reviews_1000 == null ? "–" : fmt(m.reviews_1000, 1)}</td></tr>`; }).join("") + `</tbody>`;
+  $("cgNote").innerHTML = `Ad spend in lek at ${d.rate ? fmt(d.rate, 2) + " lek for 1 euro (" + esc(d.rate_source) + ")" : "no rate: set EUR in Settings → group rates"}. ` + Object.values(d.definitions || {}).map(esc).join(" ");
+  cgSnaps();
+}
+function cgFunnelHtml(B){
+  const sum = f => B.reduce((s, m) => s + (m[f] || 0), 0), spend = sum("spend"), clicks = sum("clicks"), res = sum("res"), dirs = sum("dirs"), checks = sum("checks"), guests = sum("guests");
+  if (!spend) return `<p class="meta">No ad spend in the month.</p>`;
+  const st = [["Ad spend", spend, `lek`], ["Clicks", clicks, clicks ? `${fmt(spend / clicks, 0)} lek a click` : ""], ["Reservations", res, res ? `${fmt(spend / res, 0)} lek each · ${fmt(res / (clicks || 1) * 100, 1)} per 100 clicks` : "SevenRooms venues only"],
+    ["Direction requests", dirs, dirs ? `${fmt(spend / dirs, 0)} lek each` : "Google Ads"], ["Checks at the tills", checks, checks ? `${fmt(spend / checks, 0)} lek of ads a check` : ""], ["Guests", guests, guests ? `${fmt(spend / guests, 0)} lek of ads a guest` : ""]];
+  const mx = Math.max(...st.slice(1).map(x => x[1] || 0), 1);
+  return `<div class="cg-fun">${st.map(([l, v, s], i) => `<div class="cg-fr"><span>${esc(l)}</span><div class="cg-fb">${i ? `<i style="width:${Math.max(2, (v || 0) / mx * 100)}%"></i>` : ""}</div><b>${i ? fmt(v || 0) : flM(v)}</b><small>${esc(s)}</small></div>`).join("")}</div>`;
+}
+// the lift of each month as bars above and below zero, the ±5 points dashed
+function cgLiftChart(H){
+  const P = H.filter(h => h.lift != null); if (!P.length) return `<p class="meta">No month to compare with last year.</p>`;
+  const W = 900, Ht = 190, l = 70, t = 12, b = 24, n = H.length, bw = (W - l) / n, mx = Math.max(8, ...P.map(h => Math.abs(h.lift))) * 1.1;
+  const Y = v => t + (Ht - t - b) / 2 * (1 - v / mx);
+  return `<div class="pz-cols"><svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="Lift by month" class="cg-svg">
+    <line x1="${l}" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>
+    ${[5, -5].map(v => `<line x1="${l}" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v > 0 ? "var(--down)" : "var(--up)"}" stroke-dasharray="4 4" opacity=".6"/><text x="${l - 6}" y="${Y(v) + 4}" text-anchor="end">${cgPts(v)}</text>`).join("")}
+    ${H.map((h, i) => { const x = l + i * bw + 2, w = Math.max(3, bw - 6), v = h.lift;
+      return `<g><title>${esc(`${h.ym}: ${cgPts(v)} (${cgPct(h.growth)} vs LY, rest of RHG ${cgPct(h.group_growth)}) · ${CG_V[h.verdict || "no_ly"][0]}`)}</title>
+        ${v == null ? "" : `<rect x="${x}" width="${w}" y="${v >= 0 ? Y(v) : Y(0)}" height="${Math.max(1.5, Math.abs(Y(v) - Y(0)))}" rx="3" fill="${CG_V[h.verdict || "no_ly"][1]}"/>`}
+        <text x="${x + w / 2}" y="${Ht - 6}" text-anchor="middle">${esc(h.ym.slice(2))}</text></g>`; }).join("")}</svg></div>`
+    + `<div class="cg-lg" style="margin-top:6px">${["working", "neutral", "not_working", "no_ads"].map(cgChip).join("")}</div>`;
+}
+// one brand or unit: its months, its funnel, its listing
+function cgEntPop(id){
+  const d = cgData, e = d && d.entities.find(x => x.id === id); if (!e) return;
+  const k = mkK(), m = cgM(e, k), H = e.months.slice(Math.max(0, k - 11), k + 1);
+  Pulse.pop({title: esc(e.name), sub: esc(`${e.kind === "unit" ? "OPA unit" : "Brand"} · ${d.months[k]} · Simphony ${e.refs.join(", ") || "not found"}`), body:
+    Pulse.tiles([{l: "Verdict", v: cgChip(m.verdict || "no_ly"), s: m.complete === false ? "the month is still being read" : ""},
+      {l: "Lift", v: cgPts(m.lift), s: `${cgPct(m.growth)} vs LY · rest of RHG ${cgPct(m.group_growth)}`, cls: m.lift >= 5 ? "down" : m.lift <= -5 ? "up" : ""},
+      {l: "Sales", v: cgL(m.sales), s: `last year ${cgL(m.sales_ly)}`}, {l: "Ad spend", v: cgL(m.spend), s: `${m.mkt_pct == null ? "–" : fmt(m.mkt_pct, 2) + "%"} of sales · €${fmt(m.spend_eur || 0, 0)}`},
+      {l: "Cost per guest", v: m.cost_guest == null ? "–" : fmt(m.cost_guest, 0), s: `per check ${m.cost_check == null ? "–" : fmt(m.cost_check, 0)} · checks ${cgPct(m.checks_growth)} vs LY`},
+      {l: "Sales per lek of ads", v: m.mer == null ? "–" : fmt(m.mer, 1), s: `nl360's estimated return ${m.est_roas == null ? "–" : fmt(m.est_roas, 1) + "×"}`}])
+    + Pulse.panel("Lift, month by month", cgLiftChart(H), "against the rest of RHG; beyond the dashed lines: working or not working")
+    + Pulse.panel("Ad spend, month by month", Pulse.cols(H.map(h => ({label: h.ym.slice(2), segs: [[h.spend || 0, "var(--ch-0)", "ad spend"]], tip: `${h.ym}: ${cgL(h.spend)} lek · ${h.mkt_pct == null ? "–" : fmt(h.mkt_pct, 2) + "%"} of sales`})), null,
+        {w: 900, h: 130, aria: "Ad spend by month", maxLabel: x => flM(x)}))
+    + Pulse.panel("The ads funnel", cgFunnelHtml([m]))
+    + Pulse.panel("Google listing", Pulse.tiles([{l: "Listing actions", v: m.inter == null ? "–" : fmt(m.inter), s: m.inter_100 == null ? "" : `${fmt(m.inter_100, 1)} per 100 checks`},
+        {l: "New reviews", v: m.reviews == null ? "–" : fmt(m.reviews), s: m.reviews_1000 == null ? "" : `${fmt(m.reviews_1000, 1)} per 1,000 checks`}]))
+    + Pulse.panel("Every month", Pulse.list([["Month"], ["Verdict"], ["Sales", 1], ["vs LY", 1], ["Rest of RHG", 1], ["Lift", 1], ["Ad spend", 1], ["% of sales", 1], ["Per guest", 1], ["Sales per lek", 1]],
+        e.months.slice().reverse().map(h => ({cells: [esc(h.ym), cgChip(h.verdict || "no_ly"), cgL(h.sales), cgPct(h.growth), cgPct(h.group_growth), `<b>${cgPts(h.lift)}</b>`, cgL(h.spend),
+          h.mkt_pct == null ? "–" : fmt(h.mkt_pct, 2) + "%", h.cost_guest == null ? "–" : fmt(h.cost_guest, 0), h.mer == null ? "–" : fmt(h.mer, 1)]})), {max: 360}))});
+}
+Pulse.on("cgent", id => cgEntPop(id));
+// snapshots on top of the other tabs: the few figures that tie them to the sales
+function cgSnaps(){
+  const d = cgData, ok = d && d.available;
+  const k = ok ? mkK() : 0, B = ok ? cgSel().filter(e => e.kind === "brand").map(e => cgM(e, k)) : [], sum = f => B.reduce((s, m) => s + (m[f] || 0), 0);
+  const C = (l, v, s) => `<div class="cg-c"><span>${esc(l)}</span><b>${v}</b><small>${esc(s)}</small></div>`;
+  const spend = sum("spend"), sales = sum("sales"), guests = sum("guests"), checks = sum("checks"), clicks = sum("clicks"), res = sum("res"), inter = sum("inter"), rev = sum("reviews");
+  const work = B.filter(m => m.verdict === "working").length, ads = B.filter(m => m.spend).length;
+  const salesLy = sum("sales_ly"), g = sales && salesLy ? (sales / salesLy - 1) * 100 : null;
+  const S = {
+    overview: [C("Campaigns working", `${work} / ${ads}`, "brands with ads that beat the rest of RHG"), C("Ads % of sales", sales ? fmt(spend / sales * 100, 2) + "%" : "–", "Simphony net sales"), C("Cost per guest", guests ? fmt(spend / guests, 0) : "–", "lek of ads"), C("Sales vs LY", cgPct(g), "Simphony, the brands chosen")],
+    ads: [C("Sales per lek of ads", spend ? fmt(sales / spend, 1) : "–", "Simphony ÷ ad spend"), C("Cost per click", clicks ? fmt(spend / clicks, 0) : "–", "lek"), C("Cost per reservation", res ? fmt(spend / res, 0) : "–", "lek"), C("Reservations per 100 clicks", clicks ? fmt(res / clicks * 100, 1) : "–", "SevenRooms venues")],
+    gbp: [C("Listing actions per 100 checks", checks ? fmt(inter / checks * 100, 1) : "–", "Google listing ÷ Simphony checks"), C("New reviews per 1,000 checks", checks ? fmt(rev / checks * 1000, 1) : "–", "how often a visit becomes a review"), C("Checks vs LY", cgPct(sum("checks_ly") ? (checks / sum("checks_ly") - 1) * 100 : null), "Simphony")],
+    social: [C("Sales vs LY", cgPct(g), "Simphony, the brands chosen"), C("Checks vs LY", cgPct(sum("checks_ly") ? (checks / sum("checks_ly") - 1) * 100 : null), "Simphony"), C("Campaigns working", `${work} / ${ads}`, "see Campaigns")]};
+  Object.keys(S).forEach(t => { const el = $("cgSnap_" + t); if (el) el.innerHTML = ok ? `<span class="cg-snap-t">With the sales</span>` + S[t].join("") : ""; });
+}
 function mkShow(t){
   mkTab = t;
   document.querySelectorAll("#mkTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === t); b.setAttribute("aria-selected", b.dataset.t === t); });
   document.querySelectorAll("#v-marketing .mk-p").forEach(x => x.hidden = x.dataset.p !== t);
   if (!mkData) mkLoad(); else mkRender();
+  if (!cgData) cgLoad(); else cgRender();
   if (currentView().id === "marketing") setHeader();
 }
 document.querySelectorAll("#mkTabs button").forEach(b => b.onclick = () => mkShow(b.dataset.t));
-$("mkRead").onclick = () => mkLoad();
-$("mkMonth").onchange = () => mkRender();
-$("mkBrand").onchange = () => mkRender();
+$("mkRead").onclick = () => { mkLoad(); cgLoad(); };
+$("mkMonth").onchange = () => { mkRender(); cgRender(); };
+$("mkBrand").onchange = () => { mkRender(); cgRender(); };
 async function mkLoad(){
   $("mkStatus").textContent = "Reading…";
   try { const j = await readJSON(await fetch("/api/marketing")); if (j.error && j.available !== false) throw new Error(j.error); mkData = j; mkFill(); mkRender(); }

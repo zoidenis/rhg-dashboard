@@ -42,6 +42,8 @@ FINANCE = [
     # Marketing (Geri, 23 Nov 2026): nl360's RHG Performance dashboard read into pulse: ads, Google Business Profile, organic
     # social, by brand and month (marketing.py)
     ("marketing", "Marketing", "Marketing & Sales", "mkTabs", [
+        # Campaigns (Geri, 25 Nov 2026): did the campaigns work? nl360 against Simphony's sales (mkkpi.py)
+        ("campaigns", "Campaigns", "company", []),
         ("overview", "Overview", "company", []),
         ("ads", "Ads", "company", []),
         ("gbp", "Google Business Profile", "company", []),

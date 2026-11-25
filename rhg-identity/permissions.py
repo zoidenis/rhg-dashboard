@@ -406,7 +406,10 @@ ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
                  "finance.s.marketing.overview": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
                  "finance.s.marketing.ads": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
                  "finance.s.marketing.gbp": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
-                 "finance.s.marketing.social": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main")}
+                 "finance.s.marketing.social": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
+                 # Marketing → Campaigns (25 Nov 2026): whoever reads the Marketing overview
+                 "finance.s.marketing.campaigns": ("finance.s.marketing.overview", "platform.s.executive.overview",
+                                                   "platform.s.executive.sales", "finance.s.sales.main")}
 # Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
 REMOVED_SCREENS = ("purchasing.s.live", "finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
                    "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",

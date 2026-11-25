@@ -172,7 +172,7 @@ def public():
                      for l in b.get("locs") or []]})
     ch = v["checks"] if isinstance(v["checks"], dict) else {}
     return {"available": True, "generated": d.get("generated"), "synced": d.get("syncedAt"), "latest_bus_dt": d.get("latestBusDt"),
-            "months": d.get("months") or [], "gbp_first": d.get("gbpFirst"), "social_from": d.get("socialFrom"),
+            "months": d.get("months") or [], "fx_rate": d.get("fxRate"), "gbp_first": d.get("gbpFirst"), "social_from": d.get("socialFrom"),
             "ads_source": d.get("adsSource"), "brands": brands, "symbiosis": d.get("symbiosis"),
             "checks": {"total": ch.get("total"), "mismatches": len(ch.get("mismatches") or []),
                        "workbook_diffs": len(ch.get("workbookDiffs") or [])} if ch else None,
