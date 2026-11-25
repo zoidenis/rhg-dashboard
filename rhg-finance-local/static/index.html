@@ -381,6 +381,10 @@ td.num,th.num{text-align:right}
 .pg-num{font-size:clamp(40px,6vw,64px);font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;color:#fff;transition:opacity .3s}
 .pg-hero.up .pg-num{color:#9ff0c9}.pg-hero.dn .pg-num{color:#ffc2b5}
 .pg-cur{font-size:15px;font-weight:700;color:#a0d8ea}
+.pg-big[data-pulse]{cursor:pointer;border-radius:14px;width:max-content;max-width:100%;padding:0 8px 0 0}.pg-big[data-pulse]:hover .pg-how,.pg-big[data-pulse]:focus-visible .pg-how{opacity:1;transform:none}
+.pg-big[data-pulse]:focus-visible{outline:2px solid #a0d8ea;outline-offset:4px}
+.pg-how{align-self:center;font-size:12px;font-weight:700;color:#062634;background:#a0d8ea;border-radius:999px;padding:3px 10px;opacity:.75;transform:translateX(-4px);transition:.15s}
+.ps-x td.f{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--sub);white-space:nowrap}
 .pg-sub{font-size:13px;color:#cfe8f0}.pg-sub b{color:#fff}
 .pg-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .pg-chips span{display:flex;flex-direction:column;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:7px 11px;min-width:96px}
@@ -1830,7 +1834,7 @@ table.bn-plan td{padding:3px 4px}
         <div class="pg-hero-l">
           <div class="pg-eyebrow"><span>Price simulator</span> · <span id="pgScope" data-no-i18n></span> · <span id="pgPeriod"></span></div>
           <h2 class="pg-q">What if you changed your prices?</h2>
-          <div class="pg-big" aria-live="polite"><span class="pg-num" id="pgBig">0</span> <span class="pg-cur" id="pgCur">ALL</span></div>
+          <div class="pg-big" aria-live="polite" data-pulse="psexplain|" role="button" tabindex="0" title="How this figure is worked out"><span class="pg-num" id="pgBig">0</span> <span class="pg-cur" id="pgCur">ALL</span><span class="pg-how">How? ›</span></div>
           <div class="pg-sub" id="pgSub">extra sales a year</div>
           <div class="pg-chips" id="pgChips"></div>
         </div>
@@ -5030,6 +5034,41 @@ function psLive(){
   });
   psBasket(S); psWins();
 }
+// How the big number is worked out (Geri, 25 Nov 2026: to check the calculation): every price changed, step by step
+function psExplain(){
+  const d = psData; if (!d) return;
+  const yr = psYear(), days = d.period.days, C = d.currency, R = [];
+  for (const r of psRows()) { const p1 = psPrice(r.it, r.ch); if (p1 === r.c.price) continue; R.push(Object.assign({r, p1, el: psEl(r.it.cls, r.ch), a: psFactor(r.it.vat, r.ch), ch: psChan(r.ch)}, psEff(r.it, r.ch, p1))); }
+  R.sort((x, y) => Math.abs(y.new_net - y.net) - Math.abs(x.new_net - x.net));
+  const dn = R.reduce((s, x) => s + x.new_net - x.net, 0), dm = R.reduce((s, x) => s + (x.r.it.cost == null ? 0 : x.new_cm - x.cm), 0);
+  const f2 = v => fmt(v, 2), f0 = v => fmt(v, 0), f1 = v => fmt(v, 1);
+  if (!R.length) { Pulse.pop({title: "Extra sales a year", sub: esc(`${d.title} · ${d.period.from} → ${d.period.to}`), body: `<p class="meta">No price is changed yet: the figure is 0. Move a category or an item, or let Pulse suggest.</p>`}); return; }
+  const x = R[0], it = x.r.it, v = 1 + (it.vat || 0) / 100, k = (x.ch.commission_pct || 0) / 100;
+  const step = (n, t, calc, res) => `<tr><td class="num"><b>${n}</b></td><td>${t}</td><td class="f">${calc}</td><td class="num"><b>${res}</b></td></tr>`;
+  const worked = `<div class="scroll"><table class="ps-x" data-nosort><tr><th></th><th>Step</th><th>Calculation</th><th class="num">Result</th></tr>`
+    + step(1, `Items sold at a price in the ${f0(days)} days`, `Simphony, ${esc(x.r.ch)}`, f1(x.qty))
+    + step(2, "Price today, VAT included", x.r.c.menu_source && x.r.c.menu_source !== "EMC" ? esc(x.r.c.menu_source) : "sales with VAT / items sold at a price", f2(x.r.c.price))
+    + step(3, "New price", "", f0(x.p1))
+    + step(4, `Items sold at the new price (elasticity ${f2(x.el)})`, `${f1(x.qty)} × (${f2(x.p1)} / ${f2(x.r.c.price)}) ^ ${f2(x.el)}`, f1(x.new_qty))
+    + step(5, "Sales today, without VAT", `${f2(x.r.c.price)} / ${f2(v)} × ${f1(x.qty)}`, f0(x.net))
+    + step(6, "Sales at the new price, without VAT", `${f2(x.p1)} / ${f2(v)} × ${f1(x.new_qty)}`, f0(x.new_net))
+    + step(7, `Change in the ${f0(days)} days`, `${f0(x.new_net)} − ${f0(x.net)}`, psSign(x.new_net - x.net))
+    + step(8, "Change in a year", `${psSign(x.new_net - x.net)} × 365 / ${f0(days)}`, psSign((x.new_net - x.net) * yr))
+    + (it.cost != null ? step(9, "Margin per item, new price", `${f0(x.p1)} / ${f2(v)}${k ? ` − ${f0(x.ch.commission_base === "net" ? k * x.p1 / v : k * x.p1)} commission (${fmt(k * 100)}%)` : ""} − ${f1(it.cost)} cost`, f1(x.new_cm_unit))
+      + step(10, "Margin in a year: change", `(${f1(x.new_cm_unit)} × ${f1(x.new_qty)} − ${f1(x.cm_unit)} × ${f1(x.qty)}) × 365 / ${f0(days)}`, psSign((x.new_cm - x.cm) * yr)) : "")
+    + `</table></div>`;
+  Pulse.pop({title: `Extra sales a year: ${psSign(dn * yr)} ${esc(C)}`, sub: esc(`${d.title} · ${d.period.from} → ${d.period.to} (${days} days) · ${psChSel.size ? [...psChSel].join(", ") : "every channel"}`), body:
+    Pulse.tiles([{l: "Prices changed", v: fmt(R.length), s: "item × channel; the others add nothing"}, {l: `Change in the ${days} days`, v: psSign(dn), s: `${C} without VAT`},
+      {l: "× 365 / " + days, v: psSign(dn * yr), s: "extra sales a year", cls: dn >= 0 ? "down" : "up"}, {l: "Margin a year", v: psSign(dm * yr), s: "items with a portion cost", cls: dm >= 0 ? "down" : "up"}])
+    + Pulse.panel(`Worked through: ${esc(it.name)} on ${esc(x.r.ch)}`, worked, R.length > 1 ? "the largest change; every price is in the table below" : "")
+    + Pulse.panel("Every price changed", Pulse.list([["Item"], ["Channel"], ["Items sold", 1], ["Price today", 1], ["New price", 1], ["Elasticity", 1], ["Items sold, new", 1], ["Sales today", 1], ["Sales, new", 1], ["Change", 1], ["A year", 1]],
+        R.map(y => ({cells: [`<b>${esc(y.r.it.name)}</b><div class="meta">${esc(psCodes(y.r.it))}</div>`, `<span data-no-i18n>${esc(y.r.ch)}</span>`, f0(y.qty), f0(y.r.c.price), `<b>${f0(y.p1)}</b>`, f2(y.el), f0(y.new_qty),
+          f0(y.net), f0(y.new_net), `<b class="${y.new_net >= y.net ? "down" : "up"}">${psSign(y.new_net - y.net)}</b>`, psSign((y.new_net - y.net) * yr)], open: `psitem|${y.r.it.mi}`}))
+          .concat([{cells: ["<b>Total</b>", "", "", "", "", "", "", f0(R.reduce((s, y) => s + y.net, 0)), f0(R.reduce((s, y) => s + y.new_net, 0)), `<b>${psSign(dn)}</b>`, `<b>${psSign(dn * yr)}</b>`]}]), {max: 420}),
+        "sales without VAT = price / (1 + VAT) × items sold")
+    + `<p class="meta">Items sold at a price only: units rung at no price (combo meals, the platform's own lines) do not move with the price. The elasticity is the class's (Parameters), × ${fmt(psP.el_delivery || 1, 1)} on delivery channels. A year = the period's change at the same pace for 365 days.</p>`});
+}
+Pulse.on("psexplain", () => psExplain());
 // the big number counts to its new value
 function psTween(to){
   const el = $("pgBig"), from = psShown, t0 = performance.now(), dur = 450;
@@ -5190,6 +5229,8 @@ function psItemPop(mi){
   Pulse.pop({title: esc(it.name), sub: esc(`${psCodes(it)} · ${it.section} · ${d.title} · ${d.period.from} → ${d.period.to}`), body:
     Pulse.tiles([{l: "Class", v: psSt(it.cls)}, {l: "Portion cost", v: it.cost == null ? "–" : fmt(it.cost, 0), s: it.cost == null ? (it.bc_item ? `BC item ${it.bc_item}: no recipe or cost` : "no BC item found for it") : `${C} · BC item ${it.bc_item || it.mi}`},
       {l: "VAT", v: fmt(it.vat, 0) + "%"}, {l: "Items sold", v: fmt(it.qty, 0), s: `sales ${flM(it.net)} ${C}`},
+      ...(it.twin != null ? [(() => { const tw = d.items.find(i => i.mi === it.twin), tc = tw && Object.values(tw.channels).sort((a, b) => b.qty - a.qty)[0];
+        return tw ? {l: it.delivery ? "Its eat-in item" : "Its delivery item", v: tc ? fmt(tc.price, 0) : "–", s: esc(tw.name), open: `psitem|${tw.mi}`} : null; })()] : []),
       {l: "Competitors", v: it.competitors.length ? fmt(it.competitors.length) : "–", s: it.competitors.length ? `median ${fmt(Pulse_median(it.competitors.map(x => x.price)), 0)}` : "no price matched"}])
     + Pulse.panel("By channel", Pulse.list([["Channel"], ["Items sold", 1], ["Price today", 1], ["Suggested", 1], ["New price", 1], ["Competitors", 1], ["Margin per item", 1], ["Change of margin", 1]],
         chs.map(ch => { const x = it.channels[ch], p1 = psPrice(it, ch), e = psEff(it, ch, p1);
@@ -5325,6 +5366,12 @@ document.addEventListener("click", e => {
   if (prod && psData) { if (!pdMi) pdPick(psData.items[0]); else pdRender(); }
 });
 const pdItem = () => psData && psData.items.find(i => String(i.mi) === String(pdMi));
+// a delivery item (… DEL) beside its eat-in item, and the other way round
+function pdTwin(it){
+  const tw = it.twin != null && psData.items.find(i => i.mi === it.twin); if (!tw) return null;
+  const tc = Object.values(tw.channels).sort((a, b) => b.qty - a.qty)[0];
+  return tc ? [it.delivery ? "Eat-in item" : "Delivery item", tc.price, "#16a085"] : null;
+}
 function pdPick(it, ch){
   if (!it) return;
   pdMi = it.mi;
@@ -5383,7 +5430,7 @@ function pdRender(){
   // the price against the break-even and the competitors
   const B = [["Break-even", be, "var(--ch-4)"], comps.length ? ["Competitors, low", Math.min(...comps), "var(--ch-0)"] : null, cAvg != null ? ["Competitors, average", cAvg, "var(--ch-0)"] : null,
     comps.length ? ["Competitors, high", Math.max(...comps), "var(--ch-0)"] : null, ["Today", c.price, "var(--sub)"], c.suggested && c.suggested !== c.price ? ["Pulse", c.suggested, "#c47f1f"] : null,
-    tgt != null ? ["At the cost target", tgt, "var(--ch-2)"] : null, ["New", nw.p, "var(--pg-up)"]].filter(x => x && x[1] != null);
+    tgt != null ? ["At the cost target", tgt, "var(--ch-2)"] : null, pdTwin(it), ["New", nw.p, "var(--pg-up)"]].filter(x => x && x[1] != null);
   const mx = Math.max(...B.map(x => x[1])) * 1.12 || 1, W = 520, H = 220, top = 18, bot = 46, bw = W / B.length, h = H - top - bot, y = v => top + h - v / mx * h;
   $("pdBars").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price comparison">
     <line x1="0" x2="${W}" y1="${top + h}" y2="${top + h}" stroke="var(--line)"/>

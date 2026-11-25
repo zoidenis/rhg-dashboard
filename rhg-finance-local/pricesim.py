@@ -330,6 +330,18 @@ def effect(q, price, new, cost, vat, k=0.0, base="vat", el=-1.0):
 GENERIC = {"ORDER", "TYPE", "NO", "THE", "AND", "TAKE", "AWAY", "EAT", "IN", "DINE", "OUT", "DE", "TO", "GO", "ME", "NE"}
 
 
+DEL_RE = re.compile(r"[\s\-_(]+DEL\)?\s*$", re.I)
+
+
+def is_del(name):
+    """A delivery item: its name ends in DEL (Chicken Gyros Big DEL), with a price of its own for delivery."""
+    return bool(DEL_RE.search(str(name or "")))
+
+
+def base_name(name):
+    return DEL_RE.sub("", str(name or "")).strip()
+
+
 def channel_words(ch):
     return {w for w in re.split(r"[^A-Z0-9]+", str(ch).upper()) if len(w) >= 3 and w not in GENERIC}
 
@@ -459,6 +471,15 @@ def build(ds, level="all", key="", section="family", settings=None):
                  commission_base=cc.get("commission_base") or "vat", delivery=is_delivery(ch, cfg))
     eat = max((c for c in chans.values() if not c["delivery"]), key=lambda c: (bool(EAT_IN_HINT.search(c["channel"])), c["qty"]),
               default=None)
+    # delivery items: the same product with " DEL" at the end of its name and a price of its own (Chicken Gyros Big DEL);
+    # each is paired with its eat-in item by the name
+    by_name = {norm(it["name"]): mi for mi, it in items.items() if not is_del(it["name"])}
+    twin = {}
+    for mi, it in items.items():
+        if is_del(it["name"]):
+            b = by_name.get(norm(base_name(it["name"])))
+            if b is not None:
+                twin[mi], twin[b] = b, mi
     comp_rows = [dict(r, source=s["file"]) for s in load_competitors()["sources"] for r in s["rows"]]
     brands = sorted({L["brand"] for L in locs if L["brand"]})
     cmap, unmatched = match(comp_rows, list(items.values()), brands)
@@ -478,7 +499,9 @@ def build(ds, level="all", key="", section="family", settings=None):
                     ([] if c["delivery"] else [r["price"] for r in comps if not r["channel"] or not DELIVERY_HINT.search(r["channel"])])
             eat_ex = None
             if eat and ch != eat["channel"]:
-                eq, en, _r = per.get((mi, eat["channel"]), (0.0, 0.0, 0.0))
+                # a delivery item ("… DEL") keeps the margin of its eat-in twin (Geri, 25 Nov 2026)
+                src = twin.get(mi) if twin.get(mi) and is_del(items[mi]["name"]) else mi
+                eq, en, _r = per.get((src, eat["channel"]), (0.0, 0.0, 0.0))
                 eat_ex = en / eq if eq > 0 else None
             el = P.get(f"el_{it['cls']}", -1.0) * (P["el_delivery"] if c["delivery"] else 1.0)
             sug, why = suggest(it["cls"], price, it["cost"], v, k, c["commission_base"], S["target"], ccomp, eat_ex, P, step, el)
@@ -497,6 +520,7 @@ def build(ds, level="all", key="", section="family", settings=None):
         out.append({"mi": mi, "bc_item": it.get("bc_item") or "", "name": it["name"], "section": it["section"], "family": it["family"], "major": it["major"],
                     "cls": it["cls"], "cost": it["cost"], "vat": v, "emc_incl": it.get("emc_incl"), "qty": it["qty"],
                     "net": it["net"], "channels": chs,
+                    "delivery": is_del(it["name"]), "twin": twin.get(mi),
                     "competitors": [{k: r.get(k) for k in ("competitor", "item", "price", "channel", "date", "source", "matched")}
                                     for r in comps][:30]})
     out.sort(key=lambda x: -x["net"])

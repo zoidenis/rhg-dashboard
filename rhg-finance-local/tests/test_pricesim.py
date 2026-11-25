@@ -161,3 +161,21 @@ def test_the_channel_price_from_its_emc_level(base, monkeypatch):
     w = pricesim.build(base, "brand", "OPA")["items"][0]["channels"]["DE-WOLT"]
     assert w["price"] == 480.0 and round(w["qty"]) == 76 and w["menu_source"] == "EMC level Wolt"
     assert pricesim.channel_words("DE - WOLT") == {"WOLT"} and pricesim.channel_words("EAT IN") == set()
+
+
+def test_delivery_items_are_paired_with_their_eat_in_item():
+    assert pricesim.is_del("Chicken Gyros Big DEL") and pricesim.is_del("Pita (DEL)") and not pricesim.is_del("Delight")
+    assert pricesim.base_name("Chicken Gyros Big DEL") == "Chicken Gyros Big"
+
+
+def test_a_del_item_keeps_the_margin_of_its_eat_in_twin(base, monkeypatch):
+    an = menueng.analyse(base, "locations", "OPA_B")
+    it2 = dict(an["items"][0], mi=2, name="Pita Gyros Pule DEL", emc_incl=440.0)
+    monkeypatch.setattr(menueng, "analyse", lambda *a, **k: dict(an, items=an["items"] + [it2]))
+    monkeypatch.setattr(menueng, "items_by_order_type", lambda ref, a, b: [("2026-11-02", 1, 1, 33333.3, 80, 0),
+                                                                          ("2026-11-02", 2, 2, 7333.3, 20, 0)])
+    base["rows"]["OPA_B"].append({"mi": 2, "vat": 20.0})
+    r = {i["mi"]: i for i in pricesim.build(base, "brand", "OPA")["items"]}
+    assert r[2]["delivery"] and r[2]["twin"] == 1 and r[1]["twin"] == 2
+    # 440 on Wolt at 30%: the eat-in margin (500 → 416.67 without VAT) needs 781; the step allows 8%: 475.2 → 480
+    assert r[2]["channels"]["DE-WOLT"]["suggested"] == 480 and any("Delivery" in w for w in r[2]["channels"]["DE-WOLT"]["why"])
