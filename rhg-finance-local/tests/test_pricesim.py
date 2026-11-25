@@ -179,3 +179,24 @@ def test_a_del_item_keeps_the_margin_of_its_eat_in_twin(base, monkeypatch):
     assert r[2]["delivery"] and r[2]["twin"] == 1 and r[1]["twin"] == 2
     # 440 on Wolt at 30%: the eat-in margin (500 → 416.67 without VAT) needs 781; the step allows 8%: 475.2 → 480
     assert r[2]["channels"]["DE-WOLT"]["suggested"] == 480 and any("Delivery" in w for w in r[2]["channels"]["DE-WOLT"]["why"])
+
+
+def test_each_location_at_its_own_price(base, monkeypatch):
+    # Chicken Gyros Pita Combo: 530 at OPA Bllok, 590 at OPA Arena; Wolt sells it at Arena only: 590, not the mix
+    base["locations"].append({"ref": "OPA_A", "name": "OPA Arena", "brand": "OPA", "currency": "ALL"})
+    monkeypatch.setattr(pricesim.locintel, "registry", lambda settings=None: [
+        {"ref": "OPA_B", "brand": "OPA", "price_group": "OPA"}, {"ref": "OPA_A", "brand": "OPA", "price_group": "OPA"}])
+    an = menueng.analyse(base, "locations", "OPA_B")
+    an = dict(an, selection=[{"ref": "OPA_B", "name": "OPA Bllok", "currency": "ALL"}, {"ref": "OPA_A", "name": "OPA Arena", "currency": "ALL"}],
+              items=[dict(an["items"][0], emc_incl=541.0)])
+    monkeypatch.setattr(menueng, "analyse", lambda *a, **k: an)
+    monkeypatch.setattr(menueng, "emc_prices", lambda ref: {1: ({"OPA_B": 530.0, "OPA_A": 590.0}[ref], 530.0)})
+    monkeypatch.setattr(simphony, "rvc_dims", lambda ref: {1: "Restaurant"})
+    monkeypatch.setattr(simphony, "menu_item_prices", lambda ref, max_age=3600, history=False: [])
+    sold = {"OPA_B": [("2026-11-02", 1, 1, 530 / 1.2 * 50, 50, 0)],
+            "OPA_A": [("2026-11-02", 1, 1, 590 / 1.2 * 30, 30, 0), ("2026-11-02", 2, 1, 590 / 1.2 * 39, 39, 0)]}
+    monkeypatch.setattr(menueng, "items_by_order_type", lambda ref, a, b: sold[ref])
+    ch = pricesim.build(base, "brand", "OPA")["items"][0]["channels"]
+    assert ch["DE-WOLT"]["price"] == 590.0 and round(ch["DE-WOLT"]["qty"]) == 39 and ch["DE-WOLT"]["menu_price"] == 590.0
+    assert [(x["name"], x["price"]) for x in ch["DE-WOLT"]["locs"]] == [("OPA Arena", 590.0)]
+    assert ch["EAT IN"]["price"] == 552.5 and ch["EAT IN"]["menu_price"] == 552.5              # 50 at 530 and 30 at 590

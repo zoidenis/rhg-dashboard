@@ -5096,7 +5096,7 @@ function psExplain(){
   const step = (n, t, calc, res) => `<tr><td class="num"><b>${n}</b></td><td>${t}</td><td class="f">${calc}</td><td class="num"><b>${res}</b></td></tr>`;
   const worked = `<div class="scroll"><table class="ps-x" data-nosort><tr><th></th><th>Step</th><th>Calculation</th><th class="num">Result</th></tr>`
     + step(1, `Items sold at a price in the ${f0(days)} days`, `Simphony, ${esc(x.r.ch)}`, f1(x.qty))
-    + step(2, "Price today, VAT included", x.r.c.menu_source && x.r.c.menu_source !== "EMC" ? esc(x.r.c.menu_source) : "sales with VAT / items sold at a price", f2(x.r.c.price))
+    + step(2, "Price today, VAT included", x.r.c.menu_source && x.r.c.menu_source !== "EMC" ? esc(x.r.c.menu_source) : "sales with VAT / items sold at a price, each location at its own price" + psLocs(x.r.c), f2(x.r.c.price))
     + step(3, "New price", "", f0(x.p1))
     + step(4, `Items sold at the new price (elasticity ${f2(x.el)})`, `${f1(x.qty)} × (${f2(x.p1)} / ${f2(x.r.c.price)}) ^ ${f2(x.el)}`, f1(x.new_qty))
     + step(5, "Sales today, without VAT", `${f2(x.r.c.price)} / ${f2(v)} × ${f1(x.qty)}`, f0(x.net))
@@ -5283,7 +5283,7 @@ function psItemPop(mi){
       {l: "Competitors", v: it.competitors.length ? fmt(it.competitors.length) : "–", s: it.competitors.length ? `median ${fmt(Pulse_median(it.competitors.map(x => x.price)), 0)}` : "no price matched"}])
     + Pulse.panel("By channel", Pulse.list([["Channel"], ["Items sold", 1], ["Price today", 1], ["Suggested", 1], ["New price", 1], ["Competitors", 1], ["Margin per item", 1], ["Change of margin", 1]],
         chs.map(ch => { const x = it.channels[ch], p1 = psPrice(it, ch), e = psEff(it, ch, p1);
-          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, `${fmt(x.qty, 0)}${x.unpriced >= 1 ? `<div class="meta">+${fmt(x.unpriced, 0)} at no price</div>` : ""}`, `${fmt(x.price, 0)}${x.menu_source && x.menu_source !== "EMC" ? `<div class="meta">${esc(x.menu_source)}: ${fmt(x.menu_price, 0)}</div>` : ""}`,
+          return {cells: [`<b data-no-i18n>${esc(ch)}</b>${psChan(ch).commission_pct ? `<div class="meta">${fmt(psChan(ch).commission_pct)}% commission</div>` : ""}`, `${fmt(x.qty, 0)}${x.unpriced >= 1 ? `<div class="meta">+${fmt(x.unpriced, 0)} at no price</div>` : ""}`, `${fmt(x.price, 0)}${x.menu_source && x.menu_source !== "EMC" ? `<div class="meta">${esc(x.menu_source)}: ${fmt(x.menu_price, 0)}</div>` : ""}${psLocs(x)}`,
             x.suggested && x.suggested !== x.price ? `<button type="button" class="ps-sug ${x.suggested > x.price ? "up" : "dn"}" data-psuse="${esc(psK(it, ch))}">${fmt(x.suggested, 0)}</button>` : `<span class="meta">hold</span>`,
             p1 !== x.price ? `<b>${fmt(p1, 0)}</b>` : "–", x.comp_median ? fmt(x.comp_median, 0) : "–",
             it.cost == null ? "–" : `${fmt(e.cm_unit, 0)}${p1 !== x.price ? ` → <b>${fmt(e.new_cm_unit, 0)}</b>` : ""}`,
@@ -5441,6 +5441,10 @@ function pdPick(it, ch){
   pdRender();
 }
 // the figures of one price on the item and channel chosen, with the inputs
+// where a channel's price today comes from: each location at its own price (Geri, 25 Nov 2026)
+const psLocs = x => (x.locs || []).length > 1 || ((x.locs || [])[0] && (x.locs[0].price || 0).toFixed(0) !== (x.price || 0).toFixed(0))
+  ? `<div class="meta ps-locs" data-no-i18n>${x.locs.map(l => `${esc(l.name)} ${fmt(l.price, 0)} ×${fmt(l.qty, 0)}`).join("<br>")}</div>`
+  : (x.locs || [])[0] ? `<div class="meta" data-no-i18n>${esc(x.locs[0].name)}</div>` : "";
 function pdAt(p){
   const it = pdItem(), c = it.channels[pdCh], v = (it.vat || 0) / 100, ch = psChan(pdCh), k = (ch.commission_pct || 0) / 100;
   const cost = pdIn.cost == null || pdIn.cost === "" ? null : +pdIn.cost, net = p / (1 + v), comm = ch.commission_base === "net" ? k * net : k * p;

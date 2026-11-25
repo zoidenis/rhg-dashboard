@@ -346,9 +346,9 @@ def channel_words(ch):
     return {w for w in re.split(r"[^A-Z0-9]+", str(ch).upper()) if len(w) >= 3 and w not in GENERIC}
 
 
-def channel_prices(locs, channels, items, rates=None, errors=None):
-    """{(menu item, channel): (price with VAT, "EMC level <name>")}: the prices of the EMC price levels or revenue
-    centres whose name carries a word of the channel's (WOLT of DE - WOLT), the most common across the locations."""
+def loc_channel_prices(locs, channels, items, rates=None, errors=None):
+    """{(location, menu item, channel): (price with VAT, "EMC level <name>")}: the price of the EMC price levels or
+    revenue centres of each location whose name carries a word of the channel's (WOLT of DE - WOLT), the most common."""
     want = {ch: channel_words(ch) for ch in channels}
     want = {ch: w for ch, w in want.items() if w}
     if not want:
@@ -373,11 +373,23 @@ def channel_prices(locs, channels, items, rates=None, errors=None):
             words = set(re.split(r"[^A-Z0-9]+", names))
             for ch, w in want.items():
                 if w & words:
-                    found.setdefault((r["num"], ch), []).append((round(float(p) * f, 2), r.get("level_name") or f"level {r.get('level')}"))
+                    found.setdefault((L["ref"], r["num"], ch), []).append((round(float(p) * f, 2), r.get("level_name") or f"level {r.get('level')}"))
     out = {}
     for k, lst in found.items():
         price = statistics.mode([p for p, _n in lst])
         out[k] = (price, f"EMC level {next(n for p, n in lst if p == price)}")
+    return out
+
+
+def channel_prices(locs, channels, items, rates=None, errors=None):
+    """{(menu item, channel): (price with VAT, "EMC level <name>")}: the most common across the locations."""
+    by = {}
+    for (_ref, mi, ch), v in loc_channel_prices(locs, channels, items, rates, errors).items():
+        by.setdefault((mi, ch), []).append(v)
+    out = {}
+    for k, lst in by.items():
+        price = statistics.mode([p for p, _n in lst])
+        out[k] = next(v for v in lst if v[0] == price)
     return out
 
 
@@ -434,7 +446,7 @@ def build(ds, level="all", key="", section="family", settings=None):
                 continue
             n = ots.get(int(ot)) if str(ot).lstrip("-").isdigit() and int(ot) else None
             ch = chanprof.channel_key(n or ("No order type" if not ot or str(ot) == "0" else f"Order type {ot}"))
-            x = per.setdefault((mi, ch), [0.0, 0.0])
+            x = per.setdefault((mi, ch, L["ref"]), [0.0, 0.0])
             x[0] += qty or 0
             x[1] += (net or 0) * f
 
@@ -448,15 +460,47 @@ def build(ds, level="all", key="", section="family", settings=None):
     # most the units rung; without an EMC price, the item's share of units sold at a price
     # the menu price of the item on a channel: the EMC price of a price level or revenue centre named like the channel
     # (a level "Wolt" for DE - WOLT), else the item's menu price (Menu engineering's)
-    ch_names = {ch for (_mi, ch) in per}
-    chref = channel_prices(locs, ch_names, set(items), rates if convert else None, errors)
+    # each location at its own price (Geri, 25 Nov 2026: Chicken Gyros Pita Combo is 530 at four OPA and 590 at Blloku
+    # and Arena; Wolt sold it at 590 and showed 541, the price of the six together): the units at a price are counted
+    # location by location, at the location's EMC price for the channel, and the channel's price is what they sold at
+    ch_names = {ch for (_mi, ch, _r) in per}
+    lchref = loc_channel_prices(locs, ch_names, set(items), rates if convert else None, errors)
+    lemc, lname = {}, {L["ref"]: L.get("name") or L["ref"] for L in locs}
+    for L in locs:
+        f = rates.get(L["currency"]) if convert else 1.0
+        try:
+            lemc[L["ref"]] = {num: p * f for num, (p, _low) in menueng.emc_prices(L["ref"]).items()} if f else {}
+        except Exception:                                            # noqa: BLE001 - no prices: the item's own
+            lemc[L["ref"]] = {}
 
-    def priced(mi, ch, q, n):
-        ref = (chref.get((mi, ch)) or (None,))[0] or items[mi].get("emc_incl")
-        if ref and ref > 0:
-            return min(q, n * (1 + vat_of(mi) / 100) / ref)
+    def ref_price(mi, ch, ref):
+        lv = lchref.get((ref, mi, ch))
+        if lv:
+            return lv
+        p = lemc.get(ref, {}).get(mi)
+        return (p, "EMC") if p and p > 1 else (items[mi].get("emc_incl"), "EMC")
+
+    def priced(mi, ch, q, n, ref):
+        rp = ref_price(mi, ch, ref)[0]
+        if rp and rp > 0:
+            return min(q, n * (1 + vat_of(mi) / 100) / rp)
         return q * share[mi]
-    per = {k: (priced(k[0], k[1], q, n), n, q) for k, (q, n) in per.items()}
+    per_loc, agg = {}, {}
+    for (mi, ch, ref), (q, n) in per.items():
+        qp = priced(mi, ch, q, n, ref)
+        rp, src = ref_price(mi, ch, ref)
+        per_loc.setdefault((mi, ch), []).append({"ref": ref, "name": lname.get(ref, ref), "qty": round(qp, 2), "rung": round(q, 2),
+                                                 "price": round(n * (1 + vat_of(mi) / 100) / qp, 2) if qp > 0 else None,
+                                                 "menu_price": round(rp, 2) if rp else None, "menu_source": src})
+        x = agg.setdefault((mi, ch), [0.0, 0.0, 0.0, 0.0, set()])
+        x[0] += qp
+        x[1] += n
+        x[2] += q
+        x[3] += (rp or 0) * qp
+        if src != "EMC":
+            x[4].add(src)
+    per = {k: (q, n, raw) for k, (q, n, raw, _w, _s) in agg.items()}
+    chref = {k: (round(w / q, 2), " / ".join(sorted(srcs)) if srcs else "EMC") for k, (q, _n, _r, w, srcs) in agg.items() if q > 0 and w > 0}
     chans = {}
     for (mi, ch), (q, n, _raw) in per.items():
         if q <= 0.5:
@@ -510,9 +554,10 @@ def build(ds, level="all", key="", section="family", settings=None):
                 why = [f"{unpriced:,.0f} of the {raw:,.0f} rung on this channel were at no price (inside combo meals or the "
                        f"platform's own lines): left out; the price and the change are of the {q:,.0f} sold at a price."] + why
             ref = chref.get((mi, ch))
+            ls = sorted((x for x in per_loc.get((mi, ch), []) if x["qty"] > 0.5), key=lambda x: -x["qty"])
             chs[ch] = {"qty": round(q, 2), "net": round(n, 0), "price": price, "price_ex": round(p_ex, 4),
-                       "rung": round(raw, 2), "unpriced": round(unpriced, 2),
-                       "menu_price": round(ref[0], 2) if ref else it.get("emc_incl"), "menu_source": ref[1] if ref else "EMC",
+                       "rung": round(raw, 2), "unpriced": round(unpriced, 2), "locs": ls,
+                       "menu_price": ref[0] if ref else it.get("emc_incl"), "menu_source": ref[1] if ref else "EMC",
                        "comp_median": round(statistics.median(ccomp), 2) if ccomp else None, "comp_n": len(ccomp),
                        "suggested": sug, "why": why}
         if not chs:
