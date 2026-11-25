@@ -40,6 +40,7 @@ import unicodedata
 import uuid
 
 import chanprof
+import elastic
 import locintel
 import menueng
 import simphony
@@ -50,10 +51,12 @@ SCEN_FILE = store.DATA_DIR / "price_scenarios.json"
 PARAMS_FILE = store.DATA_DIR / "price_params.json"
 _lock = threading.Lock()
 
-DEFAULTS = {"el_star": -0.6, "el_plowhorse": -0.9, "el_puzzle": -1.2, "el_dog": -1.4, "el_nocost": -1.0,
+# el_plowhorse −0.8 (was −0.9; Geri, 25 Nov 2026): on delivery −0.96, a rise no longer loses sales by itself.
+# el_measured: the elasticity measured from RHG's own price changes where there are enough (elastic.py)
+DEFAULTS = {"el_star": -0.6, "el_plowhorse": -0.8, "el_puzzle": -1.2, "el_dog": -1.4, "el_nocost": -1.0,
             "el_delivery": 1.2,                      # delivery customers compare more: the elasticity × this
             "star_step_pct": 4.0, "max_step_pct": 8.0, "comp_band_pct": 5.0, "comp_low_pct": 10.0,
-            "round_all": 10.0, "round_eur": 0.1, "parity": True}
+            "round_all": 10.0, "round_eur": 0.1, "parity": True, "el_measured": True}
 CLASSES = ("star", "plowhorse", "puzzle", "dog", "nocost")
 DELIVERY_HINT = re.compile(r"WOLT|GLOVO|BOLT|DELIVER|DORËZIM|DOREZIM|\bDE\b|DE-|UBER|FOODPANDA|BAJA|TAKEAWAY ONLINE", re.I)
 EAT_IN_HINT = re.compile(r"EAT|DINE|SALL|IN ?HOUSE|LOKAL|TABLE|TAVOL", re.I)
@@ -529,6 +532,13 @@ def build(ds, level="all", key="", section="family", settings=None):
             b = by_name.get(norm(base_name(it["name"])))
             if b is not None:
                 twin[mi], twin[b] = b, mi
+    # the elasticity measured from RHG's own price changes (elastic.py), else the class's (Parameters)
+    meas = {"items": {}, "status": None}
+    if P.get("el_measured", True):
+        try:
+            meas = elastic.measure([L["ref"] for L in locs], list(items), {mi: it.get("family") for mi, it in items.items()})
+        except Exception as exc:                                     # noqa: BLE001
+            errors.append(f"elasticity from history: {str(exc)[:160]}")
     comp_rows = [dict(r, source=s["file"]) for s in load_competitors()["sources"] for r in s["rows"]]
     brands = sorted({L["brand"] for L in locs if L["brand"]})
     cmap, unmatched = match(comp_rows, list(items.values()), brands)
@@ -552,7 +562,8 @@ def build(ds, level="all", key="", section="family", settings=None):
                 src = twin.get(mi) if twin.get(mi) and is_del(items[mi]["name"]) else mi
                 eq, en, _r = per.get((src, eat["channel"]), (0.0, 0.0, 0.0))
                 eat_ex = en / eq if eq > 0 else None
-            el = P.get(f"el_{it['cls']}", -1.0) * (P["el_delivery"] if c["delivery"] else 1.0)
+            em = meas["items"].get(mi)
+            el = em["value"] if em else P.get(f"el_{it['cls']}", -1.0) * (P["el_delivery"] if c["delivery"] else 1.0)
             sug, why = suggest(it["cls"], price, it["cost"], v, k, c["commission_base"], S["target"], ccomp, eat_ex, P, step, el)
             unpriced = max(0.0, raw - q)
             if unpriced >= 1 and unpriced >= 0.1 * raw:
@@ -570,7 +581,7 @@ def build(ds, level="all", key="", section="family", settings=None):
         out.append({"mi": mi, "bc_item": it.get("bc_item") or "", "name": it["name"], "section": it["section"], "family": it["family"], "major": it["major"],
                     "cls": it["cls"], "cost": it["cost"], "vat": v, "emc_incl": it.get("emc_incl"), "qty": it["qty"],
                     "net": it["net"], "channels": chs,
-                    "delivery": is_del(it["name"]), "twin": twin.get(mi),
+                    "delivery": is_del(it["name"]), "twin": twin.get(mi), "el_m": meas["items"].get(mi),
                     "competitors": [{k: r.get(k) for k in ("competitor", "item", "price", "channel", "date", "source", "matched")}
                                     for r in comps][:30]})
     out.sort(key=lambda x: -x["net"])
@@ -579,7 +590,7 @@ def build(ds, level="all", key="", section="family", settings=None):
             "round_step": step, "eat_in": eat["channel"] if eat else None,
             "channels": sorted(chans.values(), key=lambda c: -c["net"]), "items": out,
             "brands": groups, "locations": an["locations"], "selection": an["selection"],
-            "franchises": sorted(L["name"] for L in fr),
+            "franchises": sorted(L["name"] for L in fr), "elasticity": meas["status"],
             "labels": an["labels"],
             "competitors": {"sources": [{k: s.get(k) for k in ("id", "file", "by", "at")} | {"rows": len(s["rows"])}
                                         for s in load_competitors()["sources"]],

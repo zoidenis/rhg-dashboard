@@ -209,3 +209,15 @@ def test_a_franchise_is_left_out(base, monkeypatch):
         {"ref": "OPA_B", "brand": "OPA", "price_group": "OPA"}, {"ref": "OPA_SK", "brand": "OPA", "price_group": "OPA", "ownership": "Franchise"}])
     r = pricesim.build(base, "brand", "OPA")
     assert base["_calls"][-1] == ("locations", "OPA_B") and r["franchises"] == ["OPA Shkodër"]
+
+
+def test_the_measured_elasticity_is_used_unless_switched_off(base, monkeypatch):
+    calls = []
+    monkeypatch.setattr(pricesim.elastic, "measure", lambda refs, items, fam: calls.append(refs) or
+                        {"items": {1: {"value": -0.3, "source": "item", "events": 2, "units": 400, "last": "2026-06-01"}},
+                         "status": {"measured": 1, "family": 0, "missing_days": 0, "running": False, "done": 0, "total": 0, "errors": []}})
+    r = pricesim.build(base, "brand", "OPA")
+    assert calls == [["OPA_B"]] and r["items"][0]["el_m"]["value"] == -0.3 and r["elasticity"]["measured"] == 1
+    pricesim.save_params({"el_measured": False}, "geri")
+    r = pricesim.build(base, "brand", "OPA")
+    assert len(calls) == 1 and r["items"][0]["el_m"] is None and pricesim.DEFAULTS["el_plowhorse"] == -0.8

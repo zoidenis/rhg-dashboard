@@ -475,6 +475,10 @@ td.num,th.num{text-align:right}
 .pg-rank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#062634;background:linear-gradient(135deg,#ffd27a,#ffe9b8)}
 .pg-win.warn .pg-rank{background:color-mix(in srgb,var(--pg-dn) 20%,transparent);color:var(--pg-dn)}
 .pg-tools{display:flex;flex-wrap:wrap;gap:6px}
+.ps-lg{width:100%}.ps-lg td{vertical-align:top;font-size:12.5px;line-height:1.45;white-space:normal}.ps-lg td:first-child{white-space:nowrap;padding-right:14px}
+.ps-lg-p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--sub)}
+.ps-lg-ex{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--bg);font-size:12.5px;line-height:1.6}
+.ps-lg-btn{border:1px solid var(--line);background:var(--card);border-radius:999px;font:inherit;font-size:11px;font-weight:700;padding:1px 9px;cursor:pointer;color:var(--accent)}
 /* Financial statements: the executive summary on top of each tab */
 .ex-sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:stretch;padding:20px 22px;border-radius:20px;margin:0 0 15px;color:#e8f3f7;background:radial-gradient(120% 140% at 0% 0%,#0f5a73 0%,#0b3a4d 55%,#08283a 100%)}
 .ex-sum:empty{display:none}
@@ -1901,6 +1905,7 @@ table.bn-plan td{padding:3px 4px}
             <button class="pg-magic" id="pgMagic" type="button"><span class="pg-spark" aria-hidden="true"></span>Let Pulse suggest</button>
             <button class="pg-ghost" id="pgUndo" type="button" disabled>Undo</button>
             <button class="pg-ghost" id="pgReset" type="button">Start again</button>
+            <button class="pg-ghost" type="button" data-pulse="pslegend|">How it works</button>
           </div>
         </div>
       </section>
@@ -1969,6 +1974,7 @@ table.bn-plan td{padding:3px 4px}
           <div class="pg-card pg-tools">
             <button class="mini" id="psCompBtn" type="button" aria-expanded="false" aria-controls="psComp">Competitors</button>
             <button class="mini" id="psParBtn" type="button" aria-expanded="false" aria-controls="psPar">Parameters</button>
+            <button class="mini" type="button" data-pulse="pslegend|">Legend</button>
             <button class="mini exp dark" id="psXlsx" type="button">Export ▾</button>
             <button class="mini" id="psRead" type="button">Read again</button>
           </div>
@@ -1993,6 +1999,7 @@ table.bn-plan td{padding:3px 4px}
           <label class="field">Elasticity · Puzzle<input id="psElPuzzle" type="number" step="0.1" max="0"></label>
           <label class="field">Elasticity · Dog<input id="psElDog" type="number" step="0.1" max="0"></label>
           <label class="field">Elasticity · No cost<input id="psElNocost" type="number" step="0.1" max="0"></label>
+          <label class="field">Elasticity from<select id="psElMeas"><option value="1">RHG's own price changes, where there are enough</option><option value="0">The class defaults only</option></select><span class="meta">Measured: the items sold in the 4 weeks before and after each price change in Simphony, against the items whose price did not change.</span></label>
           <label class="field">Delivery channels: elasticity ×<input id="psElDel" type="number" step="0.1" min="1" max="3"><span class="meta">Delivery customers compare prices more.</span></label>
           <label class="field">Star: rise (%)<input id="psStar" type="number" step="0.5" min="0" max="50"></label>
           <label class="field">Largest step at once (%)<input id="psMax" type="number" step="0.5" min="0" max="50"></label>
@@ -5121,11 +5128,21 @@ $("psSec").onchange = () => { psCat = {}; psLoad(); };
 $("psRead").onclick = () => psLoad(true);
 // ---- the arithmetic (pricesim.effect, the same formulas)
 const psChan = ch => (psData.channels || []).find(c => c.channel === ch) || {commission_pct: 0, commission_base: "vat", delivery: false};
-const psEl = (cls, ch) => (psP["el_" + cls] ?? -1) * (psChan(ch).delivery ? psP.el_delivery || 1 : 1);
+// the state of the measured elasticity, on the status line
+function psElStatus(d){
+  const e = d.elasticity; if (!e || (psP && psP.el_measured === false)) return [];
+  const a = `Elasticity measured from RHG's price changes: ${fmt(e.measured)} items, ${fmt(e.family)} from their family; the others by class`;
+  return [e.running ? `${a} · reading the days around the price changes from Simphony: ${fmt(e.done)} of ${fmt(e.total)} (Read again when done)` : e.missing_days ? `${a} · ${fmt(e.missing_days)} days still to read` : a];
+}
+// the elasticity of an item on a channel: measured from RHG's own price changes (elastic.py: the item's, else its
+// family's) unless Parameters say the class defaults only; else the class's, × the delivery factor on delivery
+const psElM = it => psP && psP.el_measured !== false && it && it.el_m && it.el_m.value != null ? it.el_m : null;
+const psEl = (cls, ch, it) => { const m = psElM(it); return m ? m.value : (psP["el_" + cls] ?? -1) * (psChan(ch).delivery ? psP.el_delivery || 1 : 1); };
+const psElSrc = (it, ch) => { const m = psElM(it); return m ? (m.source === "item" ? `measured: ${m.events} price change${m.events === 1 ? "" : "s"}` : "measured: its family") : `${psLbl(it.cls)}${psChan(ch).delivery ? ", delivery" : ""}`; };
 function psFactor(vat, ch){ const c = psChan(ch), k = (c.commission_pct || 0) / 100, v = (vat || 0) / 100; return c.commission_base === "net" ? (1 - k) / (1 + v) : 1 / (1 + v) - k; }
 function psEff(it, ch, price){
   const c = it.channels[ch], q = c.qty, p0 = c.price, p1 = price || p0, a = psFactor(it.vat, ch), v = 1 + (it.vat || 0) / 100, cost = it.cost || 0;
-  const nq = p0 && p1 ? q * Math.pow(p1 / p0, psEl(it.cls, ch)) : q, cmu = p0 * a - cost, ncmu = p1 * a - cost;
+  const nq = p0 && p1 ? q * Math.pow(p1 / p0, psEl(it.cls, ch, it)) : q, cmu = p0 * a - cost, ncmu = p1 * a - cost;
   return {qty: q, new_qty: nq, net: p0 / v * q, new_net: p1 / v * nq, cm: cmu * q, new_cm: ncmu * nq, cm_unit: cmu, new_cm_unit: ncmu,
     be: ncmu > 0 && q ? (cmu * q / ncmu - q) / q * 100 : null, cost: it.cost == null ? null : cost * q, new_cost: it.cost == null ? null : cost * nq};
 }
@@ -5199,7 +5216,7 @@ function psSections(){
 // ---- drawing
 function psRender(){
   const d = psData; if (!d) return;
-  readBanner("psStatus", {src: "Simphony", at: d.read_at, lines: [`${d.title} · ${d.period.from} → ${d.period.to} (${fmt(d.period.days)} days) · ${d.currency}${d.converted ? " (converted at the group rates)" : ""} · ${fmt(d.items.length)} items on ${fmt(d.channels.length)} channels`], warns: d.errors});
+  readBanner("psStatus", {src: "Simphony", at: d.read_at, lines: [`${d.title} · ${d.period.from} → ${d.period.to} (${fmt(d.period.days)} days) · ${d.currency}${d.converted ? " (converted at the group rates)" : ""} · ${fmt(d.items.length)} items on ${fmt(d.channels.length)} channels`].concat(psElStatus(d)), warns: d.errors});
   $("pgScope").textContent = d.title; $("pgPeriod").textContent = `${d.period.from} → ${d.period.to}` + ((d.franchises || []).length ? ` · franchise left out: ${d.franchises.join(", ")}` : ""); $("pgCur").textContent = d.currency;
   $("pgCh").innerHTML = `<button type="button" class="pg-pill${psChSel.size ? "" : " on"}" data-pgch="">All channels</button>` + d.channels.map(c =>
     `<button type="button" class="pg-pill${psChSel.has(c.channel) ? " on" : ""}${c.delivery ? " del" : ""}" data-pgch="${esc(c.channel)}"><span data-no-i18n>${esc(c.channel)}</span>${c.commission_pct ? `<small>${fmt(c.commission_pct)}%</small>` : ""}</button>`).join("");
@@ -5278,11 +5295,66 @@ function psLive(){
   });
   psBasket(S); psWins();
 }
+// ---------- Price simulator: the legend (Geri, 25 Nov 2026): what every word, column and colour means, with the
+// elasticities and rules in force (the parameters of this simulation), and a worked example of elasticity
+function psLegend(){
+  const P = (typeof psP !== "undefined" && psP) || {}, del = P.el_delivery || 1.2, C = psData ? psData.currency : "ALL";
+  const CL = ["star", "plowhorse", "puzzle", "dog", "nocost"];
+  const MEAN = {star: "Popular and high margin", plowhorse: "Popular, low margin", puzzle: "High margin, sold little", dog: "Low margin, sold little", nocost: "No recipe or cost in BC"};
+  const RULE = {star: `A small rise (${fmt(P.star_step_pct ?? 4, 0)}%) usually holds.`,
+    plowhorse: `Towards the price at the food cost target, no more than ${fmt(P.max_step_pct ?? 8, 0)}% at once; already within it: a small rise.`,
+    puzzle: "No rise: move it on the menu and recommend it; lower it if dearer than the competitors.",
+    dog: "Towards the cost target, else hold; consider taking it off the menu.",
+    nocost: "Priced against the competitors only."};
+  const e = (cls, d) => (P["el_" + cls] ?? -1) * (d ? del : 1);
+  // what 10% dearer does at an elasticity
+  const ex = el => { const q = Math.pow(1.1, el); return {q: (q - 1) * 100, s: (1.1 * q - 1) * 100}; };
+  const row = (t, d) => `<tr><td><b>${fcSp(t)}</b></td><td>${fcSp(d)}</td></tr>`;
+  const tbl = rows => `<div class="scroll"><table class="ps-lg" data-nosort>${rows.join("")}</table></div>`;
+  const a = ex(e("star", true)), b = ex(e("plowhorse", true));
+  Pulse.pop({title: fcSp("How the price simulator works"), sub: fcSp("Every word, column and colour of this screen; the rules and elasticities are the ones in force (Parameters)."), body:
+    Pulse.panel("In four steps", tbl([
+      row("1 · Where", "All RHG, a brand (its price group: OPA without the airport) or the locations you choose. Franchises are left out."),
+      row("2 · On which channel", "Eat in, take away, DE - WOLT and the other order types of Simphony. A price changes on the channels you pick only."),
+      row("3 · What to change", "Move a whole category with its slider, or one item; or let Pulse suggest a price for every item."),
+      row("4 · The money", "The big number: the extra sales a year, without VAT. Click it for the calculation, step by step.")]))
+    + Pulse.panel("The columns", tbl([
+      row("Items sold", "Items sold at a price in the period on that channel (Simphony). Items rung at no price, inside combo meals or the platform's own lines, are left out: they do not move with the price."),
+      row("Price today", "What the item sold at, VAT included: each location at its own EMC price, or the EMC price level named like the channel (a level \"Wolt\" for DE - WOLT)."),
+      row("New price", "The price you set, or the one Pulse suggests, rounded to the step in Parameters."),
+      row("Elasticity", "How much the items sold move when the price moves: \"measured\" from RHG's own price changes, or by \"class\" (see below)."),
+      row("Items sold, new", "Items sold today × (new price ÷ price today) ^ elasticity."),
+      row("Sales today / Sales, new", "Price ÷ (1 + VAT) × items sold: without VAT, as in the P&L."),
+      row("Change", "Sales, new − sales today, in the period."),
+      row("A year", "The change × 365 ÷ the days of the period."),
+      row("Margin per item", "Price without VAT − the platform's commission − the portion cost of the recipe in BC."),
+      row("Margin, change / a year", "Margin per item × items sold, new against today: a rise can lose some sales and still earn more margin."),
+      row("Suggested", "Pulse's price for the item on the channel; \"hold\" when the best is today's price. Click it to use it."),
+      row("DEL items", `A delivery item with a price of its own ("Chicken Gyros Big DEL"), paired with its eat-in twin; it keeps the eat-in margin after the commission.`)]))
+    + Pulse.panel("Elasticity", `<p class="ps-lg-p">${fcSp("Elasticity is how much the items sold fall when the price rises: −1 means 10% dearer, about 10% fewer sold.")}</p>`
+      + `<p class="ps-lg-p"><b>${fcSp("Measured")}</b> · ${fcSp("Where RHG changed an item's price before, Pulse measures it: the items sold at a price in the 4 weeks before and the 4 weeks after each price change in Simphony, against the items of the same location whose price did not change (so the season and a busy month cancel out). At least 20 sold in each 4 weeks; kept between −3 and −0.1. An item never re-priced takes its family's when three items of the family are measured.")}</p>`
+      + `<p class="ps-lg-p"><b>${fcSp("By class")}</b> · ${fcSp("Otherwise it comes from the item's class in Menu engineering, multiplied on a delivery channel, because delivery customers compare prices more:")}</p>`
+      + `<div class="scroll"><table class="ps-lg" data-nosort><tr><th>${fcSp("Class")}</th><th>${fcSp("What it is")}</th><th class="num">${fcSp("Eat in")}</th><th class="num">${fcSp(`Delivery (× ${fmt(del, 1)})`)}</th><th>${fcSp("What Pulse suggests")}</th></tr>`
+      + CL.map(k => `<tr><td>${psSt(k)}</td><td>${fcSp(MEAN[k])}</td><td class="num"><b>${fmt(e(k, false), 2)}</b></td><td class="num"><b>${fmt(e(k, true), 2)}</b></td><td class="meta">${fcSp(RULE[k])}</td></tr>`).join("") + `</table></div>`
+      + `<div class="ps-lg-ex">${fcSp("10% dearer on delivery:")}<br>· ${fcSp(`Star (${fmt(e("star", true), 2)}): ${psPctT(a.q)} items sold, sales ${psPctT(a.s)}.`)}<br>· ${fcSp(`Plowhorse (${fmt(e("plowhorse", true), 2)}): ${psPctT(b.q)} items sold, sales ${psPctT(b.s)}.`)}</div>`
+      + `<p class="ps-lg-p">${fcSp("Beyond −1 a rise sells so many fewer items that sales fall, though the margin can still rise: each item earns more and the items no longer sold cost no food and no commission. Pulse never suggests a price that earns less margin than today's at the elasticity.")}</p>`)
+    + Pulse.panel("How Pulse suggests a price", tbl([
+      row("By class", "The rule of the item's class, in the table above."),
+      row("Delivery", `On a channel with a commission, towards the price that keeps the margin of eating in, no more than ${fmt(P.max_step_pct ?? 8, 0)}% at once.`),
+      row("Competitors", `A rise stops at the competitors' median + ${fmt(P.comp_band_pct ?? 5, 0)}% (Competitors: the price files uploaded).`),
+      row("Floors", "Never below the portion cost; never a price that earns less margin (or sales, without a cost) than today's at the elasticity.")]))
+    + Pulse.panel("Colours and signs", tbl([
+      row("Green / red", `Green: more sales or margin than today; red: less. Amounts in ${C}.`),
+      row("+ k at no price", "Under Items sold: the units rung at no price, left out."),
+      row("Location lines", "Under Price today: what each location sold at, and how many."),
+      row("Parameters", "Elasticities, steps, rounding and competitor bands: \"Apply here\" for this simulation, \"Save for everyone\" with the Settings permission.")]))});
+}
+Pulse.on("pslegend", () => psLegend());
 // How the big number is worked out (Geri, 25 Nov 2026: to check the calculation): every price changed, step by step
 function psExplain(){
   const d = psData; if (!d) return;
   const yr = psYear(), days = d.period.days, C = d.currency, R = [];
-  for (const r of psRows()) { const p1 = psPrice(r.it, r.ch); if (p1 === r.c.price) continue; R.push(Object.assign({r, p1, el: psEl(r.it.cls, r.ch), a: psFactor(r.it.vat, r.ch), ch: psChan(r.ch)}, psEff(r.it, r.ch, p1))); }
+  for (const r of psRows()) { const p1 = psPrice(r.it, r.ch); if (p1 === r.c.price) continue; R.push(Object.assign({r, p1, el: psEl(r.it.cls, r.ch, r.it), a: psFactor(r.it.vat, r.ch), ch: psChan(r.ch)}, psEff(r.it, r.ch, p1))); }
   R.sort((x, y) => Math.abs(y.new_net - y.net) - Math.abs(x.new_net - x.net));
   const dn = R.reduce((s, x) => s + x.new_net - x.net, 0), dm = R.reduce((s, x) => s + (x.r.it.cost == null ? 0 : x.new_cm - x.cm), 0);
   const f2 = v => fmt(v, 2), f0 = v => fmt(v, 0), f1 = v => fmt(v, 1);
@@ -5305,12 +5377,16 @@ function psExplain(){
     Pulse.tiles([{l: "Prices changed", v: fmt(R.length), s: "item × channel; the others add nothing"}, {l: `Change in the ${days} days`, v: psSign(dn), s: `${C} without VAT`},
       {l: "× 365 / " + days, v: psSign(dn * yr), s: "extra sales a year", cls: dn >= 0 ? "down" : "up"}, {l: "Margin a year", v: psSign(dm * yr), s: "items with a portion cost", cls: dm >= 0 ? "down" : "up"}])
     + Pulse.panel(`Worked through: ${esc(it.name)} on ${esc(x.r.ch)}`, worked, R.length > 1 ? "the largest change; every price is in the table below" : "")
-    + Pulse.panel("Every price changed", Pulse.list([["Item"], ["Channel"], ["Items sold", 1], ["Price today", 1], ["New price", 1], ["Elasticity", 1], ["Items sold, new", 1], ["Sales today", 1], ["Sales, new", 1], ["Change", 1], ["A year", 1]],
-        R.map(y => ({cells: [`<b>${esc(y.r.it.name)}</b><div class="meta">${esc(psCodes(y.r.it))}</div>`, `<span data-no-i18n>${esc(y.r.ch)}</span>`, f0(y.qty), f0(y.r.c.price), `<b>${f0(y.p1)}</b>`, f2(y.el), f0(y.new_qty),
-          f0(y.net), f0(y.new_net), `<b class="${y.new_net >= y.net ? "down" : "up"}">${psSign(y.new_net - y.net)}</b>`, psSign((y.new_net - y.net) * yr)], open: `psitem|${y.r.it.mi}`}))
-          .concat([{cells: ["<b>Total</b>", "", "", "", "", "", "", f0(R.reduce((s, y) => s + y.net, 0)), f0(R.reduce((s, y) => s + y.new_net, 0)), `<b>${psSign(dn)}</b>`, `<b>${psSign(dn * yr)}</b>`]}]), {max: 420}),
-        "sales without VAT = price / (1 + VAT) × items sold")
-    + `<p class="meta">Items sold at a price only: units rung at no price (combo meals, the platform's own lines) do not move with the price. The elasticity is the class's (Parameters), × ${fmt(psP.el_delivery || 1, 1)} on delivery channels. A year = the period's change at the same pace for 365 days.</p>`});
+    + Pulse.panel("Every price changed", Pulse.list([["Item"], ["Channel"], ["Items sold", 1], ["Price today", 1], ["New price", 1], ["Elasticity", 1], ["Items sold, new", 1], ["Sales today", 1], ["Sales, new", 1], ["Change", 1], ["A year", 1], ["Margin, change", 1], ["Margin a year", 1]],
+        R.map(y => { const hc = y.r.it.cost != null, dmy_ = y.new_cm - y.cm;
+          return {cells: [`<b>${esc(y.r.it.name)}</b><div class="meta">${esc(psCodes(y.r.it))}</div>`, `<span data-no-i18n>${esc(y.r.ch)}</span>`, f0(y.qty), f0(y.r.c.price), `<b>${f0(y.p1)}</b>`,
+          `${f2(y.el)}<div class="meta">${esc(psElM(y.r.it) ? "measured" : "class")}</div>`, f0(y.new_qty),
+          f0(y.net), f0(y.new_net), `<b class="${y.new_net >= y.net ? "down" : "up"}">${psSign(y.new_net - y.net)}</b>`, psSign((y.new_net - y.net) * yr),
+          hc ? `<b class="${dmy_ >= 0 ? "down" : "up"}">${psSign(dmy_)}</b>` : `<span class="meta">no cost</span>`, hc ? psSign(dmy_ * yr) : "–"], open: `psitem|${y.r.it.mi}`}; })
+          .concat([{cells: ["<b>Total</b>", "", "", "", "", "", "", f0(R.reduce((s, y) => s + y.net, 0)), f0(R.reduce((s, y) => s + y.new_net, 0)), `<b>${psSign(dn)}</b>`, `<b>${psSign(dn * yr)}</b>`,
+            `<b>${psSign(dm)}</b>`, `<b>${psSign(dm * yr)}</b>`]}]), {max: 420}),
+        `${fcSp("sales without VAT = price / (1 + VAT) × items sold")} · <button type="button" class="ps-lg-btn" data-pulse="pslegend|">${fcSp("Legend")}</button>`)
+    + `<p class="meta">Items sold at a price only: units rung at no price (combo meals, the platform's own lines) do not move with the price. The elasticity is measured from RHG's own price changes where there are enough ("measured"), else the class's (Parameters), × ${fmt(psP.el_delivery || 1, 1)} on delivery channels. Margin = price without VAT − commission − portion cost, × items sold: a rise can lose sales and still earn more margin. A year = the period's change at the same pace for 365 days.</p>`});
 }
 Pulse.on("psexplain", () => psExplain());
 // the big number counts to its new value
@@ -5490,7 +5566,7 @@ function psItemPop(mi){
         + Pulse.list([["Price", 1], ["Change", 1], ["Items sold", 1], ["Sales", 1], ["Margin", 1], ["Change of margin", 1]],
           L.map(s => ({cells: [`<b>${fmt(s.price, 0)}</b>${s.sug ? ` <span class="meta">suggested</span>` : ""}${s === best ? ` <span class="meta">highest margin</span>` : ""}`, psPctT(s.p), fmt(s.new_qty, 0), flM(s.new_net),
             it.cost == null ? "–" : flM(s.new_cm), it.cost == null ? "–" : `<b class="${s.new_cm >= s.cm ? "down" : "up"}">${psSign(s.new_cm - s.cm)}</b>`]}))),
-        `elasticity ${fmt(psEl(it.cls, main), 2)} (${psLbl(it.cls)}${psChan(main).delivery ? ", delivery" : ""}) · the period`)
+        `elasticity ${fmt(psEl(it.cls, main, it), 2)} (${psElSrc(it, main)}) · the period`)
     + Pulse.panel("Why this price", chs.map(ch => `<p style="margin:0 0 8px"><b data-no-i18n>${esc(ch)}</b>: ${(it.channels[ch].why || []).map(w => `<span>${esc(w)}</span>`).join(" ")}</p>`).join(""))
     + Pulse.panel("Competitors' prices", Pulse.list([["Competitor"], ["Their item"], ["Channel"], ["Price", 1], ["Date"], ["Matched"]],
         it.competitors.map(x => ({cells: [esc(x.competitor), esc(x.item), esc(x.channel || "menu"), `<b>${fmt(x.price, 0)}</b>`, esc(x.date || "–"), `<span class="meta">${esc(x.matched || "")}</span>`]})),
@@ -5504,14 +5580,14 @@ function psParFill(){
   const p = psP || {};
   Object.entries(PS_EL).forEach(([c, id]) => $(id).value = p["el_" + c]);
   $("psElDel").value = p.el_delivery; $("psStar").value = p.star_step_pct; $("psMax").value = p.max_step_pct; $("psBand").value = p.comp_band_pct; $("psLow").value = p.comp_low_pct;
-  $("psRoundAll").value = p.round_all; $("psRoundEur").value = p.round_eur; $("psParity").value = p.parity ? "1" : "0";
+  $("psRoundAll").value = p.round_all; $("psRoundEur").value = p.round_eur; $("psParity").value = p.parity ? "1" : "0"; $("psElMeas").value = p.el_measured === false ? "0" : "1";
   $("psParSave").disabled = !can("settings");
 }
 function psParRead(){
   const o = {}; Object.entries(PS_EL).forEach(([c, id]) => o["el_" + c] = -Math.abs(parseFloat($(id).value) || 0));
   return Object.assign(o, {el_delivery: parseFloat($("psElDel").value) || 1, star_step_pct: parseFloat($("psStar").value) || 0, max_step_pct: parseFloat($("psMax").value) || 0,
     comp_band_pct: parseFloat($("psBand").value) || 0, comp_low_pct: parseFloat($("psLow").value) || 0, round_all: parseFloat($("psRoundAll").value) || 0,
-    round_eur: parseFloat($("psRoundEur").value) || 0, parity: $("psParity").value === "1"});
+    round_eur: parseFloat($("psRoundEur").value) || 0, parity: $("psParity").value === "1", el_measured: $("psElMeas").value === "1"});
 }
 const psParShow = on => { $("psPar").hidden = !on; $("psParBtn").setAttribute("aria-expanded", on); if (on && psData) psParFill(); };
 $("psParBtn").onclick = () => psParShow($("psPar").hidden);
@@ -5623,7 +5699,7 @@ function pdPick(it, ch){
   pdCh = ch && it.channels[ch] ? ch : (chs.find(psOn) || chs[0]);
   const c = it.channels[pdCh];
   pdIn = {price: psPrice(it, pdCh), cost: it.cost, target: psData.settings.target || 32, units: Math.round(c.qty * 30 / Math.max(1, psData.period.days)),
-          el: Math.round(psEl(it.cls, pdCh) * 100) / 100, step: +$("pdStep").value || 10};
+          el: Math.round(psEl(it.cls, pdCh, it) * 100) / 100, step: +$("pdStep").value || 10};
   $("pdItem").value = it.name;
   $("pdCh").innerHTML = chs.map(x => `<option value="${esc(x)}" data-no-i18n>${esc(x)}${psChan(x).commission_pct ? ` · ${fmt(psChan(x).commission_pct)}%` : ""}</option>`).join("");
   $("pdCh").value = pdCh;
@@ -5631,7 +5707,7 @@ function pdPick(it, ch){
   ["price", "cost", "target", "units", "el"].forEach(k => $("pd" + k[0].toUpperCase() + k.slice(1)).value = pdIn[k] == null ? "" : pdIn[k]);
   $("pdCostNote").textContent = it.cost == null ? "(no cost in BC: type one)" : `(BC item ${it.bc_item || it.mi}: ${fmt(it.cost, 0)})`;
   $("pdUnitsNote").textContent = `(the period: ${fmt(c.qty, 0)} in ${fmt(psData.period.days)} days)`;
-  $("pdElNote").textContent = `(${psLbl(it.cls)}${psChan(pdCh).delivery ? ", delivery" : ""})`;
+  $("pdElNote").textContent = `(${psElSrc(it, pdCh)})`;
   $("pdMsg").textContent = "";
   pdRender();
 }
