@@ -97,7 +97,8 @@ FINANCE = [
         ("invcharts", "Inventory charts", "location", ["finance.inventory.view"])]),
     ("budget", "Budget & forecast", "Planning", "bgTabs", [
         ("budget", "Budget & forecast", "company", ["finance.pl.view"]),
-        ("loc", "Location intelligence", "location", ["finance.pl.view"])]),
+        ("loc", "Location intelligence", "location", ["finance.pl.view"]),
+        ("build", "Build the budget", "company", ["finance.pl.view"])]),
     ("assets", "Fixed assets", "Planning", "faTabs", [
         ("main", "Fixed assets", "company", ["finance.assets.view"]),
         ("loc", "Location intelligence", "location", ["finance.assets.view"])]),

@@ -486,6 +486,27 @@ td.num,th.num{text-align:right}
 .pg-plan-ts{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:6px 0 10px}
 .pg-plan-ts .ex-t{background:var(--bg);border-color:var(--line)}.pg-plan-ts .ex-tl{color:var(--sub)}.pg-plan-ts .ex-t b{color:var(--ink)}.pg-plan-ts .ex-t small{color:var(--sub)}.pg-plan-ts .ex-u{color:var(--sub)}
 .pg-plan-gap{margin:0 0 10px;font-size:13px;line-height:1.5}
+/* Budget & forecast → Build the budget */
+.bb-hero{margin-top:4px}.bb-ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+.bb-ctl label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;color:#9fd6e8;text-transform:uppercase;letter-spacing:.03em}
+.bb-ctl select,.bb-ctl input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:5px 8px;font:inherit;font-size:13px}
+.bb-ctl option{color:#0e2733}
+.bb-read{margin:4px 0 8px;font-size:12px}
+.bb-read .readst{background:rgba(255,255,255,.07)!important;border-color:rgba(255,255,255,.18)!important;box-shadow:none!important}.bb-read .readst,.bb-read .readst *{color:#d6ebf2!important}
+.bb-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.bb-acts .meta{color:#d6ebf2}
+.bb-hero .ex-ts{grid-template-columns:repeat(3,minmax(0,1fr))}
+.bb-steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.bb-steps button{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 14px 7px 8px;font:inherit;font-size:13px;font-weight:700;color:var(--sub);cursor:pointer}
+.bb-steps button span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--bg);font-size:11px}
+.bb-steps button.on{background:var(--accent);color:#fff;border-color:var(--accent)}.bb-steps button.on span{background:rgba(255,255,255,.2)}
+.bb-t td,.bb-t th{white-space:nowrap}.bb-t tr.bb-loc td{background:var(--bg);border-top:2px solid var(--line)}.bb-t tr.bb-ch td:first-child{padding-left:22px}
+.bb-n{width:84px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px;text-align:right;background:var(--card);color:var(--ink)}
+.bb-n:focus{outline:2px solid var(--accent);outline-offset:0}.bb-n:disabled{background:transparent;border-color:transparent}
+.bb-all{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-radius:12px;background:var(--bg)}.bb-all label{display:flex;align-items:center;font-size:12px;color:var(--sub);gap:6px}.bb-all input{width:80px;padding:4px 6px;border:1px solid var(--line);border-radius:7px}
+.bb-map{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12.5px;padding:10px 12px;border-radius:12px;background:var(--bg)}
+.bb-mapi{display:inline-flex;gap:6px;align-items:center}.bb-mapi select{max-width:220px}
+.bb-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:900px){.bb-two{grid-template-columns:1fr}.bb-hero .ex-ts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* Financial statements: the executive summary on top of each tab */
 .ex-sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:stretch;padding:20px 22px;border-radius:20px;margin:0 0 15px;color:#e8f3f7;background:radial-gradient(120% 140% at 0% 0%,#0f5a73 0%,#0b3a4d 55%,#08283a 100%)}
 .ex-sum:empty{display:none}
@@ -1791,7 +1812,67 @@ table.bn-plan td{padding:3px 4px}
   </section>
 
   <section class="view" id="v-budget">
-    <div class="ov-tabs" id="bgTabs" role="tablist"><button data-t="budget" class="on" role="tab" aria-selected="true">Budget &amp; forecast</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button></div>
+    <div class="ov-tabs" id="bgTabs" role="tablist"><button data-t="budget" class="on" role="tab" aria-selected="true">Budget &amp; forecast</button><button data-t="loc" role="tab" aria-selected="false">Location intelligence</button><button data-t="build" role="tab" aria-selected="false">Build the budget</button></div>
+    <div id="bbView" style="display:none">
+      <!-- Build the budget (Geri, 26 Nov 2026): checks × average check by restaurant and channel, the mix by major group
+           and category, every account of the chart with a driver; draft → review → approved → the file for BC -->
+      <section class="ex-sum bb-hero" id="bbHero">
+        <div class="ex-h">
+          <div class="ex-eye"><span>Build the budget</span> · <span id="bbCo" data-no-i18n></span> · <span id="bbStatus" class="chip"></span></div>
+          <h2 id="bbHead">Budget</h2>
+          <div class="bb-ctl">
+            <label>Year<select id="bbYear"></select></label>
+            <label>Budget name in BC<input id="bbName" maxlength="20" data-no-i18n></label>
+            <button class="mini" type="button" id="bbRead">Read again</button>
+          </div>
+          <p class="bb-read" id="bbReading"></p>
+          <div class="bb-acts">
+            <button class="mini dark" type="button" id="bbSave">Save draft</button>
+            <button class="mini" type="button" id="bbSubmit">Send for review</button>
+            <button class="mini" type="button" id="bbApprove">Approve</button>
+            <button class="mini" type="button" id="bbReopen">Reopen</button>
+            <button class="mini exp" type="button" id="bbExport">File for BC</button>
+            <button class="mini" type="button" id="bbVers">Versions</button>
+            <span class="meta" id="bbMsg"></span>
+          </div>
+        </div>
+        <div class="ex-ts" id="bbTiles"></div>
+      </section>
+      <div class="bb-steps" role="tablist" aria-label="Budget parts">
+        <button type="button" class="on" data-bbp="sales" role="tab" aria-selected="true"><span>1</span>Sales</button>
+        <button type="button" data-bbp="mix" role="tab" aria-selected="false"><span>2</span>Mix &amp; categories</button>
+        <button type="button" data-bbp="costs" role="tab" aria-selected="false"><span>3</span>Costs &amp; other income</button>
+        <button type="button" data-bbp="pl" role="tab" aria-selected="false"><span>4</span>P&amp;L preview</button>
+      </div>
+      <section class="card bb-p" data-bbp="sales">
+        <div class="card-head"><div><h2>Sales: checks × average check</h2>
+          <p class="hint"><span>Each restaurant and channel from Simphony, month by month as last year (the base months above).</span> <span>Change the checks and the average check by a %; a restaurant's row sets all its channels.</span></p></div>
+          <div class="bb-all"><span class="meta">All restaurants</span><label>Checks %<input type="number" step="0.5" id="bbAllChk"></label><label>Avg check %<input type="number" step="0.5" id="bbAllAc"></label><button class="mini" type="button" id="bbAllGo">Apply</button></div></div>
+        <div id="bbSalesChart"></div>
+        <div class="scroll"><table class="bb-t" id="bbSalesT" data-nosort></table></div>
+      </section>
+      <section class="card bb-p" data-bbp="mix" hidden>
+        <div class="card-head"><div><h2>Mix by major group and category</h2>
+          <p class="hint"><span>Each restaurant's sales by major group, last year's mix of the last three closed months; change a share and the others make up the rest.</span> <span>The categories (family groups) follow their major group. The major groups go to the sales accounts of BC below.</span></p></div></div>
+        <div class="bb-map" id="bbMap"></div>
+        <div class="pg-row" style="margin:8px 0"><label class="meta">Restaurant <select id="bbMixLoc"></select></label></div>
+        <div class="bb-two"><div class="scroll"><table class="bb-t" id="bbMixT" data-nosort></table></div><div class="scroll"><table class="bb-t" id="bbFamT" data-nosort></table></div></div>
+      </section>
+      <section class="card bb-p" data-bbp="costs" hidden>
+        <div class="card-head"><div><h2>Costs and other income: every account of the chart</h2>
+          <p class="hint"><span>Each account takes a driver: last year + %, % of sales, fixed a month, or per check.</span> <span>The value applies to every department; empty: each department from its own last year. Click an account for its departments and months.</span></p></div>
+          <div class="pg-row"><input id="bbAccQ" placeholder="Find an account" style="width:180px"><select id="bbAccLine"><option value="">Every line</option></select></div></div>
+        <div class="scroll"><table class="bb-t" id="bbAccT" data-nosort></table></div>
+      </section>
+      <section class="card bb-p" data-bbp="pl" hidden>
+        <div class="card-head"><div><h2>The budget P&amp;L</h2><p class="hint">Month by month, against last year; the whole company or one department.</p></div>
+          <label class="meta">Department <select id="bbPlDept"><option value="*">The whole company</option></select></label></div>
+        <div id="bbPlChart"></div>
+        <div class="scroll"><table class="bb-t" id="bbPlT" data-nosort></table></div>
+      </section>
+      <div class="card"><details><summary style="cursor:pointer;font-size:16px;font-weight:600">How the budget is built</summary>
+        <div class="hint" id="bbDefs" style="margin-top:12px;line-height:1.55"></div></details></div>
+    </div>
     <div id="blView" style="display:none">
       <div class="card">
         <div class="card-head"><div><h2>Actual against budget, by location</h2>
@@ -14813,11 +14894,326 @@ const blM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + (Mat
 const blS = v => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : "") + blM(v);
 const blPct = (a, b) => b ? a / b * 100 : null;
 const blMon = k => new Date(k + "-01T00:00:00").toLocaleDateString("en-GB", {month: "short", year: "numeric"});
+// ---------- Budget & forecast → Build the budget (budgetbuild.py; Geri, 26 Nov 2026, approved): the base from the server,
+// the parameters in bbS, every figure worked out here as the parameters change; draft → review → approved → BC
+let bbB = null, bbS = null, bbVer = null, bbPart = "sales", bbTimer = null, bbDirty = false, bbCalc = null;
+const BB_MM = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+const BB_DRV = {ly: "Last year + %", pct: "% of sales", fixed: "Fixed a month", check: "Per check"};
+const BB_LINES = [["revenue", "Sales (other accounts)"], ["other_income", "Other income"], ["cogs", "Cost of goods sold"], ["labour", "Labour"], ["occupancy", "Occupancy"],
+  ["opex", "Other operating expenses"], ["da", "Depreciation and amortisation"], ["finance", "Interest and finance (net)"], ["nonop", "Non-operating items"], ["tax", "Income tax"], ["", "Not in the KPI mapping"]];
+const bbM = v => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + fcM(Math.abs(v));
+const bbP = v => v == null || !isFinite(v) ? "–" : fmt(v, 1) + "%";
+const bbSg = (v, d = 1) => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), d) + "%";
+const bbLocked = () => !bbB || !bbB.rights.edit || (bbVer && bbVer.status === "Approved");
+const bbIncome = no => { const a = bbB.accounts[no]; return a && bbB.income_buckets.includes(a[1]); };
+const bbLine = no => { const a = bbB.accounts[no] || []; return a[2] || (a[1] === "sales" ? "revenue" : a[1] === "other_income" ? "other_income" : ""); };
+function bbQs(){ const p = new URLSearchParams(); if ($("company").value) p.set("company", $("company").value); p.set("year", $("bbYear").value || new Date().getFullYear() + 1); return p.toString(); }
+async function bbLoad(refresh){
+  clearTimeout(bbTimer);
+  if (!$("bbYear").options.length) { const y = new Date().getFullYear(); $("bbYear").innerHTML = [y + 1, y, y + 2].map(v => `<option value="${v}">${v}</option>`).join(""); }
+  $("bbMsg").textContent = "";
+  readBanner("bbReading", {src: "Business Central and Simphony", reading: true});
+  try {
+    const j = await readJSON(await fetch("/api/budget/build?" + bbQs() + (refresh ? "&refresh=1" : "")));
+    if (j.error) throw new Error(j.error);
+    if (j.pending) { readBanner("bbReading", {src: "Business Central", reading: true, text: `${j.stage || "Reading"}${j.progress && j.progress.stage ? ": " + j.progress.stage : "…"}`}); bbTimer = setTimeout(() => bbLoad(false), 5000); return; }
+    bbB = j; bbVer = j.current;
+    bbS = bbStateFrom(j.current && j.current.state);
+    bbDirty = false; bbFill(); bbRender();
+    const rd = j.reading, more = [];
+    if (rd.checks.running || rd.checks.missing) more.push(`checks by channel: ${fmt(rd.checks.done)} of ${fmt(rd.checks.total || rd.checks.missing)} days`);
+    if (rd.mix.running || rd.mix.missing) more.push(`menu items for the mix: ${fmt(rd.mix.done)} of ${fmt(rd.mix.total || rd.mix.missing)} days`);
+    readBanner("bbReading", {src: "Business Central and Simphony", at: new Date().toISOString(), incomplete: !!more.length || rd.bc_pending,
+      lines: [`base months: ${Object.entries(j.base_months).map(([m, k]) => k).join(", ")}`], warns: more.length || rd.bc_pending ? [`Still reading from Simphony (${more.join("; ")})${rd.bc_pending ? "; Business Central still reading" : ""}: Read again when done.`] : []});
+  } catch(e) { readBanner("bbReading", {src: "Business Central and Simphony", error: e.message}); }
+}
+function bbStateFrom(st){
+  st = st && typeof st === "object" ? JSON.parse(JSON.stringify(st)) : {};
+  return {sales: st.sales || {}, mix: st.mix || {}, macct: Object.assign({}, bbB.major_accounts, st.macct || {}), acc: st.acc || {}, name: st.name || (bbVer && bbVer.name) || `BUDGET${bbB.year}`};
+}
+// ---- the engine
+function bbSalesOf(){
+  // per restaurant, channel and month: base checks and net, budget checks and net
+  const out = {};
+  for (const L of bbB.locations) {
+    const R = out[L.ref] = {};
+    for (const [ch, byM] of Object.entries(L.channels)) {
+      const p = ((bbS.sales[L.ref] || {})[ch]) || {}, gc = 1 + (+p.chk || 0) / 100, ga = 1 + (+p.ac || 0) / 100;
+      R[ch] = BB_MM.map(mm => { const b = byM[mm] || {net: 0, checks: 0}, ac = b.checks ? b.net / b.checks : 0;
+        return {chk0: b.checks, net0: b.net, chk: b.checks * gc, net: b.checks * gc * ac * ga}; });
+    }
+  }
+  return out;
+}
+function bbMixOf(L){
+  // the major groups' shares of a restaurant (all channels), last year's or the ones typed
+  const base = {}; let t = 0;
+  for (const x of Object.values(L.mix || {})) for (const [mj, v] of Object.entries(x.major)) { base[mj] = (base[mj] || 0) + v; t += v; }
+  const ly = Object.fromEntries(Object.entries(base).map(([k, v]) => [k, t ? v / t * 100 : 0]));
+  const ov = bbS.mix[L.ref];
+  return {ly, bud: ov && Object.keys(ov).length ? ov : ly};
+}
+function bbRun(){
+  const S = bbSalesOf(), depts = ["", ...bbB.departments.map(d => d.code)];
+  // sales and checks by department and month; the sales accounts by department and month
+  const dSales = {}, dChk = {}, dChk0 = {}, salesAcc = {}, hasSim = new Set();
+  const z = () => BB_MM.map(() => 0);
+  depts.forEach(d => { dSales[d] = z(); dChk[d] = z(); dChk0[d] = z(); });
+  for (const L of bbB.locations) {
+    const d = L.dept_known ? L.dept : "";
+    if (!dSales[d]) { dSales[d] = z(); dChk[d] = z(); dChk0[d] = z(); }
+    hasSim.add(d);
+    const mx = bbMixOf(L).bud, tot = Object.values(mx).reduce((a, b) => a + (+b || 0), 0) || 1;
+    for (const rows of Object.values(S[L.ref])) rows.forEach((r, i) => {
+      dSales[d][i] += r.net; dChk[d][i] += r.chk; dChk0[d][i] += r.chk0;
+      for (const [mj, sh] of Object.entries(mx)) { const a = bbS.macct[mj]; if (!a) continue;
+        const x = (salesAcc[a] = salesAcc[a] || {}); (x[d] = x[d] || z())[i] += r.net * (+sh || 0) / tot; }
+    });
+  }
+  const coSales = z(), coChk = z();
+  depts.forEach(d => (dSales[d] || []).forEach((v, i) => { coSales[i] += v; coChk[i] += dChk[d][i]; }));
+  // last year's sales (BC, the sales accounts) by department, for the defaults of % of sales
+  const lyOf = (d, no) => BB_MM.map(mm => ((bbB.ly[d] || {})[mm] || {})[no] || 0);
+  const lySalesD = {};
+  depts.forEach(d => { lySalesD[d] = BB_MM.map(mm => Object.entries((bbB.ly[d] || {})[mm] || {}).reduce((a, [no, v]) => a + ((bbB.accounts[no] || [])[1] === "sales" ? v : 0), 0)); });
+  const lyCoSales = BB_MM.map((_, i) => depts.reduce((a, d) => a + lySalesD[d][i], 0));
+  const simSales = new Set(Object.keys(salesAcc));
+  const res = {acc: {}, dSales, dChk, dChk0, coSales, coChk, lySalesD, lyCoSales, defaults: {}};
+  for (const no of Object.keys(bbB.accounts)) {
+    const A = bbS.acc[no] || {}, line = bbLine(no), drv = A.d || bbDefDrv(no, line), byD = {};
+    let any = false;
+    for (const d of depts) {
+      const ly = lyOf(d, no), lyT = ly.reduce((a, b) => a + b, 0);
+      if (simSales.has(no) && hasSim.has(d)) { const v = (salesAcc[no] || {})[d]; if (v) { byD[d] = {ly, bud: v.slice(), drv: "sim"}; any = true; } else if (lyT) { byD[d] = {ly, bud: z(), drv: "sim"}; any = true; } continue; }
+      if (!lyT && A.v == null && !(A.dept || {})[d]) continue;
+      const own = lySalesD[d].reduce((a, b) => a + b, 0) > 0 && dSales[d] && dSales[d].some(Boolean);
+      const sb = own ? dSales[d] : coSales, sl = own ? lySalesD[d] : lyCoSales, cb = own && dChk[d].some(Boolean) ? dChk[d] : coChk, cl = own && dChk0[d].some(Boolean) ? dChk0[d] : null;
+      const slT = sl.reduce((a, b) => a + b, 0), clT = cl ? cl.reduce((a, b) => a + b, 0) : 0;
+      const def = drv === "pct" ? (slT ? lyT / slT * 100 : 0) : drv === "fixed" ? lyT / 12 : drv === "check" ? (clT ? lyT / clT : 0) : 0;
+      const v = (A.dept || {})[d] != null ? +A.dept[d] : A.v != null ? +A.v : def;
+      const bud = BB_MM.map((_, i) => drv === "ly" ? ly[i] * (1 + v / 100) : drv === "pct" ? sb[i] * v / 100 : drv === "fixed" ? v : drv === "check" ? cb[i] * v : 0);
+      byD[d] = {ly, bud, drv, v, def}; any = true;
+    }
+    if (any) res.acc[no] = {drv, line, byD};
+  }
+  return res;
+}
+function bbDefDrv(no, line){ return line === "cogs" ? "pct" : (line === "occupancy" || line === "da") ? "fixed" : "ly"; }
+const bbSum = arr => arr.reduce((a, b) => a + b, 0);
+// the P&L lines of a department ("*": all) by month: {line: [12]}
+function bbPL(calc, dept, which){
+  const out = {}; BB_LINES.forEach(([k]) => out[k] = BB_MM.map(() => 0));
+  for (const [no, A] of Object.entries(calc.acc)) for (const [d, x] of Object.entries(A.byD)) {
+    if (dept !== "*" && d !== dept) continue;
+    const arr = which === "ly" ? x.ly : x.bud;
+    arr.forEach((v, i) => out[A.line in out ? A.line : ""][i] += v);
+  }
+  const t = (k, i) => out[k][i];
+  out.sales = BB_MM.map((_, i) => t("revenue", i));
+  out.gm = BB_MM.map((_, i) => t("revenue", i) + t("other_income", i) - t("cogs", i));
+  out.ebitda = BB_MM.map((_, i) => out.gm[i] - t("labour", i) - t("occupancy", i) - t("opex", i) - t("", i));
+  out.net = BB_MM.map((_, i) => out.ebitda[i] - t("da", i) - t("finance", i) - t("nonop", i) - t("tax", i));
+  return out;
+}
+// ---- the page
+function bbFill(){
+  $("bbCo").textContent = bbB.company; $("bbName").value = bbS.name;
+  $("bbAccLine").innerHTML = `<option value="">Every line</option>` + BB_LINES.map(([k, l]) => `<option value="${k || "_"}">${esc(l)}</option>`).join("");
+  $("bbMixLoc").innerHTML = bbB.locations.map(L => `<option value="${esc(L.ref)}" data-no-i18n>${esc(L.name)}</option>`).join("");
+  $("bbPlDept").innerHTML = `<option value="*">The whole company</option>` + bbB.departments.map(d => `<option value="${esc(d.code)}" data-no-i18n>${esc(d.code)} · ${esc(d.name)}</option>`).join("") + `<option value="">No department</option>`;
+}
+function bbRender(){
+  if (!bbB) return;
+  bbCalc = bbRun();
+  const lock = bbLocked(), st = bbVer ? bbVer.status : "New";
+  $("bbStatus").textContent = st + (bbDirty ? " · not saved" : ""); $("bbStatus").className = "chip " + (st === "Approved" ? "down" : st === "In review" ? "" : "warn");
+  $("bbHead").textContent = `${bbS.name} · ${bbB.year}` + (bbVer ? ` · ${bbVer.status} by ${bbVer.by}, ${String(bbVer.at).replace("T", " ").slice(0, 16)}` : " · not saved yet");
+  $("bbSave").disabled = lock || !bbB.rights.edit; $("bbSubmit").disabled = lock || !bbB.rights.edit || st === "In review" && !bbDirty;
+  $("bbApprove").disabled = !bbB.rights.approve || st !== "In review" || bbDirty; $("bbReopen").disabled = !bbB.rights.approve || st !== "Approved";
+  $("bbExport").disabled = !bbB.approved || !bbB.rights.export;
+  $("bbName").disabled = lock;
+  const P = bbPL(bbCalc, "*", "bud"), L = bbPL(bbCalc, "*", "ly"), y = k => bbSum(P[k]), ly = k => bbSum(L[k]);
+  const pc = (a, b) => b ? a / b * 100 : null, S = y("sales"), S0 = ly("sales");
+  const T = (l, v, s, light) => `<div class="ex-t ex-${light || "na"}"><div class="ex-tl"><span>${fcSp(l)}</span><i></i></div><b>${v}</b><small>${s}</small></div>`;
+  const dl = (a, b, good) => a == null || b == null ? "na" : good * (a - b) >= 0 ? "g" : "r";
+  $("bbTiles").innerHTML = [
+    T("Sales", `${bbM(S)} <span class="ex-u">${esc(bbB.currency)}</span>`, `${bbSg((S / S0 - 1) * 100)} ${fcSp("on last year")} (${bbM(S0)})`, dl(S, S0, 1)),
+    T("Checks", fmt(bbSum(bbCalc.coChk)), `${bbSg((bbSum(bbCalc.coChk) / bbSum(Object.values(bbCalc.dChk0).flat()) - 1) * 100)} ${fcSp("on last year")}`, "na"),
+    T("Food & beverage cost", bbP(pc(y("cogs"), S)), `${fcSp("last year")} ${bbP(pc(ly("cogs"), S0))}`, dl(pc(y("cogs"), S), pc(ly("cogs"), S0), -1)),
+    T("Labour", bbP(pc(y("labour"), S)), `${fcSp("last year")} ${bbP(pc(ly("labour"), S0))}`, dl(pc(y("labour"), S), pc(ly("labour"), S0), -1)),
+    T("EBITDA", `${bbM(y("ebitda"))} <span class="ex-u">${esc(bbB.currency)}</span>`, `${bbP(pc(y("ebitda"), S))} ${fcSp("of sales; last year")} ${bbM(ly("ebitda"))}`, dl(y("ebitda"), ly("ebitda"), 1)),
+    T("Net profit", `${bbM(y("net"))} <span class="ex-u">${esc(bbB.currency)}</span>`, `${fcSp("last year")} ${bbM(ly("net"))}`, dl(y("net"), ly("net"), 1))].join("");
+  document.querySelectorAll(".bb-p").forEach(p => p.hidden = p.dataset.bbp !== bbPart);
+  document.querySelectorAll("[data-bbp]").forEach(b => { if (b.tagName === "BUTTON") { b.classList.toggle("on", b.dataset.bbp === bbPart); b.setAttribute("aria-selected", b.dataset.bbp === bbPart); } });
+  ({sales: bbSalesDraw, mix: bbMixDraw, costs: bbAccDraw, pl: bbPlDraw})[bbPart]();
+  document.querySelectorAll("#bbView input:not(#bbAccQ):not([data-ro]), #bbView select.bb-in").forEach(x => x.disabled = lock);
+  $("bbDefs").innerHTML = [
+    `The base: each calendar month from the latest one closed and posted (${Object.entries(bbB.base_months).map(([m, k]) => k).join(", ")}): the same months for Simphony's sales and checks and for Business Central's accounts, so the ratios hold.`,
+    "Sales = checks × average check, by restaurant, channel and month (Simphony, without VAT), each with its %. The major groups take the sales in last year's mix of the last three closed months (or the shares typed) and go to the sales accounts of the mapping; a department without a restaurant in Simphony keeps its sales accounts on their driver.",
+    "Every other account of the chart takes a driver: last year + % (its own months), % of sales (of its department, else of the company), fixed a month, per check. Empty value: each department from its own last year; a value typed: every department; a department's own value in the account's pop-up.",
+    "Draft → Send for review → Approve (finance.budget.approve). The approved version keeps the entries it was approved with; only they go into the file for BC: G/L Budget Entries by account, month and DEPARTMENT, signed as BC holds them. Nothing is written to Business Central."].map(x => `<p style="margin:0 0 8px">${esc(x)}</p>`).join("");
+}
+function bbSalesDraw(){
+  const S = bbSalesOf(), lock = bbLocked();
+  const sum = rows => rows.reduce((a, r) => ({chk0: a.chk0 + r.chk0, net0: a.net0 + r.net0, chk: a.chk + r.chk, net: a.net + r.net}), {chk0: 0, net0: 0, chk: 0, net: 0});
+  const inp = (ref, ch, k, v) => `<input class="bb-n" type="number" step="0.5" data-bbs="${esc(ref)}|${esc(ch)}|${k}" value="${v ?? ""}" placeholder="0"${lock ? " disabled" : ""}>`;
+  const row = (t, ref, ch, cls, label) => { const ac0 = t.chk0 ? t.net0 / t.chk0 : null, ac = t.chk ? t.net / t.chk : null, p = ch ? ((bbS.sales[ref] || {})[ch] || {}) : {};
+    return `<tr class="${cls}"><td>${label ? `<b>${fcSp(label)}</b>` : ch ? `<span data-no-i18n>${esc(ch)}</span>` : `<b data-no-i18n>${esc(bbB.locations.find(L => L.ref === ref).name)}</b>`}</td>
+      <td class="num">${fmt(t.chk0)}</td><td class="num">${label ? "" : inp(ref, ch || "*", "chk", ch ? p.chk : "")}</td><td class="num"><b>${fmt(t.chk)}</b></td>
+      <td class="num">${fmt(ac0, 0)}</td><td class="num">${label ? "" : inp(ref, ch || "*", "ac", ch ? p.ac : "")}</td><td class="num"><b>${fmt(ac, 0)}</b></td>
+      <td class="num">${bbM(t.net0)}</td><td class="num"><b>${bbM(t.net)}</b></td><td class="num ${t.net >= t.net0 ? "down" : "up"}">${bbSg(t.net0 ? (t.net / t.net0 - 1) * 100 : null)}</td></tr>`; };
+  let html = `<tr><th>Restaurant / channel</th><th class="num">Checks, last year</th><th class="num">Checks %</th><th class="num">Checks, budget</th><th class="num">Avg check, last year</th><th class="num">Avg check %</th><th class="num">Avg check, budget</th><th class="num">Sales, last year</th><th class="num">Sales, budget</th><th class="num">Change</th></tr>`;
+  const all = [];
+  for (const L of bbB.locations) {
+    const chs = Object.keys(S[L.ref]).sort((a, b) => sum(S[L.ref][b]).net0 - sum(S[L.ref][a]).net0), tl = sum(chs.map(ch => sum(S[L.ref][ch])));
+    all.push(tl);
+    html += row(tl, L.ref, null, "bb-loc") + chs.map(ch => row(sum(S[L.ref][ch]), L.ref, ch, "bb-ch")).join("");
+  }
+  html += row(all.reduce((a, t) => ({chk0: a.chk0 + t.chk0, net0: a.net0 + t.net0, chk: a.chk + t.chk, net: a.net + t.net}), {chk0: 0, net0: 0, chk: 0, net: 0}), "", "", "total", "Every restaurant");
+  $("bbSalesT").innerHTML = bbB.locations.length ? html : `<tr><td class="meta">${fcSp("No restaurant of this company in the registry (Settings → Location intelligence) with a Simphony reference.")}</td></tr>`;
+  $("bbSalesT").querySelectorAll("[data-bbs]").forEach(x => x.onchange = () => {
+    const [ref, ch, k] = x.dataset.bbs.split("|"), v = x.value === "" ? null : +x.value, R = bbS.sales[ref] = bbS.sales[ref] || {};
+    const set = c => { const o = R[c] = R[c] || {}; if (v == null) delete o[k]; else o[k] = v; };
+    if (ch === "*") Object.keys(bbB.locations.find(L => L.ref === ref).channels).forEach(set); else set(ch);
+    bbDirty = true; bbRender();
+  });
+  const co = bbCalc.coSales, ly = bbCalc.lyCoSales;
+  const sim0 = BB_MM.map((_, i) => bbB.locations.reduce((a, L) => a + Object.values(L.channels).reduce((b, m) => b + ((m[BB_MM[i]] || {}).net || 0), 0), 0));
+  $("bbSalesChart").innerHTML = Pulse.cols(BB_MM.map((mm, i) => ({label: mm, segs: [[co[i], "var(--ch-0)", "budget"]], line: sim0[i],
+    tip: `${bbB.year}-${mm}: budget ${fmt(co[i])} · last year ${fmt(sim0[i])} (Simphony, ${bbB.base_months[mm]})`})), [["var(--ch-0)", "budget"], ["var(--ink)", "last year (dashed)"]], {h: 150, aria: "Sales by month", maxLabel: x => bbM(x)});
+}
+$("bbAllGo").onclick = () => {
+  const c = $("bbAllChk").value, a = $("bbAllAc").value;
+  for (const L of bbB.locations) { const R = bbS.sales[L.ref] = bbS.sales[L.ref] || {};
+    for (const ch of Object.keys(L.channels)) { const o = R[ch] = R[ch] || {}; if (c !== "") o.chk = +c; if (a !== "") o.ac = +a; } }
+  bbDirty = true; bbRender();
+};
+function bbMixDraw(){
+  const lock = bbLocked(), sa = bbB.sales_accounts;
+  $("bbMap").innerHTML = `<b>${fcSp("Major group → sales account in BC")}</b> ` + bbB.majors.map(mj => `<label class="bb-mapi"><span data-no-i18n>${esc(mj)}</span><select class="bb-in" data-bbmap="${esc(mj)}"${lock ? " disabled" : ""}>${sa.map(a => `<option value="${esc(a)}"${bbS.macct[mj] === a ? " selected" : ""}>${esc(a)} ${esc((bbB.accounts[a] || [""])[0])}</option>`).join("")}</select></label>`).join("");
+  $("bbMap").querySelectorAll("[data-bbmap]").forEach(x => x.onchange = () => { bbS.macct[x.dataset.bbmap] = x.value; bbDirty = true; bbRender(); });
+  const L = bbB.locations.find(x => x.ref === $("bbMixLoc").value) || bbB.locations[0]; if (!L) { $("bbMixT").innerHTML = ""; $("bbFamT").innerHTML = ""; return; }
+  const m = bbMixOf(L), S = bbSalesOf()[L.ref], tot = Object.values(S).reduce((a, rows) => a + bbSum(rows.map(r => r.net)), 0), bt = Object.values(m.bud).reduce((a, b) => a + (+b || 0), 0) || 1;
+  $("bbMixT").innerHTML = `<tr><th>Major group</th><th class="num">Last year</th><th class="num">Budget share</th><th class="num">Sales, budget</th><th>Account</th></tr>` +
+    Object.keys(m.ly).sort((a, b) => m.ly[b] - m.ly[a]).map(mj => `<tr><td><b data-no-i18n>${esc(mj)}</b></td><td class="num">${bbP(m.ly[mj])}</td>
+      <td class="num"><input class="bb-n" type="number" step="0.5" min="0" max="100" data-bbmix="${esc(mj)}" value="${fmt(+m.bud[mj] || 0, 1).replace(/,/g, "")}"${lock ? " disabled" : ""}></td>
+      <td class="num"><b>${bbM(tot * (+m.bud[mj] || 0) / bt)}</b></td><td class="meta">${esc(bbS.macct[mj] || "–")}</td></tr>`).join("")
+    + `<tr class="total"><td>${fcSp("Total")}</td><td class="num">100%</td><td class="num">${bbP(bt)}</td><td class="num">${bbM(tot)}</td><td></td></tr>`;
+  $("bbMixT").querySelectorAll("[data-bbmix]").forEach(x => x.onchange = () => {
+    // the share typed; the other groups make up the rest in their own proportions
+    const mj = x.dataset.bbmix, v = Math.max(0, Math.min(100, +x.value || 0)), cur = Object.assign({}, m.bud), rest = Object.keys(cur).filter(k => k !== mj), rt = rest.reduce((a, k) => a + (+cur[k] || 0), 0);
+    const o = {[mj]: v}; rest.forEach(k => o[k] = rt ? (+cur[k] || 0) / rt * (100 - v) : (100 - v) / rest.length);
+    bbS.mix[L.ref] = o; bbDirty = true; bbRender();
+  });
+  // categories (family groups): within their major group, last year's shares
+  const fam = {}, fmj = {};
+  for (const x of Object.values(L.mix || {})) { for (const [f, v] of Object.entries(x.family)) fam[f] = (fam[f] || 0) + v; Object.assign(fmj, x.fam_major); }
+  const mjT = {}; Object.entries(fam).forEach(([f, v]) => mjT[fmj[f]] = (mjT[fmj[f]] || 0) + v);
+  $("bbFamT").innerHTML = `<tr><th>Category (family group)</th><th>Major group</th><th class="num">Share, budget</th><th class="num">Sales, budget</th></tr>` +
+    Object.keys(fam).sort((a, b) => fam[b] - fam[a]).map(f => { const sh = (mjT[fmj[f]] ? fam[f] / mjT[fmj[f]] : 0) * (+m.bud[fmj[f]] || 0) / bt * 100;
+      return `<tr><td data-no-i18n>${esc(f)}</td><td class="meta" data-no-i18n>${esc(fmj[f] || "")}</td><td class="num">${bbP(sh)}</td><td class="num">${bbM(tot * sh / 100)}</td></tr>`; }).join("")
+    + `<tr><td colspan="4" class="meta">${fcSp(`Mix of ${L.mix_from} → ${L.mix_to} (Simphony menu items, without VAT).`)}</td></tr>`;
+}
+$("bbMixLoc").onchange = () => bbRender();
+function bbAccDraw(){
+  const lock = bbLocked(), q = $("bbAccQ").value.trim().toLowerCase(), lf = $("bbAccLine").value, S = bbSum(bbCalc.coSales), S0 = bbSum(bbCalc.lyCoSales);
+  const rows = Object.entries(bbCalc.acc).filter(([no, A]) => (!q || no.includes(q) || (bbB.accounts[no][0] || "").toLowerCase().includes(q)) && (!lf || (lf === "_" ? !A.line : A.line === lf)));
+  const byLine = {}; rows.forEach(([no, A]) => (byLine[A.line] = byLine[A.line] || []).push([no, A]));
+  let html = `<tr><th>Account</th><th class="num">Last year</th><th>Driver</th><th class="num">Value</th><th class="num">Budget</th><th class="num">Change</th><th class="num">% of sales</th></tr>`;
+  for (const [k, lab] of BB_LINES) {
+    const list = byLine[k]; if (!list) continue;
+    const t = list.reduce((a, [, A]) => { for (const x of Object.values(A.byD)) { a.ly += bbSum(x.ly); a.b += bbSum(x.bud); } return a; }, {ly: 0, b: 0});
+    html += `<tr class="total"><td>${fcSp(lab)}</td><td class="num">${bbM(t.ly)}</td><td></td><td></td><td class="num">${bbM(t.b)}</td><td class="num">${bbSg(t.ly ? (t.b / t.ly - 1) * 100 : null)}</td><td class="num">${bbP(S ? t.b / S * 100 : null)}</td></tr>`;
+    for (const [no, A] of list.sort((a, b) => a[0].localeCompare(b[0]))) {
+      const lyT = Object.values(A.byD).reduce((a, x) => a + bbSum(x.ly), 0), bT = Object.values(A.byD).reduce((a, x) => a + bbSum(x.bud), 0), sim = Object.values(A.byD).some(x => x.drv === "sim");
+      const own = (bbS.acc[no] || {}).v, depOv = Object.keys((bbS.acc[no] || {}).dept || {}).length;
+      html += `<tr data-pulse="bbacc|${esc(no)}" tabindex="0" style="cursor:pointer"><td><b>${esc(no)}</b> <span data-no-i18n>${esc(bbB.accounts[no][0])}</span>${depOv ? ` <span class="chip">${fcSp(`${depOv} department(s) own value`)}</span>` : ""}</td>
+        <td class="num">${bbM(lyT)}</td>
+        <td>${sim ? `<span class="meta">${fcSp("from the sales (Simphony × mix)")}</span>` : `<select class="bb-in" data-bbdrv="${esc(no)}"${lock ? " disabled" : ""}>${Object.entries(BB_DRV).map(([d, l]) => `<option value="${d}"${A.drv === d ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`}</td>
+        <td class="num">${sim ? "" : `<input class="bb-n" type="number" step="any" data-bbv="${esc(no)}" value="${own ?? ""}" placeholder="${esc(bbPh(A))}"${lock ? " disabled" : ""}>`}</td>
+        <td class="num"><b>${bbM(bT)}</b></td><td class="num ${Math.abs(bT - lyT) < Math.max(1, Math.abs(lyT) * 0.0005) ? "" : (bbIncome(no) ? bT >= lyT : bT <= lyT) ? "down" : "up"}">${bbSg(lyT ? (bT / lyT - 1) * 100 : null)}</td><td class="num">${bbP(S ? bT / S * 100 : null)}</td></tr>`;
+    }
+  }
+  $("bbAccT").innerHTML = html;
+  $("bbAccT").querySelectorAll("[data-bbdrv]").forEach(x => { x.onclick = e => e.stopPropagation(); x.onchange = () => { const A = bbS.acc[x.dataset.bbdrv] = bbS.acc[x.dataset.bbdrv] || {}; A.d = x.value; delete A.v; delete A.dept; bbDirty = true; bbRender(); }; });
+  $("bbAccT").querySelectorAll("[data-bbv]").forEach(x => { x.onclick = e => e.stopPropagation(); x.onchange = () => { const A = bbS.acc[x.dataset.bbv] = bbS.acc[x.dataset.bbv] || {}; if (x.value === "") delete A.v; else A.v = +x.value; if (!A.d) A.d = bbCalc.acc[x.dataset.bbv].drv; bbDirty = true; bbRender(); }; });
+}
+// the placeholder of an account's value: what each department takes from its own last year
+function bbPh(A){
+  const ds = Object.values(A.byD).filter(x => x.def != null);
+  if (!ds.length) return "";
+  if (A.drv === "ly") return "0";
+  const avg = ds.reduce((a, x) => a + x.def, 0) / ds.length;
+  return A.drv === "pct" ? `≈${fmt(avg, 2)}` : `≈${fmt(avg, 0)}`;
+}
+["bbAccQ", "bbAccLine"].forEach(id => $(id).addEventListener("input", () => bbAccDraw()));
+// an account: its departments (last year, the value, a department's own value) and its months
+function bbAccPop(no){
+  const A = bbCalc.acc[no]; if (!A) return;
+  const lock = bbLocked(), names = Object.fromEntries(bbB.departments.map(d => [d.code, d.name])), sim = Object.values(A.byD).some(x => x.drv === "sim");
+  const tl = BB_MM.map((_, i) => Object.values(A.byD).reduce((a, x) => a + x.ly[i], 0)), tb = BB_MM.map((_, i) => Object.values(A.byD).reduce((a, x) => a + x.bud[i], 0));
+  const body = Pulse.pop({title: `${esc(no)} · <span data-no-i18n>${esc(bbB.accounts[no][0])}</span>`, sub: esc(`${sim ? "From the sales: Simphony × mix" : BB_DRV[A.drv]} · ${bbB.company} · ${bbB.year}`), body:
+    Pulse.panel("Month by month", Pulse.cols(BB_MM.map((mm, i) => ({label: mm, segs: [[tb[i], "var(--ch-0)", "budget"]], line: tl[i], tip: `${bbB.year}-${mm}: budget ${fmt(tb[i])} · last year ${fmt(tl[i])} (${bbB.base_months[mm]})`})),
+      [["var(--ch-0)", "budget"], ["var(--ink)", "last year (dashed)"]], {h: 140, aria: "By month", maxLabel: x => bbM(x)}))
+    + Pulse.panel("By department", `<div class="scroll"><table class="bb-t" data-nosort><tr><th>Department</th><th class="num">Last year</th><th class="num">From its last year</th><th class="num">Its own value</th><th class="num">Budget</th></tr>`
+      + Object.entries(A.byD).sort((a, b) => bbSum(b[1].ly) - bbSum(a[1].ly)).map(([d, x]) => `<tr><td><b data-no-i18n>${esc(d || "—")}</b> <span class="meta" data-no-i18n>${esc(d ? names[d] || "" : "no department")}</span></td>
+        <td class="num">${bbM(bbSum(x.ly))}</td><td class="num">${x.def == null ? "–" : A.drv === "pct" ? bbP(x.def) : fmt(x.def, A.drv === "ly" ? 1 : 0)}</td>
+        <td class="num">${sim ? "–" : `<input class="bb-n" type="number" step="any" data-bbdv="${esc(d)}" value="${((bbS.acc[no] || {}).dept || {})[d] ?? ""}"${lock ? " disabled" : ""}>`}</td><td class="num"><b>${bbM(bbSum(x.bud))}</b></td></tr>`).join("")
+      + `</table></div>${sim ? "" : `<p class="meta">${fcSp(`Value: ${A.drv === "ly" ? "% on its last year" : A.drv === "pct" ? "% of its sales (a department without sales: of the company's)" : A.drv === "fixed" ? "an amount a month" : "an amount per check"}. Empty: the account's value, else its own last year.`)}</p>`}`)});
+  body.querySelectorAll("[data-bbdv]").forEach(x => x.onchange = () => {
+    const S = bbS.acc[no] = bbS.acc[no] || {d: A.drv}; S.dept = S.dept || {};
+    if (x.value === "") delete S.dept[x.dataset.bbdv]; else S.dept[x.dataset.bbdv] = +x.value;
+    bbDirty = true; bbRender(); bbAccPop(no);
+  });
+}
+Pulse.on("bbacc", no => bbAccPop(no));
+function bbPlDraw(){
+  const d = $("bbPlDept").value, P = bbPL(bbCalc, d, "bud"), L = bbPL(bbCalc, d, "ly");
+  const R = [["sales", "Sales", 1], ["other_income", "Other income", 0], ["cogs", "Cost of goods sold", 0], ["gm", "Gross margin", 1], ["labour", "Labour", 0], ["occupancy", "Occupancy", 0],
+    ["opex", "Other operating expenses", 0], ["", "Not in the KPI mapping", 0], ["ebitda", "EBITDA", 1], ["da", "Depreciation and amortisation", 0], ["finance", "Interest and finance (net)", 0], ["nonop", "Non-operating items", 0], ["tax", "Income tax", 0], ["net", "Net profit", 1]];
+  $("bbPlT").innerHTML = `<tr><th>Line</th>${BB_MM.map(mm => `<th class="num">${bbB.year}-${mm}</th>`).join("")}<th class="num">Budget</th><th class="num">Last year</th><th class="num">Change</th><th class="num">% of sales</th></tr>`
+    + R.filter(([k]) => bbSum(P[k].map(Math.abs)) || bbSum(L[k].map(Math.abs)) || ["sales", "ebitda", "net", "gm"].includes(k)).map(([k, l, tot]) => { const b = bbSum(P[k]), ly = bbSum(L[k]);
+      return `<tr class="${tot ? "total" : ""}"><td>${fcSp(l)}</td>${P[k].map(v => `<td class="num">${bbM(v)}</td>`).join("")}<td class="num"><b>${bbM(b)}</b></td><td class="num">${bbM(ly)}</td>
+        <td class="num">${bbSg(ly ? (b - ly) / Math.abs(ly) * 100 : null)}</td><td class="num">${bbP(bbSum(P.sales) ? b / bbSum(P.sales) * 100 : null)}</td></tr>`; }).join("");
+  $("bbPlChart").innerHTML = Pulse.cols(BB_MM.map((mm, i) => ({label: mm, segs: [[Math.max(0, P.ebitda[i]), "var(--ch-0)", "EBITDA"]], line: Math.max(0, L.ebitda[i]),
+    tip: `${bbB.year}-${mm}: EBITDA ${fmt(P.ebitda[i])} (last year ${fmt(L.ebitda[i])}) · sales ${fmt(P.sales[i])}`})), [["var(--ch-0)", "EBITDA, budget"], ["var(--ink)", "last year (dashed)"]], {h: 140, aria: "EBITDA by month", maxLabel: x => bbM(x)});
+}
+$("bbPlDept").onchange = () => bbPlDraw();
+document.querySelectorAll("button[data-bbp]").forEach(b => b.onclick = () => { bbPart = b.dataset.bbp; bbRender(); });
+$("bbYear").onchange = () => { if (bbDirty && !confirm("Leave the changes not saved?")) return; bbLoad(false); };
+$("bbRead").onclick = () => bbLoad(true);
+$("bbName").onchange = () => { bbS.name = $("bbName").value.trim().toUpperCase() || `BUDGET${bbB.year}`; bbDirty = true; bbRender(); };
+// the entries for BC: account × department × month, signed as BC holds them (income negative)
+function bbEntries(){
+  const out = [];
+  for (const [no, A] of Object.entries(bbCalc.acc)) for (const [d, x] of Object.entries(A.byD)) x.bud.forEach((v, i) => {
+    const amt = Math.round((bbIncome(no) ? -v : v) * 100) / 100; if (amt) out.push({a: no, d, m: i + 1, v: amt}); });
+  return out;
+}
+async function bbPost(action, extra){
+  const P = bbPL(bbCalc, "*", "bud");
+  try {
+    const j = await simphonyPost("/api/budget/build", Object.assign({company: bbB.company, year: bbB.year, action, name: bbS.name, state: bbS,
+      summary: {sales: Math.round(bbSum(P.sales)), ebitda: Math.round(bbSum(P.ebitda)), net: Math.round(bbSum(P.net))}}, extra || {}));
+    bbB.current = j.current; bbB.approved = j.approved; bbB.versions = j.versions; bbVer = j.current; bbDirty = false;
+    $("bbMsg").textContent = {save: "Saved as a draft.", submit: "Sent for review.", approve: "Approved: the file for BC is ready.", reopen: "Reopened as a draft."}[action];
+    bbRender();
+  } catch(e) { $("bbMsg").textContent = "Could not: " + e.message; }
+}
+$("bbSave").onclick = () => bbPost("save");
+$("bbSubmit").onclick = () => bbPost("submit");
+$("bbApprove").onclick = () => { const e = bbEntries(); if (!confirm(`Approve ${bbS.name}: ${fmt(e.length)} budget entries for Business Central?`)) return; bbPost("approve", {entries: e}); };
+$("bbReopen").onclick = () => { if (confirm("Reopen the approved budget as a draft? The approved file stays until a new version is approved.")) bbPost("reopen"); };
+$("bbExport").onclick = () => exportGo("/api/budget/build/xlsx?" + bbQs());
+$("bbVers").onclick = () => Pulse.pop({title: fcSp("Versions"), sub: esc(`${bbB.company} · ${bbB.year}`), body: Pulse.list([["When"], ["Status"], ["By"], ["Name"], ["Sales", 1], ["EBITDA", 1], ["Note"]],
+  (bbB.versions || []).slice().reverse().map(v => ({cells: [esc(String(v.at).replace("T", " ").slice(0, 16)), esc(v.status), esc(v.by), esc(v.name || ""), bbM((v.summary || {}).sales), bbM((v.summary || {}).ebitda), esc(v.note || "")]})), {none: "No version saved yet."})});
 function blShowTab(tab){
   blTab = tab;
   document.querySelectorAll("#bgTabs button").forEach(b => { b.classList.toggle("on", b.dataset.t === tab); b.setAttribute("aria-selected", b.dataset.t === tab); });
-  $("bgMain").style.display = tab === "loc" ? "none" : "";
+  $("bgMain").style.display = tab === "budget" ? "" : "none";
   $("blView").style.display = tab === "loc" ? "" : "none";
+  $("bbView").style.display = tab === "build" ? "" : "none";
+  if (tab === "build" && !bbB) bbLoad(false);
   if (tab === "loc") { if (!blData || blKey !== blQuery()) loadBl(false); else blRender(); }
 }
 document.querySelectorAll("#bgTabs button").forEach(b => b.onclick = () => blShowTab(b.dataset.t));

@@ -46,6 +46,7 @@ import faregister
 import transit
 import pricesim
 import mkkpi
+import budgetbuild
 import plan
 import ocdiag
 import emcaudit
@@ -2673,6 +2674,62 @@ class Handler(BaseHTTPRequestHandler):
     # ---------------------------------------------------------------- Sales → Price simulator (pricesim.py)
     PRICESIM_SCREEN = "finance.s.sales.pricing"
 
+    # ---- Budget & forecast → Build the budget (budgetbuild.py): the base, the versions, the file for BC
+    BUDGET_SCREEN = "finance.s.budget.build"
+
+    def _budget_build_get(self, path, q, user):
+        if not auth.can(user, self.BUDGET_SCREEN):
+            self._send(403, {"error": "Your role does not include Build the budget."})
+            return
+        company = q.get("company") or config.BC_COMPANY
+        try:
+            year = int(q.get("year") or date.today().year + 1)
+        except ValueError:
+            year = date.today().year + 1
+        year = max(date.today().year, min(year, date.today().year + 2))
+        if path.endswith("/xlsx"):
+            if not auth.can(user, "finance.export"):
+                self._send(403, {"error": "Your role cannot export."})
+                return
+            v = budgetbuild.approved_entries(company, year)
+            if not v:
+                self._send(409, {"error": "No approved budget to export: approve it first."})
+                return
+            cube = executive.assemble(company, min(date.today().year, year - 1), company_currency(company))
+            body = budgetbuild.render_xlsx(company, year, v, cube.get("accounts") or {}, cube.get("departments") or [])
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", f'attachment; filename="RHG_{company.replace(" ", "_")}_{v.get("name") or year}_for_BC.xlsx"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            store.audit("export", f"budget for BC · {company} {year}", user["username"], {}, {}, v.get("id") or "")
+            return
+        try:
+            r = budgetbuild.base(client, company, year, company_currency(company), q.get("refresh") == "1")
+        except Exception as exc:                                       # noqa: BLE001
+            traceback.print_exc()
+            self._send(200, {"error": f"The budget base could not be read: {str(exc)[:240]}"})
+            return
+        r.update(budgetbuild.load(company, year), rights={"edit": auth.can(user, "finance.budget.edit"),
+                                                          "approve": auth.can(user, "finance.budget.approve"),
+                                                          "export": auth.can(user, "finance.export")})
+        self._send(200, r)
+
+    def _budget_build_post(self, body, user):
+        if not auth.can(user, self.BUDGET_SCREEN) or not auth.can(user, "finance.budget.edit"):
+            self._send(403, {"error": "Your role cannot change the budget."})
+            return
+        company = str(body.get("company") or config.BC_COMPANY)
+        try:
+            year = int(body.get("year"))
+            self._send(200, budgetbuild.save(company, year, body, user["username"], auth.can(user, "finance.budget.approve")))
+        except PermissionError as exc:
+            self._send(403, {"error": str(exc)})
+        except (TypeError, ValueError) as exc:
+            self._send(400, {"error": str(exc) or "Bad request."})
+
     def _pricesim_get(self, path, q, user):
         """The simulator's base (Menu engineering's read of the period, by channel), the template of the competitors'
         price file, the saved scenarios."""
@@ -3363,6 +3420,8 @@ class Handler(BaseHTTPRequestHandler):
                 store.audit("export", f"channel profitability · {r['title']}", user["username"], {}, {}, r["period"]["from"])
             elif url.path.startswith("/api/sales/pricesim"):
                 self._pricesim_get(url.path, q, user)
+            elif url.path in ("/api/budget/build", "/api/budget/build/xlsx"):
+                self._budget_build_get(url.path, q, user)
             elif url.path in ("/api/sales/menu", "/api/sales/menu/xlsx"):
                 # Sales → Menu engineering: popularity and margin of every menu item (Simphony + BC recipes)
                 if not simphony.info()["configured"]:
@@ -4500,6 +4559,12 @@ class Handler(BaseHTTPRequestHandler):
         actor = user["username"]
         if url.path.startswith("/api/bonus/"):
             self._bonus_post(url.path, body, user, actor)
+            return
+        if url.path == "/api/budget/build":
+            if self.headers.get("X-Requested-With") != "RHG-Finance":
+                self._send(403, {"error": "This request must come from the Finance tower."})
+                return
+            self._budget_build_post(body or {}, user)
             return
         if url.path in ("/api/marketing/settings", "/api/marketing/upload", "/api/marketing/fetch"):
             if not auth.can(user, "finance.s.marketing.data"):

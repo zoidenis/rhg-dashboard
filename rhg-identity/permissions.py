@@ -37,6 +37,8 @@ PERMISSIONS = {
     "purchasing.settings.manage": "Change purchasing thresholds",
     "purchasing.export":          "Export purchasing data",
     "purchasing.negotiations.edit": "Enter proposed prices and negotiation scenarios",
+    "finance.budget.edit":        "Build and change the budget (draft, send for review)",
+    "finance.budget.approve":     "Approve or reopen the budget, the version exported for Business Central",
 
     # --- Layout of the towers (drag and drop, hiding sections)
     "layout.personal":       "Rearrange and hide sections for yourself",
@@ -77,6 +79,8 @@ ACTIONS = {
     "purchasing.actions.manage": "Purchasing: create and update actions",
     "purchasing.settings.manage": "Purchasing: change thresholds and email settings",
     "purchasing.negotiations.edit": "Purchasing: enter proposed prices and negotiation scenarios (Negotiations)",
+    "finance.budget.edit": "Finance: build and change the budget (Budget & forecast → Build the budget)",
+    "finance.budget.approve": "Finance: approve or reopen the budget; only the approved version is exported for BC",
     "unicorn.use": "Unicorn, the business analyst: the morning brief and the chat",
     "unicorn.decisions.approve": "Unicorn: approve or refuse its proposals, own and close actions and findings",
     "unicorn.rules.manage": "Unicorn: change the rules library (thresholds, policies, approved decisions)",
@@ -142,7 +146,7 @@ _FIN_ALL = _s("finance.s")
 _PUR_ALL = _s("purchasing.s")
 _EXEC = _s("platform.s.executive")
 _FIN_ACT = ["finance.export", "finance.actions.manage", "finance.closing.manage", "finance.settings.manage",
-            "reports.manage"]
+            "reports.manage", "finance.budget.edit", "finance.budget.approve"]
 _PUR_ACT = ["purchasing.export", "purchasing.actions.manage", "purchasing.settings.manage", "reports.manage"]
 
 # ---------------------------------------------------------------- roles
@@ -409,7 +413,12 @@ ADDED_SCREENS = {"platform.s.executive.audit": "platform.s.executive.budget",
                  "finance.s.marketing.social": ("platform.s.executive.overview", "platform.s.executive.sales", "finance.s.sales.main"),
                  # Marketing → Campaigns (25 Nov 2026): whoever reads the Marketing overview
                  "finance.s.marketing.campaigns": ("finance.s.marketing.overview", "platform.s.executive.overview",
-                                                   "platform.s.executive.sales", "finance.s.sales.main")}
+                                                   "platform.s.executive.sales", "finance.s.sales.main"),
+                 # Budget & forecast → Build the budget (26 Nov 2026): whoever reads the budget; Finance with the
+                 # thresholds (CFO, Finance director) builds and approves it
+                 "finance.s.budget.build": "finance.s.budget.budget",
+                 "finance.budget.edit": "finance.settings.manage",
+                 "finance.budget.approve": "finance.settings.manage"}
 # Screens taken out of the catalogue: removed from every role once ADDED_SCREENS has passed them on.
 REMOVED_SCREENS = ("purchasing.s.live", "finance.s.sales.today", "finance.s.cash.today", "finance.s.kartela.today", "finance.s.inventory.today",
                    "finance.s.budget.today", "finance.s.assets.today", "purchasing.s.exceptions.today",
