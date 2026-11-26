@@ -335,7 +335,8 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
             row = [loc, it, round(qty, 3), round(qty * cost, 2), round(s["cons"][7], 2), round(s["cons"][30], 2),
                    round(s["cons"][60], 2), round(s["cons"][90], 2), round(s["cons"][180], 2),
                    round(s["cons"][365], 2), s["last_rcpt"], s["last_cons"], days_without, cls,
-                   sev or "", cat, "P" if cat in perishable else ""]
+                   sev or "", cat, "P" if cat in perishable else "",
+                   str(card.get("Item_Category_Group_4") or "").strip().upper()]   # Item Category Group 4 (Geri, 26 Nov 2026)
             out_rows.append(row)
             if qty < 0:
                 negative.append(row)
@@ -376,11 +377,12 @@ def analyse(company, as_of, history_days, qty_by_loc, master_data, settings, hel
 
 
 COLS = ["location", "item", "qty", "value", "c7", "c30", "c60", "c90", "c180", "c365", "last_receipt",
-        "last_consumption", "days_without", "class", "received_not_used", "category", "perishable"]
+        "last_consumption", "days_without", "class", "received_not_used", "category", "perishable", "group4"]
 
 
-def select_rows(r, location="", cls="", category="", q="", rnc=False, sort="value", limit=500):
+def select_rows(r, location="", cls="", category="", q="", rnc=False, sort="value", limit=500, group4=""):
     rows = r["_rows"]
+    g4 = lambda x: x[17] if len(x) > 17 else ""                                                    # noqa: E731
     ql = (q or "").strip().lower()
     out = []
     for x in rows:
@@ -389,6 +391,8 @@ def select_rows(r, location="", cls="", category="", q="", rnc=False, sort="valu
         if cls and x[13] != cls:
             continue
         if category and x[15] != category.upper():
+            continue
+        if group4 and g4(x) != group4.upper():
             continue
         if rnc and not x[14]:
             continue
@@ -399,7 +403,8 @@ def select_rows(r, location="", cls="", category="", q="", rnc=False, sort="valu
            "qty": lambda x: -abs(x[2])}.get(sort, lambda x: -abs(x[3]))
     out.sort(key=key)
     return {"total": len(out), "value": round(sum(x[3] for x in out), 0), "cols": COLS,
-            "rows": out[:limit], "names": {x[1]: r["_names"].get(x[1], "") for x in out[:limit]}}
+            "rows": out[:limit], "names": {x[1]: r["_names"].get(x[1], "") for x in out[:limit]},
+            "groups4": sorted({g4(x) for x in rows if g4(x)})}
 
 
 # ---------------------------------------------------------------- the request
@@ -568,15 +573,15 @@ def render_xlsx(r):
           + ["Received, never used: items", "Received, never used: value"],
           [[L["location"], L["items"], L["value"]] + [L[c][0] for c in classes] + [round(L[c][1], 0) for c in classes]
            + [L["rnc"][0], round(L["rnc"][1], 0)] for L in r["locations"]], [14, 8, 14] + [10] * 16 + [14, 14])
-    head = ["Location", "Item", "Description", "Category", "Perishable", "Qty on hand", "Value (est.)",
+    head = ["Location", "Item", "Description", "Category", "Item Category Group 4", "Perishable", "Qty on hand", "Value (est.)",
             "Used 7d", "Used 30d", "Used 60d", "Used 90d", "Used 180d", "Used 365d", "Last receipt",
             "Last consumption", "Days without consumption", "Class", "Received, never used"]
-    rows = [[x[0], x[1], r["_names"].get(x[1], ""), x[15], x[16], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9],
+    rows = [[x[0], x[1], r["_names"].get(x[1], ""), x[15], x[17] if len(x) > 17 else "", x[16], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9],
              x[10], x[11], x[12], x[13], x[14]] for x in sorted(r["_rows"], key=lambda x: (x[0], -abs(x[3])))]
     sheet(wb.create_sheet("Items by location"), head, rows,
-          [12, 12, 40, 14, 9, 11, 13, 9, 9, 9, 9, 10, 10, 12, 14, 12, 13, 12])
-    sheet(wb.create_sheet("Received never used"), head, [x for x in rows if x[17]],
-          [12, 12, 40, 14, 9, 11, 13, 9, 9, 9, 9, 10, 10, 12, 14, 12, 13, 12])
+          [12, 12, 40, 14, 18, 9, 11, 13, 9, 9, 9, 9, 10, 10, 12, 14, 12, 13, 12])
+    sheet(wb.create_sheet("Received never used"), head, [x for x in rows if x[18]],
+          [12, 12, 40, 14, 18, 9, 11, 13, 9, 9, 9, 9, 10, 10, 12, 14, 12, 13, 12])
     sheet(wb.create_sheet("Left out"), ["Location or category", "Lines", "Value (est.)"],
           [list(x) for x in r.get("excluded") or []], [30, 10, 16])
     sheet(wb.create_sheet("Adjustments"), ["Location", "Positive qty", "Positive cost", "Negative qty", "Negative cost"],

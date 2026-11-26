@@ -4031,7 +4031,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, movement.select_rows(r, q.get("location") or "", q.get("class") or "",
                                                          q.get("category") or "", q.get("q") or "",
                                                          q.get("rnc") == "1", q.get("sort") or "value",
-                                                         min(2000, int(q.get("limit") or 500))))
+                                                         min(2000, int(q.get("limit") or 500)), q.get("group4") or ""))
                 else:
                     body = movement.render_xlsx(r)
                     self.send_response(200)

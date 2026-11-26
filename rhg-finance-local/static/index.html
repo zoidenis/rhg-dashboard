@@ -1426,6 +1426,7 @@ table.bn-plan td{padding:3px 4px}
         <label>Location<select id="mvFLoc"><option value="">All</option></select></label>
         <label>Class<select id="mvFClass"><option value="">All</option></select></label>
         <label>Category<select id="mvFCat"><option value="">All</option></select></label>
+        <label>Item Category Group 4<select id="mvFG4"><option value="">All</option></select></label>
         <label>Item<input id="mvFQ" placeholder="number or name"></label>
         <label>Show<select id="mvFRnc"><option value="">All items</option><option value="1">Received, never used</option></select></label>
         <label>Sort<select id="mvFSort"><option value="value">Value</option><option value="days">Days without use</option><option value="qty">Quantity</option></select></label>
@@ -8933,7 +8934,7 @@ $("mvRead").onclick = () => { mvData = null; loadMovement(true); };
 $("mvDays").onchange = () => { mvData = null; loadMovement(false); };
 $("mvAsOf").onchange = () => { mvData = null; loadMovement(false); };
 $("mvXlsx").onclick = () => { if (mvData) exportGo("/api/movement/xlsx?" + mvQs()); };
-["mvFLoc","mvFClass","mvFCat","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => { $("mvItems").closest("details").open = true; loadMvRows(); });
+["mvFLoc","mvFClass","mvFCat","mvFG4","mvFRnc","mvFSort"].forEach(id => $(id).onchange = () => { $("mvItems").closest("details").open = true; loadMvRows(); });
 $("mvFQ").onkeydown = e => { if (e.key === "Enter") loadMvRows(); };
 function renderMovement(){
   const d = mvData, t = d.totals, c = t.classes;
@@ -8973,7 +8974,7 @@ function renderMovement(){
 }
 async function loadMvRows(){
   if (!mvData) return;
-  const extra = {location: $("mvFLoc").value, class: $("mvFClass").value, category: $("mvFCat").value, q: $("mvFQ").value.trim(), rnc: $("mvFRnc").value, sort: $("mvFSort").value};
+  const extra = {location: $("mvFLoc").value, class: $("mvFClass").value, category: $("mvFCat").value, group4: $("mvFG4").value, q: $("mvFQ").value.trim(), rnc: $("mvFRnc").value, sort: $("mvFSort").value};
   try{
     const j = await readJSON(await fetch("/api/movement/rows?" + mvQs(extra)));
     if (j.error) throw new Error(j.error);
@@ -8982,10 +8983,13 @@ async function loadMvRows(){
       const cats = [...new Set((await readJSON(await fetch("/api/movement/rows?" + mvQs({limit: 2000})))).rows.map(r => r[ix("category")]).filter(Boolean))].sort();
       $("mvFCat").innerHTML = `<option value="">All</option>` + cats.map(c => `<option>${esc(c)}</option>`).join(""); $("mvFCat").dataset.filled = "1";
     }
+    if (!$("mvFG4").dataset.filled && (j.groups4 || []).length) {
+      $("mvFG4").innerHTML = `<option value="">All</option>` + j.groups4.map(c => `<option value="${esc(c)}" data-no-i18n>${esc(c)}</option>`).join(""); $("mvFG4").value = extra.group4 || ""; $("mvFG4").dataset.filled = "1";
+    }
     $("mvItemsTitle").textContent = `Items · ${fmt(j.total)} lines · ${fmt(j.value)}`;
     $("mvItemsHint").textContent = `Showing ${fmt(j.rows.length)}; the Excel file has every line. Use = qualifying consumption in the window.`;
     $("mvItems").innerHTML = `<tr><th>Location</th><th>Item</th><th class="num">On hand</th><th class="num">Value</th><th class="num">Used 7d</th><th class="num">30d</th><th class="num">90d</th><th class="num">180d</th><th>Last receipt</th><th>Last use</th><th class="num">Days without use</th><th>Class</th><th></th></tr>` +
-      j.rows.map(r => `<tr data-pulse="item|${esc(r[ix("item")])}" tabindex="0" style="cursor:pointer"><td>${esc(r[ix("location")])}</td><td><b>${esc(r[ix("item")])}</b> ${esc(j.names[r[ix("item")]] || "")} <span class="meta">${esc(r[ix("category")])}${r[ix("perishable")] ? " · perishable" : ""}</span></td>
+      j.rows.map(r => `<tr data-pulse="item|${esc(r[ix("item")])}" tabindex="0" style="cursor:pointer"><td>${esc(r[ix("location")])}</td><td><b>${esc(r[ix("item")])}</b> ${esc(j.names[r[ix("item")]] || "")} <span class="meta">${esc(r[ix("category")])}${ix("group4") >= 0 && r[ix("group4")] ? " · " + esc(r[ix("group4")]) : ""}${r[ix("perishable")] ? " · perishable" : ""}</span></td>
         <td class="num">${fmt(r[ix("qty")], 2)}</td><td class="num">${fmt(r[ix("value")])}</td><td class="num">${fmt(r[ix("c7")], 1)}</td><td class="num">${fmt(r[ix("c30")], 1)}</td><td class="num">${fmt(r[ix("c90")], 1)}</td><td class="num">${fmt(r[ix("c180")], 1)}</td>
         <td class="meta">${esc(r[ix("last_receipt")] || "–")}</td><td class="meta">${esc(r[ix("last_consumption")] || "–")}</td><td class="num">${r[ix("days_without")] == null ? `> ${mvData.history_days}` : fmt(r[ix("days_without")])}</td>
         <td><span class="rhg-pill ${MV_PILL[r[ix("class")]] || "info"}">${esc(r[ix("class")].toLowerCase())}</span>${r[ix("received_not_used")] ? ` <span class="rhg-pill ${r[ix("received_not_used")] === "critical" ? "critical" : "warning"}">never used</span>` : ""}</td>
