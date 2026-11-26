@@ -580,6 +580,81 @@ def inventory_request(company, anchor, mode, dimension, location=None, refresh=F
 _latest_cache = {}
 
 
+# ---- Price simulator: the whole read as one job on the server (Geri, 26 Nov 2026: a plan took long, and leaving the
+# page stopped it). The menu items of the period (Menu engineering's read), the plan's checks by channel started at the
+# same time, then the prices, the elasticity and the plan; the job goes on whether the page waits or not, and its
+# answer is kept 15 minutes for whoever asks the same.
+_ps_jobs, _ps_lock = {}, threading.Lock()
+PS_KEEP = 900
+
+
+def _pricesim_request(per, key, refs, q, pw):
+    refresh = q.get("refresh") == "1"
+    jkey = (tuple(sorted((k, v) for k, v in q.items() if k not in ("refresh", "_"))), key)
+    now = time.time()
+    with _ps_lock:
+        job = _ps_jobs.get(jkey)
+        if job and job["state"] == "running":
+            return {"pending": True, "stage": job["stage"], "done": job.get("done", 0), "total": job.get("total", 0),
+                    "elapsed": int(now - job["started"])}
+        if job and job["state"] == "done" and not refresh and now - job["finished"] < job.get("keep", PS_KEEP):
+            return job["result"]
+        if job and job["state"] == "failed" and not refresh:
+            _ps_jobs.pop(jkey, None)
+            return {"error": job["error"]}
+        job = _ps_jobs[jkey] = {"state": "running", "started": now, "stage": "Starting", "done": 0, "total": 0}
+        for k in [k for k, v in _ps_jobs.items() if v.get("state") != "running" and now - v.get("finished", now) > 3 * PS_KEEP]:
+            _ps_jobs.pop(k, None)
+
+    def stage(text, done=0, total=0):
+        with _ps_lock:
+            job.update(stage=text, done=done, total=total)
+
+    def run():
+        try:
+            if pw:                                                   # the plan's checks by channel, read alongside
+                try:
+                    in_scope = [l["locRef"] for l in simphony.locations() if locintel.in_use(l) and (refs is None or l["locRef"].upper() in refs)]
+                    plan.build(q["plan"], in_scope, {}, w=pw)
+                except Exception:                                    # noqa: BLE001
+                    traceback.print_exc()
+            first = True
+            while True:
+                ds = menueng.request(per, _latest, client, key, refs, refresh and first)
+                first = False
+                if not ds.get("pending"):
+                    break
+                stage("menu items", ds.get("done", 0), ds.get("total", 0))
+                time.sleep(2)
+            if ds.get("available") is False:
+                raise ValueError(ds.get("error") or "The menu items could not be read.")
+            stage("prices, elasticity" + (" and the plan" if pw else ""))
+            level = q.get("level") if q.get("level") in ("brand", "location", "locations", "all") else "all"
+            try:
+                infl = json.loads(q.get("infl") or "{}")
+                infl = {str(k)[:80]: float(v) for k, v in infl.items()} if isinstance(infl, dict) else {}
+            except (ValueError, TypeError):
+                infl = {}
+            r = pricesim.build(ds, level, (q.get("key") or "")[:1200], q.get("section") or "family", infl=infl)
+            r["plan_options"] = plan.options()
+            if pw:
+                names = {x["ref"]: x["name"] for x in r.get("selection") or []}
+                r["plan"] = plan.build(q["plan"], list(names), names, w=pw)
+            # still reading behind (the plan's checks, the days around the price changes): kept a little only, so the
+            # page's next ask builds it again with what has arrived
+            behind = (r.get("plan") or {}).get("reading") or {}
+            el = r.get("elasticity") or {}
+            busy = behind.get("running") or behind.get("missing") or el.get("running")
+            state = {"state": "done", "result": r, "keep": 20 if busy else PS_KEEP}
+        except Exception as exc:                                       # noqa: BLE001
+            traceback.print_exc()
+            state = {"state": "failed", "error": f"The simulator could not be built: {str(exc)[:240]}"}
+        with _ps_lock:
+            _ps_jobs[jkey] = dict(state, started=job["started"], finished=time.time(), stage="done")
+    threading.Thread(target=run, daemon=True, name="pricesim").start()
+    return {"pending": True, "stage": "Starting", "done": 0, "total": 0, "elapsed": 0}
+
+
 def _latest(loc_ref):
     hit = _latest_cache.get(loc_ref)
     if hit and time.time() - hit[0] < 900:
@@ -2774,26 +2849,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             per = (pw["b0"], pw["b1"], pw["b0"], pw["b1"], pw["b0"], pw["b1"], False, f"base of {pw['label']}", "")
         key = (per[0].isoformat(), per[1].isoformat(), tuple(sorted(refs)) if refs is not None else None)
-        ds = menueng.request(per, _latest, client, key, refs, q.get("refresh") == "1")     # the same read as Menu engineering
-        if ds.get("pending") or ds.get("available") is False:
-            self._send(200, ds)
-            return
-        level = q.get("level") if q.get("level") in ("brand", "location", "locations", "all") else "all"
-        try:
-            infl = json.loads(q.get("infl") or "{}")
-            infl = {str(k)[:80]: float(v) for k, v in infl.items()} if isinstance(infl, dict) else {}
-        except (ValueError, TypeError):
-            infl = {}
-        try:
-            r = pricesim.build(ds, level, (q.get("key") or "")[:1200], q.get("section") or "family", infl=infl)
-            r["plan_options"] = plan.options()
-            if pw:
-                names = {x["ref"]: x["name"] for x in r.get("selection") or []}
-                r["plan"] = plan.build(q["plan"], list(names), names, w=pw)
-            self._send(200, r)
-        except Exception as exc:                                       # noqa: BLE001
-            traceback.print_exc()
-            self._send(200, {"error": f"The simulator could not be built: {str(exc)[:240]}"})
+        self._send(200, _pricesim_request(per, key, refs, q, pw))
 
     def _pricesim_post(self, path, body, user):
         if not auth.can(user, self.PRICESIM_SCREEN):

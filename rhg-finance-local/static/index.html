@@ -486,6 +486,7 @@ td.num,th.num{text-align:right}
 .pg-plan-ts{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:6px 0 10px}
 .pg-plan-ts .ex-t{background:var(--bg);border-color:var(--line)}.pg-plan-ts .ex-tl{color:var(--sub)}.pg-plan-ts .ex-t b{color:var(--ink)}.pg-plan-ts .ex-t small{color:var(--sub)}.pg-plan-ts .ex-u{color:var(--sub)}
 .pg-plan-gap{margin:0 0 10px;font-size:13px;line-height:1.5}
+#slTabs button[data-busy]::after{content:"⟳ " attr(data-busy);margin-left:6px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
 /* Budget & forecast → Build the budget */
 .bb-hero{margin-top:4px}.bb-ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
 .bb-ctl label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;color:#9fd6e8;text-transform:uppercase;letter-spacing:.03em}
@@ -5193,27 +5194,40 @@ function psQs(){
   return o.toString();
 }
 const psLocMs = msPick("psLocPick", "Choose locations", () => { if ($("psLevel").value === "locations" && psLocMs.vals().length) psLoad(); });
-async function psLoad(refresh){
+async function psLoad(refresh, quiet){
   clearTimeout(psTimer);
   const q = psQs(); psKey = q;
-  readBanner("psStatus", {src: "Simphony", reading: true});
-  $("pgHero").classList.add("pg-loading");
+  if (!quiet) { readBanner("psStatus", {src: "Simphony", reading: true}); $("pgHero").classList.add("pg-loading"); }
   try{
     const j = await readJSON(await fetch("/api/sales/pricesim?" + q + (refresh ? "&refresh=1" : "")));
     if (psKey !== q) return;
     if (j.error) throw new Error(j.error);
     if (j.pending) {
-      readBanner("psStatus", {src: "Simphony", reading: true, text: `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} The same read as Menu engineering; closed days are kept.`});
-      psTimer = setTimeout(() => psLoad(false), 4000); return;
+      const items = j.stage === "menu items" || j.stage === "Starting";
+      readBanner("psStatus", {src: "Simphony", reading: true, text: items
+        ? `Reading the menu items from Simphony, day by day and location by location${j.total ? `: ${fmt(j.done)} of ${fmt(j.total)} days` : "…"} The same read as Menu engineering; closed days are kept. It goes on if you open another page.`
+        : `Working out the prices, the elasticity${psPlan.code ? " and the plan" : ""}… It goes on if you open another page.`});
+      psBusy(items && j.total ? Math.round(j.done / j.total * 100) + "%" : "…");
+      psTimer = setTimeout(() => psLoad(false), 3000); return;
     }
+    psBusy("");
     if (j.available === false) throw new Error(j.error || "not available");
     psData = j; psP = Object.assign({}, j.params);
     psChSel = new Set([...psChSel].filter(c => j.channels.some(x => x.channel === c)));
-    psSug = {}; psManual = Object.fromEntries(Object.entries(psManual).filter(([k]) => psItemOf(k)));
+    psSug = Object.fromEntries(Object.entries(psSug).filter(([k]) => psItemOf(k))); psManual = Object.fromEntries(Object.entries(psManual).filter(([k]) => psItemOf(k)));
     $("pgHero").classList.remove("pg-loading");
     psFillKeys(); psParFill(); psComp(); psScnLoad(); psPlanOptions(); psPlanInputs(); psRebuild(); psRender();
     if (!$("pgProd").hidden) { const it = pdItem(); if (it) pdPick(it, pdCh); else { pdMi = null; pdPick(psData.items[0]); } }
-  }catch(e){ readBanner("psStatus", {src: "Simphony", error: e.message}); }
+    // still reading behind (the plan's checks by channel, the days around the price changes): ask again in a while,
+    // the moves on the page are kept
+    const pr = (j.plan || {}).reading || {}, er = j.elasticity || {};
+    if (pr.running || pr.missing || er.running) { psBusy("…"); psTimer = setTimeout(() => psLoad(false, true), 15000); }
+  }catch(e){ readBanner("psStatus", {src: "Simphony", error: e.message}); psBusy(""); }
+}
+// the Price simulator's tab says it is still reading, wherever the person is
+function psBusy(t){
+  const b = document.querySelector('#slTabs button[data-t="pricing"]'); if (!b) return;
+  if (t) b.setAttribute("data-busy", t); else b.removeAttribute("data-busy");
 }
 // Where: all RHG, a brand (its price group: OPA without OPA · TIA Airport), or the locations ticked in the box
 function psFillKeys(){
@@ -5241,7 +5255,7 @@ const psChan = ch => (psData.channels || []).find(c => c.channel === ch) || {com
 function psElStatus(d){
   const e = d.elasticity; if (!e || (psP && psP.el_measured === false)) return [];
   const a = `Elasticity measured from RHG's price changes: ${fmt(e.measured)} items, ${fmt(e.family)} from their family; the others by class`;
-  return [e.running ? `${a} · reading the days around the price changes from Simphony: ${fmt(e.done)} of ${fmt(e.total)} (Read again when done)` : e.missing_days ? `${a} · ${fmt(e.missing_days)} days still to read` : a];
+  return [e.running ? `${a} · reading the days around the price changes from Simphony: ${fmt(e.done)} of ${fmt(e.total)} (updates by itself)` : e.missing_days ? `${a} · ${fmt(e.missing_days)} days still to read` : a];
 }
 // the elasticity of an item on a channel: measured from RHG's own price changes (elastic.py: the item's, else its
 // family's) unless Parameters say the class defaults only; else the class's, × the delivery factor on delivery
@@ -5565,7 +5579,7 @@ function psPlanRender(){
   const b = p.base, rd = p.reading;
   $("pgPlanMeta").innerHTML = `${fcSp(`${p.from} → ${p.to}`)} · ${fcSp(`base: ${b.from} → ${b.to}, as Simphony sold it`)}`
     + (b.cut ? ` · ${fcSp(`completed to the whole period with the season of ${b.season[0].slice(0, 4)}`)}` : "")
-    + (rd && (rd.running || rd.missing) ? ` · <b>${fcSp(`reading the checks by channel from Simphony: ${fmt(rd.done)} of ${fmt(rd.total || rd.missing)} days (Read again when done)`)}</b>` : "");
+    + (rd && (rd.running || rd.missing) ? ` · <b>${fcSp(`reading the checks by channel from Simphony: ${fmt(rd.done)} of ${fmt(rd.total || rd.missing)} days (the plan updates by itself)`)}</b>` : "");
   const gA = psGap(A, TA.ac);
   const dot = (v, t, good) => t == null || v == null ? "na" : (good * (v - t) >= 0 ? "g" : Math.abs(v / t - 1) <= 0.02 ? "a" : "r");
   const T = (l, v, s, light) => `<div class="ex-t ex-${light || "na"}"><div class="ex-tl"><span>${fcSp(l)}</span><i></i></div><b>${v}</b><small>${s}</small></div>`;
@@ -7365,7 +7379,8 @@ function slShowTab(tab){
   if (tab === "menucost") mcLoad();
   $("slCpView").style.display = tab === "chanprofit" ? "" : "none";
   $("slPsView").style.display = tab === "pricing" ? "" : "none";
-  if (tab === "pricing" && (!psData || psKey !== psQs())) psLoad(); else if (tab !== "pricing") clearTimeout(psTimer);
+  // the read goes on when the tab is left (the server's job; the page keeps asking): only a new tab's own loads stop
+  if (tab === "pricing" && (!psData || psKey !== psQs())) psLoad();
   if (tab === "chanprofit" && (!cpData || cpKey !== cpQs())) cpLoad();
   $("slLocView").style.display = tab === "loc" ? "" : "none";
   $("slPrView").style.display = tab === "prices" ? "" : "none";

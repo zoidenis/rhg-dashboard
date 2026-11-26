@@ -294,8 +294,17 @@ def locations(max_age=6 * 3600):
     return out
 
 
-def latest_business_date(loc_ref):
+_latest_mem = {}
+
+
+def latest_business_date(loc_ref, max_age=600):
+    """The last business date of a location; kept ten minutes (the Price simulator's plan, the elasticity and the
+    budget ask it for every location, several times a read)."""
+    hit = _latest_mem.get(loc_ref)
+    if hit and time.time() - hit[0] < max_age:
+        return hit[1]
     j = call("getLatestBusDt", {"locRef": loc_ref}) or {}
+    _latest_mem[loc_ref] = (time.time(), j.get("latestBusDt"))
     return j.get("latestBusDt")
 
 

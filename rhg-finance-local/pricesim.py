@@ -402,6 +402,23 @@ def is_delivery(ch, cfg):
     return float(c.get("commission_pct") or 0) > 0 or bool(DELIVERY_HINT.search(ch))
 
 
+def _warm(refs, history):
+    """Read the prices, revenue centres, order types (and the price history) of the locations together, a few at a
+    time, so the steps after find them held instead of asking Simphony one location after another."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(ref):
+        for fn in (lambda: simphony.menu_item_prices(ref), lambda: simphony.rvc_dims(ref), lambda: simphony.order_type_dims(ref),
+                   (lambda: simphony.menu_item_prices(ref, history=True)) if history else None):
+            if fn:
+                try:
+                    fn()
+                except Exception:                                    # noqa: BLE001 - the step itself reports it
+                    pass
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(one, refs))
+
+
 def build(ds, level="all", key="", section="family", settings=None, infl=None):
     """The items of the selection with their price, items sold and net sales on every channel, the class, the cost,
     the competitors and the suggested price per channel."""
@@ -428,6 +445,7 @@ def build(ds, level="all", key="", section="family", settings=None, infl=None):
     reporting, rates = menueng._rates(settings)
     sel_refs = {x["ref"] for x in an["selection"]}
     locs = [L for L in ds["locations"] if L["ref"] in sel_refs]
+    _warm([L["ref"] for L in locs], P.get("el_measured", True))
     convert = an["converted"]
     cur = an["currency"]
     step = P["round_eur"] if cur == "EUR" else P["round_all"]

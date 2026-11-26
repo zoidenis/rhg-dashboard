@@ -150,10 +150,17 @@ def measure(refs, items, family=None, read=True, today=None):
     locations: measured where the days are held, the missing days read behind."""
     family = family or {}
     found, missing, errors = {}, [], []
-    for ref in refs:
+    want = set(items)
+
+    def ev(ref):
         try:
-            evs = events(ref, set(items), today)
+            return ref, events(ref, want, today), None
         except Exception as exc:                                     # noqa: BLE001
+            return ref, None, exc
+    with ThreadPoolExecutor(max_workers=6) as pool:                  # the locations' price histories together
+        got = list(pool.map(ev, refs))
+    for ref, evs, exc in got:
+        if exc is not None:
             errors.append(f"{ref}: price history: {str(exc)[:120]}")
             continue
         by_date = {}
