@@ -479,6 +479,7 @@ td.num,th.num{text-align:right}
 .ps-lg-p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--sub)}
 .ps-lg-ex{margin:10px 0;padding:10px 12px;border-radius:10px;background:var(--bg);font-size:12.5px;line-height:1.6}
 .ps-lg-btn{border:1px solid var(--line);background:var(--card);border-radius:999px;font:inherit;font-size:11px;font-weight:700;padding:1px 9px;cursor:pointer;color:var(--accent)}
+.pg-plan-pick{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--sub)}.pg-plan-pick select{min-width:200px;font-weight:600}
 .pg-plan{margin:0 0 14px}.pg-plan-h{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.pg-plan-h h3{margin:0}
 .pg-plan-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
 .pg-plan-in label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--sub)}.pg-plan-in input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink);min-width:0}
@@ -1924,17 +1925,18 @@ table.bn-plan td{padding:3px 4px}
               <button type="button" class="dimf-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-text">Choose locations</span><span class="dimf-caret" aria-hidden="true">▾</span></button>
               <div class="dimf-list" hidden></div>
               <select id="psLocs" multiple hidden></select></div>
-            <select id="psSec" aria-label="Categories"><option value="family">Categories: family groups</option><option value="major">Categories: major groups</option></select>
-            <select id="psPlanSel" aria-label="Plan for"><option value="">The period above (no plan)</option></select></div></div></div>
+            <select id="psSec" aria-label="Categories"><option value="family">Categories: family groups</option><option value="major">Categories: major groups</option></select></div></div></div>
         <div class="pg-step"><span class="pg-n">2</span><div class="pg-sb"><b>On which channel</b><div class="pg-pills" id="pgCh"></div></div></div>
         <div class="pg-step"><span class="pg-n">3</span><div class="pg-sb"><b>What to change</b>
           <div class="pg-row"><input id="pgFind" list="pgItems" placeholder="Find an item…" autocomplete="off"><datalist id="pgItems"></datalist><span class="meta">or move a category below</span></div></div></div>
       </section>
       <p class="meta" id="psStatus" style="margin:0 0 12px"></p>
-      <section class="pg-card pg-plan" id="pgPlan" hidden>
-        <div class="pg-plan-h"><div><h3 id="pgPlanT">Plan</h3><p class="meta" id="pgPlanMeta"></p></div>
-          <div class="pg-tools"><button class="mini dark" type="button" id="pgPlanTg">Targets</button><button class="mini" type="button" id="pgPlanReachAll">Reach every target</button>
-            <button class="mini" type="button" id="pgPlanCmp">Plans side by side</button><button class="mini" type="button" id="pgPlanActBtn" hidden>Actual vs plan</button></div></div>
+      <section class="pg-card pg-plan" id="pgPlan">
+        <div class="pg-plan-h"><div><h3 id="pgPlanT">Plan for a future period</h3><p class="meta" id="pgPlanMeta"></p></div>
+          <label class="pg-plan-pick">Plan for<select id="psPlanSel" aria-label="Plan for"><option value="">No plan: the period above</option></select></label></div>
+        <div id="pgPlanBody" hidden>
+        <div class="pg-tools" style="margin-top:10px"><button class="mini dark" type="button" id="pgPlanTg">Targets</button><button class="mini" type="button" id="pgPlanReachAll">Reach every target</button>
+            <button class="mini" type="button" id="pgPlanCmp">Plans side by side</button><button class="mini" type="button" id="pgPlanActBtn" hidden>Actual vs plan</button></div>
         <div class="pg-plan-in">
           <label>Volume growth (% checks)<input id="pgPlanGrowth" type="number" step="0.5" value="0"></label>
           <label>New prices from<input id="pgPlanFrom" type="date"></label>
@@ -1946,6 +1948,7 @@ table.bn-plan td{padding:3px 4px}
         <div class="scroll"><table id="pgPlanCh" data-nosort></table></div>
         <p class="meta" id="pgPlanMsg"></p>
         <details class="pz-fold"><summary>By restaurant (click one for its targets)</summary><div class="scroll"><table id="pgPlanLoc" data-nosort></table></div></details>
+        </div>
       </section>
       <div class="pg-mode" role="tablist" aria-label="View"><button type="button" class="on" data-pgmode="cats" role="tab" aria-selected="true">Categories &amp; items</button><button type="button" data-pgmode="prod" role="tab" aria-selected="false">One product</button></div>
       <section class="pd" id="pgProd" hidden>
@@ -5470,9 +5473,12 @@ function psGap(m, ac){
   return {d, price: d * 100, upsell: ipc == null ? null : ipc * d, ipc, aip: m.units ? m.inet / m.units : null};
 }
 function psPlanRender(){
-  const box = $("pgPlan");
-  if (!psPlanOn()) { box.hidden = true; return; }
-  box.hidden = false;
+  if (!psPlanOn()) {
+    $("pgPlanBody").hidden = true; $("pgPlanT").textContent = "Plan for a future period";
+    $("pgPlanMeta").textContent = psPlan.code ? "Reading the base of the plan…" : "Choose 2027, a half or a quarter on the right: the plan starts from the same period last year, and the panel opens with the volume growth, the date the new prices start, cost inflation and the targets of average check and checks.";
+    return;
+  }
+  $("pgPlanBody").hidden = false;
   const p = psData.plan, calc = psPlanCalc(), C = psData.currency, A = calc.all, TA = psTarget("*", calc);
   $("pgPlanT").textContent = `Plan · ${p.label}`;
   const b = p.base, rd = p.reading;
@@ -5525,6 +5531,7 @@ function psPlanInputs(){
 }));
 $("pgPlanInfl").addEventListener("change", () => { psPlan.infl = Object.assign({}, psPlan.infl, {"*": +$("pgPlanInfl").value || 0}); psLoad(); });
 $("psPlanSel").onchange = () => { psPlan.code = $("psPlanSel").value; psLoad(); };
+psPlanOptions();
 // cost inflation by category
 $("pgPlanInflCat").onclick = () => {
   const secs = [...new Set(psData.items.map(i => i.section))].sort(), f = psPlan.infl || {};
@@ -5618,9 +5625,11 @@ $("pgPlanActBtn").onclick = () => {
     body: Pulse.list([["Month"], ["Sales, plan", 1], ["Sales, actual", 1], ["vs plan", 1], ["Checks, plan", 1], ["Checks, actual", 1], ["vs plan", 1], ["Avg check, plan", 1], ["Avg check, actual", 1], ["Target", 1]], rows, {none: "The plan period has not started."})});
 };
 function psPlanOptions(){
-  const sel = $("psPlanSel"), keep = psPlan.code || sel.value;
-  sel.innerHTML = `<option value="">The period above (no plan)</option>` + (psData.plan_options || []).map(o => `<option value="${esc(o.code)}">${esc(o.label)}</option>`).join("");
-  sel.value = (psData.plan_options || []).some(o => o.code === keep) ? keep : "";
+  const sel = $("psPlanSel"), keep = psPlan.code || sel.value, y = new Date().getFullYear();
+  const opts = (psData && psData.plan_options || []).length ? psData.plan_options
+    : [y + 1, y + 2].flatMap(Y => [{code: String(Y), label: `Whole ${Y}`}].concat(["H1", "H2", "Q1", "Q2", "Q3", "Q4"].map(p => ({code: `${Y}-${p}`, label: `${p} ${Y}`}))));
+  sel.innerHTML = `<option value="">No plan: the period above</option>` + opts.map(o => `<option value="${esc(o.code)}">${esc(o.label)}</option>`).join("");
+  sel.value = opts.some(o => o.code === keep) ? keep : "";
 }
 // How the big number is worked out (Geri, 25 Nov 2026: to check the calculation): every price changed, step by step
 function psExplain(){
